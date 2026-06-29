@@ -42,9 +42,7 @@ import SpreadSheet from "@/components/UI/SpreadSheet";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
-import CargosTab from "@/components/cargos/CargosTab";
-import CargoTypesTab from "@/components/cargos/CargoTypesTab";
-import PackingListTab from "./PackingListTab";
+
 import {
   getAllCustomers,
   CustomerData as APICustomerData,
@@ -77,6 +75,7 @@ import BillToShipToForm, {
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
+import { getAllOffers } from "@/api/offers";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
@@ -154,14 +153,12 @@ interface FilterOptions {
 }
 
 const invoiceTabs = [
-  { id: "orders", label: "Orders" },
-  { id: "order_items", label: "Order Items" },
-  { id: "open_invoices", label: "Open Invoices" },
-  { id: "closed_invoices", label: "Closed Invoices" },
-  { id: "billto_shipto", label: "Bill To / Ship To" },
-  { id: "cargos", label: "Cargos" },
-  { id: "cargo_type", label: "Cargo Type" },
-  { id: "packing_list", label: "Packing List" },
+  { id: "angebot", label: "Angebot" },
+  { id: "auftrag", label: "Auftrag" },
+  { id: "bestellung", label: "Bestellung" },
+  { id: "rechnung", label: "Rechnung" },
+  { id: "rk", label: "RK" },
+  { id: "lieferschein", label: "Lieferschein" },
 ] as const;
 
 type Item = {
@@ -193,15 +190,14 @@ const InvoiceListPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useSelector((state: RootState) => state.user);
-  const cargosTabRef = useRef<any>(null);
-  const cargoTypesTabRef = useRef<any>(null);
+
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<APICustomerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeInvTab, setActiveInvTab] = useState<InvoiceTab>(
-    () => (searchParams.get("tab") as InvoiceTab) || "orders",
+    () => (searchParams.get("tab") as InvoiceTab) || "angebot",
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -307,6 +303,8 @@ const InvoiceListPage: React.FC = () => {
   const [qtyRemarks, setQtyRemarks] = useState("");
 
   const [orders, setOrders] = useState<any[]>([]);
+  const [offers, setOffers] = useState<any[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -338,7 +336,7 @@ const InvoiceListPage: React.FC = () => {
     ref_no: "",
   });
 
-  const isTab1 = activeInvTab !== "order_items";
+  const isTab1 = activeInvTab !== "auftrag";
   const isTab2 = false;
   const isConvertMode = mode === "convert";
 
@@ -626,7 +624,7 @@ const InvoiceListPage: React.FC = () => {
       type === "taric" ? currentState.taric : currentState.items;
 
     let newState: any;
-    if (activeInvTab === "closed_invoices") {
+    if (activeInvTab === "rk") {
       const bothActive = currentState.taric && currentState.items;
       newState = { ...currentState, taric: !bothActive, items: !bothActive };
       isCurrentlyOpen = bothActive;
@@ -673,7 +671,7 @@ const InvoiceListPage: React.FC = () => {
     try {
       const cargoIdNum = Number(targetCargoId);
 
-      if (activeInvTab === "orders") {
+      if (activeInvTab === "bestellung" || activeInvTab === "auftrag") {
         await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)], false);
         toast.success(`Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`);
         setShowREModal(false);
@@ -1047,6 +1045,20 @@ const InvoiceListPage: React.FC = () => {
     }
   }, []);
 
+  const fetchOffers = useCallback(async () => {
+    setLoadingOffers(true);
+    try {
+      const response = await getAllOffers();
+      if (response?.success) setOffers(response.data);
+      else if (response?.data) setOffers(response.data);
+    } catch (error) {
+      console.error("Error fetching Offers:", error);
+      toast.error("Failed to fetch offers");
+    } finally {
+      setLoadingOffers(false);
+    }
+  }, []);
+
   const itemById = useMemo(() => {
     const map = new Map<string, any>();
     for (const it of itemsAll) map.set(String(it.id), it);
@@ -1145,7 +1157,7 @@ const InvoiceListPage: React.FC = () => {
 
   const handleGoToItems = (orderNo: string) => {
     setOrderNoFilter(orderNo);
-    setActiveInvTab("order_items");
+    setActiveInvTab("auftrag");
   };
 
   const handleViewOrder = (order: any) => {
@@ -1197,11 +1209,16 @@ const InvoiceListPage: React.FC = () => {
 
   useEffect(() => {
     loadInvoices();
-    if (activeInvTab === "billto_shipto") {
+    if (activeInvTab === "lieferschein") {
       fetchCustomers();
     }
-    if (activeInvTab === "orders" || activeInvTab === "order_items") {
+    if (
+      activeInvTab === "angebot" ||
+      activeInvTab === "auftrag" ||
+      activeInvTab === "bestellung"
+    ) {
       fetchOrders();
+      fetchOffers();
       fetchCustomers();
       fetchCategories();
       fetchSuppliers();
@@ -1215,15 +1232,22 @@ const InvoiceListPage: React.FC = () => {
     if (orderNoFilter) params.set("order_no", orderNoFilter);
     else params.delete("order_no");
     const qs = params.toString();
-    router.replace(qs ? `/invoices?${qs}` : "/invoices", { scroll: false });
+    router.replace(qs ? `/commercial?${qs}` : "/commercial", { scroll: false });
   }, [activeInvTab, orderNoFilter, router, searchParams]);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      const validTabs = ["orders", "order_items", "open_invoices", "closed_invoices", "billto_shipto", "cargos", "cargo_type", "packing_list"];
-      if (validTabs.includes(tabParam)) {
-        setActiveInvTab(tabParam as InvoiceTab);
+      let mappedTab = tabParam;
+      if (tabParam === "orders") mappedTab = "bestellung";
+      if (tabParam === "order_items") mappedTab = "auftrag";
+      if (tabParam === "open_invoices") mappedTab = "rechnung";
+      if (tabParam === "closed_invoices") mappedTab = "rk";
+      if (tabParam === "billto_shipto") mappedTab = "lieferschein";
+
+      const validTabs = ["angebot", "auftrag", "bestellung", "rechnung", "rk", "lieferschein"];
+      if (validTabs.includes(mappedTab)) {
+        setActiveInvTab(mappedTab as InvoiceTab);
       }
     }
     const orderNo = searchParams.get("order_no");
@@ -1248,19 +1272,19 @@ const InvoiceListPage: React.FC = () => {
     } catch (error) {
       console.error("Failed to fetch customers:", error);
     } finally {
-      if (activeInvTab === "billto_shipto") setLoading(false);
+      if (activeInvTab === "lieferschein") setLoading(false);
     }
   };
 
   useEffect(() => {
     let filtered = invoices || [];
 
-    if (activeInvTab === "open_invoices") {
+    if (activeInvTab === "rechnung") {
       filtered = filtered.filter(
         (invoice) =>
           invoice.status !== "paid" && invoice.status !== "cancelled",
       );
-    } else if (activeInvTab === "closed_invoices") {
+    } else if (activeInvTab === "rk") {
       filtered = filtered.filter(
         (invoice) =>
           invoice.status === "paid" || invoice.status === "cancelled",
@@ -1502,10 +1526,295 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  const filteredItems = useMemo(() => {
+    let list: any[] = [];
+    if (activeInvTab === "angebot") {
+      list = offers || [];
+    } else if (activeInvTab === "auftrag") {
+      list = orders.filter((o: any) => String(o.order_no).startsWith("MA"));
+    } else if (activeInvTab === "bestellung") {
+      list = orders.filter((o: any) => !String(o.order_no).startsWith("MA"));
+    } else if (activeInvTab === "rechnung") {
+      list = invoices.filter(
+        (inv: any) => inv.status !== "paid" && inv.status !== "cancelled"
+      );
+    } else if (activeInvTab === "rk") {
+      list = invoices.filter(
+        (inv: any) => inv.status === "paid" || inv.status === "cancelled"
+      );
+    } else {
+      list = [];
+    }
+
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      list = list.filter((item: any) => {
+        if (activeInvTab === "angebot") {
+          return (
+            String(item.offerNumber).toLowerCase().includes(s) ||
+            String(item.customerSnapshot?.companyName || "").toLowerCase().includes(s)
+          );
+        } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+          return (
+            String(item.order_no).toLowerCase().includes(s) ||
+            String(item.customer_name || "").toLowerCase().includes(s) ||
+            (item.comment || "").toLowerCase().includes(s)
+          );
+        } else {
+          return (
+            String(item.invoiceNumber || item.id).toLowerCase().includes(s) ||
+            String(item.bill_to || "").toLowerCase().includes(s) ||
+            String(item.ship_to || "").toLowerCase().includes(s)
+          );
+        }
+      });
+    }
+    return list;
+  }, [activeInvTab, offers, orders, invoices, searchTerm]);
+
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentInvoices = filteredInvoices.slice(startIndex, endIndex);
+  const currentItems = filteredItems.slice(startIndex, endIndex);
+  const currentInvoices = currentItems;
+
+  const commercialColumns: ColumnDef<any>[] = useMemo(() => {
+    return [
+      {
+        header: "date_created",
+        width: "120px",
+        align: "center",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            return row.createdAt
+              ? new Intl.DateTimeFormat("de-DE", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              }).format(new Date(row.createdAt))
+              : "-";
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            const dateStr = row.date_created || row.created_at;
+            return dateStr
+              ? new Intl.DateTimeFormat("de-DE", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              }).format(new Date(dateStr))
+              : "-";
+          } else {
+            return row.invoiceDate
+              ? new Intl.DateTimeFormat("de-DE", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              }).format(new Date(row.invoiceDate))
+              : "-";
+          }
+        },
+      },
+      {
+        header: "No",
+        width: "130px",
+        align: "center",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/offers?edit=${row.id}`);
+                }}
+                className="text-green-600 hover:underline font-semibold"
+              >
+                {row.offerNumber || "N/A"}
+              </button>
+            );
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGoToItems(String(row.order_no));
+                }}
+                className="text-green-600 hover:underline font-semibold"
+              >
+                {row.order_no || "N/A"}
+              </button>
+            );
+          } else {
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenInvoiceDetails(row);
+                }}
+                className="text-green-600 hover:underline font-semibold"
+              >
+                {row.invoiceNumber || row.id.slice(-5).toUpperCase()}
+              </button>
+            );
+          }
+        },
+      },
+      {
+        header: "Company",
+        width: "180px",
+        align: "left",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            return row.customerSnapshot?.companyName || "N/A";
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            return row.customer_name || row.customer?.companyName || "N/A";
+          } else {
+            return row.bill_to || row.customer?.companyName || "N/A";
+          }
+        },
+      },
+      {
+        header: "Person",
+        width: "150px",
+        align: "left",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            return row.customerSnapshot?.contactEmail || row.customerSnapshot?.contactPhoneNumber || "-";
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            return row.customer?.contactEmail || "-";
+          } else {
+            return row.ship_to || "-";
+          }
+        },
+      },
+      {
+        header: "Shipping_postal_code",
+        width: "100px",
+        align: "center",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            return row.deliveryAddress?.postalCode || row.customerSnapshot?.postalCode || "-";
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            return row.customer?.postalCode || row.cargo?.customer?.postalCode || "-";
+          } else {
+            return row.customer?.postalCode || "-";
+          }
+        },
+      },
+      {
+        header: "City, county",
+        width: "180px",
+        align: "left",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            const city = row.deliveryAddress?.city || row.customerSnapshot?.city || "";
+            const country = row.deliveryAddress?.country || row.customerSnapshot?.country || "";
+            return [city, country].filter(Boolean).join(", ") || "-";
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            const city = row.customer?.city || row.cargo?.customer?.city || "";
+            const country = row.customer?.country || row.cargo?.customer?.country || "";
+            return [city, country].filter(Boolean).join(", ") || "-";
+          } else {
+            const city = row.customer?.city || "";
+            const country = row.customer?.country || "";
+            return [city, country].filter(Boolean).join(", ") || "-";
+          }
+        },
+      },
+      {
+        header: "Value_net",
+        width: "100px",
+        align: "right",
+        render: (row) => {
+          let val = 0;
+          if (activeInvTab === "angebot") {
+            val = Number(row.subtotal || row.totalAmount || 0);
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            val = (row.items || []).reduce(
+              (sum: number, it: any) => sum + Number(it.price || 0) * Number(it.qty || 0),
+              0,
+            );
+          } else {
+            val = Number(row.netTotal || row.grossTotal || 0);
+          }
+          return `€${val.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        },
+      },
+      {
+        header: "Item_Count",
+        width: "90px",
+        align: "center",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            return row.lineItems?.length || 0;
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            return row.items?.length || 0;
+          } else {
+            return row.customItemCount ?? row.items?.length ?? 0;
+          }
+        },
+      },
+      {
+        header: "Actions",
+        width: "150px",
+        align: "center",
+        render: (row) => {
+          if (activeInvTab === "angebot") {
+            return (
+              <div className="flex items-center justify-center gap-1.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/offers?edit=${row.id}`);
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+                >
+                  Edit
+                </button>
+              </div>
+            );
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+            const hasCargo = !!row.cargo_id;
+            return (
+              <div className="flex items-center justify-center gap-1.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenReassignModal(row);
+                  }}
+                  title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
+                  className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+                >
+                  <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditOrder(row);
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+                >
+                  Edit
+                </button>
+              </div>
+            );
+          } else {
+            return (
+              <div className="flex items-center justify-center gap-1.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenInvoiceDetails(row);
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+                >
+                  View
+                </button>
+              </div>
+            );
+          }
+        },
+      },
+    ];
+  }, [activeInvTab, router]);
 
   const totalAmount = filteredInvoices.reduce(
     (sum, inv) => sum + (Number(inv.grossTotal) || 0),
@@ -1557,35 +1866,19 @@ const InvoiceListPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-3">
           <div>
             <PageHeader
-              title={
-                activeInvTab === "orders"
-                  ? "Orders"
-                  : activeInvTab === "order_items"
-                    ? "Order Items"
-                    : activeInvTab === "cargos"
-                      ? "Cargos"
-                      : activeInvTab === "cargo_type"
-                        ? "Cargo Types"
-                        : "Delivery"
-              }
-              icon={
-                activeInvTab === "orders" || activeInvTab === "order_items"
-                  ? ShoppingCart
-                  : activeInvTab === "cargos" || activeInvTab === "cargo_type"
-                    ? Truck
-                    : FileText
-              }
+              title="Commercial"
+              icon={DollarSign}
             />
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
-            {(activeInvTab === "orders" || activeInvTab === "order_items") && (
+            {(activeInvTab === "angebot" || activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
               <div className="relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                   <Search className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   type="text"
-                  placeholder="Search Order No / Details..."
+                  placeholder="Search..."
                   value={orderNoFilter}
                   onChange={(e) => setOrderNoFilter(e.target.value)}
                   className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent w-64 shadow-sm text-black"
@@ -1600,75 +1893,44 @@ const InvoiceListPage: React.FC = () => {
                 )}
               </div>
             )}
-            {activeInvTab === "cargos" ? (
-              <>
-                <button
-                  onClick={() => cargosTabRef.current?.fetchCargos?.()}
-                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-semibold shadow-sm transition-all"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-                <button
-                  onClick={() => cargosTabRef.current?.handleOpenCreate?.()}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
-                >
-                  <Plus className="h-4 w-4" />
-                  New Cargo
-                </button>
-              </>
-            ) : activeInvTab === "cargo_type" ? (
-              <>
-                <button
-                  onClick={() => cargoTypesTabRef.current?.fetchCargoTypes?.()}
-                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-semibold shadow-sm transition-all"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-                <button
-                  onClick={() => cargoTypesTabRef.current?.handleOpenCreate?.()}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
-                >
-                  <Plus className="h-4 w-4" />
-                  New Cargo Type
-                </button>
-              </>
-            ) : (
-              <>
+            <>
+              <button
+                onClick={() => {
+                  if (
+                    activeInvTab === "angebot" ||
+                    activeInvTab === "auftrag" ||
+                    activeInvTab === "bestellung"
+                  ) {
+                    fetchOrders();
+                    fetchOffers();
+                  } else {
+                    setLoading(true);
+                    loadInvoices();
+                    if (activeInvTab === "lieferschein") fetchCustomers();
+                  }
+                }}
+                disabled={loading || loadingOrders || loadingOffers}
+                className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 font-semibold shadow-sm transition-all"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${loading || loadingOrders || loadingOffers ? "animate-spin" : ""}`}
+                />
+                {loading || loadingOrders || loadingOffers ? "Loading..." : "Refresh"}
+              </button>
+              {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
                 <button
                   onClick={() => {
-                    if (activeInvTab === "orders" || activeInvTab === "order_items") {
-                      fetchOrders();
-                    } else {
-                      setLoading(true);
-                      loadInvoices();
-                      if (activeInvTab === "billto_shipto") fetchCustomers();
-                    }
+                    resetForm();
+                    setMode("create");
+                    setShowModal(true);
                   }}
-                  disabled={loading || loadingOrders}
-                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 font-semibold shadow-sm transition-all"
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
                 >
-                  <RefreshCw
-                    className={`w-4 h-4 ${loading || loadingOrders ? "animate-spin" : ""}`}
-                  />
-                  {loading || loadingOrders ? "Loading..." : "Refresh"}
+                  <Plus className="w-4 h-4" />
+                  New Order
                 </button>
-                {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-                  <button
-                    onClick={() => {
-                      resetForm();
-                      setMode("create");
-                      setShowModal(true);
-                    }}
-                    className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
-                  >
-                    <Plus className="w-4 h-4" />
-                    New Order
-                  </button>
-                )}
-              </>
-            )}
+              )}
+            </>
           </div>
         </div>
 
@@ -1690,506 +1952,252 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
-        {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-          <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm mb-6">
-            {activeInvTab === "order_items" && orderNoFilter && (
-              <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-100 mb-4 rounded-[4px]">
-                <span className="text-xs text-blue-700 font-medium">
-                  🔍 Showing items for order:&nbsp;
-                  <span className="font-bold bg-blue-100 px-1.5 py-0.5 rounded text-blue-800">
-                    {orderNoFilter}
-                  </span>
-                </span>
-                <button
-                  onClick={() => setOrderNoFilter("")}
-                  className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold ml-1"
-                >
-                  Clear filter (show all)
-                </button>
-              </div>
-            )}
-            <OrdersTable
-              orders={activeInvTab === "orders" ? filteredOrders : orderItemsFlat}
-              loading={loadingOrders}
-              getCategoryName={getCategoryName}
-              getSupplierName={getSupplierName}
-              getOrderStatusColor={getOrderStatusColor}
-              onView={handleViewOrder}
-              onEdit={handleEditOrder}
-              onDelete={handleDeleteOrder}
-              canDelete={user?.role === "ADMIN"}
-              showConvert={false}
-              onConvert={undefined}
-              onReassign={handleOpenReassignModal}
-              onGoToItems={handleGoToItems}
-              activeTab={activeInvTab}
-              itemById={itemById}
-              suppliers={suppliers}
-              onAssignSupplier={handleAssignSupplier}
-              onSplit={handleOpenSplitModal}
-              router={router}
-            />
-          </div>
-        )}
-
-        {(activeInvTab === "open_invoices" ||
-          activeInvTab === "closed_invoices") && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#E8F5E8" }}
-                    >
-                      <FileText
-                        className="w-5 h-5"
-                        style={{ color: "#059669" }}
-                      />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Total Invoices
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        {filteredInvoices.length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#E8F5E8" }}
-                    >
-                      <DollarSign
-                        className="w-5 h-5"
-                        style={{ color: "#2E7D32" }}
-                      />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Total Amount
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        $
-                        {Number(totalAmount).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#E8F4D6" }}
-                    >
-                      <CheckCircle
-                        className="w-5 h-5"
-                        style={{ color: "#8CC21B" }}
-                      />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Paid Amount
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        ${Number(totalPaid).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#FFF3E0" }}
-                    >
-                      <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Outstanding
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        ${Number(outstandingAmount).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
-                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
-                  <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                    <Filter className="w-5 h-5 text-[#8CC21B]" />
-                  </div>
-                  <div className="flex-1 min-w-[200px]">
-                    <input
-                      type="text"
-                      placeholder="Search invoices, customers, or order numbers..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className={getInputClass(!!searchTerm)}
+        {false && (activeInvTab === "rechnung" || activeInvTab === "rk") && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+              <div
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#E8F5E8" }}
+                  >
+                    <FileText
+                      className="w-5 h-5"
+                      style={{ color: "#059669" }}
                     />
                   </div>
-                  {searchTerm && (
-                    <button
-                      onClick={() => {
-                        setSearchTerm("");
-                        setFilters({
-                          status: "",
-                          dateFrom: "",
-                          dateTo: "",
-                          customer: "",
-                          minAmount: "",
-                          maxAmount: "",
-                        });
-                      }}
-                      className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
                     >
-                      <RefreshCw className="w-4 h-4" />
-                      Reset
-                    </button>
-                  )}
+                      Total Invoices
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
+                    >
+                      {filteredInvoices.length}
+                    </p>
+                  </div>
                 </div>
               </div>
 
               <div
-                className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
                 style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
               >
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                      <p className="text-xs text-[#6C757D]">
-                        Loading invoices...
-                      </p>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#E8F5E8" }}
+                  >
+                    <DollarSign
+                      className="w-5 h-5"
+                      style={{ color: "#2E7D32" }}
+                    />
                   </div>
-                ) : filteredInvoices.length === 0 ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
-                      <h3 className="text-lg font-medium mb-1 text-[#212529]">
-                        No invoices found
-                      </h3>
-                      <p className="text-xs text-[#6C757D]">
-                        Try adjusting your search or filters
-                      </p>
-                    </div>
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
+                    >
+                      Total Amount
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
+                    >
+                      $
+                      {Number(totalAmount).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
                   </div>
-                ) : (
-                  <>
-                    <div className="hidden lg:block overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
-                          <tr>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                #
-                              </th>
-                            )}
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              <div className="flex items-center gap-1.5">ID</div>
-                            </th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Invoice No
-                              </th>
-                            )}
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Bill To
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Ship To
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Cargo No.
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Date created"
-                                : "Closed Date"}
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Count Item"
-                                : "Item Count"}
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "QTY"
-                                : "Total Qty"}
-                            </th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Total Price
-                              </th>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#F1F3F5]">
-                          {currentInvoices.map((invoice, index) => {
-                            return (
-                              <React.Fragment key={invoice.id}>
-                                <tr
-                                  onClick={() => handleOpenInvoiceDetails(invoice)}
-                                  className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium"
-                                >
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-[#212529]">
-                                      {startIndex + index + 1}
-                                    </td>
-                                  )}
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-bold">
-                                    {invoice.id.slice(-5).toUpperCase()}
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                                      {invoice.invoiceNumber || "N/A"}
-                                    </td>
-                                  )}
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {(() => {
-                                      const v = invoice.bill_to;
-                                      if (!v || typeof v === "object")
-                                        return "N/A";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "N/A";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {(() => {
-                                      const v = invoice.ship_to;
-                                      if (!v || typeof v === "object") return "-";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "-";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.cargo?.cargo_no || "No Cargo"}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {new Date(
-                                      invoice.invoiceDate,
-                                    ).toLocaleDateString("de-DE", {
-                                      day: "2-digit",
-                                      month: "2-digit",
-                                    })}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.customItemCount ??
-                                      invoice.items?.length ??
-                                      0}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                    {invoice.customTotalQty ??
-                                      invoice.items?.reduce(
-                                        (sum: any, item: any) =>
-                                          sum + item.quantity,
-                                        0,
-                                      ) ??
-                                      0}
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                      {Number(invoice.grossTotal).toLocaleString(
-                                        undefined,
-                                        {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        },
-                                      )}
-                                    </td>
-                                  )}
-                                </tr>
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                </div>
+              </div>
 
-                    <div className="lg:hidden divide-y divide-[#F1F3F5]">
-                      {currentInvoices.map((invoice) => (
-                        <div
-                          key={invoice.id}
-                          onClick={() => handleOpenInvoiceDetails(invoice)}
-                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
-                                {invoice.id.slice(-5).toUpperCase()}
-                              </div>
-                              <div className="font-bold text-sm text-[#212529]">
-                                {activeInvTab === "closed_invoices"
-                                  ? invoice.invoiceNumber
-                                  : `ID: ${invoice.id.slice(-5)}`}
-                              </div>
-                            </div>
-                            <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
-                              style={getStatusColor(invoice.status)}
-                            >
-                              {invoice.status}
-                            </span>
-                          </div>
+              <div
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#E8F4D6" }}
+                  >
+                    <CheckCircle
+                      className="w-5 h-5"
+                      style={{ color: "#8CC21B" }}
+                    />
+                  </div>
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
+                    >
+                      Paid Amount
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
+                    >
+                      ${Number(totalPaid).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Customer</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customer?.companyName}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">
-                                {activeInvTab === "open_invoices"
-                                  ? "Cargo"
-                                  : "Cargo No."}
-                              </span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.cargo?.cargo_no || "-"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Items / Qty</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customItemCount ?? invoice.items?.length ?? 0} /{" "}
-                                {invoice.customTotalQty ?? (invoice.items?.reduce(
-                                  (sum, item) => sum + item.quantity,
-                                  0,
-                                ) ?? 0)}
-                              </span>
-                            </div>
-                            {activeInvTab === "closed_invoices" && (
-                              <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
-                                <span className="text-[#6C757D]">
-                                  Total Price
-                                </span>
-                                <span className="text-[#212529]">
-                                  ${Number(invoice.grossTotal).toFixed(2)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              <div
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#FFF3E0" }}
+                  >
+                    <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
+                  </div>
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
+                    >
+                      Outstanding
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
+                    >
+                      ${Number(outstandingAmount).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
-                        <div className="text-[11px] font-medium text-[#6C757D]">
-                          Showing {startIndex + 1} to{" "}
-                          {Math.min(endIndex, filteredInvoices.length)} of{" "}
-                          {filteredInvoices.length} invoices
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() =>
-                              setCurrentPage(Math.max(1, currentPage - 1))
-                            }
-                            disabled={currentPage === 1}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
-                          {[...Array(totalPages)].map((_, i) => (
-                            <button
-                              key={i + 1}
-                              onClick={() => setCurrentPage(i + 1)}
-                              className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                                }`}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() =>
-                              setCurrentPage(
-                                Math.min(totalPages, currentPage + 1),
-                              )
-                            }
-                            disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
+            <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+                <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                  <Filter className="w-5 h-5 text-[#8CC21B]" />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <input
+                    type="text"
+                    placeholder="Search invoices, customers, or order numbers..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={getInputClass(!!searchTerm)}
+                  />
+                </div>
+                {searchTerm && (
+                  <button
+                    onClick={() => {
+                      setSearchTerm("");
+                      setFilters({
+                        status: "",
+                        dateFrom: "",
+                        dateTo: "",
+                        customer: "",
+                        minAmount: "",
+                        maxAmount: "",
+                      });
+                    }}
+                    className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Reset
+                  </button>
                 )}
               </div>
-            </>
+            </div>
+          </>
+        )}
+
+        {(activeInvTab === "angebot" ||
+          activeInvTab === "auftrag" ||
+          activeInvTab === "bestellung") && (
+            <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm mb-6">
+              <DataTable
+                data={currentItems}
+                columns={commercialColumns}
+                loading={
+                  activeInvTab === "angebot"
+                    ? loadingOffers
+                    : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                      ? loadingOrders
+                      : loading
+                }
+                emptyMessage={`No ${activeInvTab === "angebot"
+                  ? "Offers"
+                  : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                    ? "Orders"
+                    : "Invoices"
+                  } Found`}
+                getRowClassName={(row) => {
+                  if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+                    const isExpress = (row.comment || "").toLowerCase().includes("express");
+                    return isExpress ? "bg-red-50" : "";
+                  }
+                  return "";
+                }}
+                onRowClick={(row) => {
+                  if (activeInvTab === "angebot") {
+                    router.push(`/offers?edit=${row.id}`);
+                  } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+                    handleViewOrder(row);
+                  } else {
+                    handleOpenInvoiceDetails(row);
+                  }
+                }}
+              />
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA] rounded-b-[4px] mt-4">
+                  <div className="text-[11px] font-medium text-[#6C757D]">
+                    Showing {startIndex + 1} to{" "}
+                    {Math.min(endIndex, filteredItems.length)} of{" "}
+                    {filteredItems.length} documents
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
+                    </button>
+                    {[...Array(totalPages)].map((_, i) => (
+                      <button
+                        key={i + 1}
+                        onClick={() => setCurrentPage(i + 1)}
+                        className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
+                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                          }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
-        {activeInvTab === "cargos" && (
-          <div
-            className="bg-white rounded-[4px] border border-[#E9ECEF] p-4"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-          >
-            <CargosTab ref={cargosTabRef} />
-          </div>
-        )}
-
-        {activeInvTab === "cargo_type" && (
-          <div
-            className="bg-white rounded-[4px] border border-[#E9ECEF] p-4"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-          >
-            <CargoTypesTab ref={cargoTypesTabRef} />
-          </div>
-        )}
-
-        {activeInvTab === "billto_shipto" && (
+        {activeInvTab === "lieferschein" && (
           <div
             className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
@@ -2299,11 +2307,7 @@ const InvoiceListPage: React.FC = () => {
           </div>
         )}
 
-        {activeInvTab === "packing_list" && (
-          <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm">
-            <PackingListTab />
-          </div>
-        )}
+
         {showInvoiceDetailsModal && selectedInvoice && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
@@ -2325,7 +2329,7 @@ const InvoiceListPage: React.FC = () => {
                     {selectedInvoice.status}
                   </span>
 
-                  {activeInvTab === "open_invoices" ? (
+                  {activeInvTab === "rechnung" ? (
                     <button
                       onClick={() => handleMarkAsPaid(selectedInvoice.id)}
                       disabled={actionLoading[`paid-${selectedInvoice.id}`]}
@@ -2415,14 +2419,14 @@ const InvoiceListPage: React.FC = () => {
                     <span className="text-sm font-semibold text-gray-800 block mt-1">
                       {selectedInvoice.customItemCount ?? selectedInvoice.items?.length ?? 0} Items | {selectedInvoice.customTotalQty ?? 0} Qty
                     </span>
-                    {activeInvTab === "closed_invoices" && (
+                    {activeInvTab === "rk" && (
                       <span className="text-sm font-bold text-emerald-600 block mt-0.5">
                         Total: ${Number(selectedInvoice.grossTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                     )}
                   </div>
                 </div>
-                {activeInvTab === "open_invoices" && (
+                {activeInvTab === "rechnung" && (
                   <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-4">
                     <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Edit Invoice Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2514,7 +2518,7 @@ const InvoiceListPage: React.FC = () => {
                           loading={expandedStates[selectedInvoice.id]?.loading}
                           showTotals={true}
                           columns={
-                            activeInvTab === "closed_invoices"
+                            activeInvTab === "rk"
                               ? [
                                 {
                                   header: "Position",
@@ -2621,7 +2625,7 @@ const InvoiceListPage: React.FC = () => {
                           }
                           expandedRowId={null}
                           totalCols={
-                            activeInvTab === "closed_invoices"
+                            activeInvTab === "rk"
                               ? [
                                 {
                                   label: "Grand Total",
@@ -2696,7 +2700,7 @@ const InvoiceListPage: React.FC = () => {
                         data={expandedStates[selectedInvoice.id]?.data?.detailedItems || []}
                         loading={expandedStates[selectedInvoice.id]?.loading}
                         columns={
-                          activeInvTab === "closed_invoices"
+                          activeInvTab === "rk"
                             ? [
                               {
                                 header: "#",
@@ -3385,7 +3389,6 @@ const InvoiceListPage: React.FC = () => {
     </div>
   );
 };
-
 const InvoiceListPageWrapper: React.FC = () => (
   <Suspense
     fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}
@@ -3393,5 +3396,4 @@ const InvoiceListPageWrapper: React.FC = () => (
     <InvoiceListPage />
   </Suspense>
 );
-
 export default InvoiceListPageWrapper;

@@ -43,6 +43,8 @@ import {
   ClipboardList,
   ShoppingCart,
   Timer,
+  Globe as LucideGlobe,
+  Percent as LucidePercent,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -86,7 +88,7 @@ const allMenuItems: MenuEntry[] = [
   {
     icon: DollarSign,
     text: "Commercial",
-    path: "/invoices",
+    path: "/commercial",
     resource: "Invoices",
   },
   {
@@ -94,6 +96,12 @@ const allMenuItems: MenuEntry[] = [
     text: "Fulfillment",
     resource: "Delivery",
     children: [
+      {
+        icon: Receipt,
+        text: "Orders",
+        path: "/invoices",
+        resource: "Invoices",
+      },
       {
         icon: ShoppingCart,
         text: "Order Processing",
@@ -130,6 +138,18 @@ const allMenuItems: MenuEntry[] = [
         text: "Tags",
         path: "/tags",
         resource: "Tags",
+      },
+      {
+        icon: LucideGlobe,
+        text: "Countries",
+        path: "/countries",
+        resource: "Settings",
+      },
+      {
+        icon: LucidePercent,
+        text: "Tax Profiles",
+        path: "/tax-profiles",
+        resource: "Settings",
       },
     ],
   },

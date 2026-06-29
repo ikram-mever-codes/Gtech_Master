@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { getShippingAddresses, CompanyShippingAddress } from "@/api/shipping_addresses";
 
 export interface BillToShipToData {
     customer_type?: string;
@@ -77,6 +78,25 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
     }, [data.customer_type]);
 
     const [addressProfile, setAddressProfile] = useState<string>("main");
+    const [dbShippingAddresses, setDbShippingAddresses] = useState<CompanyShippingAddress[]>([]);
+
+    useEffect(() => {
+        const fetchShippingAddresses = async () => {
+            if (!selectedCustomer?.id) {
+                setDbShippingAddresses([]);
+                return;
+            }
+            try {
+                const res = await getShippingAddresses(selectedCustomer.id);
+                if (res && res.data && res.data.success) {
+                    setDbShippingAddresses(res.data.data || []);
+                }
+            } catch (err) {
+                console.error("Failed to load customer shipping addresses", err);
+            }
+        };
+        fetchShippingAddresses();
+    }, [selectedCustomer]);
 
     const mainAddressStr = selectedCustomer ? [
         selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address,
@@ -90,6 +110,27 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
         selectedCustomer.deliveryCountry
     ].filter(Boolean).join(", ") : "";
 
+    const applyShipToAddress = (
+        country: string,
+        city: string,
+        postalCode: string,
+        fullAddress: string,
+        extraFields: Partial<BillToShipToData> = {}
+    ) => {
+        if (!selectedCustomer) return;
+        onBatchChange({
+            ship_to_company_name: selectedCustomer.companyName || "",
+            ship_to_display_name: selectedCustomer.companyName || "",
+            ship_to_contact_person: selectedCustomer.legalName || "",
+            ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
+            ship_to_country: country || "",
+            ship_to_city: city || "",
+            ship_to_postal_code: postalCode || "",
+            ship_to_full_address: fullAddress || "",
+            ...extraFields
+        });
+    };
+
     const handleAddressProfileChange = (profileType: string) => {
         if (!selectedCustomer) return;
 
@@ -98,57 +139,73 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
                 selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "",
                 selectedCustomer.addressLine2 || ""
             ].filter(Boolean).join(" ");
-
-            onBatchChange({
-                ship_to_company_name: selectedCustomer.companyName || "",
-                ship_to_display_name: selectedCustomer.companyName || "",
-                ship_to_contact_person: selectedCustomer.legalName || "",
-                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
-                ship_to_country: selectedCustomer.country || selectedCustomer.businessDetails?.country || "",
-                ship_to_city: selectedCustomer.city || selectedCustomer.businessDetails?.city || "",
-                ship_to_postal_code: selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || "",
-                ship_to_full_address: mainFullAddress,
-            });
+            applyShipToAddress(
+                selectedCustomer.country || selectedCustomer.businessDetails?.country || "",
+                selectedCustomer.city || selectedCustomer.businessDetails?.city || "",
+                selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || "",
+                mainFullAddress
+            );
         } else if (profileType === "delivery") {
             const deliveryFullAddress = [
                 selectedCustomer.deliveryAddressLine1 || "",
                 selectedCustomer.deliveryAddressLine2 || ""
             ].filter(Boolean).join(" ");
-
-            onBatchChange({
-                ship_to_company_name: selectedCustomer.companyName || "",
-                ship_to_display_name: selectedCustomer.companyName || "",
-                ship_to_contact_person: selectedCustomer.legalName || "",
-                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
-                ship_to_country: selectedCustomer.deliveryCountry || "",
-                ship_to_city: selectedCustomer.deliveryCity || "",
-                ship_to_postal_code: selectedCustomer.deliveryPostalCode || "",
-                ship_to_full_address: deliveryFullAddress,
-            });
+            applyShipToAddress(
+                selectedCustomer.deliveryCountry || "",
+                selectedCustomer.deliveryCity || "",
+                selectedCustomer.deliveryPostalCode || "",
+                deliveryFullAddress
+            );
+        } else {
+            const targetAddress = dbShippingAddresses.find(a => a.id === profileType);
+            if (targetAddress) {
+                const fullAddressStr = [
+                    targetAddress.street,
+                    targetAddress.address_additional_line || ""
+                ].filter(Boolean).join(" ");
+                applyShipToAddress(
+                    targetAddress.country?.name || "",
+                    targetAddress.city || "",
+                    targetAddress.postal_code || "",
+                    fullAddressStr
+                );
+            }
         }
     };
 
     useEffect(() => {
         if (selectedCustomer) {
+            const defaultAddress = dbShippingAddresses.find(a => a.is_default);
+            if (defaultAddress) {
+                setAddressProfile(defaultAddress.id);
+                const fullAddressStr = [
+                    defaultAddress.street,
+                    defaultAddress.address_additional_line || ""
+                ].filter(Boolean).join(" ");
+                applyShipToAddress(
+                    defaultAddress.country?.name || "",
+                    defaultAddress.city || "",
+                    defaultAddress.postal_code || "",
+                    fullAddressStr,
+                    { customer_type: "Other Customer" }
+                );
+                return;
+            }
+
             const hasDelivery = !!(selectedCustomer.deliveryAddressLine1 || selectedCustomer.deliveryCity || selectedCustomer.deliveryCountry);
             const initialProfile = hasDelivery ? "delivery" : "main";
             setAddressProfile(initialProfile);
 
-            onBatchChange({
-                customer_type: "Other Customer",
-                ship_to_company_name: selectedCustomer.companyName || "",
-                ship_to_display_name: selectedCustomer.companyName || "",
-                ship_to_contact_person: selectedCustomer.legalName || "",
-                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
-                ship_to_country: hasDelivery ? (selectedCustomer.deliveryCountry || "") : (selectedCustomer.country || selectedCustomer.businessDetails?.country || ""),
-                ship_to_city: hasDelivery ? (selectedCustomer.deliveryCity || "") : (selectedCustomer.city || selectedCustomer.businessDetails?.city || ""),
-                ship_to_postal_code: hasDelivery ? (selectedCustomer.deliveryPostalCode || "") : (selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || ""),
-                ship_to_full_address: hasDelivery
-                    ? ((selectedCustomer.deliveryAddressLine1 || "") + (selectedCustomer.deliveryAddressLine2 ? " " + selectedCustomer.deliveryAddressLine2 : ""))
-                    : ((selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "") + (selectedCustomer.addressLine2 ? " " + selectedCustomer.addressLine2 : "")),
-            });
+            const country = hasDelivery ? (selectedCustomer.deliveryCountry || "") : (selectedCustomer.country || selectedCustomer.businessDetails?.country || "");
+            const city = hasDelivery ? (selectedCustomer.deliveryCity || "") : (selectedCustomer.city || selectedCustomer.businessDetails?.city || "");
+            const postalCode = hasDelivery ? (selectedCustomer.deliveryPostalCode || "") : (selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || "");
+            const fullAddress = hasDelivery
+                ? ((selectedCustomer.deliveryAddressLine1 || "") + (selectedCustomer.deliveryAddressLine2 ? " " + selectedCustomer.deliveryAddressLine2 : ""))
+                : ((selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "") + (selectedCustomer.addressLine2 ? " " + selectedCustomer.addressLine2 : ""));
+
+            applyShipToAddress(country, city, postalCode, fullAddress, { customer_type: "Other Customer" });
         }
-    }, [selectedCustomer]);
+    }, [selectedCustomer, dbShippingAddresses]);
 
     const isGTWarehouse = data.customer_type === "GT-Warehouse";
 
@@ -350,6 +407,11 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
                             >
                                 <option value="main">Main Address {mainAddressStr ? `— ${mainAddressStr}` : ""}</option>
                                 <option value="delivery">Delivery Address {deliveryAddressStr ? `— ${deliveryAddressStr}` : "— (Not Set)"}</option>
+                                {dbShippingAddresses.map((addr) => (
+                                    <option key={addr.id} value={addr.id}>
+                                        {addr.name}{addr.is_default ? " (Default)" : ""} — {addr.street}, {addr.city}{addr.country ? `, ${addr.country.name}` : ""}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                     )}

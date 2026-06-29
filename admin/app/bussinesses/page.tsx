@@ -63,6 +63,8 @@ import {
   type Business,
   type SearchFilters,
 } from "@/api/bussiness";
+import { getAllCountries } from "@/api/countries";
+import { ShippingAddressManager } from "@/components/Businesses/ShippingAddressManager";
 import {
   getAllContactPersons,
   createContactPerson,
@@ -292,6 +294,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     ...emptyBusinessForm,
   });
   const [taxProfiles, setTaxProfiles] = useState<any[]>([]);
+  const [dbCountries, setDbCountries] = useState<any[]>([]);
   const [newBusinessTags, setNewBusinessTags] = useState<Tag[]>([]);
   const [newContactTags, setNewContactTags] = useState<Tag[]>([]);
 
@@ -407,7 +410,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
         console.error("Failed to load tax profiles", error);
       }
     };
+    const loadCountries = async () => {
+      try {
+        const res: any = await getAllCountries(false);
+        if (res && res.data && res.data.success) {
+          setDbCountries(res.data.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to load countries", error);
+      }
+    };
     loadTaxProfiles();
+    loadCountries();
   }, []);
 
   const filteredBusinesses = useMemo(() => {
@@ -934,7 +948,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       );
     }
   };
-
   const modalContacts: ContactPersonData[] = editingBusinessId
     ? allBusinesses.find((b) => b.id === editingBusinessId)?.contacts || []
     : [];
@@ -1842,11 +1855,19 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     disabled={businessFieldDisabled}
                     className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
-                    {COUNTRY_OPTIONS.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
+                    {dbCountries.length > 0 ? (
+                      dbCountries.map((c) => (
+                        <option key={c.id} value={c.iso2}>
+                          {c.iso2} - {c.name}
+                        </option>
+                      ))
+                    ) : (
+                      COUNTRY_OPTIONS.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -2192,6 +2213,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   )}
                 </div>
               </div>
+            )}
+
+            {businessModalMode === "edit" && editingBusinessId && (
+              <ShippingAddressManager companyId={editingBusinessId} countries={dbCountries} />
             )}
           </div>
 

@@ -20,6 +20,7 @@ import { Inquiry } from "./inquiry";
 import { Tag } from "./tags";
 import { Item } from "./items";
 import { TaxProfile } from "./tax_profile";
+import { CompanyShippingAddress } from "./company_shipping_address";
 
 @Entity()
 export class Customer {
@@ -140,6 +141,9 @@ export class Customer {
 
   @OneToMany(() => Item, (item) => item.customer)
   items!: Item[];
+
+  @OneToMany(() => CompanyShippingAddress, (address) => address.company)
+  shippingAddresses!: CompanyShippingAddress[];
 
   @CreateDateColumn()
   createdAt!: Date;
