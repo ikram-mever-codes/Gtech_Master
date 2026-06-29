@@ -40,6 +40,7 @@ import {
   BusinessCreatePayload,
 } from "@/api/bussiness";
 import { getCustomerLists, deleteList } from "@/api/list";
+import { getAllCountries } from "@/api/countries";
 import CustomButton from "@/components/UI/CustomButton";
 import { Eye, Pencil, Building2 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
@@ -97,6 +98,7 @@ const AddEditBusinessManual: React.FC = () => {
   const [loadingLists, setLoadingLists] = useState(false);
   const [expandedLists, setExpandedLists] = useState<Set<string>>(new Set());
   const [isListsSectionOpen, setIsListsSectionOpen] = useState(false);
+  const [countries, setCountries] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<ExtendedBusinessCreatePayload>({
     name: "",
@@ -186,6 +188,20 @@ const AddEditBusinessManual: React.FC = () => {
       fetchCustomerLists();
     }
   }, [businessId, isEditMode, isViewMode, isStarCustomer]);
+
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        const res: any = await getAllCountries(false); // active only
+        if (res && res.data && res.data.success) {
+          setCountries(res.data.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load countries in new/page.tsx", err);
+      }
+    };
+    loadCountries();
+  }, []);
 
   const fetchBusinessData = async () => {
     try {
@@ -975,7 +991,13 @@ const AddEditBusinessManual: React.FC = () => {
                 undefined,
                 undefined,
                 undefined,
-                ["Germany", "Austria", "Switzerland"]
+                countries.length > 0
+                  ? countries.map((c) => ({ value: c.iso2, label: `${c.iso2} - ${c.name}` }))
+                  : [
+                      { value: "DE", label: "DE - Germany" },
+                      { value: "AT", label: "AT - Austria" },
+                      { value: "CH", label: "CH - Switzerland" },
+                    ]
               )}
               {renderField(
                 "Is Device Maker",

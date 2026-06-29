@@ -28,6 +28,7 @@ import systemRoutes from "./routes/system_routes";
 import dashboardRoutes from "./routes/dashboard_routes";
 import tagRoutes from "./routes/tag_routes";
 import taxProfileRoutes from "./routes/tax_profile_routes";
+import countryRoutes from "./routes/country_routes";
 
 const app: any = express();
 
@@ -79,6 +80,7 @@ app.use("/api/v1/system", systemRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/tags", tagRoutes);
 app.use("/api/v1/tax-profiles", taxProfileRoutes);
+app.use("/api/v1/countries", countryRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));

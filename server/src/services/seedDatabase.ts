@@ -6,6 +6,7 @@ import { BusinessDetails } from "../models/business_details";
 import { Supplier } from "../models/suppliers";
 import { Category } from "../models/categories";
 import { TaxProfile } from "../models/tax_profile";
+import { Country } from "../models/country";
 
 export const seedDatabase = async () => {
     try {
@@ -18,6 +19,7 @@ export const seedDatabase = async () => {
         const supplierRepository = AppDataSource.getRepository(Supplier);
         const categoryRepository = AppDataSource.getRepository(Category);
         const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+        const countryRepository = AppDataSource.getRepository(Country);
 
         const existingTaxProfiles = await taxProfileRepository.count();
         if (existingTaxProfiles === 0) {
@@ -32,6 +34,32 @@ export const seedDatabase = async () => {
                 await taxProfileRepository.save(taxProfileRepository.create(p));
             }
             console.log("  ✓ Seeded default tax profiles");
+        }
+
+        const existingCountries = await countryRepository.count();
+        if (existingCountries === 0) {
+            console.log("🌍 Seeding countries...");
+            const countries = [
+                { iso2: "DE", name: "Germany", is_eu: true, is_igl_country: true },
+                { iso2: "AT", name: "Austria", is_eu: true, is_igl_country: true },
+                { iso2: "CH", name: "Switzerland", is_eu: false, is_igl_country: false },
+                { iso2: "US", name: "United States", is_eu: false, is_igl_country: false },
+                { iso2: "CN", name: "China", is_eu: false, is_igl_country: false },
+                { iso2: "GB", name: "United Kingdom", is_eu: false, is_igl_country: false },
+                { iso2: "FR", name: "France", is_eu: true, is_igl_country: false },
+                { iso2: "IT", name: "Italy", is_eu: true, is_igl_country: false },
+                { iso2: "NL", name: "Netherlands", is_eu: true, is_igl_country: false },
+                { iso2: "PL", name: "Poland", is_eu: true, is_igl_country: false },
+                { iso2: "CZ", name: "Czech Republic", is_eu: true, is_igl_country: false },
+                { iso2: "ES", name: "Spain", is_eu: true, is_igl_country: false },
+                { iso2: "BE", name: "Belgium", is_eu: true, is_igl_country: false },
+                { iso2: "HU", name: "Hungary", is_eu: true, is_igl_country: false },
+                { iso2: "JP", name: "Japan", is_eu: false, is_igl_country: false },
+            ];
+            for (const c of countries) {
+                await countryRepository.save(countryRepository.create(c));
+            }
+            console.log("  ✓ Seeded default countries");
         }
 
         const existingSuppliers = await supplierRepository.count();

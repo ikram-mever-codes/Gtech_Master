@@ -42,6 +42,7 @@ import { SalesPrice } from "../models/sales_prices";
 import { PurchasePrice } from "../models/purchase_prices";
 import { Tag } from "../models/tags";
 import { TaxProfile } from "../models/tax_profile";
+import { Country } from "../models/country";
 
 dotenv.config();
 
@@ -97,6 +98,7 @@ export const AppDataSource = new DataSource({
     SupplierOrder,
     Tag,
     TaxProfile,
+    Country,
   ],
   extra: {
     ssl:

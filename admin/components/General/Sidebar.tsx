@@ -43,6 +43,7 @@ import {
   ClipboardList,
   ShoppingCart,
   Timer,
+  Globe as LucideGlobe,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -130,6 +131,12 @@ const allMenuItems: MenuEntry[] = [
         text: "Tags",
         path: "/tags",
         resource: "Tags",
+      },
+      {
+        icon: LucideGlobe,
+        text: "Countries",
+        path: "/countries",
+        resource: "Settings",
       },
     ],
   },
