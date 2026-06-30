@@ -44,16 +44,16 @@ export default function TaxProfilesPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, countriesRes] = await Promise.all([
+      const [profilesRes, countriesRes]: [any, any] = await Promise.all([
         getAllTaxProfiles(true),
         getAllCountries(false),
       ]);
 
-      if (profilesRes && profilesRes.data && profilesRes.data.success) {
-        setTaxProfiles(profilesRes.data.data || []);
+      if (profilesRes && profilesRes.success) {
+        setTaxProfiles(profilesRes.data || []);
       }
-      if (countriesRes && countriesRes.data && countriesRes.data.success) {
-        setCountries(countriesRes.data.data || []);
+      if (countriesRes && countriesRes.success) {
+        setCountries(countriesRes.data || []);
       }
     } catch (err) {
       console.error(err);
@@ -108,18 +108,18 @@ export default function TaxProfilesPage() {
 
     try {
       if (isEditing && editingId) {
-        const res = await updateTaxProfile(editingId, {
+        const res: any = await updateTaxProfile(editingId, {
           ...payload,
           is_active: isActive,
         });
-        if (res && res.data && res.data.success) {
+        if (res && res.success) {
           toast.success("Tax profile updated successfully");
           fetchData();
           resetForm();
         }
       } else {
-        const res = await createTaxProfile(payload);
-        if (res && res.data && res.data.success) {
+        const res: any = await createTaxProfile(payload);
+        if (res && res.success) {
           toast.success("Tax profile created successfully");
           fetchData();
           resetForm();
@@ -156,10 +156,10 @@ export default function TaxProfilesPage() {
     }
 
     try {
-      const res = await updateTaxProfile(profile.id, {
+      const res: any = await updateTaxProfile(profile.id, {
         is_active: !profile.is_active,
       });
-      if (res && res.data && res.data.success) {
+      if (res && res.success) {
         toast.success(`Tax profile ${actionText}d successfully`);
         fetchData();
         if (editingId === profile.id) {
@@ -193,11 +193,6 @@ export default function TaxProfilesPage() {
             <h3 className="text-lg font-bold text-gray-900">
               {isEditing ? "Edit Tax Profile" : "Create New Tax Profile"}
             </h3>
-            <p className="text-xs text-gray-500 mt-1">
-              {isEditing
-                ? "Update specific cases, accounts or VAT validation logic."
-                : "Add a new configuration mapping country cases and rates."}
-            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

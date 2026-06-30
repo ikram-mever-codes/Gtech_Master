@@ -413,8 +413,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     const loadCountries = async () => {
       try {
         const res: any = await getAllCountries(false);
-        if (res && res.data && res.data.success) {
-          setDbCountries(res.data.data || []);
+        if (res && res.success) {
+          setDbCountries(res.data || []);
         }
       } catch (error) {
         console.error("Failed to load countries", error);
