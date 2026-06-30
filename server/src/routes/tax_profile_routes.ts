@@ -4,6 +4,7 @@ import {
   createTaxProfile,
   updateTaxProfile,
   deactivateTaxProfile,
+  deleteTaxProfile,
 } from "../controllers/tax_profile_controller";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -13,5 +14,6 @@ router.get("/", authenticateUser, getAllTaxProfiles as any);
 router.post("/", authenticateUser, createTaxProfile as any);
 router.put("/:id", authenticateUser, updateTaxProfile as any);
 router.patch("/:id/deactivate", authenticateUser, deactivateTaxProfile as any);
+router.delete("/:id", authenticateUser, deleteTaxProfile as any);
 
 export default router;

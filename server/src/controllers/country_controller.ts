@@ -120,3 +120,36 @@ export const deactivateCountry = async (
     return next(error);
   }
 };
+
+export const deleteCountry = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const countryRepository = AppDataSource.getRepository(Country);
+    const { id } = req.params;
+
+    const country = await countryRepository.findOne({ where: { id } });
+    if (!country) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Country not found." });
+    }
+
+    try {
+      await countryRepository.remove(country);
+      return res.status(200).json({ success: true, message: "Country deleted successfully." });
+    } catch (err: any) {
+      country.is_active = false;
+      await countryRepository.save(country);
+      return res.status(200).json({
+        success: true,
+        message: "Country is in use by other data, so it has been set to Inactive instead.",
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    return next(error);
+  }
+};

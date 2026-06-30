@@ -40,9 +40,9 @@ export const ShippingAddressManager: React.FC<ShippingAddressManagerProps> = ({
   const fetchShippingAddresses = useCallback(async () => {
     if (!companyId) return;
     try {
-      const res = await getShippingAddresses(companyId);
-      if (res && res.data && res.data.success) {
-        setShippingAddresses(res.data.data || []);
+      const res: any = await getShippingAddresses(companyId);
+      if (res && res.success) {
+        setShippingAddresses(res.data || []);
       }
     } catch (err) {
       console.error("Failed to fetch shipping addresses", err);

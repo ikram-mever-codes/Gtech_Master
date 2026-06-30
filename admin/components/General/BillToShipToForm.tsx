@@ -87,9 +87,9 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
                 return;
             }
             try {
-                const res = await getShippingAddresses(selectedCustomer.id);
-                if (res && res.data && res.data.success) {
-                    setDbShippingAddresses(res.data.data || []);
+                const res: any = await getShippingAddresses(selectedCustomer.id);
+                if (res && res.success) {
+                    setDbShippingAddresses(res.data || []);
                 }
             } catch (err) {
                 console.error("Failed to load customer shipping addresses", err);

@@ -64,3 +64,13 @@ export const deactivateCountry = async (id: string) => {
     throw error;
   }
 };
+
+export const deleteCountry = async (id: string) => {
+  try {
+    const response = await api.delete(`/countries/${id}`);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to delete country");
+    throw error;
+  }
+};

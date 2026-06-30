@@ -15,6 +15,7 @@ import {
   getAllCountries,
   createCountry,
   updateCountry,
+  deleteCountry,
   Country,
 } from "@/api/countries";
 import { toast } from "react-hot-toast";
@@ -26,7 +27,6 @@ export default function CountriesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Form states
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [iso2, setIso2] = useState("");
@@ -120,30 +120,28 @@ export default function CountriesPage() {
     setIsActive(country.is_active);
   };
 
-  const handleToggleActive = async (country: Country) => {
-    const actionText = country.is_active ? "deactivate" : "activate";
-    if (!confirm(`Are you sure you want to ${actionText} ${country.name}?`)) {
+  const handleDeleteCountry = async (country: Country) => {
+    if (!confirm(`Are you sure you want to delete ${country.name}?`)) {
       return;
     }
 
     try {
-      const res: any = await updateCountry(country.id, {
-        is_active: !country.is_active,
-      });
+      const res: any = await deleteCountry(country.id);
       if (res && res.success) {
-        toast.success(`Country ${actionText}d successfully`);
+        toast.success(res.message || "Country deleted successfully");
         fetchCountries();
         if (editingId === country.id) {
-          setIsActive(!country.is_active);
+          resetForm();
         }
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to update country status");
+      toast.error(err?.response?.data?.message || "Failed to delete country");
     }
   };
 
   const filteredCountries = countries.filter((c) => {
+    if (!c.is_active) return false;
     const q = searchQuery.toLowerCase().trim();
     return (
       c.name.toLowerCase().includes(q) ||
@@ -156,7 +154,6 @@ export default function CountriesPage() {
       <PageHeader title="Country Settings" icon={Globe2} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Side: Create / Edit Form */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 h-fit lg:sticky lg:top-6">
           <div>
             <h3 className="text-lg font-bold text-gray-900">
@@ -170,7 +167,6 @@ export default function CountriesPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* ISO2 Code */}
             <div className="space-y-1.5">
               <label
                 htmlFor="country_iso2"
@@ -190,7 +186,6 @@ export default function CountriesPage() {
               />
             </div>
 
-            {/* Country Name */}
             <div className="space-y-1.5">
               <label
                 htmlFor="country_name"
@@ -208,7 +203,6 @@ export default function CountriesPage() {
               />
             </div>
 
-            {/* Toggle checkboxes */}
             <div className="space-y-4 pt-2">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -249,7 +243,6 @@ export default function CountriesPage() {
               )}
             </div>
 
-            {/* Submit & Cancel Buttons */}
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
@@ -271,9 +264,7 @@ export default function CountriesPage() {
           </form>
         </div>
 
-        {/* Right Side: Countries Table / List */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Search bar and refresh */}
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -328,9 +319,8 @@ export default function CountriesPage() {
                     {filteredCountries.map((country) => (
                       <tr
                         key={country.id}
-                        className={`hover:bg-gray-50/50 transition-all ${
-                          !country.is_active ? "opacity-60" : ""
-                        }`}
+                        className={`hover:bg-gray-50/50 transition-all ${!country.is_active ? "opacity-60" : ""
+                          }`}
                       >
                         <td className="px-6 py-4.5 font-mono font-bold text-gray-700">
                           {country.iso2}
@@ -379,17 +369,9 @@ export default function CountriesPage() {
                               <Pencil className="h-4.5 w-4.5" />
                             </button>
                             <button
-                              onClick={() => handleToggleActive(country)}
-                              className={`p-1.5 rounded-xl transition-all ${
-                                country.is_active
-                                  ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                  : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
-                              }`}
-                              title={
-                                country.is_active
-                                  ? "Deactivate Country"
-                                  : "Activate Country"
-                              }
+                              onClick={() => handleDeleteCountry(country)}
+                              className="p-1.5 rounded-xl transition-all text-gray-400 hover:text-red-600 hover:bg-red-50"
+                              title="Delete Country"
                             >
                               <Trash2 className="h-4.5 w-4.5" />
                             </button>

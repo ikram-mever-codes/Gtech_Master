@@ -201,3 +201,37 @@ export const deactivateTaxProfile = async (
     return next(new ErrorHandler("Failed to deactivate tax profile", 500));
   }
 };
+
+export const deleteTaxProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+    const { id } = req.params;
+
+    const profile = await taxProfileRepository.findOne({ where: { id } });
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Tax Profile not found.",
+      });
+    }
+
+    try {
+      await taxProfileRepository.remove(profile);
+      return res.status(200).json({ success: true, message: "Tax Profile deleted successfully." });
+    } catch (err: any) {
+      profile.is_active = false;
+      await taxProfileRepository.save(profile);
+      return res.status(200).json({
+        success: true,
+        message: "Tax Profile is in use by other data, so it has been set to Inactive instead.",
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    return next(error);
+  }
+};
