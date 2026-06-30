@@ -193,8 +193,8 @@ const AddEditBusinessManual: React.FC = () => {
     const loadCountries = async () => {
       try {
         const res: any = await getAllCountries(false); // active only
-        if (res && res.data && res.data.success) {
-          setCountries(res.data.data || []);
+        if (res && res.success) {
+          setCountries(res.data || []);
         }
       } catch (err) {
         console.error("Failed to load countries in new/page.tsx", err);

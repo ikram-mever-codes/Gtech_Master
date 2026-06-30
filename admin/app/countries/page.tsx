@@ -34,13 +34,12 @@ export default function CountriesPage() {
   const [isEu, setIsEu] = useState(false);
   const [isIglCountry, setIsIglCountry] = useState(false);
   const [isActive, setIsActive] = useState(true);
-
   const fetchCountries = async () => {
     setLoading(true);
     try {
-      const res = await getAllCountries(true); // true to include inactive
-      if (res && res.data && res.data.success) {
-        setCountries(res.data.data || []);
+      const res: any = await getAllCountries(true);
+      if (res && res.success) {
+        setCountries(res.data || []);
       }
     } catch (err) {
       console.error(err);
@@ -78,25 +77,25 @@ export default function CountriesPage() {
     setSubmitting(true);
     try {
       if (isEditing && editingId) {
-        const res = await updateCountry(editingId, {
+        const res: any = await updateCountry(editingId, {
           name: name.trim(),
           is_eu: isEu,
           is_igl_country: isIglCountry,
           is_active: isActive,
         });
-        if (res && res.data && res.data.success) {
+        if (res && res.success) {
           toast.success("Country updated successfully");
           fetchCountries();
           resetForm();
         }
       } else {
-        const res = await createCountry({
+        const res: any = await createCountry({
           iso2: iso2.trim().toUpperCase(),
           name: name.trim(),
           is_eu: isEu,
           is_igl_country: isIglCountry,
         });
-        if (res && res.data && res.data.success) {
+        if (res && res.success) {
           toast.success("Country created successfully");
           fetchCountries();
           resetForm();
@@ -128,10 +127,10 @@ export default function CountriesPage() {
     }
 
     try {
-      const res = await updateCountry(country.id, {
+      const res: any = await updateCountry(country.id, {
         is_active: !country.is_active,
       });
-      if (res && res.data && res.data.success) {
+      if (res && res.success) {
         toast.success(`Country ${actionText}d successfully`);
         fetchCountries();
         if (editingId === country.id) {
