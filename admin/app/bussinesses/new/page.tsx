@@ -192,7 +192,7 @@ const AddEditBusinessManual: React.FC = () => {
   useEffect(() => {
     const loadCountries = async () => {
       try {
-        const res: any = await getAllCountries(false); // active only
+        const res: any = await getAllCountries(false);
         if (res && res.success) {
           setCountries(res.data || []);
         }
@@ -994,10 +994,10 @@ const AddEditBusinessManual: React.FC = () => {
                 countries.length > 0
                   ? countries.map((c) => ({ value: c.iso2, label: `${c.iso2} - ${c.name}` }))
                   : [
-                      { value: "DE", label: "DE - Germany" },
-                      { value: "AT", label: "AT - Austria" },
-                      { value: "CH", label: "CH - Switzerland" },
-                    ]
+                    { value: "DE", label: "DE - Germany" },
+                    { value: "AT", label: "AT - Austria" },
+                    { value: "CH", label: "CH - Switzerland" },
+                  ]
               )}
               {renderField(
                 "Is Device Maker",
@@ -1129,7 +1129,7 @@ const AddEditBusinessManual: React.FC = () => {
                       undefined,
                       ["Yes", "No"],
                       undefined,
-                      handleStarBusinessChange // Use the correct handler
+                      handleStarBusinessChange
                     )}
                     {renderField(
                       "Made In",
@@ -1141,7 +1141,7 @@ const AddEditBusinessManual: React.FC = () => {
                       undefined,
                       ["Yes", "No"],
                       undefined,
-                      handleStarBusinessChange // Use the correct handler
+                      handleStarBusinessChange
                     )}
                     {renderField(
                       "Industry",
@@ -1153,7 +1153,7 @@ const AddEditBusinessManual: React.FC = () => {
                       <CogIcon className="w-5 h-5" />,
                       industries,
                       undefined,
-                      handleStarBusinessChange // Use the correct handler
+                      handleStarBusinessChange
                     )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1183,7 +1183,6 @@ const AddEditBusinessManual: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Special handling for Checked By field */}
                     {/* <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Checked By{" "}
@@ -1243,8 +1242,6 @@ const AddEditBusinessManual: React.FC = () => {
                         undefined,
                         <CalendarIcon className="w-5 h-5" />
                       )} */}
-
-                    {/* New View-Only Fields in Star Business Details */}
                     {(isEditMode || isViewMode) &&
                       formData.starBusinessDetails?.convertedBy && (
                         <>
@@ -1273,13 +1270,11 @@ const AddEditBusinessManual: React.FC = () => {
                             "",
                             <CalendarIcon className="w-5 h-5" />,
                             undefined,
-                            true // Read-only
+                            true
                           )}
                         </>
                       )}
                   </div>
-
-                  {/* New Editable Comment Field */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <div className="flex items-center gap-2">
@@ -1353,7 +1348,6 @@ const AddEditBusinessManual: React.FC = () => {
             </div>
           ) : null}
 
-          {/* Customer Lists Section - Only for Star Customers */}
           {isStarCustomer && (isEditMode || isViewMode) && (
             <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200">
               {!isViewMode ? (
@@ -1422,7 +1416,6 @@ const AddEditBusinessManual: React.FC = () => {
                           key={list.id}
                           className="border border-gray-200 rounded-lg overflow-hidden bg-white"
                         >
-                          {/* List Header */}
                           <div
                             className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
                             onClick={() => toggleListExpansion(list.id)}
@@ -1444,7 +1437,6 @@ const AddEditBusinessManual: React.FC = () => {
                             </div>
 
                             <div className="flex items-center space-x-6">
-                              {/* Item Count */}
                               <div className="text-right">
                                 <p className="text-sm font-medium text-gray-900">
                                   {list?.items?.length}
@@ -1452,7 +1444,6 @@ const AddEditBusinessManual: React.FC = () => {
                                 <p className="text-xs text-gray-500">Items</p>
                               </div>
 
-                              {/* Added Date */}
                               <div className="text-right">
                                 <p className="text-sm font-medium text-gray-900">
                                   {new Date(
@@ -1461,8 +1452,6 @@ const AddEditBusinessManual: React.FC = () => {
                                 </p>
                                 <p className="text-xs text-gray-500">Created</p>
                               </div>
-
-                              {/* Expand/Collapse Icon */}
                               <div className="flex items-center">
                                 {expandedLists.has(list.id) ? (
                                   <ChevronUpIcon className="h-5 w-5 text-gray-400" />
@@ -1472,8 +1461,6 @@ const AddEditBusinessManual: React.FC = () => {
                               </div>
                             </div>
                           </div>
-
-                          {/* Expanded Content */}
                           {expandedLists.has(list.id) && (
                             <div className="p-4 bg-white border-t border-gray-200">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
@@ -1539,8 +1526,6 @@ const AddEditBusinessManual: React.FC = () => {
                                   </p>
                                 </div>
                               </div>
-
-                              {/* Action Buttons */}
                               <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
                                 <button
                                   type="button"
@@ -1563,8 +1548,6 @@ const AddEditBusinessManual: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Optional Fields Section - Collapsible */}
           <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200">
             {!isViewMode ? (
               <button
@@ -1603,7 +1586,6 @@ const AddEditBusinessManual: React.FC = () => {
               <div
                 className={`${isViewMode ? "px-6 pb-6" : "p-8 pt-0"} space-y-6`}
               >
-                {/* Contact & Location */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
                     <MapPinIcon className="w-5 h-5" />
@@ -1656,7 +1638,6 @@ const AddEditBusinessManual: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Categories */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
                     <TagIcon className="w-5 h-5" />
@@ -1696,7 +1677,6 @@ const AddEditBusinessManual: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Google Integration */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
                     <MapIcon className="w-5 h-5" />
@@ -1729,8 +1709,6 @@ const AddEditBusinessManual: React.FC = () => {
                     )}
                   </div>
                 </div>
-
-                {/* Description */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description
@@ -1754,8 +1732,6 @@ const AddEditBusinessManual: React.FC = () => {
                     />
                   )}
                 </div>
-
-                {/* Social Media */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-700 mb-4">
                     Social Media Links
@@ -1792,8 +1768,6 @@ const AddEditBusinessManual: React.FC = () => {
                     )}
                   </div>
                 </div>
-
-                {/* Business Hours */}
                 {/* <div>
                   <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
                     <ClockIcon className="w-5 h-5" />
@@ -1831,8 +1805,6 @@ const AddEditBusinessManual: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Form Actions - Only show in edit/create mode */}
           {!isViewMode && (
             <div className="flex justify-between items-center pt-6 border-t border-gray-200">
               <button

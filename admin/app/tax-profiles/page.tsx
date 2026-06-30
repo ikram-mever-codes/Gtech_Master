@@ -15,6 +15,7 @@ import {
   getAllTaxProfiles,
   createTaxProfile,
   updateTaxProfile,
+  deleteTaxProfile,
   TaxProfile,
 } from "@/api/tax_profiles";
 import { getAllCountries, Country } from "@/api/countries";
@@ -149,30 +150,28 @@ export default function TaxProfilesPage() {
     setDescription(profile.description || "");
   };
 
-  const handleToggleActive = async (profile: TaxProfile) => {
-    const actionText = profile.is_active ? "deactivate" : "activate";
-    if (!confirm(`Are you sure you want to ${actionText} the profile "${profile.name}"?`)) {
+  const handleDeleteTaxProfile = async (profile: TaxProfile) => {
+    if (!confirm(`Are you sure you want to delete the profile "${profile.name}"?`)) {
       return;
     }
 
     try {
-      const res: any = await updateTaxProfile(profile.id, {
-        is_active: !profile.is_active,
-      });
+      const res: any = await deleteTaxProfile(profile.id);
       if (res && res.success) {
-        toast.success(`Tax profile ${actionText}d successfully`);
+        toast.success(res.message || "Tax profile deleted successfully");
         fetchData();
         if (editingId === profile.id) {
-          setIsActive(!profile.is_active);
+          resetForm();
         }
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to update profile status");
+      toast.error(err?.response?.data?.message || "Failed to delete tax profile");
     }
   };
 
   const filteredProfiles = taxProfiles.filter((p) => {
+    if (!p.is_active) return false;
     const q = searchQuery.toLowerCase().trim();
     return (
       p.name.toLowerCase().includes(q) ||
@@ -496,17 +495,10 @@ export default function TaxProfilesPage() {
                             >
                               <Pencil className="h-4.5 w-4.5" />
                             </button>
-                            <button
-                              onClick={() => handleToggleActive(p)}
-                              className={`p-1.5 rounded-xl transition-all ${p.is_active
-                                ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
-                                }`}
-                              title={
-                                p.is_active
-                                  ? "Deactivate Profile"
-                                  : "Activate Profile"
-                              }
+                             <button
+                              onClick={() => handleDeleteTaxProfile(p)}
+                              className="p-1.5 rounded-xl transition-all text-gray-400 hover:text-red-600 hover:bg-red-50"
+                              title="Delete Profile"
                             >
                               <Trash2 className="h-4.5 w-4.5" />
                             </button>

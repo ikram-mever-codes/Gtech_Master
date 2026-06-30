@@ -81,3 +81,13 @@ export const deactivateTaxProfile = async (id: string) => {
     throw error;
   }
 };
+
+export const deleteTaxProfile = async (id: string) => {
+  try {
+    const response = await api.delete(`/tax-profiles/${id}`);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to delete tax profile");
+    throw error;
+  }
+};
