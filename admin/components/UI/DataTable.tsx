@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowPathIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
 
 export type ColumnDef<T> = {
     header: string;
@@ -42,14 +42,14 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
 
     return (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white">
             <table className="w-full border-collapse">
-                <thead className={headerClassName || "bg-gray-50 border-b border-gray-200"}>
+                <thead className={headerClassName || "bg-gray-50/50 border-b border-gray-100"}>
                     <tr>
                         {columns.map((c, i) => (
                             <th
                                 key={i}
-                                className={thClassName || `px-2 py-2 text-${c.align || "left"} text-[10px] font-bold text-gray-600 uppercase tracking-tight border border-gray-200`}
+                                className={thClassName || `px-4 py-3.5 text-${c.align || "left"} text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100`}
                                 style={c.width ? { width: c.width, minWidth: c.width } : {}}
                             >
                                 {c.header}
@@ -57,13 +57,13 @@ export function DataTable<T>({
                         ))}
                     </tr>
                 </thead>
-                <tbody className="bg-white">
+                <tbody className="bg-white text-sm divide-y divide-gray-100">
                     {showTotals && data.length > 0 && (
-                        <tr className="bg-gray-100 font-bold text-gray-800 border-b border-gray-200">
+                        <tr className="bg-gray-50/50 font-bold text-gray-800 border-b border-gray-100">
                             {columns.map((c, i) => (
                                 <td
                                     key={`total-${i}`}
-                                    className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px]`}
+                                    className={`px-4 py-3 text-${c.align || "left"} border-b border-gray-100 text-xs`}
                                     style={c.width ? { width: c.width, minWidth: c.width } : {}}
                                 >
                                     {c.renderTotal ? c.renderTotal(data) : null}
@@ -73,16 +73,16 @@ export function DataTable<T>({
                     )}
                     {loading ? (
                         <tr>
-                            <td colSpan={columns.length} className="px-4 py-8 text-center">
+                            <td colSpan={columns.length} className="px-4 py-12 text-center">
                                 <div className="inline-flex items-center gap-3">
-                                    <ArrowPathIcon className="h-4 w-4 animate-spin text-gray-500" />
-                                    <span className="text-gray-500 text-xs">Loading data...</span>
+                                    <ArrowPathIcon className="h-5 w-5 animate-spin text-[#8CC21B]" />
+                                    <span className="text-gray-500 text-sm font-semibold font-poppins">Loading data...</span>
                                 </div>
                             </td>
                         </tr>
                     ) : data.length === 0 ? (
                         <tr>
-                            <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500 text-xs font-medium">
+                            <td colSpan={columns.length} className="px-4 py-12 text-center text-gray-500 text-sm font-medium font-poppins">
                                 {emptyMessage}
                             </td>
                         </tr>
@@ -93,7 +93,7 @@ export function DataTable<T>({
                             return (
                                 <React.Fragment key={(row as any).id || (row as any)._id || idx}>
                                     <tr
-                                        className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""} ${onRowClick ? "cursor-pointer" : ""}`}
+                                        className={`hover:bg-gray-50/50 transition-all ${getRowClassName ? getRowClassName(row, idx) : ""} ${onRowClick ? "cursor-pointer" : ""}`}
                                         onClick={(e) => {
                                             if (!onRowClick) return;
                                             const target = e.target as HTMLElement;
@@ -105,7 +105,7 @@ export function DataTable<T>({
                                         {columns.map((c, i) => (
                                             <td
                                                 key={i}
-                                                className={tdClassName || `px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
+                                                className={tdClassName || `px-4 py-3.5 text-${c.align || "left"} border-b border-gray-100 text-gray-700 font-medium`}
                                                 style={c.width ? { width: c.width, minWidth: c.width } : {}}
                                             >
                                                 {c.render(row, idx)}
@@ -114,7 +114,7 @@ export function DataTable<T>({
                                     </tr>
                                     {isExpanded && renderRowDetails && (
                                         <tr>
-                                            <td colSpan={columns.length} className="px-4 py-4 bg-gray-50 border border-gray-200">
+                                            <td colSpan={columns.length} className="px-6 py-4 bg-gray-50/30 border-b border-gray-100">
                                                 {renderRowDetails(row, idx)}
                                             </td>
                                         </tr>

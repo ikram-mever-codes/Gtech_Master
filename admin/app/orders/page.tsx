@@ -66,7 +66,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import CustomModal from "@/components/UI/CustomModal";
 import PageHeader from "@/components/UI/PageHeader";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Search, RefreshCw } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
@@ -1516,10 +1516,10 @@ const OrderPage: React.FC = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-white shadow-xl rounded-[4px] p-2 md:p-4">
+      <div className="min-h-screen bg-transparent font-poppins">
         <div className="max-w-full mx-auto">
           <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <PageHeader
                   title={activeTabObj?.label || "Orders"}
@@ -1527,7 +1527,16 @@ const OrderPage: React.FC = () => {
                 />
               </div>
 
-              {tabActions[activeTab]}
+              <div className="flex items-center gap-3">
+                <CustomButton
+                  gradient={true}
+                  onClick={openCreate}
+                  className="px-4 py-2.5 text-sm bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl shadow-sm transition-all font-semibold flex items-center gap-2"
+                >
+                  <PlusIcon className="h-5 w-5 text-white" />
+                  New Order
+                </CustomButton>
+              </div>
             </div>
           </div>
 
@@ -1559,15 +1568,17 @@ const OrderPage: React.FC = () => {
             </div>
           )}
 
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+          <div className="border-b border-gray-100 mb-6 pb-px">
+            <nav className="-mb-px flex space-x-8 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                    ? "border-gray-600 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                  }}
+                  className={`py-3.5 px-1 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${activeTab === tab.id
+                    ? "border-[#8CC21B] text-[#8CC21B]"
+                    : "border-transparent text-gray-500 hover:text-gray-900"
                     }`}
                 >
                   {tab.label}
@@ -1576,7 +1587,59 @@ const OrderPage: React.FC = () => {
             </nav>
           </div>
 
-          <div className="bg-white rounded-[4px] shadow-lg border border-gray-200 overflow-hidden">
+          <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder={
+                  activeTab === "nso"
+                    ? "Search NSOs..."
+                    : activeTab === "supplier_orders"
+                      ? "Search Supplier Orders..."
+                      : activeTab === "purchase_order"
+                        ? "Search purchase orders..."
+                        : activeTab === "problems"
+                          ? "Search items..."
+                          : "Search reprint items..."
+                }
+                value={
+                  activeTab === "nso"
+                    ? nsoSearch
+                    : activeTab === "supplier_orders"
+                      ? supplierOrderSearch
+                      : activeTab === "purchase_order"
+                        ? poSearch
+                        : reprintSearch
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (activeTab === "nso") setNsoSearch(val);
+                  else if (activeTab === "supplier_orders") setSupplierOrderSearch(val);
+                  else if (activeTab === "purchase_order") setPoSearch(val);
+                  else setReprintSearch(val);
+                }}
+                className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                fetchOrders();
+                fetchSupplierOrders();
+              }}
+              disabled={loadingOrders || loadingSupplierOrders}
+              className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
+              title="Refresh"
+            >
+              <RefreshCw
+                className={`h-4.5 w-4.5 ${loadingOrders || loadingSupplierOrders ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {activeTab === "nso" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px] relative">
                 {loadingOrders && (
@@ -1587,27 +1650,7 @@ const OrderPage: React.FC = () => {
                     </p>
                   </div>
                 )}
-                <div className="flex items-center justify-between mb-8 px-4">
-                  <button
-                    onClick={() => router.push("/invoices")}
-                    className="bg-[#059669] text-white rounded-[4px] px-6 py-2 flex items-center gap-2 font-bold text-sm shadow-md hover:bg-green-700 transition"
-                  >
-                    <XMarkIcon className="h-4 w-4 bg-white text-[#059669] rounded-full p-0.5" />
-                    Back
-                  </button>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                      <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search NSOs"
-                      value={nsoSearch}
-                      onChange={(e) => setNsoSearch(e.target.value)}
-                      className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 w-80 shadow-md text-sm"
-                    />
-                  </div>
-                </div>
+                <div className="h-4"></div>
                 {(() => {
                   const renderNsoItemDetails = (row: any) => (
                     <div className="p-4 bg-white border border-gray-100 rounded-lg shadow-inner m-2">
@@ -1847,29 +1890,7 @@ const OrderPage: React.FC = () => {
               </div>
             ) : activeTab === "supplier_orders" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
-                <div className="flex justify-between items-center mb-6 gap-4">
-                  <div className="flex gap-2 items-center">
-                    <button
-                      onClick={() => router.push("/invoices")}
-                      className="bg-[#059669] text-white px-4 py-2 rounded-[4px] text-xs font-bold hover:bg-green-700 transition shadow-md"
-                    >
-                      Back
-                    </button>
-                    <div className="relative">
-                      <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search Supplier Orders..."
-                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-[4px] text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
-                        value={supplierOrderSearch}
-                        onChange={(e) => setSupplierOrderSearch(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-[#059669] font-bold text-lg">
-                    Supplier Orders
-                  </div>
-                </div>
+                <div className="h-4"></div>
                 <DataTable
                   data={supplierOrdersList}
                   expandedRowId={expandedSupplierOrderId}
@@ -2238,29 +2259,7 @@ const OrderPage: React.FC = () => {
               </div>
             ) : activeTab === "purchase_order" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
-                <div className="flex justify-between items-center mb-6 gap-4">
-                  <div className="flex gap-2 items-center">
-                    <button
-                      onClick={() => router.push("/invoices")}
-                      className="bg-[#059669] text-white px-4 py-2 rounded-[4px] text-xs font-bold hover:bg-green-700 transition shadow-md"
-                    >
-                      Back
-                    </button>
-                    <div className="relative">
-                      <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search purchase order..."
-                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-[4px] text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
-                        value={poSearch}
-                        onChange={(e) => setPoSearch(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-[#059669] font-bold text-lg">
-                    List of created PO for all Suppliers
-                  </div>
-                </div>
+                <div className="h-4"></div>
                 <DataTable
                   data={purchaseOrdersList}
                   columns={[
@@ -2495,18 +2494,6 @@ const OrderPage: React.FC = () => {
                     <h2 className="text-lg font-bold text-gray-800">
                       Label Reprint
                     </h2>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                        <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Search items..."
-                        value={reprintSearch}
-                        onChange={(e) => setReprintSearch(e.target.value)}
-                        className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 w-64 shadow-sm text-xs"
-                      />
-                    </div>
                   </div>
                   <DataTable
                     data={reprintItems}
@@ -2631,20 +2618,6 @@ const OrderPage: React.FC = () => {
                     <h2 className="text-lg font-bold text-gray-800">
                       Label Management
                     </h2>
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                          <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Search by EAN, Item name, Order No..."
-                          value={reprintSearch}
-                          onChange={(e) => setReprintSearch(e.target.value)}
-                          className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#059669] w-80 shadow-sm text-xs text-gray-900"
-                        />
-                      </div>
-                    </div>
                   </div>
 
                   <DataTable

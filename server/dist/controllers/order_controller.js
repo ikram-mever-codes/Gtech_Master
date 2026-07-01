@@ -1369,9 +1369,10 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         const customerAddress = resolveCustomerAddress(customer);
         const hasCargoBillTo = !!((cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_display_name) || (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_company_name));
         const rawBillName = hasCargoBillTo
-            ? cargo.bill_to_display_name || cargo.bill_to_company_name || ""
-            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) ||
-                (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) ||
+            ? cargo.bill_to_company_name || cargo.bill_to_display_name || ""
+            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) ||
+                (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) ||
+                (customer === null || customer === void 0 ? void 0 : customer.legalName) ||
                 (customer === null || customer === void 0 ? void 0 : customer.companyName) ||
                 "";
         const billToName = rawBillName
@@ -1397,8 +1398,9 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         const billToEori = hasCargoBillTo
             ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_tax_no) || (customer === null || customer === void 0 ? void 0 : customer.taxNumber) || ""
             : (customer === null || customer === void 0 ? void 0 : customer.taxNumber) || "";
-        const shipToCompany = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) ||
-            (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) ||
+        const shipToCompany = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) ||
+            (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) ||
+            (customer === null || customer === void 0 ? void 0 : customer.legalName) ||
             (customer === null || customer === void 0 ? void 0 : customer.companyName) ||
             "";
         const shipToStreet = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_full_address) || customerAddress.street;
@@ -1406,7 +1408,12 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
             : formatPostalCity(customerAddress.postalCode, customerAddress.city);
         const shipToCountry = formatCountry((cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_country) || customerAddress.country || "");
-        const shipToContact = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_person) || customerAddress.contact || "";
+        const isContactSameAsLegalName = !!(customerAddress.contact &&
+            (customer === null || customer === void 0 ? void 0 : customer.legalName) &&
+            customerAddress.contact.trim().toLowerCase() === customer.legalName.trim().toLowerCase());
+        const shipToContact = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_person) ||
+            (!isContactSameAsLegalName ? customerAddress.contact : "") ||
+            "";
         const shipToPhone = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_phone) || customerAddress.phone || "";
         const customerID = (() => {
             var _a;
@@ -1442,9 +1449,13 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
                 phone: shipToPhone,
             },
         };
+        const safeInvoiceNo = (data.invoiceNo || "").trim() || "CI";
+        const safeCargoNo = (data.cargoNo || "").trim() || "NoCargo";
+        const filename = `${safeInvoiceNo}_${safeCargoNo}.pdf`
+            .replace(/[/\\?%*:|"<>\s]/g, "_");
         const doc = new pdfkit_1.default({ size: "A4", margin: 40, bufferPages: true });
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename=Invoice_${data.invoiceNo}.pdf`);
+        res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
         doc.pipe(res);
         doc
             .fillColor("#777777")

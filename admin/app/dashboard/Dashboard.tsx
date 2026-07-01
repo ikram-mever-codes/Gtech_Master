@@ -68,7 +68,7 @@ export default function Dashboard() {
             USD: { label: "US Dollar", rate: Number(rates.USD).toFixed(2), symbol: "$" },
             RMB: { label: "Chinese Yuan", rate: Number(rates.RMB).toFixed(2), symbol: "¥" }
           });
-          
+
           if (response.data.controlData) {
             setControlData(response.data.controlData);
           }
@@ -126,13 +126,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#F8F9FA] text-[#212529] font-['Poppins'] py-5 px-3 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-5">
 
-        {/* Header Section - Compact */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-[#E9ECEF]">
           <div>
             <PageHeader title="Reports & Control" icon={ClipboardList} />
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5 font-medium">
-              System health audit, live currency tracking, and data integrity metrics.
-            </p>
           </div>
           <button
             onClick={handleBack}
@@ -144,7 +140,6 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Currency Rates Section - Super Compact & Premium */}
         <div
           className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden"
           style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
@@ -195,10 +190,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 2x2 Grid of Audit Cards - Highly Compact */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
 
-          {/* Orders Card */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
             style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
@@ -239,7 +232,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Items Card */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
             style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
@@ -280,7 +272,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Suppliers Card */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
             style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
@@ -321,7 +312,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Pictures Card */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
             style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}

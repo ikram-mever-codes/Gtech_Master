@@ -8,8 +8,16 @@ const router = (0, express_1.Router)();
 const offerController = new offer_controller_1.OfferController();
 // Apply authentication to all offer routes
 router.use(authorized_1.authenticateUser);
-// Offer CRUD operations - Restricted to Admin and Sales
+// ---------------------------------------------------------------------------
+// Offer creation - Restricted to Admin and Sales
+// ---------------------------------------------------------------------------
 router.post("/inquiry/:inquiryId", (0, authorized_1.authorize)(users_1.UserRole.SALES), offerController.createOfferFromInquiry.bind(offerController));
+// NEW: create an offer from an existing item (customer prefilled from the
+// item's linked customer, or an explicit customerId in the body)
+router.post("/from-item/:itemId", (0, authorized_1.authorize)(users_1.UserRole.SALES), offerController.createOfferFromItem.bind(offerController));
+// ---------------------------------------------------------------------------
+// Offer CRUD operations - Restricted to Admin and Sales
+// ---------------------------------------------------------------------------
 router.get("", (0, authorized_1.authorize)(users_1.UserRole.SALES), offerController.getAllOffers.bind(offerController));
 router.get("/:id", (0, authorized_1.authorize)(users_1.UserRole.SALES), offerController.getOfferById.bind(offerController));
 router.put("/:id", (0, authorized_1.authorize)(users_1.UserRole.SALES), offerController.updateOffer.bind(offerController));
@@ -20,8 +28,14 @@ router.post("/:id/revisions", offerController.createRevision.bind(offerControlle
 router.post("/:id/generate-pdf", offerController.generatePdf.bind(offerController));
 // Offer PDF generation
 router.get("/:id/download-pdf", offerController.generateAndDownloadPdf.bind(offerController));
+// ---------------------------------------------------------------------------
 // Line item operations
+// ---------------------------------------------------------------------------
+// NEW: add a line item to an offer (needed for customer/blank offers)
+router.post("/:offerId/line-items", offerController.createLineItem.bind(offerController));
 router.put("/:offerId/line-items/:lineItemId", offerController.updateLineItem.bind(offerController));
+// NEW: delete a line item
+router.delete("/:offerId/line-items/:lineItemId", offerController.deleteLineItem.bind(offerController));
 router.put("/:offerId/line-items/bulk", offerController.bulkUpdateLineItems.bind(offerController));
 // Price management operations
 router.post("/line-items/:lineItemId/quantity-prices", offerController.addQuantityPrice.bind(offerController));

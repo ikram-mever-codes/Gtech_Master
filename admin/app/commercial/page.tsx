@@ -1582,7 +1582,7 @@ const InvoiceListPage: React.FC = () => {
     return [
       {
         header: "date_created",
-        width: "120px",
+        width: "100px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -1615,7 +1615,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "No",
-        width: "130px",
+        width: "100px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -1659,35 +1659,41 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Company",
-        width: "180px",
+        width: "130px",
         align: "left",
         render: (row) => {
-          if (activeInvTab === "angebot") {
-            return row.customerSnapshot?.companyName || "N/A";
-          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
-            return row.customer_name || row.customer?.companyName || "N/A";
-          } else {
-            return row.bill_to || row.customer?.companyName || "N/A";
-          }
+          const text = activeInvTab === "angebot"
+            ? row.customerSnapshot?.companyName || "N/A"
+            : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+              ? row.customer_name || row.customer?.companyName || "N/A"
+              : row.bill_to || row.customer?.companyName || "N/A";
+          return (
+            <div className="truncate max-w-[130px]" title={text}>
+              {text}
+            </div>
+          );
         },
       },
       {
         header: "Person",
-        width: "150px",
+        width: "110px",
         align: "left",
         render: (row) => {
-          if (activeInvTab === "angebot") {
-            return row.customerSnapshot?.contactEmail || row.customerSnapshot?.contactPhoneNumber || "-";
-          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
-            return row.customer?.contactEmail || "-";
-          } else {
-            return row.ship_to || "-";
-          }
+          const text = activeInvTab === "angebot"
+            ? row.customerSnapshot?.contactEmail || row.customerSnapshot?.contactPhoneNumber || "-"
+            : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+              ? row.customer?.contactEmail || "-"
+              : row.ship_to || "-";
+          return (
+            <div className="truncate max-w-[110px]" title={text}>
+              {text}
+            </div>
+          );
         },
       },
       {
         header: "Shipping_postal_code",
-        width: "100px",
+        width: "80px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -1701,27 +1707,33 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "City, county",
-        width: "180px",
+        width: "110px",
         align: "left",
         render: (row) => {
+          let text = "";
           if (activeInvTab === "angebot") {
             const city = row.deliveryAddress?.city || row.customerSnapshot?.city || "";
             const country = row.deliveryAddress?.country || row.customerSnapshot?.country || "";
-            return [city, country].filter(Boolean).join(", ") || "-";
+            text = [city, country].filter(Boolean).join(", ") || "-";
           } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
             const city = row.customer?.city || row.cargo?.customer?.city || "";
             const country = row.customer?.country || row.cargo?.customer?.country || "";
-            return [city, country].filter(Boolean).join(", ") || "-";
+            text = [city, country].filter(Boolean).join(", ") || "-";
           } else {
             const city = row.customer?.city || "";
             const country = row.customer?.country || "";
-            return [city, country].filter(Boolean).join(", ") || "-";
+            text = [city, country].filter(Boolean).join(", ") || "-";
           }
+          return (
+            <div className="truncate max-w-[110px]" title={text}>
+              {text}
+            </div>
+          );
         },
       },
       {
         header: "Value_net",
-        width: "100px",
+        width: "80px",
         align: "right",
         render: (row) => {
           let val = 0;
@@ -1740,7 +1752,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Item_Count",
-        width: "90px",
+        width: "70px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -1754,7 +1766,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Actions",
-        width: "150px",
+        width: "110px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -1774,14 +1786,14 @@ const InvoiceListPage: React.FC = () => {
           } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
             const hasCargo = !!row.cargo_id;
             return (
-              <div className="flex items-center justify-center gap-1.5">
+              <div className="flex items-center justify-center gap-1.5 font-poppins">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleOpenReassignModal(row);
                   }}
                   title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+                  className="px-1.5 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-0.5"
                 >
                   <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
                 </button>
@@ -1790,7 +1802,7 @@ const InvoiceListPage: React.FC = () => {
                     e.stopPropagation();
                     handleEditOrder(row);
                   }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+                  className="px-1.5 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
                 >
                   Edit
                 </button>
@@ -1863,93 +1875,98 @@ const InvoiceListPage: React.FC = () => {
             </button>
           </div>
         )}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <PageHeader
               title="Commercial"
               icon={DollarSign}
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            {(activeInvTab === "angebot" || activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
-              <div className="relative">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={orderNoFilter}
-                  onChange={(e) => setOrderNoFilter(e.target.value)}
-                  className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent w-64 shadow-sm text-black"
-                />
-                {orderNoFilter && (
-                  <button
-                    onClick={() => setOrderNoFilter("")}
-                    className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            )}
-            <>
+          <div className="flex items-center gap-3">
+            {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
               <button
                 onClick={() => {
-                  if (
-                    activeInvTab === "angebot" ||
-                    activeInvTab === "auftrag" ||
-                    activeInvTab === "bestellung"
-                  ) {
-                    fetchOrders();
-                    fetchOffers();
-                  } else {
-                    setLoading(true);
-                    loadInvoices();
-                    if (activeInvTab === "lieferschein") fetchCustomers();
-                  }
+                  resetForm();
+                  setMode("create");
+                  setShowModal(true);
                 }}
-                disabled={loading || loadingOrders || loadingOffers}
-                className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 font-semibold shadow-sm transition-all"
+                className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
               >
-                <RefreshCw
-                  className={`w-4 h-4 ${loading || loadingOrders || loadingOffers ? "animate-spin" : ""}`}
-                />
-                {loading || loadingOrders || loadingOffers ? "Loading..." : "Refresh"}
+                <Plus className="w-4 h-4" />
+                New Order
               </button>
-              {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setMode("create");
-                    setShowModal(true);
-                  }}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  New Order
-                </button>
-              )}
-            </>
+            )}
           </div>
         </div>
 
-        <div className="flex overflow-x-auto mb-6 border-b border-gray-200">
+        <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
           {invoiceTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveInvTab(tab.id)}
-              className={`px-6 py-3 text-sm font-semibold transition-all relative min-w-fit ${activeInvTab === tab.id
-                ? "text-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-700"
+              onClick={() => {
+                setActiveInvTab(tab.id);
+                setCurrentPage(1);
+              }}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
+                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
                 }`}
             >
               {tab.label}
-              {activeInvTab === tab.id && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#8CC21B]" />
-              )}
             </button>
           ))}
+        </div>
+
+        <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder={
+                (activeInvTab === "rechnung" || activeInvTab === "rk")
+                  ? "Search invoices, customers, or order numbers..."
+                  : "Search..."
+              }
+              value={
+                (activeInvTab === "rechnung" || activeInvTab === "rk")
+                  ? searchTerm
+                  : orderNoFilter
+              }
+              onChange={(e) => {
+                if (activeInvTab === "rechnung" || activeInvTab === "rk") {
+                  setSearchTerm(e.target.value);
+                } else {
+                  setOrderNoFilter(e.target.value);
+                }
+              }}
+              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
+            />
+          </div>
+
+          <button
+            onClick={() => {
+              if (
+                activeInvTab === "angebot" ||
+                activeInvTab === "auftrag" ||
+                activeInvTab === "bestellung"
+              ) {
+                fetchOrders();
+                fetchOffers();
+              } else {
+                setLoading(true);
+                loadInvoices();
+                if (activeInvTab === "lieferschein") fetchCustomers();
+              }
+            }}
+            disabled={loading || loadingOrders || loadingOffers}
+            className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
+            title="Refresh"
+          >
+            <RefreshCw
+              className={`h-4.5 w-4.5 ${loading || loadingOrders || loadingOffers ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </button>
         </div>
 
         {false && (activeInvTab === "rechnung" || activeInvTab === "rk") && (
@@ -2122,7 +2139,7 @@ const InvoiceListPage: React.FC = () => {
         {(activeInvTab === "angebot" ||
           activeInvTab === "auftrag" ||
           activeInvTab === "bestellung") && (
-            <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm mb-6">
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
               <DataTable
                 data={currentItems}
                 columns={commercialColumns}

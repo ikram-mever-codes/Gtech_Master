@@ -20,6 +20,7 @@ import { User } from "../models/users";
 import { Invoice } from "../models/invoice";
 import { RequestedItem } from "../models/requested_items";
 import { ContactPerson } from "../models/contact_person";
+import { Country } from "../models/country";
 
 export const BUSINESS_SOURCE = {
   GOOGLE_MAPS: "Google Maps",
@@ -761,6 +762,19 @@ export const createBusiness = async (
         businessDetails.city = city ? city.trim() : undefined;
         businessDetails.state = state ? state.trim() : undefined;
         businessDetails.country = country ? country.trim() : undefined;
+        if (country) {
+          const countryRepo = AppDataSource.getRepository(Country);
+          const matched = await countryRepo.findOne({
+            where: [
+              { iso2: country.trim().toUpperCase() },
+              { name: country.trim() }
+            ]
+          });
+          if (matched) {
+            customer.country_id = matched.id;
+            businessDetails.country_id = matched.id;
+          }
+        }
         businessDetails.postalCode = postalCode ? postalCode.trim() : undefined;
         businessDetails.latitude = sanitizeNumber(latitude);
         businessDetails.longitude = sanitizeNumber(longitude);
@@ -1249,8 +1263,25 @@ export const updateBusiness = async (
             businessDetails.city = updateData.city.trim();
           if (updateData.state !== undefined)
             businessDetails.state = updateData.state.trim();
-          if (updateData.country !== undefined)
-            businessDetails.country = updateData.country.trim();
+          if (updateData.country !== undefined) {
+            const countryStr = updateData.country.trim();
+            businessDetails.country = countryStr;
+            
+            const countryRepo = AppDataSource.getRepository(Country);
+            const matched = await countryRepo.findOne({
+              where: [
+                { iso2: countryStr.toUpperCase() },
+                { name: countryStr }
+              ]
+            });
+            if (matched) {
+              customer.country_id = matched.id;
+              businessDetails.country_id = matched.id;
+            } else {
+              customer.country_id = null;
+              businessDetails.country_id = null;
+            }
+          }
           if (updateData.postalCode !== undefined)
             businessDetails.postalCode = updateData.postalCode.trim();
           if (updateData.latitude !== undefined)

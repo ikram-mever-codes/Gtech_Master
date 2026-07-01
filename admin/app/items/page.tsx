@@ -101,13 +101,12 @@ const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
-  }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
+    }`;
 };
 
 const ItemsManagementPage: React.FC = () => {
@@ -1521,12 +1520,6 @@ const ItemsManagementPage: React.FC = () => {
                         : ArchiveBoxIcon
               }
             />
-            {activeTab === "items" && pendingSyncCount > 0 && (
-              <div className="mt-2 text-sm text-yellow-600 flex items-center gap-2">
-                <Sync className="w-4 h-4" />
-                <span>{pendingSyncCount} item(s) pending sync to WaWi</span>
-              </div>
-            )}
           </div>
 
           <div className="flex gap-1.5 items-center flex-wrap justify-end">
