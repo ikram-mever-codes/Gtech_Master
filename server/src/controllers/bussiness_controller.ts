@@ -1266,7 +1266,7 @@ export const updateBusiness = async (
           if (updateData.country !== undefined) {
             const countryStr = updateData.country.trim();
             businessDetails.country = countryStr;
-            
+
             const countryRepo = AppDataSource.getRepository(Country);
             const matched = await countryRepo.findOne({
               where: [

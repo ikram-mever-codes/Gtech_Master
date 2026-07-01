@@ -45,6 +45,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import { Eye, Pencil, Building2 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import theme from "@/styles/theme";
+import { formatDate } from "@/utils/date";
 
 interface FormErrors {
   [key: string]: string;
@@ -1446,9 +1447,7 @@ const AddEditBusinessManual: React.FC = () => {
 
                               <div className="text-right">
                                 <p className="text-sm font-medium text-gray-900">
-                                  {new Date(
-                                    list.createdAt
-                                  ).toLocaleDateString()}
+                                  {formatDate(list.createdAt)}
                                 </p>
                                 <p className="text-xs text-gray-500">Created</p>
                               </div>
@@ -1502,10 +1501,7 @@ const AddEditBusinessManual: React.FC = () => {
                                     Created
                                   </p>
                                   <p className="text-sm text-gray-900">
-                                    {new Date(
-                                      list.createdAt
-                                    ).toLocaleDateString()}{" "}
-                                    at{" "}
+                                    {formatDate(list.createdAt)} at{" "}
                                     {new Date(
                                       list.createdAt
                                     ).toLocaleTimeString()}
@@ -1516,10 +1512,7 @@ const AddEditBusinessManual: React.FC = () => {
                                     Last Updated
                                   </p>
                                   <p className="text-sm text-gray-900">
-                                    {new Date(
-                                      list.updatedAt
-                                    ).toLocaleDateString()}{" "}
-                                    at{" "}
+                                    {formatDate(list.updatedAt)} at{" "}
                                     {new Date(
                                       list.updatedAt
                                     ).toLocaleTimeString()}

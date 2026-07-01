@@ -166,8 +166,8 @@ import { DataGrid } from "react-data-grid";
 import { useSelector } from "react-redux";
 import { RootState } from "../Redux/store";
 import { getAllContactPersons } from "@/api/contacts";
-import { log } from "console";
 import { json } from "stream/consumers";
+import { formatDate } from "@/utils/date";
 
 function AddItemDialog({
   open,
@@ -1157,7 +1157,7 @@ function DeliveryCell({
             {delivery?.deliveredAt && (
               <Typography color="white" variant="caption" display="block">
                 Geliefert am:{" "}
-                {new Date(delivery.deliveredAt).toLocaleDateString()}
+                {formatDate(delivery.deliveredAt)}
               </Typography>
             )}
             {delivery?.cargoNo && (
@@ -2466,20 +2466,8 @@ const AdminAllItemsPage = () => {
 
   function formatEta(etaDate: any) {
     if (!etaDate) return null;
-    const now = new Date();
-    const eta = new Date(etaDate);
-    if (isNaN(eta.getTime())) return etaDate;
-
-    const isCurrentYear = eta.getFullYear() === now.getFullYear();
-
-    if (isCurrentYear) {
-      return eta.toLocaleDateString("de-DE", {
-        day: "2-digit",
-        month: "2-digit",
-      });
-    } else {
-      return eta.toLocaleDateString("de-DE");
-    }
+    const formatted = formatDate(etaDate);
+    return formatted === "-" ? etaDate : formatted;
   }
 
   function formatCargoColumnLabel(
@@ -3229,7 +3217,7 @@ const AdminAllItemsPage = () => {
             </button>
             <button
               onClick={() => setAddItemDialog(true)}
-              className="px-4 py-2.5 bg-gradient-to-r from-[#059669] to-[#047857] hover:from-[#047857] hover:to-[#035e43] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+              className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
             >
               <Add className="w-4 h-4" />
               Add Item

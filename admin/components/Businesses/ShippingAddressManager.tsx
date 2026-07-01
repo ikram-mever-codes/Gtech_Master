@@ -12,6 +12,7 @@ import {
 } from "@/api/shipping_addresses";
 import { Country } from "@/api/countries";
 import { toast } from "react-hot-toast";
+import { formatCountryCode } from "@/utils/address";
 
 interface ShippingAddressManagerProps {
   companyId: string;
@@ -297,7 +298,7 @@ export const ShippingAddressManager: React.FC<ShippingAddressManagerProps> = ({
                   {addr.street}
                   {addr.address_additional_line ? `, ${addr.address_additional_line}` : ""}
                   {` · ${addr.postal_code} ${addr.city}`}
-                  {addr.country ? ` · ${addr.country.name}` : ""}
+                  {formatCountryCode(addr.country?.name) ? ` · ${formatCountryCode(addr.country?.name)}` : ""}
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">

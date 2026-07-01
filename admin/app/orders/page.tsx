@@ -73,6 +73,7 @@ import { UserRole } from "@/utils/interfaces";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
+import { formatDate } from "@/utils/date";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 type Item = {
@@ -2216,10 +2217,7 @@ const OrderPage: React.FC = () => {
                       header: "Date created",
                       width: "100px",
                       render: (row) =>
-                        new Date(row.created_at).toLocaleDateString(undefined, {
-                          day: "2-digit",
-                          month: "2-digit",
-                        }),
+                        row.created_at ? formatDate(row.created_at) : "-",
                       align: "center",
                     },
                     {
@@ -2274,7 +2272,7 @@ const OrderPage: React.FC = () => {
                       width: "120px",
                       render: (row) => (
                         <div className="text-center text-[11px]">
-                          {new Date(row.created_at).toLocaleDateString()}
+                          {formatDate(row.created_at)}
                         </div>
                       ),
                       align: "center",
@@ -3069,7 +3067,7 @@ const OrderPage: React.FC = () => {
                               <td className="px-4 py-2 text-xs text-gray-600">{getSupplierName(so.supplier_id)}</td>
                               <td className="px-4 py-2 text-xs text-gray-500 max-w-[200px] truncate">{desc || so.remark || "-"}</td>
                               <td className="px-4 py-2 text-xs text-right font-bold text-gray-900">¥ {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                              <td className="px-4 py-2 text-xs text-center text-gray-500">{new Date(so.created_at).toLocaleDateString()}</td>
+                              <td className="px-4 py-2 text-xs text-center text-gray-500">{formatDate(so.created_at)}</td>
                               <td className="px-4 py-2 text-center">
                                 <button
                                   onClick={() => openPO(so)}

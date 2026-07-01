@@ -80,6 +80,8 @@ import { Pencil, Scissors, MoveRight } from "lucide-react";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
+import { formatDate } from "@/utils/date";
+import { formatCountryCode } from "@/utils/address";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -2004,12 +2006,7 @@ const InvoiceListPage: React.FC = () => {
                                     {invoice.cargo?.cargo_no || "No Cargo"}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {new Date(
-                                      invoice.invoiceDate,
-                                    ).toLocaleDateString("de-DE", {
-                                      day: "2-digit",
-                                      month: "2-digit",
-                                    })}
+                                    {formatDate(invoice.invoiceDate)}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {invoice.customItemCount ??
@@ -2260,8 +2257,13 @@ const InvoiceListPage: React.FC = () => {
                           {customer.companyName}
                         </td>
                         <td className="py-4 px-4 text-xs text-[#6C757D] max-w-[200px] truncate">
-                          {customer.country}, {customer.city},{" "}
-                          {customer.addressLine1}
+                          {[
+                            formatCountryCode(customer.country),
+                            customer.city,
+                            customer.addressLine1,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
                         </td>
                         <td className="py-4 px-4 text-xs text-[#212529]">
                           {customer.email}
@@ -2397,7 +2399,7 @@ const InvoiceListPage: React.FC = () => {
                     <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Cargo No / Dates</span>
                     <span className="text-sm font-semibold text-gray-800 block mt-1">Cargo: {selectedInvoice.cargo?.cargo_no || "No Cargo"}</span>
                     <span className="text-xs text-gray-500 block mt-0.5">
-                      Date: {new Date(selectedInvoice.invoiceDate).toLocaleDateString("de-DE")}
+                      Date: {formatDate(selectedInvoice.invoiceDate)}
                     </span>
                   </div>
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">

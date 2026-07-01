@@ -51,6 +51,7 @@ import ModalFooter from "@/components/UI/ModalFooter";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
+import { formatDate } from "@/utils/date";
 
 interface ContactPerson {
   id: string;
@@ -482,14 +483,7 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("de-DE", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+
 
   return (
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-8">

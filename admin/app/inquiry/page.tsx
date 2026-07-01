@@ -72,6 +72,7 @@ import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
+import { formatDate } from "@/utils/date";
 
 export interface Customer {
   id: string;
@@ -1302,14 +1303,7 @@ const CombinedInquiriesPageContent = () => {
     const hasHigh = requests.some(r => r.priority === "High");
     return hasHigh ? "High" : "Normal";
   };
-  const formatDate = (dateString: string | Date) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("de-DE", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat("de-DE", {
       style: "currency",

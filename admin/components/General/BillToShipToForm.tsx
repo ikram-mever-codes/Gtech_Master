@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getShippingAddresses, CompanyShippingAddress } from "@/api/shipping_addresses";
+import { formatCountryCode } from "@/utils/address";
 
 export interface BillToShipToData {
     customer_type?: string;
@@ -101,13 +102,13 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
     const mainAddressStr = selectedCustomer ? [
         selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address,
         selectedCustomer.city || selectedCustomer.businessDetails?.city,
-        selectedCustomer.country || selectedCustomer.businessDetails?.country
+        formatCountryCode(selectedCustomer.country || selectedCustomer.businessDetails?.country)
     ].filter(Boolean).join(", ") : "";
 
     const deliveryAddressStr = selectedCustomer ? [
         selectedCustomer.deliveryAddressLine1,
         selectedCustomer.deliveryCity,
-        selectedCustomer.deliveryCountry
+        formatCountryCode(selectedCustomer.deliveryCountry)
     ].filter(Boolean).join(", ") : "";
 
     const applyShipToAddress = (
@@ -409,7 +410,7 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
                                 <option value="delivery">Delivery Address {deliveryAddressStr ? `— ${deliveryAddressStr}` : "— (Not Set)"}</option>
                                 {dbShippingAddresses.map((addr) => (
                                     <option key={addr.id} value={addr.id}>
-                                        {addr.name}{addr.is_default ? " (Default)" : ""} — {addr.street}, {addr.city}{addr.country ? `, ${addr.country.name}` : ""}
+                                        {addr.name}{addr.is_default ? " (Default)" : ""} — {addr.street}, {addr.city}{formatCountryCode(addr.country?.name) ? `, ${formatCountryCode(addr.country?.name)}` : ""}
                                     </option>
                                 ))}
                             </select>

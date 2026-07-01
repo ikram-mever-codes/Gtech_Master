@@ -82,6 +82,7 @@ import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import { DownloadCloudIcon, ToggleLeft, ToggleRight } from "lucide-react";
 import { formatDate, openOutlookWithOffer } from "@/utils/offers";
+import { formatCountryCode } from "@/utils/address";
 import { Customer } from "../inquiry/page";
 import { errorStyles } from "@/utils/constants";
 import { FunnelIcon } from "@heroicons/react/24/outline";
@@ -1516,9 +1517,9 @@ const OffersPage: React.FC = () => {
                           {selectedOffer.customerSnapshot.city}
                         </div>
                       )}
-                    {selectedOffer.customerSnapshot.country && (
+                    {formatCountryCode(selectedOffer.customerSnapshot.country) && (
                       <div className="text-gray-600">
-                        {selectedOffer.customerSnapshot.country}
+                        {formatCountryCode(selectedOffer.customerSnapshot.country)}
                       </div>
                     )}
                     {selectedOffer.customerSnapshot.vatId && (
@@ -1551,9 +1552,9 @@ const OffersPage: React.FC = () => {
                           {selectedOffer.deliveryAddress.city}
                         </div>
                       )}
-                    {selectedOffer.deliveryAddress?.country && (
+                    {formatCountryCode(selectedOffer.deliveryAddress?.country) && (
                       <div className="text-gray-600">
-                        {selectedOffer.deliveryAddress.country}
+                        {formatCountryCode(selectedOffer.deliveryAddress.country)}
                       </div>
                     )}
                     {selectedOffer.deliveryAddress?.contactPhone && (

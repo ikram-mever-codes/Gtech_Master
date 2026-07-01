@@ -76,6 +76,8 @@ import {
 } from "@/api/customers";
 import { CustomerVerificationStatus } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
+import { formatDate } from "@/utils/date";
+import { formatCountryCode } from "@/utils/address";
 
 const CustomersPage = () => {
   const muiTheme = useTheme();
@@ -260,19 +262,6 @@ const CustomersPage = () => {
     }
   };
 
-  // Helper function to format dates
-  const formatDate = (dateString: any) => {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "Invalid date";
-
-    const day = date.getDate();
-    const month = date.toLocaleString("en-US", { month: "short" });
-    const year = date.getFullYear();
-
-    return `${month} ${day}, ${year}`;
-  };
-
-  // Helper function to format the status text
   const formatStatus = (status: string) => {
     switch (status) {
       case CustomerVerificationStatus.APPROVED:
@@ -350,7 +339,7 @@ const CustomersPage = () => {
             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
             badgeContent={
               row.accountVerificationStatus ===
-              CustomerVerificationStatus.APPROVED ? (
+                CustomerVerificationStatus.APPROVED ? (
                 <Box
                   sx={{
                     width: 16,
@@ -419,7 +408,7 @@ const CustomersPage = () => {
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <MapPin size={14} style={{ marginRight: 6, color: "#5f6368" }} />
             <Typography variant="caption" sx={{ fontWeight: 500 }}>
-              {row.city}, {row.country}
+              {[row.city, formatCountryCode(row.country)].filter(Boolean).join(", ")}
             </Typography>
           </Box>
         </Stack>
@@ -449,43 +438,43 @@ const CustomersPage = () => {
         <Stack direction="row" spacing={0.5}>
           {row.accountVerificationStatus ===
             CustomerVerificationStatus.PENDING && (
-            <>
-              <Tooltip title="Approve" placement="top">
-                <IconButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedCustomer(row);
-                    setApproveDialogOpen(true);
-                  }}
-                  size="small"
-                  sx={{
-                    backgroundColor: "#e8f5e8",
-                    color: "#2e7d32",
-                    "&:hover": { backgroundColor: "#c8e6c9" },
-                  }}
-                >
-                  <LucideCheck size={16} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Reject" placement="top">
-                <IconButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedCustomer(row);
-                    setRejectDialogOpen(true);
-                  }}
-                  size="small"
-                  sx={{
-                    backgroundColor: "#ffebee",
-                    color: "#c62828",
-                    "&:hover": { backgroundColor: "#ffcdd2" },
-                  }}
-                >
-                  <LucideX size={16} />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
+              <>
+                <Tooltip title="Approve" placement="top">
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCustomer(row);
+                      setApproveDialogOpen(true);
+                    }}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#e8f5e8",
+                      color: "#2e7d32",
+                      "&:hover": { backgroundColor: "#c8e6c9" },
+                    }}
+                  >
+                    <LucideCheck size={16} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Reject" placement="top">
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCustomer(row);
+                      setRejectDialogOpen(true);
+                    }}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#ffebee",
+                      color: "#c62828",
+                      "&:hover": { backgroundColor: "#ffcdd2" },
+                    }}
+                  >
+                    <LucideX size={16} />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
           <IconButton
             onClick={(e) => {
               e.stopPropagation();

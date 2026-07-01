@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Select from "react-select";
 import { toast } from "react-hot-toast";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
+import { formatDate } from "@/utils/date";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -400,14 +401,7 @@ export default function OrdersTable({
     {
       header: "Created",
       width: "65px",
-      render: (row) =>
-        row.created_at
-          ? new Intl.DateTimeFormat("de-DE", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }).format(new Date(row.created_at))
-          : "-",
+      render: (row) => (row.created_at ? formatDate(row.created_at) : "-"),
       align: "center",
     },
     {
@@ -415,11 +409,7 @@ export default function OrdersTable({
       width: "65px",
       render: (row) =>
         row.date_emailed && row.date_emailed !== "-"
-          ? new Intl.DateTimeFormat("de-DE", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }).format(new Date(row.date_emailed))
+          ? formatDate(row.date_emailed)
           : "-",
       align: "center",
     },
@@ -428,11 +418,7 @@ export default function OrdersTable({
       width: "65px",
       render: (row) =>
         row.date_delivery && row.date_delivery !== "-"
-          ? new Intl.DateTimeFormat("de-DE", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }).format(new Date(row.date_delivery))
+          ? formatDate(row.date_delivery)
           : "-",
       align: "center",
     },

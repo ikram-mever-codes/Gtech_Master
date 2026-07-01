@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { getBusinessById } from "@/api/bussiness";
 import { toast } from "react-hot-toast";
 import { EntityTagSelector } from "@/components/Tags/TagManager";
+import { formatDate } from "@/utils/date";
 import {
   Building2,
   Mail,
@@ -417,14 +418,14 @@ const BusinessProfilePage = () => {
                   <div className="h-2 w-2 rounded-full bg-green-500"></div>
                   <span className="text-gray-600">Created</span>
                   <span className="text-gray-900 font-medium">
-                    {new Date(business.createdAt).toLocaleDateString()}
+                    {formatDate(business.createdAt)}
                   </span>
                 </div>
                 <div className="flex items-center space-x-3 text-sm">
                   <div className="h-2 w-2 rounded-full bg-blue-500"></div>
                   <span className="text-gray-600">Last Updated</span>
                   <span className="text-gray-900 font-medium">
-                    {new Date(business.updatedAt).toLocaleDateString()}
+                    {formatDate(business.updatedAt)}
                   </span>
                 </div>
               </div>
@@ -719,13 +720,9 @@ const BusinessProfilePage = () => {
                           Last Verification
                         </p>
                         <p className="text-sm font-medium text-gray-900">
-                          {new Date(
+                          {formatDate(
                             business.starBusinessDetails.lastChecked
-                          ).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
+                          )}
                         </p>
                       </div>
                       {business.starBusinessDetails.checkedBy && (
@@ -854,7 +851,7 @@ const BusinessProfilePage = () => {
           <div className="flex items-center justify-between text-xs text-gray-500">
             <span>ID: {business.id}</span>
             <span>
-              Last updated: {new Date(business.updatedAt).toLocaleDateString()}
+              Last updated: {formatDate(business.updatedAt)}
             </span>
           </div>
         </div>
