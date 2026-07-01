@@ -81,6 +81,8 @@ import ItemCreateModal from "@/components/Item/ItemCreateModal";
 import ParentModal from "@/components/Item/ParentModal";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
+import { SuppliersPage } from "@/components/Supplier/SuppliersPage";
+import { formatDate } from "@/utils/date";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
@@ -101,16 +103,18 @@ const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 const ItemsManagementPage: React.FC = () => {
   const router = useRouter();
+  const suppliersRef = useRef<{ openCreate: () => void } | null>(null);
   const searchParams = useSearchParams();
   const auditFilter = searchParams.get("filter") || "";
 
@@ -244,17 +248,6 @@ const ItemsManagementPage: React.FC = () => {
         (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
         null,
     );
-
-  const formatDate = (d: string | Date | null | undefined) => {
-    if (!d || d === "0000-00-00 00:00:00") return "-";
-    const date = new Date(d);
-    if (isNaN(date.getTime())) return "-";
-    return new Intl.DateTimeFormat("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(date);
-  };
 
   const getStatusBadgeColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -1239,14 +1232,6 @@ const ItemsManagementPage: React.FC = () => {
               setShowParentModal(true);
             }}
           >
-            <td className="p-4" onClick={(e) => e.stopPropagation()}>
-              <input
-                type="checkbox"
-                checked={selectedItems.has(parent.id.toString())}
-                onChange={() => toggleSelect(parent.id.toString())}
-                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-              />
-            </td>
             <td className="px-4 py-3">
               <div className="font-medium text-gray-900">
                 {parent.de_no || "-"}
@@ -1289,14 +1274,6 @@ const ItemsManagementPage: React.FC = () => {
       case "warehouse":
         return pageData.map((w: any) => (
           <tr key={w.id} className="hover:bg-gray-50 transition-colors">
-            <td className="p-4">
-              <input
-                type="checkbox"
-                checked={selectedItems.has(w.id.toString())}
-                onChange={() => toggleSelect(w.id.toString())}
-                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-              />
-            </td>
             <td className="px-4 py-3">
               <div className="font-medium text-gray-900">
                 {w.item_no_de || "-"}
@@ -1330,15 +1307,16 @@ const ItemsManagementPage: React.FC = () => {
                 {w.is_active === "Y" ? "Active" : "Inactive"}
               </span>
             </td>
-            <td className="px-4 py-3">
-              <div className="flex gap-2">
+            <td className="px-4 py-3 whitespace-nowrap">
+              <div className="flex gap-2 items-center">
                 <button
                   onClick={() =>
                     updateWarehouseStock(w.id, { stock_qty: w.stock_qty + 1 })
                   }
-                  className="text-green-600 hover:text-green-900"
+                  className="whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-all border border-green-200/50 flex items-center gap-1 shadow-sm"
                 >
-                  + Stock
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Stock
                 </button>
                 <button
                   onClick={() =>
@@ -1346,7 +1324,11 @@ const ItemsManagementPage: React.FC = () => {
                       is_stock_item: w.is_stock_item === "Y" ? "N" : "Y",
                     })
                   }
-                  className="text-blue-600 hover:text-blue-900"
+                  className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${
+                    w.is_stock_item === "Y"
+                      ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
+                      : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
+                  }`}
                 >
                   {w.is_stock_item === "Y" ? "Remove Stock" : "Add Stock"}
                 </button>
@@ -1362,14 +1344,6 @@ const ItemsManagementPage: React.FC = () => {
             className="hover:bg-gray-50 transition-colors cursor-pointer"
             onClick={() => openEditTaric(taric)}
           >
-            <td className="p-4" onClick={(e) => e.stopPropagation()}>
-              <input
-                type="checkbox"
-                checked={selectedTarics.has(taric.id.toString())}
-                onChange={() => toggleSelect(taric.id.toString())}
-                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-              />
-            </td>
             <td className="px-4 py-3">
               <div className="font-medium text-gray-900">
                 {taric.code || "-"}
@@ -1632,12 +1606,12 @@ const ItemsManagementPage: React.FC = () => {
             )}
             {activeTab === "suppliers" && (
               <CustomButton
-                onClick={() => router.push("/suppliers")}
+                onClick={() => suppliersRef.current?.openCreate()}
                 gradient={true}
                 size="small"
                 startIcon={<PlusIcon className="w-5 h-5" />}
               >
-                Manage Suppliers
+                New Supplier
               </CustomButton>
             )}
           </div>
@@ -1686,326 +1660,308 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
-          {activeTab === "items" ? (
-            <div className="flex flex-wrap items-center gap-2 w-full">
-              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                <FunnelIcon className="w-5 h-5 text-primary" />
-              </div>
-              <div className="relative flex-grow flex-shrink flex-1 min-w-[140px]">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Name..."
-                    value={filters.search}
-                    onChange={(e) =>
-                      setFilters({ ...filters, search: e.target.value })
-                    }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                      filters.search
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                    }`}
-                  />
-                  {filters.search && (
-                    <button
-                      onClick={() => setFilters({ ...filters, search: "" })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                    >
-                      <XMarkIcon className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Item No..."
-                    value={filters.eanSearch}
-                    onChange={(e) =>
-                      setFilters({ ...filters, eanSearch: e.target.value })
-                    }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                      filters.eanSearch
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                    }`}
-                  />
-                  {filters.eanSearch && (
-                    <button
-                      onClick={() => setFilters({ ...filters, eanSearch: "" })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                    >
-                      <XMarkIcon className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="flex-grow flex-shrink flex-1 min-w-[180px]">
-                <TagFilterSelector
-                  category="item"
-                  compact={true}
-                  onChange={(tagString) =>
-                    setFilters((prev) => ({ ...prev, tags: tagString }))
-                  }
-                  onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
-                />
-              </div>
-              <div className="relative flex-grow flex-shrink flex-1 min-w-[180px]">
-                <CustomerSearchInput
-                  value={filters.company || ""}
-                  onChange={(id, name) =>
-                    setFilters({ ...filters, company: name })
-                  }
-                  placeholder="Company..."
-                  mode="customers"
-                  initialLabel={filters.company || ""}
-                />
-              </div>
-
-              <div className="w-[90px] flex-shrink-0">
-                <select
-                  value={filters.isLabel || ""}
-                  onChange={(e) =>
-                    setFilters({ ...filters, isLabel: e.target.value })
-                  }
-                  className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                    filters.isLabel
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                  }`}
-                >
-                  <option value="">isLabel...</option>
-                  <option value="Y">Yes</option>
-                  <option value="N">No</option>
-                </select>
-              </div>
-
-              <div className="flex-grow flex-shrink flex-1 min-w-[150px]">
-                <select
-                  value={filters.supplier}
-                  onChange={(e) =>
-                    setFilters({ ...filters, supplier: e.target.value })
-                  }
-                  className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                    filters.supplier
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                  }`}
-                >
-                  <option value="">Supplier...</option>
-                  {refSuppliers.map((s) => (
-                    <option key={s.id} value={s.id.toString()}>
-                      {`[${s.id}] ${s.company_name || s.name || ""}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="w-[105px] flex-shrink-0">
-                <select
-                  value={filters.category}
-                  onChange={(e) =>
-                    setFilters({ ...filters, category: e.target.value })
-                  }
-                  className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                    filters.category
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                  }`}
-                >
-                  <option value="">Category</option>
-                  {Array.from(
-                    new Set(categories.map((c) => c.name?.toString().trim())),
-                  )
-                    .filter(Boolean)
-                    .sort()
-                    .map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className="shrink-0">
-                <button
-                  onClick={resetFilters}
-                  className="w-full lg:w-auto px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
-                >
-                  <ArrowPathIcon className="w-3.5 h-3.5" />
-                  Reset
-                </button>
-              </div>
-            </div>
-          ) : activeTab === "parents" ? (
-            <div className="flex flex-wrap items-center gap-2 w-full">
-              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                <FunnelIcon className="w-5 h-5 text-primary" />
-              </div>
-              <div className="w-64 shrink-0">
-                <input
-                  type="text"
-                  placeholder="Search Parents..."
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters({ ...filters, search: e.target.value })
-                  }
-                  className={getInputClass(!!filters.search)}
-                />
-              </div>
-              <button
-                onClick={resetFilters}
-                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                Reset
-              </button>
-            </div>
-          ) : activeTab === "tarics" ? (
-            <div className="flex flex-wrap items-center gap-2 w-full">
-              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                <FunnelIcon className="w-5 h-5 text-primary" />
-              </div>
-              <div className="w-64 shrink-0">
-                <input
-                  type="text"
-                  placeholder="Search TARICs..."
-                  value={taricSearch}
-                  onChange={(e) => setTaricSearch(e.target.value)}
-                  className={getInputClass(!!taricSearch)}
-                />
-              </div>
-              <button
-                onClick={() => setTaricSearch("")}
-                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                Reset
-              </button>
-            </div>
-          ) : activeTab === "suppliers" ? (
-            <div className="flex flex-wrap items-center gap-2 w-full">
-              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                <FunnelIcon className="w-5 h-5 text-primary" />
-              </div>
-              <div className="w-64 shrink-0">
-                <input
-                  type="text"
-                  placeholder="Search Suppliers..."
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters({ ...filters, search: e.target.value })
-                  }
-                  className={getInputClass(!!filters.search)}
-                />
-              </div>
-              <button
-                onClick={resetFilters}
-                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                Reset
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-end justify-end">
-              <button
-                onClick={resetFilters}
-                className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
-              >
-                <ArrowPathIcon className="w-3.5 h-3.5" />
-                Reset Filters
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-20 flex justify-center items-center">
-              <div className="text-center">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-primary" />
-                <p className="mt-4 text-gray-600">Loading {activeTab}...</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto w-full">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      {activeTab !== "items" && (
-                        <th className="p-4">
-                          <input
-                            type="checkbox"
-                            checked={
-                              pageData.length > 0 &&
-                              pageData.every((d: any) =>
-                                currentSelection.has(d.id.toString()),
-                              )
+        {activeTab === "suppliers" ? (
+          <SuppliersPage isEmbedded={true} ref={suppliersRef} />
+        ) : (
+          <>
+            {activeTab !== "warehouse" && (
+              <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+                {activeTab === "items" ? (
+                  <div className="flex flex-wrap items-center gap-2 w-full">
+                    <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                      <FunnelIcon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="relative flex-grow flex-shrink flex-1 min-w-[140px]">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Name..."
+                          value={filters.search}
+                          onChange={(e) =>
+                            setFilters({ ...filters, search: e.target.value })
+                          }
+                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.search
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
+                        />
+                        {filters.search && (
+                          <button
+                            onClick={() =>
+                              setFilters({ ...filters, search: "" })
                             }
-                            onChange={handleSelectAll}
-                            className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-                          />
-                        </th>
-                      )}
-                      {renderTableHeaders()}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {pageData.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={activeTab === "items" ? 5 : 10}
-                          className="px-4 py-8 text-center text-gray-500"
-                        >
-                          No {activeTab} found matching your criteria.
-                        </td>
-                      </tr>
-                    ) : (
-                      renderTableRows()
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                          >
+                            <XMarkIcon className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Item No..."
+                          value={filters.eanSearch}
+                          onChange={(e) =>
+                            setFilters({
+                              ...filters,
+                              eanSearch: e.target.value,
+                            })
+                          }
+                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.eanSearch
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
+                        />
+                        {filters.eanSearch && (
+                          <button
+                            onClick={() =>
+                              setFilters({ ...filters, eanSearch: "" })
+                            }
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                          >
+                            <XMarkIcon className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-grow flex-shrink flex-1 min-w-[180px]">
+                      <TagFilterSelector
+                        category="item"
+                        compact={true}
+                        onChange={(tagString) =>
+                          setFilters((prev) => ({ ...prev, tags: tagString }))
+                        }
+                        onReset={() =>
+                          setFilters((prev) => ({ ...prev, tags: "" }))
+                        }
+                      />
+                    </div>
+                    <div className="relative flex-grow flex-shrink flex-1 min-w-[180px]">
+                      <CustomerSearchInput
+                        value={filters.company || ""}
+                        onChange={(id, name) =>
+                          setFilters({ ...filters, company: name })
+                        }
+                        placeholder="Company..."
+                        mode="customers"
+                        initialLabel={filters.company || ""}
+                      />
+                    </div>
 
-              <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <p className="text-sm text-gray-600">
-                    Showing{" "}
-                    {totalRecords === 0 ? 0 : (safePage - 1) * PAGE_LIMIT + 1}{" "}
-                    to {Math.min(safePage * PAGE_LIMIT, totalRecords)} of{" "}
-                    {totalRecords} {activeTab}
-                  </p>
-                  {getSelectedCount() > 0 && (
-                    <span className="text-sm font-medium text-primary">
-                      {getSelectedCount()} selected
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={safePage === 1}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-600">
-                    Page {safePage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={safePage === totalPages}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
+                    <div className="w-[90px] flex-shrink-0">
+                      <select
+                        value={filters.isLabel || ""}
+                        onChange={(e) =>
+                          setFilters({ ...filters, isLabel: e.target.value })
+                        }
+                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.isLabel
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
+                      >
+                        <option value="">isLabel...</option>
+                        <option value="Y">Yes</option>
+                        <option value="N">No</option>
+                      </select>
+                    </div>
+
+                    <div className="flex-grow flex-shrink flex-1 min-w-[150px]">
+                      <select
+                        value={filters.supplier}
+                        onChange={(e) =>
+                          setFilters({ ...filters, supplier: e.target.value })
+                        }
+                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.supplier
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
+                      >
+                        <option value="">Supplier...</option>
+                        {refSuppliers.map((s) => (
+                          <option key={s.id} value={s.id.toString()}>
+                            {`[${s.id}] ${s.company_name || s.name || ""}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-[105px] flex-shrink-0">
+                      <select
+                        value={filters.category}
+                        onChange={(e) =>
+                          setFilters({ ...filters, category: e.target.value })
+                        }
+                        className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.category
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
+                      >
+                        <option value="">Category</option>
+                        {Array.from(
+                          new Set(
+                            categories.map((c) => c.name?.toString().trim()),
+                          ),
+                        )
+                          .filter(Boolean)
+                          .sort()
+                          .map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="shrink-0">
+                      <button
+                        onClick={resetFilters}
+                        className="w-full lg:w-auto px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                      >
+                        <ArrowPathIcon className="w-3.5 h-3.5" />
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                ) : activeTab === "parents" ? (
+                  <div className="flex flex-wrap items-center gap-2 w-full">
+                    <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                      <FunnelIcon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="w-64 shrink-0">
+                      <input
+                        type="text"
+                        placeholder="Search Parents..."
+                        value={filters.search}
+                        onChange={(e) =>
+                          setFilters({ ...filters, search: e.target.value })
+                        }
+                        className={getInputClass(!!filters.search)}
+                      />
+                    </div>
+                    <button
+                      onClick={resetFilters}
+                      className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                    >
+                      <ArrowPathIcon className="w-4 h-4" />
+                      Reset
+                    </button>
+                  </div>
+                ) : activeTab === "tarics" ? (
+                  <div className="flex flex-wrap items-center gap-2 w-full">
+                    <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                      <FunnelIcon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="w-64 shrink-0">
+                      <input
+                        type="text"
+                        placeholder="Search TARICs..."
+                        value={taricSearch}
+                        onChange={(e) => setTaricSearch(e.target.value)}
+                        className={getInputClass(!!taricSearch)}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setTaricSearch("")}
+                      className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                    >
+                      <ArrowPathIcon className="w-4 h-4" />
+                      Reset
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-end justify-end">
+                    <button
+                      onClick={resetFilters}
+                      className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
+                    >
+                      <ArrowPathIcon className="w-3.5 h-3.5" />
+                      Reset Filters
+                    </button>
+                  </div>
+                )}
               </div>
-            </>
-          )}
-        </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              {loading ? (
+                <div className="p-20 flex justify-center items-center">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-primary" />
+                    <p className="mt-4 text-gray-600">Loading {activeTab}...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>{renderTableHeaders()}</tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {pageData.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={activeTab === "items" ? 5 : 10}
+                              className="px-4 py-8 text-center text-gray-500"
+                            >
+                              No {activeTab} found matching your criteria.
+                            </td>
+                          </tr>
+                        ) : (
+                          renderTableRows()
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <p className="text-sm text-gray-600">
+                        Showing{" "}
+                        {totalRecords === 0
+                          ? 0
+                          : (safePage - 1) * PAGE_LIMIT + 1}{" "}
+                        to {Math.min(safePage * PAGE_LIMIT, totalRecords)} of{" "}
+                        {totalRecords} {activeTab}
+                      </p>
+                      {getSelectedCount() > 0 && (
+                        <span className="text-sm font-medium text-primary">
+                          {getSelectedCount()} selected
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={safePage === 1}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-gray-600">
+                        Page {safePage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={safePage === totalPages}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <ItemPreviewModal

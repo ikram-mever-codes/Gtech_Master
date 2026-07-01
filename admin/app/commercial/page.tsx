@@ -79,6 +79,8 @@ import { getAllOffers } from "@/api/offers";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
+import { formatDate } from "@/utils/date";
+import { formatCountryCode } from "@/utils/address";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -1586,30 +1588,12 @@ const InvoiceListPage: React.FC = () => {
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
-            return row.createdAt
-              ? new Intl.DateTimeFormat("de-DE", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              }).format(new Date(row.createdAt))
-              : "-";
+            return row.createdAt ? formatDate(row.createdAt) : "-";
           } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
             const dateStr = row.date_created || row.created_at;
-            return dateStr
-              ? new Intl.DateTimeFormat("de-DE", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              }).format(new Date(dateStr))
-              : "-";
+            return dateStr ? formatDate(dateStr) : "-";
           } else {
-            return row.invoiceDate
-              ? new Intl.DateTimeFormat("de-DE", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              }).format(new Date(row.invoiceDate))
-              : "-";
+            return row.invoiceDate ? formatDate(row.invoiceDate) : "-";
           }
         },
       },
@@ -1714,15 +1698,15 @@ const InvoiceListPage: React.FC = () => {
           if (activeInvTab === "angebot") {
             const city = row.deliveryAddress?.city || row.customerSnapshot?.city || "";
             const country = row.deliveryAddress?.country || row.customerSnapshot?.country || "";
-            text = [city, country].filter(Boolean).join(", ") || "-";
+            text = [city, formatCountryCode(country)].filter(Boolean).join(", ") || "-";
           } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
             const city = row.customer?.city || row.cargo?.customer?.city || "";
             const country = row.customer?.country || row.cargo?.customer?.country || "";
-            text = [city, country].filter(Boolean).join(", ") || "-";
+            text = [city, formatCountryCode(country)].filter(Boolean).join(", ") || "-";
           } else {
             const city = row.customer?.city || "";
             const country = row.customer?.country || "";
-            text = [city, country].filter(Boolean).join(", ") || "-";
+            text = [city, formatCountryCode(country)].filter(Boolean).join(", ") || "-";
           }
           return (
             <div className="truncate max-w-[110px]" title={text}>
@@ -2295,8 +2279,13 @@ const InvoiceListPage: React.FC = () => {
                           {customer.companyName}
                         </td>
                         <td className="py-4 px-4 text-xs text-[#6C757D] max-w-[200px] truncate">
-                          {customer.country}, {customer.city},{" "}
-                          {customer.addressLine1}
+                          {[
+                            formatCountryCode(customer.country),
+                            customer.city,
+                            customer.addressLine1,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
                         </td>
                         <td className="py-4 px-4 text-xs text-[#212529]">
                           {customer.email}
@@ -2428,7 +2417,7 @@ const InvoiceListPage: React.FC = () => {
                     <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Cargo No / Dates</span>
                     <span className="text-sm font-semibold text-gray-800 block mt-1">Cargo: {selectedInvoice.cargo?.cargo_no || "No Cargo"}</span>
                     <span className="text-xs text-gray-500 block mt-0.5">
-                      Date: {new Date(selectedInvoice.invoiceDate).toLocaleDateString("de-DE")}
+                      Date: {formatDate(selectedInvoice.invoiceDate)}
                     </span>
                   </div>
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">

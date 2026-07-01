@@ -50,6 +50,7 @@ import { UserRole } from "@/utils/interfaces";
 import Link from "next/link";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
+import { formatDate } from "@/utils/date";
 
 type TabType = "all" | "no-contacts" | "sales";
 type ModalMode = "create" | "edit";
@@ -553,15 +554,6 @@ const ContactPersonsPage: React.FC = () => {
     });
     setSelectedBusiness(null);
     setEditModeEnabled(false);
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
   };
 
   const getLinkedInStateColor = (state: string) => {

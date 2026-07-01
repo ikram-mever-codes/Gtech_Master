@@ -45,6 +45,7 @@ import { getAllCustomers } from "@/api/customers";
 import Image from "next/image";
 import { LibraryBig } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+import { formatDate } from "@/utils/date";
 
 const LibraryPage: React.FC = () => {
   const [files, setFiles] = useState<LibraryFile[]>([]);
@@ -679,7 +680,7 @@ const LibraryPage: React.FC = () => {
                         {formatFileSize(file.fileSize)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {new Date(file.uploadedAt).toLocaleDateString()}
+                        {formatDate(file.uploadedAt)}
                       </td>
                       <td className="px-6 py-4">
                         {file.isPublic ? (
@@ -999,7 +1000,7 @@ const LibraryPage: React.FC = () => {
                     <div className="flex justify-between">
                       <dt className="text-gray-600">Uploaded:</dt>
                       <dd className="font-medium">
-                        {new Date(previewFile.uploadedAt).toLocaleDateString()}{" "}
+                        {formatDate(previewFile.uploadedAt)}{" "}
                         at{" "}
                         {new Date(previewFile.uploadedAt).toLocaleTimeString()}
                       </dd>

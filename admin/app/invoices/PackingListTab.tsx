@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getAllInvoices, updatePackingList, downloadPackingList, getExpandedInvoiceDetails } from "@/api/invoice";
 import { toast } from "react-hot-toast";
+import { formatDate } from "@/utils/date";
 
 interface PackingListData {
   id: string;
@@ -233,7 +234,7 @@ const PackingListTab: React.FC = () => {
                     <td className="py-3 px-4 text-[13px] text-[#212529]">{item.cargoNo || "-"}</td>
                     <td className="py-3 px-4 text-[13px] text-[#212529]">{item.invoiceNumber}</td>
                     <td className="py-3 px-4 text-[13px] text-[#212529]">
-                      {item.invoiceDate ? new Date(item.invoiceDate).toLocaleDateString() : "-"}
+                      {item.invoiceDate ? formatDate(item.invoiceDate) : "-"}
                     </td>
                     <td className="py-3 px-4 text-[13px] text-[#212529] text-center">
                       {item.customItemCount || item.items?.length || 0}

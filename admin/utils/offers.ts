@@ -1,16 +1,10 @@
 import { calculateLineItemTotal, formatCurrency } from "@/api/offers";
 import toast from "react-hot-toast";
+import { formatDate as centralFormatDate } from "./date";
 
-// Format date
-export const formatDate = (dateString: string | Date) => {
-  if (!dateString) return "-";
-  return new Date(dateString).toLocaleDateString("de-DE", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+export const formatDate = (dateString: string | Date | null | undefined) => {
+  return centralFormatDate(dateString);
 };
-// Helper function to generate HTML email content for an offer
 export const generateOfferEmailHTML = (offer: any): string => {
   const formatDate = (dateString: string | Date) => {
     if (!dateString) return "-";
@@ -20,8 +14,6 @@ export const generateOfferEmailHTML = (offer: any): string => {
       day: "numeric",
     });
   };
-
-  // Helper to format currency
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat("de-DE", {
       style: "currency",
@@ -31,7 +23,6 @@ export const generateOfferEmailHTML = (offer: any): string => {
     }).format(amount || 0);
   };
 
-  // Generate HTML table rows for line items
   const generateLineItemsTable = () => {
     if (!offer.lineItems || offer.lineItems.length === 0) {
       return "<tr><td colspan='4' style='padding: 8px; text-align: center;'>No items</td></tr>";
@@ -173,24 +164,22 @@ export const generateOfferEmailHTML = (offer: any): string => {
               <td style="text-align: right;">Subtotal:</td>
               <td style="text-align: right;">${formatCurrency(subtotal, offer.currency)}</td>
             </tr>
-            ${
-              discount > 0
-                ? `
+            ${discount > 0
+      ? `
             <tr>
               <td style="text-align: right; color: #e74c3c;">Discount:</td>
               <td style="text-align: right; color: #e74c3c;">-${formatCurrency(discount, offer.currency)}</td>
             </tr>`
-                : ""
-            }
-            ${
-              shipping > 0
-                ? `
+      : ""
+    }
+            ${shipping > 0
+      ? `
             <tr>
               <td style="text-align: right;">Shipping:</td>
               <td style="text-align: right;">${formatCurrency(shipping, offer.currency)}</td>
             </tr>`
-                : ""
-            }
+      : ""
+    }
             <tr>
               <td style="text-align: right;">VAT:</td>
               <td style="text-align: right;">${formatCurrency(tax, offer.currency)}</td>
@@ -203,63 +192,57 @@ export const generateOfferEmailHTML = (offer: any): string => {
         </div>
 
         <!-- Terms & Conditions -->
-        ${
-          offer.termsConditions || offer.paymentTerms || offer.deliveryTerms
-            ? `
+        ${offer.termsConditions || offer.paymentTerms || offer.deliveryTerms
+      ? `
         <div class="section">
           <h2 class="section-title">Terms & Conditions</h2>
           <table style="width: 100%;">
-            ${
-              offer.paymentTerms
-                ? `
+            ${offer.paymentTerms
+        ? `
             <tr>
               <td style="border: none; width: 120px;"><strong>Payment Terms:</strong></td>
               <td style="border: none;">${offer.paymentTerms}</td>
             </tr>`
-                : ""
-            }
-            ${
-              offer.deliveryTerms
-                ? `
+        : ""
+      }
+            ${offer.deliveryTerms
+        ? `
             <tr>
               <td style="border: none;"><strong>Delivery Terms:</strong></td>
               <td style="border: none;">${offer.deliveryTerms}</td>
             </tr>`
-                : ""
-            }
-            ${
-              offer.deliveryTime
-                ? `
+        : ""
+      }
+            ${offer.deliveryTime
+        ? `
             <tr>
               <td style="border: none;"><strong>Delivery Time:</strong></td>
               <td style="border: none;">${offer.deliveryTime}</td>
             </tr>`
-                : ""
-            }
-            ${
-              offer.termsConditions
-                ? `
+        : ""
+      }
+            ${offer.termsConditions
+        ? `
             <tr>
               <td style="border: none;"><strong>Additional Terms:</strong></td>
               <td style="border: none;">${offer.termsConditions}</td>
             </tr>`
-                : ""
-            }
+        : ""
+      }
           </table>
         </div>`
-            : ""
-        }
+      : ""
+    }
 
         <!-- Notes -->
-        ${
-          offer.notes
-            ? `
+        ${offer.notes
+      ? `
         <div class="section">
           <h2 class="section-title">Notes</h2>
           <p style="background-color: #f9f9f9; padding: 10px; border-radius: 5px;">${offer.notes.replace(/\n/g, "<br/>")}</p>
         </div>`
-            : ""
-        }
+      : ""
+    }
 
         <!-- Footer -->
         <div class="footer">

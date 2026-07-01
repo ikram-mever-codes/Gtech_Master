@@ -137,6 +137,7 @@ import {
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
+import { formatDate } from "@/utils/date";
 
 // Types for activity logs
 interface ActivityLog {
@@ -519,7 +520,7 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
             </Typography>
             {delivery?.deliveredAt && (
               <Typography color="white" variant="caption" display="block">
-                Delivered: {new Date(delivery.deliveredAt).toLocaleDateString()}
+                Delivered: {formatDate(delivery.deliveredAt)}
               </Typography>
             )}
             {delivery?.cargoNo && (

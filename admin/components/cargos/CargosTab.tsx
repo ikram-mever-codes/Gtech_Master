@@ -33,6 +33,7 @@ import { errorStyles, successStyles } from "@/utils/constants";
 import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "../General/BillToShipToForm";
 import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
 import SegmentedControl from "@/components/UI/SegmentedControl";
+import { formatDate } from "@/utils/date";
 
 
 type Customer = {
@@ -61,17 +62,6 @@ interface CargosTabProps {
     customers?: Customer[];
 }
 
-const formatDate = (dateString: string | Date | undefined | null) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-";
-    return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    });
-};
-
 const formatDateInput = (dateString: string | Date | undefined | null) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -80,12 +70,7 @@ const formatDateInput = (dateString: string | Date | undefined | null) => {
 };
 
 const formatCargoDateShort = (dateString: string | Date | undefined | null) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-";
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${day}.${month}`;
+    return formatDate(dateString);
 };
 
 const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCustomers }, ref) => {
