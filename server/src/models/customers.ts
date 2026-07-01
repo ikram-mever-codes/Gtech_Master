@@ -21,6 +21,7 @@ import { Tag } from "./tags";
 import { Item } from "./items";
 import { TaxProfile } from "./tax_profile";
 import { CompanyShippingAddress } from "./company_shipping_address";
+import { Country } from "./country";
 
 @Entity()
 export class Customer {
@@ -34,7 +35,6 @@ export class Customer {
   })
   stage!: "business" | "star_business" | "star_customer" | "device_maker";
 
-  // Only required field
   @Column({ unique: true })
   companyName!: string;
 
@@ -56,6 +56,13 @@ export class Customer {
   @ManyToOne(() => TaxProfile, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "default_tax_profile_id" })
   defaultTaxProfile?: TaxProfile;
+
+  @Column({ name: "country_id", nullable: true })
+  country_id?: string | null;
+
+  @ManyToOne(() => Country, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "country_id" })
+  countryEntity?: Country | null;
 
   @Column({
     name: "vat_id_status",

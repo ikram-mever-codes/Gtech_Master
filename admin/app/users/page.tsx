@@ -1,29 +1,25 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import {
-  Box,
-  InputBase,
-  Paper,
-  Button,
   FormControl,
   InputLabel,
   Select,
   Checkbox,
   ListItemText,
   Typography,
-  useTheme,
   CircularProgress,
   Alert,
   alpha,
   Avatar,
   MenuItem,
+  Button,
 } from "@mui/material";
 import {
-  LucideUserPlus,
-  LucideSearch,
   PlusIcon,
   RefreshCw,
   Users,
+  Search,
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { UserRole, UserStatus } from "@/utils/interfaces";
@@ -32,10 +28,9 @@ import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
 import { useRouter } from "next/navigation";
 import { getAllUsers, resendVerificationEmail } from "@/api/user";
-import { toast } from "react-hot-toast";
+import MasterPageLayout from "@/components/General/MasterPageLayout";
 
-const UsersPage = () => {
-  const muiTheme = useTheme();
+export default function UsersPage() {
   const [searchText, setSearchText] = useState("");
   const router = useRouter();
   const [filters, setFilters] = useState({
@@ -43,20 +38,17 @@ const UsersPage = () => {
     role: [] as UserRole[],
   });
 
-  // New state for users data and loading
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  // Function to fetch users from backend
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await getAllUsers();
       if (response && response.data) {
-        console.log(response.data);
         setUsers(response.data);
       } else {
         setUsers([]);
@@ -69,7 +61,6 @@ const UsersPage = () => {
     }
   };
 
-  // Fetch users on component mount and when refreshKey changes
   useEffect(() => {
     fetchUsers();
   }, [refreshKey]);
@@ -93,14 +84,14 @@ const UsersPage = () => {
         <div className="flex items-center gap-4">
           <Avatar
             src={row.avatar || ""}
-            className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold"
+            className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold font-poppins"
             alt={`${row.name}'s avatar`}
           >
             {row.name?.charAt(0).toUpperCase()}
           </Avatar>
           <div>
-            <div className="text-gray-800 font-medium">{row.name}</div>
-            <div className="text-sm text-gray-500">{row.email}</div>
+            <div className="text-gray-800 font-medium font-poppins">{row.name}</div>
+            <div className="text-sm text-gray-500 font-poppins">{row.email}</div>
           </div>
         </div>
       ),
@@ -109,7 +100,7 @@ const UsersPage = () => {
       key: "phoneNumber",
       label: "Phone",
       render: (value: string) => (
-        <span className="text-gray-700">{value || "Not provided"}</span>
+        <span className="text-gray-700 font-poppins">{value || "Not provided"}</span>
       ),
     },
     {
@@ -128,7 +119,7 @@ const UsersPage = () => {
       key: "address",
       label: "Location",
       render: (value: string) => (
-        <span className="text-gray-700">
+        <span className="text-gray-700 font-poppins">
           {value?.slice(0, 20) || "Not specified"}...
         </span>
       ),
@@ -138,12 +129,13 @@ const UsersPage = () => {
       label: "Verification",
       render: (value: boolean) => (
         <span
-          className={`px-3 py-1 rounded-full text-xs font-medium ${value === true
-            ? "bg-green-200/80 text-green-600"
-            : value === false
-              ? "bg-yellow-200/80 text-yellow-800"
-              : "bg-red-200/80 text-red-800"
-            }`}
+          className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${
+            value === true
+              ? "bg-green-100 text-green-700"
+              : value === false
+                ? "bg-amber-100 text-amber-800"
+                : "bg-red-100 text-red-800"
+          }`}
         >
           {value === true ? "Verified" : "Unverified"}
         </span>
@@ -154,10 +146,11 @@ const UsersPage = () => {
       label: "Login",
       render: (value: boolean) => (
         <span
-          className={`px-3 py-1 rounded-full text-xs font-medium ${value !== false
-            ? "bg-green-200/80 text-green-600"
-            : "bg-red-200/80 text-red-800"
-            }`}
+          className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${
+            value !== false
+              ? "bg-emerald-50 text-emerald-600"
+              : "bg-red-55 text-red-600"
+          }`}
         >
           {value !== false ? "Enabled" : "Disabled"}
         </span>
@@ -167,7 +160,7 @@ const UsersPage = () => {
       key: "role",
       label: "Role",
       render: (value: UserRole) => (
-        <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-200/80 text-blue-800">
+        <span className="px-3 py-1 rounded-full text-xs font-semibold font-poppins bg-blue-50 text-blue-800">
           {value || "Unknown"}
         </span>
       ),
@@ -201,197 +194,171 @@ const UsersPage = () => {
     }
   };
 
-  return (
-    <div className="w-full mx-auto px-0">
-      <div
-        className="bg-white rounded-lg shadow-sm pb-[7rem] p-8 px-9"
-        style={{
-          border: "1px solid #e0e0e0",
-          background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
+  const actionButtons = (
+    <CustomButton
+      startIcon={<PlusIcon color="white" size={18} />}
+      gradient
+      shadow="large"
+      onClick={() => router.push("/users/create")}
+    >
+      Create User
+    </CustomButton>
+  );
+
+  const filterBar = (
+    <div className="flex flex-wrap gap-4 items-center w-full">
+      <div className="relative flex-1 max-w-md">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white"
+        />
+      </div>
+
+      <FormControl sx={{ minWidth: 150 }} size="small">
+        <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
+        <Select
+          multiple
+          value={filters.status}
+          onChange={(e) =>
+            setFilters({
+              ...filters,
+              status: e.target.value as UserStatus[],
+            })
+          }
+          renderValue={(selected) => selected.join(", ")}
+          sx={{
+            borderRadius: "8px",
+            "& .MuiSelect-select": {
+              py: 1.2,
+            },
+          }}
+          MenuProps={{
+            PaperProps: {
+              sx: {
+                borderRadius: "8px",
+                mt: 1,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              },
+            },
+          }}
+        >
+          {Object.values(UserStatus).map((status) => (
+            <MenuItem key={status} value={status}>
+              <Checkbox checked={filters.status.includes(status)} />
+              <ListItemText primary={status} />
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl sx={{ minWidth: 150 }} size="small">
+        <InputLabel sx={{ color: "text.secondary" }}>Role</InputLabel>
+        <Select
+          multiple
+          value={filters.role}
+          onChange={(e) =>
+            setFilters({ ...filters, role: e.target.value as UserRole[] })
+          }
+          renderValue={(selected) => selected.join(", ")}
+          sx={{
+            borderRadius: "8px",
+            "& .MuiSelect-select": {
+              py: 1.2,
+            },
+          }}
+          MenuProps={{
+            PaperProps: {
+              sx: {
+                borderRadius: "8px",
+                mt: 1,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              },
+            },
+          }}
+        >
+          {Object.values(UserRole).map((role) => (
+            <MenuItem key={role} value={role}>
+              <Checkbox checked={filters.role.includes(role)} />
+              <ListItemText primary={role} />
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <button
+        onClick={handleRefresh}
+        className="p-2 px-3 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-xs font-semibold"
+        title="Refresh"
+      >
+        <RefreshCw className="h-4 w-4" />
+        Refresh
+      </button>
+
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{
+          ml: "auto",
+          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+          px: 2,
+          py: 1,
+          borderRadius: 2,
+          fontWeight: 500,
         }}
       >
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <PageHeader title="Users Management" icon={Users} />
-          </div>
-
-          <div className="flex gap-4 w-full md:w-auto">
-            <Paper
-              className="flex items-center px-4 py-2 flex-1 max-w-md"
-              sx={{
-                borderRadius: "8px",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                border: "1px solid #e0e0e0",
-              }}
-            >
-              <LucideSearch className="text-gray-400 mr-2" size={20} />
-              <InputBase
-                placeholder="Search users..."
-                className="flex-1"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                sx={{
-                  "& input": {
-                    padding: "4px",
-                  },
-                }}
-              />
-            </Paper>
-
-            <CustomButton
-              startIcon={<PlusIcon color="white" size={18} />}
-              gradient
-              shadow="large"
-              onClick={() => router.push("/users/create")}
-            >
-              Create User
-            </CustomButton>
-          </div>
-        </div>
-
-        {/* Filters and Refresh Button */}
-        <div className="flex flex-wrap gap-4 mb-6 items-center">
-          <FormControl sx={{ minWidth: 180 }} size="small">
-            <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
-            <Select
-              multiple
-              value={filters.status}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  status: e.target.value as UserStatus[],
-                })
-              }
-              renderValue={(selected) => selected.join(", ")}
-              sx={{
-                borderRadius: "8px",
-                "& .MuiSelect-select": {
-                  py: 1.2,
-                },
-              }}
-              MenuProps={{
-                PaperProps: {
-                  sx: {
-                    borderRadius: "8px",
-                    mt: 1,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  },
-                },
-              }}
-            >
-              {Object.values(UserStatus).map((status) => (
-                <MenuItem key={status} value={status}>
-                  <Checkbox checked={filters.status.includes(status)} />
-                  <ListItemText primary={status} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl sx={{ minWidth: 180 }} size="small">
-            <InputLabel sx={{ color: "text.secondary" }}>Role</InputLabel>
-            <Select
-              multiple
-              value={filters.role}
-              onChange={(e) =>
-                setFilters({ ...filters, role: e.target.value as UserRole[] })
-              }
-              renderValue={(selected) => selected.join(", ")}
-              sx={{
-                borderRadius: "8px",
-                "& .MuiSelect-select": {
-                  py: 1.2,
-                },
-              }}
-              MenuProps={{
-                PaperProps: {
-                  sx: {
-                    borderRadius: "8px",
-                    mt: 1,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  },
-                },
-              }}
-            >
-              {Object.values(UserRole).map((role) => (
-                <MenuItem key={role} value={role}>
-                  <Checkbox checked={filters.role.includes(role)} />
-                  <ListItemText primary={role} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Refresh Button */}
-          <Button
-            variant="outlined"
-            startIcon={<RefreshCw size={16} />}
-            onClick={handleRefresh}
-            sx={{
-              borderRadius: "8px",
-              borderColor: theme.palette.primary.light,
-              color: theme.palette.primary.main,
-              "&:hover": {
-                borderColor: theme.palette.primary.main,
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-              },
-            }}
-          >
-            Refresh
-          </Button>
-
-          {/* Total Users Count */}
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{
-              ml: "auto",
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              px: 2,
-              py: 1,
-              borderRadius: 2,
-              fontWeight: 500,
-            }}
-          >
-            Total Users: {users.length}
-          </Typography>
-        </div>
-
-        {error && (
-          <Alert
-            severity="error"
-            sx={{ mb: 4, borderRadius: 2 }}
-            onClose={() => setError(null)}
-          >
-            {error}
-          </Alert>
-        )}
-
-        {loading ? (
-          <div className="flex justify-center items-center p-20">
-            <CircularProgress
-              size={40}
-              sx={{ color: theme.palette.primary.main }}
-            />
-          </div>
-        ) : (
-          <CustomTable
-            columns={columns}
-            data={filteredUsers}
-            title=""
-            searchable={false}
-            pagination={true}
-            onRowClick={(row) => router.push(`/users/${row.id}`)}
-            onEdit={(row) => router.push(`/users/${row.id}/edit`)}
-            onView={(row) => router.push(`/users/${row.id}`)}
-            onResendVerification={(row) => {
-              handleResendVerification(row.id, row.email);
-            }}
-          />
-        )}
-      </div>
+        Total Users: {users.length}
+      </Typography>
     </div>
   );
-};
-export default UsersPage;
+
+  const tableContent = (
+    <>
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ m: 4, borderRadius: 2 }}
+          onClose={() => setError(null)}
+        >
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center items-center p-20">
+          <CircularProgress
+            size={40}
+            sx={{ color: theme.palette.primary.main }}
+          />
+        </div>
+      ) : (
+        <CustomTable
+          columns={columns}
+          data={filteredUsers}
+          title=""
+          searchable={false}
+          pagination={true}
+          onRowClick={(row) => router.push(`/users/${row.id}`)}
+          onEdit={(row) => router.push(`/users/${row.id}/edit`)}
+          onView={(row) => router.push(`/users/${row.id}`)}
+          onResendVerification={(row) => {
+            handleResendVerification(row.id, row.email);
+          }}
+        />
+      )}
+    </>
+  );
+
+  return (
+    <MasterPageLayout
+      title="Users Management"
+      icon={Users}
+      actionButtons={actionButtons}
+      filterBar={filterBar}
+      tableContent={tableContent}
+    />
+  );
+}

@@ -10,6 +10,7 @@ import {
 } from "typeorm";
 import { Customer } from "./customers";
 import { User } from "./users";
+import { Country } from "./country";
 
 @Entity()
 export class BusinessDetails {
@@ -71,6 +72,13 @@ export class BusinessDetails {
 
   @Column({ nullable: true })
   country?: string;
+
+  @Column({ name: "country_id", nullable: true })
+  country_id?: string | null;
+
+  @ManyToOne(() => Country, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "country_id" })
+  countryEntity?: Country | null;
 
   @Column({ nullable: true })
   postalCode?: string;

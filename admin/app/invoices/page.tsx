@@ -1554,7 +1554,7 @@ const InvoiceListPage: React.FC = () => {
             </button>
           </div>
         )}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <PageHeader
               title={
@@ -1577,121 +1577,114 @@ const InvoiceListPage: React.FC = () => {
               }
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-              <div className="relative">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search Order No / Details..."
-                  value={orderNoFilter}
-                  onChange={(e) => setOrderNoFilter(e.target.value)}
-                  className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent w-64 shadow-sm text-black"
-                />
-                {orderNoFilter && (
-                  <button
-                    onClick={() => setOrderNoFilter("")}
-                    className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            )}
+          <div className="flex items-center gap-3">
             {activeInvTab === "cargos" ? (
-              <>
-                <button
-                  onClick={() => cargosTabRef.current?.fetchCargos?.()}
-                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-semibold shadow-sm transition-all"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-                <button
-                  onClick={() => cargosTabRef.current?.handleOpenCreate?.()}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
-                >
-                  <Plus className="h-4 w-4" />
-                  New Cargo
-                </button>
-              </>
+              <button
+                onClick={() => cargosTabRef.current?.handleOpenCreate?.()}
+                className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                New Cargo
+              </button>
             ) : activeInvTab === "cargo_type" ? (
-              <>
-                <button
-                  onClick={() => cargoTypesTabRef.current?.fetchCargoTypes?.()}
-                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-semibold shadow-sm transition-all"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-                <button
-                  onClick={() => cargoTypesTabRef.current?.handleOpenCreate?.()}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
-                >
-                  <Plus className="h-4 w-4" />
-                  New Cargo Type
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => {
-                    if (activeInvTab === "orders" || activeInvTab === "order_items") {
-                      fetchOrders();
-                    } else {
-                      setLoading(true);
-                      loadInvoices();
-                      if (activeInvTab === "billto_shipto") fetchCustomers();
-                    }
-                  }}
-                  disabled={loading || loadingOrders}
-                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 font-semibold shadow-sm transition-all"
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 ${loading || loadingOrders ? "animate-spin" : ""}`}
-                  />
-                  {loading || loadingOrders ? "Loading..." : "Refresh"}
-                </button>
-                {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-                  <button
-                    onClick={() => {
-                      resetForm();
-                      setMode("create");
-                      setShowModal(true);
-                    }}
-                    className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
-                  >
-                    <Plus className="w-4 h-4" />
-                    New Order
-                  </button>
-                )}
-              </>
-            )}
+              <button
+                onClick={() => cargoTypesTabRef.current?.handleOpenCreate?.()}
+                className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                New Cargo Type
+              </button>
+            ) : (activeInvTab === "orders" || activeInvTab === "order_items") ? (
+              <button
+                onClick={() => {
+                  resetForm();
+                  setMode("create");
+                  setShowModal(true);
+                }}
+                className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                New Order
+              </button>
+            ) : null}
           </div>
         </div>
 
-        <div className="flex overflow-x-auto mb-6 border-b border-gray-200">
+        <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
           {invoiceTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveInvTab(tab.id)}
-              className={`px-6 py-3 text-sm font-semibold transition-all relative min-w-fit ${activeInvTab === tab.id
-                ? "text-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-700"
+              onClick={() => {
+                setActiveInvTab(tab.id);
+                setCurrentPage(1);
+              }}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
+                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
                 }`}
             >
               {tab.label}
-              {activeInvTab === tab.id && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#8CC21B]" />
-              )}
             </button>
           ))}
         </div>
 
+        <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder={
+                (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices")
+                  ? "Search invoices, customers, or order numbers..."
+                  : activeInvTab === "cargos"
+                    ? "Search cargos..."
+                    : activeInvTab === "cargo_type"
+                      ? "Search cargo types..."
+                      : "Search..."
+              }
+              value={
+                (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices")
+                  ? searchTerm
+                  : orderNoFilter
+              }
+              onChange={(e) => {
+                if (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices") {
+                  setSearchTerm(e.target.value);
+                } else {
+                  setOrderNoFilter(e.target.value);
+                }
+              }}
+              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
+            />
+          </div>
+
+          <button
+            onClick={() => {
+              if (activeInvTab === "cargos") {
+                cargosTabRef.current?.fetchCargos?.();
+              } else if (activeInvTab === "cargo_type") {
+                cargoTypesTabRef.current?.fetchCargoTypes?.();
+              } else if (activeInvTab === "orders" || activeInvTab === "order_items") {
+                fetchOrders();
+              } else {
+                setLoading(true);
+                loadInvoices();
+                if (activeInvTab === "billto_shipto") fetchCustomers();
+              }
+            }}
+            disabled={loading || loadingOrders}
+            className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
+            title="Refresh"
+          >
+            <RefreshCw
+              className={`h-4.5 w-4.5 ${loading || loadingOrders ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </button>
+        </div>
+
         {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-          <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm mb-6">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
             {activeInvTab === "order_items" && orderNoFilter && (
               <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-100 mb-4 rounded-[4px]">
                 <span className="text-xs text-blue-700 font-medium">
@@ -1897,10 +1890,7 @@ const InvoiceListPage: React.FC = () => {
                 </div>
               </div>
 
-              <div
-                className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
-                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-              >
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="text-center">

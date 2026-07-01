@@ -39,7 +39,6 @@ export const seedDatabase = async () => {
                 { iso2: "ES", name: "Spain", is_eu: true, is_igl_country: false },
                 { iso2: "BE", name: "Belgium", is_eu: true, is_igl_country: false },
                 { iso2: "HU", name: "Hungary", is_eu: true, is_igl_country: false },
-                { iso2: "JP", name: "Japan", is_eu: false, is_igl_country: false },
             ];
             for (const c of countries) {
                 await countryRepository.save(countryRepository.create(c));
@@ -496,6 +495,39 @@ export const seedDatabase = async () => {
             const item = itemRepository.create(itemData);
             const saved = await itemRepository.save(item);
             console.log(`  ✓ Created item: ${saved.item_name} (${saved.ItemID_DE})`);
+        }
+
+        console.log("🔗 Mapping existing businesses/customers to Country table...");
+        const allCustomers = await customerRepository.find({ relations: ["businessDetails"] });
+        for (const customer of allCustomers) {
+            const countryStr = (customer.country || customer.businessDetails?.country || "").trim().toUpperCase();
+            if (countryStr) {
+                const matchedCountry = await countryRepository.findOne({
+                    where: [
+                        { iso2: countryStr },
+                        { name: countryStr }
+                    ]
+                });
+
+                if (matchedCountry) {
+                    let updated = false;
+                    if (customer.country_id !== matchedCountry.id) {
+                        customer.country_id = matchedCountry.id;
+                        await customerRepository.save(customer);
+                        updated = true;
+                    }
+                    if (customer.businessDetails && customer.businessDetails.country_id !== matchedCountry.id) {
+                        customer.businessDetails.country_id = matchedCountry.id;
+                        await businessDetailsRepository.save(customer.businessDetails);
+                        updated = true;
+                    }
+                    if (updated) {
+                        console.log(`  ✓ Mapped business "${customer.companyName}" to country ${matchedCountry.name}`);
+                    }
+                } else {
+                    console.log(`  ⚠ No country match found in DB for string "${countryStr}" (Business: ${customer.companyName})`);
+                }
+            }
         }
 
         console.log("✅ Database seeding completed successfully!");

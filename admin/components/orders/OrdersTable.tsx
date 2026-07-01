@@ -62,7 +62,7 @@ export default function OrdersTable({
     },
     {
       header: "EAN",
-      width: "120px",
+      width: "95px",
       render: (row) => {
         const ean =
           row.ean ||
@@ -91,37 +91,35 @@ export default function OrdersTable({
     },
     {
       header: "Item name",
-      width: "200px",
-      render: (row) => (
-        <div
-          className="line-clamp-3 leading-tight break-words"
-          title={
-            row.item_name ||
-            row.itemName ||
-            row.item?.item_name ||
-            row.item?.name
-          }
-        >
-          {row.item_name ||
-            row.itemName ||
-            row.item?.item_name ||
-            row.item?.name ||
-            "Unknown"}
-        </div>
-      ),
+      width: "140px",
+      render: (row) => {
+        const text = row.item_name ||
+          row.itemName ||
+          row.item?.item_name ||
+          row.item?.name ||
+          "Unknown";
+        return (
+          <div
+            className="line-clamp-2 max-w-[140px] leading-tight break-words"
+            title={text}
+          >
+            {text}
+          </div>
+        );
+      },
     },
     {
       header: "Price",
-      width: "80px",
+      width: "45px",
       render: (row) => {
         const val = row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0;
         return <div className="font-semibold">{Number(val).toFixed(2)}</div>;
       },
     },
-    { header: "QTY", width: "40px", render: (row) => row.qty, align: "center" },
+    { header: "QTY", width: "35px", render: (row) => row.qty, align: "center" },
     {
       header: "Total",
-      width: "80px",
+      width: "45px",
       render: (row) => {
         const p = Number(
           row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0,
@@ -132,7 +130,7 @@ export default function OrdersTable({
     },
     {
       header: "Supplier",
-      width: "180px",
+      width: "110px",
       render: (row) => {
         const itemDetails = itemById.get(String(row.item_id));
         const sid = Number(row.supplier_id || row.item?.supplier_id || itemDetails?.supplier_id || 0);
@@ -213,7 +211,7 @@ export default function OrdersTable({
 
         return (
           <div className="flex items-center gap-2">
-            <div className="truncate max-w-[120px] font-medium text-gray-700">
+            <div className="truncate max-w-[100px] font-medium text-gray-700" title={sname || ""}>
               {sname ? (
                 sname
               ) : sid && sid !== 0 ? (
@@ -239,49 +237,52 @@ export default function OrdersTable({
         );
       },
     },
-    { header: "Order No.", width: "80px", render: (row) => row.order_no },
+    { header: "Order No.", width: "65px", render: (row) => row.order_no },
     {
       header: "Remarks",
-      width: "150px",
-      render: (row) => (
-        <div className="line-clamp-2" title={row.remarks_cn || row.remark_de}>
-          {row.remarks_cn || row.remark_de || "-"}
-        </div>
-      ),
+      width: "90px",
+      render: (row) => {
+        const text = row.remarks_cn || row.remark_de || "-";
+        return (
+          <div className="line-clamp-2 max-w-[90px]" title={text}>
+            {text}
+          </div>
+        );
+      },
     },
     {
       header: "Status",
-      width: "60px",
+      width: "45px",
       render: (row) => row.item_status || row.status || "-",
       align: "center",
     },
     {
       header: "Cargo",
-      width: "40px",
+      width: "35px",
       render: (row) => row.cargo_id || "-",
       align: "center",
     },
     {
       header: "SOID",
-      width: "40px",
+      width: "35px",
       render: (row) => row.supplier_order_id || "-",
       align: "center",
     },
     {
       header: "Actions",
-      width: "135px",
+      width: "115px",
       align: "center",
       render: (row) => {
         const hasCargo = !!row.cargo_id;
         return (
-          <div className="flex items-center justify-center gap-1.5">
+          <div className="flex items-center justify-center gap-1">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onReassign(row);
               }}
               title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
-              className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+              className="px-1.5 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-0.5"
             >
               <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
             </button>
@@ -291,7 +292,7 @@ export default function OrdersTable({
                 onSplit(row);
               }}
               title="Split Order Item"
-              className="px-2 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
+              className="px-1.5 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
             >
               Split
             </button>
@@ -388,9 +389,9 @@ export default function OrdersTable({
     },
     {
       header: "Comment",
-      width: "250px",
+      width: "160px",
       render: (row) => (
-        <div className="line-clamp-2 leading-tight" title={row.comment}>
+        <div className="line-clamp-2 max-w-[160px] leading-tight" title={row.comment}>
           {row.comment || "-"}
         </div>
       ),

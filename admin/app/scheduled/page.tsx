@@ -125,6 +125,7 @@ import {
   Shield,
   Package,
   Calendar,
+  RefreshCw,
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { useRouter, useParams } from "next/navigation";
@@ -209,10 +210,7 @@ function AddItemDialog({
 
   const selectedList =
     availableLists.find((l: any) => l.id === selectedListId) || null;
-
-  // Temporary fallback until API is fixed
   const fallbackSearch = async (query: string) => {
-    // Return empty array or mock data
     return [];
   };
 
@@ -2515,7 +2513,7 @@ const AdminAllItemsPage = () => {
       {
         key: "selection",
         name: "",
-        width: 50,
+        width: 40,
         frozen: true,
         renderCell: (props: any) => (
           <Checkbox
@@ -2536,10 +2534,9 @@ const AdminAllItemsPage = () => {
       {
         key: "company_list",
         name: "Company / List",
-        width: 200,
+        width: 140,
         resizable: true,
         renderCell: (props: any) => {
-          // Safely access contact person data with fallbacks
           const contactPersonName =
             props.row.contactPerson?.name || "Select Contact";
           const contactPersonId = props.row.contactPerson?.id || "";
@@ -2656,7 +2653,7 @@ const AdminAllItemsPage = () => {
       {
         key: "imageUrl",
         name: "Image",
-        width: 100,
+        width: 80,
         resizable: true,
         frozen: true,
         renderCell: (props: any) => {
@@ -2771,11 +2768,10 @@ const AdminAllItemsPage = () => {
           );
         },
       },
-      // MERGED COLUMN - Item No. DE + Article Name
       {
         key: "item_info",
         name: "Item",
-        width: 300,
+        width: 210,
         resizable: true,
         renderCell: (props: any) => {
           const hasItemNoChanges =
@@ -2871,7 +2867,7 @@ const AdminAllItemsPage = () => {
       {
         key: "interval_quantity",
         name: "Interval / Qty",
-        width: 130,
+        width: 100,
         resizable: true,
         renderCell: (props: any) => (
           <Box
@@ -3216,513 +3212,350 @@ const AdminAllItemsPage = () => {
   }
 
   return (
-    <Box sx={{ width: "100%", py: 3, px: 0, pt: 0 }}>
-      <Box sx={{ width: "100%", mx: "auto" }}>
-        {/* Header */}
-        <Box
-          sx={{
-            mb: 2,
-            display: "flex",
-            flexDirection: "column",
-            background: "rgba(255,255,255,0.8)",
-            backdropFilter: "blur(10px)",
-            borderRadius: 1,
-            px: 2.5,
-            py: 2,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-            border: "1px solid",
-            borderColor: alpha("#ADB5BD", 0.15),
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
-            <IconButton
-              onClick={() => router.back()}
-              sx={{
-                mr: 1.5,
-                bgcolor: "background.paper",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                "&:hover": {
-                  bgcolor: "background.paper",
-                  transform: "translateY(-2px)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-                },
-                transition: "all 0.2s",
-              }}
-            >
-              <ArrowBack />
-            </IconButton>
+    <div className="min-h-screen bg-transparent font-poppins px-0 py-0">
+      <div className="w-full mx-auto p-0">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
             <PageHeader title="Scheduled Items" icon={Calendar} />
-
-            {saving && <CircularProgress size={20} sx={{ ml: 2 }} />}
-          </Box>
-          <CardContent sx={{ paddingLeft: 4, paddingRight: 4 }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Filter by Customer</InputLabel>
-                  <Select
-                    value={selectedCustomer}
-                    onChange={(e) => {
-                      setSelectedCustomer(e.target.value);
-                      setSelectedList("");
-                    }}
-                    label="Filter by Customer"
-                  >
-                    <MenuItem value="">
-                      <em>All Customers</em>
-                    </MenuItem>
-                    {customers.map((customer) => (
-                      <MenuItem key={customer.id} value={customer.id}>
-                        {customer.companyName || customer.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Filter by List</InputLabel>
-                  <Select
-                    value={selectedList}
-                    onChange={(e) => setSelectedList(e.target.value)}
-                    label="Filter by List"
-                    disabled={!selectedCustomer}
-                  >
-                    <MenuItem value="">
-                      <em>All Lists</em>
-                    </MenuItem>
-                    {availableLists.map((list) => (
-                      <MenuItem key={list.id} value={list.id}>
-                        {list.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Show Items</InputLabel>
-                  <Select
-                    value={showOnlyChanges ? "changes" : "all"}
-                    onChange={(e) =>
-                      setShowOnlyChanges(e.target.value === "changes")
-                    }
-                    label="Show Items"
-                  >
-                    <MenuItem value="all">All Items</MenuItem>
-                    <MenuItem value="changes">
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Warning
-                          fontSize="small"
-                          sx={{ color: "warning.main" }}
-                        />
-                        Items with Changes
-                        {itemsWithChanges.length > 0 && (
-                          <Chip
-                            label={itemsWithChanges.length}
-                            size="small"
-                            color="warning"
-                            sx={{ ml: 1 }}
-                          />
-                        )}
-                      </Box>
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<Clear />}
-                  onClick={() => {
-                    setSelectedCustomer("");
-                    setSelectedList("");
-                    setSearchTerm("");
-                    setShowOnlyChanges(false);
-                  }}
-                  size="small"
-                  sx={{ height: "40px" }}
-                >
-                  Clear Filters
-                </Button>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 12, md: 2 }}>
-                <Box
-                  sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}
-                >
-                  <CustomButton
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => setCreateListDialog(true)}
-                    fullWidth
-                  >
-                    Create List
-                  </CustomButton>
-                </Box>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Box>
+            {saving && <CircularProgress size={20} className="ml-2 inline-block" />}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setCreateListDialog(true)}
+              className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+            >
+              <Add className="w-4 h-4" />
+              Create List
+            </button>
+            <button
+              onClick={() => setAddItemDialog(true)}
+              className="px-4 py-2.5 bg-gradient-to-r from-[#059669] to-[#047857] hover:from-[#047857] hover:to-[#035e43] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+            >
+              <Add className="w-4 h-4" />
+              Add Item
+            </button>
+          </div>
+        </div>
 
         {/* Tabs Section */}
-        <Card
-          sx={{
-            mb: 2,
-            borderRadius: 1,
-            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-            border: "1px solid",
-            borderColor: alpha("#E2E8F0", 0.8),
-          }}
-        >
-          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-            <Tabs
-              value={currentTab}
-              onChange={(_, newValue) => setCurrentTab(newValue)}
+        <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
+          <button
+            onClick={() => setCurrentTab(0)}
+            className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px flex items-center gap-2 ${currentTab === 0
+              ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+              : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
+          >
+            <Inventory className="w-4 h-4" />
+            Items Management ({filteredItems.length})
+          </button>
+          <button
+            onClick={() => setCurrentTab(1)}
+            className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px flex items-center gap-2 ${currentTab === 1
+              ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+              : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
+          >
+            <History className="w-4 h-4" />
+            Activity Logs ({filteredActivityLogs.length})
+          </button>
+        </div>
+
+        {/* One-line Filter Container */}
+        <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
+          {/* Search Field */}
+          <div className="relative flex-1 min-w-[240px] max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder={
+                currentTab === 0
+                  ? "Search items, companies, lists..."
+                  : "Search activity logs..."
+              }
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
+            />
+          </div>
+
+          {/* Customer Filter */}
+          <div className="w-[180px]">
+            <select
+              value={selectedCustomer}
+              onChange={(e) => {
+                setSelectedCustomer(e.target.value);
+                setSelectedList("");
+              }}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 bg-white text-gray-700"
+            >
+              <option value="">All Customers</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.companyName || c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* List Filter */}
+          <div className="w-[160px]">
+            <select
+              value={selectedList}
+              onChange={(e) => setSelectedList(e.target.value)}
+              disabled={!selectedCustomer}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 bg-white text-gray-700 disabled:opacity-50"
+            >
+              <option value="">All Lists</option>
+              {availableLists.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Show Items (All vs Changes) */}
+          <div className="w-[180px]">
+            <select
+              value={showOnlyChanges ? "changes" : "all"}
+              onChange={(e) => setShowOnlyChanges(e.target.value === "changes")}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 bg-white text-gray-700"
+            >
+              <option value="all">All Items</option>
+              <option value="changes">Items with Changes ({itemsWithChanges.length})</option>
+            </select>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 ml-auto">
+            {currentTab === 0 && user?.role === UserRole.ADMIN && selectedRows.size > 0 && (
+              <button
+                onClick={handleDeleteSelectedItems}
+                disabled={saving}
+                className="px-3 py-2 text-xs bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 transition-all font-semibold flex items-center gap-1.5"
+              >
+                <Delete className="w-3.5 h-3.5" />
+                Delete ({selectedRows.size})
+              </button>
+            )}
+
+            {currentTab === 0 ? (
+              <>
+                <button
+                  onClick={async () => await handleRefetchItemData()}
+                  className="px-3 py-2 text-xs bg-white text-[#8CC21B] border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-semibold flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Refetch WaWi
+                </button>
+                <button
+                  onClick={() => loadAllItems()}
+                  className="px-3 py-2 text-xs bg-white text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-semibold flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Refresh
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => loadAllItems()}
+                className="px-3 py-2 text-xs bg-white text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-semibold flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Refresh Logs
+              </button>
+            )}
+
+            {(selectedCustomer || selectedList || searchTerm || showOnlyChanges) && (
+              <button
+                onClick={() => {
+                  setSelectedCustomer("");
+                  setSelectedList("");
+                  setSearchTerm("");
+                  setShowOnlyChanges(false);
+                }}
+                className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all"
+                title="Clear Filters"
+              >
+                <Clear className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tab Panel 0: Items Management */}
+        {currentTab === 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4">
+            <Paper
+              elevation={0}
               sx={{
-                px: 2,
-                "& .MuiTab-root": {
-                  textTransform: "none",
+                height: "600px",
+                width: "100%",
+                backgroundColor: "#ffffff",
+                borderRadius: "16px",
+                border: "none",
+                overflow: "hidden",
+                "& .rdg": {
+                  border: "none !important",
+                  "--rdg-selection-color":
+                    "rgba(140, 194, 27, 0.15) !important",
+                  "--rdg-background-color": "#ffffff !important",
+                  "--rdg-header-background-color":
+                    "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%) !important",
+                  fontFamily:
+                    '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                },
+                "& .rdg-header-row": {
+                  background:
+                    "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%)",
+                  borderBottom: "2px solid rgba(140, 194, 27, 0.2)",
                   fontWeight: 600,
-                  fontSize: "0.95rem",
-                  minHeight: 56,
-                  "&.Mui-selected": {
-                    color: "primary.main",
+                  minHeight: "75px !important",
+                  color: "#2d3748",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                },
+                "& .rdg-header-cell": {
+                  padding: "8px 12px !important",
+                  display: "flex !important",
+                  alignItems: "center !important",
+                  justifyContent: "center !important",
+                  borderRight: "1px solid rgba(140, 194, 27, 0.1)",
+                  background: "transparent",
+                  color: "#2d3748",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  "&:hover": {
+                    background: "rgba(140, 194, 27, 0.05)",
                   },
                 },
-                "& .MuiTabs-indicator": {
-                  backgroundColor: "primary.main",
-                  height: 3,
-                  borderRadius: "2px 2px 0 0",
+                "& .rdg-cell": {
+                  padding: "12px 16px !important",
+                  display: "flex !important",
+                  alignItems: "center !important",
+                  borderRight: "1px solid rgba(226, 232, 240, 0.8)",
+                  borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
+                  backgroundColor: "#ffffff",
+                  color: "#374151",
+                  fontSize: "0.875rem",
+                  transition: "all 0.2s ease",
+                },
+                "& .rdg-row": {
+                  minHeight: "80px !important",
+                  "&:hover": {
+                    backgroundColor: "rgba(140, 194, 27, 0.04) !important",
+                    transform: "translateY(-1px)",
+                    boxShadow: "0 4px 12px rgba(140, 194, 27, 0.08)",
+                    "& .rdg-cell": {
+                      backgroundColor: "rgba(140, 194, 27, 0.04)",
+                      borderColor: "rgba(140, 194, 27, 0.15)",
+                    },
+                  },
+                },
+                "& .rdg-row:nth-of-type(even)": {
+                  backgroundColor: "rgba(248, 250, 252, 0.5)",
+                  "& .rdg-cell": {
+                    backgroundColor: "rgba(248, 250, 252, 0.5)",
+                  },
+                },
+                "& .rdg-row:nth-of-type(odd)": {
+                  backgroundColor: "#ffffff",
+                  "& .rdg-cell": {
+                    backgroundColor: "#ffffff",
+                  },
+                },
+                "& .rdg-row.rdg-row-selected": {
+                  backgroundColor: "rgba(140, 194, 27, 0.08) !important",
+                  "& .rdg-cell": {
+                    backgroundColor: "rgba(140, 194, 27, 0.08)",
+                    borderColor: "rgba(140, 194, 27, 0.2)",
+                  },
                 },
               }}
             >
-              <Tab
-                icon={<Inventory />}
-                iconPosition="start"
-                label={`Items Management (${filteredItems.length})`}
-                sx={{ gap: 1 }}
-              />
-              <Tab
-                icon={<History />}
-                iconPosition="start"
-                label={`Activity Logs (${filteredActivityLogs.length})`}
-                sx={{ gap: 1 }}
-              />
-            </Tabs>
-          </Box>
-
-          {/* Tab Panel 0: Items Management */}
-          <TabPanel value={currentTab} index={0}>
-            <Box sx={{ p: 3 }}>
-              {/* Action Bar */}
-              <Box
-                sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
-              >
-                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
-                  <TextField
-                    placeholder="Search items, companies, lists..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    size="small"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search fontSize="small" />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      width: 300,
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 1,
-                      },
+              {filteredItems.length === 0 ? (
+                <div className="text-center py-16 px-3">
+                  <Package
+                    size={64}
+                    style={{
+                      color: "#ccc",
+                      marginBottom: 24,
+                      margin: "0 auto",
                     }}
                   />
-
-                  {user?.role === UserRole.ADMIN && selectedRows.size > 0 && (
-                    <CustomButton
-                      variant="outlined"
-                      color="error"
-                      startIcon={<Delete />}
-                      onClick={handleDeleteSelectedItems}
-                      loading={saving}
-                    >
-                      Delete ({selectedRows.size})
-                    </CustomButton>
-                  )}
-                  <CustomButton
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => setAddItemDialog(true)}
-                  >
-                    Add Item
-                  </CustomButton>
-                </Box>
-
-                <Box sx={{ display: "flex", gap: 1.5 }}>
-                  <CustomButton
-                    variant="contained"
-                    startIcon={<Refresh />}
-                    onClick={async () => await handleRefetchItemData()}
-                  >
-                    Refetch Item Data
-                  </CustomButton>
-                  <CustomButton
-                    variant="outlined"
-                    startIcon={<Refresh />}
-                    onClick={() => loadAllItems()}
-                  >
-                    Refresh
-                  </CustomButton>
-                </Box>
-              </Box>
-
-              {/* Items Grid */}
-              <Paper
-                elevation={3}
-                sx={{
-                  height: "600px",
-                  width: "100%",
-                  backgroundColor: "#ffffff",
-                  borderRadius: "16px",
-                  border: "1px solid #e8f0fe",
-                  overflow: "hidden",
-                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
-                  "& .rdg": {
-                    border: "none !important",
-                    "--rdg-selection-color":
-                      "rgba(140, 194, 27, 0.15) !important",
-                    "--rdg-background-color": "#ffffff !important",
-                    "--rdg-header-background-color":
-                      "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%) !important",
+                  <p className="text-sm text-gray-500 mb-2">
+                    {searchTerm || selectedCustomer || selectedList
+                      ? "Try adjusting your filters or search terms"
+                      : "No items available"}
+                  </p>
+                </div>
+              ) : (
+                <DataGrid
+                  columns={columns}
+                  rows={filteredItems}
+                  rowKeyGetter={(row: any) => row.id}
+                  selectedRows={selectedRows}
+                  onSelectedRowsChange={setSelectedRows}
+                  rowHeight={80}
+                  headerRowHeight={75}
+                  className="fill-grid"
+                  style={{
+                    height: "100%",
+                    border: "none",
+                    fontSize: "0.875rem",
+                    backgroundColor: "#ffffff",
                     fontFamily:
                       '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  },
-                  "& .rdg-header-row": {
-                    background:
-                      "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%)",
-                    borderBottom: "2px solid rgba(140, 194, 27, 0.2)",
-                    fontWeight: 600,
-                    minHeight: "75px !important",
-                    color: "#2d3748",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                  },
-                  "& .rdg-header-cell": {
-                    padding: "8px 12px !important",
-                    display: "flex !important",
-                    alignItems: "center !important",
-                    justifyContent: "center !important",
-                    borderRight: "1px solid rgba(140, 194, 27, 0.1)",
-                    background: "transparent",
-                    color: "#2d3748",
-                    fontWeight: 600,
-                    fontSize: "0.85rem",
-                    "&:hover": {
-                      background: "rgba(140, 194, 27, 0.05)",
-                    },
-                  },
-                  "& .rdg-cell": {
-                    padding: "12px 16px !important",
-                    display: "flex !important",
-                    alignItems: "center !important",
-                    borderRight: "1px solid rgba(226, 232, 240, 0.8)",
-                    borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
-                    backgroundColor: "#ffffff",
-                    color: "#374151",
-                    fontSize: "0.875rem",
-                    transition: "all 0.2s ease",
-                  },
-                  "& .rdg-row": {
-                    minHeight: "80px !important",
-                    "&:hover": {
-                      backgroundColor: "rgba(140, 194, 27, 0.04) !important",
-                      transform: "translateY(-1px)",
-                      boxShadow: "0 4px 12px rgba(140, 194, 27, 0.08)",
-                      "& .rdg-cell": {
-                        backgroundColor: "rgba(140, 194, 27, 0.04)",
-                        borderColor: "rgba(140, 194, 27, 0.15)",
-                      },
-                    },
-                  },
-                  "& .rdg-row:nth-of-type(even)": {
-                    backgroundColor: "rgba(248, 250, 252, 0.5)",
-                    "& .rdg-cell": {
-                      backgroundColor: "rgba(248, 250, 252, 0.5)",
-                    },
-                  },
-                  "& .rdg-row:nth-of-type(odd)": {
-                    backgroundColor: "#ffffff",
-                    "& .rdg-cell": {
-                      backgroundColor: "#ffffff",
-                    },
-                  },
-                  "& .rdg-row.rdg-row-selected": {
-                    backgroundColor: "rgba(140, 194, 27, 0.08) !important",
-                    "& .rdg-cell": {
-                      backgroundColor: "rgba(140, 194, 27, 0.08)",
-                      borderColor: "rgba(140, 194, 27, 0.2)",
-                    },
-                  },
-                }}
-              >
-                {filteredItems.length === 0 ? (
-                  <Box sx={{ textAlign: "center", py: 8, px: 3 }}>
-                    <Package
-                      size={64}
-                      style={{
-                        color: "#ccc",
-                        marginBottom: 24,
-                        margin: "0 auto",
-                      }}
-                    />
+                  }}
+                  defaultColumnOptions={{
+                    sortable: true,
+                    resizable: true,
+                  }}
+                />
+              )}
+            </Paper>
+          </div>
+        )}
 
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      {searchTerm || selectedCustomer || selectedList
-                        ? "Try adjusting your filters or search terms"
-                        : "No items available"}
-                    </Typography>
-                  </Box>
-                ) : (
-                  <DataGrid
-                    columns={columns}
-                    rows={filteredItems}
-                    rowKeyGetter={(row: any) => row.id}
-                    selectedRows={selectedRows}
-                    onSelectedRowsChange={setSelectedRows}
-                    rowHeight={80}
-                    headerRowHeight={75}
-                    className="fill-grid"
-                    style={{
-                      height: "100%",
-                      border: "none",
-                      fontSize: "0.875rem",
-                      backgroundColor: "#ffffff",
-                      fontFamily:
-                        '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    }}
-                    defaultColumnOptions={{
-                      sortable: true,
-                      resizable: true,
-                    }}
+        {/* Tab Panel 1: Activity Logs */}
+        {currentTab === 1 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <History className="text-[#8CC21B] w-5 h-5" />
+              <h3 className="text-lg font-bold text-gray-800">Activity Timeline</h3>
+            </div>
+            <div
+              className="h-[600px] overflow-y-auto border border-gray-100 rounded-xl p-4 bg-[#fafafa]"
+              style={{
+                scrollbarWidth: "thin",
+              }}
+            >
+              {filteredActivityLogs.length === 0 ? (
+                <div className="text-center py-16 px-3">
+                  <History style={{ color: "#ccc", marginBottom: 24, margin: "0 auto" }} />
+                  <p className="text-base font-bold text-gray-600 mb-2">
+                    No activity logs found
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {searchTerm || selectedCustomer || selectedList
+                      ? "Try adjusting your filters or search terms"
+                      : "No activity logs available"}
+                  </p>
+                </div>
+              ) : (
+                filteredActivityLogs.map((log) => (
+                  <ActivityLogCard
+                    key={log.id}
+                    log={log}
+                    customerName={log.customerName}
+                    listName={log.listName}
                   />
-                )}
-              </Paper>
-            </Box>
-          </TabPanel>
-
-          <TabPanel value={currentTab} index={1}>
-            <Box sx={{ p: 3 }}>
-              <Box
-                sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
-              >
-                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
-                  <TextField
-                    placeholder="Search activity logs..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    size="small"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search fontSize="small" />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      width: 300,
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 1,
-                      },
-                    }}
-                  />
-
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <History sx={{ color: "primary.main", fontSize: 20 }} />
-                    <Typography variant="h6" fontWeight={600}>
-                      Activity Timeline
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <CustomButton
-                  variant="outlined"
-                  startIcon={<Refresh />}
-                  onClick={() => loadAllItems()}
-                >
-                  Refresh Logs
-                </CustomButton>
-              </Box>
-
-              <Box
-                sx={{
-                  height: "600px",
-                  overflowY: "auto",
-                  border: "1px solid #e8f0fe",
-                  borderRadius: 2,
-                  bgcolor: "#fafafa",
-                  p: 2,
-                  "& ::-webkit-scrollbar": {
-                    width: "8px",
-                  },
-                  "& ::-webkit-scrollbar-track": {
-                    backgroundColor: "rgba(0,0,0,0.05)",
-                    borderRadius: "4px",
-                  },
-                  "& ::-webkit-scrollbar-thumb": {
-                    backgroundColor: "rgba(140, 194, 27, 0.3)",
-                    borderRadius: "4px",
-                    "&:hover": {
-                      backgroundColor: "rgba(140, 194, 27, 0.5)",
-                    },
-                  },
-                }}
-              >
-                {filteredActivityLogs.length === 0 ? (
-                  <Box sx={{ textAlign: "center", py: 8, px: 3 }}>
-                    <History style={{ color: "#ccc", marginBottom: 24 }} />
-                    <Typography
-                      variant="h6"
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      No activity logs found
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      {searchTerm || selectedCustomer || selectedList
-                        ? "Try adjusting your filters or search terms"
-                        : "No activity logs available"}
-                    </Typography>
-                  </Box>
-                ) : (
-                  filteredActivityLogs.map((log) => (
-                    <ActivityLogCard
-                      key={log.id}
-                      log={log}
-                      customerName={log.customerName}
-                      listName={log.listName}
-                    />
-                  ))
-                )}
-              </Box>
-            </Box>
-          </TabPanel>
-        </Card>
-      </Box>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Dialogs */}
       <CreateListDialog
@@ -3754,7 +3587,7 @@ const AdminAllItemsPage = () => {
         activityLogs={allActivityLogs}
         onSwitchToMainActivityTab={handleSwitchToMainActivityTab}
       />
-    </Box>
+    </div>
   );
 };
 
