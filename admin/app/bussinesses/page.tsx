@@ -1630,7 +1630,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       >
         <ModalHeader
           entityName="Business"
-          entityNo={businessModalMode === "edit" ? businessForm.customerNumber : null}
+          entityNo={businessModalMode === "edit" ? (businessForm.displayName) : null}
           icon={BuildingOfficeIcon}
           isEditMode={businessModalMode === "edit"}
           isEditEnabled={businessEditMode}

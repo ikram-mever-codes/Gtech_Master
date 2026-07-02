@@ -152,8 +152,6 @@ export default function TaxProfileDetailsPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-3xl mx-auto space-y-4">
-
-        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <button
             onClick={() => router.push("/tax-profiles")}
@@ -170,11 +168,7 @@ export default function TaxProfileDetailsPage() {
           <span>/</span>
           <span className="text-gray-900 font-medium">{taxProfile.name}</span>
         </div>
-
-        {/* Detail Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-
-          {/* Reusable ModalHeader */}
           <ModalHeader
             entityName={taxProfile.name}
             icon={Percent}
@@ -183,12 +177,8 @@ export default function TaxProfileDetailsPage() {
             onToggleEdit={() => setIsEditEnabled((prev) => !prev)}
             onClose={() => router.push("/tax-profiles")}
           />
-
-          {/* Form Body */}
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-              {/* Profile Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Profile Name
@@ -206,8 +196,6 @@ export default function TaxProfileDetailsPage() {
                   </div>
                 )}
               </div>
-
-              {/* Tax Case */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Tax Case
@@ -229,8 +217,6 @@ export default function TaxProfileDetailsPage() {
                   </div>
                 )}
               </div>
-
-              {/* Tax Rate */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Tax Rate (%)
@@ -250,8 +236,6 @@ export default function TaxProfileDetailsPage() {
                   </div>
                 )}
               </div>
-
-              {/* Tax Code */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Tax Code
@@ -269,8 +253,6 @@ export default function TaxProfileDetailsPage() {
                   </div>
                 )}
               </div>
-
-              {/* Revenue Account */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Revenue Account
@@ -288,8 +270,6 @@ export default function TaxProfileDetailsPage() {
                   </div>
                 )}
               </div>
-
-              {/* Description */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Description
@@ -307,8 +287,6 @@ export default function TaxProfileDetailsPage() {
                   </div>
                 )}
               </div>
-
-              {/* Switches / Checkboxes */}
               <div className="space-y-3 pt-4 md:col-span-2 border-t border-gray-100">
                 {isEditEnabled ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -360,8 +338,6 @@ export default function TaxProfileDetailsPage() {
 
             </div>
           </div>
-
-          {/* Reusable ModalFooter */}
           <ModalFooter
             isEditMode={true}
             isEditEnabled={isEditEnabled}
