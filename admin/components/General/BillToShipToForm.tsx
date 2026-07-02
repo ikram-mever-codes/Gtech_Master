@@ -80,6 +80,7 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
 
     const [addressProfile, setAddressProfile] = useState<string>("main");
     const [dbShippingAddresses, setDbShippingAddresses] = useState<CompanyShippingAddress[]>([]);
+    const [prevCustomerId, setPrevCustomerId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchShippingAddresses = async () => {
@@ -176,6 +177,56 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
 
     useEffect(() => {
         if (selectedCustomer) {
+            const customerChanged = prevCustomerId !== null && String(prevCustomerId) !== String(selectedCustomer.id);
+            setPrevCustomerId(selectedCustomer.id);
+
+            const hasExistingAddress = !customerChanged && !!(data.ship_to_company_name || data.ship_to_full_address || data.ship_to_city);
+
+            if (hasExistingAddress) {
+                const matchedProfile = dbShippingAddresses.find(addr => {
+                    const fullAddressStr = [
+                        addr.street,
+                        addr.address_additional_line || ""
+                    ].filter(Boolean).join(" ");
+                    return (
+                        addr.city?.toLowerCase() === data.ship_to_city?.toLowerCase() &&
+                        addr.postal_code === data.ship_to_postal_code &&
+                        fullAddressStr.toLowerCase() === data.ship_to_full_address?.toLowerCase()
+                    );
+                });
+
+                if (matchedProfile) {
+                    setAddressProfile(matchedProfile.id);
+                } else {
+                    const deliveryFullAddress = [
+                        selectedCustomer.deliveryAddressLine1 || "",
+                        selectedCustomer.deliveryAddressLine2 || ""
+                    ].filter(Boolean).join(" ");
+                    if (
+                        selectedCustomer.deliveryCity?.toLowerCase() === data.ship_to_city?.toLowerCase() &&
+                        selectedCustomer.deliveryPostalCode === data.ship_to_postal_code &&
+                        deliveryFullAddress.toLowerCase() === data.ship_to_full_address?.toLowerCase()
+                    ) {
+                        setAddressProfile("delivery");
+                    } else {
+                        const mainFullAddress = [
+                            selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "",
+                            selectedCustomer.addressLine2 || ""
+                        ].filter(Boolean).join(" ");
+                        if (
+                            (selectedCustomer.city || selectedCustomer.businessDetails?.city)?.toLowerCase() === data.ship_to_city?.toLowerCase() &&
+                            (selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode) === data.ship_to_postal_code &&
+                            mainFullAddress.toLowerCase() === data.ship_to_full_address?.toLowerCase()
+                        ) {
+                            setAddressProfile("main");
+                        } else {
+                            setAddressProfile("");
+                        }
+                    }
+                }
+                return;
+            }
+
             const defaultAddress = dbShippingAddresses.find(a => a.is_default);
             if (defaultAddress) {
                 setAddressProfile(defaultAddress.id);
@@ -206,7 +257,7 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
 
             applyShipToAddress(country, city, postalCode, fullAddress, { customer_type: "Other Customer" });
         }
-    }, [selectedCustomer, dbShippingAddresses]);
+    }, [selectedCustomer, dbShippingAddresses, data.ship_to_company_name, data.ship_to_full_address, data.ship_to_city]);
 
     const isGTWarehouse = data.customer_type === "GT-Warehouse";
 

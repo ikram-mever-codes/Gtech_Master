@@ -60,6 +60,7 @@ type Customer = {
 
 interface CargosTabProps {
     customers?: Customer[];
+    searchTerm?: string;
 }
 
 const formatDateInput = (dateString: string | Date | undefined | null) => {
@@ -73,10 +74,11 @@ const formatCargoDateShort = (dateString: string | Date | undefined | null) => {
     return formatDate(dateString);
 };
 
-const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCustomers }, ref) => {
+const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCustomers, searchTerm: externalSearchTerm }, ref) => {
     const [cargos, setCargos] = useState<CargoType[]>([]);
     const [loading, setLoading] = useState(false);
-    const [search, setSearch] = useState("");
+    const [localSearch, setLocalSearch] = useState("");
+    const search = externalSearchTerm !== undefined ? externalSearchTerm : localSearch;
     const [statusFilter, setStatusFilter] = useState("Open");
     const [pagination, setPagination] = useState({
         page: 1,
@@ -449,16 +451,18 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
         <div>
             <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-                    <div className="flex-1 w-full relative">
-                        <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search cargos..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
-                        />
-                    </div>
+                    {externalSearchTerm === undefined && (
+                        <div className="flex-1 w-full relative">
+                            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search cargos..."
+                                value={localSearch}
+                                onChange={(e) => setLocalSearch(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
+                            />
+                        </div>
+                    )}
                     <div className="shrink-0">
                         <SegmentedControl
                             options={[
@@ -473,7 +477,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                     {(search || statusFilter !== "Open") && (
                         <button
                             onClick={() => {
-                                setSearch("");
+                                setLocalSearch("");
                                 handleStatusFilterChange("Open");
                             }}
                             className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm w-full sm:w-auto justify-center"
@@ -514,9 +518,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                                     </th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
                                         CARGO TYPE
-                                    </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
-                                        BILL TO
                                     </th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
                                         SHIP TO
@@ -561,9 +562,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-800">
                                             {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800">
-                                            {cargo.bill_to_company_name || "GTech"}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-800">
                                             {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
