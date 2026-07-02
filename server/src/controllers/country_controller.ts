@@ -4,7 +4,6 @@ import { Country } from "../models/country";
 import { BusinessDetails } from "../models/business_details";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
 import { Customer } from "../models/customers";
-import { TaxProfile } from "../models/tax_profile";
 
 export const getAllCountries = async (
   req: Request,
@@ -175,12 +174,7 @@ export const deleteCountry = async (
     const customerCount = await AppDataSource.getRepository(Customer).count({
       where: { country_id: id }
     });
-    const taxProfileCount = await AppDataSource.getRepository(TaxProfile)
-      .createQueryBuilder("tp")
-      .where("tp.country_id = :id", { id })
-      .getCount();
-
-    if (businessDetailsCount > 0 || companyShippingCount > 0 || customerCount > 0 || taxProfileCount > 0) {
+    if (businessDetailsCount > 0 || companyShippingCount > 0 || customerCount > 0) {
       return res.status(400).json({
         success: false,
         message: "This country cannot be deleted because it is currently in use in the system."

@@ -4,10 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
 } from "typeorm";
-import { Country } from "./country";
 
 @Entity()
 export class TaxProfile {
@@ -16,10 +13,6 @@ export class TaxProfile {
 
   @Column({ type: "varchar", length: 150 })
   name!: string;
-
-  @ManyToOne(() => Country, { nullable: true, onDelete: "SET NULL" })
-  @JoinColumn({ name: "country_id" })
-  country?: Country | null;
 
   @Column({ type: "varchar", length: 150, nullable: true })
   tax_case?: string | null;

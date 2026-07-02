@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Percent,
-  Trash2,
-  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -14,53 +12,42 @@ import {
 import {
   getAllTaxProfiles,
   createTaxProfile,
-  updateTaxProfile,
-  deleteTaxProfile,
   TaxProfile,
 } from "@/api/tax_profiles";
-import { getAllCountries, Country } from "@/api/countries";
 import { toast } from "react-hot-toast";
 import MasterPageLayout from "@/components/General/MasterPageLayout";
 import CustomModal from "@/components/UI/CustomModal";
 import CustomButton from "@/components/UI/CustomButton";
+import { useRouter } from "next/navigation";
 
 export default function TaxProfilesPage() {
+  const router = useRouter();
   const [taxProfiles, setTaxProfiles] = useState<TaxProfile[]>([]);
-  const [countries, setCountries] = useState<Country[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Form & Modal States
   const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [countryId, setCountryId] = useState("");
-  const [taxCase, setTaxCase] = useState("");
+  const [taxCase, setTaxCase] = useState("DE-VAT"); // default to first option
   const [taxRate, setTaxRate] = useState(0);
   const [taxCode, setTaxCode] = useState("");
   const [revenueAccountNo, setRevenueAccountNo] = useState("");
   const [requiresVatId, setRequiresVatId] = useState(false);
   const [requiresConfirmedVatId, setRequiresConfirmedVatId] = useState(false);
-  const [isActive, setIsActive] = useState(true);
   const [description, setDescription] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, countriesRes]: [any, any] = await Promise.all([
-        getAllTaxProfiles(true),
-        getAllCountries(false),
-      ]);
-
-      if (profilesRes && profilesRes.success) {
-        setTaxProfiles(profilesRes.data || []);
-      }
-      if (countriesRes && countriesRes.success) {
-        setCountries(countriesRes.data || []);
+      const res: any = await getAllTaxProfiles(true);
+      if (res && res.success) {
+        setTaxProfiles(res.data || []);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load settings data");
+      toast.error("Failed to load tax profiles");
     } finally {
       setLoading(false);
     }
@@ -72,17 +59,13 @@ export default function TaxProfilesPage() {
 
   const resetForm = () => {
     setName("");
-    setCountryId("");
-    setTaxCase("");
+    setTaxCase("DE-VAT");
     setTaxRate(0);
     setTaxCode("");
     setRevenueAccountNo("");
     setRequiresVatId(false);
     setRequiresConfirmedVatId(false);
-    setIsActive(true);
     setDescription("");
-    setIsEditing(false);
-    setEditingId(null);
     setShowModal(false);
   };
 
@@ -100,7 +83,6 @@ export default function TaxProfilesPage() {
     setSubmitting(true);
     const payload = {
       name: name.trim(),
-      country_id: countryId || null,
       tax_case: taxCase.trim() || null,
       tax_rate: Number(taxRate),
       tax_code: taxCode.trim() || null,
@@ -111,23 +93,11 @@ export default function TaxProfilesPage() {
     };
 
     try {
-      if (isEditing && editingId) {
-        const res: any = await updateTaxProfile(editingId, {
-          ...payload,
-          is_active: isActive,
-        });
-        if (res && res.success) {
-          toast.success("Tax profile updated successfully");
-          fetchData();
-          resetForm();
-        }
-      } else {
-        const res: any = await createTaxProfile(payload);
-        if (res && res.success) {
-          toast.success("Tax profile created successfully");
-          fetchData();
-          resetForm();
-        }
+      const res: any = await createTaxProfile(payload);
+      if (res && res.success) {
+        toast.success("Tax profile created successfully");
+        fetchData();
+        resetForm();
       }
     } catch (err: any) {
       console.error(err);
@@ -138,42 +108,6 @@ export default function TaxProfilesPage() {
     }
   };
 
-  const handleEdit = (profile: TaxProfile) => {
-    setIsEditing(true);
-    setEditingId(profile.id);
-    setName(profile.name);
-    setCountryId(profile.country?.id || "");
-    setTaxCase(profile.tax_case || "");
-    setTaxRate(profile.tax_rate);
-    setTaxCode(profile.tax_code || "");
-    setRevenueAccountNo(profile.revenue_account_no || "");
-    setRequiresVatId(profile.requires_vat_id);
-    setRequiresConfirmedVatId(profile.requires_confirmed_vat_id);
-    setIsActive(profile.is_active);
-    setDescription(profile.description || "");
-    setShowModal(true);
-  };
-
-  const handleDeleteTaxProfile = async (profile: TaxProfile) => {
-    if (!confirm(`Are you sure you want to delete the profile "${profile.name}"?`)) {
-      return;
-    }
-
-    try {
-      const res: any = await deleteTaxProfile(profile.id);
-      if (res && res.success) {
-        toast.success(res.message || "Tax profile deleted successfully");
-        fetchData();
-        if (editingId === profile.id) {
-          resetForm();
-        }
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to delete tax profile");
-    }
-  };
-
   const filteredProfiles = taxProfiles.filter((p) => {
     if (!p.is_active) return false;
     const q = searchQuery.toLowerCase().trim();
@@ -181,8 +115,7 @@ export default function TaxProfilesPage() {
       p.name.toLowerCase().includes(q) ||
       (p.tax_case && p.tax_case.toLowerCase().includes(q)) ||
       (p.tax_code && p.tax_code.toLowerCase().includes(q)) ||
-      (p.revenue_account_no && p.revenue_account_no.toLowerCase().includes(q)) ||
-      (p.country?.name && p.country.name.toLowerCase().includes(q))
+      (p.revenue_account_no && p.revenue_account_no.toLowerCase().includes(q))
     );
   });
 
@@ -198,6 +131,7 @@ export default function TaxProfilesPage() {
       Add Tax Profile
     </CustomButton>
   );
+
   const filterBar = (
     <div className="flex flex-wrap items-center gap-3">
       <div className="relative flex-1 max-w-md">
@@ -220,6 +154,7 @@ export default function TaxProfilesPage() {
       </button>
     </div>
   );
+
   const tableContent = (
     <>
       {loading ? (
@@ -243,19 +178,18 @@ export default function TaxProfilesPage() {
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Country</th>
                 <th className="px-6 py-4">Case</th>
                 <th className="px-6 py-4 text-center">Rate</th>
                 <th className="px-6 py-4">Rev Account</th>
                 <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
               {filteredProfiles.map((p) => (
                 <tr
                   key={p.id}
-                  className={`hover:bg-gray-50/50 transition-all ${!p.is_active ? "opacity-60" : ""
+                  onClick={() => router.push(`/tax-profiles/${p.id}`)}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!p.is_active ? "opacity-60" : ""
                     }`}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">
@@ -268,18 +202,7 @@ export default function TaxProfilesPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-gray-600 font-medium">
-                    {p.country ? (
-                      <span className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-800 px-2 py-0.5 rounded-md font-mono text-xs">
-                        {p.country.iso2} - {p.country.name}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 italic text-xs">
-                        Global Default
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-gray-700 font-mono text-xs">
+                  <td className="px-6 py-4 text-gray-700 font-mono text-xs font-bold">
                     {p.tax_case || "—"}
                   </td>
                   <td className="px-6 py-4 text-center font-bold text-gray-800">
@@ -301,24 +224,6 @@ export default function TaxProfilesPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => handleEdit(p)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title="Edit Profile"
-                      >
-                        <Pencil className="h-4.5 w-4.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTaxProfile(p)}
-                        className="p-1.5 rounded-xl transition-all text-gray-400 hover:text-red-600 hover:bg-red-50"
-                        title="Delete Profile"
-                      >
-                        <Trash2 className="h-4.5 w-4.5" />
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -327,11 +232,12 @@ export default function TaxProfilesPage() {
       )}
     </>
   );
+
   const modalContent = (
     <CustomModal
       isOpen={showModal}
       onClose={resetForm}
-      title={isEditing ? "Edit Tax Profile" : "Create New Tax Profile"}
+      title="Create New Tax Profile"
       width="max-w-lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -352,28 +258,6 @@ export default function TaxProfilesPage() {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <label
-            htmlFor="profile_country"
-            className="text-xs font-bold text-gray-700 uppercase tracking-wider block"
-          >
-            Country
-          </label>
-          <select
-            id="profile_country"
-            value={countryId}
-            onChange={(e) => setCountryId(e.target.value)}
-            className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-gray-50/50"
-          >
-            <option value="">No Specific Country (Global Default)</option>
-            {countries.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.iso2} - {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label
@@ -382,14 +266,17 @@ export default function TaxProfilesPage() {
             >
               Tax Case
             </label>
-            <input
+            <select
               id="profile_case"
-              type="text"
               value={taxCase}
               onChange={(e) => setTaxCase(e.target.value)}
-              placeholder="Standard, IGL, Export"
               className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-gray-50/50"
-            />
+            >
+              <option value="DE-VAT">DE-VAT</option>
+              <option value="EU_IGL">EU_IGL</option>
+              <option value="EU_no_valid_VAT_ID">EU_no_valid_VAT_ID</option>
+              <option value="third_country">third_country</option>
+            </select>
           </div>
 
           <div className="space-y-1.5">
@@ -489,20 +376,6 @@ export default function TaxProfilesPage() {
               Requires Confirmed VAT ID (e.g. Qualified VIES)
             </span>
           </label>
-
-          {isEditing && (
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4.5 w-4.5 border-gray-300"
-              />
-              <span className="text-xs font-semibold text-gray-700">
-                Active (shows in defaults selection)
-              </span>
-            </label>
-          )}
         </div>
 
         <div className="flex gap-3 pt-4 border-t border-gray-100">
@@ -518,13 +391,12 @@ export default function TaxProfilesPage() {
             disabled={submitting}
             className="flex-1 px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm"
           >
-            {isEditing ? "Save Changes" : "Create Profile"}
+            Create Profile
           </button>
         </div>
       </form>
     </CustomModal>
   );
-
   return (
     <MasterPageLayout
       title="Tax Profile Settings"

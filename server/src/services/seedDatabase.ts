@@ -49,16 +49,12 @@ export const seedDatabase = async () => {
         const existingTaxProfiles = await taxProfileRepository.count();
         if (existingTaxProfiles === 0) {
             console.log("📦 Seeding tax profiles...");
-            const deCountry = await countryRepository.findOne({ where: { iso2: "DE" } });
-            const atCountry = await countryRepository.findOne({ where: { iso2: "AT" } });
-            const chCountry = await countryRepository.findOne({ where: { iso2: "CH" } });
 
             const profiles = [
                 {
                     name: "DE 19%",
                     tax_rate: 19.00,
-                    country: deCountry,
-                    tax_case: "Standard",
+                    tax_case: "DE-VAT",
                     tax_code: "DE-VAT19",
                     revenue_account_no: "8400",
                     description: "Standard German VAT rate (19%)",
@@ -66,8 +62,7 @@ export const seedDatabase = async () => {
                 {
                     name: "Reduced VAT (7%)",
                     tax_rate: 7.00,
-                    country: deCountry,
-                    tax_case: "Standard",
+                    tax_case: "DE-VAT",
                     tax_code: "DE-VAT7",
                     revenue_account_no: "8300",
                     description: "Reduced German VAT rate (7%)",
@@ -75,8 +70,7 @@ export const seedDatabase = async () => {
                 {
                     name: "AT IGL 0%",
                     tax_rate: 0.00,
-                    country: atCountry,
-                    tax_case: "IGL",
+                    tax_case: "EU_IGL",
                     tax_code: "AT-IGL0",
                     revenue_account_no: "8125",
                     requires_vat_id: true,
@@ -86,8 +80,7 @@ export const seedDatabase = async () => {
                 {
                     name: "AT without valid VAT ID 19%",
                     tax_rate: 19.00,
-                    country: atCountry,
-                    tax_case: "Standard",
+                    tax_case: "EU_no_valid_VAT_ID",
                     tax_code: "AT-VAT19",
                     revenue_account_no: "8315",
                     description: "Transactions to Austria without valid VAT ID (19%)",
@@ -95,8 +88,7 @@ export const seedDatabase = async () => {
                 {
                     name: "CH Export 0%",
                     tax_rate: 0.00,
-                    country: chCountry,
-                    tax_case: "Export",
+                    tax_case: "third_country",
                     tax_code: "CH-EXP0",
                     revenue_account_no: "8120",
                     description: "Export to Switzerland (0%)",
@@ -104,8 +96,7 @@ export const seedDatabase = async () => {
                 {
                     name: "VAT Free (Export to Third Countries)",
                     tax_rate: 0.00,
-                    country: deCountry,
-                    tax_case: "Export",
+                    tax_case: "third_country",
                     tax_code: "DE-EXP0",
                     revenue_account_no: "8120",
                     description: "Export to non-EU countries (0%)",
@@ -529,7 +520,6 @@ export const seedDatabase = async () => {
                 }
             }
         }
-
         console.log("✅ Database seeding completed successfully!");
     } catch (error) {
         console.error("❌ Error seeding database:", error);
