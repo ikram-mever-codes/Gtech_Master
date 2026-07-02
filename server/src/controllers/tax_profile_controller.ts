@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { TaxProfile } from "../models/tax_profile";
-import { Country } from "../models/country";
 import ErrorHandler from "../utils/errorHandler";
 
 export const getAllTaxProfiles = async (
@@ -15,7 +14,6 @@ export const getAllTaxProfiles = async (
 
     const taxProfiles = await taxProfileRepository.find({
       where: includeInactive ? {} : { is_active: true },
-      relations: ["country"],
       order: {
         tax_rate: "DESC",
         name: "ASC",
@@ -39,10 +37,8 @@ export const createTaxProfile = async (
 ) => {
   try {
     const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
-    const countryRepository = AppDataSource.getRepository(Country);
     const {
       name,
-      country_id,
       tax_case,
       tax_rate,
       tax_code,
@@ -58,23 +54,8 @@ export const createTaxProfile = async (
         message: "Tax Profile name is required.",
       });
     }
-
-    let countryEntity = null;
-    if (country_id) {
-      countryEntity = await countryRepository.findOne({
-        where: { id: country_id },
-      });
-      if (!countryEntity) {
-        return res.status(404).json({
-          success: false,
-          message: "Linked Country not found.",
-        });
-      }
-    }
-
     const taxProfile = taxProfileRepository.create({
       name: name.trim(),
-      country: countryEntity,
       tax_case: tax_case ? tax_case.trim() : null,
       tax_rate: tax_rate !== undefined ? Number(tax_rate) : 0.0,
       tax_code: tax_code ? tax_code.trim() : null,
@@ -104,11 +85,9 @@ export const updateTaxProfile = async (
 ) => {
   try {
     const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
-    const countryRepository = AppDataSource.getRepository(Country);
     const { id } = req.params;
     const {
       name,
-      country_id,
       tax_case,
       tax_rate,
       tax_code,
@@ -121,7 +100,6 @@ export const updateTaxProfile = async (
 
     const profile = await taxProfileRepository.findOne({
       where: { id },
-      relations: ["country"],
     });
 
     if (!profile) {
@@ -143,22 +121,7 @@ export const updateTaxProfile = async (
     if (is_active !== undefined) profile.is_active = !!is_active;
     if (description !== undefined) profile.description = description ? description.trim() : undefined;
 
-    if (country_id !== undefined) {
-      if (country_id === null || country_id === "") {
-        profile.country = null;
-      } else {
-        const countryEntity = await countryRepository.findOne({
-          where: { id: country_id },
-        });
-        if (!countryEntity) {
-          return res.status(404).json({
-            success: false,
-            message: "Linked Country not found.",
-          });
-        }
-        profile.country = countryEntity;
-      }
-    }
+
 
     const updated = await taxProfileRepository.save(profile);
 
@@ -233,5 +196,35 @@ export const deleteTaxProfile = async (
   } catch (error) {
     console.error(error);
     return next(error);
+  }
+};
+
+export const getTaxProfileById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+    const { id } = req.params;
+
+    const profile = await taxProfileRepository.findOne({
+      where: { id },
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Tax Profile not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: profile,
+    });
+  } catch (error) {
+    console.error("Error fetching tax profile by ID:", error);
+    return next(new ErrorHandler("Failed to retrieve tax profile details", 500));
   }
 };

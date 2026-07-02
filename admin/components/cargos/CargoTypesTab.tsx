@@ -18,10 +18,15 @@ import {
     CargoTypeObj,
 } from "@/api/cargo_types";
 
-const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
+interface CargoTypesTabProps {
+    searchQuery?: string;
+}
+
+const CargoTypesTab = React.forwardRef<any, CargoTypesTabProps>(({ searchQuery: externalSearchQuery }, ref) => {
     const [cargoTypes, setCargoTypes] = useState<CargoTypeObj[]>([]);
     const [loading, setLoading] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [localSearchQuery, setLocalSearchQuery] = useState("");
+    const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : localSearchQuery;
 
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -135,28 +140,30 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
 
     return (
         <div>
-            <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="flex items-center gap-2 w-full">
-                    <div className="flex-1">
-                        <input
-                            type="text"
-                            placeholder="Search cargo types..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full px-3.5 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
-                        />
+            {externalSearchQuery === undefined && (
+                <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="flex items-center gap-2 w-full">
+                        <div className="flex-1">
+                            <input
+                                type="text"
+                                placeholder="Search cargo types..."
+                                value={localSearchQuery}
+                                onChange={(e) => setLocalSearchQuery(e.target.value)}
+                                className="w-full px-3.5 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
+                            />
+                        </div>
+                        {localSearchQuery && (
+                            <button
+                                onClick={() => setLocalSearchQuery("")}
+                                className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm"
+                            >
+                                <ArrowPathIcon className="w-4 h-4" />
+                                Reset
+                            </button>
+                        )}
                     </div>
-                    {searchQuery && (
-                        <button
-                            onClick={() => setSearchQuery("")}
-                            className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm"
-                        >
-                            <ArrowPathIcon className="w-4 h-4" />
-                            Reset
-                        </button>
-                    )}
                 </div>
-            </div>
+            )}
             <div className="overflow-x-auto px-6 pb-6">
                 {loading && cargoTypes.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">Loading...</div>

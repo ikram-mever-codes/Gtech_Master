@@ -5,6 +5,7 @@ import {
   updateTaxProfile,
   deactivateTaxProfile,
   deleteTaxProfile,
+  getTaxProfileById,
 } from "../controllers/tax_profile_controller";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -12,6 +13,7 @@ const router = Router();
 
 router.get("/", authenticateUser, getAllTaxProfiles as any);
 router.post("/", authenticateUser, createTaxProfile as any);
+router.get("/:id", authenticateUser, getTaxProfileById as any);
 router.put("/:id", authenticateUser, updateTaxProfile as any);
 router.patch("/:id/deactivate", authenticateUser, deactivateTaxProfile as any);
 router.delete("/:id", authenticateUser, deleteTaxProfile as any);

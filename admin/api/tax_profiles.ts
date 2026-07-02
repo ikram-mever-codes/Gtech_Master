@@ -1,10 +1,8 @@
 import { api, handleApiError } from "../utils/api";
-import { Country } from "./countries";
 
 export interface TaxProfile {
   id: string;
   name: string;
-  country?: Country | null;
   tax_case?: string | null;
   tax_rate: number;
   tax_code?: string | null;
@@ -28,9 +26,18 @@ export const getAllTaxProfiles = async (all?: boolean) => {
   }
 };
 
+export const getTaxProfileById = async (id: string) => {
+  try {
+    const response = await api.get(`/tax-profiles/${id}`);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch tax profile details");
+    throw error;
+  }
+};
+
 export const createTaxProfile = async (payload: {
   name: string;
-  country_id?: string | null;
   tax_case?: string | null;
   tax_rate: number;
   tax_code?: string | null;
@@ -52,7 +59,6 @@ export const updateTaxProfile = async (
   id: string,
   payload: {
     name?: string;
-    country_id?: string | null;
     tax_case?: string | null;
     tax_rate?: number;
     tax_code?: string | null;

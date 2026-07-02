@@ -48,7 +48,6 @@ import PackingListTab from "./PackingListTab";
 import {
   getAllCustomers,
   CustomerData as APICustomerData,
-  updateCustomerProfile,
 } from "@/api/customers";
 import {
   updateOrderItemStatus,
@@ -70,10 +69,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { ShoppingCart, Truck } from "lucide-react";
-import BillToShipToForm, {
-  BillToShipToData,
-  WAREHOUSE_BILL_TO,
-} from "@/components/General/BillToShipToForm";
+
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
@@ -160,7 +156,6 @@ const invoiceTabs = [
   { id: "order_items", label: "Order Items" },
   { id: "open_invoices", label: "Open Invoices" },
   { id: "closed_invoices", label: "Closed Invoices" },
-  { id: "billto_shipto", label: "Bill To / Ship To" },
   { id: "cargos", label: "Cargos" },
   { id: "cargo_type", label: "Cargo Type" },
   { id: "packing_list", label: "Packing List" },
@@ -278,12 +273,7 @@ const InvoiceListPage: React.FC = () => {
   const [splitQty, setSplitQty] = useState<number>(0);
   const [newQty, setNewQty] = useState<number>(0);
   const [targetCargoId, setTargetCargoId] = useState<string>("");
-  const [showBTSTModal, setShowBTSTModal] = useState(false);
-  const [selectedCustomerForEdit, setSelectedCustomerForEdit] =
-    useState<any>(null);
-  const [btstFormData, setBtstFormData] = useState<Partial<BillToShipToData>>(
-    {},
-  );
+
 
   const [expandedPriceItemId, setExpandedPriceItemId] = useState<string | null>(
     null,
@@ -917,86 +907,7 @@ const InvoiceListPage: React.FC = () => {
     printWindow.document.close();
   };
 
-  const handleOpenBTSTModal = (customer: any) => {
-    setSelectedCustomerForEdit(customer);
-    setBtstFormData({
-      customer_type: customer.customer_type || "GT-Warehouse",
-      ...(customer.customer_type === "Other Customer" ? {} : WAREHOUSE_BILL_TO),
-      bill_to_company_name:
-        customer.bill_to_company_name || WAREHOUSE_BILL_TO.bill_to_company_name,
-      bill_to_display_name:
-        customer.bill_to_display_name || WAREHOUSE_BILL_TO.bill_to_display_name,
-      bill_to_phone_no:
-        customer.bill_to_phone_no || WAREHOUSE_BILL_TO.bill_to_phone_no,
-      bill_to_tax_no:
-        customer.bill_to_tax_no || WAREHOUSE_BILL_TO.bill_to_tax_no,
-      bill_to_email: customer.bill_to_email || WAREHOUSE_BILL_TO.bill_to_email,
-      bill_to_website:
-        customer.bill_to_website || WAREHOUSE_BILL_TO.bill_to_website,
-      bill_to_contact_person:
-        customer.bill_to_contact_person ||
-        WAREHOUSE_BILL_TO.bill_to_contact_person,
-      bill_to_contact_phone:
-        customer.bill_to_contact_phone ||
-        WAREHOUSE_BILL_TO.bill_to_contact_phone,
-      bill_to_contact_mobile:
-        customer.bill_to_contact_mobile ||
-        WAREHOUSE_BILL_TO.bill_to_contact_mobile,
-      bill_to_contact_email:
-        customer.bill_to_contact_email ||
-        WAREHOUSE_BILL_TO.bill_to_contact_email,
-      bill_to_country:
-        customer.bill_to_country || WAREHOUSE_BILL_TO.bill_to_country,
-      bill_to_city: customer.bill_to_city || WAREHOUSE_BILL_TO.bill_to_city,
-      bill_to_postal_code:
-        customer.bill_to_postal_code || WAREHOUSE_BILL_TO.bill_to_postal_code,
-      bill_to_full_address:
-        customer.bill_to_full_address || WAREHOUSE_BILL_TO.bill_to_full_address,
-      ship_to_company_name:
-        customer.ship_to_company_name || customer.companyName || "",
-      ship_to_display_name:
-        customer.ship_to_display_name || customer.companyName || "",
-      ship_to_contact_person: customer.ship_to_contact_person || "-",
-      ship_to_contact_phone:
-        customer.ship_to_contact_phone || customer.contactPhoneNumber || "",
-      ship_to_country:
-        customer.ship_to_country ||
-        customer.deliveryCountry ||
-        customer.country ||
-        "",
-      ship_to_city:
-        customer.ship_to_city || customer.deliveryCity || customer.city || "",
-      ship_to_postal_code:
-        customer.ship_to_postal_code ||
-        customer.deliveryPostalCode ||
-        customer.postalCode ||
-        "",
-      ship_to_full_address:
-        customer.ship_to_full_address ||
-        customer.deliveryAddressLine1 ||
-        customer.addressLine1 ||
-        "",
-      ship_to_remarks: customer.ship_to_remarks || "",
-    });
-    setShowBTSTModal(true);
-  };
 
-  const handleSaveBTST = async () => {
-    if (!selectedCustomerForEdit) return;
-    try {
-      const payload = {
-        ...selectedCustomerForEdit,
-        ...btstFormData,
-      };
-      const res = await updateCustomerProfile(payload);
-      if (res?.success) {
-        setShowBTSTModal(false);
-        fetchCustomers();
-      }
-    } catch (error) {
-      console.error("Failed to update billto/shipto:", error);
-    }
-  };
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -1199,9 +1110,6 @@ const InvoiceListPage: React.FC = () => {
 
   useEffect(() => {
     loadInvoices();
-    if (activeInvTab === "billto_shipto") {
-      fetchCustomers();
-    }
     if (activeInvTab === "orders" || activeInvTab === "order_items") {
       fetchOrders();
       fetchCustomers();
@@ -1223,7 +1131,7 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      const validTabs = ["orders", "order_items", "open_invoices", "closed_invoices", "billto_shipto", "cargos", "cargo_type", "packing_list"];
+      const validTabs = ["orders", "order_items", "open_invoices", "closed_invoices", "cargos", "cargo_type", "packing_list"];
       if (validTabs.includes(tabParam)) {
         setActiveInvTab(tabParam as InvoiceTab);
       }
@@ -1250,7 +1158,6 @@ const InvoiceListPage: React.FC = () => {
     } catch (error) {
       console.error("Failed to fetch customers:", error);
     } finally {
-      if (activeInvTab === "billto_shipto") setLoading(false);
     }
   };
 
@@ -1642,7 +1549,9 @@ const InvoiceListPage: React.FC = () => {
                     ? "Search cargos..."
                     : activeInvTab === "cargo_type"
                       ? "Search cargo types..."
-                      : "Search..."
+                      : activeInvTab === "packing_list"
+                        ? "Search packing lists..."
+                        : "Search..."
               }
               value={
                 (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices")
@@ -1656,8 +1565,22 @@ const InvoiceListPage: React.FC = () => {
                   setOrderNoFilter(e.target.value);
                 }
               }}
-              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
+              className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
             />
+            {((activeInvTab === "open_invoices" || activeInvTab === "closed_invoices") ? searchTerm : orderNoFilter) && (
+              <button
+                onClick={() => {
+                  if (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices") {
+                    setSearchTerm("");
+                  } else {
+                    setOrderNoFilter("");
+                  }
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           <button
@@ -1671,7 +1594,6 @@ const InvoiceListPage: React.FC = () => {
               } else {
                 setLoading(true);
                 loadInvoices();
-                if (activeInvTab === "billto_shipto") fetchCustomers();
               }
             }}
             disabled={loading || loadingOrders}
@@ -1856,41 +1778,7 @@ const InvoiceListPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
-                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
-                  <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                    <Filter className="w-5 h-5 text-[#8CC21B]" />
-                  </div>
-                  <div className="flex-1 min-w-[200px]">
-                    <input
-                      type="text"
-                      placeholder="Search invoices, customers, or order numbers..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className={getInputClass(!!searchTerm)}
-                    />
-                  </div>
-                  {searchTerm && (
-                    <button
-                      onClick={() => {
-                        setSearchTerm("");
-                        setFilters({
-                          status: "",
-                          dateFrom: "",
-                          dateTo: "",
-                          customer: "",
-                          minAmount: "",
-                          maxAmount: "",
-                        });
-                      }}
-                      className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Reset
-                    </button>
-                  )}
-                </div>
-              </div>
+
 
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
                 {loading ? (
@@ -2163,7 +2051,7 @@ const InvoiceListPage: React.FC = () => {
             className="bg-white rounded-[4px] border border-[#E9ECEF] p-4"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
           >
-            <CargosTab ref={cargosTabRef} />
+            <CargosTab ref={cargosTabRef} searchTerm={orderNoFilter} />
           </div>
         )}
 
@@ -2172,128 +2060,15 @@ const InvoiceListPage: React.FC = () => {
             className="bg-white rounded-[4px] border border-[#E9ECEF] p-4"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
           >
-            <CargoTypesTab ref={cargoTypesTabRef} />
+            <CargoTypesTab ref={cargoTypesTabRef} searchQuery={orderNoFilter} />
           </div>
         )}
 
-        {activeInvTab === "billto_shipto" && (
-          <div
-            className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead style={{ backgroundColor: "#F8F9FA" }}>
-                  <tr className="border-b border-[#E9ECEF]">
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      ID
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Customer Type
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Bill To
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Ship To
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Delivery address
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Email
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Phone
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Website
-                    </th>
-                    <th className="text-center py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F1F3F5]">
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="py-12 text-center text-xs text-[#6C757D]"
-                      >
-                        Loading customers...
-                      </td>
-                    </tr>
-                  ) : customers.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="py-12 text-center text-xs text-[#6C757D]"
-                      >
-                        No customers found
-                      </td>
-                    </tr>
-                  ) : (
-                    customers.map((customer) => (
-                      <tr
-                        key={customer.id}
-                        className="hover:bg-[#F8F9FA] transition-colors group"
-                      >
-                        <td className="py-4 px-4">
-                          <button className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap">
-                            {customer.id.slice(-2)}{" "}
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529]">
-                          <span className="px-2 py-0.5 bg-gray-100 rounded-[4px] text-[10px] font-medium uppercase text-[#495057]">
-                            GT-Warehouse
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                          GTech
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529]">
-                          {customer.companyName}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#6C757D] max-w-[200px] truncate">
-                          {[
-                            formatCountryCode(customer.country),
-                            customer.city,
-                            customer.addressLine1,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529]">
-                          {customer.email}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529] whitespace-nowrap">
-                          {customer.contactPhoneNumber}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#6C757D]">-</td>
-                        <td className="py-4 px-4">
-                          <div className="flex justify-center">
-                            <button
-                              onClick={() => handleOpenBTSTModal(customer)}
-                              className="px-3.5 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-all shadow-md"
-                            >
-                              EDIT
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+
 
         {activeInvTab === "packing_list" && (
           <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm">
-            <PackingListTab />
+            <PackingListTab searchTerm={orderNoFilter} />
           </div>
         )}
         {showInvoiceDetailsModal && selectedInvoice && (
@@ -3194,42 +2969,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
           </CustomModal>
         )}
-        {showBTSTModal && (
-          <CustomModal
-            isOpen={showBTSTModal}
-            onClose={() => setShowBTSTModal(false)}
-            title="Update Bill To / Ship To Details"
-            width="max-w-5xl"
-            footer={
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowBTSTModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-[4px] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveBTST}
-                  className="px-6 py-2 text-sm bg-[#8CC21B] text-white rounded-[4px] hover:bg-opacity-90 font-bold transition-all shadow-sm"
-                >
-                  Save Changes
-                </button>
-              </div>
-            }
-          >
-            <BillToShipToForm
-              data={btstFormData}
-              isEditEnabled={true}
-              selectedCustomer={selectedCustomerForEdit}
-              onChange={(field, value) =>
-                setBtstFormData((prev) => ({ ...prev, [field]: value }))
-              }
-              onBatchChange={(updates) =>
-                setBtstFormData((prev) => ({ ...prev, ...updates }))
-              }
-            />
-          </CustomModal>
-        )}
+
 
         <OrderDetailsModal
           isOpen={showViewModal}

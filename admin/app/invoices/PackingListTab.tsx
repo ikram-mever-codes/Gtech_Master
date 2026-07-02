@@ -42,9 +42,14 @@ interface PackingItem {
 
 const P_TYPE_OPTIONS = ["Tray", "Box", "Pallet", "Carton", "Bag", "Other"];
 
-const PackingListTab: React.FC = () => {
+interface PackingListTabProps {
+  searchTerm?: string;
+}
+
+const PackingListTab: React.FC<PackingListTabProps> = ({ searchTerm: externalSearchTerm }) => {
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [localSearchTerm, setLocalSearchTerm] = useState("");
+  const searchTerm = externalSearchTerm !== undefined ? externalSearchTerm : localSearchTerm;
   const [packingLists, setPackingLists] = useState<PackingListData[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editItems, setEditItems] = useState<PackingItem[]>([]);
@@ -183,24 +188,26 @@ const PackingListTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 font-['Poppins']">
-      <div className="flex justify-between items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#ADB5BD]" />
-          <input
-            type="text"
-            placeholder="Search by cargo, invoice..."
-            className="w-full pl-10 pr-4 py-2 text-sm border border-[#DEE2E6] rounded-[4px] focus:outline-none focus:border-[#10B981] transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {externalSearchTerm === undefined && (
+        <div className="flex justify-between items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#ADB5BD]" />
+            <input
+              type="text"
+              placeholder="Search by cargo, invoice..."
+              className="w-full pl-10 pr-4 py-2 text-sm border border-[#DEE2E6] rounded-[4px] focus:outline-none focus:border-[#10B981] transition-all"
+              value={localSearchTerm}
+              onChange={(e) => setLocalSearchTerm(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={fetchInvoices}
+            className="p-2 border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 text-[#495057] transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
         </div>
-        <button
-          onClick={fetchInvoices}
-          className="p-2 border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 text-[#495057] transition-all"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </div>
+      )}
 
       <div className="bg-white border border-[#E9ECEF] rounded-[4px] shadow-sm overflow-x-auto">
         <table className="w-full border-collapse">
