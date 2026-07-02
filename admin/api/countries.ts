@@ -4,6 +4,7 @@ export interface Country {
   id: string;
   iso2: string;
   name: string;
+  name_de?: string;
   is_eu: boolean;
   is_igl_country: boolean;
   is_active: boolean;
@@ -22,9 +23,20 @@ export const getAllCountries = async (all?: boolean) => {
   }
 };
 
+export const getCountryById = async (id: string) => {
+  try {
+    const response = await api.get(`/countries/${id}`);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch country details");
+    throw error;
+  }
+};
+
 export const createCountry = async (countryData: {
   iso2: string;
   name: string;
+  name_de?: string;
   is_eu: boolean;
   is_igl_country: boolean;
 }) => {
@@ -41,6 +53,7 @@ export const updateCountry = async (
   id: string,
   countryData: {
     name?: string;
+    name_de?: string;
     is_eu?: boolean;
     is_igl_country?: boolean;
     is_active?: boolean;

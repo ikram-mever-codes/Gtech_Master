@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Globe2,
-  Trash2,
-  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -14,30 +12,27 @@ import {
 import {
   getAllCountries,
   createCountry,
-  updateCountry,
-  deleteCountry,
   Country,
 } from "@/api/countries";
 import { toast } from "react-hot-toast";
 import MasterPageLayout from "@/components/General/MasterPageLayout";
 import CustomModal from "@/components/UI/CustomModal";
 import CustomButton from "@/components/UI/CustomButton";
+import { useRouter } from "next/navigation";
 
 export default function CountriesPage() {
+  const router = useRouter();
   const [countries, setCountries] = useState<Country[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Form & Modal States
   const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [iso2, setIso2] = useState("");
   const [name, setName] = useState("");
+  const [nameDe, setNameDe] = useState("");
   const [isEu, setIsEu] = useState(false);
   const [isIglCountry, setIsIglCountry] = useState(false);
-  const [isActive, setIsActive] = useState(true);
 
   const fetchCountries = async () => {
     setLoading(true);
@@ -61,11 +56,9 @@ export default function CountriesPage() {
   const resetForm = () => {
     setIso2("");
     setName("");
+    setNameDe("");
     setIsEu(false);
     setIsIglCountry(false);
-    setIsActive(true);
-    setIsEditing(false);
-    setEditingId(null);
     setShowModal(false);
   };
 
@@ -82,30 +75,17 @@ export default function CountriesPage() {
 
     setSubmitting(true);
     try {
-      if (isEditing && editingId) {
-        const res: any = await updateCountry(editingId, {
-          name: name.trim(),
-          is_eu: isEu,
-          is_igl_country: isIglCountry,
-          is_active: isActive,
-        });
-        if (res && res.success) {
-          toast.success("Country updated successfully");
-          fetchCountries();
-          resetForm();
-        }
-      } else {
-        const res: any = await createCountry({
-          iso2: iso2.trim().toUpperCase(),
-          name: name.trim(),
-          is_eu: isEu,
-          is_igl_country: isIglCountry,
-        });
-        if (res && res.success) {
-          toast.success("Country created successfully");
-          fetchCountries();
-          resetForm();
-        }
+      const res: any = await createCountry({
+        iso2: iso2.trim().toUpperCase(),
+        name: name.trim(),
+        name_de: nameDe.trim() || undefined,
+        is_eu: isEu,
+        is_igl_country: isIglCountry,
+      });
+      if (res && res.success) {
+        toast.success("Country created successfully");
+        fetchCountries();
+        resetForm();
       }
     } catch (err: any) {
       console.error(err);
@@ -116,47 +96,16 @@ export default function CountriesPage() {
     }
   };
 
-  const handleEdit = (country: Country) => {
-    setIsEditing(true);
-    setEditingId(country.id);
-    setIso2(country.iso2);
-    setName(country.name);
-    setIsEu(country.is_eu);
-    setIsIglCountry(country.is_igl_country);
-    setIsActive(country.is_active);
-    setShowModal(true);
-  };
-
-  const handleDeleteCountry = async (country: Country) => {
-    if (!confirm(`Are you sure you want to delete ${country.name}?`)) {
-      return;
-    }
-
-    try {
-      const res: any = await deleteCountry(country.id);
-      if (res && res.success) {
-        toast.success(res.message || "Country deleted successfully");
-        fetchCountries();
-        if (editingId === country.id) {
-          resetForm();
-        }
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to delete country");
-    }
-  };
 
   const filteredCountries = countries.filter((c) => {
-    if (!c.is_active) return false;
     const q = searchQuery.toLowerCase().trim();
     return (
       c.name.toLowerCase().includes(q) ||
+      (c.name_de && c.name_de.toLowerCase().includes(q)) ||
       c.iso2.toLowerCase().includes(q)
     );
   });
 
-  // Green Action Buttons in Header
   const actionButtons = (
     <CustomButton
       startIcon={<Plus className="w-5 h-5" />}
@@ -170,7 +119,6 @@ export default function CountriesPage() {
     </CustomButton>
   );
 
-  // One-line Filter row
   const filterBar = (
     <div className="flex flex-wrap items-center gap-3">
       <div className="relative flex-1 max-w-md">
@@ -194,7 +142,6 @@ export default function CountriesPage() {
     </div>
   );
 
-  // Table Body Content
   const tableContent = (
     <>
       {loading ? (
@@ -219,25 +166,28 @@ export default function CountriesPage() {
               <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <th className="px-6 py-4">ISO2</th>
                 <th className="px-6 py-4">Name</th>
+                <th className="px-6 py-4">Name DE</th>
                 <th className="px-6 py-4 text-center">EU Member</th>
                 <th className="px-6 py-4 text-center">IGL Country</th>
                 <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
               {filteredCountries.map((country) => (
                 <tr
                   key={country.id}
-                  className={`hover:bg-gray-50/50 transition-all ${
-                    !country.is_active ? "opacity-60" : ""
-                  }`}
+                  onClick={() => router.push(`/countries/${country.id}`)}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!country.is_active ? "opacity-60" : ""
+                    }`}
                 >
                   <td className="px-6 py-4 font-mono font-bold text-gray-700">
                     {country.iso2}
                   </td>
                   <td className="px-6 py-4 font-semibold text-gray-900">
                     {country.name}
+                  </td>
+                  <td className="px-6 py-4 font-semibold text-gray-900">
+                    {country.name_de || "—"}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {country.is_eu ? (
@@ -270,24 +220,7 @@ export default function CountriesPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => handleEdit(country)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title="Edit Country"
-                      >
-                        <Pencil className="h-4.5 w-4.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCountry(country)}
-                        className="p-1.5 rounded-xl transition-all text-gray-400 hover:text-red-600 hover:bg-red-50"
-                        title="Delete Country"
-                      >
-                        <Trash2 className="h-4.5 w-4.5" />
-                      </button>
-                    </div>
-                  </td>
+
                 </tr>
               ))}
             </tbody>
@@ -297,12 +230,11 @@ export default function CountriesPage() {
     </>
   );
 
-  // Form Inside Modal Popup
   const modalContent = (
     <CustomModal
       isOpen={showModal}
       onClose={resetForm}
-      title={isEditing ? "Edit Country" : "Create New Country"}
+      title="Create New Country"
       width="max-w-md"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -317,7 +249,7 @@ export default function CountriesPage() {
             id="country_iso2"
             type="text"
             maxLength={2}
-            disabled={isEditing}
+            disabled={false}
             value={iso2}
             onChange={(e) => setIso2(e.target.value.toUpperCase())}
             placeholder="DE"
@@ -338,6 +270,23 @@ export default function CountriesPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Germany"
+            className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-gray-50/50"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label
+            htmlFor="country_name_de"
+            className="text-xs font-bold text-gray-700 uppercase tracking-wider block"
+          >
+            German Country Name (Name DE)
+          </label>
+          <input
+            id="country_name_de"
+            type="text"
+            value={nameDe}
+            onChange={(e) => setNameDe(e.target.value)}
+            placeholder="Deutschland"
             className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-gray-50/50"
           />
         </div>
@@ -367,19 +316,7 @@ export default function CountriesPage() {
             </span>
           </label>
 
-          {isEditing && (
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4.5 w-4.5 border-gray-300"
-              />
-              <span className="text-sm font-semibold text-gray-700">
-                Active (shows in company dropdowns)
-              </span>
-            </label>
-          )}
+
         </div>
 
         <div className="flex gap-3 pt-4 border-t border-gray-100">
@@ -395,7 +332,7 @@ export default function CountriesPage() {
             disabled={submitting}
             className="flex-1 px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm"
           >
-            {isEditing ? "Save Changes" : "Create Country"}
+            Create Country
           </button>
         </div>
       </form>

@@ -17,6 +17,9 @@ export class Country {
   @Column({ type: "varchar", length: 150 })
   name!: string;
 
+  @Column({ type: "varchar", length: 150, nullable: true })
+  name_de?: string;
+
   @Column({ type: "boolean", default: false })
   is_eu!: boolean;
 

@@ -25,20 +25,20 @@ export const seedDatabase = async () => {
         if (existingCountries === 0) {
             console.log("🌍 Seeding countries...");
             const countries = [
-                { iso2: "DE", name: "Germany", is_eu: true, is_igl_country: true },
-                { iso2: "AT", name: "Austria", is_eu: true, is_igl_country: true },
-                { iso2: "CH", name: "Switzerland", is_eu: false, is_igl_country: false },
-                { iso2: "US", name: "United States", is_eu: false, is_igl_country: false },
-                { iso2: "CN", name: "China", is_eu: false, is_igl_country: false },
-                { iso2: "GB", name: "United Kingdom", is_eu: false, is_igl_country: false },
-                { iso2: "FR", name: "France", is_eu: true, is_igl_country: false },
-                { iso2: "IT", name: "Italy", is_eu: true, is_igl_country: false },
-                { iso2: "NL", name: "Netherlands", is_eu: true, is_igl_country: false },
-                { iso2: "PL", name: "Poland", is_eu: true, is_igl_country: false },
-                { iso2: "CZ", name: "Czech Republic", is_eu: true, is_igl_country: false },
-                { iso2: "ES", name: "Spain", is_eu: true, is_igl_country: false },
-                { iso2: "BE", name: "Belgium", is_eu: true, is_igl_country: false },
-                { iso2: "HU", name: "Hungary", is_eu: true, is_igl_country: false },
+                { iso2: "DE", name: "Germany", name_de: "Deutschland", is_eu: true, is_igl_country: true },
+                { iso2: "AT", name: "Austria", name_de: "Österreich", is_eu: true, is_igl_country: true },
+                { iso2: "CH", name: "Switzerland", name_de: "Schweiz", is_eu: false, is_igl_country: false },
+                { iso2: "US", name: "United States", name_de: "Vereinigte Staaten", is_eu: false, is_igl_country: false },
+                { iso2: "CN", name: "China", name_de: "China", is_eu: false, is_igl_country: false },
+                { iso2: "GB", name: "United Kingdom", name_de: "Vereinigtes Königreich", is_eu: false, is_igl_country: false },
+                { iso2: "FR", name: "France", name_de: "Frankreich", is_eu: true, is_igl_country: false },
+                { iso2: "IT", name: "Italy", name_de: "Italien", is_eu: true, is_igl_country: false },
+                { iso2: "NL", name: "Netherlands", name_de: "Niederlande", is_eu: true, is_igl_country: false },
+                { iso2: "PL", name: "Poland", name_de: "Polen", is_eu: true, is_igl_country: false },
+                { iso2: "CZ", name: "Czech Republic", name_de: "Tschechische Republik", is_eu: true, is_igl_country: false },
+                { iso2: "ES", name: "Spain", name_de: "Spanien", is_eu: true, is_igl_country: false },
+                { iso2: "BE", name: "Belgium", name_de: "Belgien", is_eu: true, is_igl_country: false },
+                { iso2: "HU", name: "Hungary", name_de: "Ungarn", is_eu: true, is_igl_country: false },
             ];
             for (const c of countries) {
                 await countryRepository.save(countryRepository.create(c));

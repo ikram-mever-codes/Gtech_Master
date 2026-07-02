@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { Country } from "../models/country";
+import { BusinessDetails } from "../models/business_details";
+import { CompanyShippingAddress } from "../models/company_shipping_address";
+import { Customer } from "../models/customers";
+import { TaxProfile } from "../models/tax_profile";
 
 export const getAllCountries = async (
   req: Request,
@@ -23,6 +27,29 @@ export const getAllCountries = async (
   }
 };
 
+export const getCountryById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const countryRepository = AppDataSource.getRepository(Country);
+    const { id } = req.params;
+
+    const country = await countryRepository.findOne({ where: { id } });
+    if (!country) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Country not found." });
+    }
+
+    return res.status(200).json({ success: true, data: country });
+  } catch (error) {
+    console.error(error);
+    return next(error);
+  }
+};
+
 export const createCountry = async (
   req: Request,
   res: Response,
@@ -30,7 +57,7 @@ export const createCountry = async (
 ) => {
   try {
     const countryRepository = AppDataSource.getRepository(Country);
-    const { iso2, name, is_eu, is_igl_country } = req.body;
+    const { iso2, name, name_de, is_eu, is_igl_country } = req.body;
 
     if (!iso2 || !name) {
       return res
@@ -51,6 +78,7 @@ export const createCountry = async (
     const country = countryRepository.create({
       iso2: iso2.trim().toUpperCase(),
       name: name.trim(),
+      name_de: name_de ? name_de.trim() : undefined,
       is_eu: !!is_eu,
       is_igl_country: !!is_igl_country,
       is_active: true,
@@ -72,7 +100,7 @@ export const updateCountry = async (
   try {
     const countryRepository = AppDataSource.getRepository(Country);
     const { id } = req.params;
-    const { name, is_eu, is_igl_country, is_active } = req.body;
+    const { name, name_de, is_eu, is_igl_country, is_active } = req.body;
 
     const country = await countryRepository.findOne({ where: { id } });
     if (!country) {
@@ -82,6 +110,7 @@ export const updateCountry = async (
     }
 
     if (name !== undefined) country.name = name.trim();
+    if (name_de !== undefined) country.name_de = name_de ? name_de.trim() : undefined;
     if (is_eu !== undefined) country.is_eu = !!is_eu;
     if (is_igl_country !== undefined) country.is_igl_country = !!is_igl_country;
     if (is_active !== undefined) country.is_active = !!is_active;
@@ -136,18 +165,30 @@ export const deleteCountry = async (
         .status(404)
         .json({ success: false, message: "Country not found." });
     }
+    const businessDetailsCount = await AppDataSource.getRepository(BusinessDetails).count({
+      where: { country_id: id }
+    });
+    const companyShippingCount = await AppDataSource.getRepository(CompanyShippingAddress)
+      .createQueryBuilder("address")
+      .where("address.country_id = :id", { id })
+      .getCount();
+    const customerCount = await AppDataSource.getRepository(Customer).count({
+      where: { country_id: id }
+    });
+    const taxProfileCount = await AppDataSource.getRepository(TaxProfile)
+      .createQueryBuilder("tp")
+      .where("tp.country_id = :id", { id })
+      .getCount();
 
-    try {
-      await countryRepository.remove(country);
-      return res.status(200).json({ success: true, message: "Country deleted successfully." });
-    } catch (err: any) {
-      country.is_active = false;
-      await countryRepository.save(country);
-      return res.status(200).json({
-        success: true,
-        message: "Country is in use by other data, so it has been set to Inactive instead.",
+    if (businessDetailsCount > 0 || companyShippingCount > 0 || customerCount > 0 || taxProfileCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "This country cannot be deleted because it is currently in use in the system."
       });
     }
+
+    await countryRepository.remove(country);
+    return res.status(200).json({ success: true, message: "Country deleted successfully." });
   } catch (error) {
     console.error(error);
     return next(error);
