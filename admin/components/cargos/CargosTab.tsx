@@ -450,7 +450,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
     return (
         <div>
             <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                <div className="flex flex-row items-center gap-3 w-full">
                     {externalSearchTerm === undefined && (
                         <div className="flex-1 w-full relative">
                             <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -480,7 +480,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                                 setLocalSearch("");
                                 handleStatusFilterChange("Open");
                             }}
-                            className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm w-full sm:w-auto justify-center"
+                            className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm justify-center"
                         >
                             <ArrowPathIcon className="w-4 h-4" />
                             Reset
