@@ -2207,7 +2207,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
             )}
 
             {businessModalMode === "edit" && editingBusinessId && (
-              <ShippingAddressManager companyId={editingBusinessId} countries={dbCountries} />
+              <ShippingAddressManager companyId={editingBusinessId} countries={dbCountries} displayName={businessForm.displayName} />
             )}
           </div>
 

@@ -17,11 +17,13 @@ import { formatCountryCode } from "@/utils/address";
 interface ShippingAddressManagerProps {
   companyId: string;
   countries: Country[];
+  displayName?: string;
 }
 
 export const ShippingAddressManager: React.FC<ShippingAddressManagerProps> = ({
   companyId,
   countries,
+  displayName,
 }) => {
   const [shippingAddresses, setShippingAddresses] = useState<CompanyShippingAddress[]>([]);
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -135,7 +137,7 @@ export const ShippingAddressManager: React.FC<ShippingAddressManagerProps> = ({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <MapPin className="h-5 w-5 text-gray-500" />
-          <span>Shipping Addresses</span>
+          <span>Shipping Addresses {displayName ? `${displayName} ` : ""}</span>
           <span className="text-xs font-normal text-gray-500">
             ({shippingAddresses.length})
           </span>
@@ -144,6 +146,8 @@ export const ShippingAddressManager: React.FC<ShippingAddressManagerProps> = ({
           <button
             type="button"
             onClick={() => {
+              const deCountry = countries.find((c) => c.iso2 === "DE");
+              const deCountryId = deCountry ? deCountry.id : "";
               setEditingAddressId(null);
               setAddressForm({
                 name: "",
@@ -151,7 +155,7 @@ export const ShippingAddressManager: React.FC<ShippingAddressManagerProps> = ({
                 street: "",
                 postal_code: "",
                 city: "",
-                country_id: "",
+                country_id: deCountryId,
                 is_default: false,
               });
               setShowAddressForm(true);

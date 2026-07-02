@@ -135,8 +135,6 @@ export default function CountryDetailsPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-3xl mx-auto space-y-4">
-
-        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <button
             onClick={() => router.push("/countries")}
@@ -153,11 +151,8 @@ export default function CountryDetailsPage() {
           <span>/</span>
           <span className="text-gray-900 font-medium">{country.name}</span>
         </div>
-
-        {/* Detail Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
 
-          {/* Reusable ModalHeader — has title, icon, ViewEditToggle toggle */}
           <ModalHeader
             entityName={country.name}
             entityNo={country.iso2}
@@ -167,12 +162,9 @@ export default function CountryDetailsPage() {
             onToggleEdit={() => setIsEditEnabled((prev) => !prev)}
             onClose={() => router.push("/countries")}
           />
-
-          {/* Form Body */}
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-              {/* ISO2 — always read-only */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   ISO2 Code
@@ -182,7 +174,6 @@ export default function CountryDetailsPage() {
                 </div>
               </div>
 
-              {/* Country Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Country Name (English)
@@ -201,7 +192,6 @@ export default function CountryDetailsPage() {
                 )}
               </div>
 
-              {/* German Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   German Country Name (Name DE)
@@ -220,8 +210,6 @@ export default function CountryDetailsPage() {
                   </div>
                 )}
               </div>
-
-              {/* Flags / Checkboxes */}
               <div className="space-y-3 pt-1">
                 {isEditEnabled ? (
                   <>
@@ -272,8 +260,6 @@ export default function CountryDetailsPage() {
               </div>
             </div>
           </div>
-
-          {/* Reusable ModalFooter — Delete on lower left, Save/Cancel on right */}
           <ModalFooter
             isEditMode={true}
             isEditEnabled={isEditEnabled}

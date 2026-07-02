@@ -27,10 +27,9 @@ export default function TaxProfilesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Form & Modal States
   const [showModal, setShowModal] = useState(false);
   const [name, setName] = useState("");
-  const [taxCase, setTaxCase] = useState("DE-VAT"); // default to first option
+  const [taxCase, setTaxCase] = useState("DE-VAT");
   const [taxRate, setTaxRate] = useState(0);
   const [taxCode, setTaxCode] = useState("");
   const [revenueAccountNo, setRevenueAccountNo] = useState("");
