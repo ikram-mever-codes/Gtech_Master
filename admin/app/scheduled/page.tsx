@@ -112,7 +112,6 @@ import {
 } from "@mui/icons-material";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
-import "react-data-grid/lib/styles.css";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
 import { useDropzone } from "react-dropzone";
@@ -162,7 +161,6 @@ import {
   UserRole,
 } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
-import { DataGrid } from "react-data-grid";
 import { useSelector } from "react-redux";
 import { RootState } from "../Redux/store";
 import { getAllContactPersons } from "@/api/contacts";
@@ -1915,6 +1913,66 @@ function CreateListDialog({
   );
 }
 
+function ImageCellRenderer({ row }: { row: any }) {
+  const [imageOpen, setImageOpen] = useState(false);
+
+  if (!row.imageUrl) {
+    return (
+      <div className="flex items-center justify-center text-gray-300 w-12 h-12 bg-gray-50 rounded-lg border border-gray-100 mx-auto">
+        <Image fontSize="small" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className="flex items-center justify-center cursor-pointer w-12 h-12 bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden hover:scale-105 transition-all mx-auto"
+        onClick={() => setImageOpen(true)}
+      >
+        <img
+          src={`https://system.gtech.de/storage/${row.imageUrl}`}
+          alt={row.articleName || "Product"}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+      </div>
+
+      <Dialog
+        open={imageOpen}
+        onClose={() => setImageOpen(false)}
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+          },
+        }}
+      >
+        <DialogTitle>
+          <div className="flex justify-between items-center">
+            <Typography variant="h6" fontWeight={600}>
+              {row.articleName || "Product Image"}
+            </Typography>
+            <IconButton onClick={() => setImageOpen(false)} size="small">
+              <X size={18} />
+            </IconButton>
+          </div>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <img
+            src={`https://system.gtech.de/storage/${row.imageUrl}`}
+            alt={row.articleName || "Product"}
+            className="w-full max-h-[70vh] object-contain block"
+          />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // Main Admin All Items Page Component
 const AdminAllItemsPage = () => {
   const router = useRouter();
@@ -2287,6 +2345,39 @@ const AdminAllItemsPage = () => {
       await loadAllItems();
     }
   };
+
+  const handleAcknowledgeItem = async (row: any) => {
+    try {
+      setSaving(true);
+      const result = await acknowledgeItemChanges(row.listId, row.id);
+      if (result?.success) {
+        toast.success(
+          `Acknowledged ${result.data?.acknowledgedCount || 0} changes`,
+          successStyles
+        );
+
+        // Optimistically update the state
+        setAllItems((prev) =>
+          prev.map((item) =>
+            item.id === row.id
+              ? {
+                  ...item,
+                  hasUnacknowledgedChanges: false,
+                  unacknowledgedFields: [],
+                  changedFields: [],
+                }
+              : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to acknowledge changes:", error);
+      toast.error("Failed to acknowledge changes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleOpenItemActivityLogs = (item: any) => {
     setSelectedItemForLogs(item);
     setActivityLogsDialog(true);
@@ -2496,693 +2587,7 @@ const AdminAllItemsPage = () => {
     return label;
   }
 
-  const columns = useMemo(() => {
-    const baseColumns = [
-      {
-        key: "selection",
-        name: "",
-        width: 40,
-        frozen: true,
-        renderCell: (props: any) => (
-          <Checkbox
-            size="small"
-            checked={selectedRows.has(props.row.id)}
-            onChange={() => {
-              const newSelectedRows = new Set(selectedRows);
-              if (newSelectedRows.has(props.row.id)) {
-                newSelectedRows.delete(props.row.id);
-              } else {
-                newSelectedRows.add(props.row.id);
-              }
-              setSelectedRows(newSelectedRows);
-            }}
-          />
-        ),
-      },
-      {
-        key: "company_list",
-        name: "Company / List",
-        width: 140,
-        resizable: true,
-        renderCell: (props: any) => {
-          const contactPersonName =
-            props.row.contactPerson?.name || "Select Contact";
-          const contactPersonId = props.row.contactPerson?.id || "";
-          const listId = props.row.listId;
 
-          return (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                width: "100%",
-                height: "100%",
-                p: 0,
-              }}
-            >
-              {/* Top level - Company Name (black) */}
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 500,
-                  color: "black",
-                  fontSize: "0.8rem",
-                  lineHeight: 1.2,
-                  mb: 0,
-                }}
-              >
-                {props.row.companyName}
-              </Typography>
-
-              {/* Bottom level - List Name (grey) */}
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "#64748B",
-                  fontSize: "14px",
-                  lineHeight: 1.2,
-                  mb: 0,
-                }}
-              >
-                {props.row.listName}
-              </Typography>
-
-              {/* Contact Person Select */}
-              <Select
-                size="small"
-                value={contactPersonId}
-                onChange={async (e) => {
-                  if (listId && e.target.value) {
-                    await updateListContact(listId, e.target.value);
-                  }
-                }}
-                displayEmpty
-                sx={{
-                  height: 28,
-                  fontSize: "0.75rem",
-                  "& .MuiSelect-select": {
-                    padding: "4px 8px",
-                    fontSize: "0.75rem",
-                  },
-                }}
-              >
-                <MenuItem value="" sx={{ fontSize: "0.75rem" }}>
-                  <em>Select Contact</em>
-                </MenuItem>
-                {contactPersons.map((cp) => (
-                  <MenuItem
-                    key={cp.id}
-                    sx={{ fontSize: "0.75rem" }}
-                    value={cp.id}
-                  >
-                    {cp.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Box>
-          );
-        },
-        renderHeaderCell: () => (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              padding: "4px 8px",
-            }}
-          >
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontWeight: 500,
-                color: "black",
-                fontSize: "0.8rem",
-                lineHeight: 1.2,
-              }}
-            >
-              Company
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-                fontSize: "0.75rem",
-                lineHeight: 1.2,
-                mt: 0.5,
-              }}
-            >
-              List
-            </Typography>
-          </Box>
-        ),
-      },
-      {
-        key: "imageUrl",
-        name: "Image",
-        width: 80,
-        resizable: true,
-        frozen: true,
-        renderCell: (props: any) => {
-          const [imageOpen, setImageOpen] = useState(false);
-
-          if (!props.row.imageUrl) {
-            return (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "text.disabled",
-                  width: "100%",
-                  height: 60,
-                }}
-              >
-                <Image fontSize="small" />
-              </Box>
-            );
-          }
-
-          return (
-            <>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  width: "100%",
-                }}
-                onClick={() => setImageOpen(true)}
-              >
-                <Box
-                  sx={{
-                    width: 65,
-                    height: 65,
-                    borderRadius: 1,
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                    border: "2px solid #fff",
-                    transition: "all 0.2s ease",
-                    "&:hover": {
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                      transform: "scale(1.05)",
-                    },
-                  }}
-                >
-                  <img
-                    src={`https://system.gtech.de/storage/${props.row.imageUrl}`}
-                    alt={props.row.articleName || "Product"}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </Box>
-              </Box>
-
-              <Dialog
-                open={imageOpen}
-                onClose={() => setImageOpen(false)}
-                maxWidth="md"
-                PaperProps={{
-                  sx: {
-                    borderRadius: 3,
-                    overflow: "hidden",
-                  },
-                }}
-              >
-                <DialogTitle>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Typography variant="h6" fontWeight={600}>
-                      {props.row.articleName || "Product Image"}
-                    </Typography>
-                    <IconButton
-                      onClick={() => setImageOpen(false)}
-                      size="small"
-                    >
-                      <X fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </DialogTitle>
-                <DialogContent sx={{ p: 0 }}>
-                  <img
-                    src={`https://system.gtech.de/storage/${props.row.imageUrl}`}
-                    alt={props.row.articleName || "Product"}
-                    style={{
-                      width: "100%",
-                      maxHeight: "70vh",
-                      objectFit: "contain",
-                      display: "block",
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-            </>
-          );
-        },
-      },
-      {
-        key: "item_info",
-        name: "Item",
-        width: 210,
-        resizable: true,
-        renderCell: (props: any) => {
-          const hasItemNoChanges =
-            props.row.unacknowledgedFields?.includes("item_no_de");
-          const hasArticleNameChanges =
-            props.row.unacknowledgedFields?.includes("articleName");
-
-          return (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                width: "100%",
-                height: "100%",
-                p: 1,
-              }}
-            >
-              {/* Top level - Item No. DE (black) */}
-              <FieldHighlight
-                hasChanges={hasItemNoChanges}
-                fieldName="Item No."
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 600,
-                    color: "black",
-                    fontSize: "0.8rem",
-                    lineHeight: 1.2,
-                    mb: 0.5,
-                  }}
-                >
-                  {props.row.item_no_de || "-"}
-                </Typography>
-              </FieldHighlight>
-
-              {/* Bottom level - Article Name (grey) */}
-              <FieldHighlight
-                hasChanges={hasArticleNameChanges}
-                fieldName="Article Name"
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: "#64748B",
-                    fontSize: "14px",
-                    lineHeight: 1.2,
-                    fontStyle: props.row.articleName ? "normal" : "italic",
-                  }}
-                >
-                  {props.row.articleName || "No article name"}
-                </Typography>
-              </FieldHighlight>
-            </Box>
-          );
-        },
-        renderHeaderCell: () => (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              padding: "4px 8px",
-            }}
-          >
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontWeight: 600,
-                color: "black",
-                fontSize: "0.8rem",
-                lineHeight: 1.2,
-              }}
-            >
-              ItemNo
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-                fontSize: "0.75rem",
-                lineHeight: 1.2,
-                mt: 0.5,
-              }}
-            >
-              ItemName
-            </Typography>
-          </Box>
-        ),
-      },
-      {
-        key: "interval_quantity",
-        name: "Interval / Qty",
-        width: 100,
-        resizable: true,
-        renderCell: (props: any) => (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              width: "100%",
-              height: "100%",
-              cursor: "pointer",
-            }}
-          >
-            <EditableIntervalCell
-              row={props.row}
-              onUpdateItem={handleUpdateItem}
-              onAcknowledgeField={handleAcknowledgeField}
-              compact={true}
-            />
-
-            <EditableQuantityCell
-              row={props.row}
-              onUpdateItem={handleUpdateItem}
-              onAcknowledgeField={handleAcknowledgeField}
-              compact={true}
-            />
-          </Box>
-        ),
-        renderHeaderCell: () => (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              padding: "4px 8px",
-            }}
-          >
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontWeight: 600,
-                color: "black",
-                fontSize: "0.8rem",
-                lineHeight: 1.2,
-              }}
-            >
-              Interval
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-                fontSize: "0.75rem",
-                lineHeight: 1.2,
-                mt: 0.5,
-              }}
-            >
-              Qty
-            </Typography>
-          </Box>
-        ),
-      },
-    ];
-
-    // Generate delivery columns based on unique cargo numbers - now properly sorted by ETA
-    const deliveryColumns = deliveryColumnsData.sortedCargos.map((cargoNo) => {
-      const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
-      console.log(cargoData);
-      const statusDescriptions: Record<string, string> = {
-        open: "Fracht geplant - Die Sendung befindet sich in der Planungsphase",
-        packed:
-          "Ware ist verpackt - Artikel wurden für den Versand vorbereitet und verpackt",
-        shipped:
-          "Fracht wurde versendet - Die Sendung hat das Ursprungszentrum verlassen",
-        arrived:
-          "In Deutschland angekommen - Die Sendung hat ihr Ziel in Deutschland erreicht",
-      };
-
-      const renderTooltipContent = () => (
-        <Box sx={{ p: 1 }}>
-          <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
-            {cargoData?.cargoStatus
-              ? `${cargoData.cargoStatus.toUpperCase()}`
-              : "No Status"}
-          </Typography>
-          <Typography variant="body2">
-            {cargoData?.cargoStatus
-              ? statusDescriptions[cargoData.cargoStatus.toLowerCase()]
-              : "No status information available"}
-          </Typography>
-          {cargoData?.eta && (
-            <Typography variant="body2" sx={{ mt: 1, fontStyle: "italic" }}>
-              Estimated arrival: {formatEta(cargoData.eta)}
-            </Typography>
-          )}
-        </Box>
-      );
-
-      const tooltipProps = {
-        title: renderTooltipContent(),
-        arrow: true,
-        placement: "top" as const,
-        componentsProps: {
-          tooltip: {
-            sx: {
-              bgcolor: "common.white",
-              color: "text.primary",
-              boxShadow: 1,
-              border: "1px solid",
-              borderColor: "divider",
-              maxWidth: 300,
-            },
-          },
-          arrow: {
-            sx: {
-              color: "common.white",
-              "&:before": {
-                border: "1px solid",
-                borderColor: "divider",
-              },
-            },
-          },
-        },
-      };
-
-      return {
-        key: `cargo_${cargoNo}`,
-        name: formatCargoColumnLabel(
-          cargoNo,
-          cargoData?.period || "",
-          cargoData?.eta,
-          cargoData?.cargoStatus
-        ),
-        width: 250,
-        resizable: false,
-        renderCell: (props: any) => (
-          <Tooltip {...tooltipProps}>
-            <span className=" w-full">
-              <DeliveryCell
-                row={props.row}
-                cargoNo={cargoNo}
-                onUpdateDelivery={handleUpdateDelivery}
-                onAcknowledgeField={handleAcknowledgeField}
-              />
-            </span>
-          </Tooltip>
-        ),
-        renderHeaderCell: () => (
-          <Tooltip {...tooltipProps}>
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                padding: "8px 4px",
-                textWrap: "wrap",
-                cursor: "help",
-              }}
-            >
-              <div className="flex gap-0 text-sm flex-col items-center">
-                <span>
-                  {formatCargoColumnLabel(
-                    cargoNo,
-                    cargoData?.period || "",
-                    cargoData?.eta,
-                    cargoData?.cargoStatus,
-                    cargoData?.cargoType
-                  )}
-                </span>
-                {cargoData?.cargoStatus && (
-                  <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full mt-1">
-                    {cargoData.cargoStatus}
-                  </span>
-                )}
-                {cargoData?.eta && (
-                  <span className="text-xs text-gray-600 mt-1">
-                    ETA:{" "}
-                    <span className="font-medium">
-                      {formatEta(cargoData.eta)}
-                    </span>
-                  </span>
-                )}
-              </div>
-            </Box>
-          </Tooltip>
-        ),
-      };
-    });
-
-    const endColumns = [
-      {
-        key: "comment",
-        name: "Comment",
-        width: 200,
-        resizable: true,
-        renderCell: (props: any) => (
-          <EditableCommentCell
-            row={props.row}
-            onUpdateItem={handleUpdateItem}
-            onAcknowledgeField={handleAcknowledgeField}
-          />
-        ),
-      },
-      {
-        key: "activity_logs",
-        name: "Activity Logs",
-        width: 120,
-        resizable: false,
-        renderCell: (props: any) => (
-          <CustomButton
-            variant="outlined"
-            color="primary"
-            size="small"
-            onClick={() => handleOpenItemActivityLogs(props.row)}
-            startIcon={<History />}
-            sx={{
-              minWidth: "auto",
-              px: 2,
-              py: 0.5,
-              fontSize: "0.75rem",
-              textTransform: "none",
-              borderRadius: 2,
-            }}
-          >
-            Logs
-          </CustomButton>
-        ),
-      },
-      {
-        key: "acknowledge",
-        name: "Acknowledge",
-        width: 140,
-        resizable: false,
-        renderCell: (props: any) => {
-          const hasUnacknowledged =
-            props.row.hasUnacknowledgedChanges ||
-            props.row.unacknowledgedFields?.length > 0;
-
-          return (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              {hasUnacknowledged && (
-                <Badge
-                  badgeContent={props.row.unacknowledgedFields?.length || 0}
-                  color="error"
-                >
-                  <CustomButton
-                    variant="contained"
-                    color="warning"
-                    size="small"
-                    onClick={async () => {
-                      try {
-                        // Call API to acknowledge all changes for this item
-                        const result = await acknowledgeItemChanges(
-                          props.row.listId,
-                          props.row.id
-                        );
-
-                        if (result?.success) {
-                          toast.success(
-                            `Acknowledged ${result.data?.acknowledgedCount || 0
-                            } changes`,
-                            successStyles
-                          );
-
-                          // Optimistically update the state
-                          setAllItems((prev) =>
-                            prev.map((item) =>
-                              item.id === props.row.id
-                                ? {
-                                  ...item,
-                                  hasUnacknowledgedChanges: false,
-                                  unacknowledgedFields: [],
-                                  changedFields: [],
-                                }
-                                : item
-                            )
-                          );
-                        }
-                      } catch (error) {
-                        console.error("Failed to acknowledge changes:", error);
-                        toast.error("Failed to acknowledge changes");
-                      }
-                    }}
-                    startIcon={<DoneAll />}
-                    sx={{
-                      minWidth: "auto",
-                      px: 2,
-                      py: 0.5,
-                      fontSize: "0.75rem",
-                      textTransform: "none",
-                      borderRadius: 2,
-                      backgroundColor: "#ff9800",
-                      "&:hover": {
-                        backgroundColor: "#f57c00",
-                      },
-                    }}
-                  >
-                    Acknowledge All
-                  </CustomButton>
-                </Badge>
-              )}
-              {!hasUnacknowledged && (
-                <Chip
-                  label="Acknowledged"
-                  size="small"
-                  color="success"
-                  icon={<CheckCircle fontSize="small" />}
-                  sx={{ fontSize: "0.7rem" }}
-                />
-              )}
-            </Box>
-          );
-        },
-      },
-    ];
-
-    return [...baseColumns, ...deliveryColumns, ...endColumns];
-  }, [
-    deliveryColumnsData,
-    selectedRows,
-    handleUpdateDelivery,
-    handleUpdateItem,
-    handleAcknowledgeField,
-    allItems,
-  ]);
 
   if (loading) {
     return (
@@ -3210,14 +2615,14 @@ const AdminAllItemsPage = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setCreateListDialog(true)}
-              className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+              className="px-4 py-2 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-[4px] flex items-center gap-2 font-bold shadow-md transition-all text-xs"
             >
               <Add className="w-4 h-4" />
               Create List
             </button>
             <button
               onClick={() => setAddItemDialog(true)}
-              className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+              className="px-4 py-2 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-[4px] flex items-center gap-2 font-bold shadow-md transition-all text-xs"
             >
               <Add className="w-4 h-4" />
               Add Item
@@ -3226,22 +2631,28 @@ const AdminAllItemsPage = () => {
         </div>
 
         {/* Tabs Section */}
-        <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
+        <div className="flex flex-wrap items-center gap-2 mb-6 bg-white p-2 border border-gray-100 rounded-2xl shadow-sm">
           <button
-            onClick={() => setCurrentTab(0)}
-            className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px flex items-center gap-2 ${currentTab === 0
-              ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-              : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+            onClick={() => {
+              setCurrentTab(0);
+              setSearchTerm("");
+            }}
+            className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 ${currentTab === 0
+              ? "bg-[#8CC21B] text-white shadow-sm"
+              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
           >
             <Inventory className="w-4 h-4" />
             Items Management ({filteredItems.length})
           </button>
           <button
-            onClick={() => setCurrentTab(1)}
-            className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px flex items-center gap-2 ${currentTab === 1
-              ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-              : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+            onClick={() => {
+              setCurrentTab(1);
+              setSearchTerm("");
+            }}
+            className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 ${currentTab === 1
+              ? "bg-[#8CC21B] text-white shadow-sm"
+              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
           >
             <History className="w-4 h-4" />
@@ -3374,134 +2785,252 @@ const AdminAllItemsPage = () => {
 
         {/* Tab Panel 0: Items Management */}
         {currentTab === 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4">
-            <Paper
-              elevation={0}
-              sx={{
-                height: "600px",
-                width: "100%",
-                backgroundColor: "#ffffff",
-                borderRadius: "16px",
-                border: "none",
-                overflow: "hidden",
-                "& .rdg": {
-                  border: "none !important",
-                  "--rdg-selection-color":
-                    "rgba(140, 194, 27, 0.15) !important",
-                  "--rdg-background-color": "#ffffff !important",
-                  "--rdg-header-background-color":
-                    "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%) !important",
-                  fontFamily:
-                    '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                },
-                "& .rdg-header-row": {
-                  background:
-                    "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%)",
-                  borderBottom: "2px solid rgba(140, 194, 27, 0.2)",
-                  fontWeight: 600,
-                  minHeight: "75px !important",
-                  color: "#2d3748",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                },
-                "& .rdg-header-cell": {
-                  padding: "8px 12px !important",
-                  display: "flex !important",
-                  alignItems: "center !important",
-                  justifyContent: "center !important",
-                  borderRight: "1px solid rgba(140, 194, 27, 0.1)",
-                  background: "transparent",
-                  color: "#2d3748",
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  "&:hover": {
-                    background: "rgba(140, 194, 27, 0.05)",
-                  },
-                },
-                "& .rdg-cell": {
-                  padding: "12px 16px !important",
-                  display: "flex !important",
-                  alignItems: "center !important",
-                  borderRight: "1px solid rgba(226, 232, 240, 0.8)",
-                  borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
-                  backgroundColor: "#ffffff",
-                  color: "#374151",
-                  fontSize: "0.875rem",
-                  transition: "all 0.2s ease",
-                },
-                "& .rdg-row": {
-                  minHeight: "80px !important",
-                  "&:hover": {
-                    backgroundColor: "rgba(140, 194, 27, 0.04) !important",
-                    transform: "translateY(-1px)",
-                    boxShadow: "0 4px 12px rgba(140, 194, 27, 0.08)",
-                    "& .rdg-cell": {
-                      backgroundColor: "rgba(140, 194, 27, 0.04)",
-                      borderColor: "rgba(140, 194, 27, 0.15)",
-                    },
-                  },
-                },
-                "& .rdg-row:nth-of-type(even)": {
-                  backgroundColor: "rgba(248, 250, 252, 0.5)",
-                  "& .rdg-cell": {
-                    backgroundColor: "rgba(248, 250, 252, 0.5)",
-                  },
-                },
-                "& .rdg-row:nth-of-type(odd)": {
-                  backgroundColor: "#ffffff",
-                  "& .rdg-cell": {
-                    backgroundColor: "#ffffff",
-                  },
-                },
-                "& .rdg-row.rdg-row-selected": {
-                  backgroundColor: "rgba(140, 194, 27, 0.08) !important",
-                  "& .rdg-cell": {
-                    backgroundColor: "rgba(140, 194, 27, 0.08)",
-                    borderColor: "rgba(140, 194, 27, 0.2)",
-                  },
-                },
-              }}
-            >
-              {filteredItems.length === 0 ? (
-                <div className="text-center py-16 px-3">
-                  <Package
-                    size={64}
-                    style={{
-                      color: "#ccc",
-                      marginBottom: 24,
-                      margin: "0 auto",
-                    }}
-                  />
-                  <p className="text-sm text-gray-500 mb-2">
-                    {searchTerm || selectedCustomer || selectedList
-                      ? "Try adjusting your filters or search terms"
-                      : "No items available"}
-                  </p>
-                </div>
-              ) : (
-                <DataGrid
-                  columns={columns}
-                  rows={filteredItems}
-                  rowKeyGetter={(row: any) => row.id}
-                  selectedRows={selectedRows}
-                  onSelectedRowsChange={setSelectedRows}
-                  rowHeight={80}
-                  headerRowHeight={75}
-                  className="fill-grid"
-                  style={{
-                    height: "100%",
-                    border: "none",
-                    fontSize: "0.875rem",
-                    backgroundColor: "#ffffff",
-                    fontFamily:
-                      '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  }}
-                  defaultColumnOptions={{
-                    sortable: true,
-                    resizable: true,
-                  }}
-                />
-              )}
-            </Paper>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm text-gray-700">
+                <thead style={{ backgroundColor: "#F8F9FA" }}>
+                  <tr className="border-b border-gray-200 text-[#495057]">
+                    <th className="p-4 text-center w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.size === filteredItems.length && filteredItems.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRows(new Set(filteredItems.map(row => row.id)));
+                          } else {
+                            setSelectedRows(new Set());
+                          }
+                        }}
+                        className="rounded border-gray-300 text-[#8CC21B] focus:ring-[#8CC21B] w-4 h-4 cursor-pointer"
+                      />
+                    </th>
+                    <th className="py-3 px-4 text-center font-bold text-xs uppercase tracking-wider w-20">
+                      Image
+                    </th>
+                    <th className="py-3 px-4 font-bold text-xs uppercase tracking-wider">
+                      <div className="flex flex-col items-start">
+                        <span>Company</span>
+                        <span className="text-[10px] text-gray-400 normal-case font-normal mt-0.5">List</span>
+                      </div>
+                    </th>
+                    <th className="py-3 px-4 font-bold text-xs uppercase tracking-wider">
+                      <div className="flex flex-col items-start">
+                        <span>ItemNo</span>
+                        <span className="text-[10px] text-gray-400 normal-case font-normal mt-0.5">ItemName</span>
+                      </div>
+                    </th>
+                    <th className="py-3 px-4 font-bold text-xs uppercase tracking-wider">
+                      <div className="flex flex-col items-start">
+                        <span>Interval</span>
+                        <span className="text-[10px] text-gray-400 normal-case font-normal mt-0.5">Qty</span>
+                      </div>
+                    </th>
+                    {deliveryColumnsData.sortedCargos.map((cargoNo) => {
+                      const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
+                      return (
+                        <th key={cargoNo} className="py-3 px-4 text-center font-bold text-xs uppercase tracking-wider min-w-[200px]">
+                          <div className="flex flex-col items-center">
+                            <span>
+                              {formatCargoColumnLabel(
+                                cargoNo,
+                                cargoData?.period || "",
+                                cargoData?.eta,
+                                cargoData?.cargoStatus,
+                                cargoData?.cargoType
+                              )}
+                            </span>
+                            {cargoData?.cargoStatus && (
+                              <span className="w-max h-max px-2.5 py-0.5 text-[9px] bg-yellow-500 text-white rounded-full mt-1 font-semibold uppercase">
+                                {cargoData.cargoStatus}
+                              </span>
+                            )}
+                            {cargoData?.eta && (
+                              <span className="text-[10px] text-gray-500 mt-1 font-medium">
+                                ETA: {formatEta(cargoData.eta)}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                    <th className="py-3 px-4 font-bold text-xs uppercase tracking-wider">
+                      Comment
+                    </th>
+                    <th className="py-3 px-4 text-center font-bold text-xs uppercase tracking-wider w-28">
+                      Activity Logs
+                    </th>
+                    <th className="py-3 px-4 text-center font-bold text-xs uppercase tracking-wider w-36">
+                      Acknowledge
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1F3F5] bg-white">
+                  {filteredItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={8 + deliveryColumnsData.sortedCargos.length} className="py-16 text-center text-sm text-gray-500">
+                        No items found
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredItems.map((row) => {
+                      const contactPersonName = row.contactPerson?.name || "Select Contact";
+                      const contactPersonId = row.contactPerson?.id || "";
+                      const listId = row.listId;
+                      const hasItemNoChanges = row.unacknowledgedFields?.includes("item_no_de");
+                      const hasArticleNameChanges = row.unacknowledgedFields?.includes("articleName");
+                      const hasUnacknowledged = row.hasUnacknowledgedChanges || row.unacknowledgedFields?.length > 0;
+
+                      return (
+                        <tr key={row.id} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="p-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.has(row.id)}
+                              onChange={() => {
+                                const newSelectedRows = new Set(selectedRows);
+                                if (newSelectedRows.has(row.id)) {
+                                  newSelectedRows.delete(row.id);
+                                } else {
+                                  newSelectedRows.add(row.id);
+                                }
+                                setSelectedRows(newSelectedRows);
+                              }}
+                              className="rounded border-gray-300 text-[#8CC21B] focus:ring-[#8CC21B] w-4 h-4 cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <ImageCellRenderer row={row} />
+                          </td>
+                          <td className="py-3 px-4 text-left">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-xs text-black">{row.companyName}</span>
+                              <span className="text-xs text-gray-500 mt-0.5">{row.listName}</span>
+                              <select
+                                value={contactPersonId}
+                                onChange={async (e) => {
+                                  if (listId && e.target.value) {
+                                    await updateListContact(listId, e.target.value);
+                                  }
+                                }}
+                                className="mt-1.5 px-2 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#8CC21B] bg-white text-gray-700 font-medium w-full cursor-pointer"
+                              >
+                                <option value="">Select Contact</option>
+                                {contactPersons.map((cp) => (
+                                  <option key={cp.id} value={cp.id}>
+                                    {cp.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-left">
+                            <div className="flex flex-col">
+                              <FieldHighlight hasChanges={hasItemNoChanges} fieldName="Item No.">
+                                <span className="font-semibold text-xs text-black">{row.item_no_de || "-"}</span>
+                              </FieldHighlight>
+                              <FieldHighlight hasChanges={hasArticleNameChanges} fieldName="Article Name">
+                                <span className={`text-xs text-gray-500 mt-0.5 ${row.articleName ? "" : "italic"}`}>
+                                  {row.articleName || "No article name"}
+                                </span>
+                              </FieldHighlight>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-left">
+                            <div className="flex flex-col gap-1 w-full min-w-[120px]">
+                              <EditableIntervalCell
+                                row={row}
+                                onUpdateItem={handleUpdateItem}
+                                onAcknowledgeField={handleAcknowledgeField}
+                                compact={true}
+                              />
+                              <EditableQuantityCell
+                                row={row}
+                                onUpdateItem={handleUpdateItem}
+                                onAcknowledgeField={handleAcknowledgeField}
+                                compact={true}
+                              />
+                            </div>
+                          </td>
+                          {deliveryColumnsData.sortedCargos.map((cargoNo) => {
+                            const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
+                            const statusDescriptions: Record<string, string> = {
+                              open: "Fracht geplant - Die Sendung befindet sich in der Planungsphase",
+                              packed: "Ware ist verpackt - Artikel wurden für den Versand vorbereitet und verpackt",
+                              shipped: "Fracht wurde versendet - Die Sendung hat das Ursprungszentrum verlassen",
+                              arrived: "In Deutschland angekommen - Die Sendung hat ihr Ziel in Deutschland erreicht",
+                            };
+
+                            const tooltipContent = (
+                              <div className="p-2 text-xs">
+                                <div className="font-bold mb-1">
+                                  {cargoData?.cargoStatus ? cargoData.cargoStatus.toUpperCase() : "No Status"}
+                                </div>
+                                <div>
+                                  {cargoData?.cargoStatus
+                                    ? statusDescriptions[cargoData.cargoStatus.toLowerCase()]
+                                    : "No status information available"}
+                                </div>
+                                {cargoData?.eta && (
+                                  <div className="mt-1 italic">
+                                    Estimated arrival: {formatEta(cargoData.eta)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+
+                            return (
+                              <td key={cargoNo} className="py-3 px-4 text-center">
+                                <Tooltip title={tooltipContent} arrow placement="top">
+                                  <span className="w-full inline-block">
+                                    <DeliveryCell
+                                      row={row}
+                                      cargoNo={cargoNo}
+                                      onUpdateDelivery={handleUpdateDelivery}
+                                      onAcknowledgeField={handleAcknowledgeField}
+                                    />
+                                  </span>
+                                </Tooltip>
+                              </td>
+                            );
+                          })}
+                          <td className="py-3 px-4 text-left min-w-[200px]">
+                            <EditableCommentCell
+                              row={row}
+                              onUpdateItem={handleUpdateItem}
+                              onAcknowledgeField={handleAcknowledgeField}
+                            />
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => handleOpenItemActivityLogs(row)}
+                              className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-150 text-gray-600 transition-colors flex items-center justify-center gap-1 text-xs font-semibold mx-auto shadow-sm"
+                            >
+                              <History className="w-3.5 h-3.5 text-[#8CC21B]" />
+                              Logs
+                            </button>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {hasUnacknowledged ? (
+                              <button
+                                onClick={() => handleAcknowledgeItem(row)}
+                                className="px-3.5 py-1.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white text-[10px] font-bold rounded-[4px] hover:bg-opacity-90 transition-all shadow-md mx-auto block"
+                              >
+                                ACKNOWLEDGE
+                              </button>
+                            ) : (
+                              <span className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 mx-auto">
+                                <CheckCircle className="w-3 h-3 text-green-600" />
+                                Acknowledged
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
