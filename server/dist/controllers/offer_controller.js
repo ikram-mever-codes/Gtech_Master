@@ -738,7 +738,27 @@ class OfferController {
                     status: inquiry.status,
                     requestsCount: ((_a = inquiry.requests) === null || _a === void 0 ? void 0 : _a.length) || 0,
                 };
+<<<<<<< HEAD
                 const customerSnapshot = this.buildCustomerSnapshot(customer);
+=======
+                const customerSnapshot = {
+                    id: customer.id,
+                    customerNumber: customer.customerNumber,
+                    companyName: customer.companyName,
+                    legalName: customer.legalName,
+                    email: customer.email,
+                    contactEmail: customer.contactEmail,
+                    contactPhoneNumber: customer.contactPhoneNumber,
+                    vatId: customer.vatTaxId || customer.taxNumber || "",
+                    address: customer.addressLine1 || ((_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.address) || "",
+                    city: customer.city || ((_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.city) || "",
+                    postalCode: customer.postalCode || ((_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.postalCode) || "",
+                    country: customer.country || ((_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.country) || "",
+                    state: ((_f = customer.businessDetails) === null || _f === void 0 ? void 0 : _f.state) || "",
+                    street: customer.addressLine1 || "Street Address",
+                    additionalInfo: customer.addressLine2 || "Additional Info",
+                };
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
                 const defaultUnitPrices = createOfferDto.useUnitPrices
                     ? createOfferDto.defaultUnitPrices || this.createDefaultUnitPrices()
                     : [];
@@ -2599,12 +2619,16 @@ class OfferController {
                 }
                 const offer = yield this.offerRepository.findOne({
                     where: { id },
+<<<<<<< HEAD
                     relations: [
                         "lineItems",
                         "inquiry",
                         "inquiry.contactPerson",
                         "inquiry.customer",
                     ],
+=======
+                    relations: ["lineItems", "inquiry", "inquiry.contactPerson", "inquiry.customer"],
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
                 });
                 if (!offer) {
                     return response.status(404).json({
@@ -2822,12 +2846,16 @@ class OfferController {
                     ["Datum", formatDate(offer.createdAt)],
                     ["Gültig bis", formatDate(offer.validUntil)],
                     ["Ansprechpartner", contactName],
+<<<<<<< HEAD
                     [
                         "Kundennr.",
                         ((_c = (_b = offer.inquiry) === null || _b === void 0 ? void 0 : _b.customer) === null || _c === void 0 ? void 0 : _c.customerNumber) ||
                             customer.customerNumber ||
                             "-",
                     ],
+=======
+                    ["Kundennr.", ((_c = (_b = offer.inquiry) === null || _b === void 0 ? void 0 : _b.customer) === null || _c === void 0 ? void 0 : _c.customerNumber) || customer.customerNumber || "-"],
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
                 ];
                 offerDetails.forEach((detail, index) => {
                     const detailY = detailsStartY + index * 15;

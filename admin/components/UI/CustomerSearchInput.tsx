@@ -191,9 +191,10 @@ export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
                   ? item.companyName || item.legalName || "Unnamed Customer"
                   : item.label || "Unnamed Business";
 
-              const isSelected =
+              const isSelected = !!(
                 String(itemId) === String(value) ||
-                (value && String(nameLabel).toLowerCase() === String(value).toLowerCase());
+                (value && String(nameLabel).toLowerCase() === String(value).toLowerCase())
+              );
 
               const subLabel =
                 mode === "customers"

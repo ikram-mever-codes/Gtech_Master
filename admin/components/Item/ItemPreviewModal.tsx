@@ -773,44 +773,13 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
                 <Field label="Company">
                   {previewEdit ? (
-                    <ReactSelect
-                      isClearable
-                      placeholder="Search customer..."
-                      options={customerOptions}
-                      value={
-                        customerOptions.find(
-                          (o) =>
-                            String(o.value) === String(previewItem.customer_id),
-                        ) ||
-                        (previewItem.customer_id
-                          ? {
-                              value: String(previewItem.customer_id),
-                              label:
-                                previewItem.customer_name ||
-                                `#${previewItem.customer_id}`,
-                            }
-                          : null)
+                    <CustomerSearchInput
+                      value={previewItem.customer_id ?? ""}
+                      initialLabel={getCompany(previewItem)}
+                      onChange={(id) =>
+                        patchPreview({ customer_id: id || null })
                       }
-                      onChange={(opt: any) =>
-                        patchPreview({
-                          customer_id: opt?.value ?? null,
-                          customer_name: opt?.label ?? "",
-                        })
-                      }
-                      menuPortalTarget={
-                        typeof document !== "undefined"
-                          ? document.body
-                          : undefined
-                      }
-                      styles={{
-                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                        control: (base) => ({
-                          ...base,
-                          minHeight: "34px",
-                          fontSize: "0.875rem",
-                          borderRadius: "0.5rem",
-                        }),
-                      }}
+                      placeholder="Search company..."
                     />
                   ) : (
                     getCompany(previewItem) || "—"

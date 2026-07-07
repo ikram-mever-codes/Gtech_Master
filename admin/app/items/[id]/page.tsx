@@ -1321,7 +1321,7 @@ const ItemDetailsPage = () => {
                         initialLabel={selectedCustomerName}
                         onChange={(id) => {
                           setItemData((prev) =>
-                            prev ? ({ ...prev, customer_id: id ? parseInt(id) : null } as any) : prev,
+                            prev ? ({ ...prev, customer_id: id || null } as any) : prev,
                           );
                         }}
                         placeholder="Search customer by name or number..."

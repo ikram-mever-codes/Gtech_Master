@@ -20,6 +20,10 @@ const tags_1 = require("./tags");
 const items_1 = require("./items");
 const tax_profile_1 = require("./tax_profile");
 const company_shipping_address_1 = require("./company_shipping_address");
+<<<<<<< HEAD
+=======
+const country_1 = require("./country");
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
 let Customer = class Customer {
     populateDetails() {
         if (this.businessDetails) {
@@ -87,6 +91,18 @@ __decorate([
     __metadata("design:type", tax_profile_1.TaxProfile)
 ], Customer.prototype, "defaultTaxProfile", void 0);
 __decorate([
+<<<<<<< HEAD
+=======
+    (0, typeorm_1.Column)({ name: "country_id", nullable: true }),
+    __metadata("design:type", Object)
+], Customer.prototype, "country_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => country_1.Country, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "country_id" }),
+    __metadata("design:type", Object)
+], Customer.prototype, "countryEntity", void 0);
+__decorate([
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
     (0, typeorm_1.Column)({
         name: "vat_id_status",
         type: "enum",

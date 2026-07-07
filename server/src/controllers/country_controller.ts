@@ -99,7 +99,7 @@ export const updateCountry = async (
   try {
     const countryRepository = AppDataSource.getRepository(Country);
     const { id } = req.params;
-    const { name, name_de, is_eu, is_igl_country, is_active } = req.body;
+    const { iso2, name, name_de, is_eu, is_igl_country, is_active } = req.body;
 
     const country = await countryRepository.findOne({ where: { id } });
     if (!country) {
@@ -108,12 +108,30 @@ export const updateCountry = async (
         .json({ success: false, message: "Country not found." });
     }
 
+    if (iso2 !== undefined) {
+      const cleanIso2 = iso2.trim().toUpperCase();
+      if (cleanIso2.length !== 2) {
+        return res
+          .status(400)
+          .json({ success: false, message: "ISO2 code must be exactly 2 characters." });
+      }
+      const existing = await countryRepository.findOne({
+        where: { iso2: cleanIso2 },
+      });
+      if (existing && existing.id !== id) {
+        return res.status(409).json({
+          success: false,
+          message: `Country with ISO2 code "${cleanIso2}" already exists.`,
+        });
+      }
+      country.iso2 = cleanIso2;
+    }
+
     if (name !== undefined) country.name = name.trim();
     if (name_de !== undefined) country.name_de = name_de ? name_de.trim() : undefined;
     if (is_eu !== undefined) country.is_eu = !!is_eu;
     if (is_igl_country !== undefined) country.is_igl_country = !!is_igl_country;
     if (is_active !== undefined) country.is_active = !!is_active;
-
     const updated = await countryRepository.save(country);
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {

@@ -33,6 +33,7 @@ const star_customer_details_1 = require("../models/star_customer_details");
 const list_1 = require("../models/list");
 const emailService_1 = __importDefault(require("../services/emailService"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const country_1 = require("../models/country");
 exports.BUSINESS_SOURCE = {
     GOOGLE_MAPS: "Google Maps",
     MANUAL: "Manual",
@@ -572,6 +573,19 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             businessDetails.city = city ? city.trim() : undefined;
             businessDetails.state = state ? state.trim() : undefined;
             businessDetails.country = country ? country.trim() : undefined;
+            if (country) {
+                const countryRepo = database_1.AppDataSource.getRepository(country_1.Country);
+                const matched = yield countryRepo.findOne({
+                    where: [
+                        { iso2: country.trim().toUpperCase() },
+                        { name: country.trim() }
+                    ]
+                });
+                if (matched) {
+                    customer.country_id = matched.id;
+                    businessDetails.country_id = matched.id;
+                }
+            }
             businessDetails.postalCode = postalCode ? postalCode.trim() : undefined;
             businessDetails.latitude = sanitizeNumber(latitude);
             businessDetails.longitude = sanitizeNumber(longitude);
@@ -895,8 +909,25 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                     businessDetails.city = updateData.city.trim();
                 if (updateData.state !== undefined)
                     businessDetails.state = updateData.state.trim();
-                if (updateData.country !== undefined)
-                    businessDetails.country = updateData.country.trim();
+                if (updateData.country !== undefined) {
+                    const countryStr = updateData.country.trim();
+                    businessDetails.country = countryStr;
+                    const countryRepo = database_1.AppDataSource.getRepository(country_1.Country);
+                    const matched = yield countryRepo.findOne({
+                        where: [
+                            { iso2: countryStr.toUpperCase() },
+                            { name: countryStr }
+                        ]
+                    });
+                    if (matched) {
+                        customer.country_id = matched.id;
+                        businessDetails.country_id = matched.id;
+                    }
+                    else {
+                        customer.country_id = null;
+                        businessDetails.country_id = null;
+                    }
+                }
                 if (updateData.postalCode !== undefined)
                     businessDetails.postalCode = updateData.postalCode.trim();
                 if (updateData.latitude !== undefined)
