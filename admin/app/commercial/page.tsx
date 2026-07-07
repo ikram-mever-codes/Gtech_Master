@@ -76,6 +76,7 @@ import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
 import { getAllOffers } from "@/api/offers";
+import OffersPage from "../offers/page";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
@@ -1859,29 +1860,31 @@ const InvoiceListPage: React.FC = () => {
             </button>
           </div>
         )}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <PageHeader
-              title="Commercial"
-              icon={DollarSign}
-            />
+        {activeInvTab !== "angebot" && (
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <PageHeader
+                title="Commercial"
+                icon={DollarSign}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setMode("create");
+                    setShowModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Order
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
-              <button
-                onClick={() => {
-                  resetForm();
-                  setMode("create");
-                  setShowModal(true);
-                }}
-                className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                New Order
-              </button>
-            )}
-          </div>
-        </div>
+        )}
 
         <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
           {invoiceTabs.map((tab) => (
@@ -1901,57 +1904,58 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
-        <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
-            <input
-              type="text"
-              placeholder={
-                (activeInvTab === "rechnung" || activeInvTab === "rk")
-                  ? "Search invoices, customers, or order numbers..."
-                  : "Search..."
-              }
-              value={
-                (activeInvTab === "rechnung" || activeInvTab === "rk")
-                  ? searchTerm
-                  : orderNoFilter
-              }
-              onChange={(e) => {
-                if (activeInvTab === "rechnung" || activeInvTab === "rk") {
-                  setSearchTerm(e.target.value);
+        {activeInvTab !== "angebot" && (
+          <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder={
+                  (activeInvTab === "rechnung" || activeInvTab === "rk")
+                    ? "Search invoices, customers, or order numbers..."
+                    : "Search..."
+                }
+                value={
+                  (activeInvTab === "rechnung" || activeInvTab === "rk")
+                    ? searchTerm
+                    : orderNoFilter
+                }
+                onChange={(e) => {
+                  if (activeInvTab === "rechnung" || activeInvTab === "rk") {
+                    setSearchTerm(e.target.value);
+                  } else {
+                    setOrderNoFilter(e.target.value);
+                  }
+                }}
+                className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                if (
+                  activeInvTab === "auftrag" ||
+                  activeInvTab === "bestellung"
+                ) {
+                  fetchOrders();
+                  fetchOffers();
                 } else {
-                  setOrderNoFilter(e.target.value);
+                  setLoading(true);
+                  loadInvoices();
+                  if (activeInvTab === "lieferschein") fetchCustomers();
                 }
               }}
-              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
-            />
+              disabled={loading || loadingOrders || loadingOffers}
+              className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
+              title="Refresh"
+            >
+              <RefreshCw
+                className={`h-4.5 w-4.5 ${loading || loadingOrders || loadingOffers ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
           </div>
-
-          <button
-            onClick={() => {
-              if (
-                activeInvTab === "angebot" ||
-                activeInvTab === "auftrag" ||
-                activeInvTab === "bestellung"
-              ) {
-                fetchOrders();
-                fetchOffers();
-              } else {
-                setLoading(true);
-                loadInvoices();
-                if (activeInvTab === "lieferschein") fetchCustomers();
-              }
-            }}
-            disabled={loading || loadingOrders || loadingOffers}
-            className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
-            title="Refresh"
-          >
-            <RefreshCw
-              className={`h-4.5 w-4.5 ${loading || loadingOrders || loadingOffers ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </button>
-        </div>
+        )}
 
         {false && (activeInvTab === "rechnung" || activeInvTab === "rk") && (
           <>
@@ -2120,23 +2124,22 @@ const InvoiceListPage: React.FC = () => {
           </>
         )}
 
-        {(activeInvTab === "angebot" ||
-          activeInvTab === "auftrag" ||
+        {activeInvTab === "angebot" && (
+          <OffersPage />
+        )}
+
+        {(activeInvTab === "auftrag" ||
           activeInvTab === "bestellung") && (
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
               <DataTable
                 data={currentItems}
                 columns={commercialColumns}
                 loading={
-                  activeInvTab === "angebot"
-                    ? loadingOffers
-                    : activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                      ? loadingOrders
-                      : loading
+                  activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                    ? loadingOrders
+                    : loading
                 }
-                emptyMessage={`No ${activeInvTab === "angebot"
-                  ? "Offers"
-                  : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                emptyMessage={`No ${activeInvTab === "auftrag" || activeInvTab === "bestellung"
                     ? "Orders"
                     : "Invoices"
                   } Found`}
@@ -2148,9 +2151,7 @@ const InvoiceListPage: React.FC = () => {
                   return "";
                 }}
                 onRowClick={(row) => {
-                  if (activeInvTab === "angebot") {
-                    router.push(`/offers?edit=${row.id}`);
-                  } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+                  if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
                     handleViewOrder(row);
                   } else {
                     handleOpenInvoiceDetails(row);

@@ -174,18 +174,17 @@ export const getItems = async (
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
 
-    const tagIds = tagStr
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const incTags = tagIds
-      .filter((t) => !t.startsWith("!"))
-      .map((t) => parseInt(t, 10))
-      .filter((n) => !isNaN(n));
-    const excTags = tagIds
-      .filter((t) => t.startsWith("!"))
-      .map((t) => parseInt(t.slice(1), 10))
-      .filter((n) => !isNaN(n));
+    if (company) {
+      const companyStr = (company as string).trim();
+      qb.leftJoin(
+        Customer,
+        "cust_filter",
+        "cust_filter.id::text = item.customer_id::text",
+      );
+      qb.andWhere("cust_filter.companyName ILIKE :companySearch", {
+        companySearch: `%${companyStr}%`,
+      });
+    }
 
     const idQb = itemRepository
       .createQueryBuilder("item")
@@ -1151,6 +1150,41 @@ export const updateItem = async (
         }
       }
     });
+
+    if (req.body.taricCode !== undefined) {
+      const code = req.body.taricCode.toString().trim();
+      if (code) {
+        const taricRepository = AppDataSource.getRepository(Taric);
+        let taric = await taricRepository.findOne({ where: { code } });
+        if (!taric) {
+          const maxIdResult = await taricRepository
+            .createQueryBuilder("taric")
+            .select("MAX(taric.id)", "max")
+            .getRawOne();
+          const nextId = (maxIdResult?.max || 0) + 1;
+
+          taric = taricRepository.create({
+            id: nextId,
+            code,
+            reguler_artikel: "Y",
+            duty_rate: 0,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+          await taricRepository.save(taric);
+        }
+
+        if (item.taric_id !== taric.id) {
+          item.taric_id = taric.id;
+          hasChanges = true;
+        }
+      } else {
+        if (item.taric_id !== null) {
+          item.taric_id = null as any;
+          hasChanges = true;
+        }
+      }
+    }
 
     const supplierItemData = req.body.supplierItem;
     const supplierItemsData = req.body.supplierItems;
