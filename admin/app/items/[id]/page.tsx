@@ -3006,4 +3006,5 @@ const ItemDetailsPage = () => {
     </div>
   );
 };
+
 export default ItemDetailsPage;
