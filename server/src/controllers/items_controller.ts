@@ -174,17 +174,18 @@ export const getItems = async (
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
 
-    if (company) {
-      const companyStr = (company as string).trim();
-      qb.leftJoin(
-        Customer,
-        "cust_filter",
-        "cust_filter.id::text = item.customer_id::text",
-      );
-      qb.andWhere("cust_filter.companyName ILIKE :companySearch", {
-        companySearch: `%${companyStr}%`,
-      });
-    }
+    const tagIds = tagStr
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const incTags = tagIds
+      .filter((t) => !t.startsWith("!"))
+      .map((t) => parseInt(t, 10))
+      .filter((n) => !isNaN(n));
+    const excTags = tagIds
+      .filter((t) => t.startsWith("!"))
+      .map((t) => parseInt(t.slice(1), 10))
+      .filter((n) => !isNaN(n));
 
     const idQb = itemRepository
       .createQueryBuilder("item")
