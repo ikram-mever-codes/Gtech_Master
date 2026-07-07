@@ -978,6 +978,7 @@ const ItemDetailsPage = () => {
         is_pu_item: updatedData.others?.isPU ? 1 : 0,
         is_meter_item: updatedData.others?.isMeter ? 1 : 0,
         npr_remark: updatedData.nprRemarks,
+        taricCode: updatedData.others?.taricCode || "",
         RMB_Price: toNum(updatedData.others?.rmbPrice),
         FOQ: toInt(updatedData.others?.foq) || 0,
         is_dimension_special: updatedData.others?.isDimensionSpecial

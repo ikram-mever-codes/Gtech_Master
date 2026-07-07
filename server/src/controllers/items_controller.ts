@@ -213,7 +213,7 @@ export const getItems = async (
 
       if (company) {
         const companyStr = (company as string).trim();
-        qb.leftJoin("item.customer", "cust_filter");
+        qb.leftJoin(Customer, "cust_filter", "cust_filter.id::text = item.customer_id::text");
         qb.andWhere("cust_filter.companyName ILIKE :companySearch", {
           companySearch: `%${companyStr}%`,
         });
@@ -1393,6 +1393,41 @@ export const updateItem = async (
         }
       }
     });
+
+    if (req.body.taricCode !== undefined) {
+      const code = req.body.taricCode.toString().trim();
+      if (code) {
+        const taricRepository = AppDataSource.getRepository(Taric);
+        let taric = await taricRepository.findOne({ where: { code } });
+        if (!taric) {
+          const maxIdResult = await taricRepository
+            .createQueryBuilder("taric")
+            .select("MAX(taric.id)", "max")
+            .getRawOne();
+          const nextId = (maxIdResult?.max || 0) + 1;
+
+          taric = taricRepository.create({
+            id: nextId,
+            code,
+            reguler_artikel: "Y",
+            duty_rate: 0,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+          await taricRepository.save(taric);
+        }
+
+        if (item.taric_id !== taric.id) {
+          item.taric_id = taric.id;
+          hasChanges = true;
+        }
+      } else {
+        if (item.taric_id !== null) {
+          item.taric_id = null as any;
+          hasChanges = true;
+        }
+      }
+    }
 
     const supplierItemData = req.body.supplierItem;
     const supplierItemsData = req.body.supplierItems;
