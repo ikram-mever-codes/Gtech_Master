@@ -69,7 +69,11 @@ import ModalFooter from "@/components/UI/ModalFooter";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
-import { TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
+import {
+  TagPickerInput,
+  EntityTagSelector,
+  type Tag,
+} from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { formatDate } from "@/utils/date";
@@ -324,8 +328,11 @@ const CombinedInquiriesPageContent = () => {
   const [conversionRequestData, setConversionRequestData] =
     useState<Request | null>(null);
   const [showRequestDetailModal, setShowRequestDetailModal] = useState(false);
-  const [selectedRequestForDetail, setSelectedRequestForDetail] = useState<any | null>(null);
-  const [selectedRequestInquiryId, setSelectedRequestInquiryId] = useState<string>("");
+  const [selectedRequestForDetail, setSelectedRequestForDetail] = useState<
+    any | null
+  >(null);
+  const [selectedRequestInquiryId, setSelectedRequestInquiryId] =
+    useState<string>("");
   const [expandedRequestIndex, setExpandedRequestIndex] = useState<any>(0);
   const [expandedInquiryIds, setExpandedInquiryIds] = useState<Set<string>>(
     new Set(),
@@ -656,29 +663,49 @@ const CombinedInquiriesPageContent = () => {
           : response.data.data || response.data.inquiries || [];
         if (inquiryFilters.requestItemTags) {
           const tagFilters = inquiryFilters.requestItemTags.split(",");
-          const includeTagIds = tagFilters.filter((t: string) => !t.startsWith("!")).map((t: string) => t);
-          const excludeTagIds = tagFilters.filter((t: string) => t.startsWith("!")).map((t: string) => t.substring(1));
+          const includeTagIds = tagFilters
+            .filter((t: string) => !t.startsWith("!"))
+            .map((t: string) => t);
+          const excludeTagIds = tagFilters
+            .filter((t: string) => t.startsWith("!"))
+            .map((t: string) => t.substring(1));
 
           inquiryData = inquiryData.filter((inquiry: any) => {
             return (inquiry.requests || []).some((req: any) => {
               const reqTagIds = req.tags?.map((t: any) => t.id) || [];
-              const hasAllIncludes = includeTagIds.every((id: string) => reqTagIds.includes(id));
-              const hasNoExcludes = excludeTagIds.every((id: string) => !reqTagIds.includes(id));
+              const hasAllIncludes = includeTagIds.every((id: string) =>
+                reqTagIds.includes(id),
+              );
+              const hasNoExcludes = excludeTagIds.every(
+                (id: string) => !reqTagIds.includes(id),
+              );
               return hasAllIncludes && hasNoExcludes;
             });
           });
         }
         if (inquiryFilters.sortBy === "total_potential_k_eur") {
           inquiryData = [...inquiryData].sort((a: any, b: any) => {
-            const valA = a.total_potential_k_eur !== undefined && a.total_potential_k_eur !== null ? Number(a.total_potential_k_eur) : 0;
-            const valB = b.total_potential_k_eur !== undefined && b.total_potential_k_eur !== null ? Number(b.total_potential_k_eur) : 0;
-            return inquiryFilters.sortOrder === "ASC" ? valA - valB : valB - valA;
+            const valA =
+              a.total_potential_k_eur !== undefined &&
+              a.total_potential_k_eur !== null
+                ? Number(a.total_potential_k_eur)
+                : 0;
+            const valB =
+              b.total_potential_k_eur !== undefined &&
+              b.total_potential_k_eur !== null
+                ? Number(b.total_potential_k_eur)
+                : 0;
+            return inquiryFilters.sortOrder === "ASC"
+              ? valA - valB
+              : valB - valA;
           });
         } else if (inquiryFilters.sortBy === "createdAt") {
           inquiryData = [...inquiryData].sort((a: any, b: any) => {
             const timeA = new Date(a.createdAt || 0).getTime();
             const timeB = new Date(b.createdAt || 0).getTime();
-            return inquiryFilters.sortOrder === "ASC" ? timeA - timeB : timeB - timeA;
+            return inquiryFilters.sortOrder === "ASC"
+              ? timeA - timeB
+              : timeB - timeA;
           });
         }
 
@@ -713,7 +740,7 @@ const CombinedInquiriesPageContent = () => {
     }
   }, [editingInquiryId]);
   const handleItemInfoClick = async (request: any, index: number) => {
-    if (request.id) {
+    if (request?.id) {
       setSelectedRequestForDetail(request);
       setSelectedRequestInquiryId(editingInquiryId || "");
       setShowRequestDetailModal(true);
@@ -739,7 +766,10 @@ const CombinedInquiriesPageContent = () => {
         updatedRequests[index].itemName = "Draft Request Item";
         changedRequests = true;
       }
-      if (!updatedRequests[index].qty || parseInt(updatedRequests[index].qty) < 1) {
+      if (
+        !updatedRequests[index].qty ||
+        parseInt(updatedRequests[index].qty) < 1
+      ) {
         updatedRequests[index].qty = 1;
         changedRequests = true;
       }
@@ -772,14 +802,20 @@ const CombinedInquiriesPageContent = () => {
           ...inquiryPayload,
         } as UpdateInquiryPayload);
       } else {
-        const result = await createInquiry(inquiryPayload as CreateInquiryPayload);
+        const result = await createInquiry(
+          inquiryPayload as CreateInquiryPayload,
+        );
         savedInquiryId = (result as any)?.data?.id || (result as any)?.id;
         if (savedInquiryId) {
           setEditingInquiryId(savedInquiryId);
           setInquiryModalMode("edit");
           setEditModeEnabled(true);
           if (newInquiryTags.length > 0) {
-            await syncEntityTags(savedInquiryId, "inquiry", newInquiryTags.map((t) => t.id));
+            await syncEntityTags(
+              savedInquiryId,
+              "inquiry",
+              newInquiryTags.map((t) => t.id),
+            );
           }
         }
       }
@@ -928,10 +964,16 @@ const CombinedInquiriesPageContent = () => {
           ...inquiryPayload,
         } as UpdateInquiryPayload);
       } else {
-        const result = await createInquiry(inquiryPayload as CreateInquiryPayload);
+        const result = await createInquiry(
+          inquiryPayload as CreateInquiryPayload,
+        );
         const createdId = (result as any)?.data?.id;
         if (createdId && newInquiryTags.length > 0) {
-          await syncEntityTags(createdId, "inquiry", newInquiryTags.map((t) => t.id));
+          await syncEntityTags(
+            createdId,
+            "inquiry",
+            newInquiryTags.map((t) => t.id),
+          );
         }
       }
       resetInquiryForm();
@@ -939,7 +981,8 @@ const CombinedInquiriesPageContent = () => {
       fetchInquiries();
     } catch (error) {
       console.error(
-        `Error ${inquiryModalMode === "edit" ? "updating" : "creating"
+        `Error ${
+          inquiryModalMode === "edit" ? "updating" : "creating"
         } inquiry:`,
         error,
       );
@@ -1264,7 +1307,9 @@ const CombinedInquiriesPageContent = () => {
     );
   };
   const getInquiryStatusColor = (status: string) => {
-    const statusObj = getInquiryStatuses().find((s) => s.value.toLowerCase() === status?.toLowerCase());
+    const statusObj = getInquiryStatuses().find(
+      (s) => s.value.toLowerCase() === status?.toLowerCase(),
+    );
     return statusObj?.color || "bg-gray-100 text-gray-800";
   };
   const getInquiryPriorityColor = (priority: string) => {
@@ -1300,7 +1345,7 @@ const CombinedInquiriesPageContent = () => {
   };
   const getHighestPriority = (requests?: any[]) => {
     if (!requests || requests.length === 0) return "-";
-    const hasHigh = requests.some(r => r.priority === "High");
+    const hasHigh = requests.some((r) => r.priority === "High");
     return hasHigh ? "High" : "Normal";
   };
 
@@ -1336,8 +1381,9 @@ const CombinedInquiriesPageContent = () => {
   };
   const formatTaricDisplay = (taric: any) => {
     if (!taric) return "";
-    return `${taric.id} - ${taric.code || "No code"} - ${taric.name_de || taric.name_en || taric.name_cn || "No name"
-      }`;
+    return `${taric.id} - ${taric.code || "No code"} - ${
+      taric.name_de || taric.name_en || taric.name_cn || "No name"
+    }`;
   };
   const getConversionFormFieldsWithOptions = () => {
     const fields = getConversionFormFields(existingDimensionFields);
@@ -1408,7 +1454,10 @@ const CombinedInquiriesPageContent = () => {
                 compact={true}
                 placeholder="Filter by Inquiry Tags..."
                 onChange={(tagString) =>
-                  setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))
+                  setInquiryFilters((prev: any) => ({
+                    ...prev,
+                    tags: tagString,
+                  }))
                 }
                 onReset={() =>
                   setInquiryFilters((prev: any) => ({ ...prev, tags: "" }))
@@ -1422,10 +1471,16 @@ const CombinedInquiriesPageContent = () => {
                 compact={true}
                 placeholder="Filter by Request Item Tags..."
                 onChange={(tagString) =>
-                  setInquiryFilters((prev: any) => ({ ...prev, requestItemTags: tagString }))
+                  setInquiryFilters((prev: any) => ({
+                    ...prev,
+                    requestItemTags: tagString,
+                  }))
                 }
                 onReset={() =>
-                  setInquiryFilters((prev: any) => ({ ...prev, requestItemTags: "" }))
+                  setInquiryFilters((prev: any) => ({
+                    ...prev,
+                    requestItemTags: "",
+                  }))
                 }
               />
             </div>
@@ -1510,8 +1565,18 @@ const CombinedInquiriesPageContent = () => {
                           )
                         ) : (
                           <span className="text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity">
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+                            <svg
+                              className="h-3.5 w-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M7 10l5-5 5 5M7 14l5 5 5-5"
+                              />
                             </svg>
                           </span>
                         )}
@@ -1545,12 +1610,15 @@ const CombinedInquiriesPageContent = () => {
                                 e.stopPropagation();
                                 toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`${!inquiry.requests || inquiry.requests.length === 0
-                                ? "text-red-500 hover:text-red-700"
-                                : "text-gray-400 hover:text-gray-700"
-                                } flex-shrink-0 mt-0.5`}
+                              className={`${
+                                !inquiry.requests ||
+                                inquiry.requests.length === 0
+                                  ? "text-red-500 hover:text-red-700"
+                                  : "text-gray-400 hover:text-gray-700"
+                              } flex-shrink-0 mt-0.5`}
                               title={
-                                !inquiry.requests || inquiry.requests.length === 0
+                                !inquiry.requests ||
+                                inquiry.requests.length === 0
                                   ? "No request items yet"
                                   : expandedInquiryIds.has(inquiry.id)
                                     ? "Hide requests"
@@ -1558,8 +1626,11 @@ const CombinedInquiriesPageContent = () => {
                               }
                             >
                               <ChevronRightIcon
-                                className={`h-4 w-4 transition-transform duration-200 ${expandedInquiryIds.has(inquiry.id) ? "rotate-90" : ""
-                                  }`}
+                                className={`h-4 w-4 transition-transform duration-200 ${
+                                  expandedInquiryIds.has(inquiry.id)
+                                    ? "rotate-90"
+                                    : ""
+                                }`}
                               />
                             </button>
                             <div
@@ -1567,7 +1638,9 @@ const CombinedInquiriesPageContent = () => {
                               onClick={() => handleInquiryClick(inquiry)}
                             >
                               <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-medium text-gray-900">{inquiry.name}</span>
+                                <span className="text-sm font-medium text-gray-900">
+                                  {inquiry.name}
+                                </span>
                                 {inquiry.isAssembly && (
                                   <CubeIcon
                                     className="h-3.5 w-3.5 text-blue-500"
@@ -1596,11 +1669,10 @@ const CombinedInquiriesPageContent = () => {
                               {inquiry.customer?.companyName || "-"}
                             </a>
                             <div className="text-xs text-gray-600 truncate mt-0.5">
-                              {inquiry.contactPerson ? (
-                                `${inquiry.contactPerson.name || ""} ${inquiry.contactPerson.familyName || ""}`.trim() || "-"
-                              ) : (
-                                "-"
-                              )}
+                              {inquiry.contactPerson
+                                ? `${inquiry.contactPerson.name || ""} ${inquiry.contactPerson.familyName || ""}`.trim() ||
+                                  "-"
+                                : "-"}
                             </div>
                           </div>
                         </td>
@@ -1613,11 +1685,17 @@ const CombinedInquiriesPageContent = () => {
                                     src={inquiry.image}
                                     alt="Assembly"
                                     className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
-                                    onClick={(e) => { e.stopPropagation(); window.open(inquiry.image!, "_blank"); }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(inquiry.image!, "_blank");
+                                    }}
                                     title="Assembly item image"
                                   />
                                 ) : (
-                                  <PhotoIcon className="w-5 h-5 text-gray-300" title="No image available" />
+                                  <PhotoIcon
+                                    className="w-5 h-5 text-gray-300"
+                                    title="No image available"
+                                  />
                                 )}
                               </div>
                             ) : (
@@ -1631,7 +1709,8 @@ const CombinedInquiriesPageContent = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-900 font-medium">
-                          {inquiry.total_potential_k_eur !== undefined && inquiry.total_potential_k_eur !== null
+                          {inquiry.total_potential_k_eur !== undefined &&
+                          inquiry.total_potential_k_eur !== null
                             ? Math.round(inquiry.total_potential_k_eur)
                             : "-"}
                         </td>
@@ -1660,39 +1739,72 @@ const CombinedInquiriesPageContent = () => {
                         <td className="px-4 py-3 text-center">
                           {(() => {
                             const hp = getHighestPriority(inquiry.requests);
-                            if (hp === "-") return <span className="text-gray-400">-</span>;
-                            const badgeColor = hp === "High" ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-800";
+                            if (hp === "-")
+                              return <span className="text-gray-400">-</span>;
+                            const badgeColor =
+                              hp === "High"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-gray-100 text-gray-800";
                             return (
                               <div className="flex justify-center">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
+                                <span
+                                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}
+                                >
                                   {hp}
                                 </span>
                               </div>
                             );
                           })()}
                         </td>
-                        <td className="px-4 py-3 text-left text-sm text-gray-700 max-w-[15rem] truncate" title={inquiry.next_action || ""}>
-                          {inquiry.next_action || <span className="text-gray-400">-</span>}
+                        <td
+                          className="px-4 py-3 text-left text-sm text-gray-700 max-w-[15rem] truncate"
+                          title={inquiry.next_action || ""}
+                        >
+                          {inquiry.next_action || (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-900 font-medium">
-                          {inquiry.next_followup_at ? formatDate(inquiry.next_followup_at) : <span className="text-gray-400">-</span>}
+                          {inquiry.next_followup_at ? (
+                            formatDate(inquiry.next_followup_at)
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-left text-sm text-gray-900 font-medium">
                           <div className="flex items-center gap-2">
                             {(() => {
-                              const ownerUser = users.find((u) => u.id === inquiry.owner_user_id);
-                              return ownerUser ? ownerUser.name : <span className="text-gray-400">-</span>;
+                              const ownerUser = users.find(
+                                (u) => u.id === inquiry.owner_user_id,
+                              );
+                              return ownerUser ? (
+                                ownerUser.name
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              );
                             })()}
-                            {(inquiry.asanaLink || inquiry.requests?.some((r: any) => r.asanaLink)) && (
+                            {(inquiry.asanaLink ||
+                              inquiry.requests?.some(
+                                (r: any) => r.asanaLink,
+                              )) && (
                               <a
-                                href={inquiry.asanaLink || inquiry.requests?.find((r: any) => r.asanaLink)?.asanaLink}
+                                href={
+                                  inquiry.asanaLink ||
+                                  inquiry.requests?.find(
+                                    (r: any) => r.asanaLink,
+                                  )?.asanaLink
+                                }
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-purple-500 hover:text-purple-700 transition-colors shrink-0"
                                 title="Open Asana task"
                               >
-                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                                <svg
+                                  className="h-4 w-4"
+                                  viewBox="0 0 24 24"
+                                  fill="currentColor"
+                                >
                                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
                                   <circle cx="12" cy="8.5" r="1.5" />
                                   <circle cx="8.5" cy="14.5" r="1.5" />
@@ -1703,14 +1815,19 @@ const CombinedInquiriesPageContent = () => {
                           </div>
                         </td>
                       </tr>
-                      {expandedInquiryIds.has(inquiry.id) && (
-                        inquiry.requests && inquiry.requests.length > 0 ? (
+                      {expandedInquiryIds.has(inquiry.id) &&
+                        (inquiry.requests && inquiry.requests.length > 0 ? (
                           <tr className="bg-gray-50/50 border-t border-b border-gray-100">
                             <td colSpan={totalCols} className="px-6 py-4">
                               <div>
                                 <div className="text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wider flex items-center gap-1.5 select-none">
                                   <ClipboardList className="h-4 w-4 text-blue-500" />
-                                  <span>Request Items for: <strong className="text-gray-800">{inquiry.name}</strong></span>
+                                  <span>
+                                    Request Items for:{" "}
+                                    <strong className="text-gray-800">
+                                      {inquiry.name}
+                                    </strong>
+                                  </span>
                                 </div>
                                 <div className="overflow-x-auto shadow-sm rounded-lg border border-gray-200 bg-white">
                                   <table className="w-full text-sm">
@@ -1752,14 +1869,19 @@ const CombinedInquiriesPageContent = () => {
                                         <tr
                                           key={request.id}
                                           onClick={() => {
-                                            setSelectedRequestForDetail(request);
-                                            setSelectedRequestInquiryId(inquiry.id);
+                                            setSelectedRequestForDetail(
+                                              request,
+                                            );
+                                            setSelectedRequestInquiryId(
+                                              inquiry.id,
+                                            );
                                             setShowRequestDetailModal(true);
                                           }}
-                                          className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${request.priority === "High"
-                                            ? "bg-red-50/50"
-                                            : ""
-                                            }`}
+                                          className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${
+                                            request.priority === "High"
+                                              ? "bg-red-50/50"
+                                              : ""
+                                          }`}
                                         >
                                           <td className="px-4 py-3">
                                             <div className="w-[8rem]">
@@ -1776,16 +1898,26 @@ const CombinedInquiriesPageContent = () => {
                                           {inquiry.isAssembly && (
                                             <td className="px-3 py-3 text-center">
                                               <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
-                                                {request.images && request.images.length > 0 ? (
+                                                {request.images &&
+                                                request.images.length > 0 ? (
                                                   <img
                                                     src={request.images[0]}
                                                     alt="Item"
                                                     className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
-                                                    onClick={(e) => { e.stopPropagation(); window.open(request.images![0], "_blank"); }}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      window.open(
+                                                        request.images![0],
+                                                        "_blank",
+                                                      );
+                                                    }}
                                                     title="View image"
                                                   />
                                                 ) : (
-                                                  <PhotoIcon className="w-5 h-5 text-gray-300" title="No image available" />
+                                                  <PhotoIcon
+                                                    className="w-5 h-5 text-gray-300"
+                                                    title="No image available"
+                                                  />
                                                 )}
                                               </div>
                                             </td>
@@ -1797,24 +1929,34 @@ const CombinedInquiriesPageContent = () => {
                                           </td>
                                           <td className="px-4 py-3 text-center">
                                             <div className="text-sm font-medium text-gray-900">
-                                              {request.targetPrice !== undefined && request.targetPrice !== null
+                                              {request.targetPrice !==
+                                                undefined &&
+                                              request.targetPrice !== null
                                                 ? `${request.targetPrice} €`
                                                 : "-"}
                                             </div>
                                           </td>
                                           <td className="px-4 py-3 text-center">
                                             <div className="text-sm font-bold text-blue-600">
-                                              {request.annualPotentialKEur !== undefined && request.annualPotentialKEur !== null
-                                                ? Math.round(request.annualPotentialKEur)
+                                              {request.annualPotentialKEur !==
+                                                undefined &&
+                                              request.annualPotentialKEur !==
+                                                null
+                                                ? Math.round(
+                                                    request.annualPotentialKEur,
+                                                  )
                                                 : "-"}
                                             </div>
                                           </td>
                                           <td className="px-4 py-3 text-center">
                                             <select
                                               value={request.requestStatus}
-                                              onClick={(e) => e.stopPropagation()}
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
                                               onChange={async (e: any) => {
-                                                const nextStatus = e.target.value;
+                                                const nextStatus =
+                                                  e.target.value;
 
                                                 setInquiries((prevInquiries) =>
                                                   prevInquiries.map((inq) => ({
@@ -1823,10 +1965,10 @@ const CombinedInquiriesPageContent = () => {
                                                       (req: any) =>
                                                         req.id === request.id
                                                           ? {
-                                                            ...req,
-                                                            requestStatus:
-                                                              nextStatus,
-                                                          }
+                                                              ...req,
+                                                              requestStatus:
+                                                                nextStatus,
+                                                            }
                                                           : req,
                                                     ),
                                                   })),
@@ -1841,12 +1983,12 @@ const CombinedInquiriesPageContent = () => {
                                                           inq.requests?.map(
                                                             (req: any) =>
                                                               req.id ===
-                                                                request.id
+                                                              request.id
                                                                 ? {
-                                                                  ...req,
-                                                                  requestStatus:
-                                                                    nextStatus,
-                                                                }
+                                                                    ...req,
+                                                                    requestStatus:
+                                                                      nextStatus,
+                                                                  }
                                                                 : req,
                                                           ),
                                                       }),
@@ -1964,16 +2106,22 @@ const CombinedInquiriesPageContent = () => {
                           </tr>
                         ) : (
                           <tr className="bg-gray-50/30">
-                            <td colSpan={totalCols} className="px-6 py-5 text-center">
+                            <td
+                              colSpan={totalCols}
+                              className="px-6 py-5 text-center"
+                            >
                               <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
                                 <ClipboardDocumentListIcon className="h-8 w-8 text-gray-300" />
-                                <p className="text-sm font-medium text-gray-500">No request items yet</p>
-                                <p className="text-xs text-gray-400">This inquiry has no requested items.</p>
+                                <p className="text-sm font-medium text-gray-500">
+                                  No request items yet
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  This inquiry has no requested items.
+                                </p>
                               </div>
                             </td>
                           </tr>
-                        )
-                      )}
+                        ))}
                     </React.Fragment>
                   ))}
                 </tbody>
@@ -2008,10 +2156,11 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         key={pageNum}
                         onClick={() => setInquiryCurrentPage(pageNum)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
-                          ? "bg-gray-600 text-white"
-                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
+                          inquiryCurrentPage === pageNum
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                        }`}
                       >
                         {pageNum}
                       </button>
@@ -2022,10 +2171,11 @@ const CombinedInquiriesPageContent = () => {
                       <span className="px-1 text-gray-500">...</span>
                       <button
                         onClick={() => setInquiryCurrentPage(inquiryTotalPages)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
-                          ? "bg-gray-600 text-white"
-                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
+                          inquiryCurrentPage === inquiryTotalPages
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                        }`}
                       >
                         {inquiryTotalPages}
                       </button>
@@ -2062,7 +2212,9 @@ const CombinedInquiriesPageContent = () => {
       >
         <ModalHeader
           entityName="Inquiry"
-          entityNo={inquiryModalMode === "edit" ? inquiryFormData.inquiryNo : null}
+          entityNo={
+            inquiryModalMode === "edit" ? inquiryFormData.inquiryNo : null
+          }
           icon={ClipboardDocumentListIcon}
           isEditMode={inquiryModalMode === "edit"}
           isEditEnabled={editModeEnabled}
@@ -2079,19 +2231,38 @@ const CombinedInquiriesPageContent = () => {
               let factor = 12;
               const interval = req.interval || "Monatlich";
               const normalized = interval.toLowerCase().trim();
-              if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+              if (
+                normalized === "jährlich" ||
+                normalized === "jaehrlich" ||
+                normalized === "yearly"
+              ) {
                 factor = 1;
-              } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+              } else if (
+                normalized === "halbjährlich" ||
+                normalized === "halbjaehrlich" ||
+                normalized === "half-yearly" ||
+                normalized === "half yearly" ||
+                normalized === "biannually"
+              ) {
                 factor = 2;
-              } else if (normalized === "quartal" || normalized === "quarterly") {
+              } else if (
+                normalized === "quartal" ||
+                normalized === "quarterly"
+              ) {
                 factor = 4;
-              } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+              } else if (
+                normalized === "2 monatlich" ||
+                normalized === "bimonthly"
+              ) {
                 factor = 6;
-              } else if (normalized === "monatlich" || normalized === "monthly") {
+              } else if (
+                normalized === "monatlich" ||
+                normalized === "monthly"
+              ) {
                 factor = 12;
               }
               const annual = qty * targetPrice * factor;
-              total += (annual / 1000);
+              total += annual / 1000;
             });
             return (
               <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
@@ -2103,10 +2274,11 @@ const CombinedInquiriesPageContent = () => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="space-y-6">
             <div
-              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                ? "bg-red-50 border border-red-200/70"
-                : "bg-transparent"
-                }`}
+              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
+                inquiryFormData.isAssembly
+                  ? "bg-red-50 border border-red-200/70"
+                  : "bg-transparent"
+              }`}
             >
               <div>
                 <div className="grid grid-cols-2 gap-4">
@@ -2123,9 +2295,7 @@ const CombinedInquiriesPageContent = () => {
                           contactPersonId: "",
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       placeholder="Select Customer..."
                       mode="customers"
                     />
@@ -2142,17 +2312,14 @@ const CombinedInquiriesPageContent = () => {
                           contactPersonId: e.target.value,
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Contact Person</option>
                       {contactPersons
                         .filter(
                           (person) =>
-                            person.businessId ===
-                            inquiryFormData.customerId,
+                            person.businessId === inquiryFormData.customerId,
                         )
                         .map((person) => (
                           <option key={person.id} value={person.id}>
@@ -2174,9 +2341,7 @@ const CombinedInquiriesPageContent = () => {
                           name: e.target.value,
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
                       placeholder="PT0171 - Untere Schiebemuffe"
                     />
@@ -2194,7 +2359,11 @@ const CombinedInquiriesPageContent = () => {
                       />
                     </div>
                   )}
-                  <div className={inquiryFormData.inquiryNo ? "col-span-1" : "col-span-2"}>
+                  <div
+                    className={
+                      inquiryFormData.inquiryNo ? "col-span-1" : "col-span-2"
+                    }
+                  >
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Status
                     </label>
@@ -2206,9 +2375,7 @@ const CombinedInquiriesPageContent = () => {
                           status: e.target.value as any,
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       {getInquiryStatuses().map((status) => (
@@ -2230,9 +2397,7 @@ const CombinedInquiriesPageContent = () => {
                           description: e.target.value,
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       rows={2}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       placeholder="Enter inquiry description"
@@ -2278,9 +2443,7 @@ const CombinedInquiriesPageContent = () => {
                           owner_user_id: e.target.value,
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Owner</option>
@@ -2304,9 +2467,7 @@ const CombinedInquiriesPageContent = () => {
                           next_action: e.target.value,
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       placeholder="e.g. Call client"
                     />
@@ -2319,7 +2480,9 @@ const CombinedInquiriesPageContent = () => {
                       type="date"
                       value={
                         inquiryFormData.next_followup_at
-                          ? new Date(inquiryFormData.next_followup_at).toISOString().split("T")[0]
+                          ? new Date(inquiryFormData.next_followup_at)
+                              .toISOString()
+                              .split("T")[0]
                           : ""
                       }
                       onChange={(e) =>
@@ -2328,9 +2491,7 @@ const CombinedInquiriesPageContent = () => {
                           next_followup_at: e.target.value || undefined,
                         })
                       }
-                      disabled={
-                        inquiryModalMode === "edit" && !editModeEnabled
-                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
                   </div>
@@ -2389,8 +2550,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                             placeholder="Enter item number"
@@ -2409,8 +2569,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           >
@@ -2440,8 +2599,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                             min="1"
@@ -2460,8 +2618,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           >
@@ -2489,8 +2646,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                             placeholder="Link to Asana"
@@ -2509,16 +2665,12 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           >
                             {getRequestStatuses().map((status) => (
-                              <option
-                                key={status.value}
-                                value={status.value}
-                              >
+                              <option key={status.value} value={status.value}>
                                 {status.label}
                               </option>
                             ))}
@@ -2541,8 +2693,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                             step="0.01"
@@ -2557,13 +2708,11 @@ const CombinedInquiriesPageContent = () => {
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                purchasePriceCurrency: e.target
-                                  .value as any,
+                                purchasePriceCurrency: e.target.value as any,
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           >
@@ -2590,8 +2739,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           >
@@ -2615,13 +2763,11 @@ const CombinedInquiriesPageContent = () => {
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                weight:
-                                  parseFloat(e.target.value) || undefined,
+                                weight: parseFloat(e.target.value) || undefined,
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
                             step="0.001"
@@ -2637,13 +2783,11 @@ const CombinedInquiriesPageContent = () => {
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                length:
-                                  parseFloat(e.target.value) || undefined,
+                                length: parseFloat(e.target.value) || undefined,
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
                             step="0.1"
@@ -2659,13 +2803,11 @@ const CombinedInquiriesPageContent = () => {
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                width:
-                                  parseFloat(e.target.value) || undefined,
+                                width: parseFloat(e.target.value) || undefined,
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
                             step="0.1"
@@ -2681,13 +2823,11 @@ const CombinedInquiriesPageContent = () => {
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                height:
-                                  parseFloat(e.target.value) || undefined,
+                                height: parseFloat(e.target.value) || undefined,
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
                             step="0.1"
@@ -2708,8 +2848,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             rows={3}
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
@@ -2729,8 +2868,7 @@ const CombinedInquiriesPageContent = () => {
                               })
                             }
                             disabled={
-                              inquiryModalMode === "edit" &&
-                              !editModeEnabled
+                              inquiryModalMode === "edit" && !editModeEnabled
                             }
                             rows={3}
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
@@ -2833,10 +2971,11 @@ const CombinedInquiriesPageContent = () => {
               </div>
             </div>
             <div
-              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                ? "bg-green-50 border border-green-200/70 mt-2"
-                : "bg-transparent"
-                }`}
+              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
+                inquiryFormData.isAssembly
+                  ? "bg-green-50 border border-green-200/70 mt-2"
+                  : "bg-transparent"
+              }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -2849,9 +2988,7 @@ const CombinedInquiriesPageContent = () => {
                   <button
                     type="button"
                     onClick={addNewRequest}
-                    disabled={
-                      inquiryModalMode === "edit" && !editModeEnabled
-                    }
+                    disabled={inquiryModalMode === "edit" && !editModeEnabled}
                     className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <PlusIcon className="h-3 w-3" />
@@ -2867,14 +3004,15 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         type="button"
                         onClick={() => toggleRequestExpansion(index)}
-                        className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
-                          ? inquiryFormData.isAssembly
-                            ? "bg-green-100"
-                            : "bg-gray-100"
-                          : inquiryFormData.isAssembly
-                            ? "bg-green-50 hover:bg-green-100"
-                            : "bg-gray-50 hover:bg-gray-100"
-                          }`}
+                        className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
+                          expandedRequestIndex === index
+                            ? inquiryFormData.isAssembly
+                              ? "bg-green-100"
+                              : "bg-gray-100"
+                            : inquiryFormData.isAssembly
+                              ? "bg-green-50 hover:bg-green-100"
+                              : "bg-gray-50 hover:bg-gray-100"
+                        }`}
                       >
                         <div className="flex items-center gap-2">
                           {expandedRequestIndex === index ? (
@@ -2906,8 +3044,7 @@ const CombinedInquiriesPageContent = () => {
                                 removeRequest(index);
                               }}
                               disabled={
-                                inquiryModalMode === "edit" &&
-                                !editModeEnabled
+                                inquiryModalMode === "edit" && !editModeEnabled
                               }
                               className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -3004,11 +3141,7 @@ const CombinedInquiriesPageContent = () => {
                                   type="number"
                                   value={request.qty}
                                   onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "qty",
-                                      e.target.value,
-                                    )
+                                    updateRequest(index, "qty", e.target.value)
                                   }
                                   disabled={
                                     inquiryModalMode === "edit" &&
@@ -3037,16 +3170,14 @@ const CombinedInquiriesPageContent = () => {
                                   }
                                   className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                                 >
-                                  {getAvailableIntervals().map(
-                                    (interval) => (
-                                      <option
-                                        key={interval.value}
-                                        value={interval.value}
-                                      >
-                                        {interval.label}
-                                      </option>
-                                    ),
-                                  )}
+                                  {getAvailableIntervals().map((interval) => (
+                                    <option
+                                      key={interval.value}
+                                      value={interval.value}
+                                    >
+                                      {interval.label}
+                                    </option>
+                                  ))}
                                 </select>
                               </div>
                               <div>
@@ -3113,7 +3244,9 @@ const CombinedInquiriesPageContent = () => {
                                     updateRequest(
                                       index,
                                       "targetPrice",
-                                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0,
+                                      e.target.value === ""
+                                        ? ""
+                                        : parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   disabled={
@@ -3137,19 +3270,42 @@ const CombinedInquiriesPageContent = () => {
                                   <strong className="text-sm font-semibold">
                                     {(() => {
                                       const qty = parseInt(request.qty) || 0;
-                                      const targetPrice = parseFloat(request.targetPrice) || 0;
+                                      const targetPrice =
+                                        parseFloat(request.targetPrice) || 0;
                                       let factor = 12;
-                                      const interval = request.interval || "Monatlich";
-                                      const normalized = interval.toLowerCase().trim();
-                                      if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                      const interval =
+                                        request.interval || "Monatlich";
+                                      const normalized = interval
+                                        .toLowerCase()
+                                        .trim();
+                                      if (
+                                        normalized === "jährlich" ||
+                                        normalized === "jaehrlich" ||
+                                        normalized === "yearly"
+                                      ) {
                                         factor = 1;
-                                      } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                      } else if (
+                                        normalized === "halbjährlich" ||
+                                        normalized === "halbjaehrlich" ||
+                                        normalized === "half-yearly" ||
+                                        normalized === "half yearly" ||
+                                        normalized === "biannually"
+                                      ) {
                                         factor = 2;
-                                      } else if (normalized === "quartal" || normalized === "quarterly") {
+                                      } else if (
+                                        normalized === "quartal" ||
+                                        normalized === "quarterly"
+                                      ) {
                                         factor = 4;
-                                      } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                      } else if (
+                                        normalized === "2 monatlich" ||
+                                        normalized === "bimonthly"
+                                      ) {
                                         factor = 6;
-                                      } else if (normalized === "monatlich" || normalized === "monthly") {
+                                      } else if (
+                                        normalized === "monatlich" ||
+                                        normalized === "monthly"
+                                      ) {
                                         factor = 12;
                                       }
                                       const annual = qty * targetPrice * factor;
@@ -3162,19 +3318,42 @@ const CombinedInquiriesPageContent = () => {
                                   <strong className="text-sm font-semibold">
                                     {(() => {
                                       const qty = parseInt(request.qty) || 0;
-                                      const targetPrice = parseFloat(request.targetPrice) || 0;
+                                      const targetPrice =
+                                        parseFloat(request.targetPrice) || 0;
                                       let factor = 12;
-                                      const interval = request.interval || "Monatlich";
-                                      const normalized = interval.toLowerCase().trim();
-                                      if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                      const interval =
+                                        request.interval || "Monatlich";
+                                      const normalized = interval
+                                        .toLowerCase()
+                                        .trim();
+                                      if (
+                                        normalized === "jährlich" ||
+                                        normalized === "jaehrlich" ||
+                                        normalized === "yearly"
+                                      ) {
                                         factor = 1;
-                                      } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                      } else if (
+                                        normalized === "halbjährlich" ||
+                                        normalized === "halbjaehrlich" ||
+                                        normalized === "half-yearly" ||
+                                        normalized === "half yearly" ||
+                                        normalized === "biannually"
+                                      ) {
                                         factor = 2;
-                                      } else if (normalized === "quartal" || normalized === "quarterly") {
+                                      } else if (
+                                        normalized === "quartal" ||
+                                        normalized === "quarterly"
+                                      ) {
                                         factor = 4;
-                                      } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                      } else if (
+                                        normalized === "2 monatlich" ||
+                                        normalized === "bimonthly"
+                                      ) {
                                         factor = 6;
-                                      } else if (normalized === "monatlich" || normalized === "monthly") {
+                                      } else if (
+                                        normalized === "monatlich" ||
+                                        normalized === "monthly"
+                                      ) {
                                         factor = 12;
                                       }
                                       const annual = qty * targetPrice * factor;
@@ -3270,9 +3449,7 @@ const CombinedInquiriesPageContent = () => {
                                   <div className="flex items-center gap-1">
                                     <input
                                       type="text"
-                                      value={
-                                        requestLoopTagInputs[index] || ""
-                                      }
+                                      value={requestLoopTagInputs[index] || ""}
                                       onChange={(e) =>
                                         setRequestLoopTagInputs({
                                           ...requestLoopTagInputs,
@@ -3285,9 +3462,7 @@ const CombinedInquiriesPageContent = () => {
                                           e.key === ","
                                         ) {
                                           e.preventDefault();
-                                          handleAddRequestLoopPainPoint(
-                                            index,
-                                          );
+                                          handleAddRequestLoopPainPoint(index);
                                         }
                                       }}
                                       disabled={
@@ -3387,7 +3562,9 @@ const CombinedInquiriesPageContent = () => {
             resetInquiryForm();
           }}
           onSave={handleInquirySubmit}
-          saveLabel={inquiryModalMode === "edit" ? "Update Inquiry" : "Create Inquiry"}
+          saveLabel={
+            inquiryModalMode === "edit" ? "Update Inquiry" : "Create Inquiry"
+          }
           loading={inquiryLoading}
           saveDisabled={
             !inquiryFormData.name ||
@@ -3415,9 +3592,7 @@ const CombinedInquiriesPageContent = () => {
           Fill in the required fields to create a new item
         </p>
         <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-          <h3 className="font-medium text-gray-900 mb-2">
-            Source Information
-          </h3>
+          <h3 className="font-medium text-gray-900 mb-2">Source Information</h3>
           {conversionType === "inquiry" && conversionInquiryData && (
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
@@ -3444,21 +3619,21 @@ const CombinedInquiriesPageContent = () => {
                 conversionInquiryData.width ||
                 conversionInquiryData.height ||
                 conversionInquiryData.length) && (
-                  <div className="col-span-2">
-                    <span className="text-gray-600">Dimensions:</span>
-                    <span className="ml-2">
-                      {conversionInquiryData.weight &&
-                        `${conversionInquiryData.weight}kg `}
-                      {conversionInquiryData.length &&
-                        `${conversionInquiryData.length}×`}
-                      {conversionInquiryData.width &&
-                        `${conversionInquiryData.width}×`}
-                      {conversionInquiryData.height &&
-                        `${conversionInquiryData.height}`}
-                      cm
-                    </span>
-                  </div>
-                )}
+                <div className="col-span-2">
+                  <span className="text-gray-600">Dimensions:</span>
+                  <span className="ml-2">
+                    {conversionInquiryData.weight &&
+                      `${conversionInquiryData.weight}kg `}
+                    {conversionInquiryData.length &&
+                      `${conversionInquiryData.length}×`}
+                    {conversionInquiryData.width &&
+                      `${conversionInquiryData.width}×`}
+                    {conversionInquiryData.height &&
+                      `${conversionInquiryData.height}`}
+                    cm
+                  </span>
+                </div>
+              )}
             </div>
           )}
           {conversionType === "request" && conversionRequestData && (
@@ -3474,8 +3649,7 @@ const CombinedInquiriesPageContent = () => {
                 <span className="ml-2 font-medium">
                   {(conversionRequestData as any).business?.customer
                     ?.companyName ||
-                    (conversionRequestData as any).business
-                      ?.companyName ||
+                    (conversionRequestData as any).business?.companyName ||
                     "N/A"}
                 </span>
               </div>
@@ -3495,21 +3669,21 @@ const CombinedInquiriesPageContent = () => {
                 conversionRequestData.width ||
                 conversionRequestData.height ||
                 conversionRequestData.length) && (
-                  <div className="col-span-2">
-                    <span className="text-gray-600">Dimensions:</span>
-                    <span className="ml-2">
-                      {conversionRequestData.weight &&
-                        `${conversionRequestData.weight}kg `}
-                      {conversionRequestData.length &&
-                        `${conversionRequestData.length}×`}
-                      {conversionRequestData.width &&
-                        `${conversionRequestData.width}×`}
-                      {conversionRequestData.height &&
-                        `${conversionRequestData.height}`}
-                      cm
-                    </span>
-                  </div>
-                )}
+                <div className="col-span-2">
+                  <span className="text-gray-600">Dimensions:</span>
+                  <span className="ml-2">
+                    {conversionRequestData.weight &&
+                      `${conversionRequestData.weight}kg `}
+                    {conversionRequestData.length &&
+                      `${conversionRequestData.length}×`}
+                    {conversionRequestData.width &&
+                      `${conversionRequestData.width}×`}
+                    {conversionRequestData.height &&
+                      `${conversionRequestData.height}`}
+                    cm
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -3585,9 +3759,7 @@ const CombinedInquiriesPageContent = () => {
                                   ...conversionFormData,
                                   [field.name]: conversionFormData[
                                     field.name
-                                  ].filter(
-                                    (_: any, idx: number) => idx !== i,
-                                  ),
+                                  ].filter((_: any, idx: number) => idx !== i),
                                 })
                               }
                               className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
@@ -3602,9 +3774,7 @@ const CombinedInquiriesPageContent = () => {
                       <input
                         type="text"
                         value={conversionTagInput}
-                        onChange={(e) =>
-                          setConversionTagInput(e.target.value)
-                        }
+                        onChange={(e) => setConversionTagInput(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === ",") {
                             e.preventDefault();
@@ -3639,10 +3809,11 @@ const CombinedInquiriesPageContent = () => {
                             : e.target.value,
                       })
                     }
-                    className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
-                      ? "border-red-300"
-                      : "border-gray-300/80"
-                      } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
+                    className={`w-full px-3 py-2 text-sm border ${
+                      field.required && !conversionFormData[field.name]
+                        ? "border-red-300"
+                        : "border-gray-300/80"
+                    } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
                     placeholder={field.placeholder}
                     min={field.min}
                     step={field.step}
@@ -3651,8 +3822,9 @@ const CombinedInquiriesPageContent = () => {
                 )}
                 {field.description && (
                   <p
-                    className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
-                      }`}
+                    className={`text-xs mt-1 ${
+                      field.required ? "text-red-600" : "text-gray-500"
+                    }`}
                   >
                     {field.description}
                   </p>
@@ -3667,24 +3839,20 @@ const CombinedInquiriesPageContent = () => {
                 <p className="font-medium">Note:</p>
                 <ul className="mt-1 space-y-1 list-disc list-inside">
                   <li>
-                    TARIC code and EAN will be automatically generated if
-                    not provided
+                    TARIC code and EAN will be automatically generated if not
+                    provided
                   </li>
                   <li>Parent and category fields will be left null</li>
                   <li>
-                    For assembly inquiries, name, quantity, and image will
-                    be used directly from the inquiry
+                    For assembly inquiries, name, quantity, and image will be
+                    used directly from the inquiry
                   </li>
+                  <li>Missing fields will be filled from the form above</li>
                   <li>
-                    Missing fields will be filled from the form above
+                    Dimension fields that exist in the source are pre-filled and
+                    optional
                   </li>
-                  <li>
-                    Dimension fields that exist in the source are
-                    pre-filled and optional
-                  </li>
-                  <li>
-                    Dimension fields missing in the source are required
-                  </li>
+                  <li>Dimension fields missing in the source are required</li>
                 </ul>
               </div>
             </div>
@@ -3729,10 +3897,7 @@ const CombinedInquiriesPageContent = () => {
           fetchInquiries();
         }}
         onConvert={(itemData) => {
-          handleConvertRequestClick(
-            itemData,
-            selectedRequestInquiryId
-          );
+          handleConvertRequestClick(itemData, selectedRequestInquiryId);
         }}
       />
     </div>

@@ -101,6 +101,21 @@ const formatCountry = (country?: string | null): string => {
   return country.trim();
 };
 
+/**
+ * Coerce whatever `validUntil` shape reaches us (Date, "YYYY-MM-DD" string,
+ * ISO string, or nothing) into a real Date. The DTOs validate this field with
+ * @IsDate, and when class-transformer's implicit conversion doesn't run (e.g.
+ * the module isn't present and the fallback passes the body through untouched)
+ * a raw date string would fail validation and block offer creation. Doing the
+ * coercion here makes the create paths robust regardless of that.
+ */
+const coerceDate = (value: any): Date | undefined => {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (value instanceof Date) return isNaN(value.getTime()) ? undefined : value;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? undefined : d;
+};
+
 export class CreateOfferDto {
   @IsOptional()
   @IsString()
@@ -122,6 +137,14 @@ export class CreateOfferDto {
   @IsOptional()
   @IsString()
   paymentTerms?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
 
   @IsOptional()
   @IsString()
@@ -241,6 +264,14 @@ export class UpdateOfferDto {
   @IsOptional()
   @IsString()
   paymentTerms?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
 
   @IsOptional()
   @IsString()
@@ -462,6 +493,14 @@ export class CreateOfferFromItemDto {
 
   @IsOptional()
   @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
+
+  @IsOptional()
+  @IsString()
   baseQuantity?: string;
 
   @IsOptional()
@@ -508,6 +547,14 @@ export class CreateOfferFromCustomerDto {
   @IsOptional()
   @IsString()
   internalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -632,7 +679,14 @@ export class OfferController {
     try {
       const { inquiryId } = request.params;
 
-      const createOfferDto = plainToInstance(CreateOfferDto, request.body, {
+      // Coerce the date before validation so a plain "YYYY-MM-DD" string from
+      // the client can't fail @IsDate when implicit conversion doesn't run.
+      const bodyForDto = {
+        ...request.body,
+        validUntil: coerceDate(request.body?.validUntil),
+      };
+
+      const createOfferDto = plainToInstance(CreateOfferDto, bodyForDto, {
         excludeExtraneousValues: false,
         enableImplicitConversion: true,
       });
@@ -721,11 +775,13 @@ export class OfferController {
         },
         status: "Draft",
         validUntil:
-          createOfferDto.validUntil ||
+          coerceDate(createOfferDto.validUntil) ||
           new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         termsConditions: createOfferDto.termsConditions,
         deliveryTerms: createOfferDto.deliveryTerms,
         paymentTerms: createOfferDto.paymentTerms,
+        paymentMethod: createOfferDto.paymentMethod,
+        shippingMethod: createOfferDto.shippingMethod,
         deliveryTime: createOfferDto.deliveryTime,
         currency: createOfferDto.currency || "EUR",
         discountPercentage: createOfferDto.discountPercentage || 0,
@@ -903,11 +959,18 @@ export class OfferController {
           .json({ success: false, message: "No matching items found." });
       }
 
-      // find() doesn't guarantee order — restore the requested sequence.
+      // find() doesn't guarantee order — restore the requested sequence and
+      // drop any ids that didn't resolve to a row.
       const itemById = new Map(fetchedItems.map((it) => [String(it.id), it]));
       const orderedItems = requestedIds
         .map((id) => itemById.get(String(id)))
-        .filter(Boolean);
+        .filter((it): it is any => !!it);
+
+      if (orderedItems.length === 0) {
+        return response
+          .status(404)
+          .json({ success: false, message: "No matching items found." });
+      }
 
       // Recipient customer: body.customerId wins, else first item's customer.
       let customer: any = null;
@@ -957,10 +1020,13 @@ export class OfferController {
         deliveryAddress: this.buildDeliveryAddress(customer),
         status: "Draft",
         validUntil:
-          body.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          coerceDate(body.validUntil) ||
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         currency: body.currency || "EUR",
         notes: body.notes,
         internalNotes: body.internalNotes,
+        paymentMethod: body.paymentMethod,
+        shippingMethod: body.shippingMethod,
         isAssembly: false,
         useUnitPrices,
         unitPriceDecimalPlaces: body.unitPriceDecimalPlaces || 3,
@@ -1120,6 +1186,105 @@ export class OfferController {
       });
     } catch (error) {
       console.error("Error deleting line item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // DELETE A PRICING COLUMN (a whole quantity tier) ACROSS EVERY LINE ITEM
+  // DELETE /offers/:offerId/price-column?quantity=1000
+  // Unit-price offers show prices as columns shared by all line items; this
+  // removes the tier with the matching quantity from each line item at once.
+  // ==========================================================================
+  async deletePriceColumn(request: Request, response: Response) {
+    try {
+      const { offerId } = request.params;
+      const quantity = (request.query.quantity ?? request.body?.quantity) as
+        | string
+        | undefined;
+
+      if (!quantity) {
+        return response.status(400).json({
+          success: false,
+          message: "A quantity is required to identify the column to delete.",
+        });
+      }
+
+      const offer = await this.offerRepository.findOne({
+        where: { id: offerId },
+      });
+      if (!offer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Offer not found" });
+      }
+
+      const lineItems = await this.lineItemRepository.find({
+        where: { offerId, isComponent: false },
+      });
+
+      const target = String(quantity).trim();
+      const updates = [];
+
+      for (const lineItem of lineItems) {
+        if (offer.useUnitPrices) {
+          const before = lineItem.unitPrices || [];
+          const after = before.filter(
+            (up: UnitPrice) => String(up.quantity).trim() !== target,
+          );
+          if (after.length !== before.length) {
+            if (
+              after.length > 0 &&
+              !after.some((up: UnitPrice) => up.isActive)
+            ) {
+              after[0].isActive = true;
+            }
+            lineItem.unitPrices = after;
+            updates.push(lineItem);
+          }
+        } else {
+          const before = lineItem.quantityPrices || [];
+          const after = before.filter(
+            (qp: QuantityPrice) => String(qp.quantity).trim() !== target,
+          );
+          if (after.length !== before.length) {
+            if (
+              after.length > 0 &&
+              !after.some((qp: QuantityPrice) => qp.isActive)
+            ) {
+              after[0].isActive = true;
+            }
+            lineItem.quantityPrices = after;
+            updates.push(lineItem);
+          }
+        }
+      }
+
+      // Also drop the column from the offer-level template so newly added
+      // line items don't reintroduce it.
+      if (offer.useUnitPrices && offer.defaultUnitPrices) {
+        offer.defaultUnitPrices = offer.defaultUnitPrices.filter(
+          (up: UnitPrice) => String(up.quantity).trim() !== target,
+        );
+        await this.offerRepository.save(offer);
+      }
+
+      if (updates.length > 0) {
+        await this.lineItemRepository.save(updates);
+      }
+
+      await this.calculateOfferTotals(offerId);
+
+      return response.status(200).json({
+        success: true,
+        message: `Removed the ${target} column from ${updates.length} line items`,
+        data: { updatedLineItems: updates.length },
+      });
+    } catch (error) {
+      console.error("Error deleting price column:", error);
       return response.status(500).json({
         success: false,
         message: "Internal server error",
@@ -1584,6 +1749,10 @@ export class OfferController {
 
       const processedBody = {
         ...rawBody,
+        validUntil:
+          rawBody.validUntil !== undefined
+            ? coerceDate(rawBody.validUntil)
+            : undefined,
         discountPercentage:
           rawBody.discountPercentage !== undefined
             ? this.cleanNumberForDB(rawBody.discountPercentage)
@@ -1691,9 +1860,12 @@ export class OfferController {
         "validUntil",
         "deliveryTime",
         "paymentTerms",
+        "paymentMethod",
+        "shippingMethod",
         "deliveryTerms",
         "termsConditions",
         "notes",
+        "internalNotes",
         "currency",
         "deliveryAddress",
         "useUnitPrices",
@@ -3262,6 +3434,10 @@ export class OfferController {
       if (offer.deliveryTime) {
         doc.text(`Lieferzeit: ${offer.deliveryTime}`, leftAlignX, yPos);
       }
+      if (offer.shippingMethod) {
+        doc.text(`Versandart: ${offer.shippingMethod}`, leftAlignX + 250, yPos);
+        yPos += 15;
+      }
       if (offer.deliveryTerms) {
         doc.text(
           `Lieferbedingungen: ${offer.deliveryTerms}`,
@@ -3572,6 +3748,7 @@ export class OfferController {
       yPos += 35;
       let notesHeight = 15;
       if (offer.paymentTerms) notesHeight += 15;
+      if (offer.paymentMethod) notesHeight += 15;
       if (offer.notes)
         notesHeight +=
           doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
@@ -3586,6 +3763,11 @@ export class OfferController {
 
       doc.text("All prices are net prices.", leftAlignX, yPos);
       yPos += 15;
+
+      if (offer.paymentMethod) {
+        doc.text(`Zahlungsart: ${offer.paymentMethod}`, leftAlignX, yPos);
+        yPos += 15;
+      }
 
       if (offer.paymentTerms) {
         doc.text(
@@ -3873,6 +4055,46 @@ export class OfferController {
         success: false,
         message: "Internal server error",
       });
+    }
+  }
+
+  // Generic, dropdown-friendly payment & shipping method lists. Kept in the
+  // controller (not the DB) so the UI can offer consistent options without a
+  // schema change; the chosen value is stored as free text on the offer.
+  async getPaymentMethods(request: Request, response: Response) {
+    try {
+      const methods = [
+        { value: "Prepayment", label: "Prepayment" },
+        { value: "Bank transfer", label: "Bank transfer" },
+        { value: "Cash on delivery", label: "Cash on delivery" },
+        { value: "Invoice", label: "Invoice" },
+        { value: "Credit card", label: "Credit card" },
+        { value: "PayPal", label: "PayPal" },
+      ];
+      return response.status(200).json({ success: true, data: methods });
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
+    }
+  }
+
+  async getShippingMethods(request: Request, response: Response) {
+    try {
+      const methods = [
+        { value: "Standard shipping", label: "Standard shipping" },
+        { value: "Express shipping", label: "Express shipping" },
+        { value: "Freight", label: "Freight" },
+        { value: "Courier", label: "Courier" },
+        { value: "Pickup", label: "Pickup" },
+      ];
+      return response.status(200).json({ success: true, data: methods });
+    } catch (error) {
+      console.error("Error fetching shipping methods:", error);
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 

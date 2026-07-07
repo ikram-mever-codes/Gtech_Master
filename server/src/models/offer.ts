@@ -186,6 +186,14 @@ export class Offer {
   @Column({ type: "text", nullable: true })
   paymentTerms?: string;
 
+  // --- Payment & shipping method (dropdown-fed, kept as free varchar so the
+  // option lists can evolve in the UI without a DB migration each time) ---
+  @Column({ type: "varchar", length: 100, nullable: true })
+  paymentMethod?: string;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  shippingMethod?: string;
+
   @Column({ type: "varchar", length: 100, nullable: true })
   deliveryTime?: string;
 
@@ -232,9 +240,11 @@ export class Offer {
   @Column({ type: "decimal", precision: 12, scale: 2, default: 0 })
   totalAmount!: number;
 
+  // External comment shown to the customer (printed on the offer PDF).
   @Column({ type: "text", nullable: true })
   notes?: string;
 
+  // Internal comment, never shown to the customer.
   @Column({ type: "text", nullable: true })
   internalNotes?: string;
 

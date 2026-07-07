@@ -55,6 +55,7 @@ import { getItems } from "@/api/items";
 import { formatDate, openOutlookWithOffer } from "@/utils/offers";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles } from "@/utils/constants";
+import { BASE_URL } from "@/utils/constants";
 
 interface OfferDetailModalProps {
   isOpen: boolean;
@@ -70,6 +71,68 @@ type SourceType = "inquiry" | "item";
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
+
+/**
+ * Generic, dropdown-fed option lists. Kept on the client so the UX is
+ * consistent; the chosen value is stored as free text on the offer, which
+ * means these can grow without a DB migration.
+ */
+const PAYMENT_METHODS = [
+  "Prepayment",
+  "Bank transfer",
+  "Cash on delivery",
+  "Invoice",
+  "Credit card",
+  "PayPal",
+];
+
+const SHIPPING_METHODS = [
+  "Standard shipping",
+  "Express shipping",
+  "Freight",
+  "Courier",
+  "Pickup",
+];
+
+/**
+ * Thumbnail resolution mirrors the Items page so selected items look the same
+ * here. Duplicated intentionally to keep this modal self-contained rather than
+ * coupling it to the Items page's internal helpers.
+ */
+const resolveThumbUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (url.includes("cloudinary.com")) return url;
+  if (url.includes("/uploads/")) {
+    const fileName = url.split("/uploads/").pop();
+    try {
+      const apiOrigin = new URL(BASE_URL).origin;
+      return `${apiOrigin}/uploads/${fileName}`;
+    } catch {
+      return url;
+    }
+  }
+  return url;
+};
+
+const getItemThumb = (item: any): string | null =>
+  resolveThumbUrl(
+    item?.photo ||
+      item?.pix_path_eBay ||
+      item?.pictures?.shopPicture ||
+      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+      null,
+  );
+
+const getItemCompany = (item: any): string =>
+  item?.customer_name ||
+  item?.company_display_name ||
+  item?.companyDisplayName ||
+  item?.customer?.companyName ||
+  item?.customer?.company_name ||
+  item?.customer?.name ||
+  item?.company_name ||
+  item?.company ||
+  "";
 
 /** Section wrapper for a consistent rhythm across the modal. */
 const Section: React.FC<{
@@ -108,7 +171,74 @@ const Field: React.FC<{
   </div>
 );
 
-/** Small selectable row used by the inline create picker. */
+/**
+ * Selected/selectable item row styled like the Items page: thumbnail, then
+ * ItemName over "ItemNo - Company - isLabel".
+ */
+const ItemRow: React.FC<{
+  item: any;
+  selected: boolean;
+  onClick: () => void;
+}> = ({ item, selected, onClick }) => {
+  const thumb = getItemThumb(item);
+  const name = item.item_name || item.itemName || "Unnamed item";
+  const itemNo = item.de_no || item.ItemID_DE || item.ean || item.id || "";
+  const company = getItemCompany(item);
+  const isLabel = item.isLabelPrint || item.isLabel === "Y";
+
+  return (
+    <div
+      onClick={onClick}
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
+          ? "border-primary bg-primary/5"
+          : "border-gray-200 hover:bg-gray-50"
+      }`}
+    >
+      <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+        {thumb ? (
+          <img
+            src={thumb}
+            alt="thumb"
+            className="w-full h-full object-cover"
+            onError={(e) =>
+              ((e.target as HTMLImageElement).style.display = "none")
+            }
+          />
+        ) : (
+          <span className="text-gray-300 text-xs">—</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-gray-900 truncate">{name}</div>
+        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold text-gray-700">{itemNo || "-"}</span>
+          {company && (
+            <>
+              <span>-</span>
+              <span className="text-blue-600 font-medium truncate max-w-[10rem]">
+                {company}
+              </span>
+            </>
+          )}
+          {isLabel && (
+            <>
+              <span>-</span>
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded uppercase tracking-wider">
+                Label
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+      {selected && (
+        <CheckCircleIcon className="h-5 w-5 text-primary shrink-0" />
+      )}
+    </div>
+  );
+};
+
+/** Small selectable row used by the inquiry picker. */
 const PickerRow: React.FC<{
   selected: boolean;
   onClick: () => void;
@@ -137,6 +267,38 @@ const PickerRow: React.FC<{
     </div>
   </div>
 );
+
+/** Read-only address block, reused for both customer and delivery address. */
+const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
+  addr,
+  emptyText,
+}) => {
+  if (!addr) {
+    return <div className="text-sm text-gray-400">{emptyText}</div>;
+  }
+  const line2 = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
+  return (
+    <div className="space-y-1 text-sm text-gray-700">
+      {(addr.companyName || addr.contactName) && (
+        <div className="font-medium text-gray-900">
+          {addr.companyName || addr.contactName}
+        </div>
+      )}
+      {addr.legalName && addr.legalName !== addr.companyName && (
+        <div>{addr.legalName}</div>
+      )}
+      {(addr.address || addr.street) && (
+        <div>{addr.address || addr.street}</div>
+      )}
+      {line2 && <div>{line2}</div>}
+      {addr.country && <div>{addr.country}</div>}
+      {addr.vatId && <div className="text-gray-500">VAT ID: {addr.vatId}</div>}
+      {addr.contactPhone && (
+        <div className="text-gray-500">Phone: {addr.contactPhone}</div>
+      )}
+    </div>
+  );
+};
 
 export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   isOpen,
@@ -181,6 +343,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
+    paymentMethod: "",
+    shippingMethod: "",
     useUnitPrices: true,
     unitPriceDecimalPlaces: 3,
     totalPriceDecimalPlaces: 2,
@@ -198,7 +362,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     } catch (e) {
       console.error("Failed to load offer:", e);
-      toast.error("Couldn't load the offer. Try again.", errorStyles);
     } finally {
       setLoading(false);
     }
@@ -265,6 +428,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0],
+      paymentMethod: "",
+      shippingMethod: "",
       useUnitPrices: true,
       unitPriceDecimalPlaces: 3,
       totalPriceDecimalPlaces: 2,
@@ -280,11 +445,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       validUntil: o.validUntil,
       deliveryTime: o.deliveryTime || "",
       paymentTerms: o.paymentTerms || "",
+      paymentMethod: o.paymentMethod || "",
+      shippingMethod: o.shippingMethod || "",
       deliveryTerms: o.deliveryTerms || "",
       termsConditions: o.termsConditions || "",
       discountPercentage: o.discountPercentage ?? "",
       shippingCost: o.shippingCost ?? "",
       notes: o.notes || "",
+      internalNotes: o.internalNotes || "",
       deliveryAddress: { ...(o.deliveryAddress || {}) },
       useUnitPrices: !!o.useUnitPrices,
       unitPriceDecimalPlaces: o.unitPriceDecimalPlaces || 3,
@@ -294,11 +462,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   }
 
   const patch = (p: any) => setForm((f: any) => ({ ...f, ...p }));
-  const patchDelivery = (p: any) =>
-    setForm((f: any) => ({
-      ...f,
-      deliveryAddress: { ...f.deliveryAddress, ...p },
-    }));
 
   const refreshLocal = async () => {
     const updated = await getOfferById(offer.id);
@@ -321,7 +484,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   });
 
   // Items are decoupled from the offer's customer: the customer is just the
-  // recipient. Show every item, filtered only by the search box.
+  // recipient. Show every item, filtered only by the search box. (MVP: any
+  // company can be offered any item — no cross-restriction.)
   const visibleItems = items.filter((it) => {
     const name = it.item_name || it.itemName || "";
     if (!sourceSearch) return true;
@@ -337,6 +501,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         .includes(q)
     );
   });
+
+  const selectedCustomer = customers.find(
+    (c: any) => String(c.id) === String(filterCustomerId),
+  );
 
   const toggleItem = (it: any) => {
     setSelectedItems((prev) => {
@@ -358,6 +526,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const canCreate = () => {
     if (!createForm.title?.trim()) return false;
     if (sourceType === "inquiry") return !!selectedInquiry;
+    // MVP: recipient customer required for item offers, but any item allowed.
     if (sourceType === "item")
       return !!filterCustomerId && selectedItems.length > 0;
     return false;
@@ -372,6 +541,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         title: createForm.title,
         currency: createForm.currency,
         validUntil: createForm.validUntil,
+        paymentMethod: createForm.paymentMethod || undefined,
+        shippingMethod: createForm.shippingMethod || undefined,
         useUnitPrices: createForm.useUnitPrices,
         unitPriceDecimalPlaces: createForm.unitPriceDecimalPlaces,
         totalPriceDecimalPlaces: createForm.totalPriceDecimalPlaces,
@@ -390,18 +561,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
 
       if (res?.success && res.data?.id) {
-        toast.success("Offer created");
         onChanged?.();
         // Flip into the normal detail/edit view on the brand-new offer.
         setOffer(res.data);
         setForm(buildForm(res.data));
         setEdit(true); // open straight into edit so pricing can be entered
-      } else {
-        toast.error("Couldn't create the offer.", errorStyles);
       }
     } catch (e) {
       console.error("Error creating offer:", e);
-      toast.error("Couldn't create the offer.", errorStyles);
     } finally {
       setCreating(false);
     }
@@ -423,9 +590,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         validUntil: form.validUntil,
         deliveryTime: form.deliveryTime,
         paymentTerms: form.paymentTerms,
+        paymentMethod: form.paymentMethod || undefined,
+        shippingMethod: form.shippingMethod || undefined,
         deliveryTerms: form.deliveryTerms,
         termsConditions: form.termsConditions,
         notes: form.notes,
+        internalNotes: form.internalNotes,
+        // Delivery address is shown read-only at the top; still persisted as-is.
         deliveryAddress: form.deliveryAddress,
         discountPercentage:
           form.discountPercentage === ""
@@ -439,14 +610,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         maxUnitPriceColumns: form.maxUnitPriceColumns,
       });
       if (res.success) {
-        toast.success("Offer saved");
         await refreshLocal();
         setEdit(false);
         onChanged?.();
       }
     } catch (e) {
       console.error("Error saving offer:", e);
-      toast.error("Couldn't save the offer.", errorStyles);
     } finally {
       setSaving(false);
     }
@@ -464,12 +633,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     if (!window.confirm("Delete this offer? This can't be undone.")) return;
     try {
       await deleteOffer(offer.id);
-      toast.success("Offer deleted");
       onClose();
       onChanged?.();
     } catch (e) {
       console.error("Error deleting offer:", e);
-      toast.error("Couldn't delete the offer.", errorStyles);
     }
   };
 
@@ -482,7 +649,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     } catch (e) {
       console.error("PDF error:", e);
-      toast.error("Couldn't generate the PDF.", errorStyles);
     }
   };
 
@@ -494,7 +660,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       await refreshLocal();
       onChanged?.();
     } catch (e) {
-      toast.error("Couldn't switch pricing mode.", errorStyles);
+      console.error("Couldn't switch pricing mode:", e);
     }
   };
 
@@ -507,10 +673,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       });
       await refreshLocal();
       setShowSettings(false);
-      toast.success("Pricing settings saved");
       onChanged?.();
     } catch (e) {
-      toast.error("Couldn't save settings.", errorStyles);
+      console.error("Couldn't save settings:", e);
     }
   };
 
@@ -524,7 +689,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       await refreshLocal();
       onChanged?.();
     } catch (e) {
-      toast.error("Couldn't set the active price.", errorStyles);
+      console.error("Couldn't set the active price:", e);
     }
   };
 
@@ -581,6 +746,44 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     await persistLine(lineItemId, { unitPrices: next });
   };
 
+  // Delete a whole pricing column (a quantity tier) across every line item.
+  const deletePriceColumn = async (quantity: string) => {
+    if (
+      !window.confirm(
+        `Delete the ${quantity} column from all items in this offer?`,
+      )
+    )
+      return;
+    try {
+      // One update per line item so the change is atomic per row and reuses
+      // the existing updateLineItem endpoint (no extra API surface required).
+      const targets = (offer.lineItems || []).filter(
+        (li: any) => !li.isComponent,
+      );
+      for (const li of targets) {
+        if (offer.useUnitPrices) {
+          const after = (li.unitPrices || []).filter(
+            (up: UnitPrice) => String(up.quantity).trim() !== quantity.trim(),
+          );
+          if (after.length && !after.some((up: UnitPrice) => up.isActive))
+            after[0].isActive = true;
+          await updateLineItem(offer.id, li.id, { unitPrices: after });
+        } else {
+          const after = (li.quantityPrices || []).filter(
+            (qp: any) => String(qp.quantity).trim() !== quantity.trim(),
+          );
+          if (after.length && !after.some((qp: any) => qp.isActive))
+            after[0].isActive = true;
+          await updateLineItem(offer.id, li.id, { quantityPrices: after });
+        }
+      }
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't delete the pricing column:", e);
+    }
+  };
+
   const updateQuantityPriceRow = async (
     lineItemId: string,
     idx: number,
@@ -617,7 +820,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       await refreshLocal();
       onChanged?.();
     } catch (e) {
-      toast.error("Couldn't add the price level.", errorStyles);
+      console.error("Couldn't add the price level:", e);
     }
   };
 
@@ -635,7 +838,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       await refreshLocal();
       onChanged?.();
     } catch (e) {
-      toast.error("Couldn't add the item.", errorStyles);
+      console.error("Couldn't add the item:", e);
     }
   };
 
@@ -646,7 +849,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       await refreshLocal();
       onChanged?.();
     } catch (e) {
-      toast.error("Couldn't remove the item.", errorStyles);
+      console.error("Couldn't remove the item:", e);
     }
   };
 
@@ -662,10 +865,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         setCopyPasteData("");
         await refreshLocal();
         onChanged?.();
-        toast.success("Prices imported");
       }
     } catch (e) {
-      toast.error("Couldn't import the pasted prices.", errorStyles);
+      console.error("Couldn't import the pasted prices:", e);
     }
   };
 
@@ -704,6 +906,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   const visibleLineItems =
     offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
+
+  // Collect the distinct quantity tiers so a whole column can be deleted.
+  const priceColumns: string[] = (() => {
+    const set = new Set<string>();
+    visibleLineItems.forEach((li: any) => {
+      const rows = offer?.useUnitPrices ? li.unitPrices : li.quantityPrices;
+      (rows || []).forEach((r: any) => set.add(String(r.quantity).trim()));
+    });
+    return Array.from(set).sort(
+      (a, b) => (parseFloat(a) || 0) - (parseFloat(b) || 0),
+    );
+  })();
 
   const sourceTabs: {
     key: SourceType;
@@ -765,6 +979,23 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 ))}
               </div>
 
+              {/* Offer title — always visible for BOTH tabs, editable, prefilled */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Offer title *
+                </label>
+                <input
+                  value={createForm.title}
+                  onChange={(e) => cPatch({ title: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                  placeholder={
+                    sourceType === "inquiry"
+                      ? "Defaults to the inquiry name"
+                      : "Defaults to the first item's name"
+                  }
+                />
+              </div>
+
               {/* Filter / search row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -811,6 +1042,65 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </div>
 
+              {/* Recipient customer address preview (item flow) */}
+              {sourceType === "item" && selectedCustomer && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Customer address
+                    </p>
+                    <AddressBlock
+                      addr={{
+                        companyName: selectedCustomer.companyName,
+                        legalName: selectedCustomer.legalName,
+                        address:
+                          selectedCustomer.addressLine1 ||
+                          selectedCustomer.businessDetails?.address,
+                        postalCode:
+                          selectedCustomer.postalCode ||
+                          selectedCustomer.businessDetails?.postalCode,
+                        city:
+                          selectedCustomer.city ||
+                          selectedCustomer.businessDetails?.city,
+                        country:
+                          selectedCustomer.country ||
+                          selectedCustomer.businessDetails?.country,
+                        vatId:
+                          selectedCustomer.vatTaxId ||
+                          selectedCustomer.taxNumber,
+                      }}
+                      emptyText="No address on file."
+                    />
+                  </div>
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Delivery address
+                    </p>
+                    <AddressBlock
+                      addr={{
+                        contactName:
+                          selectedCustomer.legalName ||
+                          selectedCustomer.companyName,
+                        street:
+                          selectedCustomer.addressLine1 ||
+                          selectedCustomer.businessDetails?.address,
+                        postalCode:
+                          selectedCustomer.postalCode ||
+                          selectedCustomer.businessDetails?.postalCode,
+                        city:
+                          selectedCustomer.city ||
+                          selectedCustomer.businessDetails?.city,
+                        country:
+                          selectedCustomer.country ||
+                          selectedCustomer.businessDetails?.country,
+                        contactPhone: selectedCustomer.contactPhoneNumber,
+                      }}
+                      emptyText="Same as customer address."
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Source list */}
               <div className="space-y-2 max-h-56 overflow-y-auto">
                 {sourceType === "inquiry" &&
@@ -848,200 +1138,228 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </div>
                   ) : (
                     visibleItems.map((it) => (
-                      <PickerRow
+                      <ItemRow
                         key={it.id}
+                        item={it}
                         selected={selectedItems.some(
                           (p) => String(p.id) === String(it.id),
                         )}
                         onClick={() => toggleItem(it)}
-                        title={it.item_name || it.itemName}
-                        subtitle={
-                          it.customer?.companyName
-                            ? `Item customer: ${it.customer.companyName}`
-                            : it.ean
-                              ? `EAN: ${it.ean}`
-                              : `Item ${it.id}`
-                        }
-                        meta={it.model || ""}
                       />
                     ))
                   ))}
               </div>
 
-              {/* Multi-select chips */}
+              {/* Selected items list (Items-page styling) */}
               {sourceType === "item" && selectedItems.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {selectedItems.map((it) => (
-                    <span
-                      key={it.id}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-full"
-                    >
-                      {it.item_name || it.itemName}
-                      <button
-                        onClick={() => toggleItem(it)}
-                        className="hover:text-rose-600"
-                      >
-                        <XMarkIcon className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    Selected items ({selectedItems.length})
+                  </p>
+                  <div className="space-y-2">
+                    {selectedItems.map((it) => (
+                      <div key={it.id} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ItemRow
+                            item={it}
+                            selected
+                            onClick={() => toggleItem(it)}
+                          />
+                        </div>
+                        <button
+                          onClick={() => toggleItem(it)}
+                          className="text-rose-600 hover:text-rose-800 p-1.5 rounded-lg hover:bg-rose-50 shrink-0"
+                          title="Remove from selection"
+                        >
+                          <XMarkIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Common fields once a source is chosen */}
-              {(selectedInquiry || selectedItems.length > 0) && (
-                <div className="space-y-4 border-t pt-4">
+              {/* Common fields — always available once a title exists */}
+              <div className="space-y-4 border-t pt-4">
+                {/* <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Offer title *
+                      Currency
+                    </label>
+                    <select
+                      value={createForm.currency}
+                      onChange={(e) => cPatch({ currency: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    >
+                      {getAvailableCurrencies().map((c: any) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Valid until
                     </label>
                     <input
-                      value={createForm.title}
-                      onChange={(e) => cPatch({ title: e.target.value })}
+                      type="date"
+                      value={createForm.validUntil}
+                      onChange={(e) => cPatch({ validUntil: e.target.value })}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      placeholder="e.g., Offer for Product XYZ"
                     />
                   </div>
+                </div> */}
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Currency
-                      </label>
-                      <select
-                        value={createForm.currency}
-                        onChange={(e) => cPatch({ currency: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      >
-                        {getAvailableCurrencies().map((c: any) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Valid until
-                      </label>
-                      <input
-                        type="date"
-                        value={createForm.validUntil}
-                        onChange={(e) => cPatch({ validUntil: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      />
-                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Payment method
+                    </label>
+                    <select
+                      value={createForm.paymentMethod}
+                      onChange={(e) =>
+                        cPatch({ paymentMethod: e.target.value })
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select…</option>
+                      {PAYMENT_METHODS.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-
-                  {/* Pricing mode: unit pricing default */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <span className="text-sm font-medium text-gray-900">
-                          Unit pricing
-                        </span>
-                        <span className="ml-2 text-xs text-gray-500">
-                          {createForm.useUnitPrices
-                            ? "(default)"
-                            : "single price per line"}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() =>
-                          cPatch({ useUnitPrices: !createForm.useUnitPrices })
-                        }
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          createForm.useUnitPrices
-                            ? "bg-green-500"
-                            : "bg-gray-300"
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                            createForm.useUnitPrices
-                              ? "translate-x-5"
-                              : "translate-x-1"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    {createForm.useUnitPrices && (
-                      <>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Unit decimals
-                            </label>
-                            <select
-                              value={createForm.unitPriceDecimalPlaces}
-                              onChange={(e) =>
-                                cPatch({
-                                  unitPriceDecimalPlaces: parseInt(
-                                    e.target.value,
-                                  ),
-                                })
-                              }
-                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                            >
-                              <option value={2}>2</option>
-                              <option value={3}>3</option>
-                              <option value={4}>4</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Total decimals
-                            </label>
-                            <select
-                              value={createForm.totalPriceDecimalPlaces}
-                              onChange={(e) =>
-                                cPatch({
-                                  totalPriceDecimalPlaces: parseInt(
-                                    e.target.value,
-                                  ),
-                                })
-                              }
-                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                            >
-                              <option value={2}>2</option>
-                              <option value={3}>3</option>
-                              <option value={4}>4</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Starting columns
-                            </label>
-                            <input
-                              type="text"
-                              value={createForm.maxUnitPriceColumns || ""}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                if (v === "")
-                                  return cPatch({ maxUnitPriceColumns: 0 });
-                                if (!/^\d+$/.test(v)) return;
-                                const n = parseInt(v, 10);
-                                if (n > 10)
-                                  return toast.error(
-                                    "Max columns is 10.",
-                                    errorStyles,
-                                  );
-                                cPatch({ maxUnitPriceColumns: n });
-                              }}
-                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                              placeholder="3"
-                            />
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          You can add or remove price columns later inside the
-                          offer.
-                        </p>
-                      </>
-                    )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Shipping method
+                    </label>
+                    <select
+                      value={createForm.shippingMethod}
+                      onChange={(e) =>
+                        cPatch({ shippingMethod: e.target.value })
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select…</option>
+                      {SHIPPING_METHODS.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              )}
+
+                {/* Pricing mode: unit pricing default */}
+                {/* <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">
+                        Unit pricing
+                      </span>
+                      <span className="ml-2 text-xs text-gray-500">
+                        {createForm.useUnitPrices
+                          ? "(default)"
+                          : "single price per line"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        cPatch({ useUnitPrices: !createForm.useUnitPrices })
+                      }
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        createForm.useUnitPrices
+                          ? "bg-green-500"
+                          : "bg-gray-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          createForm.useUnitPrices
+                            ? "translate-x-5"
+                            : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {createForm.useUnitPrices && (
+                    <>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Unit decimals
+                          </label>
+                          <select
+                            value={createForm.unitPriceDecimalPlaces}
+                            onChange={(e) =>
+                              cPatch({
+                                unitPriceDecimalPlaces: parseInt(
+                                  e.target.value,
+                                ),
+                              })
+                            }
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                          >
+                            <option value={2}>2</option>
+                            <option value={3}>3</option>
+                            <option value={4}>4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Total decimals
+                          </label>
+                          <select
+                            value={createForm.totalPriceDecimalPlaces}
+                            onChange={(e) =>
+                              cPatch({
+                                totalPriceDecimalPlaces: parseInt(
+                                  e.target.value,
+                                ),
+                              })
+                            }
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                          >
+                            <option value={2}>2</option>
+                            <option value={3}>3</option>
+                            <option value={4}>4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Starting columns
+                          </label>
+                          <input
+                            type="text"
+                            value={createForm.maxUnitPriceColumns || ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === "")
+                                return cPatch({ maxUnitPriceColumns: 0 });
+                              if (!/^\d+$/.test(v)) return;
+                              const n = parseInt(v, 10);
+                              if (n > 10)
+                                return toast.error(
+                                  "Max columns is 10.",
+                                  errorStyles,
+                                );
+                              cPatch({ maxUnitPriceColumns: n });
+                            }}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                            placeholder="3"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        You can add or remove price columns later inside the
+                        offer.
+                      </p>
+                    </>
+                  )}
+                </div> */}
+              </div>
             </div>
 
             {/* Create footer */}
@@ -1068,7 +1386,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           </div>
         ) : (
           <>
-            {/* Header */}
+            {/* Header — shows offer title, and inquiry number when applicable */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1088,8 +1406,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     {offer.status}
                   </span>
                   {sourceBadge()}
+                  {offer.inquirySnapshot?.referenceNumber && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                      <LinkIcon className="h-3 w-3" />
+                      Inquiry {offer.inquirySnapshot.referenceNumber}
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-gray-500 truncate mt-0.5">
+                {/* Offer title, always shown in the header */}
+                <p className="text-sm font-medium text-gray-800 truncate mt-0.5">
                   {offer.title}
                 </p>
               </div>
@@ -1162,6 +1487,48 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Customer + delivery address, read-only, at the top */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <Section
+                  title="Customer"
+                  icon={
+                    <BuildingOfficeIcon className="h-4 w-4 text-gray-500" />
+                  }
+                >
+                  <AddressBlock
+                    addr={{
+                      companyName: offer.customerSnapshot?.companyName,
+                      legalName: offer.customerSnapshot?.legalName,
+                      address: offer.customerSnapshot?.address,
+                      street: offer.customerSnapshot?.street,
+                      postalCode: offer.customerSnapshot?.postalCode,
+                      city: offer.customerSnapshot?.city,
+                      country: offer.customerSnapshot?.country,
+                      vatId: offer.customerSnapshot?.vatId,
+                    }}
+                    emptyText="No customer snapshot."
+                  />
+                  <p className="text-[11px] text-gray-400 pt-2">
+                    Snapshot taken when the offer was created.
+                  </p>
+                </Section>
+
+                <Section
+                  title="Delivery address"
+                  icon={
+                    <BuildingOfficeIcon className="h-4 w-4 text-gray-500" />
+                  }
+                >
+                  {/* Read-only by request. To make this editable again, swap
+                      AddressBlock for the previous input grid bound to
+                      form.deliveryAddress. */}
+                  <AddressBlock
+                    addr={offer.deliveryAddress}
+                    emptyText="No delivery address set."
+                  />
+                </Section>
+              </div>
+
               {/* Offer details */}
               <Section
                 title="Offer details"
@@ -1235,6 +1602,48 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ deliveryTime: e.target.value })}
                     />
                   </Field>
+                  {/* Payment method — dropdown (replaces the old free-text terms
+                      field as the primary control; paymentTerms still editable
+                      below if you keep using it) */}
+                  <Field
+                    label="Payment method"
+                    edit={edit}
+                    value={offer.paymentMethod}
+                  >
+                    <select
+                      className={inputCls}
+                      value={form.paymentMethod || ""}
+                      onChange={(e) => patch({ paymentMethod: e.target.value })}
+                    >
+                      <option value="">Select…</option>
+                      {PAYMENT_METHODS.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {/* Shipping method — dropdown */}
+                  <Field
+                    label="Shipping method"
+                    edit={edit}
+                    value={offer.shippingMethod}
+                  >
+                    <select
+                      className={inputCls}
+                      value={form.shippingMethod || ""}
+                      onChange={(e) =>
+                        patch({ shippingMethod: e.target.value })
+                      }
+                    >
+                      <option value="">Select…</option>
+                      {SHIPPING_METHODS.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field
                     label="Payment terms"
                     edit={edit}
@@ -1243,145 +1652,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <input
                       className={inputCls}
                       value={form.paymentTerms}
+                      placeholder="e.g., 30 days net"
                       onChange={(e) => patch({ paymentTerms: e.target.value })}
                     />
                   </Field>
                 </div>
               </Section>
 
-              {/* Customer + delivery */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Section
-                  title="Customer"
-                  icon={
-                    <BuildingOfficeIcon className="h-4 w-4 text-gray-500" />
-                  }
-                >
-                  <div className="space-y-1 text-sm text-gray-700">
-                    <div className="font-medium text-gray-900">
-                      {offer.customerSnapshot?.companyName}
-                    </div>
-                    {offer.customerSnapshot?.legalName && (
-                      <div>{offer.customerSnapshot.legalName}</div>
-                    )}
-                    {offer.customerSnapshot?.address && (
-                      <div>{offer.customerSnapshot.address}</div>
-                    )}
-                    {(offer.customerSnapshot?.postalCode ||
-                      offer.customerSnapshot?.city) && (
-                      <div>
-                        {offer.customerSnapshot.postalCode}{" "}
-                        {offer.customerSnapshot.city}
-                      </div>
-                    )}
-                    {offer.customerSnapshot?.country && (
-                      <div>{offer.customerSnapshot.country}</div>
-                    )}
-                    {offer.customerSnapshot?.vatId && (
-                      <div className="text-gray-500">
-                        VAT ID: {offer.customerSnapshot.vatId}
-                      </div>
-                    )}
-                    <p className="text-[11px] text-gray-400 pt-1">
-                      Snapshot taken when the offer was created.
-                    </p>
-                  </div>
-                </Section>
-
-                <Section
-                  title="Delivery address"
-                  icon={
-                    <BuildingOfficeIcon className="h-4 w-4 text-gray-500" />
-                  }
-                >
-                  {edit ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        className={inputCls}
-                        placeholder="Contact name"
-                        value={form.deliveryAddress?.contactName || ""}
-                        onChange={(e) =>
-                          patchDelivery({ contactName: e.target.value })
-                        }
-                      />
-                      <input
-                        className={inputCls}
-                        placeholder="Phone"
-                        value={form.deliveryAddress?.contactPhone || ""}
-                        onChange={(e) =>
-                          patchDelivery({ contactPhone: e.target.value })
-                        }
-                      />
-                      <input
-                        className={`${inputCls} col-span-2`}
-                        placeholder="Street"
-                        value={form.deliveryAddress?.street || ""}
-                        onChange={(e) =>
-                          patchDelivery({ street: e.target.value })
-                        }
-                      />
-                      <input
-                        className={inputCls}
-                        placeholder="Postal code"
-                        value={form.deliveryAddress?.postalCode || ""}
-                        onChange={(e) =>
-                          patchDelivery({ postalCode: e.target.value })
-                        }
-                      />
-                      <input
-                        className={inputCls}
-                        placeholder="City"
-                        value={form.deliveryAddress?.city || ""}
-                        onChange={(e) =>
-                          patchDelivery({ city: e.target.value })
-                        }
-                      />
-                      <input
-                        className={`${inputCls} col-span-2`}
-                        placeholder="Country"
-                        value={form.deliveryAddress?.country || ""}
-                        onChange={(e) =>
-                          patchDelivery({ country: e.target.value })
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-1 text-sm text-gray-700">
-                      {offer.deliveryAddress?.contactName && (
-                        <div className="font-medium text-gray-900">
-                          {offer.deliveryAddress.contactName}
-                        </div>
-                      )}
-                      {offer.deliveryAddress?.street && (
-                        <div>{offer.deliveryAddress.street}</div>
-                      )}
-                      {(offer.deliveryAddress?.postalCode ||
-                        offer.deliveryAddress?.city) && (
-                        <div>
-                          {offer.deliveryAddress.postalCode}{" "}
-                          {offer.deliveryAddress.city}
-                        </div>
-                      )}
-                      {offer.deliveryAddress?.country && (
-                        <div>{offer.deliveryAddress.country}</div>
-                      )}
-                      {offer.deliveryAddress?.contactPhone && (
-                        <div className="text-gray-500">
-                          Phone: {offer.deliveryAddress.contactPhone}
-                        </div>
-                      )}
-                      {!offer.deliveryAddress && (
-                        <div className="text-gray-400">
-                          No delivery address set.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Section>
-              </div>
-
               {/* Source */}
-              {(offer.inquirySnapshot || offer.itemSnapshot) && (
+              {/* {(offer.inquirySnapshot || offer.itemSnapshot) && (
                 <Section
                   title="Source"
                   icon={<LinkIcon className="h-4 w-4 text-gray-500" />}
@@ -1431,7 +1710,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </div>
                   )}
                 </Section>
-              )}
+              )} */}
 
               {/* PRICING — the focus */}
               <Section
@@ -1480,6 +1759,27 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 }
               >
+                {/* Delete-a-whole-column controls */}
+                {edit && priceColumns.length > 0 && (
+                  <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                      Delete a pricing column (applies to every item)
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {priceColumns.map((q) => (
+                        <button
+                          key={q}
+                          onClick={() => deletePriceColumn(q)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-colors"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Inline settings panel */}
                 {showSettings && offer.useUnitPrices && (
                   <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
@@ -1646,11 +1946,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   : "Quantity price"}
                               </div>
                             )}
+                            {/* Remove-item button — always available in edit */}
                             {edit && (
                               <button
                                 onClick={() => removeLineItem(item.id)}
-                                className="text-xs text-rose-600 hover:text-rose-800"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors"
                               >
+                                <TrashIcon className="h-3.5 w-3.5" />
                                 Remove item
                               </button>
                             )}
@@ -2125,22 +2427,58 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </Section>
 
-              {/* Notes */}
-              <Section
-                title="Notes"
-                icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
-              >
-                {edit ? (
-                  <textarea
-                    rows={3}
-                    className={inputCls}
-                    value={form.notes}
-                    onChange={(e) => patch({ notes: e.target.value })}
-                  />
-                ) : (
-                  <p className="text-sm text-gray-600">{offer.notes || "—"}</p>
-                )}
-              </Section>
+              {/* Comments — external (customer-facing) + internal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <Section
+                  title="External comment"
+                  icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
+                >
+                  {edit ? (
+                    <>
+                      <textarea
+                        rows={3}
+                        className={inputCls}
+                        value={form.notes}
+                        placeholder="Shown to the customer on the offer."
+                        onChange={(e) => patch({ notes: e.target.value })}
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Printed on the offer PDF.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      {offer.notes || "—"}
+                    </p>
+                  )}
+                </Section>
+
+                <Section
+                  title="Internal comment"
+                  icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
+                >
+                  {edit ? (
+                    <>
+                      <textarea
+                        rows={3}
+                        className={inputCls}
+                        value={form.internalNotes}
+                        placeholder="Only visible to the team."
+                        onChange={(e) =>
+                          patch({ internalNotes: e.target.value })
+                        }
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Never shown to the customer.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      {offer.internalNotes || "—"}
+                    </p>
+                  )}
+                </Section>
+              </div>
             </div>
 
             {/* Footer */}

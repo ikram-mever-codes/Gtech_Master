@@ -57,6 +57,12 @@ interface ItemPreviewModalProps {
   onSaved?: () => void;
   onDeleted?: () => void;
   onConvert?: (itemData: any) => void;
+  /**
+   * Tailwind z-index class for the overlay. Defaults to "z-50". Pass a higher
+   * layer (e.g. "z-[160]") when opening this modal on top of another modal so
+   * it isn't hidden behind the parent.
+   */
+  zIndex?: string;
 }
 
 const inputCls =
@@ -70,6 +76,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   onSaved,
   onDeleted,
   onConvert,
+  zIndex = "z-[50000]",
 }) => {
   const router = useRouter();
   const [previewItem, setPreviewItem] = useState<any>(null);
@@ -681,7 +688,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const previewItemNo = previewItem?.de_no || "—";
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div
+      className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 ${zIndex}`}
+    >
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         {previewLoading || !previewItem ? (
           <div className="p-6 py-20 text-center">
