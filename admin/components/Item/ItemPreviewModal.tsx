@@ -667,7 +667,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <CustomerSearchInput
                       value={previewItem.customer_id ?? ""}
                       initialLabel={getCompany(previewItem)}
-                      onChange={(id) => patchPreview({ customer_id: id ? parseInt(id) : null })}
+                      onChange={(id) => patchPreview({ customer_id: id || null })}
                       placeholder="Search company..."
                     />
                   ) : (

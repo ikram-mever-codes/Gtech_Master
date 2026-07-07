@@ -33,6 +33,7 @@ const star_customer_details_1 = require("../models/star_customer_details");
 const list_1 = require("../models/list");
 const emailService_1 = __importDefault(require("../services/emailService"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const country_1 = require("../models/country");
 exports.BUSINESS_SOURCE = {
     GOOGLE_MAPS: "Google Maps",
     MANUAL: "Manual",
@@ -405,7 +406,7 @@ const generateTempPassword = () => {
 const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     try {
-        const { displayName, companyName, name, customerNumber, companyLabelPrintLogo, address, street, addressAdditional, website, description, note, city, state, country = "Germany", postalCode, latitude, longitude, phoneNumber, phone, email, contactEmail, contactPhoneNumber, vatTaxId, googleMapsUrl, reviewCount, category, additionalCategories, socialMedia, source = exports.BUSINESS_SOURCE.MANUAL, isDeviceMaker, starBusinessDetails, isStarCustomer, starCustomerEmail, asanaLink, } = req.body;
+        const { displayName, companyName, name, customerNumber, companyLabelPrintLogo, address, street, addressAdditional, website, description, note, city, state, country = "Germany", postalCode, latitude, longitude, phoneNumber, phone, email, contactEmail, contactPhoneNumber, vatTaxId, googleMapsUrl, reviewCount, category, additionalCategories, socialMedia, source = exports.BUSINESS_SOURCE.MANUAL, isDeviceMaker, starBusinessDetails, isStarCustomer, starCustomerEmail, asanaLink, debtor_no, default_tax_profile_id, vat_id_status, } = req.body;
         const user = req.user;
         const dbCompanyName = displayName || name || companyName;
         const dbLegalName = companyName;
@@ -499,6 +500,9 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 ? companyLabelPrintLogo.trim()
                 : undefined;
             customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+            customer.debtor_no = debtor_no ? debtor_no.trim() : undefined;
+            customer.default_tax_profile_id = default_tax_profile_id || undefined;
+            customer.vat_id_status = vat_id_status || "unchecked";
             customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
             customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
             if (isStarCustomer) {
@@ -569,6 +573,19 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             businessDetails.city = city ? city.trim() : undefined;
             businessDetails.state = state ? state.trim() : undefined;
             businessDetails.country = country ? country.trim() : undefined;
+            if (country) {
+                const countryRepo = database_1.AppDataSource.getRepository(country_1.Country);
+                const matched = yield countryRepo.findOne({
+                    where: [
+                        { iso2: country.trim().toUpperCase() },
+                        { name: country.trim() }
+                    ]
+                });
+                if (matched) {
+                    customer.country_id = matched.id;
+                    businessDetails.country_id = matched.id;
+                }
+            }
             businessDetails.postalCode = postalCode ? postalCode.trim() : undefined;
             businessDetails.latitude = sanitizeNumber(latitude);
             businessDetails.longitude = sanitizeNumber(longitude);
@@ -691,7 +708,7 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                     id: defaultList.id,
                     name: defaultList.name,
                 }
-                : undefined, website: (_d = finalCustomer.businessDetails) === null || _d === void 0 ? void 0 : _d.website, hasWebsite: !!((_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.website), phoneNumber: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.contactPhone, phone: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.contactPhone, businessEmail: (_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.businessSource, isDeviceMaker: (_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, vatTaxId: finalCustomer.vatTaxId, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
+                : undefined, website: (_d = finalCustomer.businessDetails) === null || _d === void 0 ? void 0 : _d.website, hasWebsite: !!((_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.website), phoneNumber: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.contactPhone, phone: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.contactPhone, businessEmail: (_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.businessSource, isDeviceMaker: (_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, vatTaxId: finalCustomer.vatTaxId, debtor_no: finalCustomer.debtor_no, default_tax_profile_id: finalCustomer.default_tax_profile_id, vat_id_status: finalCustomer.vat_id_status, vat_id_checked_at: finalCustomer.vat_id_checked_at, vat_id_check_source: finalCustomer.vat_id_check_source, vat_id_check_response_json: finalCustomer.vat_id_check_response_json, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
         let successMessage = "Business created successfully";
         if (isStarCustomer) {
             successMessage =
@@ -717,11 +734,11 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.createBusiness = createBusiness;
 const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
     try {
         const { id } = req.params;
         const updateData = req.body;
-        const { displayName, name, customerNumber, companyLabelPrintLogo, contactEmail, contactPhoneNumber, isDeviceMaker, isStarCustomer, starCustomerEmail, starBusinessDetails, street, addressAdditional, phone, vatTaxId, asanaLink, } = updateData;
+        const { displayName, name, customerNumber, companyLabelPrintLogo, contactEmail, contactPhoneNumber, isDeviceMaker, isStarCustomer, starCustomerEmail, starBusinessDetails, street, addressAdditional, phone, vatTaxId, asanaLink, debtor_no, default_tax_profile_id, vat_id_status, } = updateData;
         const user = req.user;
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
         const businessDetailsRepository = database_1.AppDataSource.getRepository(business_details_1.BusinessDetails);
@@ -854,6 +871,15 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             if (vatTaxId !== undefined) {
                 customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
             }
+            if (debtor_no !== undefined) {
+                customer.debtor_no = debtor_no ? debtor_no.trim() : undefined;
+            }
+            if (default_tax_profile_id !== undefined) {
+                customer.default_tax_profile_id = default_tax_profile_id || undefined;
+            }
+            if (vat_id_status !== undefined) {
+                customer.vat_id_status = vat_id_status || "unchecked";
+            }
             if (asanaLink !== undefined) {
                 customer.asanaLink = asanaLink ? asanaLink.trim() : null;
             }
@@ -883,8 +909,25 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                     businessDetails.city = updateData.city.trim();
                 if (updateData.state !== undefined)
                     businessDetails.state = updateData.state.trim();
-                if (updateData.country !== undefined)
-                    businessDetails.country = updateData.country.trim();
+                if (updateData.country !== undefined) {
+                    const countryStr = updateData.country.trim();
+                    businessDetails.country = countryStr;
+                    const countryRepo = database_1.AppDataSource.getRepository(country_1.Country);
+                    const matched = yield countryRepo.findOne({
+                        where: [
+                            { iso2: countryStr.toUpperCase() },
+                            { name: countryStr }
+                        ]
+                    });
+                    if (matched) {
+                        customer.country_id = matched.id;
+                        businessDetails.country_id = matched.id;
+                    }
+                    else {
+                        customer.country_id = null;
+                        businessDetails.country_id = null;
+                    }
+                }
                 if (updateData.postalCode !== undefined)
                     businessDetails.postalCode = updateData.postalCode.trim();
                 if (updateData.latitude !== undefined)
@@ -1032,8 +1075,8 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!finalCustomer) {
             return next(new errorHandler_1.default("Business not found after update", 404));
         }
-        const _r = finalCustomer.businessDetails || {}, { id: detailsId } = _r, businessDetailsWithoutId = __rest(_r, ["id"]);
-        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.companyName, name: finalCustomer.companyName, legalName: finalCustomer.legalName, customerNumber: finalCustomer.customerNumber, companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo, asanaLink: finalCustomer.asanaLink, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, businessDetailsWithoutId), { address: (_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.address, street: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.address, addressAdditional: finalCustomer.addressLine2, note: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.description, check_by: ((_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.check_by)
+        const _q = finalCustomer.businessDetails || {}, { id: detailsId } = _q, businessDetailsWithoutId = __rest(_q, ["id"]);
+        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.companyName, name: finalCustomer.companyName, legalName: finalCustomer.legalName, customerNumber: finalCustomer.customerNumber, companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo, asanaLink: finalCustomer.asanaLink, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, businessDetailsWithoutId), { address: (_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.address, street: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.address, addressAdditional: finalCustomer.addressLine2, note: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.description, vatTaxId: finalCustomer.vatTaxId, debtor_no: finalCustomer.debtor_no, default_tax_profile_id: finalCustomer.default_tax_profile_id, vat_id_status: finalCustomer.vat_id_status, vat_id_checked_at: finalCustomer.vat_id_checked_at, vat_id_check_source: finalCustomer.vat_id_check_source, vat_id_check_response_json: finalCustomer.vat_id_check_response_json, check_by: ((_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.check_by)
                 ? {
                     id: finalCustomer.businessDetails.check_by.id,
                     name: finalCustomer.businessDetails.check_by.name,
@@ -1061,7 +1104,7 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                     id: defaultList.id,
                     name: defaultList.name,
                 }
-                : undefined, website: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.website, hasWebsite: !!((_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.website), phoneNumber: (_l = finalCustomer.businessDetails) === null || _l === void 0 ? void 0 : _l.contactPhone, phone: (_m = finalCustomer.businessDetails) === null || _m === void 0 ? void 0 : _m.contactPhone, businessEmail: (_o = finalCustomer.businessDetails) === null || _o === void 0 ? void 0 : _o.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_p = finalCustomer.businessDetails) === null || _p === void 0 ? void 0 : _p.businessSource, isDeviceMaker: (_q = finalCustomer.businessDetails) === null || _q === void 0 ? void 0 : _q.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, vatTaxId: finalCustomer.vatTaxId, tags: finalCustomer.tags, tagOrder: finalCustomer.tagOrder, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
+                : undefined, website: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.website, hasWebsite: !!((_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.website), phoneNumber: (_l = finalCustomer.businessDetails) === null || _l === void 0 ? void 0 : _l.contactPhone, phone: (_m = finalCustomer.businessDetails) === null || _m === void 0 ? void 0 : _m.contactPhone, businessEmail: (_o = finalCustomer.businessDetails) === null || _o === void 0 ? void 0 : _o.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_p = finalCustomer.businessDetails) === null || _p === void 0 ? void 0 : _p.businessSource, isStarCustomer: !!finalCustomer.starCustomerDetails, tags: finalCustomer.tags, tagOrder: finalCustomer.tagOrder, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
         let successMessage = "Business updated successfully";
         if (isStarCustomer && tempPassword) {
             successMessage =
@@ -1122,6 +1165,13 @@ const getBusinessById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             contactEmail: customer.contactEmail,
             contactPhoneNumber: customer.contactPhoneNumber,
             stage: customer.stage,
+            vatTaxId: customer.vatTaxId,
+            debtor_no: customer.debtor_no,
+            default_tax_profile_id: customer.default_tax_profile_id,
+            vat_id_status: customer.vat_id_status,
+            vat_id_checked_at: customer.vat_id_checked_at,
+            vat_id_check_source: customer.vat_id_check_source,
+            vat_id_check_response_json: customer.vat_id_check_response_json,
             businessDetails: customer.businessDetails
                 ? Object.assign(Object.assign({}, customer.businessDetails), { check_by: customer.businessDetails.check_by
                         ? {
@@ -1191,7 +1241,6 @@ const getBusinessById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             check_timestamp: (_x = customer.businessDetails) === null || _x === void 0 ? void 0 : _x.check_timestamp,
             note: (_y = customer.businessDetails) === null || _y === void 0 ? void 0 : _y.description,
             status: exports.BUSINESS_STATUS.ACTIVE,
-            vatTaxId: customer.vatTaxId,
             tags: customer.tags,
             tagOrder: customer.tagOrder,
             createdAt: customer.createdAt,
@@ -1332,7 +1381,7 @@ const getAllBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         const businesses = customers.map((customer) => {
             var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
             const _p = customer.businessDetails || {}, { id: businessId } = _p, businessDetailsWithoutId = __rest(_p, ["id"]);
-            return Object.assign(Object.assign({ id: customer.id, companyName: customer.companyName, displayName: customer.companyName, legalName: customer.legalName, name: customer.companyName, customerNumber: customer.customerNumber, companyLabelPrintLogo: customer.companyLabelPrintLogo, asanaLink: customer.asanaLink, email: customer.email, contactEmail: customer.contactEmail, contactPhoneNumber: customer.contactPhoneNumber, stage: customer.stage }, businessDetailsWithoutId), { address: (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.address, street: (_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.address, addressAdditional: customer.addressLine2, city: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.city, state: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.state, country: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.country, postalCode: (_f = customer.businessDetails) === null || _f === void 0 ? void 0 : _f.postalCode, website: (_g = customer.businessDetails) === null || _g === void 0 ? void 0 : _g.website, hasWebsite: !!((_h = customer.businessDetails) === null || _h === void 0 ? void 0 : _h.website), phoneNumber: (_j = customer.businessDetails) === null || _j === void 0 ? void 0 : _j.contactPhone, phone: (_k = customer.businessDetails) === null || _k === void 0 ? void 0 : _k.contactPhone, businessEmail: (_l = customer.businessDetails) === null || _l === void 0 ? void 0 : _l.email, note: (_m = customer.businessDetails) === null || _m === void 0 ? void 0 : _m.description, status: exports.BUSINESS_STATUS.ACTIVE, source: (_o = customer.businessDetails) === null || _o === void 0 ? void 0 : _o.businessSource, vatTaxId: customer.vatTaxId, tags: customer.tags, tagOrder: customer.tagOrder, createdAt: customer.createdAt, updatedAt: customer.updatedAt });
+            return Object.assign(Object.assign({ id: customer.id, companyName: customer.companyName, displayName: customer.companyName, legalName: customer.legalName, name: customer.companyName, customerNumber: customer.customerNumber, companyLabelPrintLogo: customer.companyLabelPrintLogo, asanaLink: customer.asanaLink, email: customer.email, contactEmail: customer.contactEmail, contactPhoneNumber: customer.contactPhoneNumber, stage: customer.stage }, businessDetailsWithoutId), { address: (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.address, street: (_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.address, addressAdditional: customer.addressLine2, city: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.city, state: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.state, country: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.country, postalCode: (_f = customer.businessDetails) === null || _f === void 0 ? void 0 : _f.postalCode, website: (_g = customer.businessDetails) === null || _g === void 0 ? void 0 : _g.website, hasWebsite: !!((_h = customer.businessDetails) === null || _h === void 0 ? void 0 : _h.website), phoneNumber: (_j = customer.businessDetails) === null || _j === void 0 ? void 0 : _j.contactPhone, phone: (_k = customer.businessDetails) === null || _k === void 0 ? void 0 : _k.contactPhone, businessEmail: (_l = customer.businessDetails) === null || _l === void 0 ? void 0 : _l.email, note: (_m = customer.businessDetails) === null || _m === void 0 ? void 0 : _m.description, status: exports.BUSINESS_STATUS.ACTIVE, source: (_o = customer.businessDetails) === null || _o === void 0 ? void 0 : _o.businessSource, vatTaxId: customer.vatTaxId, debtor_no: customer.debtor_no, default_tax_profile_id: customer.default_tax_profile_id, vat_id_status: customer.vat_id_status, vat_id_checked_at: customer.vat_id_checked_at, vat_id_check_source: customer.vat_id_check_source, vat_id_check_response_json: customer.vat_id_check_response_json, tags: customer.tags, tagOrder: customer.tagOrder, createdAt: customer.createdAt, updatedAt: customer.updatedAt });
         });
         return res.status(200).json({
             success: true,

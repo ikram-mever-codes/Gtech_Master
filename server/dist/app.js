@@ -32,6 +32,9 @@ const supplier_order_routes_1 = __importDefault(require("./routes/supplier_order
 const system_routes_1 = __importDefault(require("./routes/system_routes"));
 const dashboard_routes_1 = __importDefault(require("./routes/dashboard_routes"));
 const tag_routes_1 = __importDefault(require("./routes/tag_routes"));
+const tax_profile_routes_1 = __importDefault(require("./routes/tax_profile_routes"));
+const country_routes_1 = __importDefault(require("./routes/country_routes"));
+const shipping_address_routes_1 = __importDefault(require("./routes/shipping_address_routes"));
 const app = (0, express_1.default)();
 const corsOptions = {
     origin: [
@@ -78,6 +81,9 @@ app.use("/api/v1/supplier-orders", supplier_order_routes_1.default);
 app.use("/api/v1/system", system_routes_1.default);
 app.use("/api/v1/dashboard", dashboard_routes_1.default);
 app.use("/api/v1/tags", tag_routes_1.default);
+app.use("/api/v1/tax-profiles", tax_profile_routes_1.default);
+app.use("/api/v1/countries", country_routes_1.default);
+app.use("/api/v1/customers/:companyId/shipping-addresses", shipping_address_routes_1.default);
 const __uploads_dirname = path_1.default.resolve();
 app.use("/uploads", express_1.default.static(path_1.default.join(__uploads_dirname, "/uploads")));
 app.use(errorMiddleware_1.default);

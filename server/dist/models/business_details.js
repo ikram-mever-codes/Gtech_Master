@@ -13,6 +13,7 @@ exports.BusinessDetails = void 0;
 const typeorm_1 = require("typeorm");
 const customers_1 = require("./customers");
 const users_1 = require("./users");
+const country_1 = require("./country");
 let BusinessDetails = class BusinessDetails {
 };
 exports.BusinessDetails = BusinessDetails;
@@ -84,6 +85,15 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], BusinessDetails.prototype, "country", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "country_id", nullable: true }),
+    __metadata("design:type", Object)
+], BusinessDetails.prototype, "country_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => country_1.Country, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "country_id" }),
+    __metadata("design:type", Object)
+], BusinessDetails.prototype, "countryEntity", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)

@@ -18,6 +18,9 @@ const star_customer_details_1 = require("./star_customer_details");
 const inquiry_1 = require("./inquiry");
 const tags_1 = require("./tags");
 const items_1 = require("./items");
+const tax_profile_1 = require("./tax_profile");
+const company_shipping_address_1 = require("./company_shipping_address");
+const country_1 = require("./country");
 let Customer = class Customer {
     populateDetails() {
         if (this.businessDetails) {
@@ -71,6 +74,55 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Customer.prototype, "vatTaxId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "debtor_no", nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "debtor_no", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "default_tax_profile_id", nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "default_tax_profile_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => tax_profile_1.TaxProfile, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "default_tax_profile_id" }),
+    __metadata("design:type", tax_profile_1.TaxProfile)
+], Customer.prototype, "defaultTaxProfile", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "country_id", nullable: true }),
+    __metadata("design:type", Object)
+], Customer.prototype, "country_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => country_1.Country, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "country_id" }),
+    __metadata("design:type", Object)
+], Customer.prototype, "countryEntity", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        name: "vat_id_status",
+        type: "enum",
+        enum: [
+            "unchecked",
+            "vies_valid",
+            "vies_invalid",
+            "bzst_qualified_valid",
+            "bzst_qualified_invalid",
+        ],
+        default: "unchecked",
+    }),
+    __metadata("design:type", String)
+], Customer.prototype, "vat_id_status", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "vat_id_checked_at", type: "timestamp", nullable: true }),
+    __metadata("design:type", Date)
+], Customer.prototype, "vat_id_checked_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "vat_id_check_source", nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "vat_id_check_source", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "vat_id_check_response_json", type: "text", nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "vat_id_check_response_json", void 0);
 __decorate([
     (0, typeorm_1.Column)({ unique: true, nullable: true }),
     __metadata("design:type", String)
@@ -146,6 +198,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => items_1.Item, (item) => item.customer),
     __metadata("design:type", Array)
 ], Customer.prototype, "items", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => company_shipping_address_1.CompanyShippingAddress, (address) => address.company),
+    __metadata("design:type", Array)
+], Customer.prototype, "shippingAddresses", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

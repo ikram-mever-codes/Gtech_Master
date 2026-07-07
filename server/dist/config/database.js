@@ -82,6 +82,9 @@ const dbUtils_1 = require("../utils/dbUtils");
 const sales_prices_1 = require("../models/sales_prices");
 const purchase_prices_1 = require("../models/purchase_prices");
 const tags_1 = require("../models/tags");
+const tax_profile_1 = require("../models/tax_profile");
+const country_1 = require("../models/country");
+const company_shipping_address_1 = require("../models/company_shipping_address");
 dotenv_1.default.config();
 exports.AppDataSource = new typeorm_1.DataSource({
     type: "postgres",
@@ -133,6 +136,9 @@ exports.AppDataSource = new typeorm_1.DataSource({
         cargo_types_1.CargoType,
         supplier_orders_1.SupplierOrder,
         tags_1.Tag,
+        tax_profile_1.TaxProfile,
+        country_1.Country,
+        company_shipping_address_1.CompanyShippingAddress,
     ],
     extra: {
         ssl: process.env.DB_SSL === "true"

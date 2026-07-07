@@ -135,7 +135,7 @@ InvoiceController.generateInvoicePDF = (invoice) => __awaiter(void 0, void 0, vo
                 phone: "+4923158697565",
                 email: "info@gtech-industries.de",
                 website: "www.gtech-shop.de",
-                registrationNumber: "Amtsgericht Hagen HRB 12496",
+                registrationNumber: "Amtsgericht Dortmund HRB38470",
                 ceo: "Geschäftsführer Joschua Grenzheuser",
                 vatId: "DE291514916",
                 taxNumber: "316/5733/1295",
@@ -147,7 +147,7 @@ InvoiceController.generateInvoicePDF = (invoice) => __awaiter(void 0, void 0, vo
             let yPos = 50;
             const logoPath = path_1.default.join(process.cwd(), "assets", "logo.png");
             if (fs_1.default.existsSync(logoPath)) {
-                doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
+                doc.image(logoPath, leftAlignX, yPos, { fit: [100, 50] });
             }
             const fontSource = order_controller_1._cachedCjkFontBuffer || order_controller_1._cachedCjkFontPath;
             if (fontSource) {
@@ -426,9 +426,19 @@ InvoiceController.downloadInvoicePDF = (req, res, next) => __awaiter(void 0, voi
             yield invoiceRepository.update(invoiceId, { pdfUrl });
             invoice.pdfUrl = pdfUrl;
         }
-        const filePath = path_1.default.join(process.cwd(), invoice.pdfUrl);
+        let filePath = path_1.default.join(process.cwd(), invoice.pdfUrl);
         if (!fs_1.default.existsSync(filePath)) {
-            return res.status(404).json({ message: "PDF file not found" });
+            console.warn(`[Invoice] PDF file missing for invoice ${invoice.invoiceNumber}, regenerating...`);
+            try {
+                const newPdfUrl = yield _a.generateInvoicePDF(invoice);
+                yield invoiceRepository.update(invoiceId, { pdfUrl: newPdfUrl });
+                invoice.pdfUrl = newPdfUrl;
+                filePath = path_1.default.join(process.cwd(), newPdfUrl);
+            }
+            catch (genError) {
+                console.error(`[Invoice] PDF regeneration failed for ${invoice.invoiceNumber}:`, genError);
+                return res.status(500).json({ message: "PDF file could not be found or regenerated. Please contact support." });
+            }
         }
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename=invoice_${invoice.invoiceNumber}.pdf`);
@@ -591,12 +601,6 @@ InvoiceController.getAllInvoices = (req, res, next) => __awaiter(void 0, void 0,
         const data = invoices.map((inv) => {
             var _b;
             const cargo = orderToCargoMap.get(inv.orderNumber);
-            if (!cargo) {
-                database_1.AppDataSource.getRepository(invoice_1.InvoiceItem).delete({ invoice: { id: inv.id } })
-                    .then(() => invoiceRepository.delete(inv.id))
-                    .catch(err => console.error("Error deleting cargo-less invoice:", err));
-                return null;
-            }
             let customItemCount = 0;
             let customTotalQty = 0;
             let calculatedGrossTotal = Number(inv.grossTotal) || 0;
@@ -617,11 +621,9 @@ InvoiceController.getAllInvoices = (req, res, next) => __awaiter(void 0, void 0,
                         calculatedGrossTotal = stats.total_price;
                 }
             }
-            if (customItemCount === 0) {
-                database_1.AppDataSource.getRepository(invoice_1.InvoiceItem).delete({ invoice: { id: inv.id } })
-                    .then(() => invoiceRepository.delete(inv.id))
-                    .catch(err => console.error("Error deleting empty invoice:", err));
-                return null;
+            if (customItemCount === 0 && inv.items) {
+                customItemCount = inv.items.length;
+                customTotalQty = inv.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
             }
             const cargoNo = (cargo === null || cargo === void 0 ? void 0 : cargo.cargo_no) || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
             const order = orders.find(o => o.order_no === inv.orderNumber);
@@ -644,22 +646,10 @@ InvoiceController.getAllInvoices = (req, res, next) => __awaiter(void 0, void 0,
             return Object.assign(Object.assign({}, inv), { grossTotal: calculatedGrossTotal, bill_to: rawBillTo, ship_to: rawShipTo, customItemCount,
                 customTotalQty, cargoNo: cargoNo || inv.orderNumber, cargoId: (cargo === null || cargo === void 0 ? void 0 : cargo.id) || null, cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null, orderComment });
         })
-            .filter((inv) => inv !== null)
-            .filter(inv => {
-            return inv.customItemCount > 0;
-        });
+            .filter((inv) => inv !== null);
         const finalDataMap = new Map();
         data.forEach(inv => {
-            const key = inv.cargoNo || inv.orderNumber;
-            if (!finalDataMap.has(key)) {
-                finalDataMap.set(key, inv);
-            }
-            else {
-                const existing = finalDataMap.get(key);
-                if (inv.orderNumber === inv.cargoNo) {
-                    finalDataMap.set(key, inv);
-                }
-            }
+            finalDataMap.set(inv.id, inv);
         });
         return res.status(200).json({ success: true, data: Array.from(finalDataMap.values()) });
     }

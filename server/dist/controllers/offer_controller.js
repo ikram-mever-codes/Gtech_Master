@@ -541,6 +541,7 @@ class OfferController {
                 };
                 const customerSnapshot = {
                     id: customer.id,
+                    customerNumber: customer.customerNumber,
                     companyName: customer.companyName,
                     legalName: customer.legalName,
                     email: customer.email,
@@ -2169,7 +2170,7 @@ class OfferController {
     }
     generatePdf(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a;
+            var _a, _b, _c;
             try {
                 const { id } = request.params;
                 if (!id) {
@@ -2180,7 +2181,7 @@ class OfferController {
                 }
                 const offer = yield this.offerRepository.findOne({
                     where: { id },
-                    relations: ["lineItems", "inquiry", "inquiry.contactPerson"],
+                    relations: ["lineItems", "inquiry", "inquiry.contactPerson", "inquiry.customer"],
                 });
                 if (!offer) {
                     return response.status(404).json({
@@ -2279,7 +2280,7 @@ class OfferController {
                     phone: "+49 231 58697565",
                     email: "info@gtech.de",
                     website: "www.gtech.de",
-                    registrationNumber: "Amtsgericht Hagen HRB 12496",
+                    registrationNumber: "Amtsgericht Dortmund HRB38470",
                     ceo: "Geschäftsführer Joschua Grenzheuser",
                     vatId: "DE291514916",
                     taxNumber: "316/5733/1295",
@@ -2303,7 +2304,7 @@ class OfferController {
                 let yPos = 50;
                 const logoPath = path_1.default.join(process.cwd(), "assets", "logo.png");
                 if (fs_1.default.existsSync(logoPath)) {
-                    doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
+                    doc.image(logoPath, leftAlignX, yPos, { fit: [100, 50] });
                 }
                 const fontSource = order_controller_1._cachedCjkFontBuffer || order_controller_1._cachedCjkFontPath;
                 doc.fontSize(12).font("Helvetica-Bold");
@@ -2385,7 +2386,7 @@ class OfferController {
                     ["Datum", formatDate(offer.createdAt)],
                     ["Gültig bis", formatDate(offer.validUntil)],
                     ["Ansprechpartner", contactName],
-                    ["Kundennr.", customer.id ? customer.id.substring(0, 8) : "N/A"],
+                    ["Kundennr.", ((_c = (_b = offer.inquiry) === null || _b === void 0 ? void 0 : _b.customer) === null || _c === void 0 ? void 0 : _c.customerNumber) || customer.customerNumber || "-"],
                 ];
                 offerDetails.forEach((detail, index) => {
                     const detailY = detailsStartY + index * 15;
@@ -2618,7 +2619,6 @@ class OfferController {
                 doc.text("Gesamtpreis Brutto", rightAlignX, yPos + 5);
                 doc.text(`${Number(totals.totalAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`, rightAlignX + 120, yPos + 5, { align: "right" });
                 yPos += 35;
-                // Measure notes/terms height to check pagination
                 let notesHeight = 15;
                 if (offer.paymentTerms)
                     notesHeight += 15;
@@ -2649,7 +2649,18 @@ class OfferController {
                         .moveTo(leftAlignX, footerY - 15)
                         .lineTo(pageWidth - margin, footerY - 15)
                         .stroke("#CCCCCC");
-                    doc.fontSize(8).font("Helvetica").fillColor("#666666");
+                    doc.fontSize(8).fillColor("#666666");
+                    if (fontSource) {
+                        try {
+                            doc.font(fontSource);
+                        }
+                        catch (e) {
+                            doc.font("Helvetica");
+                        }
+                    }
+                    else {
+                        doc.font("Helvetica");
+                    }
                     doc.font("Helvetica-Bold");
                     doc.text(companyInfo.name, leftAlignX, footerY);
                     doc.font("Helvetica");

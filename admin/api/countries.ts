@@ -52,6 +52,7 @@ export const createCountry = async (countryData: {
 export const updateCountry = async (
   id: string,
   countryData: {
+    iso2?: string;
     name?: string;
     name_de?: string;
     is_eu?: boolean;

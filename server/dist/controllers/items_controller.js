@@ -802,6 +802,9 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 fileType: file.fileType,
                 uploadedAt: file.uploadedAt,
             })),
+            photo: item.photo || "",
+            pix_path: item.pix_path || "",
+            pix_path_eBay: item.pix_path_eBay || "",
             pictures: {
                 shopPicture: item.photo || "",
                 ebayPictures: item.pix_path_eBay || "",

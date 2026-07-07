@@ -1221,6 +1221,7 @@ const getAllStarBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 qb.where("customer.companyName ILIKE :search", { search: searchTerm })
                     .orWhere("customer.legalName ILIKE :search", { search: searchTerm })
                     .orWhere("customer.email ILIKE :search", { search: searchTerm })
+                    .orWhere("customer.customerNumber ILIKE :search", { search: searchTerm })
                     .orWhere("businessDetails.city ILIKE :search", {
                     search: searchTerm,
                 })

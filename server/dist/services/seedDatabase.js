@@ -17,7 +17,10 @@ const parents_1 = require("../models/parents");
 const business_details_1 = require("../models/business_details");
 const suppliers_1 = require("../models/suppliers");
 const categories_1 = require("../models/categories");
+const tax_profile_1 = require("../models/tax_profile");
+const country_1 = require("../models/country");
 const seedDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         console.log("🌱 Starting database seeding...");
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
@@ -26,6 +29,92 @@ const seedDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
         const businessDetailsRepository = database_1.AppDataSource.getRepository(business_details_1.BusinessDetails);
         const supplierRepository = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
         const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
+        const taxProfileRepository = database_1.AppDataSource.getRepository(tax_profile_1.TaxProfile);
+        const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
+        const existingCountries = yield countryRepository.count();
+        if (existingCountries === 0) {
+            console.log("🌍 Seeding countries...");
+            const countries = [
+                { iso2: "DE", name: "Germany", name_de: "Deutschland", is_eu: true, is_igl_country: true },
+                { iso2: "AT", name: "Austria", name_de: "Österreich", is_eu: true, is_igl_country: true },
+                { iso2: "CH", name: "Switzerland", name_de: "Schweiz", is_eu: false, is_igl_country: false },
+                { iso2: "US", name: "United States", name_de: "Vereinigte Staaten", is_eu: false, is_igl_country: false },
+                { iso2: "CN", name: "China", name_de: "China", is_eu: false, is_igl_country: false },
+                { iso2: "GB", name: "United Kingdom", name_de: "Vereinigtes Königreich", is_eu: false, is_igl_country: false },
+                { iso2: "FR", name: "France", name_de: "Frankreich", is_eu: true, is_igl_country: false },
+                { iso2: "IT", name: "Italy", name_de: "Italien", is_eu: true, is_igl_country: false },
+                { iso2: "NL", name: "Netherlands", name_de: "Niederlande", is_eu: true, is_igl_country: false },
+                { iso2: "PL", name: "Poland", name_de: "Polen", is_eu: true, is_igl_country: false },
+                { iso2: "CZ", name: "Czech Republic", name_de: "Tschechische Republik", is_eu: true, is_igl_country: false },
+                { iso2: "ES", name: "Spain", name_de: "Spanien", is_eu: true, is_igl_country: false },
+                { iso2: "BE", name: "Belgium", name_de: "Belgien", is_eu: true, is_igl_country: false },
+                { iso2: "HU", name: "Hungary", name_de: "Ungarn", is_eu: true, is_igl_country: false },
+            ];
+            for (const c of countries) {
+                yield countryRepository.save(countryRepository.create(c));
+            }
+            console.log("  ✓ Seeded default countries");
+        }
+        const existingTaxProfiles = yield taxProfileRepository.count();
+        if (existingTaxProfiles === 0) {
+            console.log("📦 Seeding tax profiles...");
+            const profiles = [
+                {
+                    name: "DE 19%",
+                    tax_rate: 19.00,
+                    tax_case: "DE-VAT",
+                    tax_code: "DE-VAT19",
+                    revenue_account_no: "8400",
+                    description: "Standard German VAT rate (19%)",
+                },
+                {
+                    name: "Reduced VAT (7%)",
+                    tax_rate: 7.00,
+                    tax_case: "DE-VAT",
+                    tax_code: "DE-VAT7",
+                    revenue_account_no: "8300",
+                    description: "Reduced German VAT rate (7%)",
+                },
+                {
+                    name: "AT IGL 0%",
+                    tax_rate: 0.00,
+                    tax_case: "EU_IGL",
+                    tax_code: "AT-IGL0",
+                    revenue_account_no: "8125",
+                    requires_vat_id: true,
+                    requires_confirmed_vat_id: true,
+                    description: "Intra-EU business transactions to Austria (0%)",
+                },
+                {
+                    name: "AT without valid VAT ID 19%",
+                    tax_rate: 19.00,
+                    tax_case: "EU_no_valid_VAT_ID",
+                    tax_code: "AT-VAT19",
+                    revenue_account_no: "8315",
+                    description: "Transactions to Austria without valid VAT ID (19%)",
+                },
+                {
+                    name: "CH Export 0%",
+                    tax_rate: 0.00,
+                    tax_case: "third_country",
+                    tax_code: "CH-EXP0",
+                    revenue_account_no: "8120",
+                    description: "Export to Switzerland (0%)",
+                },
+                {
+                    name: "VAT Free (Export to Third Countries)",
+                    tax_rate: 0.00,
+                    tax_case: "third_country",
+                    tax_code: "DE-EXP0",
+                    revenue_account_no: "8120",
+                    description: "Export to non-EU countries (0%)",
+                },
+            ];
+            for (const p of profiles) {
+                yield taxProfileRepository.save(taxProfileRepository.create(p));
+            }
+            console.log("  ✓ Seeded default tax profiles");
+        }
         const existingSuppliers = yield supplierRepository.count();
         if (existingSuppliers === 0) {
             console.log("📦 Seeding suppliers...");
@@ -387,6 +476,38 @@ const seedDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
             const item = itemRepository.create(itemData);
             const saved = yield itemRepository.save(item);
             console.log(`  ✓ Created item: ${saved.item_name} (${saved.ItemID_DE})`);
+        }
+        console.log("🔗 Mapping existing businesses/customers to Country table...");
+        const allCustomers = yield customerRepository.find({ relations: ["businessDetails"] });
+        for (const customer of allCustomers) {
+            const countryStr = (customer.country || ((_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.country) || "").trim().toUpperCase();
+            if (countryStr) {
+                const matchedCountry = yield countryRepository.findOne({
+                    where: [
+                        { iso2: countryStr },
+                        { name: countryStr }
+                    ]
+                });
+                if (matchedCountry) {
+                    let updated = false;
+                    if (customer.country_id !== matchedCountry.id) {
+                        customer.country_id = matchedCountry.id;
+                        yield customerRepository.save(customer);
+                        updated = true;
+                    }
+                    if (customer.businessDetails && customer.businessDetails.country_id !== matchedCountry.id) {
+                        customer.businessDetails.country_id = matchedCountry.id;
+                        yield businessDetailsRepository.save(customer.businessDetails);
+                        updated = true;
+                    }
+                    if (updated) {
+                        console.log(`  ✓ Mapped business "${customer.companyName}" to country ${matchedCountry.name}`);
+                    }
+                }
+                else {
+                    console.log(`  ⚠ No country match found in DB for string "${countryStr}" (Business: ${customer.companyName})`);
+                }
+            }
         }
         console.log("✅ Database seeding completed successfully!");
     }

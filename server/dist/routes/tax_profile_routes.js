@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const tax_profile_controller_1 = require("../controllers/tax_profile_controller");
+const authorized_1 = require("../middlewares/authorized");
+const router = (0, express_1.Router)();
+router.get("/", authorized_1.authenticateUser, tax_profile_controller_1.getAllTaxProfiles);
+router.post("/", authorized_1.authenticateUser, tax_profile_controller_1.createTaxProfile);
+router.get("/:id", authorized_1.authenticateUser, tax_profile_controller_1.getTaxProfileById);
+router.put("/:id", authorized_1.authenticateUser, tax_profile_controller_1.updateTaxProfile);
+router.patch("/:id/deactivate", authorized_1.authenticateUser, tax_profile_controller_1.deactivateTaxProfile);
+router.delete("/:id", authorized_1.authenticateUser, tax_profile_controller_1.deleteTaxProfile);
+exports.default = router;

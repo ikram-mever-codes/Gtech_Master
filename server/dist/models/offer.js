@@ -104,7 +104,7 @@ let Offer = class Offer {
             if (this.useUnitPrices &&
                 (!lineItem.unitPrices || lineItem.unitPrices.length === 0)) {
                 lineItem.unitPrices = this.defaultUnitPrices
-                    ? JSON.parse(JSON.stringify(this.defaultUnitPrices)) // Deep copy
+                    ? JSON.parse(JSON.stringify(this.defaultUnitPrices))
                     : [];
             }
             lineItem.calculateLineTotal(this.useUnitPrices);
