@@ -494,7 +494,7 @@ export const getItems = async (
       ...new Set(
         items.map((i: any) => i.customer_id).filter(Boolean) as string[],
       ),
-    ];
+    ].filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
     const itemIdDEs = items
       .map((i: any) => i.ItemID_DE)
       .filter(Boolean) as number[];
