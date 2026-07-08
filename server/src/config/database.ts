@@ -45,6 +45,7 @@ import { TaxProfile } from "../models/tax_profile";
 import { Country } from "../models/country";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
 import { PaymentMethod } from "../models/payment_methods";
+import { ShippingMethod } from "../models/shipping_methods";
 
 dotenv.config();
 
@@ -103,6 +104,7 @@ export const AppDataSource = new DataSource({
     Country,
     CompanyShippingAddress,
     PaymentMethod,
+    ShippingMethod,
   ],
   extra: {
     ssl:

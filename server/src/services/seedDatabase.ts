@@ -8,6 +8,7 @@ import { Category } from "../models/categories";
 import { TaxProfile } from "../models/tax_profile";
 import { Country } from "../models/country";
 import { PaymentMethod } from "../models/payment_methods";
+import { ShippingMethod } from "../models/shipping_methods";
 
 export const seedDatabase = async () => {
     try {
@@ -22,6 +23,7 @@ export const seedDatabase = async () => {
         const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
         const countryRepository = AppDataSource.getRepository(Country);
         const paymentMethodRepository = AppDataSource.getRepository(PaymentMethod);
+        const shippingMethodRepository = AppDataSource.getRepository(ShippingMethod);
 
         const existingCountries = await countryRepository.count();
         if (existingCountries === 0) {
@@ -159,6 +161,26 @@ export const seedDatabase = async () => {
                 await paymentMethodRepository.save(paymentMethodRepository.create(pm));
             }
             console.log("  ✓ Seeded default payment methods");
+        }
+
+        const existingShippingMethods = await shippingMethodRepository.count();
+        if (existingShippingMethods === 0) {
+            console.log("🚚 Seeding shipping methods...");
+            const shippingMethods = [
+                { name: "Selbstabholung", is_active: true },
+                { name: "Speditionsversand", is_active: true },
+                { name: "UPS", is_active: true },
+                { name: "GLS", is_active: true },
+                { name: "FedEx direkt", is_active: true },
+                { name: "FedEx Sammel + UPS", is_active: true },
+                { name: "FedEx Sammel + GLS", is_active: true },
+                { name: "Bahnfracht + UPS", is_active: true },
+                { name: "Bahnfracht + GLS", is_active: true },
+            ];
+            for (const sm of shippingMethods) {
+                await shippingMethodRepository.save(shippingMethodRepository.create(sm));
+            }
+            console.log("  ✓ Seeded default shipping methods");
         }
 
         const existingCustomers = await customerRepository.count();

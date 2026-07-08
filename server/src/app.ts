@@ -31,6 +31,7 @@ import taxProfileRoutes from "./routes/tax_profile_routes";
 import countryRoutes from "./routes/country_routes";
 import shippingAddressRoutes from "./routes/shipping_address_routes";
 import paymentMethodRoutes from "./routes/payment_method_routes";
+import shippingMethodRoutes from "./routes/shipping_method_routes";
 
 const app: any = express();
 
@@ -85,6 +86,7 @@ app.use("/api/v1/tax-profiles", taxProfileRoutes);
 app.use("/api/v1/countries", countryRoutes);
 app.use("/api/v1/customers/:companyId/shipping-addresses", shippingAddressRoutes);
 app.use("/api/v1/payment-methods", paymentMethodRoutes);
+app.use("/api/v1/shipping-methods", shippingMethodRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));

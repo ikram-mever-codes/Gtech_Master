@@ -147,6 +147,12 @@ const allMenuItems: MenuEntry[] = [
         resource: "Settings",
       },
       {
+        icon: Truck,
+        text: "Shipping Methods",
+        path: "/shipping-methods",
+        resource: "Settings",
+      },
+      {
         icon: LucideGlobe,
         text: "Countries",
         path: "/countries",
