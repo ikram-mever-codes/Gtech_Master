@@ -7,6 +7,7 @@ import { Supplier } from "../models/suppliers";
 import { Category } from "../models/categories";
 import { TaxProfile } from "../models/tax_profile";
 import { Country } from "../models/country";
+import { PaymentMethod } from "../models/payment_methods";
 
 export const seedDatabase = async () => {
     try {
@@ -20,6 +21,7 @@ export const seedDatabase = async () => {
         const categoryRepository = AppDataSource.getRepository(Category);
         const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
         const countryRepository = AppDataSource.getRepository(Country);
+        const paymentMethodRepository = AppDataSource.getRepository(PaymentMethod);
 
         const existingCountries = await countryRepository.count();
         if (existingCountries === 0) {
@@ -144,6 +146,19 @@ export const seedDatabase = async () => {
             for (const c of categories) {
                 await categoryRepository.save(categoryRepository.create(c));
             }
+        }
+
+        const existingPaymentMethods = await paymentMethodRepository.count();
+        if (existingPaymentMethods === 0) {
+            console.log("💳 Seeding payment methods...");
+            const paymentMethods = [
+                { name: "Kauf auf Rechnung", is_prepayment: false, is_active: true },
+                { name: "Vorkasse", is_prepayment: true, is_active: true },
+            ];
+            for (const pm of paymentMethods) {
+                await paymentMethodRepository.save(paymentMethodRepository.create(pm));
+            }
+            console.log("  ✓ Seeded default payment methods");
         }
 
         const existingCustomers = await customerRepository.count();

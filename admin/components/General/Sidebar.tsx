@@ -45,6 +45,7 @@ import {
   Timer,
   Globe as LucideGlobe,
   Percent as LucidePercent,
+  CreditCard,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -138,6 +139,12 @@ const allMenuItems: MenuEntry[] = [
         text: "Tags",
         path: "/tags",
         resource: "Tags",
+      },
+      {
+        icon: CreditCard,
+        text: "Payment Methods",
+        path: "/payment-methods",
+        resource: "Settings",
       },
       {
         icon: LucideGlobe,

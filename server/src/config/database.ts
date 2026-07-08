@@ -44,6 +44,7 @@ import { Tag } from "../models/tags";
 import { TaxProfile } from "../models/tax_profile";
 import { Country } from "../models/country";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
+import { PaymentMethod } from "../models/payment_methods";
 
 dotenv.config();
 
@@ -101,6 +102,7 @@ export const AppDataSource = new DataSource({
     TaxProfile,
     Country,
     CompanyShippingAddress,
+    PaymentMethod,
   ],
   extra: {
     ssl:
