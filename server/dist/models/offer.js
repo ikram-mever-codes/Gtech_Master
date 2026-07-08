@@ -130,21 +130,37 @@ __decorate([
     __metadata("design:type", String)
 ], Offer.prototype, "title", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 20, default: "inquiry" }),
+    __metadata("design:type", String)
+], Offer.prototype, "sourceType", void 0);
+__decorate([
     (0, typeorm_1.ManyToOne)(() => inquiry_1.Inquiry, (inquiry) => inquiry.offers, {
-        nullable: false,
-        onDelete: "CASCADE",
+        nullable: true,
+        onDelete: "SET NULL",
     }),
     (0, typeorm_1.JoinColumn)({ name: "inquiry_id" }),
-    __metadata("design:type", inquiry_1.Inquiry)
+    __metadata("design:type", Object)
 ], Offer.prototype, "inquiry", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: "inquiry_id" }),
-    __metadata("design:type", String)
+    (0, typeorm_1.Column)({ name: "inquiry_id", nullable: true }),
+    __metadata("design:type", Object)
 ], Offer.prototype, "inquiryId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "json", nullable: true }),
     __metadata("design:type", Object)
 ], Offer.prototype, "inquirySnapshot", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "item_id", type: "varchar", length: 100, nullable: true }),
+    __metadata("design:type", Object)
+], Offer.prototype, "itemId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "json", nullable: true }),
+    __metadata("design:type", Object)
+], Offer.prototype, "itemSnapshot", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "customer_id", type: "varchar", length: 100, nullable: true }),
+    __metadata("design:type", Object)
+], Offer.prototype, "customerId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "json", nullable: false }),
     __metadata("design:type", Object)
@@ -446,6 +462,15 @@ __decorate([
     (0, typeorm_1.Column)({ name: "requested_item_id", nullable: true }),
     __metadata("design:type", String)
 ], OfferLineItem.prototype, "requestedItemId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        name: "source_item_id",
+        type: "varchar",
+        length: 100,
+        nullable: true,
+    }),
+    __metadata("design:type", String)
+], OfferLineItem.prototype, "sourceItemId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "varchar", length: 255 }),
     __metadata("design:type", String)

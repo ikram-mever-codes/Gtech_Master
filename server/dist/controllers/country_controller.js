@@ -9,12 +9,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+<<<<<<< HEAD
+exports.deleteCountry = exports.deactivateCountry = exports.updateCountry = exports.createCountry = exports.getAllCountries = void 0;
+const database_1 = require("../config/database");
+const country_1 = require("../models/country");
+=======
 exports.deleteCountry = exports.deactivateCountry = exports.updateCountry = exports.createCountry = exports.getCountryById = exports.getAllCountries = void 0;
 const database_1 = require("../config/database");
 const country_1 = require("../models/country");
 const business_details_1 = require("../models/business_details");
 const company_shipping_address_1 = require("../models/company_shipping_address");
 const customers_1 = require("../models/customers");
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
 const getAllCountries = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
@@ -31,6 +37,12 @@ const getAllCountries = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
     }
 });
 exports.getAllCountries = getAllCountries;
+<<<<<<< HEAD
+const createCountry = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
+        const { iso2, name, is_eu, is_igl_country } = req.body;
+=======
 const getCountryById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
@@ -53,6 +65,7 @@ const createCountry = (req, res, next) => __awaiter(void 0, void 0, void 0, func
     try {
         const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
         const { iso2, name, name_de, is_eu, is_igl_country } = req.body;
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
         if (!iso2 || !name) {
             return res
                 .status(400)
@@ -70,7 +83,10 @@ const createCountry = (req, res, next) => __awaiter(void 0, void 0, void 0, func
         const country = countryRepository.create({
             iso2: iso2.trim().toUpperCase(),
             name: name.trim(),
+<<<<<<< HEAD
+=======
             name_de: name_de ? name_de.trim() : undefined,
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
             is_eu: !!is_eu,
             is_igl_country: !!is_igl_country,
             is_active: true,
@@ -88,13 +104,21 @@ const updateCountry = (req, res, next) => __awaiter(void 0, void 0, void 0, func
     try {
         const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
         const { id } = req.params;
+<<<<<<< HEAD
+        const { name, is_eu, is_igl_country, is_active } = req.body;
+=======
         const { iso2, name, name_de, is_eu, is_igl_country, is_active } = req.body;
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
         const country = yield countryRepository.findOne({ where: { id } });
         if (!country) {
             return res
                 .status(404)
                 .json({ success: false, message: "Country not found." });
         }
+<<<<<<< HEAD
+        if (name !== undefined)
+            country.name = name.trim();
+=======
         if (iso2 !== undefined) {
             const cleanIso2 = iso2.trim().toUpperCase();
             if (cleanIso2.length !== 2) {
@@ -117,6 +141,7 @@ const updateCountry = (req, res, next) => __awaiter(void 0, void 0, void 0, func
             country.name = name.trim();
         if (name_de !== undefined)
             country.name_de = name_de ? name_de.trim() : undefined;
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
         if (is_eu !== undefined)
             country.is_eu = !!is_eu;
         if (is_igl_country !== undefined)
@@ -164,6 +189,20 @@ const deleteCountry = (req, res, next) => __awaiter(void 0, void 0, void 0, func
                 .status(404)
                 .json({ success: false, message: "Country not found." });
         }
+<<<<<<< HEAD
+        try {
+            yield countryRepository.remove(country);
+            return res.status(200).json({ success: true, message: "Country deleted successfully." });
+        }
+        catch (err) {
+            country.is_active = false;
+            yield countryRepository.save(country);
+            return res.status(200).json({
+                success: true,
+                message: "Country is in use by other data, so it has been set to Inactive instead.",
+            });
+        }
+=======
         const businessDetailsCount = yield database_1.AppDataSource.getRepository(business_details_1.BusinessDetails).count({
             where: { country_id: id }
         });
@@ -182,6 +221,7 @@ const deleteCountry = (req, res, next) => __awaiter(void 0, void 0, void 0, func
         }
         yield countryRepository.remove(country);
         return res.status(200).json({ success: true, message: "Country deleted successfully." });
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
     }
     catch (error) {
         console.error(error);

@@ -6,6 +6,7 @@ import {
   QuantityPrice,
   UnitPrice,
   OfferLineItem,
+  ItemSnapshot,
 } from "../models/offer";
 import { Inquiry } from "../models/inquiry";
 import { RequestedItem } from "../models/requested_items";
@@ -27,16 +28,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => { },
-      IsEnum: () => () => { },
-      IsNumber: () => () => { },
-      IsObject: () => () => { },
-      IsOptional: () => () => { },
-      IsString: () => () => { },
-      Max: () => () => { },
-      Min: () => () => { },
-      IsBoolean: () => () => { },
-      IsArray: () => () => { },
+      IsDate: () => () => {},
+      IsEnum: () => () => {},
+      IsNumber: () => () => {},
+      IsObject: () => () => {},
+      IsOptional: () => () => {},
+      IsString: () => () => {},
+      Max: () => () => {},
+      Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -47,7 +48,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => { },
+      Type: () => () => {},
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -89,6 +90,7 @@ import { ConvertInquiryToItemDto, ItemGenerator } from "./inquiry_controller";
 import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
+import { In } from "typeorm";
 
 const formatCountry = (country?: string | null): string => {
   if (!country) return "";
@@ -97,6 +99,21 @@ const formatCountry = (country?: string | null): string => {
   if (code === "AT") return "Austria";
   if (code === "CH") return "Switzerland";
   return country.trim();
+};
+
+/**
+ * Coerce whatever `validUntil` shape reaches us (Date, "YYYY-MM-DD" string,
+ * ISO string, or nothing) into a real Date. The DTOs validate this field with
+ * @IsDate, and when class-transformer's implicit conversion doesn't run (e.g.
+ * the module isn't present and the fallback passes the body through untouched)
+ * a raw date string would fail validation and block offer creation. Doing the
+ * coercion here makes the create paths robust regardless of that.
+ */
+const coerceDate = (value: any): Date | undefined => {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (value instanceof Date) return isNaN(value.getTime()) ? undefined : value;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? undefined : d;
 };
 
 export class CreateOfferDto {
@@ -120,6 +137,14 @@ export class CreateOfferDto {
   @IsOptional()
   @IsString()
   paymentTerms?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
 
   @IsOptional()
   @IsString()
@@ -239,6 +264,14 @@ export class UpdateOfferDto {
   @IsOptional()
   @IsString()
   paymentTerms?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
 
   @IsOptional()
   @IsString()
@@ -425,6 +458,157 @@ export class CopyPastePricesDto {
   data!: string;
 }
 
+// ---------------------------------------------------------------------------
+// New DTOs: creating offers from an Item or a Customer, and adding line items
+// to an offer that did not originate from an inquiry.
+// ---------------------------------------------------------------------------
+
+export class CreateOfferFromItemDto {
+  // Item-sourced offers may target a customer that differs from the item's
+  // own customer; if omitted we fall back to the item's customer.
+  @IsOptional()
+  @IsString()
+  customerId?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsEnum(["RMB", "HKD", "EUR", "USD"])
+  currency?: "RMB" | "HKD" | "EUR" | "USD";
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  validUntil?: Date;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  internalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  baseQuantity?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  useUnitPrices?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  unitPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  totalPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  maxUnitPriceColumns?: number;
+}
+
+export class CreateOfferFromCustomerDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsEnum(["RMB", "HKD", "EUR", "USD"])
+  currency?: "RMB" | "HKD" | "EUR" | "USD";
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  validUntil?: Date;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  internalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingMethod?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  useUnitPrices?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  unitPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  totalPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  maxUnitPriceColumns?: number;
+}
+
+export class CreateLineItemDto {
+  @IsString()
+  itemName!: string;
+
+  @IsOptional()
+  @IsString()
+  material?: string;
+
+  @IsOptional()
+  @IsString()
+  specification?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  baseQuantity?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  basePrice?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
 export class OfferController {
   private offerRepository: any = AppDataSource.getRepository(Offer);
   private lineItemRepository: any = AppDataSource.getRepository(OfferLineItem);
@@ -454,11 +638,55 @@ export class OfferController {
     return `OFF-${year}${month}-${sequence.toString().padStart(4, "0")}`;
   }
 
+  // -------------------------------------------------------------------------
+  // Shared helpers for building snapshots from a Customer entity. Used by the
+  // inquiry/item/customer create paths so the snapshot shape stays identical.
+  // -------------------------------------------------------------------------
+  private buildCustomerSnapshot(customer: Customer | any): CustomerSnapshot {
+    return {
+      id: customer.id,
+      customerNumber: customer.customerNumber,
+      companyName: customer.companyName,
+      legalName: customer.legalName,
+      email: customer.email,
+      contactEmail: customer.contactEmail,
+      contactPhoneNumber: customer.contactPhoneNumber,
+      vatId: customer.vatTaxId || customer.taxNumber || "",
+      address: customer.addressLine1 || customer.businessDetails?.address || "",
+      city: customer.city || customer.businessDetails?.city || "",
+      postalCode:
+        customer.postalCode || customer.businessDetails?.postalCode || "",
+      country: customer.country || customer.businessDetails?.country || "",
+      state: customer.businessDetails?.state || "",
+      street: customer.addressLine1 || "Street Address",
+      additionalInfo: customer.addressLine2 || "Additional Info",
+    };
+  }
+
+  private buildDeliveryAddress(customer: Customer | any) {
+    return {
+      street: customer.addressLine1 || "Street Address",
+      city: customer.city || customer.businessDetails?.city,
+      state: customer.businessDetails?.state,
+      postalCode: customer.postalCode || customer.businessDetails?.postalCode,
+      country: customer.country || customer.businessDetails?.country,
+      contactName: customer.legalName || customer.companyName,
+      contactPhone: customer.contactPhoneNumber,
+    };
+  }
+
   async createOfferFromInquiry(request: Request, response: Response) {
     try {
       const { inquiryId } = request.params;
 
-      const createOfferDto = plainToInstance(CreateOfferDto, request.body, {
+      // Coerce the date before validation so a plain "YYYY-MM-DD" string from
+      // the client can't fail @IsDate when implicit conversion doesn't run.
+      const bodyForDto = {
+        ...request.body,
+        validUntil: coerceDate(request.body?.validUntil),
+      };
+
+      const createOfferDto = plainToInstance(CreateOfferDto, bodyForDto, {
         excludeExtraneousValues: false,
         enableImplicitConversion: true,
       });
@@ -518,23 +746,8 @@ export class OfferController {
         requestsCount: inquiry.requests?.length || 0,
       };
 
-      const customerSnapshot: CustomerSnapshot = {
-        id: customer.id,
-        customerNumber: customer.customerNumber,
-        companyName: customer.companyName,
-        legalName: customer.legalName,
-        email: customer.email,
-        contactEmail: customer.contactEmail,
-        contactPhoneNumber: customer.contactPhoneNumber,
-        vatId: customer.vatTaxId || customer.taxNumber || "",
-        address: customer.addressLine1 || customer.businessDetails?.address || "",
-        city: customer.city || customer.businessDetails?.city || "",
-        postalCode: customer.postalCode || customer.businessDetails?.postalCode || "",
-        country: customer.country || customer.businessDetails?.country || "",
-        state: customer.businessDetails?.state || "",
-        street: customer.addressLine1 || "Street Address",
-        additionalInfo: customer.addressLine2 || "Additional Info",
-      };
+      const customerSnapshot: CustomerSnapshot =
+        this.buildCustomerSnapshot(customer);
 
       const defaultUnitPrices = createOfferDto.useUnitPrices
         ? createOfferDto.defaultUnitPrices || this.createDefaultUnitPrices()
@@ -542,6 +755,10 @@ export class OfferController {
 
       const offer = this.offerRepository.create({
         offerNumber,
+        sourceType: "inquiry",
+        itemId: null,
+        itemSnapshot: null,
+        customerId: customer.id,
         title: createOfferDto.title || `Offer for ${inquiry.name}`,
         inquiry: inquiry,
         inquiryId: inquiry.id,
@@ -558,11 +775,13 @@ export class OfferController {
         },
         status: "Draft",
         validUntil:
-          createOfferDto.validUntil ||
+          coerceDate(createOfferDto.validUntil) ||
           new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         termsConditions: createOfferDto.termsConditions,
         deliveryTerms: createOfferDto.deliveryTerms,
         paymentTerms: createOfferDto.paymentTerms,
+        paymentMethod: createOfferDto.paymentMethod,
+        shippingMethod: createOfferDto.shippingMethod,
         deliveryTime: createOfferDto.deliveryTime,
         currency: createOfferDto.currency || "EUR",
         discountPercentage: createOfferDto.discountPercentage || 0,
@@ -696,6 +915,379 @@ export class OfferController {
         success: false,
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // CREATE FROM ITEM
+  // POST /offers/from-item/:itemId
+  // Prefills the customer (from the item's linked customer, or an explicit
+  // body.customerId) and seeds a single line item from the item's data.
+  // ==========================================================================
+
+  async createOfferFromItem(request: Request, response: Response) {
+    try {
+      const { itemId } = request.params;
+      const body: CreateOfferFromItemDto & { itemIds?: string[] } =
+        request.body || {};
+
+      // Full, de-duplicated, order-preserving id list (param = position 1).
+      const requestedIds: string[] = Array.from(
+        new Set(
+          [itemId, ...(Array.isArray(body.itemIds) ? body.itemIds : [])].filter(
+            (id): id is string => !!id,
+          ),
+        ),
+      );
+
+      if (requestedIds.length === 0) {
+        return response
+          .status(400)
+          .json({ success: false, message: "No item ids provided." });
+      }
+
+      const itemRepository = AppDataSource.getRepository(Item);
+      const fetchedItems: any[] = await itemRepository.find({
+        where: { id: In(requestedIds as any[]) },
+        relations: ["customer", "taric"],
+      });
+
+      if (fetchedItems.length === 0) {
+        return response
+          .status(404)
+          .json({ success: false, message: "No matching items found." });
+      }
+
+      // find() doesn't guarantee order — restore the requested sequence and
+      // drop any ids that didn't resolve to a row.
+      const itemById = new Map(fetchedItems.map((it) => [String(it.id), it]));
+      const orderedItems = requestedIds
+        .map((id) => itemById.get(String(id)))
+        .filter((it): it is any => !!it);
+
+      if (orderedItems.length === 0) {
+        return response
+          .status(404)
+          .json({ success: false, message: "No matching items found." });
+      }
+
+      // Recipient customer: body.customerId wins, else first item's customer.
+      let customer: any = null;
+      if (body.customerId) {
+        customer = await this.customerRepository.findOne({
+          where: { id: body.customerId },
+        });
+      }
+      if (!customer) {
+        customer = orderedItems[0].customer || null;
+      }
+      if (!customer) {
+        return response.status(400).json({
+          success: false,
+          message:
+            "No recipient customer could be resolved. Pass a customerId to create the offer.",
+        });
+      }
+
+      const offerNumber = await this.generateOfferNumber();
+      const customerSnapshot = this.buildCustomerSnapshot(customer);
+
+      const useUnitPrices = body.useUnitPrices || false;
+      const defaultUnitPrices = useUnitPrices
+        ? this.createDefaultUnitPrices()
+        : [];
+
+      // Top-level snapshot reflects the first item (keeps single-item contract).
+      const primary = orderedItems[0];
+      const primarySnapshot: ItemSnapshot = this.buildItemSnapshot(primary);
+
+      const offer = this.offerRepository.create({
+        offerNumber,
+        sourceType: "item",
+        title:
+          body.title ||
+          (orderedItems.length > 1
+            ? `Offer for ${primarySnapshot.itemName} +${orderedItems.length - 1} more`
+            : `Offer for ${primarySnapshot.itemName}`),
+        inquiry: null,
+        inquiryId: null,
+        inquirySnapshot: null,
+        itemId: primarySnapshot.id,
+        itemSnapshot: primarySnapshot,
+        customerId: customer.id,
+        customerSnapshot,
+        deliveryAddress: this.buildDeliveryAddress(customer),
+        status: "Draft",
+        validUntil:
+          coerceDate(body.validUntil) ||
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        currency: body.currency || "EUR",
+        notes: body.notes,
+        internalNotes: body.internalNotes,
+        paymentMethod: body.paymentMethod,
+        shippingMethod: body.shippingMethod,
+        isAssembly: false,
+        useUnitPrices,
+        unitPriceDecimalPlaces: body.unitPriceDecimalPlaces || 3,
+        totalPriceDecimalPlaces: body.totalPriceDecimalPlaces || 2,
+        maxUnitPriceColumns: body.maxUnitPriceColumns || 3,
+        defaultUnitPrices,
+        revision: 1,
+        subtotal: 0,
+        taxAmount: 0,
+        totalAmount: 0,
+      });
+
+      const savedOffer = await this.offerRepository.save(offer);
+
+      // One line item per selected item, positioned in the requested order.
+      const lineItems = orderedItems.map((item, idx) => {
+        const snap = this.buildItemSnapshot(item);
+        return this.lineItemRepository.create({
+          offer: savedOffer,
+          offerId: savedOffer.id,
+          sourceItemId: snap.id,
+          itemName: snap.itemName,
+          specification: snap.specification,
+          description: snap.description,
+          weight: snap.weight,
+          width: snap.width,
+          height: snap.height,
+          length: snap.length,
+          purchasePrice: snap.purchasePrice,
+          purchaseCurrency: snap.purchaseCurrency,
+          baseQuantity: body.baseQuantity || "1",
+          position: idx + 1,
+          quantityPrices: [],
+          unitPrices: useUnitPrices ? this.createDefaultUnitPrices() : [],
+          lineTotal: 0,
+        });
+      });
+
+      await this.lineItemRepository.save(lineItems);
+
+      await this.calculateOfferTotals(savedOffer.id);
+
+      const completeOffer = await this.offerRepository.findOne({
+        where: { id: savedOffer.id },
+        relations: ["lineItems"],
+      });
+
+      return response.status(201).json({
+        success: true,
+        message:
+          orderedItems.length > 1
+            ? `Offer created from ${orderedItems.length} items successfully`
+            : "Offer created from item successfully",
+        data: completeOffer,
+      });
+    } catch (error) {
+      console.error("Error creating offer from item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+  // ==========================================================================
+  // ADD A LINE ITEM TO AN EXISTING OFFER
+  // POST /offers/:offerId/line-items
+  // Needed for customer/blank offers (and ad-hoc additions to any offer).
+  // ==========================================================================
+  async createLineItem(request: Request, response: Response) {
+    try {
+      const { offerId } = request.params;
+      const body: CreateLineItemDto = request.body || {};
+
+      if (!body.itemName || !body.itemName.trim()) {
+        return response
+          .status(400)
+          .json({ success: false, message: "itemName is required" });
+      }
+
+      const offer = await this.offerRepository.findOne({
+        where: { id: offerId },
+        relations: ["lineItems"],
+      });
+      if (!offer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Offer not found" });
+      }
+
+      const existing = (offer.lineItems || []).filter(
+        (li: OfferLineItem) => !li.isComponent,
+      );
+      const nextPosition =
+        existing.reduce(
+          (max: number, li: OfferLineItem) => Math.max(max, li.position || 0),
+          0,
+        ) + 1;
+
+      const lineItem = this.lineItemRepository.create({
+        offer,
+        offerId: offer.id,
+        itemName: body.itemName.trim(),
+        material: body.material,
+        specification: body.specification,
+        description: body.description,
+        baseQuantity: body.baseQuantity || "1",
+        basePrice: body.basePrice ?? undefined,
+        notes: body.notes,
+        position: nextPosition,
+        quantityPrices: [],
+        unitPrices: offer.useUnitPrices ? this.createDefaultUnitPrices() : [],
+        lineTotal:
+          body.basePrice && body.baseQuantity
+            ? body.basePrice * (parseFloat(body.baseQuantity) || 1)
+            : 0,
+      });
+
+      const saved = await this.lineItemRepository.save(lineItem);
+      await this.calculateOfferTotals(offer.id);
+
+      return response.status(201).json({
+        success: true,
+        message: "Line item added successfully",
+        data: saved,
+      });
+    } catch (error) {
+      console.error("Error adding line item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // DELETE A LINE ITEM
+  // DELETE /offers/:offerId/line-items/:lineItemId
+  // ==========================================================================
+  async deleteLineItem(request: Request, response: Response) {
+    try {
+      const { offerId, lineItemId } = request.params;
+      const lineItem = await this.lineItemRepository.findOne({
+        where: { id: lineItemId, offerId },
+      });
+      if (!lineItem) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Line item not found" });
+      }
+      await this.lineItemRepository.remove(lineItem);
+      await this.calculateOfferTotals(offerId);
+      return response.status(200).json({
+        success: true,
+        message: "Line item deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting line item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // DELETE A PRICING COLUMN (a whole quantity tier) ACROSS EVERY LINE ITEM
+  // DELETE /offers/:offerId/price-column?quantity=1000
+  // Unit-price offers show prices as columns shared by all line items; this
+  // removes the tier with the matching quantity from each line item at once.
+  // ==========================================================================
+  async deletePriceColumn(request: Request, response: Response) {
+    try {
+      const { offerId } = request.params;
+      const quantity = (request.query.quantity ?? request.body?.quantity) as
+        | string
+        | undefined;
+
+      if (!quantity) {
+        return response.status(400).json({
+          success: false,
+          message: "A quantity is required to identify the column to delete.",
+        });
+      }
+
+      const offer = await this.offerRepository.findOne({
+        where: { id: offerId },
+      });
+      if (!offer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Offer not found" });
+      }
+
+      const lineItems = await this.lineItemRepository.find({
+        where: { offerId, isComponent: false },
+      });
+
+      const target = String(quantity).trim();
+      const updates = [];
+
+      for (const lineItem of lineItems) {
+        if (offer.useUnitPrices) {
+          const before = lineItem.unitPrices || [];
+          const after = before.filter(
+            (up: UnitPrice) => String(up.quantity).trim() !== target,
+          );
+          if (after.length !== before.length) {
+            if (
+              after.length > 0 &&
+              !after.some((up: UnitPrice) => up.isActive)
+            ) {
+              after[0].isActive = true;
+            }
+            lineItem.unitPrices = after;
+            updates.push(lineItem);
+          }
+        } else {
+          const before = lineItem.quantityPrices || [];
+          const after = before.filter(
+            (qp: QuantityPrice) => String(qp.quantity).trim() !== target,
+          );
+          if (after.length !== before.length) {
+            if (
+              after.length > 0 &&
+              !after.some((qp: QuantityPrice) => qp.isActive)
+            ) {
+              after[0].isActive = true;
+            }
+            lineItem.quantityPrices = after;
+            updates.push(lineItem);
+          }
+        }
+      }
+
+      // Also drop the column from the offer-level template so newly added
+      // line items don't reintroduce it.
+      if (offer.useUnitPrices && offer.defaultUnitPrices) {
+        offer.defaultUnitPrices = offer.defaultUnitPrices.filter(
+          (up: UnitPrice) => String(up.quantity).trim() !== target,
+        );
+        await this.offerRepository.save(offer);
+      }
+
+      if (updates.length > 0) {
+        await this.lineItemRepository.save(updates);
+      }
+
+      await this.calculateOfferTotals(offerId);
+
+      return response.status(200).json({
+        success: true,
+        message: `Removed the ${target} column from ${updates.length} line items`,
+        data: { updatedLineItems: updates.length },
+      });
+    } catch (error) {
+      console.error("Error deleting price column:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
       });
     }
   }
@@ -1157,6 +1749,10 @@ export class OfferController {
 
       const processedBody = {
         ...rawBody,
+        validUntil:
+          rawBody.validUntil !== undefined
+            ? coerceDate(rawBody.validUntil)
+            : undefined,
         discountPercentage:
           rawBody.discountPercentage !== undefined
             ? this.cleanNumberForDB(rawBody.discountPercentage)
@@ -1264,9 +1860,12 @@ export class OfferController {
         "validUntil",
         "deliveryTime",
         "paymentTerms",
+        "paymentMethod",
+        "shippingMethod",
         "deliveryTerms",
         "termsConditions",
         "notes",
+        "internalNotes",
         "currency",
         "deliveryAddress",
         "useUnitPrices",
@@ -2202,8 +2801,9 @@ export class OfferController {
 
       return response.status(200).json({
         success: true,
-        message: `Unit prices ${useUnitPrices ? "enabled" : "disabled"
-          } successfully for entire offer`,
+        message: `Unit prices ${
+          useUnitPrices ? "enabled" : "disabled"
+        } successfully for entire offer`,
         data: updatedOffer,
       });
     } catch (error) {
@@ -2532,7 +3132,12 @@ export class OfferController {
 
       const offer = await this.offerRepository.findOne({
         where: { id },
-        relations: ["lineItems", "inquiry", "inquiry.contactPerson", "inquiry.customer"],
+        relations: [
+          "lineItems",
+          "inquiry",
+          "inquiry.contactPerson",
+          "inquiry.customer",
+        ],
       });
 
       if (!offer) {
@@ -2638,7 +3243,11 @@ export class OfferController {
 
       const totals = calculateTotals(offer);
 
-      const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+      const doc = new PDFDocument({
+        margin: 50,
+        size: "A4",
+        bufferPages: true,
+      });
 
       const pageWidth = 595.28;
       const pageHeight = 841.89;
@@ -2713,15 +3322,16 @@ export class OfferController {
       doc.text(
         `${companyInfo.name} - ${companyInfo.address} - ${companyInfo.city}`,
         leftAlignX,
-        yPos
+        yPos,
       );
 
       let customer: any = {};
       if (offer.customerSnapshot) {
         try {
-          customer = typeof offer.customerSnapshot === "string"
-            ? JSON.parse(offer.customerSnapshot)
-            : offer.customerSnapshot;
+          customer =
+            typeof offer.customerSnapshot === "string"
+              ? JSON.parse(offer.customerSnapshot)
+              : offer.customerSnapshot;
         } catch (e) {
           customer = offer.customerSnapshot;
         }
@@ -2736,7 +3346,10 @@ export class OfferController {
       if (customer.legalName && customer.legalName !== customer.companyName) {
         doc.text(customer.legalName, leftAlignX, yPos);
         yPos += 12;
-      } else if (customer.additionalInfo && customer.additionalInfo !== "Additional Info") {
+      } else if (
+        customer.additionalInfo &&
+        customer.additionalInfo !== "Additional Info"
+      ) {
         doc.text(customer.additionalInfo, leftAlignX, yPos);
         yPos += 12;
       }
@@ -2747,18 +3360,30 @@ export class OfferController {
       doc.text(
         `${customer.postalCode || ""} ${customer.city || ""}`.trim(),
         leftAlignX,
-        yPos
+        yPos,
       );
       yPos += 12;
 
       const displayCountry = formatCountry(customer.country);
-      if (displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+      if (
+        displayCountry &&
+        displayCountry.toUpperCase() !== "DE" &&
+        displayCountry.toUpperCase() !== "GERMANY" &&
+        displayCountry.toUpperCase() !== "DEUTSCHLAND"
+      ) {
         doc.text(displayCountry, leftAlignX, yPos);
         yPos += 12;
       }
 
-      const customerVatId = customer.vatId || customer.vatTaxId || customer.taxNumber || "";
-      if (customerVatId && displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+      const customerVatId =
+        customer.vatId || customer.vatTaxId || customer.taxNumber || "";
+      if (
+        customerVatId &&
+        displayCountry &&
+        displayCountry.toUpperCase() !== "DE" &&
+        displayCountry.toUpperCase() !== "GERMANY" &&
+        displayCountry.toUpperCase() !== "DEUTSCHLAND"
+      ) {
         doc.text(`VAT ID: ${customerVatId}`, leftAlignX, yPos);
         yPos += 12;
       }
@@ -2788,7 +3413,12 @@ export class OfferController {
         ["Datum", formatDate(offer.createdAt)],
         ["Gültig bis", formatDate(offer.validUntil)],
         ["Ansprechpartner", contactName],
-        ["Kundennr.", offer.inquiry?.customer?.customerNumber || customer.customerNumber || "-"],
+        [
+          "Kundennr.",
+          offer.inquiry?.customer?.customerNumber ||
+            customer.customerNumber ||
+            "-",
+        ],
       ];
 
       offerDetails.forEach((detail, index) => {
@@ -2804,8 +3434,16 @@ export class OfferController {
       if (offer.deliveryTime) {
         doc.text(`Lieferzeit: ${offer.deliveryTime}`, leftAlignX, yPos);
       }
+      if (offer.shippingMethod) {
+        doc.text(`Versandart: ${offer.shippingMethod}`, leftAlignX + 250, yPos);
+        yPos += 15;
+      }
       if (offer.deliveryTerms) {
-        doc.text(`Lieferbedingungen: ${offer.deliveryTerms}`, leftAlignX + 250, yPos);
+        doc.text(
+          `Lieferbedingungen: ${offer.deliveryTerms}`,
+          leftAlignX + 250,
+          yPos,
+        );
       }
 
       yPos += 20;
@@ -2851,9 +3489,16 @@ export class OfferController {
       doc.fontSize(9).font("Helvetica");
 
       const getActivePrice = (lineItem: any, offerUsesUnitPrices: boolean) => {
-        if (offerUsesUnitPrices && lineItem.unitPrices && lineItem.unitPrices.length > 0) {
+        if (
+          offerUsesUnitPrices &&
+          lineItem.unitPrices &&
+          lineItem.unitPrices.length > 0
+        ) {
           return lineItem.unitPrices.find((up: any) => up.isActive) || null;
-        } else if (lineItem.quantityPrices && lineItem.quantityPrices.length > 0) {
+        } else if (
+          lineItem.quantityPrices &&
+          lineItem.quantityPrices.length > 0
+        ) {
           return lineItem.quantityPrices.find((qp: any) => qp.isActive) || null;
         }
         return null;
@@ -2875,12 +3520,22 @@ export class OfferController {
 
           if (activePrice) {
             qtyStr = Number(activePrice.quantity).toString();
-            unitPriceNum = getSafeNumber("unitPrice" in activePrice ? activePrice.unitPrice : activePrice.price);
-            netTotalNum = getSafeNumber("totalPrice" in activePrice ? activePrice.totalPrice : activePrice.total);
+            unitPriceNum = getSafeNumber(
+              "unitPrice" in activePrice
+                ? activePrice.unitPrice
+                : activePrice.price,
+            );
+            netTotalNum = getSafeNumber(
+              "totalPrice" in activePrice
+                ? activePrice.totalPrice
+                : activePrice.total,
+            );
           } else {
             qtyStr = Number(item.baseQuantity || 1).toString();
             unitPriceNum = getSafeNumber(item.basePrice);
-            netTotalNum = qtyStr ? parseFloat(qtyStr) * unitPriceNum : unitPriceNum;
+            netTotalNum = qtyStr
+              ? parseFloat(qtyStr) * unitPriceNum
+              : unitPriceNum;
           }
 
           const vatRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
@@ -2891,7 +3546,11 @@ export class OfferController {
             nameText += `\n${item.description}`;
           }
 
-          if (offer.useUnitPrices && item.unitPrices && item.unitPrices.length > 1) {
+          if (
+            offer.useUnitPrices &&
+            item.unitPrices &&
+            item.unitPrices.length > 1
+          ) {
             nameText += "\nStaffelpreise:";
             item.unitPrices.slice(0, 3).forEach((up: any) => {
               const activeMark = up.isActive ? " (*)" : "";
@@ -2907,11 +3566,17 @@ export class OfferController {
           const designationWidth = columns[3].width - 6;
           doc.fontSize(9);
           if (fontSource) {
-            try { doc.font(fontSource, 0); } catch (e) { doc.font("Helvetica"); }
+            try {
+              doc.font(fontSource, 0);
+            } catch (e) {
+              doc.font("Helvetica");
+            }
           } else {
             doc.font("Helvetica");
           }
-          const textHeight = doc.heightOfString(nameText, { width: designationWidth });
+          const textHeight = doc.heightOfString(nameText, {
+            width: designationWidth,
+          });
           doc.font("Helvetica");
           const computedRowHeight = Math.max(40, textHeight + 12);
           if (currentY + computedRowHeight > pageHeight - 120) {
@@ -2950,7 +3615,9 @@ export class OfferController {
           }
 
           if (rowIndex % 2 === 1) {
-            doc.rect(leftAlignX, currentY, tableWidth, computedRowHeight).fill("#FAFAFA");
+            doc
+              .rect(leftAlignX, currentY, tableWidth, computedRowHeight)
+              .fill("#FAFAFA");
           }
 
           const rowData = [
@@ -2976,7 +3643,11 @@ export class OfferController {
             }
 
             if (colIndex === 3 && fontSource) {
-              try { doc.font(fontSource, 0); } catch (e) { doc.font("Helvetica"); }
+              try {
+                doc.font(fontSource, 0);
+              } catch (e) {
+                doc.font("Helvetica");
+              }
             } else {
               doc.font("Helvetica");
             }
@@ -3021,17 +3692,21 @@ export class OfferController {
         `${Number(totals.subtotal || 0).toFixed(2)} ${offer.currency || "EUR"}`,
         rightAlignX + 120,
         yPos,
-        { align: "right" }
+        { align: "right" },
       );
 
       if (Number(totals.discountAmount || 0) > 0) {
         yPos += 18;
-        doc.text(`Rabatt (${offer.discountPercentage || 0}%)`, rightAlignX, yPos);
+        doc.text(
+          `Rabatt (${offer.discountPercentage || 0}%)`,
+          rightAlignX,
+          yPos,
+        );
         doc.text(
           `-${Number(totals.discountAmount).toFixed(2)} ${offer.currency || "EUR"}`,
           rightAlignX + 120,
           yPos,
-          { align: "right" }
+          { align: "right" },
         );
       }
 
@@ -3042,7 +3717,7 @@ export class OfferController {
           `${Number(totals.shippingCost).toFixed(2)} ${offer.currency || "EUR"}`,
           rightAlignX + 120,
           yPos,
-          { align: "right" }
+          { align: "right" },
         );
       }
 
@@ -3053,7 +3728,7 @@ export class OfferController {
         `${Number(totals.taxAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
         rightAlignX + 120,
         yPos,
-        { align: "right" }
+        { align: "right" },
       );
 
       yPos += 20;
@@ -3068,12 +3743,15 @@ export class OfferController {
         `${Number(totals.totalAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
         rightAlignX + 120,
         yPos + 5,
-        { align: "right" }
+        { align: "right" },
       );
       yPos += 35;
       let notesHeight = 15;
       if (offer.paymentTerms) notesHeight += 15;
-      if (offer.notes) notesHeight += doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
+      if (offer.paymentMethod) notesHeight += 15;
+      if (offer.notes)
+        notesHeight +=
+          doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
 
       if (yPos + notesHeight > pageHeight - 120) {
         doc.addPage();
@@ -3086,8 +3764,17 @@ export class OfferController {
       doc.text("All prices are net prices.", leftAlignX, yPos);
       yPos += 15;
 
+      if (offer.paymentMethod) {
+        doc.text(`Zahlungsart: ${offer.paymentMethod}`, leftAlignX, yPos);
+        yPos += 15;
+      }
+
       if (offer.paymentTerms) {
-        doc.text(`Zahlungsbedingungen: ${offer.paymentTerms}`, leftAlignX, yPos);
+        doc.text(
+          `Zahlungsbedingungen: ${offer.paymentTerms}`,
+          leftAlignX,
+          yPos,
+        );
         yPos += 15;
       }
 
@@ -3109,7 +3796,11 @@ export class OfferController {
 
         doc.fontSize(8).fillColor("#666666");
         if (fontSource) {
-          try { doc.font(fontSource); } catch (e) { doc.font("Helvetica"); }
+          try {
+            doc.font(fontSource);
+          } catch (e) {
+            doc.font("Helvetica");
+          }
         } else {
           doc.font("Helvetica");
         }
@@ -3124,14 +3815,26 @@ export class OfferController {
         doc.text(companyInfo.registrationNumber, centerColumnX, footerY);
         doc.text(companyInfo.ceo, centerColumnX, footerY + 12);
         doc.text(`Ust.-ID: ${companyInfo.vatId}`, centerColumnX, footerY + 24);
-        doc.text(`SteuerNR: ${companyInfo.taxNumber}`, centerColumnX, footerY + 36);
-        doc.text(`WEEE-Reg.-Nr. ${companyInfo.weeeNumber}`, centerColumnX, footerY + 48);
+        doc.text(
+          `SteuerNR: ${companyInfo.taxNumber}`,
+          centerColumnX,
+          footerY + 36,
+        );
+        doc.text(
+          `WEEE-Reg.-Nr. ${companyInfo.weeeNumber}`,
+          centerColumnX,
+          footerY + 48,
+        );
 
         doc.text(`Angebotsnr:`, rightColumnX, footerY);
         doc.font("Helvetica-Bold");
         doc.text(`${offer.offerNumber || "N/A"}`, rightColumnX + 60, footerY);
         doc.font("Helvetica");
-        doc.text(`Seite ${pNum} / ${pages.count}`, rightColumnX + 60, footerY + 48);
+        doc.text(
+          `Seite ${pNum} / ${pages.count}`,
+          rightColumnX + 60,
+          footerY + 48,
+        );
       }
 
       doc.end();
@@ -3353,5 +4056,64 @@ export class OfferController {
         message: "Internal server error",
       });
     }
+  }
+
+  // Generic, dropdown-friendly payment & shipping method lists. Kept in the
+  // controller (not the DB) so the UI can offer consistent options without a
+  // schema change; the chosen value is stored as free text on the offer.
+  async getPaymentMethods(request: Request, response: Response) {
+    try {
+      const methods = [
+        { value: "Prepayment", label: "Prepayment" },
+        { value: "Bank transfer", label: "Bank transfer" },
+        { value: "Cash on delivery", label: "Cash on delivery" },
+        { value: "Invoice", label: "Invoice" },
+        { value: "Credit card", label: "Credit card" },
+        { value: "PayPal", label: "PayPal" },
+      ];
+      return response.status(200).json({ success: true, data: methods });
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
+    }
+  }
+
+  async getShippingMethods(request: Request, response: Response) {
+    try {
+      const methods = [
+        { value: "Standard shipping", label: "Standard shipping" },
+        { value: "Express shipping", label: "Express shipping" },
+        { value: "Freight", label: "Freight" },
+        { value: "Courier", label: "Courier" },
+        { value: "Pickup", label: "Pickup" },
+      ];
+      return response.status(200).json({ success: true, data: methods });
+    } catch (error) {
+      console.error("Error fetching shipping methods:", error);
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
+    }
+  }
+
+  private buildItemSnapshot(item: any): ItemSnapshot {
+    return {
+      id: item.id,
+      itemName: item.item_name,
+      itemNameCn: item.item_name_cn,
+      ean: item.ean ? String(item.ean) : undefined,
+      model: item.model,
+      description: item.remark || item.note,
+      specification: item.model,
+      weight: item.weight,
+      width: item.width,
+      height: item.height,
+      length: item.length,
+      purchasePrice: item.RMB_Price || 0,
+      purchaseCurrency: "RMB",
+      photo: item.photo || "",
+    };
   }
 }

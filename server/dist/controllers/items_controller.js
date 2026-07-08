@@ -135,349 +135,209 @@ exports.feedTransferPrices = feedTransferPrices;
 const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
-        const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
-        const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
-        const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
-        const supplierRepository = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
         const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
-        const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
-        const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
-        const { page = "1", limit = "50", search = "", status = "", category = "", supplier = "", isActive = "", sortBy = "created_at", sortOrder = "DESC", parentId, taricId, isNew, eanSearch, tags, filter, isLabel, company, } = req.query;
-        let pageNum = parseInt(page);
-        if (isNaN(pageNum))
-            pageNum = 1;
-        let limitNum = parseInt(limit);
-        if (isNaN(limitNum))
-            limitNum = 50;
+        // ---- Pagination ----
+        const pageNum = parseInt(req.query.page, 10) || 1;
+        const limitNum = parseInt(req.query.limit, 10) || 50;
         const skip = (pageNum - 1) * limitNum;
-        const ALLOWED_SORT_COLUMNS = new Set([
-            "created_at",
-            "updated_at",
-            "id",
-            "item_name",
-            "price",
-            "synced_at",
-        ]);
-        const safeSortBy = ALLOWED_SORT_COLUMNS.has(sortBy)
-            ? sortBy
-            : "created_at";
-        const safeSortOrder = sortOrder === "ASC" ? "ASC" : "DESC";
-        const applyFilters = (qb) => {
-            if (isLabel) {
-                if (isLabel === "Y") {
-                    qb.andWhere("item.isLabelPrint = true");
-                }
-                else {
-                    qb.andWhere("(item.isLabelPrint = false OR item.isLabelPrint IS NULL)");
-                }
-            }
-            if (company) {
-                const companyStr = company.trim();
-                qb.leftJoin("item.customer", "cust_filter");
-                qb.andWhere("cust_filter.companyName ILIKE :companySearch", {
-                    companySearch: `%${companyStr}%`,
-                });
-            }
-            if (tags) {
-                const tagIds = tags.split(",");
-                const includeTagIds = tagIds
-                    .filter((id) => !id.startsWith("!"))
-                    .map((id) => id.trim());
-                const excludeTagIds = tagIds
-                    .filter((id) => id.startsWith("!"))
-                    .map((id) => id.substring(1).trim());
-                if (includeTagIds.length > 0) {
-                    qb.andWhere((subQb) => {
-                        const subQuery = subQb
-                            .subQuery()
-                            .select("c.id")
-                            .from(items_1.Item, "c")
-                            .innerJoin("c.tags", "t")
-                            .where("t.id IN (:...itemIncludeTagIds)")
-                            .groupBy("c.id")
-                            .having("COUNT(t.id) = :itemIncludeCount");
-                        return `item.id IN ${subQuery.getQuery()}`;
-                    });
-                    qb.setParameter("itemIncludeTagIds", includeTagIds);
-                    qb.setParameter("itemIncludeCount", includeTagIds.length);
-                }
-                if (excludeTagIds.length > 0) {
-                    qb.andWhere((subQb) => {
-                        const subQuery = subQb
-                            .subQuery()
-                            .select("c.id")
-                            .from(items_1.Item, "c")
-                            .innerJoin("c.tags", "t")
-                            .where("t.id IN (:...itemExcludeTagIds)");
-                        return `item.id NOT IN ${subQuery.getQuery()}`;
-                    });
-                    qb.setParameter("itemExcludeTagIds", excludeTagIds);
-                }
-            }
-            if (eanSearch) {
-                const eanStr = eanSearch.replace(/\s+/g, "");
-                qb.andWhere(new typeorm_1.Brackets((b) => {
-                    b.where("REPLACE(CAST(item.ean AS TEXT), ' ', '') ILIKE :ean", {
-                        ean: `%${eanStr}%`,
-                    }).orWhere('EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND (REPLACE(CAST(wi.ean AS TEXT), \' \', \'\') ILIKE :ean))', { ean: `%${eanStr}%` });
-                }));
-            }
-            if (search) {
-                const searchStr = search.trim();
-                qb.andWhere(new typeorm_1.Brackets((b) => {
-                    b.where("(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search OR item.model ILIKE :search)", { search: `%${searchStr}%` }).orWhere('EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND (wi.ean ILIKE :search OR wi.item_no_de ILIKE :search))', { search: `%${searchStr}%` });
-                }));
-                const parsedId = parseInt(searchStr);
-                if (!isNaN(parsedId) && parsedId <= 2147483647) {
-                    qb.orWhere("item.id = :id", { id: parsedId });
-                }
-            }
-            if (isActive) {
-                qb.andWhere(new typeorm_1.Brackets((b) => {
-                    b.where('EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND wi.is_active = :isActive)', { isActive }).orWhere('NOT EXISTS (SELECT 1 FROM warehouse_item wi WHERE wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND item.isActive = :isActive', { isActive });
-                }));
-            }
-            if (category) {
-                const categoryValue = category.trim();
-                qb.leftJoin("item.category", "cat");
-                if (!isNaN(parseInt(categoryValue))) {
-                    qb.andWhere("(item.cat_id = :catId OR TRIM(cat.name) ILIKE :catNameExact)", { catId: parseInt(categoryValue), catNameExact: categoryValue });
-                }
-                else {
-                    qb.andWhere("TRIM(cat.name) ILIKE :catNameExact", {
-                        catNameExact: categoryValue,
-                    });
-                }
-            }
-            if (supplier) {
-                qb.andWhere("item.supplier_id = :supplierId", {
-                    supplierId: parseInt(supplier),
-                });
-            }
-            if (parentId) {
-                qb.andWhere("item.parent_id = :parentId", {
-                    parentId: parseInt(parentId),
-                });
-            }
-            if (taricId) {
-                qb.andWhere("item.taric_id = :taricId", {
-                    taricId: parseInt(taricId),
-                });
-            }
-            if (isNew === "Y") {
-                qb.andWhere("item.is_new IN ('Y', 'y')");
-            }
-            if (filter) {
-                const filterStr = filter;
-                if (filterStr === "rmb_special_no_value") {
-                    qb.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-                    qb.andWhere("item.is_rmb_special = 'Y'");
-                    qb.andWhere("(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)");
-                }
-                else if (filterStr === "eur_special_no_value") {
-                    qb.andWhere("item.is_eur_special = 'Y'");
-                    qb.andWhere("(item.price IS NULL OR item.price = 0 OR item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)");
-                }
-                else if (filterStr === "dimension_special_no_value") {
-                    qb.andWhere("item.is_dimension_special = 'Y'");
-                    qb.andWhere("(item.weight IS NULL OR item.weight = 0 OR item.length IS NULL OR item.length = 0 OR item.width IS NULL OR item.width = 0 OR item.height IS NULL OR item.height = 0)");
-                }
-                else if (filterStr === "missing_var_values_en") {
-                    qb.andWhere((subQb) => {
-                        const subQuery = subQb
-                            .subQuery()
-                            .select("1")
-                            .from(variation_values_1.VariationValue, "vv")
-                            .where("vv.item_id = item.id")
-                            .andWhere("((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
-                            "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
-                            "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))");
-                        return `EXISTS ${subQuery.getQuery()}`;
-                    });
-                }
-                else if (filterStr === "no_taric") {
-                    qb.andWhere("(item.taric_id IS NULL OR item.taric_id = 0)");
-                }
-                else if (filterStr === "mismatched_tarics") {
-                    qb.innerJoin("item.parent", "p_filter");
-                    qb.andWhere("item.taric_id IS NOT NULL AND item.taric_id != 0");
-                    qb.andWhere("p_filter.taric_id IS NOT NULL AND p_filter.taric_id != 0");
-                    qb.andWhere("item.taric_id <> p_filter.taric_id");
-                }
-                else if (filterStr === "null_category") {
-                    qb.andWhere("(item.cat_id IS NULL OR item.cat_id = 0)");
-                }
-                else if (filterStr === "no_supplier") {
-                    qb.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-                    qb.andWhere("item.isActive = 'Y'");
-                    qb.andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)");
-                    qb.andWhere("(si_filter.supplier_id IS NULL OR si_filter.supplier_id = 0)");
-                }
-                else if (filterStr === "no_rmb_price") {
-                    qb.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-                    qb.andWhere("item.isActive = 'Y'");
-                    qb.andWhere("(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)");
-                }
-                else if (filterStr === "is_po_no_url_null") {
-                    qb.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-                    qb.andWhere("si_filter.is_po = 'No'");
-                    qb.andWhere("(si_filter.url IS NULL OR si_filter.url = '' OR si_filter.url = 'null' OR si_filter.url = 'NULL')");
-                }
-                else if (filterStr === "is_po_null") {
-                    qb.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-                    qb.andWhere("(si_filter.is_po IS NULL OR si_filter.is_po = '' OR si_filter.is_po = 'null' OR si_filter.is_po = 'NULL')");
-                }
-                else if (filterStr === "new_picture_required") {
-                    qb.andWhere("item.is_npr = 'Y'");
-                }
-                else if (filterStr === "no_picture") {
-                    qb.andWhere("item.isActive = 'Y'");
-                    qb.andWhere("(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')");
-                }
-                else if (filterStr === "multiple_parents_pictures") {
-                    qb.andWhere((subQb) => {
-                        const subQuery = subQb
-                            .subQuery()
-                            .select("sub_item.photo")
-                            .from(items_1.Item, "sub_item")
-                            .where("sub_item.photo IS NOT NULL AND sub_item.photo != '' AND sub_item.photo != 'null' AND sub_item.photo != 'NULL' AND sub_item.parent_id IS NOT NULL")
-                            .groupBy("sub_item.photo")
-                            .having("COUNT(DISTINCT sub_item.parent_id) > 1");
-                        return `item.photo IN ${subQuery.getQuery()}`;
-                    });
-                }
-            }
-            return qb;
-        };
-        const countQueryBuilder = applyFilters(itemRepository.createQueryBuilder("item"));
-        const dataQueryBuilder = applyFilters(itemRepository.createQueryBuilder("item"))
-            .leftJoinAndSelect("item.tags", "tags")
-            .orderBy(`item.${safeSortBy}`, safeSortOrder)
+        // ---- Read filters ----
+        const search = (req.query.search || "").trim();
+        const eanSearch = (req.query.eanSearch || "").trim();
+        const isActive = (req.query.isActive || "").trim();
+        const category = (req.query.category || "").trim();
+        const supplier = (req.query.supplier || "").trim();
+        const company = (req.query.company || "").trim(); // customer_id
+        const isLabel = (req.query.isLabel || "").trim();
+        const tagStr = (req.query.tags || "").trim();
+        const tagIds = tagStr
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const incTags = tagIds
+            .filter((t) => !t.startsWith("!"))
+            .map((t) => parseInt(t, 10))
+            .filter((n) => !isNaN(n));
+        const excTags = tagIds
+            .filter((t) => t.startsWith("!"))
+            .map((t) => parseInt(t.slice(1), 10))
+            .filter((n) => !isNaN(n));
+        const idQb = itemRepository
+            .createQueryBuilder("item")
+            .select("item.id")
+            .addSelect("item.created_at")
+            .leftJoin("item.parent", "parent")
+            .leftJoin("item.category", "category");
+        // Name search — case-insensitive
+        if (search) {
+            idQb.andWhere("(LOWER(item.item_name) LIKE :search OR LOWER(item.item_name_cn) LIKE :search OR LOWER(item.model) LIKE :search)", { search: `%${search.toLowerCase()}%` });
+        }
+        // Item No / EAN — case-insensitive; checks item EAN, parent DE number,
+        // item name (EN/CN, where numbers like 0013-1080 may live), and the warehouse
+        if (eanSearch) {
+            idQb.andWhere((qb2) => {
+                const whSub = qb2
+                    .subQuery()
+                    .select("wi_ean.id")
+                    .from(warehouse_items_1.WarehouseItem, "wi_ean")
+                    .where("(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)")
+                    .andWhere("LOWER(wi_ean.item_no_de) LIKE :ean")
+                    .getQuery();
+                return `(LOWER(item.ean) LIKE :ean OR LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR EXISTS ${whSub})`;
+            });
+            idQb.setParameter("ean", `%${eanSearch.toLowerCase()}%`);
+        }
+        // Active status — skipped when searching by Item No, so inactive items
+        // (e.g. a deactivated 0013-1080) still surface on an exact-number lookup
+        if (isActive && !eanSearch) {
+            idQb.andWhere("item.isActive = :isActive", { isActive });
+        }
+        // Category by name
+        if (category) {
+            idQb.andWhere("(category.name = :category OR item.supp_cat = :category)", { category });
+        }
+        // Supplier
+        if (supplier) {
+            idQb.andWhere("item.supplier_id = :supplier", { supplier });
+        }
+        // Company (customer)
+        if (company) {
+            idQb.andWhere("item.customer_id = :company", { company });
+        }
+        // isLabel — tolerant of boolean / tinyint / 'Y'/'N' storage
+        if (isLabel === "Y") {
+            idQb.andWhere("item.isLabelPrint IN (:...labelTrue)", {
+                labelTrue: [1, "1", "Y", true],
+            });
+        }
+        else if (isLabel === "N") {
+            idQb.andWhere("(item.isLabelPrint IS NULL OR item.isLabelPrint IN (:...labelFalse))", { labelFalse: [0, "0", "N", false] });
+        }
+        // Tags — include
+        incTags.forEach((tid, i) => {
+            idQb.andWhere((qb2) => {
+                const sub = qb2
+                    .subQuery()
+                    .select("it_inc.id")
+                    .from(items_1.Item, "it_inc")
+                    .leftJoin("it_inc.tags", `t_inc_${i}`)
+                    .where(`t_inc_${i}.id = :incTag${i}`)
+                    .getQuery();
+                return `item.id IN ${sub}`;
+            });
+            idQb.setParameter(`incTag${i}`, tid);
+        });
+        // Tags — exclude
+        if (excTags.length) {
+            idQb.andWhere((qb2) => {
+                const sub = qb2
+                    .subQuery()
+                    .select("it_exc.id")
+                    .from(items_1.Item, "it_exc")
+                    .leftJoin("it_exc.tags", "t_exc")
+                    .where("t_exc.id IN (:...excTags)")
+                    .getQuery();
+                return `item.id NOT IN ${sub}`;
+            });
+            idQb.setParameter("excTags", excTags);
+        }
+        const [idObjects, totalRecords] = yield idQb
+            .orderBy("item.created_at", "DESC")
             .skip(skip)
-            .take(limitNum);
-        const [totalRecords, items] = yield Promise.all([
-            countQueryBuilder.getCount(),
-            dataQueryBuilder.getMany(),
-        ]);
-        const itemIds = items.map((item) => item.id);
-        const parentIds = [
-            ...new Set(items.map((i) => i.parent_id).filter(Boolean)),
-        ];
-        const taricIds = [
-            ...new Set(items.map((i) => i.taric_id).filter(Boolean)),
-        ];
-        const catIds = [
-            ...new Set(items.map((i) => i.cat_id).filter(Boolean)),
-        ];
-        const itemSupplierIds = [
-            ...new Set(items.map((i) => i.supplier_id).filter(Boolean)),
-        ];
-        const customerIds = [
-            ...new Set(items.map((i) => i.customer_id).filter(Boolean)),
-        ];
-        const itemIdDEs = items
+            .take(limitNum)
+            .getManyAndCount();
+        const targetIds = idObjects.map((io) => io.id);
+        if (targetIds.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    totalRecords,
+                    totalPages: Math.ceil(totalRecords / limitNum),
+                },
+            });
+        }
+        // STEP 2: Pull full records for the matched IDs
+        const items = yield itemRepository
+            .createQueryBuilder("item")
+            .select([
+            "item.id",
+            "item.item_name",
+            "item.item_name_cn",
+            "item.ean",
+            "item.ItemID_DE",
+            "item.isActive",
+            "item.parent_id",
+            "item.taric_id",
+            "item.cat_id",
+            "item.supp_cat",
+            "item.supplier_id",
+            "item.customer_id",
+            "item.isLabelPrint",
+            "item.photo",
+            "item.pix_path",
+            "item.pix_path_eBay",
+            "item.weight",
+            "item.length",
+            "item.width",
+            "item.height",
+            "item.remark",
+            "item.model",
+            "item.is_rmb_special",
+            "item.is_eur_special",
+            "item.is_dimension_special",
+            "item.is_npr",
+            "item.is_new",
+            "item.price",
+            "item.transfer_price_EUR",
+            "item.created_at",
+            "item.updated_at",
+            "item.tagOrder",
+        ])
+            .leftJoinAndSelect("item.tags", "tags")
+            .leftJoin("item.parent", "parent")
+            .addSelect([
+            "parent.id",
+            "parent.de_no",
+            "parent.name_de",
+            "parent.name_en",
+            "parent.name_cn",
+        ])
+            .leftJoin("item.category", "category")
+            .addSelect(["category.id", "category.name"])
+            .leftJoin("item.customer", "customer")
+            .addSelect(["customer.id", "customer.companyName"])
+            .where("item.id IN (:...targetIds)", { targetIds })
+            .orderBy("item.created_at", "DESC")
+            .getMany();
+        // STEP 3: Warehouse metrics
+        const targetItemIDsDE = items
             .map((i) => i.ItemID_DE)
             .filter(Boolean);
-        const missingSupplierIds = items
-            .filter((i) => !i.supplier_id)
-            .map((i) => i.id);
-        const [parents, tarics, cats, suppliersList, warehouseItems, supplierItems, customers, defaultSIsForMissing,] = yield Promise.all([
-            parentIds.length > 0
-                ? parentRepository.find({
-                    where: { id: (0, typeorm_1.In)(parentIds) },
-                    select: ["id", "de_no", "name_de", "name_en", "name_cn"],
-                })
-                : Promise.resolve([]),
-            taricIds.length > 0
-                ? taricRepository.find({
-                    where: { id: (0, typeorm_1.In)(taricIds) },
-                    select: ["id", "code", "description_de"],
-                })
-                : Promise.resolve([]),
-            catIds.length > 0
-                ? categoryRepository.find({
-                    where: { id: (0, typeorm_1.In)(catIds) },
-                    select: ["id", "name"],
-                })
-                : Promise.resolve([]),
-            itemSupplierIds.length > 0
-                ? supplierRepository.find({
-                    where: { id: (0, typeorm_1.In)(itemSupplierIds) },
-                    select: ["id", "name", "company_name"],
-                })
-                : Promise.resolve([]),
-            itemIds.length > 0
-                ? warehouseRepository.find({
-                    where: [
-                        { item_id: (0, typeorm_1.In)(itemIds) },
-                        ...(itemIdDEs.length > 0 ? [{ ItemID_DE: (0, typeorm_1.In)(itemIdDEs) }] : []),
-                    ],
-                })
-                : Promise.resolve([]),
-            itemIds.length > 0
-                ? supplierItemRepository.find({ where: { item_id: (0, typeorm_1.In)(itemIds) } })
-                : Promise.resolve([]),
-            customerIds.length > 0
-                ? customerRepository.find({
-                    where: { id: (0, typeorm_1.In)(customerIds) },
-                    select: ["id", "companyName"],
-                })
-                : Promise.resolve([]),
-            missingSupplierIds.length > 0
-                ? supplierItemRepository.find({
-                    where: { item_id: (0, typeorm_1.In)(missingSupplierIds), is_default: "Y" },
-                    relations: ["supplier"],
-                })
-                : Promise.resolve([]),
-        ]);
-        const parentMap = new Map(parents.map((p) => [p.id, p]));
-        const taricMap = new Map(tarics.map((t) => [t.id, t]));
-        const catMap = new Map(cats.map((c) => [c.id, c]));
-        const supplierMap = new Map(suppliersList.map((s) => [s.id, s]));
-        const customerMap = new Map(customers.map((c) => [c.id, c]));
-        const rmbPriceMap = new Map();
-        const defaultSIByItem = new Map();
-        supplierItems.forEach((si) => {
-            const existing = rmbPriceMap.get(si.item_id);
-            if (!existing || si.is_default === "Y") {
-                rmbPriceMap.set(si.item_id, si.price_rmb);
-            }
-            if (si.is_default === "Y" && !defaultSIByItem.has(si.item_id)) {
-                defaultSIByItem.set(si.item_id, si);
-            }
-        });
-        const defaultSIMap = new Map();
-        defaultSIsForMissing.forEach((si) => {
-            var _a, _b;
-            defaultSIMap.set(si.item_id, {
-                id: si.supplier_id,
-                name: ((_a = si.supplier) === null || _a === void 0 ? void 0 : _a.name) || null,
-                company_name: ((_b = si.supplier) === null || _b === void 0 ? void 0 : _b.company_name) || null,
-            });
-        });
-        const warehouseByItemId = new Map(warehouseItems
-            .filter((wi) => wi.item_id)
-            .map((wi) => [wi.item_id, wi]));
-        const warehouseByItemIdDE = new Map(warehouseItems
-            .filter((wi) => wi.ItemID_DE)
-            .map((wi) => [wi.ItemID_DE, wi]));
+        const warehouseItems = yield warehouseRepository
+            .createQueryBuilder("wi")
+            .select([
+            "wi.id",
+            "wi.item_id",
+            "wi.ItemID_DE",
+            "wi.item_no_de",
+            "wi.item_name_de",
+            "wi.ean",
+            "wi.is_active",
+        ])
+            .where("wi.item_id IN (:...targetIds)", { targetIds })
+            .orWhere(targetItemIDsDE.length > 0
+            ? "wi.ItemID_DE IN (:...targetItemIDsDE)"
+            : "1=0", { targetItemIDsDE })
+            .getMany();
+        // STEP 4: Format
         const formattedItems = items.map((item) => {
-            var _a, _b;
-            const parentData = item.parent_id
-                ? parentMap.get(item.parent_id)
-                : null;
-            const taricData = item.taric_id ? taricMap.get(item.taric_id) : null;
-            const warehouseData = (item.ItemID_DE ? warehouseByItemIdDE.get(item.ItemID_DE) : null) ||
-                warehouseByItemId.get(item.id) ||
-                null;
-            const supplierData = item.supplier_id
-                ? supplierMap.get(item.supplier_id)
-                : defaultSIMap.get(item.id);
-            const effectiveSupplierId = item.supplier_id || ((_a = defaultSIMap.get(item.id)) === null || _a === void 0 ? void 0 : _a.id) || null;
-            const customerData = item.customer_id
-                ? customerMap.get(item.customer_id)
-                : null;
-            const defaultSI = defaultSIByItem.get(item.id);
+            var _a;
+            const parentData = item.parent || null;
+            const customerData = item.customer || null;
+            const warehouseData = warehouseItems.find((wi) => wi.item_id === item.id ||
+                (item.ItemID_DE && wi.ItemID_DE === item.ItemID_DE)) || null;
             return {
                 id: item.id,
                 de_no: (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.item_no_de) || (parentData === null || parentData === void 0 ? void 0 : parentData.de_no) || null,
@@ -494,11 +354,8 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 parent_id: item.parent_id || null,
                 taric_id: item.taric_id || null,
                 category_id: item.cat_id || null,
-                category: (item.cat_id ? (_b = catMap.get(item.cat_id)) === null || _b === void 0 ? void 0 : _b.name : null) ||
-                    item.supp_cat ||
-                    null,
-                supplier_id: effectiveSupplierId,
-                supplier_name: (supplierData === null || supplierData === void 0 ? void 0 : supplierData.company_name) || (supplierData === null || supplierData === void 0 ? void 0 : supplierData.name) || null,
+                category: ((_a = item.category) === null || _a === void 0 ? void 0 : _a.name) || item.supp_cat || null,
+                supplier_id: item.supplier_id || null,
                 customer_id: item.customer_id || null,
                 customer_name: (customerData === null || customerData === void 0 ? void 0 : customerData.companyName) || null,
                 isLabelPrint: item.isLabelPrint || false,
@@ -512,30 +369,13 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 height: item.height,
                 remark: item.remark,
                 model: item.model,
-                painPoints: item.painPoints || [],
-                taric_code: (taricData === null || taricData === void 0 ? void 0 : taricData.code) || null,
-                synced_at: item.synced_at,
                 is_rmb_special: item.is_rmb_special,
                 is_eur_special: item.is_eur_special,
                 is_dimension_special: item.is_dimension_special,
                 is_npr: item.is_npr,
                 is_new: item.is_new,
-                ship_class: (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.ship_class) || null,
-                is_po: (defaultSI === null || defaultSI === void 0 ? void 0 : defaultSI.is_po) || null,
-                url: (defaultSI === null || defaultSI === void 0 ? void 0 : defaultSI.url) || null,
-                rmb_price: rmbPriceMap.get(item.id) || null,
                 price: item.price,
                 transfer_price_EUR: item.transfer_price_EUR,
-                warehouse_data: warehouseData
-                    ? {
-                        id: warehouseData.id,
-                        item_no_de: warehouseData.item_no_de,
-                        stock_qty: warehouseData.stock_qty,
-                        msq: warehouseData.msq,
-                        buffer: warehouseData.buffer,
-                        is_stock_item: warehouseData.is_stock_item,
-                    }
-                    : null,
                 created_at: item.created_at,
                 updated_at: item.updated_at,
                 tags: item.tags || [],
@@ -543,7 +383,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
             };
         });
         const user = req.user;
-        const filteredData = (0, dataFilter_1.filterDataByRole)(formattedItems, (user === null || user === void 0 ? void 0 : user.role) || users_1.UserRole.STAFF);
+        const filteredData = (0, dataFilter_1.filterDataByRole)(formattedItems, (user === null || user === void 0 ? void 0 : user.role) || "STAFF");
         return res.status(200).json({
             success: true,
             data: filteredData,
@@ -561,7 +401,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.getItems = getItems;
 const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8;
     try {
         const { id } = req.params;
         if (!id) {
@@ -585,7 +425,14 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
         const item = yield itemRepository.findOne({
             where: { id: parseInt(id) },
-            relations: ["parent", "taric", "category", "supplier", "tags"],
+            relations: [
+                "parent",
+                "taric",
+                "category",
+                "supplier",
+                "tags",
+                "customer",
+            ],
         });
         console.log(item);
         if (!item) {
@@ -698,16 +545,8 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             supplier_id: item.supplier_id,
             supplier_name: ((_d = item.supplier) === null || _d === void 0 ? void 0 : _d.company_name) || ((_e = item.supplier) === null || _e === void 0 ? void 0 : _e.name) || "",
             customer_id: item.customer_id || null,
-            customer_name: (customer === null || customer === void 0 ? void 0 : customer.companyName) || "",
-            customer: customer
-                ? {
-                    id: customer.id,
-                    companyName: customer.companyName,
-                    legalName: customer.legalName || "",
-                    customerNumber: customer.customerNumber || "",
-                    email: customer.email || "",
-                }
-                : null,
+            customer_name: ((_f = item.customer) === null || _f === void 0 ? void 0 : _f.companyName) || "",
+            customer: item.customer,
             painPoints: item.painPoints || [],
             isActive: primaryWarehouseItem
                 ? primaryWarehouseItem.is_active === "Y"
@@ -720,11 +559,11 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 ? Number(item.transfer_price_EUR).toFixed(2)
                 : "null",
             parent: {
-                noDE: ((_f = item.parent) === null || _f === void 0 ? void 0 : _f.de_no) || item.parent_no_de || "",
-                nameDE: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.name_de) || "",
-                nameEN: ((_h = item.parent) === null || _h === void 0 ? void 0 : _h.name_en) || "",
-                isActive: ((_j = item.parent) === null || _j === void 0 ? void 0 : _j.is_active) === "Y",
-                isSpecialItem: ((_k = item.parent) === null || _k === void 0 ? void 0 : _k.is_NwV) === "Y",
+                noDE: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.de_no) || item.parent_no_de || "",
+                nameDE: ((_h = item.parent) === null || _h === void 0 ? void 0 : _h.name_de) || "",
+                nameEN: ((_j = item.parent) === null || _j === void 0 ? void 0 : _j.name_en) || "",
+                isActive: ((_k = item.parent) === null || _k === void 0 ? void 0 : _k.is_active) === "Y",
+                isSpecialItem: ((_l = item.parent) === null || _l === void 0 ? void 0 : _l.is_NwV) === "Y",
                 priceEUR: 0,
                 priceRMB: rmbPrice || 0,
                 isEURSpecial: item.is_eur_special || "N",
@@ -732,42 +571,42 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 isDimensionSpecial: item.is_dimension_special || "N",
             },
             dimensions: {
-                isbn: ((_l = item.ISBN) === null || _l === void 0 ? void 0 : _l.toString()) || "0",
-                weight: ((_m = item.weight) === null || _m === void 0 ? void 0 : _m.toString()) || "0",
-                length: ((_o = item.length) === null || _o === void 0 ? void 0 : _o.toString()) || "0",
-                width: ((_p = item.width) === null || _p === void 0 ? void 0 : _p.toString()) || "0",
-                height: ((_q = item.height) === null || _q === void 0 ? void 0 : _q.toString()) || "0",
+                isbn: ((_m = item.ISBN) === null || _m === void 0 ? void 0 : _m.toString()) || "0",
+                weight: ((_o = item.weight) === null || _o === void 0 ? void 0 : _o.toString()) || "0",
+                length: ((_p = item.length) === null || _p === void 0 ? void 0 : _p.toString()) || "0",
+                width: ((_q = item.width) === null || _q === void 0 ? void 0 : _q.toString()) || "0",
+                height: ((_r = item.height) === null || _r === void 0 ? void 0 : _r.toString()) || "0",
             },
             variationsDE: {
                 variations: [
-                    (_r = item.parent) === null || _r === void 0 ? void 0 : _r.var_de_1,
-                    (_s = item.parent) === null || _s === void 0 ? void 0 : _s.var_de_2,
-                    (_t = item.parent) === null || _t === void 0 ? void 0 : _t.var_de_3,
+                    (_s = item.parent) === null || _s === void 0 ? void 0 : _s.var_de_1,
+                    (_t = item.parent) === null || _t === void 0 ? void 0 : _t.var_de_2,
+                    (_u = item.parent) === null || _u === void 0 ? void 0 : _u.var_de_3,
                 ].filter(Boolean),
                 values: variationValues.map((v) => v.value_de).filter(Boolean),
             },
             variationsEN: {
                 variations: [
-                    (_u = item.parent) === null || _u === void 0 ? void 0 : _u.var_en_1,
-                    (_v = item.parent) === null || _v === void 0 ? void 0 : _v.var_en_2,
-                    (_w = item.parent) === null || _w === void 0 ? void 0 : _w.var_en_3,
+                    (_v = item.parent) === null || _v === void 0 ? void 0 : _v.var_en_1,
+                    (_w = item.parent) === null || _w === void 0 ? void 0 : _w.var_en_2,
+                    (_x = item.parent) === null || _x === void 0 ? void 0 : _x.var_en_3,
                 ].filter(Boolean),
                 values: variationValues.map((v) => v.value_en).filter(Boolean),
             },
             others: {
-                taricCode: ((_x = item.taric) === null || _x === void 0 ? void 0 : _x.code) || "",
+                taricCode: ((_y = item.taric) === null || _y === void 0 ? void 0 : _y.code) || "",
                 isQTYdiv: item.is_qty_dividable === "Y",
-                mc: ((_y = item.many_components) === null || _y === void 0 ? void 0 : _y.toString()) || "0",
-                er: ((_z = item.effort_rating) === null || _z === void 0 ? void 0 : _z.toString()) || "0",
+                mc: ((_z = item.many_components) === null || _z === void 0 ? void 0 : _z.toString()) || "0",
+                er: ((_0 = item.effort_rating) === null || _0 === void 0 ? void 0 : _0.toString()) || "0",
                 isMeter: item.is_meter_item === 1,
                 isPU: item.is_pu_item === 1,
                 isNPR: item.is_npr || "N",
                 isNew: item.is_new || "N",
-                warehouseItem: ((_0 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.id) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
-                idDE: ((_1 = item.ItemID_DE) === null || _1 === void 0 ? void 0 : _1.toString()) || "",
+                warehouseItem: ((_1 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.id) === null || _1 === void 0 ? void 0 : _1.toString()) || "",
+                idDE: ((_2 = item.ItemID_DE) === null || _2 === void 0 ? void 0 : _2.toString()) || "",
                 noDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_no_de) || item.parent_no_de || "",
-                nameDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_de) || ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_de) || "",
-                nameEN: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_en) || ((_3 = item.parent) === null || _3 === void 0 ? void 0 : _3.name_en) || "",
+                nameDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_de) || ((_3 = item.parent) === null || _3 === void 0 ? void 0 : _3.name_de) || "",
+                nameEN: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_en) || ((_4 = item.parent) === null || _4 === void 0 ? void 0 : _4.name_en) || "",
                 isActive: primaryWarehouseItem
                     ? primaryWarehouseItem.is_active === "Y"
                     : item.isActive === "Y",
@@ -775,12 +614,12 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 qty: warehouseItems
                     .reduce((sum, wi) => sum + (wi.stock_qty || 0), 0)
                     .toString(),
-                msq: ((_4 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.msq) === null || _4 === void 0 ? void 0 : _4.toString()) || "0",
+                msq: ((_5 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.msq) === null || _5 === void 0 ? void 0 : _5.toString()) || "0",
                 isNAO: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.is_no_auto_order) === "Y",
-                buffer: ((_5 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.buffer) === null || _5 === void 0 ? void 0 : _5.toString()) || "0",
+                buffer: ((_6 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.buffer) === null || _6 === void 0 ? void 0 : _6.toString()) || "0",
                 isSnSI: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.is_SnSI) === "Y",
-                foq: ((_6 = item.FOQ) === null || _6 === void 0 ? void 0 : _6.toString()) || "0",
-                fsq: ((_7 = item.FSQ) === null || _7 === void 0 ? void 0 : _7.toString()) || "0",
+                foq: ((_7 = item.FOQ) === null || _7 === void 0 ? void 0 : _7.toString()) || "0",
+                fsq: ((_8 = item.FSQ) === null || _8 === void 0 ? void 0 : _8.toString()) || "0",
                 rmbPrice: (rmbPrice === null || rmbPrice === void 0 ? void 0 : rmbPrice.toString()) || "0",
                 isDimensionSpecial: item.is_dimension_special || "N",
                 pixPath: item.pix_path || "",
@@ -858,6 +697,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                     };
             })(),
             nprRemarks: item.npr_remark || "",
+            // remark_cn: item. || "",
         };
         const user = req.user;
         const filteredData = (0, dataFilter_1.filterDataByRole)(formattedItem, (user === null || user === void 0 ? void 0 : user.role) || users_1.UserRole.STAFF);
@@ -1100,6 +940,7 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             "width",
             "height",
             "remark",
+            "remark_cn",
             "model",
             "isActive",
             "is_qty_dividable",

@@ -6,7 +6,10 @@ const authorized_1 = require("../middlewares/authorized");
 const router = (0, express_1.Router)();
 router.get("/", authorized_1.authenticateUser, tax_profile_controller_1.getAllTaxProfiles);
 router.post("/", authorized_1.authenticateUser, tax_profile_controller_1.createTaxProfile);
+<<<<<<< HEAD
+=======
 router.get("/:id", authorized_1.authenticateUser, tax_profile_controller_1.getTaxProfileById);
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
 router.put("/:id", authorized_1.authenticateUser, tax_profile_controller_1.updateTaxProfile);
 router.patch("/:id/deactivate", authorized_1.authenticateUser, tax_profile_controller_1.deactivateTaxProfile);
 router.delete("/:id", authorized_1.authenticateUser, tax_profile_controller_1.deleteTaxProfile);

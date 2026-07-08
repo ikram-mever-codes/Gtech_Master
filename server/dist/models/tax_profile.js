@@ -11,6 +11,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TaxProfile = void 0;
 const typeorm_1 = require("typeorm");
+<<<<<<< HEAD
+const country_1 = require("./country");
+=======
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
 let TaxProfile = class TaxProfile {
     get rate() {
         return this.tax_rate;
@@ -29,6 +33,14 @@ __decorate([
     __metadata("design:type", String)
 ], TaxProfile.prototype, "name", void 0);
 __decorate([
+<<<<<<< HEAD
+    (0, typeorm_1.ManyToOne)(() => country_1.Country, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "country_id" }),
+    __metadata("design:type", Object)
+], TaxProfile.prototype, "country", void 0);
+__decorate([
+=======
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
     (0, typeorm_1.Column)({ type: "varchar", length: 150, nullable: true }),
     __metadata("design:type", Object)
 ], TaxProfile.prototype, "tax_case", void 0);

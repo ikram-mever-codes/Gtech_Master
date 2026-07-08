@@ -9,12 +9,25 @@ const offerController = new OfferController();
 // Apply authentication to all offer routes
 router.use(authenticateUser);
 
-// Offer CRUD operations - Restricted to Admin and Sales
+// ---------------------------------------------------------------------------
+// Offer creation - Restricted to Admin and Sales
+// ---------------------------------------------------------------------------
 router.post(
   "/inquiry/:inquiryId",
   authorize(UserRole.SALES),
   offerController.createOfferFromInquiry.bind(offerController),
 );
+// NEW: create an offer from an existing item (customer prefilled from the
+// item's linked customer, or an explicit customerId in the body)
+router.post(
+  "/from-item/:itemId",
+  authorize(UserRole.SALES),
+  offerController.createOfferFromItem.bind(offerController),
+);
+
+// ---------------------------------------------------------------------------
+// Offer CRUD operations - Restricted to Admin and Sales
+// ---------------------------------------------------------------------------
 router.get(
   "",
   authorize(UserRole.SALES),
@@ -54,10 +67,22 @@ router.get(
   offerController.generateAndDownloadPdf.bind(offerController),
 );
 
+// ---------------------------------------------------------------------------
 // Line item operations
+// ---------------------------------------------------------------------------
+// NEW: add a line item to an offer (needed for customer/blank offers)
+router.post(
+  "/:offerId/line-items",
+  offerController.createLineItem.bind(offerController),
+);
 router.put(
   "/:offerId/line-items/:lineItemId",
   offerController.updateLineItem.bind(offerController),
+);
+// NEW: delete a line item
+router.delete(
+  "/:offerId/line-items/:lineItemId",
+  offerController.deleteLineItem.bind(offerController),
 );
 router.put(
   "/:offerId/line-items/bulk",

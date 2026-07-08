@@ -68,6 +68,7 @@ import {
 } from "@/api/items";
 import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
+import { getAllCustomers } from "@/api/customers";
 import { uploadFile, deleteFile } from "@/api/library";
 import {
   successStyles,
@@ -77,16 +78,12 @@ import {
 } from "@/utils/constants";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import ItemCreateModal from "@/components/Item/ItemCreateModal";
-import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 import ParentModal from "@/components/Item/ParentModal";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
-import {
-  TagBadge,
-  sortTags,
-  type Tag,
-} from "@/components/Tags/TagManager";
+import { TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
 import { SuppliersPage } from "@/components/Supplier/SuppliersPage";
 import { formatDate } from "@/utils/date";
+import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
@@ -106,12 +103,13 @@ const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 const ItemsManagementPage: React.FC = () => {
@@ -143,14 +141,33 @@ const ItemsManagementPage: React.FC = () => {
   const [refTarics, setRefTarics] = useState<Taric[]>([]);
   const [refSuppliers, setRefSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [refDataLoaded, setRefDataLoaded] = useState(false);
+  const refDataLoadingRef = useRef(false);
+  const [itemsFirstLoaded, setItemsFirstLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportingNew, setExportingNew] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [newItemsCount, setNewItemsCount] = useState(0);
 
-  const [page, setPage] = useState(1);
+  const [showItemPreview, setShowItemPreview] = useState(false);
+  const [previewRow, setPreviewRow] = useState<any>(null);
+  const [previewItem, setPreviewItem] = useState<any>(null);
+  const [previewForm, setPreviewForm] = useState<any>({});
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewEdit, setPreviewEdit] = useState(false);
+  const [previewSaving, setPreviewSaving] = useState(false);
+  const [previewQuality, setPreviewQuality] = useState<any[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPictures, setUploadingPictures] = useState(false);
+  const [page, setPage] = useState(() => {
+    const p = parseInt(searchParams.get("page") || "1", 10);
+    return isNaN(p) || p < 1 ? 1 : p;
+  });
+  const didMountRef = useRef(false);
   const [showFilters, setShowFilters] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectedTarics, setSelectedTarics] = useState<Set<string>>(new Set());
@@ -226,10 +243,10 @@ const ItemsManagementPage: React.FC = () => {
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
+        item?.pix_path_eBay ||
+        item?.pictures?.shopPicture ||
+        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+        null,
     );
 
   const getStatusBadgeColor = (status: string) => {
@@ -295,7 +312,74 @@ const ItemsManagementPage: React.FC = () => {
     for (let i = 0; i < 12; i++) ean12 += Math.floor(Math.random() * 10);
     return `${ean12}${calculateEAN13Checksum(ean12)}`;
   };
-  const refreshCountsRef = useRef<() => Promise<void>>(async () => { });
+  const refreshCountsRef = useRef<() => Promise<void>>(async () => {});
+
+  // ---------------------------------------------------------------------------
+  // Field mapping: normalize whatever shape getItemById / the row returns into
+  // one consistent object the preview/edit modal can rely on. Falls back to the
+  // already-loaded list row when a field is missing from the detail response.
+  // ---------------------------------------------------------------------------
+  const normalizeItem = (raw: any, fallbackRow: any) => {
+    const r = raw || {};
+    const fb = fallbackRow || {};
+    const pick = (...vals: any[]) => {
+      for (const v of vals) {
+        if (v !== undefined && v !== null && v !== "") return v;
+      }
+      return "";
+    };
+    return {
+      id: r.id ?? fb.id,
+      // Names
+      item_name: pick(r.item_name, fb.item_name),
+      item_name_cn: pick(r.item_name_cn, fb.item_name_cn),
+      item_name_de: pick(
+        r.item_name_de,
+        r.name_de,
+        fb.item_name_de,
+        fb.name_de,
+      ),
+      name_de: pick(r.name_de, r.parent?.name_de, fb.name_de),
+      name_en: pick(r.name_en, r.parent?.name_en, fb.name_en),
+      name_cn: pick(r.name_cn, r.parent?.name_cn, fb.name_cn),
+      // Identifiers
+      de_no: pick(r.de_no, r.parent?.de_no, fb.de_no),
+      ean: pick(r.ean, fb.ean),
+      ItemID_DE: pick(r.ItemID_DE, fb.ItemID_DE),
+      model: pick(r.model, fb.model),
+      // Classification
+      category: pick(r.category?.name, r.category, r.supp_cat, fb.category),
+      cat_id: pick(r.cat_id, r.category_id, r.category?.id, fb.category_id),
+      supplier_id: String(pick(r.supplier_id, fb.supplier_id) || ""),
+      taric_id: String(pick(r.taric_id, fb.taric_id) || ""),
+      parent_id: pick(r.parent_id, r.parent?.id, fb.parent_id),
+      // Company / customer
+      customer_id: String(
+        pick(r.customer_id, r.customer?.id, fb.customer_id) || "",
+      ),
+      customer_name: getCompany(r) || getCompany(fb) || "",
+      // Status / flags
+      isActive: pick(r.isActive, r.is_active, fb.is_active, "Y"),
+      isLabelPrint: r.isLabelPrint ?? fb.isLabelPrint ?? false,
+      is_new: pick(r.is_new, fb.is_new, "N"),
+      // Dimensions / pricing
+      weight: r.weight ?? fb.weight ?? "",
+      length: r.length ?? fb.length ?? "",
+      width: r.width ?? fb.width ?? "",
+      height: r.height ?? fb.height ?? "",
+      price: r.price ?? fb.price ?? "",
+      transfer_price_EUR: r.transfer_price_EUR ?? fb.transfer_price_EUR ?? "",
+      // Misc
+      remark: pick(r.remark, fb.remark),
+      photo: r.photo ?? fb.photo ?? null,
+      pix_path: r.pix_path ?? fb.pix_path ?? null,
+      pix_path_eBay: r.pix_path_eBay ?? fb.pix_path_eBay ?? null,
+      tags: r.tags ?? fb.tags ?? [],
+      tagOrder: r.tagOrder ?? fb.tagOrder,
+      created_at: r.created_at ?? fb.created_at,
+      updated_at: r.updated_at ?? fb.updated_at,
+    };
+  };
 
   const fetchTab = useCallback(
     async (tab: TabType, force = false) => {
@@ -326,6 +410,7 @@ const ItemsManagementPage: React.FC = () => {
               { refresh: force },
             );
             data = res.data || [];
+            setItemsFirstLoaded(true);
             if (res.pagination) {
               setItemsTotalRecords(res.pagination.totalRecords || 0);
               setItemsTotalPages(res.pagination.totalPages || 1);
@@ -427,35 +512,38 @@ const ItemsManagementPage: React.FC = () => {
     setTabData((prev) => ({ ...prev, items: [], warehouse: [] }));
     fetchTab(activeTab, true);
   }, [auditFilter]);
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const [parentsRes, taricsRes, catsRes, suppliersRes]: any =
-          await Promise.all([
-            getParents({ limit: 1000, isActive: "Y" }),
-            getAllTarics({ limit: 1000 }),
-            getCategories(),
-            getAllSuppliers({ limit: 1000 }),
-          ]);
-        if (!active) return;
-        if (parentsRes?.data) setRefParents(parentsRes.data);
-        if (taricsRes?.data) setRefTarics(taricsRes.data);
-        if (catsRes?.data)
-          setCategories(
-            catsRes.data.filter(
-              (c: any) => !c.name?.toString().trim().startsWith("Imported"),
-            ),
-          );
-        if (suppliersRes?.data) setRefSuppliers(suppliersRes.data);
-      } catch (e) {
-        console.error("Failed to fetch reference data", e);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
+
+  // items have painted, or the first time a modal that needs it opens.
+  const loadReferenceData = useCallback(async () => {
+    if (refDataLoadingRef.current || refDataLoaded) return;
+    refDataLoadingRef.current = true;
+    try {
+      const [parentsRes, taricsRes, catsRes, suppliersRes, customersRes]: any =
+        await Promise.all([
+          getParents({ limit: 1000, isActive: "Y" }),
+          getAllTarics({ limit: 1000 }),
+          getCategories(),
+          getAllSuppliers({ limit: 1000 }),
+          getAllCustomers({ limit: 1000 }),
+        ]);
+      if (parentsRes?.data) setRefParents(parentsRes.data);
+      if (taricsRes?.data) setRefTarics(taricsRes.data);
+      if (catsRes?.data)
+        setCategories(
+          catsRes.data.filter(
+            (c: any) => !c.name?.toString().trim().startsWith("Imported"),
+          ),
+        );
+      if (suppliersRes?.data) setRefSuppliers(suppliersRes.data);
+      if (customersRes?.data)
+        setAllCustomers(customersRes.data.customers || customersRes.data || []);
+      setRefDataLoaded(true);
+    } catch (e) {
+      console.error("Failed to fetch reference data", e);
+    } finally {
+      refDataLoadingRef.current = false;
+    }
+  }, [refDataLoaded]);
 
   const refreshCounts = useCallback(async () => {
     try {
@@ -484,8 +572,17 @@ const ItemsManagementPage: React.FC = () => {
   refreshCountsRef.current = refreshCounts;
 
   useEffect(() => {
-    if (activeTab === "items") refreshCounts();
-  }, [activeTab, refreshCounts]);
+    if (!itemsFirstLoaded) return;
+    const t1 = setTimeout(() => loadReferenceData(), 300);
+    const t2 = setTimeout(() => {
+      if (activeTab === "items") refreshCounts();
+    }, 800);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsFirstLoaded]);
 
   useEffect(() => {
     const supplierParam = searchParams.get("supplier");
@@ -495,6 +592,26 @@ const ItemsManagementPage: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [filters, taricSearch, activeTab]);
+
+  // Reset to page 1 when filters change — but not on first mount (preserve ?page=N)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    setPage(1);
+  }, [filters, taricSearch, activeTab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (page > 1) params.set("page", String(page));
+    else params.delete("page");
+    const qs = params.toString();
+    router.replace(`${window.location.pathname}${qs ? `?${qs}` : ""}`, {
+      scroll: false,
+    });
+  }, [page, router]);
 
   const reloadItems = useCallback(async () => {
     await fetchTab("items", true);
@@ -538,25 +655,163 @@ const ItemsManagementPage: React.FC = () => {
     return res;
   }, [tabData, activeTab, filters, taricSearch]);
 
-  const totalRecords = activeTab === "items" ? itemsTotalRecords : filteredAll.length;
-  const totalPages = activeTab === "items" ? itemsTotalPages : Math.max(1, Math.ceil(totalRecords / PAGE_LIMIT));
+  const totalRecords =
+    activeTab === "items" ? itemsTotalRecords : filteredAll.length;
+  const totalPages =
+    activeTab === "items"
+      ? itemsTotalPages
+      : Math.max(1, Math.ceil(totalRecords / PAGE_LIMIT));
   const safePage = Math.min(page, totalPages);
   const pageData = useMemo(
-    () => activeTab === "items" ? filteredAll : filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
+    () =>
+      activeTab === "items"
+        ? filteredAll
+        : filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
     [filteredAll, safePage, activeTab],
   );
-  const [showItemPreview, setShowItemPreview] = useState(false);
-  const [previewRow, setPreviewRow] = useState<any>(null);
+
   const [showItemModal, setShowItemModal] = useState(false);
 
   const openItemPreview = (row: any) => {
     setPreviewRow(row);
+    setPreviewEdit(false); // always open in view mode
     setShowItemPreview(true);
+    loadReferenceData(); // make sure dropdowns (customers/suppliers/tarics) are ready
   };
 
   const closePreview = () => {
     setShowItemPreview(false);
     setPreviewRow(null);
+    setPreviewItem(null);
+    setPreviewForm({});
+    setPreviewEdit(false);
+    setPreviewSaving(false);
+    setCustomerSearch("");
+    setShowCustomerDropdown(false);
+  };
+
+  // Load full detail + map fields whenever the preview opens for a row.
+  useEffect(() => {
+    if (!showItemPreview || !previewRow?.id) return;
+    let cancelled = false;
+    setPreviewEdit(false);
+    setPreviewLoading(true);
+    setShowCustomerDropdown(false);
+    (async () => {
+      try {
+        const res: any = await getItemById(previewRow.id);
+        const raw = res?.data ?? res;
+        if (cancelled) return;
+        const normalized = normalizeItem(raw, previewRow);
+        setPreviewItem(normalized);
+        setPreviewForm(normalized);
+        setCustomerSearch(normalized.customer_name || "");
+      } catch (e) {
+        // Fall back to the row we already have so the modal still shows values.
+        if (cancelled) return;
+        const normalized = normalizeItem(null, previewRow);
+        setPreviewItem(normalized);
+        setPreviewForm(normalized);
+        setCustomerSearch(normalized.customer_name || "");
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showItemPreview, previewRow?.id]);
+
+  // Searchable customer options (deduped + filtered by the search box).
+  const customerOptions = useMemo(() => {
+    const seen = new Map<string, any>();
+    allCustomers
+      .filter((c) => c.companyName)
+      .forEach((c) => {
+        if (!seen.has(String(c.id))) seen.set(String(c.id), c);
+      });
+    let arr = Array.from(seen.values());
+    const q = customerSearch.trim().toLowerCase();
+    if (q)
+      arr = arr.filter(
+        (c) =>
+          (c.companyName || "").toLowerCase().includes(q) ||
+          String(c.id).includes(q),
+      );
+    return arr
+      .sort((a, b) => (a.companyName || "").localeCompare(b.companyName || ""))
+      .slice(0, 50);
+  }, [allCustomers, customerSearch]);
+
+  const setForm = (key: string, value: any) =>
+    setPreviewForm((p: any) => ({ ...p, [key]: value }));
+
+  const onCategoryChange = (name: string) => {
+    const found = categories.find(
+      (c) => (c.name || "").toString().trim() === name,
+    );
+    setPreviewForm((p: any) => ({
+      ...p,
+      category: name,
+      cat_id: found?.id ?? p.cat_id,
+    }));
+  };
+
+  const selectCustomer = (c: any) => {
+    setPreviewForm((p: any) => ({
+      ...p,
+      customer_id: String(c.id),
+      customer_name: c.companyName,
+    }));
+    setCustomerSearch(c.companyName);
+    setShowCustomerDropdown(false);
+  };
+
+  const clearCustomer = () => {
+    setPreviewForm((p: any) => ({ ...p, customer_id: "", customer_name: "" }));
+    setCustomerSearch("");
+  };
+
+  const savePreview = async () => {
+    if (!previewForm?.id) return;
+    setPreviewSaving(true);
+    try {
+      const payload: any = {
+        item_name: previewForm.item_name,
+        item_name_cn: previewForm.item_name_cn,
+        model: previewForm.model,
+        remark: previewForm.remark,
+        ean: previewForm.ean,
+        cat_id: previewForm.cat_id || null,
+        supplier_id: previewForm.supplier_id || null,
+        taric_id: previewForm.taric_id || null,
+        customer_id: previewForm.customer_id || null,
+        isActive: previewForm.isActive,
+        isLabelPrint: previewForm.isLabelPrint ? 1 : 0,
+        weight: previewForm.weight === "" ? null : previewForm.weight,
+        length: previewForm.length === "" ? null : previewForm.length,
+        width: previewForm.width === "" ? null : previewForm.width,
+        height: previewForm.height === "" ? null : previewForm.height,
+        price: previewForm.price === "" ? null : previewForm.price,
+        transfer_price_EUR:
+          previewForm.transfer_price_EUR === ""
+            ? null
+            : previewForm.transfer_price_EUR,
+      };
+      await updateItem(previewForm.id, payload);
+      toast.success("Item updated successfully", successStyles);
+      setPreviewEdit(false);
+      closePreview();
+      reloadItems();
+    } catch (e: any) {
+      toast.error(
+        e?.response?.data?.message || e?.message || "Failed to update item",
+        errorStyles,
+      );
+    } finally {
+      setPreviewSaving(false);
+    }
   };
 
   const [showTaricModal, setShowTaricModal] = useState(false);
@@ -682,7 +937,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(id);
       fetchTab("parents", true);
-    } catch { }
+    } catch {}
   };
 
   const handleBulk = async (action: "activate" | "deactivate" | "delete") => {
@@ -715,7 +970,7 @@ const ItemsManagementPage: React.FC = () => {
         await deleteTaric(id);
       setSelectedTarics(new Set());
       fetchTab("tarics", true);
-    } catch { }
+    } catch {}
   };
 
   const isTaricTab = activeTab === "tarics";
@@ -883,10 +1138,11 @@ const ItemsManagementPage: React.FC = () => {
             <tr
               key={item.id}
               onClick={() => openItemPreview(item)}
-              className={`cursor-pointer transition-colors ${isNew
-                ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                : "hover:bg-gray-50"
-                }`}
+              className={`cursor-pointer transition-colors ${
+                isNew
+                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                  : "hover:bg-gray-50"
+              }`}
             >
               <td className="px-2 py-2">
                 <div className="w-15 h-15 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
@@ -912,11 +1168,15 @@ const ItemsManagementPage: React.FC = () => {
                   <span className="font-semibold text-gray-700">
                     {item.de_no || "-"}
                   </span>
-                  {(item.customer_name || item.company_name || item.company) && (
+                  {(item.customer_name ||
+                    item.company_name ||
+                    item.company) && (
                     <>
                       <span>-</span>
                       <span className="text-blue-600 font-medium">
-                        {item.customer_name || item.company_name || item.company}
+                        {item.customer_name ||
+                          item.company_name ||
+                          item.company}
                       </span>
                     </>
                   )}
@@ -972,7 +1232,6 @@ const ItemsManagementPage: React.FC = () => {
               setShowParentModal(true);
             }}
           >
-
             <td className="px-4 py-3">
               <div className="font-medium text-gray-900">
                 {parent.de_no || "-"}
@@ -995,10 +1254,11 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${parent.is_active === "Y"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                  : "bg-gray-50 text-gray-600 border-gray-200"
-                  }`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                  parent.is_active === "Y"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                    : "bg-gray-50 text-gray-600 border-gray-200"
+                }`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
               </span>
@@ -1014,7 +1274,6 @@ const ItemsManagementPage: React.FC = () => {
       case "warehouse":
         return pageData.map((w: any) => (
           <tr key={w.id} className="hover:bg-gray-50 transition-colors">
-
             <td className="px-4 py-3">
               <div className="font-medium text-gray-900">
                 {w.item_no_de || "-"}
@@ -1065,10 +1324,11 @@ const ItemsManagementPage: React.FC = () => {
                       is_stock_item: w.is_stock_item === "Y" ? "N" : "Y",
                     })
                   }
-                  className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${w.is_stock_item === "Y"
+                  className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${
+                    w.is_stock_item === "Y"
                       ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
                       : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
-                    }`}
+                  }`}
                 >
                   {w.is_stock_item === "Y" ? "Remove Stock" : "Add Stock"}
                 </button>
@@ -1084,7 +1344,6 @@ const ItemsManagementPage: React.FC = () => {
             className="hover:bg-gray-50 transition-colors cursor-pointer"
             onClick={() => openEditTaric(taric)}
           >
-
             <td className="px-4 py-3">
               <div className="font-medium text-gray-900">
                 {taric.code || "-"}
@@ -1157,6 +1416,49 @@ const ItemsManagementPage: React.FC = () => {
         return null;
     }
   };
+
+  // ---- Small render helpers for the preview/edit modal ----------------------
+  const labelCls =
+    "block text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1";
+  const inputCls =
+    "w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all";
+
+  const roField = (label: string, value: any) => (
+    <div>
+      <div className={labelCls}>{label}</div>
+      <div className="text-sm text-gray-900 break-words">
+        {value !== undefined && value !== null && value !== "" ? value : "—"}
+      </div>
+    </div>
+  );
+
+  const editText = (
+    label: string,
+    key: string,
+    type: string = "text",
+    placeholder = "",
+  ) => (
+    <div>
+      <label className={labelCls}>{label}</label>
+      <input
+        type={type}
+        value={previewForm?.[key] ?? ""}
+        placeholder={placeholder}
+        onChange={(e) =>
+          setForm(
+            key,
+            type === "number"
+              ? e.target.value === ""
+                ? ""
+                : e.target.value
+              : e.target.value,
+          )
+        }
+        className={inputCls}
+      />
+    </div>
+  );
+
   return (
     <div className="w-full mx-auto">
       <div
@@ -1352,7 +1654,6 @@ const ItemsManagementPage: React.FC = () => {
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
-
                 </button>
               ))}
             </nav>
@@ -1379,14 +1680,17 @@ const ItemsManagementPage: React.FC = () => {
                           onChange={(e) =>
                             setFilters({ ...filters, search: e.target.value })
                           }
-                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-900 border-gray-300 bg-white"
-                            }`}
+                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.search
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
                         />
                         {filters.search && (
                           <button
-                            onClick={() => setFilters({ ...filters, search: "" })}
+                            onClick={() =>
+                              setFilters({ ...filters, search: "" })
+                            }
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
                           >
                             <XMarkIcon className="w-3.5 h-3.5" />
@@ -1401,16 +1705,22 @@ const ItemsManagementPage: React.FC = () => {
                           placeholder="Item No..."
                           value={filters.eanSearch}
                           onChange={(e) =>
-                            setFilters({ ...filters, eanSearch: e.target.value })
+                            setFilters({
+                              ...filters,
+                              eanSearch: e.target.value,
+                            })
                           }
-                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-900 border-gray-300 bg-white"
-                            }`}
+                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.eanSearch
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
                         />
                         {filters.eanSearch && (
                           <button
-                            onClick={() => setFilters({ ...filters, eanSearch: "" })}
+                            onClick={() =>
+                              setFilters({ ...filters, eanSearch: "" })
+                            }
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
                           >
                             <XMarkIcon className="w-3.5 h-3.5" />
@@ -1448,10 +1758,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, isLabel: e.target.value })
                         }
-                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.isLabel
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">isLabel...</option>
                         <option value="Y">Yes</option>
@@ -1465,10 +1776,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, supplier: e.target.value })
                         }
-                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.supplier
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.supplier
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">Supplier...</option>
                         {refSuppliers.map((s) => (
@@ -1484,14 +1796,17 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, category: e.target.value })
                         }
-                        className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.category
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">Category</option>
                         {Array.from(
-                          new Set(categories.map((c) => c.name?.toString().trim())),
+                          new Set(
+                            categories.map((c) => c.name?.toString().trim()),
+                          ),
                         )
                           .filter(Boolean)
                           .sort()
@@ -1522,7 +1837,9 @@ const ItemsManagementPage: React.FC = () => {
                         type="text"
                         placeholder="Search Parents..."
                         value={filters.search}
-                        onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                        onChange={(e) =>
+                          setFilters({ ...filters, search: e.target.value })
+                        }
                         className={getInputClass(!!filters.search)}
                       />
                     </div>
@@ -1583,9 +1900,7 @@ const ItemsManagementPage: React.FC = () => {
                   <div className="overflow-x-auto w-full">
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                          {renderTableHeaders()}
-                        </tr>
+                        <tr>{renderTableHeaders()}</tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {pageData.length === 0 ? (
@@ -1608,7 +1923,9 @@ const ItemsManagementPage: React.FC = () => {
                     <div className="flex items-center gap-4">
                       <p className="text-sm text-gray-600">
                         Showing{" "}
-                        {totalRecords === 0 ? 0 : (safePage - 1) * PAGE_LIMIT + 1}{" "}
+                        {totalRecords === 0
+                          ? 0
+                          : (safePage - 1) * PAGE_LIMIT + 1}{" "}
                         to {Math.min(safePage * PAGE_LIMIT, totalRecords)} of{" "}
                         {totalRecords} {activeTab}
                       </p>
@@ -1630,7 +1947,9 @@ const ItemsManagementPage: React.FC = () => {
                         Page {safePage} of {totalPages}
                       </span>
                       <button
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        onClick={() =>
+                          setPage((p) => Math.min(totalPages, p + 1))
+                        }
                         disabled={safePage === totalPages}
                         className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -1644,13 +1963,11 @@ const ItemsManagementPage: React.FC = () => {
           </>
         )}
       </div>
+
       <ItemPreviewModal
         isOpen={showItemPreview}
         onClose={closePreview}
         itemId={previewRow?.id}
-        isRequest={false}
-        onSaved={reloadItems}
-        onDeleted={reloadItems}
       />
 
       {showTaricModal && (

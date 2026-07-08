@@ -12,9 +12,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+<<<<<<< HEAD
+exports.deleteTaxProfile = exports.deactivateTaxProfile = exports.updateTaxProfile = exports.createTaxProfile = exports.getAllTaxProfiles = void 0;
+const database_1 = require("../config/database");
+const tax_profile_1 = require("../models/tax_profile");
+const country_1 = require("../models/country");
+=======
 exports.getTaxProfileById = exports.deleteTaxProfile = exports.deactivateTaxProfile = exports.updateTaxProfile = exports.createTaxProfile = exports.getAllTaxProfiles = void 0;
 const database_1 = require("../config/database");
 const tax_profile_1 = require("../models/tax_profile");
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
 const getAllTaxProfiles = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -22,6 +29,10 @@ const getAllTaxProfiles = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         const includeInactive = req.query.all === "true";
         const taxProfiles = yield taxProfileRepository.find({
             where: includeInactive ? {} : { is_active: true },
+<<<<<<< HEAD
+            relations: ["country"],
+=======
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
             order: {
                 tax_rate: "DESC",
                 name: "ASC",
@@ -41,15 +52,38 @@ exports.getAllTaxProfiles = getAllTaxProfiles;
 const createTaxProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const taxProfileRepository = database_1.AppDataSource.getRepository(tax_profile_1.TaxProfile);
+<<<<<<< HEAD
+        const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
+        const { name, country_id, tax_case, tax_rate, tax_code, revenue_account_no, requires_vat_id, requires_confirmed_vat_id, description, } = req.body;
+=======
         const { name, tax_case, tax_rate, tax_code, revenue_account_no, requires_vat_id, requires_confirmed_vat_id, description, } = req.body;
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
         if (!name) {
             return res.status(400).json({
                 success: false,
                 message: "Tax Profile name is required.",
             });
         }
+<<<<<<< HEAD
+        let countryEntity = null;
+        if (country_id) {
+            countryEntity = yield countryRepository.findOne({
+                where: { id: country_id },
+            });
+            if (!countryEntity) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Linked Country not found.",
+                });
+            }
+        }
         const taxProfile = taxProfileRepository.create({
             name: name.trim(),
+            country: countryEntity,
+=======
+        const taxProfile = taxProfileRepository.create({
+            name: name.trim(),
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
             tax_case: tax_case ? tax_case.trim() : null,
             tax_rate: tax_rate !== undefined ? Number(tax_rate) : 0.0,
             tax_code: tax_code ? tax_code.trim() : null,
@@ -74,10 +108,19 @@ exports.createTaxProfile = createTaxProfile;
 const updateTaxProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const taxProfileRepository = database_1.AppDataSource.getRepository(tax_profile_1.TaxProfile);
+<<<<<<< HEAD
+        const countryRepository = database_1.AppDataSource.getRepository(country_1.Country);
+        const { id } = req.params;
+        const { name, country_id, tax_case, tax_rate, tax_code, revenue_account_no, requires_vat_id, requires_confirmed_vat_id, is_active, description, } = req.body;
+        const profile = yield taxProfileRepository.findOne({
+            where: { id },
+            relations: ["country"],
+=======
         const { id } = req.params;
         const { name, tax_case, tax_rate, tax_code, revenue_account_no, requires_vat_id, requires_confirmed_vat_id, is_active, description, } = req.body;
         const profile = yield taxProfileRepository.findOne({
             where: { id },
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
         });
         if (!profile) {
             return res.status(404).json({
@@ -103,6 +146,26 @@ const updateTaxProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             profile.is_active = !!is_active;
         if (description !== undefined)
             profile.description = description ? description.trim() : undefined;
+<<<<<<< HEAD
+        if (country_id !== undefined) {
+            if (country_id === null || country_id === "") {
+                profile.country = null;
+            }
+            else {
+                const countryEntity = yield countryRepository.findOne({
+                    where: { id: country_id },
+                });
+                if (!countryEntity) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Linked Country not found.",
+                    });
+                }
+                profile.country = countryEntity;
+            }
+        }
+=======
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
         const updated = yield taxProfileRepository.save(profile);
         return res.status(200).json({
             success: true,
@@ -169,6 +232,8 @@ const deleteTaxProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, f
     }
 });
 exports.deleteTaxProfile = deleteTaxProfile;
+<<<<<<< HEAD
+=======
 const getTaxProfileById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const taxProfileRepository = database_1.AppDataSource.getRepository(tax_profile_1.TaxProfile);
@@ -193,3 +258,4 @@ const getTaxProfileById = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     }
 });
 exports.getTaxProfileById = getTaxProfileById;
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f

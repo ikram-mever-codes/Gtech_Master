@@ -115,6 +115,7 @@ export const AppDataSource = new DataSource({
         : false,
   },
   poolSize: 10,
+  cache: true,
 });
 
 const bootstrapAdminUser = async () => {
@@ -173,8 +174,8 @@ export const initializeDatabase = async (): Promise<DataSource> => {
 
     await bootstrapAdminUser();
 
-    const { seedDatabase } = await import("../services/seedDatabase");
-    await seedDatabase();
+    // const { seedDatabase } = await import("../services/seedDatabase");
+    // await seedDatabase();
 
     await fixSequences();
 

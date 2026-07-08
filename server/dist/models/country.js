@@ -27,10 +27,13 @@ __decorate([
     __metadata("design:type", String)
 ], Country.prototype, "name", void 0);
 __decorate([
+<<<<<<< HEAD
+=======
     (0, typeorm_1.Column)({ type: "varchar", length: 150, nullable: true }),
     __metadata("design:type", String)
 ], Country.prototype, "name_de", void 0);
 __decorate([
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
     (0, typeorm_1.Column)({ type: "boolean", default: false }),
     __metadata("design:type", Boolean)
 ], Country.prototype, "is_eu", void 0);

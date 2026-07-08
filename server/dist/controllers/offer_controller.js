@@ -21,7 +21,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.OfferController = exports.CopyPastePricesDto = exports.BulkUpdateLineItemsDto = exports.UpdateLineItemDto = exports.UnitPriceDto = exports.UpdateOfferDto = exports.CreateOfferDto = void 0;
+exports.OfferController = exports.CreateLineItemDto = exports.CreateOfferFromCustomerDto = exports.CreateOfferFromItemDto = exports.CopyPastePricesDto = exports.BulkUpdateLineItemsDto = exports.UpdateLineItemDto = exports.UnitPriceDto = exports.UpdateOfferDto = exports.CreateOfferDto = void 0;
 const database_1 = require("../config/database");
 const offer_1 = require("../models/offer");
 const inquiry_1 = require("../models/inquiry");
@@ -79,6 +79,7 @@ const inquiry_controller_1 = require("./inquiry_controller");
 const items_1 = require("../models/items");
 const tarics_1 = require("../models/tarics");
 const order_controller_1 = require("./order_controller");
+const typeorm_1 = require("typeorm");
 const formatCountry = (country) => {
     if (!country)
         return "";
@@ -455,6 +456,168 @@ __decorate([
     IsString(),
     __metadata("design:type", String)
 ], CopyPastePricesDto.prototype, "data", void 0);
+// ---------------------------------------------------------------------------
+// New DTOs: creating offers from an Item or a Customer, and adding line items
+// to an offer that did not originate from an inquiry.
+// ---------------------------------------------------------------------------
+class CreateOfferFromItemDto {
+}
+exports.CreateOfferFromItemDto = CreateOfferFromItemDto;
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromItemDto.prototype, "customerId", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromItemDto.prototype, "title", void 0);
+__decorate([
+    IsOptional(),
+    IsEnum(["RMB", "HKD", "EUR", "USD"]),
+    __metadata("design:type", String)
+], CreateOfferFromItemDto.prototype, "currency", void 0);
+__decorate([
+    IsOptional(),
+    IsDate(),
+    Type(() => Date),
+    __metadata("design:type", Date)
+], CreateOfferFromItemDto.prototype, "validUntil", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromItemDto.prototype, "notes", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromItemDto.prototype, "internalNotes", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromItemDto.prototype, "baseQuantity", void 0);
+__decorate([
+    IsOptional(),
+    IsBoolean(),
+    __metadata("design:type", Boolean)
+], CreateOfferFromItemDto.prototype, "useUnitPrices", void 0);
+__decorate([
+    IsOptional(),
+    IsNumber(),
+    Min(2),
+    Max(4),
+    __metadata("design:type", Number)
+], CreateOfferFromItemDto.prototype, "unitPriceDecimalPlaces", void 0);
+__decorate([
+    IsOptional(),
+    IsNumber(),
+    Min(2),
+    Max(4),
+    __metadata("design:type", Number)
+], CreateOfferFromItemDto.prototype, "totalPriceDecimalPlaces", void 0);
+__decorate([
+    IsOptional(),
+    IsNumber(),
+    Min(0),
+    Max(10),
+    __metadata("design:type", Number)
+], CreateOfferFromItemDto.prototype, "maxUnitPriceColumns", void 0);
+class CreateOfferFromCustomerDto {
+}
+exports.CreateOfferFromCustomerDto = CreateOfferFromCustomerDto;
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromCustomerDto.prototype, "title", void 0);
+__decorate([
+    IsOptional(),
+    IsEnum(["RMB", "HKD", "EUR", "USD"]),
+    __metadata("design:type", String)
+], CreateOfferFromCustomerDto.prototype, "currency", void 0);
+__decorate([
+    IsOptional(),
+    IsDate(),
+    Type(() => Date),
+    __metadata("design:type", Date)
+], CreateOfferFromCustomerDto.prototype, "validUntil", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromCustomerDto.prototype, "notes", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateOfferFromCustomerDto.prototype, "internalNotes", void 0);
+__decorate([
+    IsOptional(),
+    IsBoolean(),
+    __metadata("design:type", Boolean)
+], CreateOfferFromCustomerDto.prototype, "useUnitPrices", void 0);
+__decorate([
+    IsOptional(),
+    IsNumber(),
+    Min(2),
+    Max(4),
+    __metadata("design:type", Number)
+], CreateOfferFromCustomerDto.prototype, "unitPriceDecimalPlaces", void 0);
+__decorate([
+    IsOptional(),
+    IsNumber(),
+    Min(2),
+    Max(4),
+    __metadata("design:type", Number)
+], CreateOfferFromCustomerDto.prototype, "totalPriceDecimalPlaces", void 0);
+__decorate([
+    IsOptional(),
+    IsNumber(),
+    Min(0),
+    Max(10),
+    __metadata("design:type", Number)
+], CreateOfferFromCustomerDto.prototype, "maxUnitPriceColumns", void 0);
+class CreateLineItemDto {
+}
+exports.CreateLineItemDto = CreateLineItemDto;
+__decorate([
+    IsString(),
+    __metadata("design:type", String)
+], CreateLineItemDto.prototype, "itemName", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateLineItemDto.prototype, "material", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateLineItemDto.prototype, "specification", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateLineItemDto.prototype, "description", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateLineItemDto.prototype, "baseQuantity", void 0);
+__decorate([
+    IsOptional(),
+    IsNumber(),
+    Min(0),
+    __metadata("design:type", Number)
+], CreateLineItemDto.prototype, "basePrice", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateLineItemDto.prototype, "notes", void 0);
 class OfferController {
     constructor() {
         this.offerRepository = database_1.AppDataSource.getRepository(offer_1.Offer);
@@ -483,9 +646,45 @@ class OfferController {
             return `OFF-${year}${month}-${sequence.toString().padStart(4, "0")}`;
         });
     }
+    // -------------------------------------------------------------------------
+    // Shared helpers for building snapshots from a Customer entity. Used by the
+    // inquiry/item/customer create paths so the snapshot shape stays identical.
+    // -------------------------------------------------------------------------
+    buildCustomerSnapshot(customer) {
+        var _a, _b, _c, _d, _e;
+        return {
+            id: customer.id,
+            customerNumber: customer.customerNumber,
+            companyName: customer.companyName,
+            legalName: customer.legalName,
+            email: customer.email,
+            contactEmail: customer.contactEmail,
+            contactPhoneNumber: customer.contactPhoneNumber,
+            vatId: customer.vatTaxId || customer.taxNumber || "",
+            address: customer.addressLine1 || ((_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.address) || "",
+            city: customer.city || ((_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.city) || "",
+            postalCode: customer.postalCode || ((_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.postalCode) || "",
+            country: customer.country || ((_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.country) || "",
+            state: ((_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.state) || "",
+            street: customer.addressLine1 || "Street Address",
+            additionalInfo: customer.addressLine2 || "Additional Info",
+        };
+    }
+    buildDeliveryAddress(customer) {
+        var _a, _b, _c, _d;
+        return {
+            street: customer.addressLine1 || "Street Address",
+            city: customer.city || ((_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.city),
+            state: (_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.state,
+            postalCode: customer.postalCode || ((_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.postalCode),
+            country: customer.country || ((_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.country),
+            contactName: customer.legalName || customer.companyName,
+            contactPhone: customer.contactPhoneNumber,
+        };
+    }
     createOfferFromInquiry(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+            var _a, _b, _c, _d, _e;
             try {
                 const { inquiryId } = request.params;
                 const createOfferDto = plainToInstance(CreateOfferDto, request.body, {
@@ -539,6 +738,9 @@ class OfferController {
                     status: inquiry.status,
                     requestsCount: ((_a = inquiry.requests) === null || _a === void 0 ? void 0 : _a.length) || 0,
                 };
+<<<<<<< HEAD
+                const customerSnapshot = this.buildCustomerSnapshot(customer);
+=======
                 const customerSnapshot = {
                     id: customer.id,
                     customerNumber: customer.customerNumber,
@@ -556,11 +758,16 @@ class OfferController {
                     street: customer.addressLine1 || "Street Address",
                     additionalInfo: customer.addressLine2 || "Additional Info",
                 };
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
                 const defaultUnitPrices = createOfferDto.useUnitPrices
                     ? createOfferDto.defaultUnitPrices || this.createDefaultUnitPrices()
                     : [];
                 const offer = this.offerRepository.create({
                     offerNumber,
+                    sourceType: "inquiry",
+                    itemId: null,
+                    itemSnapshot: null,
+                    customerId: customer.id,
                     title: createOfferDto.title || `Offer for ${inquiry.name}`,
                     inquiry: inquiry,
                     inquiryId: inquiry.id,
@@ -568,10 +775,10 @@ class OfferController {
                     customerSnapshot,
                     deliveryAddress: createOfferDto.deliveryAddress || {
                         street: "Street Address",
-                        city: (_g = customer.businessDetails) === null || _g === void 0 ? void 0 : _g.city,
-                        state: (_h = customer.businessDetails) === null || _h === void 0 ? void 0 : _h.state,
-                        postalCode: (_j = customer.businessDetails) === null || _j === void 0 ? void 0 : _j.postalCode,
-                        country: (_k = customer.businessDetails) === null || _k === void 0 ? void 0 : _k.country,
+                        city: (_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.city,
+                        state: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.state,
+                        postalCode: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.postalCode,
+                        country: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.country,
                         contactName: customer.legalName || customer.companyName,
                         contactPhone: customer.contactPhoneNumber,
                     },
@@ -707,6 +914,237 @@ class OfferController {
                     success: false,
                     message: "Internal server error",
                     error: error instanceof Error ? error.message : "Unknown error",
+                });
+            }
+        });
+    }
+    // ==========================================================================
+    // CREATE FROM ITEM
+    // POST /offers/from-item/:itemId
+    // Prefills the customer (from the item's linked customer, or an explicit
+    // body.customerId) and seeds a single line item from the item's data.
+    // ==========================================================================
+    createOfferFromItem(request, response) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { itemId } = request.params;
+                const body = request.body || {};
+                // Full, de-duplicated, order-preserving id list (param = position 1).
+                const requestedIds = Array.from(new Set([itemId, ...(Array.isArray(body.itemIds) ? body.itemIds : [])].filter((id) => !!id)));
+                if (requestedIds.length === 0) {
+                    return response
+                        .status(400)
+                        .json({ success: false, message: "No item ids provided." });
+                }
+                const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
+                const fetchedItems = yield itemRepository.find({
+                    where: { id: (0, typeorm_1.In)(requestedIds) },
+                    relations: ["customer", "taric"],
+                });
+                if (fetchedItems.length === 0) {
+                    return response
+                        .status(404)
+                        .json({ success: false, message: "No matching items found." });
+                }
+                // find() doesn't guarantee order — restore the requested sequence.
+                const itemById = new Map(fetchedItems.map((it) => [String(it.id), it]));
+                const orderedItems = requestedIds
+                    .map((id) => itemById.get(String(id)))
+                    .filter(Boolean);
+                // Recipient customer: body.customerId wins, else first item's customer.
+                let customer = null;
+                if (body.customerId) {
+                    customer = yield this.customerRepository.findOne({
+                        where: { id: body.customerId },
+                    });
+                }
+                if (!customer) {
+                    customer = orderedItems[0].customer || null;
+                }
+                if (!customer) {
+                    return response.status(400).json({
+                        success: false,
+                        message: "No recipient customer could be resolved. Pass a customerId to create the offer.",
+                    });
+                }
+                const offerNumber = yield this.generateOfferNumber();
+                const customerSnapshot = this.buildCustomerSnapshot(customer);
+                const useUnitPrices = body.useUnitPrices || false;
+                const defaultUnitPrices = useUnitPrices
+                    ? this.createDefaultUnitPrices()
+                    : [];
+                // Top-level snapshot reflects the first item (keeps single-item contract).
+                const primary = orderedItems[0];
+                const primarySnapshot = this.buildItemSnapshot(primary);
+                const offer = this.offerRepository.create({
+                    offerNumber,
+                    sourceType: "item",
+                    title: body.title ||
+                        (orderedItems.length > 1
+                            ? `Offer for ${primarySnapshot.itemName} +${orderedItems.length - 1} more`
+                            : `Offer for ${primarySnapshot.itemName}`),
+                    inquiry: null,
+                    inquiryId: null,
+                    inquirySnapshot: null,
+                    itemId: primarySnapshot.id,
+                    itemSnapshot: primarySnapshot,
+                    customerId: customer.id,
+                    customerSnapshot,
+                    deliveryAddress: this.buildDeliveryAddress(customer),
+                    status: "Draft",
+                    validUntil: body.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                    currency: body.currency || "EUR",
+                    notes: body.notes,
+                    internalNotes: body.internalNotes,
+                    isAssembly: false,
+                    useUnitPrices,
+                    unitPriceDecimalPlaces: body.unitPriceDecimalPlaces || 3,
+                    totalPriceDecimalPlaces: body.totalPriceDecimalPlaces || 2,
+                    maxUnitPriceColumns: body.maxUnitPriceColumns || 3,
+                    defaultUnitPrices,
+                    revision: 1,
+                    subtotal: 0,
+                    taxAmount: 0,
+                    totalAmount: 0,
+                });
+                const savedOffer = yield this.offerRepository.save(offer);
+                // One line item per selected item, positioned in the requested order.
+                const lineItems = orderedItems.map((item, idx) => {
+                    const snap = this.buildItemSnapshot(item);
+                    return this.lineItemRepository.create({
+                        offer: savedOffer,
+                        offerId: savedOffer.id,
+                        sourceItemId: snap.id,
+                        itemName: snap.itemName,
+                        specification: snap.specification,
+                        description: snap.description,
+                        weight: snap.weight,
+                        width: snap.width,
+                        height: snap.height,
+                        length: snap.length,
+                        purchasePrice: snap.purchasePrice,
+                        purchaseCurrency: snap.purchaseCurrency,
+                        baseQuantity: body.baseQuantity || "1",
+                        position: idx + 1,
+                        quantityPrices: [],
+                        unitPrices: useUnitPrices ? this.createDefaultUnitPrices() : [],
+                        lineTotal: 0,
+                    });
+                });
+                yield this.lineItemRepository.save(lineItems);
+                yield this.calculateOfferTotals(savedOffer.id);
+                const completeOffer = yield this.offerRepository.findOne({
+                    where: { id: savedOffer.id },
+                    relations: ["lineItems"],
+                });
+                return response.status(201).json({
+                    success: true,
+                    message: orderedItems.length > 1
+                        ? `Offer created from ${orderedItems.length} items successfully`
+                        : "Offer created from item successfully",
+                    data: completeOffer,
+                });
+            }
+            catch (error) {
+                console.error("Error creating offer from item:", error);
+                return response.status(500).json({
+                    success: false,
+                    message: "Internal server error",
+                    error: error instanceof Error ? error.message : "Unknown error",
+                });
+            }
+        });
+    }
+    // ==========================================================================
+    // ADD A LINE ITEM TO AN EXISTING OFFER
+    // POST /offers/:offerId/line-items
+    // Needed for customer/blank offers (and ad-hoc additions to any offer).
+    // ==========================================================================
+    createLineItem(request, response) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            try {
+                const { offerId } = request.params;
+                const body = request.body || {};
+                if (!body.itemName || !body.itemName.trim()) {
+                    return response
+                        .status(400)
+                        .json({ success: false, message: "itemName is required" });
+                }
+                const offer = yield this.offerRepository.findOne({
+                    where: { id: offerId },
+                    relations: ["lineItems"],
+                });
+                if (!offer) {
+                    return response
+                        .status(404)
+                        .json({ success: false, message: "Offer not found" });
+                }
+                const existing = (offer.lineItems || []).filter((li) => !li.isComponent);
+                const nextPosition = existing.reduce((max, li) => Math.max(max, li.position || 0), 0) + 1;
+                const lineItem = this.lineItemRepository.create({
+                    offer,
+                    offerId: offer.id,
+                    itemName: body.itemName.trim(),
+                    material: body.material,
+                    specification: body.specification,
+                    description: body.description,
+                    baseQuantity: body.baseQuantity || "1",
+                    basePrice: (_a = body.basePrice) !== null && _a !== void 0 ? _a : undefined,
+                    notes: body.notes,
+                    position: nextPosition,
+                    quantityPrices: [],
+                    unitPrices: offer.useUnitPrices ? this.createDefaultUnitPrices() : [],
+                    lineTotal: body.basePrice && body.baseQuantity
+                        ? body.basePrice * (parseFloat(body.baseQuantity) || 1)
+                        : 0,
+                });
+                const saved = yield this.lineItemRepository.save(lineItem);
+                yield this.calculateOfferTotals(offer.id);
+                return response.status(201).json({
+                    success: true,
+                    message: "Line item added successfully",
+                    data: saved,
+                });
+            }
+            catch (error) {
+                console.error("Error adding line item:", error);
+                return response.status(500).json({
+                    success: false,
+                    message: "Internal server error",
+                    error: error instanceof Error ? error.message : "Unknown error",
+                });
+            }
+        });
+    }
+    // ==========================================================================
+    // DELETE A LINE ITEM
+    // DELETE /offers/:offerId/line-items/:lineItemId
+    // ==========================================================================
+    deleteLineItem(request, response) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { offerId, lineItemId } = request.params;
+                const lineItem = yield this.lineItemRepository.findOne({
+                    where: { id: lineItemId, offerId },
+                });
+                if (!lineItem) {
+                    return response
+                        .status(404)
+                        .json({ success: false, message: "Line item not found" });
+                }
+                yield this.lineItemRepository.remove(lineItem);
+                yield this.calculateOfferTotals(offerId);
+                return response.status(200).json({
+                    success: true,
+                    message: "Line item deleted successfully",
+                });
+            }
+            catch (error) {
+                console.error("Error deleting line item:", error);
+                return response.status(500).json({
+                    success: false,
+                    message: "Internal server error",
                 });
             }
         });
@@ -2181,7 +2619,16 @@ class OfferController {
                 }
                 const offer = yield this.offerRepository.findOne({
                     where: { id },
+<<<<<<< HEAD
+                    relations: [
+                        "lineItems",
+                        "inquiry",
+                        "inquiry.contactPerson",
+                        "inquiry.customer",
+                    ],
+=======
                     relations: ["lineItems", "inquiry", "inquiry.contactPerson", "inquiry.customer"],
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
                 });
                 if (!offer) {
                     return response.status(404).json({
@@ -2264,7 +2711,11 @@ class OfferController {
                     };
                 };
                 const totals = calculateTotals(offer);
-                const doc = new pdfkit_1.default({ margin: 50, size: "A4", bufferPages: true });
+                const doc = new pdfkit_1.default({
+                    margin: 50,
+                    size: "A4",
+                    bufferPages: true,
+                });
                 const pageWidth = 595.28;
                 const pageHeight = 841.89;
                 const margin = 50;
@@ -2329,9 +2780,10 @@ class OfferController {
                 let customer = {};
                 if (offer.customerSnapshot) {
                     try {
-                        customer = typeof offer.customerSnapshot === "string"
-                            ? JSON.parse(offer.customerSnapshot)
-                            : offer.customerSnapshot;
+                        customer =
+                            typeof offer.customerSnapshot === "string"
+                                ? JSON.parse(offer.customerSnapshot)
+                                : offer.customerSnapshot;
                     }
                     catch (e) {
                         customer = offer.customerSnapshot;
@@ -2347,7 +2799,8 @@ class OfferController {
                     doc.text(customer.legalName, leftAlignX, yPos);
                     yPos += 12;
                 }
-                else if (customer.additionalInfo && customer.additionalInfo !== "Additional Info") {
+                else if (customer.additionalInfo &&
+                    customer.additionalInfo !== "Additional Info") {
                     doc.text(customer.additionalInfo, leftAlignX, yPos);
                     yPos += 12;
                 }
@@ -2356,12 +2809,19 @@ class OfferController {
                 doc.text(`${customer.postalCode || ""} ${customer.city || ""}`.trim(), leftAlignX, yPos);
                 yPos += 12;
                 const displayCountry = formatCountry(customer.country);
-                if (displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+                if (displayCountry &&
+                    displayCountry.toUpperCase() !== "DE" &&
+                    displayCountry.toUpperCase() !== "GERMANY" &&
+                    displayCountry.toUpperCase() !== "DEUTSCHLAND") {
                     doc.text(displayCountry, leftAlignX, yPos);
                     yPos += 12;
                 }
                 const customerVatId = customer.vatId || customer.vatTaxId || customer.taxNumber || "";
-                if (customerVatId && displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+                if (customerVatId &&
+                    displayCountry &&
+                    displayCountry.toUpperCase() !== "DE" &&
+                    displayCountry.toUpperCase() !== "GERMANY" &&
+                    displayCountry.toUpperCase() !== "DEUTSCHLAND") {
                     doc.text(`VAT ID: ${customerVatId}`, leftAlignX, yPos);
                     yPos += 12;
                 }
@@ -2386,7 +2846,16 @@ class OfferController {
                     ["Datum", formatDate(offer.createdAt)],
                     ["Gültig bis", formatDate(offer.validUntil)],
                     ["Ansprechpartner", contactName],
+<<<<<<< HEAD
+                    [
+                        "Kundennr.",
+                        ((_c = (_b = offer.inquiry) === null || _b === void 0 ? void 0 : _b.customer) === null || _c === void 0 ? void 0 : _c.customerNumber) ||
+                            customer.customerNumber ||
+                            "-",
+                    ],
+=======
                     ["Kundennr.", ((_c = (_b = offer.inquiry) === null || _b === void 0 ? void 0 : _b.customer) === null || _c === void 0 ? void 0 : _c.customerNumber) || customer.customerNumber || "-"],
+>>>>>>> 8f5804b02278fb456cf7e905aeaba4806ef9d96f
                 ];
                 offerDetails.forEach((detail, index) => {
                     const detailY = detailsStartY + index * 15;
@@ -2439,10 +2908,13 @@ class OfferController {
                     .stroke("#333333");
                 doc.fontSize(9).font("Helvetica");
                 const getActivePrice = (lineItem, offerUsesUnitPrices) => {
-                    if (offerUsesUnitPrices && lineItem.unitPrices && lineItem.unitPrices.length > 0) {
+                    if (offerUsesUnitPrices &&
+                        lineItem.unitPrices &&
+                        lineItem.unitPrices.length > 0) {
                         return lineItem.unitPrices.find((up) => up.isActive) || null;
                     }
-                    else if (lineItem.quantityPrices && lineItem.quantityPrices.length > 0) {
+                    else if (lineItem.quantityPrices &&
+                        lineItem.quantityPrices.length > 0) {
                         return lineItem.quantityPrices.find((qp) => qp.isActive) || null;
                     }
                     return null;
@@ -2457,13 +2929,19 @@ class OfferController {
                         let netTotalNum = 0;
                         if (activePrice) {
                             qtyStr = Number(activePrice.quantity).toString();
-                            unitPriceNum = getSafeNumber("unitPrice" in activePrice ? activePrice.unitPrice : activePrice.price);
-                            netTotalNum = getSafeNumber("totalPrice" in activePrice ? activePrice.totalPrice : activePrice.total);
+                            unitPriceNum = getSafeNumber("unitPrice" in activePrice
+                                ? activePrice.unitPrice
+                                : activePrice.price);
+                            netTotalNum = getSafeNumber("totalPrice" in activePrice
+                                ? activePrice.totalPrice
+                                : activePrice.total);
                         }
                         else {
                             qtyStr = Number(item.baseQuantity || 1).toString();
                             unitPriceNum = getSafeNumber(item.basePrice);
-                            netTotalNum = qtyStr ? parseFloat(qtyStr) * unitPriceNum : unitPriceNum;
+                            netTotalNum = qtyStr
+                                ? parseFloat(qtyStr) * unitPriceNum
+                                : unitPriceNum;
                         }
                         const vatRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
                         const grossTotalNum = netTotalNum * (1 + vatRate / 100);
@@ -2471,7 +2949,9 @@ class OfferController {
                         if (item.description) {
                             nameText += `\n${item.description}`;
                         }
-                        if (offer.useUnitPrices && item.unitPrices && item.unitPrices.length > 1) {
+                        if (offer.useUnitPrices &&
+                            item.unitPrices &&
+                            item.unitPrices.length > 1) {
                             nameText += "\nStaffelpreise:";
                             item.unitPrices.slice(0, 3).forEach((up) => {
                                 const activeMark = up.isActive ? " (*)" : "";
@@ -2498,7 +2978,9 @@ class OfferController {
                         else {
                             doc.font("Helvetica");
                         }
-                        const textHeight = doc.heightOfString(nameText, { width: designationWidth });
+                        const textHeight = doc.heightOfString(nameText, {
+                            width: designationWidth,
+                        });
                         doc.font("Helvetica");
                         const computedRowHeight = Math.max(40, textHeight + 12);
                         if (currentY + computedRowHeight > pageHeight - 120) {
@@ -2531,7 +3013,9 @@ class OfferController {
                             currentY = newTableY + headerHeight;
                         }
                         if (rowIndex % 2 === 1) {
-                            doc.rect(leftAlignX, currentY, tableWidth, computedRowHeight).fill("#FAFAFA");
+                            doc
+                                .rect(leftAlignX, currentY, tableWidth, computedRowHeight)
+                                .fill("#FAFAFA");
                         }
                         const rowData = [
                             (rowIndex + 1).toString(),
@@ -2623,7 +3107,8 @@ class OfferController {
                 if (offer.paymentTerms)
                     notesHeight += 15;
                 if (offer.notes)
-                    notesHeight += doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
+                    notesHeight +=
+                        doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
                 if (yPos + notesHeight > pageHeight - 120) {
                     doc.addPage();
                     yPos = 60;
@@ -2879,6 +3364,24 @@ class OfferController {
                 });
             }
         });
+    }
+    buildItemSnapshot(item) {
+        return {
+            id: item.id,
+            itemName: item.item_name,
+            itemNameCn: item.item_name_cn,
+            ean: item.ean ? String(item.ean) : undefined,
+            model: item.model,
+            description: item.remark || item.note,
+            specification: item.model,
+            weight: item.weight,
+            width: item.width,
+            height: item.height,
+            length: item.length,
+            purchasePrice: item.RMB_Price || 0,
+            purchaseCurrency: "RMB",
+            photo: item.photo || "",
+        };
     }
 }
 exports.OfferController = OfferController;
