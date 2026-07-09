@@ -1,4 +1,4 @@
-// import { AppDataSource } from "../config/database";
+import { AppDataSource } from "../config/database";
 // import { Customer } from "../models/customers";
 // import { Item } from "../models/items";
 // import { Parent } from "../models/parents";
@@ -7,24 +7,24 @@
 // import { Category } from "../models/categories";
 // import { TaxProfile } from "../models/tax_profile";
 // import { Country } from "../models/country";
-// import { PaymentMethod } from "../models/payment_methods";
-// import { ShippingMethod } from "../models/shipping_methods";
+import { PaymentMethod } from "../models/payment_methods";
+import { ShippingMethod } from "../models/shipping_methods";
 
-// export const seedDatabase = async () => {
-//     try {
-//         console.log("🌱 Starting database seeding...");
-// 
-//         const customerRepository = AppDataSource.getRepository(Customer);
-//         const itemRepository = AppDataSource.getRepository(Item);
-//         const parentRepository = AppDataSource.getRepository(Parent);
-//         const businessDetailsRepository = AppDataSource.getRepository(BusinessDetails);
-//         const supplierRepository = AppDataSource.getRepository(Supplier);
-//         const categoryRepository = AppDataSource.getRepository(Category);
-//         const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
-//         const countryRepository = AppDataSource.getRepository(Country);
-//         const paymentMethodRepository = AppDataSource.getRepository(PaymentMethod);
-//         const shippingMethodRepository = AppDataSource.getRepository(ShippingMethod);
-// 
+export const seedDatabase = async () => {
+    try {
+        console.log("🌱 Starting database seeding...");
+
+        // const customerRepository = AppDataSource.getRepository(Customer);
+        // const itemRepository = AppDataSource.getRepository(Item);
+        // const parentRepository = AppDataSource.getRepository(Parent);
+        // const businessDetailsRepository = AppDataSource.getRepository(BusinessDetails);
+        // const supplierRepository = AppDataSource.getRepository(Supplier);
+        // const categoryRepository = AppDataSource.getRepository(Category);
+        // const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+        // const countryRepository = AppDataSource.getRepository(Country);
+        const paymentMethodRepository = AppDataSource.getRepository(PaymentMethod);
+        const shippingMethodRepository = AppDataSource.getRepository(ShippingMethod);
+
 //         const existingSuppliers = await supplierRepository.count();
 //         if (existingSuppliers === 0) {
 //             console.log("📦 Seeding suppliers...");
@@ -62,38 +62,38 @@
 //             }
 //         }
 // 
-//         const existingPaymentMethods = await paymentMethodRepository.count();
-//         if (existingPaymentMethods === 0) {
-//             console.log("💳 Seeding payment methods...");
-//             const paymentMethods = [
-//                 { name: "Kauf auf Rechnung", is_prepayment: false, is_active: true },
-//                 { name: "Vorkasse", is_prepayment: true, is_active: true },
-//             ];
-//             for (const pm of paymentMethods) {
-//                 await paymentMethodRepository.save(paymentMethodRepository.create(pm));
-//             }
-//             console.log("  ✓ Seeded default payment methods");
-//         }
-// 
-//         const existingShippingMethods = await shippingMethodRepository.count();
-//         if (existingShippingMethods === 0) {
-//             console.log("🚚 Seeding shipping methods...");
-//             const shippingMethods = [
-//                 { name: "Selbstabholung", is_active: true },
-//                 { name: "Speditionsversand", is_active: true },
-//                 { name: "UPS", is_active: true },
-//                 { name: "GLS", is_active: true },
-//                 { name: "FedEx direkt", is_active: true },
-//                 { name: "FedEx Sammel + UPS", is_active: true },
-//                 { name: "FedEx Sammel + GLS", is_active: true },
-//                 { name: "Bahnfracht + UPS", is_active: true },
-//                 { name: "Bahnfracht + GLS", is_active: true },
-//             ];
-//             for (const sm of shippingMethods) {
-//                 await shippingMethodRepository.save(shippingMethodRepository.create(sm));
-//             }
-//             console.log("  ✓ Seeded default shipping methods");
-//         }
+        const existingPaymentMethods = await paymentMethodRepository.count();
+        if (existingPaymentMethods === 0) {
+            console.log("💳 Seeding payment methods...");
+            const paymentMethods = [
+                { name: "Kauf auf Rechnung", is_prepayment: false, is_active: true },
+                { name: "Vorkasse", is_prepayment: true, is_active: true },
+            ];
+            for (const pm of paymentMethods) {
+                await paymentMethodRepository.save(paymentMethodRepository.create(pm));
+            }
+            console.log("  ✓ Seeded default payment methods");
+        }
+
+        const existingShippingMethods = await shippingMethodRepository.count();
+        if (existingShippingMethods === 0) {
+            console.log("🚚 Seeding shipping methods...");
+            const shippingMethods = [
+                { name: "Selbstabholung", is_active: true },
+                { name: "Speditionsversand", is_active: true },
+                { name: "UPS", is_active: true },
+                { name: "GLS", is_active: true },
+                { name: "FedEx direkt", is_active: true },
+                { name: "FedEx Sammel + UPS", is_active: true },
+                { name: "FedEx Sammel + GLS", is_active: true },
+                { name: "Bahnfracht + UPS", is_active: true },
+                { name: "Bahnfracht + GLS", is_active: true },
+            ];
+            for (const sm of shippingMethods) {
+                await shippingMethodRepository.save(shippingMethodRepository.create(sm));
+            }
+            console.log("  ✓ Seeded default shipping methods");
+        }
 // 
 //         const existingCustomers = await customerRepository.count();
 //         const existingItems = await itemRepository.count();
@@ -437,9 +437,9 @@
 //             console.log(`  ✓ Created item: ${saved.item_name} (${saved.ItemID_DE})`);
 //         }
 // 
-//         console.log("✅ Database seeding completed successfully!");
-//     } catch (error) {
-//         console.error("❌ Error seeding database:", error);
-//         throw error;
-//     }
-// };
+        console.log("✅ Database seeding completed successfully!");
+    } catch (error) {
+        console.error("❌ Error seeding database:", error);
+        throw error;
+    }
+};
