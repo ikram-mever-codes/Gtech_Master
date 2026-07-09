@@ -184,7 +184,7 @@ const ItemRow: React.FC<{
 }> = ({ item, selected, onClick }) => {
   const thumb = getItemThumb(item);
   const name = item.item_name || item.itemName || "Unnamed item";
-  const itemNo = item.de_no || item.ItemID_DE || item.ean || item.id || "";
+  const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   const company = getItemCompany(item);
   const isLabel = item.isLabelPrint || item.isLabel === "Y";
 
@@ -213,20 +213,16 @@ const ItemRow: React.FC<{
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-gray-900 truncate">{name}</div>
         <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-          <span className="font-semibold text-gray-700">{itemNo || "-"}</span>
-          {company && (
-            <>
-              <span>-</span>
-              <span className="text-blue-600 font-medium truncate max-w-[10rem]">
-                {company}
-              </span>
-            </>
-          )}
+          <span className="font-semibold text-gray-700">{itemNo || "—"}</span>
+          <span>-</span>
+          <span className="text-blue-600 font-medium truncate max-w-[10rem]">
+            {company || "—"}
+          </span>
           {isLabel && (
             <>
               <span>-</span>
               <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded uppercase tracking-wider">
-                Label
+                LABEL
               </span>
             </>
           )}
@@ -1097,24 +1093,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       Delivery address
                     </p>
                     <AddressBlock
-                      addr={{
-                        contactName:
-                          selectedCustomer.legalName ||
-                          selectedCustomer.companyName,
-                        street:
-                          selectedCustomer.addressLine1 ||
-                          selectedCustomer.businessDetails?.address,
-                        postalCode:
-                          selectedCustomer.postalCode ||
-                          selectedCustomer.businessDetails?.postalCode,
-                        city:
-                          selectedCustomer.city ||
-                          selectedCustomer.businessDetails?.city,
-                        country:
-                          selectedCustomer.country ||
-                          selectedCustomer.businessDetails?.country,
-                        contactPhone: selectedCustomer.contactPhoneNumber,
-                      }}
+                      addr={
+                        selectedCustomer.deliveryAddressLine1
+                          ? {
+                              contactName:
+                                selectedCustomer.legalName ||
+                                selectedCustomer.companyName,
+                              street: selectedCustomer.deliveryAddressLine1,
+                              postalCode: selectedCustomer.deliveryPostalCode,
+                              city: selectedCustomer.deliveryCity,
+                              country: selectedCustomer.deliveryCountry,
+                              contactPhone: selectedCustomer.contactPhoneNumber,
+                            }
+                          : null
+                      }
                       emptyText="Same as customer address."
                     />
                   </div>
@@ -1200,35 +1192,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
               {/* Common fields — always available once a title exists */}
               <div className="space-y-4 border-t pt-4">
-                {/* <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Currency
-                    </label>
-                    <select
-                      value={createForm.currency}
-                      onChange={(e) => cPatch({ currency: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      {getAvailableCurrencies().map((c: any) => (
-                        <option key={c.value} value={c.value}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Valid until
-                    </label>
-                    <input
-                      type="date"
-                      value={createForm.validUntil}
-                      onChange={(e) => cPatch({ validUntil: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                </div> */}
+
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1271,113 +1235,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 </div>
 
-                {/* Pricing mode: unit pricing default */}
-                {/* <div className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">
-                        Unit pricing
-                      </span>
-                      <span className="ml-2 text-xs text-gray-500">
-                        {createForm.useUnitPrices
-                          ? "(default)"
-                          : "single price per line"}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() =>
-                        cPatch({ useUnitPrices: !createForm.useUnitPrices })
-                      }
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                        createForm.useUnitPrices
-                          ? "bg-green-500"
-                          : "bg-gray-300"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                          createForm.useUnitPrices
-                            ? "translate-x-5"
-                            : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  {createForm.useUnitPrices && (
-                    <>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Unit decimals
-                          </label>
-                          <select
-                            value={createForm.unitPriceDecimalPlaces}
-                            onChange={(e) =>
-                              cPatch({
-                                unitPriceDecimalPlaces: parseInt(
-                                  e.target.value,
-                                ),
-                              })
-                            }
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                          >
-                            <option value={2}>2</option>
-                            <option value={3}>3</option>
-                            <option value={4}>4</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Total decimals
-                          </label>
-                          <select
-                            value={createForm.totalPriceDecimalPlaces}
-                            onChange={(e) =>
-                              cPatch({
-                                totalPriceDecimalPlaces: parseInt(
-                                  e.target.value,
-                                ),
-                              })
-                            }
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                          >
-                            <option value={2}>2</option>
-                            <option value={3}>3</option>
-                            <option value={4}>4</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Starting columns
-                          </label>
-                          <input
-                            type="text"
-                            value={createForm.maxUnitPriceColumns || ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              if (v === "")
-                                return cPatch({ maxUnitPriceColumns: 0 });
-                              if (!/^\d+$/.test(v)) return;
-                              const n = parseInt(v, 10);
-                              if (n > 10)
-                                return toast.error(
-                                  "Max columns is 10.",
-                                  errorStyles,
-                                );
-                              cPatch({ maxUnitPriceColumns: n });
-                            }}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                            placeholder="3"
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        You can add or remove price columns later inside the
-                        offer.
-                      </p>
-                    </>
-                  )}
-                </div> */}
+
               </div>
             </div>
 

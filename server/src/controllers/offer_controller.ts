@@ -936,11 +936,11 @@ export class OfferController {
       const { itemId } = request.params;
       const body: CreateOfferFromItemDto & { itemIds?: string[] } =
         request.body || {};
-      const requestedIds: string[] = Array.from(
+      const requestedIds: number[] = Array.from(
         new Set(
-          [itemId, ...(Array.isArray(body.itemIds) ? body.itemIds : [])].filter(
-            (id): id is string => !!id,
-          ),
+          [itemId, ...(Array.isArray(body.itemIds) ? body.itemIds : [])]
+            .map((id) => parseInt(String(id), 10))
+            .filter((id) => !isNaN(id)),
         ),
       );
 
@@ -952,7 +952,7 @@ export class OfferController {
 
       const itemRepository = AppDataSource.getRepository(Item);
       const fetchedItems: any[] = await itemRepository.find({
-        where: { id: In(requestedIds as any[]) },
+        where: { id: In(requestedIds) },
         relations: ["customer", "taric"],
       });
 
@@ -978,6 +978,7 @@ export class OfferController {
       if (body.customerId) {
         customer = await this.customerRepository.findOne({
           where: { id: body.customerId },
+          relations: ["businessDetails", "starCustomerDetails"],
         });
       }
       if (!customer) {
