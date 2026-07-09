@@ -956,8 +956,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col">
-        {/* ===================== CREATE MODE (inline picker) ===================== */}
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
         {isCreate ? (
           <>
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
@@ -995,8 +994,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </button>
                 ))}
               </div>
-
-              {/* Offer title — always visible for BOTH tabs, editable, prefilled */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Offer title *
@@ -1013,7 +1010,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 />
               </div>
 
-              {/* Filter / search row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1096,15 +1092,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       addr={
                         selectedCustomer.deliveryAddressLine1
                           ? {
-                              contactName:
-                                selectedCustomer.legalName ||
-                                selectedCustomer.companyName,
-                              street: selectedCustomer.deliveryAddressLine1,
-                              postalCode: selectedCustomer.deliveryPostalCode,
-                              city: selectedCustomer.deliveryCity,
-                              country: selectedCustomer.deliveryCountry,
-                              contactPhone: selectedCustomer.contactPhoneNumber,
-                            }
+                            contactName:
+                              selectedCustomer.legalName ||
+                              selectedCustomer.companyName,
+                            street: selectedCustomer.deliveryAddressLine1,
+                            postalCode: selectedCustomer.deliveryPostalCode,
+                            city: selectedCustomer.deliveryCity,
+                            country: selectedCustomer.deliveryCountry,
+                            contactPhone: selectedCustomer.contactPhoneNumber,
+                          }
                           : null
                       }
                       emptyText="Same as customer address."
