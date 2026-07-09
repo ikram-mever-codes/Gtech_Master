@@ -664,14 +664,26 @@ export class OfferController {
   }
 
   private buildDeliveryAddress(customer: Customer | any) {
+    const sc = customer.starCustomerDetails;
+    if (sc && sc.deliveryAddressLine1) {
+      return {
+        street: sc.deliveryAddressLine1,
+        city: sc.deliveryCity || customer.city || customer.businessDetails?.city || "",
+        state: sc.deliveryState || customer.businessDetails?.state || "",
+        postalCode: sc.deliveryPostalCode || customer.postalCode || customer.businessDetails?.postalCode || "",
+        country: sc.deliveryCountry || customer.country || customer.businessDetails?.country || "",
+        contactName: customer.legalName || customer.companyName || "",
+        contactPhone: customer.contactPhoneNumber || "",
+      };
+    }
     return {
       street: customer.addressLine1 || "Street Address",
-      city: customer.city || customer.businessDetails?.city,
-      state: customer.businessDetails?.state,
-      postalCode: customer.postalCode || customer.businessDetails?.postalCode,
-      country: customer.country || customer.businessDetails?.country,
-      contactName: customer.legalName || customer.companyName,
-      contactPhone: customer.contactPhoneNumber,
+      city: customer.city || customer.businessDetails?.city || "",
+      state: customer.businessDetails?.state || "",
+      postalCode: customer.postalCode || customer.businessDetails?.postalCode || "",
+      country: customer.country || customer.businessDetails?.country || "",
+      contactName: customer.legalName || customer.companyName || "",
+      contactPhone: customer.contactPhoneNumber || "",
     };
   }
 

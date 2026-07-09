@@ -52,6 +52,8 @@ import {
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
 import { getItems } from "@/api/items";
+import { getAllPaymentMethods } from "@/api/payment_methods";
+import { getAllShippingMethods } from "@/api/shipping_methods";
 import { formatDate, openOutlookWithOffer } from "@/utils/offers";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles } from "@/utils/constants";
@@ -117,10 +119,10 @@ const resolveThumbUrl = (url: string | null | undefined): string | null => {
 const getItemThumb = (item: any): string | null =>
   resolveThumbUrl(
     item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
+    item?.pix_path_eBay ||
+    item?.pictures?.shopPicture ||
+    (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+    null,
   );
 
 const getItemCompany = (item: any): string =>
@@ -189,11 +191,10 @@ const ItemRow: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
-        selected
-          ? "border-primary bg-primary/5"
-          : "border-gray-200 hover:bg-gray-50"
-      }`}
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
+        ? "border-primary bg-primary/5"
+        : "border-gray-200 hover:bg-gray-50"
+        }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -248,11 +249,10 @@ const PickerRow: React.FC<{
 }> = ({ selected, onClick, title, subtitle, meta }) => (
   <div
     onClick={onClick}
-    className={`p-3 border rounded-lg cursor-pointer transition-all ${
-      selected
-        ? "border-primary bg-primary/5"
-        : "border-gray-200 hover:bg-gray-50"
-    }`}
+    className={`p-3 border rounded-lg cursor-pointer transition-all ${selected
+      ? "border-primary bg-primary/5"
+      : "border-gray-200 hover:bg-gray-50"
+      }`}
   >
     <div className="flex justify-between items-start">
       <div className="min-w-0">
@@ -311,6 +311,25 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [edit, setEdit] = useState(false);
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
+  const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
+
+  // Load payment and shipping methods dynamically from the database
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        const [pmRes, smRes]: any = await Promise.all([
+          getAllPaymentMethods(true).catch(() => ({ data: [] })),
+          getAllShippingMethods(true).catch(() => ({ data: [] })),
+        ]);
+        setDbPaymentMethods(Array.isArray(pmRes?.data) ? pmRes.data.filter((pm: any) => pm.is_active) : []);
+        setDbShippingMethods(Array.isArray(smRes?.data) ? smRes.data.filter((sm: any) => sm.is_active) : []);
+      } catch (e) {
+        console.error("Failed to load payment/shipping methods:", e);
+      }
+    })();
+  }, [isOpen]);
 
   // create mode = the modal is open with no offer id yet.
   const isCreate = !offerId && !offer;
@@ -574,7 +593,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-  // --- Save header/detail fields -------------------------------------------
   const handleSave = async () => {
     if (!offer) return;
     if (!form.title?.trim()) {
@@ -924,17 +942,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     label: string;
     icon: React.ReactNode;
   }[] = [
-    {
-      key: "inquiry",
-      label: "From inquiry",
-      icon: <LinkIcon className="h-4 w-4" />,
-    },
-    {
-      key: "item",
-      label: "Customer + item(s)",
-      icon: <CubeIcon className="h-4 w-4" />,
-    },
-  ];
+      {
+        key: "inquiry",
+        label: "From inquiry",
+        icon: <LinkIcon className="h-4 w-4" />,
+      },
+      {
+        key: "item",
+        label: "Customer + item(s)",
+        icon: <CubeIcon className="h-4 w-4" />,
+      },
+    ];
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -967,11 +985,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSelectedInquiry(null);
                       setSelectedItems([]);
                     }}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
-                      sourceType === t.key
-                        ? "border-primary bg-primary/5 text-primary font-semibold"
-                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                    }`}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${sourceType === t.key
+                      ? "border-primary bg-primary/5 text-primary font-semibold"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
                   >
                     {t.icon}
                     {t.label}
@@ -1007,11 +1024,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <select
                     value={filterCustomerId}
                     onChange={(e) => setFilterCustomerId(e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg ${
-                      sourceType === "item" && !filterCustomerId
-                        ? "border-amber-400 bg-amber-50/30"
-                        : "border-gray-300"
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg ${sourceType === "item" && !filterCustomerId
+                      ? "border-amber-400 bg-amber-50/30"
+                      : "border-gray-300"
+                      }`}
                   >
                     <option value="">
                       {sourceType === "item"
@@ -1122,9 +1138,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         }}
                         title={inq.name}
                         subtitle={`Customer: ${inq.customer?.companyName || "—"}`}
-                        meta={`${inq.requests?.length || 0} items · ${
-                          inq.isAssembly ? "Assembly" : "Standard"
-                        }`}
+                        meta={`${inq.requests?.length || 0} items · ${inq.isAssembly ? "Assembly" : "Standard"
+                          }`}
                       />
                     ))
                   ))}
@@ -1224,7 +1239,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select…</option>
-                      {PAYMENT_METHODS.map((m) => (
+                      {(dbPaymentMethods.length > 0 ? dbPaymentMethods.map((pm: any) => pm.name) : PAYMENT_METHODS).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1243,7 +1258,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select…</option>
-                      {SHIPPING_METHODS.map((m) => (
+                      {(dbShippingMethods.length > 0 ? dbShippingMethods.map((sm: any) => sm.name) : SHIPPING_METHODS).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1391,7 +1406,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg font-bold text-gray-900 truncate">
-                    Offer {offer.offerNumber}
+                    Offer {offer.title}
                   </h2>
                   {offer.revision > 1 && (
                     <span className="text-xs text-gray-500">
@@ -1407,15 +1422,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </span>
                   {sourceBadge()}
                   {offer.inquirySnapshot?.referenceNumber && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                    <span className="text-sm font-bold text-gray-900 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
                       <LinkIcon className="h-3 w-3" />
-                      Inquiry {offer.inquirySnapshot.referenceNumber}
+                      {offer.inquirySnapshot.referenceNumber}
                     </span>
                   )}
                 </div>
-                {/* Offer title, always shown in the header */}
-                <p className="text-sm font-medium text-gray-800 truncate mt-0.5">
-                  {offer.title}
+                {/* Offer number, shown in the header secondary text */}
+                <p className="text-sm font-medium text-gray-500 truncate mt-0.5">
+                  Offer {offer.offerNumber}
                 </p>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
@@ -1434,60 +1449,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Action bar */}
-            <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap flex-shrink-0">
-              <button
-                onClick={() => openOutlookWithOffer(offer)}
-                className="px-3 py-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center gap-1.5"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                Send email
-              </button>
-              {offer.pdfGenerated ? (
-                <>
-                  <button
-                    onClick={() =>
-                      downloadOfferPdf(offer.id, offer.offerNumber)
-                    }
-                    className="px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-all flex items-center gap-1.5"
-                  >
-                    <DownloadCloudIcon className="h-4 w-4" />
-                    Download PDF
-                  </button>
-                  <button
-                    onClick={handlePdf}
-                    className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-1.5"
-                  >
-                    <ArrowPathIcon className="h-4 w-4 text-gray-500" />
-                    Regenerate PDF
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={handlePdf}
-                  className="px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-all flex items-center gap-1.5"
-                >
-                  <PrinterIcon className="h-4 w-4" />
-                  Generate PDF
-                </button>
-              )}
-            </div>
-
-            {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Customer + delivery address, read-only, at the top */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <Section
                   title="Customer"
@@ -1519,21 +1481,53 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <BuildingOfficeIcon className="h-4 w-4 text-gray-500" />
                   }
                 >
-                  {/* Read-only by request. To make this editable again, swap
-                      AddressBlock for the previous input grid bound to
-                      form.deliveryAddress. */}
+                  {edit && (
+                    <label className="flex items-center gap-2 mb-3 cursor-pointer text-xs font-semibold text-gray-600 select-none">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                        checked={
+                          !form.deliveryAddress?.street ||
+                          form.deliveryAddress?.street === (offer.customerSnapshot?.address || offer.customerSnapshot?.street || "")
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            patch({
+                              deliveryAddress: {
+                                contactName: offer.customerSnapshot?.legalName || offer.customerSnapshot?.companyName || "",
+                                street: offer.customerSnapshot?.address || offer.customerSnapshot?.street || "",
+                                postalCode: offer.customerSnapshot?.postalCode || "",
+                                city: offer.customerSnapshot?.city || "",
+                                country: offer.customerSnapshot?.country || "",
+                                contactPhone: offer.customerSnapshot?.contactPhoneNumber || "",
+                              }
+                            });
+                          } else {
+                            patch({
+                              deliveryAddress: {
+                                contactName: "",
+                                street: "",
+                                postalCode: "",
+                                city: "",
+                                country: "",
+                                contactPhone: "",
+                              }
+                            });
+                          }
+                        }}
+                      />
+                      Delivery address same as billing address
+                    </label>
+                  )}
                   <AddressBlock
-                    addr={offer.deliveryAddress}
+                    addr={edit ? form.deliveryAddress : offer.deliveryAddress}
                     emptyText="No delivery address set."
                   />
                 </Section>
               </div>
 
-              {/* Offer details */}
-              <Section
-                title="Offer details"
-                icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
-              >
+              {/* Offer details (Section title removed) */}
+              <div className="border border-gray-200 rounded-xl bg-white p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
                   <Field label="Title" edit={edit} value={offer.title}>
                     <input
@@ -1542,56 +1536,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ title: e.target.value })}
                     />
                   </Field>
-                  <Field label="Status" edit={edit} value={offer.status}>
-                    <select
-                      className={inputCls}
-                      value={form.status}
-                      onChange={(e) => patch({ status: e.target.value })}
-                    >
-                      {getOfferStatuses().map((s: any) => (
-                        <option key={s.value} value={s.value}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Currency" edit={edit} value={offer.currency}>
-                    <select
-                      className={inputCls}
-                      value={form.currency}
-                      onChange={(e) => patch({ currency: e.target.value })}
-                    >
-                      {getAvailableCurrencies().map((c: any) => (
-                        <option key={c.value} value={c.value}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
                   <Field
-                    label="Valid until"
-                    edit={edit}
-                    value={
-                      offer.validUntil ? formatDate(offer.validUntil) : "—"
-                    }
-                  >
-                    <input
-                      type="date"
-                      className={inputCls}
-                      value={
-                        form.validUntil
-                          ? new Date(form.validUntil)
-                              .toISOString()
-                              .split("T")[0]
-                          : ""
-                      }
-                      onChange={(e) =>
-                        patch({ validUntil: new Date(e.target.value) })
-                      }
-                    />
-                  </Field>
-                  <Field
-                    label="Delivery time"
+                    label="Delivery Date"
                     edit={edit}
                     value={offer.deliveryTime}
                   >
@@ -1602,9 +1548,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ deliveryTime: e.target.value })}
                     />
                   </Field>
-                  {/* Payment method — dropdown (replaces the old free-text terms
-                      field as the primary control; paymentTerms still editable
-                      below if you keep using it) */}
+                  {/* Payment method — dropdown */}
                   <Field
                     label="Payment method"
                     edit={edit}
@@ -1616,7 +1560,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ paymentMethod: e.target.value })}
                     >
                       <option value="">Select…</option>
-                      {PAYMENT_METHODS.map((m) => (
+                      {(dbPaymentMethods.length > 0 ? dbPaymentMethods.map((pm: any) => pm.name) : PAYMENT_METHODS).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1637,7 +1581,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       }
                     >
                       <option value="">Select…</option>
-                      {SHIPPING_METHODS.map((m) => (
+                      {(dbShippingMethods.length > 0 ? dbShippingMethods.map((sm: any) => sm.name) : SHIPPING_METHODS).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1657,8 +1601,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     />
                   </Field>
                 </div>
-              </Section>
-
+              </div>
               {/* Source */}
               {/* {(offer.inquirySnapshot || offer.itemSnapshot) && (
                 <Section
@@ -1725,16 +1668,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       <button
                         disabled={!edit}
                         onClick={() => toggleUnitPricing(!offer.useUnitPrices)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
-                          offer.useUnitPrices ? "bg-green-500" : "bg-gray-300"
-                        }`}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${offer.useUnitPrices ? "bg-green-500" : "bg-gray-300"
+                          }`}
                       >
                         <span
-                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                            offer.useUnitPrices
-                              ? "translate-x-5"
-                              : "translate-x-1"
-                          }`}
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${offer.useUnitPrices
+                            ? "translate-x-5"
+                            : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </div>
@@ -2020,7 +1961,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                                           e.target.value,
                                                           up.unitPrice,
                                                           offer.totalPriceDecimalPlaces ||
-                                                            2,
+                                                          2,
                                                         ),
                                                     },
                                                   )
@@ -2040,10 +1981,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                                   type="number"
                                                   step={
                                                     offer.unitPriceDecimalPlaces ===
-                                                    4
+                                                      4
                                                       ? "0.0001"
                                                       : offer.unitPriceDecimalPlaces ===
-                                                          2
+                                                        2
                                                         ? "0.01"
                                                         : "0.001"
                                                   }
@@ -2064,7 +2005,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                                               e.target.value,
                                                             ),
                                                             offer.totalPriceDecimalPlaces ||
-                                                              2,
+                                                            2,
                                                           ),
                                                       },
                                                     )
@@ -2427,10 +2368,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </Section>
 
-              {/* Comments — external (customer-facing) + internal */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <Section
-                  title="External comment"
+                  title="Comment field"
                   icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
                 >
                   {edit ? (
@@ -2454,7 +2394,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </Section>
 
                 <Section
-                  title="Internal comment"
+                  title="Comment intern"
                   icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
                 >
                   {edit ? (
@@ -2515,7 +2455,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           </>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 
