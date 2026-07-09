@@ -308,13 +308,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   userRole,
 }) => {
   const [offer, setOffer] = useState<any>(null);
+  const displayInquiryNo = offer?.inquirySnapshot?.referenceNumber ||
+    offer?.inquirySnapshot?.inquiryNo ||
+    offer?.inquiry?.referenceNumber ||
+    offer?.inquiry?.inquiryNo ||
+    "";
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [edit, setEdit] = useState(false);
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
 
-  // Load payment and shipping methods dynamically from the database
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
@@ -1421,14 +1425,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     {offer.status}
                   </span>
                   {sourceBadge()}
-                  {offer.inquirySnapshot?.referenceNumber && (
+                  {displayInquiryNo && (
                     <span className="text-sm font-bold text-gray-900 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
                       <LinkIcon className="h-3 w-3" />
-                      {offer.inquirySnapshot.referenceNumber}
+                      {displayInquiryNo}
                     </span>
                   )}
                 </div>
-                {/* Offer number, shown in the header secondary text */}
                 <p className="text-sm font-medium text-gray-500 truncate mt-0.5">
                   Offer {offer.offerNumber}
                 </p>
@@ -1526,7 +1529,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </Section>
               </div>
 
-              {/* Offer details (Section title removed) */}
               <div className="border border-gray-200 rounded-xl bg-white p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
                   <Field label="Title" edit={edit} value={offer.title}>
