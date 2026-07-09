@@ -1777,6 +1777,7 @@ export const getAllBusinesses = async (
     const queryBuilder = customerRepository
       .createQueryBuilder("customer")
       .leftJoinAndSelect("customer.businessDetails", "businessDetails")
+      .leftJoinAndSelect("customer.starCustomerDetails", "starCustomerDetails")
       .leftJoinAndSelect("customer.tags", "tags");
 
     if (tags) {
@@ -1923,6 +1924,10 @@ export const getAllBusinesses = async (
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
         vatTaxId: customer.vatTaxId,
+        deliveryAddressLine1: customer.starCustomerDetails?.deliveryAddressLine1,
+        deliveryPostalCode: customer.starCustomerDetails?.deliveryPostalCode,
+        deliveryCity: customer.starCustomerDetails?.deliveryCity,
+        deliveryCountry: customer.starCustomerDetails?.deliveryCountry,
         debtor_no: customer.debtor_no,
         default_tax_profile_id: customer.default_tax_profile_id,
         vat_id_status: customer.vat_id_status,

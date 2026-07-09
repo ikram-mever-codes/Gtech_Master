@@ -241,7 +241,16 @@ export const getItems = async (
 
     // Company (customer)
     if (company) {
-      idQb.andWhere("item.customer_id = :company", { company });
+      const companyStr = (company as string).trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyStr);
+      if (isUuid) {
+        idQb.andWhere("item.customer_id = :company", { company: companyStr });
+      } else {
+        idQb.leftJoin("item.customer", "cust_filter");
+        idQb.andWhere("cust_filter.companyName ILIKE :companySearch", {
+          companySearch: `%${companyStr}%`,
+        });
+      }
     }
 
     // isLabel — tolerant of boolean / tinyint / 'Y'/'N' storage

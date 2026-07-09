@@ -28,16 +28,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -48,7 +48,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -664,14 +664,26 @@ export class OfferController {
   }
 
   private buildDeliveryAddress(customer: Customer | any) {
+    const sc = customer.starCustomerDetails;
+    if (sc && sc.deliveryAddressLine1) {
+      return {
+        street: sc.deliveryAddressLine1,
+        city: sc.deliveryCity || customer.city || customer.businessDetails?.city || "",
+        state: sc.deliveryState || customer.businessDetails?.state || "",
+        postalCode: sc.deliveryPostalCode || customer.postalCode || customer.businessDetails?.postalCode || "",
+        country: sc.deliveryCountry || customer.country || customer.businessDetails?.country || "",
+        contactName: customer.legalName || customer.companyName || "",
+        contactPhone: customer.contactPhoneNumber || "",
+      };
+    }
     return {
       street: customer.addressLine1 || "Street Address",
-      city: customer.city || customer.businessDetails?.city,
-      state: customer.businessDetails?.state,
-      postalCode: customer.postalCode || customer.businessDetails?.postalCode,
-      country: customer.country || customer.businessDetails?.country,
-      contactName: customer.legalName || customer.companyName,
-      contactPhone: customer.contactPhoneNumber,
+      city: customer.city || customer.businessDetails?.city || "",
+      state: customer.businessDetails?.state || "",
+      postalCode: customer.postalCode || customer.businessDetails?.postalCode || "",
+      country: customer.country || customer.businessDetails?.country || "",
+      contactName: customer.legalName || customer.companyName || "",
+      contactPhone: customer.contactPhoneNumber || "",
     };
   }
 
@@ -741,7 +753,7 @@ export class OfferController {
         isAssembly: inquiry.isAssembly,
         description: inquiry.description,
         createdAt: inquiry.createdAt,
-        referenceNumber: inquiry.referenceNumber,
+        referenceNumber: inquiry.inquiryNo || inquiry.referenceNumber,
         status: inquiry.status,
         requestsCount: inquiry.requests?.length || 0,
       };
@@ -919,25 +931,16 @@ export class OfferController {
     }
   }
 
-  // ==========================================================================
-  // CREATE FROM ITEM
-  // POST /offers/from-item/:itemId
-  // Prefills the customer (from the item's linked customer, or an explicit
-  // body.customerId) and seeds a single line item from the item's data.
-  // ==========================================================================
-
   async createOfferFromItem(request: Request, response: Response) {
     try {
       const { itemId } = request.params;
       const body: CreateOfferFromItemDto & { itemIds?: string[] } =
         request.body || {};
-
-      // Full, de-duplicated, order-preserving id list (param = position 1).
-      const requestedIds: string[] = Array.from(
+      const requestedIds: number[] = Array.from(
         new Set(
-          [itemId, ...(Array.isArray(body.itemIds) ? body.itemIds : [])].filter(
-            (id): id is string => !!id,
-          ),
+          [itemId, ...(Array.isArray(body.itemIds) ? body.itemIds : [])]
+            .map((id) => parseInt(String(id), 10))
+            .filter((id) => !isNaN(id)),
         ),
       );
 
@@ -949,7 +952,7 @@ export class OfferController {
 
       const itemRepository = AppDataSource.getRepository(Item);
       const fetchedItems: any[] = await itemRepository.find({
-        where: { id: In(requestedIds as any[]) },
+        where: { id: In(requestedIds) },
         relations: ["customer", "taric"],
       });
 
@@ -959,8 +962,6 @@ export class OfferController {
           .json({ success: false, message: "No matching items found." });
       }
 
-      // find() doesn't guarantee order — restore the requested sequence and
-      // drop any ids that didn't resolve to a row.
       const itemById = new Map(fetchedItems.map((it) => [String(it.id), it]));
       const orderedItems = requestedIds
         .map((id) => itemById.get(String(id)))
@@ -977,6 +978,7 @@ export class OfferController {
       if (body.customerId) {
         customer = await this.customerRepository.findOne({
           where: { id: body.customerId },
+          relations: ["businessDetails", "starCustomerDetails"],
         });
       }
       if (!customer) {
@@ -2801,9 +2803,8 @@ export class OfferController {
 
       return response.status(200).json({
         success: true,
-        message: `Unit prices ${
-          useUnitPrices ? "enabled" : "disabled"
-        } successfully for entire offer`,
+        message: `Unit prices ${useUnitPrices ? "enabled" : "disabled"
+          } successfully for entire offer`,
         data: updatedOffer,
       });
     } catch (error) {
@@ -3416,8 +3417,8 @@ export class OfferController {
         [
           "Kundennr.",
           offer.inquiry?.customer?.customerNumber ||
-            customer.customerNumber ||
-            "-",
+          customer.customerNumber ||
+          "-",
         ],
       ];
 

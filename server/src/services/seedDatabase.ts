@@ -5,18 +5,26 @@
 // import { BusinessDetails } from "../models/business_details";
 // import { Supplier } from "../models/suppliers";
 // import { Category } from "../models/categories";
+// import { TaxProfile } from "../models/tax_profile";
+// import { Country } from "../models/country";
+// import { PaymentMethod } from "../models/payment_methods";
+// import { ShippingMethod } from "../models/shipping_methods";
 
 // export const seedDatabase = async () => {
 //     try {
 //         console.log("🌱 Starting database seeding...");
-
+// 
 //         const customerRepository = AppDataSource.getRepository(Customer);
 //         const itemRepository = AppDataSource.getRepository(Item);
 //         const parentRepository = AppDataSource.getRepository(Parent);
 //         const businessDetailsRepository = AppDataSource.getRepository(BusinessDetails);
 //         const supplierRepository = AppDataSource.getRepository(Supplier);
 //         const categoryRepository = AppDataSource.getRepository(Category);
-
+//         const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+//         const countryRepository = AppDataSource.getRepository(Country);
+//         const paymentMethodRepository = AppDataSource.getRepository(PaymentMethod);
+//         const shippingMethodRepository = AppDataSource.getRepository(ShippingMethod);
+// 
 //         const existingSuppliers = await supplierRepository.count();
 //         if (existingSuppliers === 0) {
 //             console.log("📦 Seeding suppliers...");
@@ -40,7 +48,7 @@
 //                 await supplierRepository.save(supplierRepository.create(s));
 //             }
 //         }
-
+// 
 //         const existingCategories = await categoryRepository.count();
 //         if (existingCategories === 0) {
 //             console.log("📦 Seeding categories...");
@@ -53,15 +61,48 @@
 //                 await categoryRepository.save(categoryRepository.create(c));
 //             }
 //         }
-
+// 
+//         const existingPaymentMethods = await paymentMethodRepository.count();
+//         if (existingPaymentMethods === 0) {
+//             console.log("💳 Seeding payment methods...");
+//             const paymentMethods = [
+//                 { name: "Kauf auf Rechnung", is_prepayment: false, is_active: true },
+//                 { name: "Vorkasse", is_prepayment: true, is_active: true },
+//             ];
+//             for (const pm of paymentMethods) {
+//                 await paymentMethodRepository.save(paymentMethodRepository.create(pm));
+//             }
+//             console.log("  ✓ Seeded default payment methods");
+//         }
+// 
+//         const existingShippingMethods = await shippingMethodRepository.count();
+//         if (existingShippingMethods === 0) {
+//             console.log("🚚 Seeding shipping methods...");
+//             const shippingMethods = [
+//                 { name: "Selbstabholung", is_active: true },
+//                 { name: "Speditionsversand", is_active: true },
+//                 { name: "UPS", is_active: true },
+//                 { name: "GLS", is_active: true },
+//                 { name: "FedEx direkt", is_active: true },
+//                 { name: "FedEx Sammel + UPS", is_active: true },
+//                 { name: "FedEx Sammel + GLS", is_active: true },
+//                 { name: "Bahnfracht + UPS", is_active: true },
+//                 { name: "Bahnfracht + GLS", is_active: true },
+//             ];
+//             for (const sm of shippingMethods) {
+//                 await shippingMethodRepository.save(shippingMethodRepository.create(sm));
+//             }
+//             console.log("  ✓ Seeded default shipping methods");
+//         }
+// 
 //         const existingCustomers = await customerRepository.count();
 //         const existingItems = await itemRepository.count();
-
+// 
 //         if (existingCustomers > 0 && existingItems > 0) {
 //             console.log("✅ Database already has customers/items. Skipping main seed.");
 //             return;
 //         }
-
+// 
 //         let savedSuppliers: any[] = [];
 //         if (existingSuppliers === 0) {
 //             console.log("📦 Seeding suppliers...");
@@ -88,7 +129,7 @@
 //                     order_type_id: 1,
 //                 },
 //             ];
-
+// 
 //             for (const suppData of suppliers) {
 //                 const supp = supplierRepository.create(suppData);
 //                 const saved = await supplierRepository.save(supp);
@@ -96,7 +137,7 @@
 //                 console.log(`  ✓ Created supplier: ${saved.company_name}`);
 //             }
 //         }
-
+// 
 //         let savedCategories: any[] = [];
 //         if (existingCategories === 0) {
 //             console.log("📦 Seeding categories...");
@@ -127,7 +168,7 @@
 //                     is_ignored_value: "N",
 //                 },
 //             ];
-
+// 
 //             for (const catData of categories) {
 //                 const cat = categoryRepository.create(catData);
 //                 const saved = await categoryRepository.save(cat);
@@ -135,7 +176,7 @@
 //                 console.log(`  ✓ Created category: ${saved.name}`);
 //             }
 //         }
-
+// 
 //         if (existingCustomers === 0) {
 //             console.log("📦 Seeding customers...");
 //             const customers = [
@@ -180,11 +221,11 @@
 //                     stage: "business" as const,
 //                 },
 //             ];
-
+// 
 //             const savedCustomers = [];
 //             for (const customerData of customers) {
 //                 const customer = customerRepository.create(customerData);
-
+// 
 //                 const businessDetails = businessDetailsRepository.create({
 //                     businessSource: "Manual",
 //                     address: `${customerData.companyName} Street 123`,
@@ -195,17 +236,17 @@
 //                     isDeviceMaker: "Unsure",
 //                     customer: customer,
 //                 });
-
+// 
 //                 customer.businessDetails = businessDetails;
 //                 const saved = await customerRepository.save(customer);
 //                 console.log(`  ✓ Created customer: ${saved.companyName}`);
 //             }
 //         }
-
+// 
 //         if (existingItems === 0) {
 //             console.log("📦 Seeding parent items...");
 //         }
-
+// 
 //         console.log("📦 Seeding parent items...");
 //         const parents = [
 //             {
@@ -233,7 +274,7 @@
 //                 is_active: "Y",
 //             },
 //         ];
-
+// 
 //         const savedParents = [];
 //         for (const parentData of parents) {
 //             const parent = parentRepository.create(parentData);
@@ -241,7 +282,7 @@
 //             savedParents.push(saved);
 //             console.log(`  ✓ Created parent: ${saved.name_de}`);
 //         }
-
+// 
 //         console.log("📦 Seeding items...");
 //         const items = [
 //             {
@@ -389,13 +430,13 @@
 //                 remark: "Compression spring",
 //             },
 //         ];
-
+// 
 //         for (const itemData of items) {
 //             const item = itemRepository.create(itemData);
 //             const saved = await itemRepository.save(item);
 //             console.log(`  ✓ Created item: ${saved.item_name} (${saved.ItemID_DE})`);
 //         }
-
+// 
 //         console.log("✅ Database seeding completed successfully!");
 //     } catch (error) {
 //         console.error("❌ Error seeding database:", error);
