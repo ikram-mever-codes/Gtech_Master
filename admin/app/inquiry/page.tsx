@@ -989,6 +989,8 @@ const CombinedInquiriesPageContent = () => {
     }
   };
   const addNewRequest = () => {
+    const nextSeq = inquiryRequests.length + 1;
+    const formattedItemNo = String(nextSeq).padStart(3, "0");
     setInquiryRequests([
       ...inquiryRequests,
       {
@@ -1009,7 +1011,7 @@ const CombinedInquiriesPageContent = () => {
         attachments: [],
         taric: "",
         asanaLink: "",
-        itemNo: "",
+        itemNo: formattedItemNo,
         urgency1: "",
         urgency2: "",
         painPoints: [],
@@ -1116,7 +1118,7 @@ const CombinedInquiriesPageContent = () => {
         attachments: [],
         taric: "",
         asanaLink: "",
-        itemNo: "",
+        itemNo: "001",
         urgency1: "",
         urgency2: "",
         painPoints: [],

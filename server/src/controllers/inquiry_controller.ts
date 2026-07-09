@@ -8,6 +8,7 @@ import { RequestedItem } from "../models/requested_items";
 import { Taric } from "../models/tarics";
 import { Item } from "../models/items";
 import { StarBusinessDetails } from "../models/star_business_details";
+import { Category } from "../models/categories";
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { UserRole } from "../models/users";
@@ -93,7 +94,7 @@ export class BaseItemConversionDto {
   note?: string;
 }
 
-export class ConvertInquiryToItemDto extends BaseItemConversionDto {}
+export class ConvertInquiryToItemDto extends BaseItemConversionDto { }
 
 export class ConvertRequestToItemDto extends BaseItemConversionDto {
   @IsOptional()
@@ -523,6 +524,17 @@ export class InquiryController {
           await starBusinessDetailsRepository.save(starBusinessDetails);
         }
 
+        let defaultProCatId: number | undefined = undefined;
+        try {
+          const categoryRepository = AppDataSource.getRepository(Category);
+          const proCat = await categoryRepository.findOne({ where: { name: "PRO" } });
+          if (proCat) {
+            defaultProCatId = proCat.id;
+          }
+        } catch (e) {
+          console.error("Failed to fetch default PRO category:", e);
+        }
+
         let total_potential_k_eur = 0;
         const requestEntities = requests.map((reqData: any, index: number) => {
           let totalWeight = null;
@@ -556,7 +568,8 @@ export class InquiryController {
 
           const requestItem = this.requestRepository.create({
             ...reqDataWithoutId,
-            itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`,
+            itemNo: reqData.itemNo || String(index + 1).padStart(3, "0"),
+            cat_id: reqData.cat_id || defaultProCatId,
             businessId: starBusinessDetails.id,
             business: starBusinessDetails,
             inquiry: savedInquiry,
@@ -748,6 +761,17 @@ export class InquiryController {
           }
 
           if (starBusinessDetails) {
+            let defaultProCatId: number | undefined = undefined;
+            try {
+              const categoryRepository = AppDataSource.getRepository(Category);
+              const proCat = await categoryRepository.findOne({ where: { name: "PRO" } });
+              if (proCat) {
+                defaultProCatId = proCat.id;
+              }
+            } catch (e) {
+              console.error("Failed to fetch default PRO category:", e);
+            }
+
             const requestEntities = requests.map((reqData: any, index: number) => {
               let totalWeight = null;
               const currentQty = reqData.qty || reqData.quantity;
@@ -781,7 +805,8 @@ export class InquiryController {
 
               const requestItem = this.requestRepository.create({
                 ...reqDataWithoutId,
-                itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`,
+                itemNo: reqData.itemNo || String(index + 1).padStart(3, "0"),
+                cat_id: reqData.cat_id || defaultProCatId,
                 businessId: starBusinessDetails.id,
                 business: starBusinessDetails,
                 inquiry: existingInquiry,
