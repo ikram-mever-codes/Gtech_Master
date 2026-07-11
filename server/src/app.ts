@@ -85,7 +85,7 @@ app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/tags", tagRoutes);
 app.use("/api/v1/tax-profiles", taxProfileRoutes);
 app.use("/api/v1/countries", countryRoutes);
-app.use("/api/v1/number-sequence", numberSequenceRoutes);
+app.use("/api/v1/number-sequences", numberSequenceRoutes);
 app.use(
   "/api/v1/customers/:companyId/shipping-addresses",
   shippingAddressRoutes,

@@ -20,6 +20,7 @@ import { DownloadCloudIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import {
   getOfferById,
   updateOffer,
@@ -1017,25 +1018,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       ? "Recipient customer * (required)"
                       : "Filter by customer"}
                   </label>
-                  <select
+                  <CustomerSearchInput
                     value={filterCustomerId}
-                    onChange={(e) => setFilterCustomerId(e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg ${sourceType === "item" && !filterCustomerId
-                      ? "border-amber-400 bg-amber-50/30"
-                      : "border-gray-300"
-                      }`}
-                  >
-                    <option value="">
-                      {sourceType === "item"
-                        ? "Select a customer…"
-                        : "All customers"}
-                    </option>
-                    {customers.map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {c.companyName || c.displayName}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(id) => setFilterCustomerId(id)}
+                    placeholder={
+                      sourceType === "item"
+                        ? "Select a customer..."
+                        : "All customers"
+                    }
+                    mode="customers"
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">

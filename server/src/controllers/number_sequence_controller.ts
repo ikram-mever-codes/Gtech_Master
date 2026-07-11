@@ -19,6 +19,7 @@ interface UpdateNumberSequenceBody {
   formatPattern?: string;
   minDigits?: number;
   resetPolicy?: ResetPolicy;
+  nextRunningNo?: number;
   isActive?: boolean;
 }
 
@@ -155,6 +156,7 @@ export class NumberSequenceController {
         "formatPattern",
         "minDigits",
         "resetPolicy",
+        "nextRunningNo",
         "isActive",
       ];
 

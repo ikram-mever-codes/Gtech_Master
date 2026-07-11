@@ -5,26 +5,23 @@ import {
   XMarkIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
-import { getAllCustomers } from "@/api/customers";
-import { fetchStarBusinessesForDropdown } from "@/api/contacts";
+import { getAllSuppliers } from "@/api/suppliers";
 
-interface CustomerSearchInputProps {
+interface SupplierSearchInputProps {
   value: string | number;
   onChange: (id: string, name: string, fullObj?: any) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
-  mode?: "customers" | "businesses";
   initialLabel?: string;
 }
 
-export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
+export const SupplierSearchInput: React.FC<SupplierSearchInputProps> = ({
   value,
   onChange,
-  placeholder = "Search by name or number...",
+  placeholder = "Search by supplier name or ID...",
   disabled = false,
   className = "",
-  mode = "customers",
   initialLabel = "",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,25 +29,19 @@ export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     let active = true;
     const loadList = async () => {
       setLoading(true);
       try {
-        if (mode === "customers") {
-          const res = await getAllCustomers({ limit: 1000 });
-          if (active) {
-            const rawList = res?.data?.customers || res?.data || [];
-            setList(rawList);
-          }
-        } else {
-          const res = await fetchStarBusinessesForDropdown("");
-          if (active) {
-            setList(res || []);
-          }
+        const res = await getAllSuppliers({ limit: 1000 });
+        if (active) {
+          const rawList = (res?.data ?? res) || [];
+          setList(rawList);
         }
       } catch (err) {
-        console.error("Failed to load search options in CustomerSearchInput:", err);
+        console.error("Failed to load search options in SupplierSearchInput:", err);
       } finally {
         if (active) setLoading(false);
       }
@@ -59,7 +50,8 @@ export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
     return () => {
       active = false;
     };
-  }, [mode]);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -74,79 +66,51 @@ export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
   const selectedItem = list.find((item) => {
-    const id = mode === "customers" ? item.id : item.value;
-    const nameLabel =
-      mode === "customers"
-        ? item.companyName || item.legalName || item.name || ""
-        : item.label || item.companyName || "";
-    return (
-      String(id) === String(value) ||
-      (value && String(nameLabel).toLowerCase() === String(value).toLowerCase())
-    );
+    return String(item.id) === String(value);
   });
 
-  const displayLabel = selectedItem
-    ? mode === "customers"
-      ? selectedItem.companyName || selectedItem.legalName || selectedItem.name || ""
-      : selectedItem.label || selectedItem.companyName || ""
-    : initialLabel;
+  const getSupplierDisplayName = (item: any) => {
+    if (!item) return "";
+    return item.company_name || item.name || `ID: ${item.id}`;
+  };
+
+  const displayLabel = selectedItem ? getSupplierDisplayName(selectedItem) : initialLabel;
+
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm(displayLabel);
     }
   }, [isOpen, displayLabel]);
+
   const handleFocus = () => {
     setIsOpen(true);
     setSearchTerm("");
   };
+
   const filteredOptions = (() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return list.slice(0, 50);
 
     return list
       .filter((item) => {
-        if (mode === "customers") {
-          const companyName = (item.companyName || "").toLowerCase();
-          const legalName = (item.legalName || "").toLowerCase();
-          const customerNumber = (item.customerNumber || "").toLowerCase();
-          const email = (item.email || "").toLowerCase();
-          return (
-            companyName.includes(term) ||
-            legalName.includes(term) ||
-            customerNumber.includes(term) ||
-            email.includes(term)
-          );
-        } else {
-          const label = (item.label || "").toLowerCase();
-          const desc = (item.description || "").toLowerCase();
-          const val = (String(item.value) || "").toLowerCase();
-          const customerNumber = (item.customerNumber || "").toLowerCase();
-          return (
-            label.includes(term) ||
-            desc.includes(term) ||
-            val.includes(term) ||
-            customerNumber.includes(term)
-          );
-        }
+        const id = String(item.id).toLowerCase();
+        const name = (item.name || "").toLowerCase();
+        const companyName = (item.company_name || "").toLowerCase();
+        const nameCN = (item.name_cn || "").toLowerCase();
+        return (
+          id.includes(term) ||
+          name.includes(term) ||
+          companyName.includes(term) ||
+          nameCN.includes(term)
+        );
       })
       .slice(0, 50);
   })();
 
   const handleSelect = (item: any) => {
-    if (mode === "customers") {
-      onChange(
-        String(item.id),
-        item.companyName || item.legalName || item.name || "",
-        item
-      );
-    } else {
-      onChange(
-        String(item.value),
-        item.label || item.companyName || "",
-        item
-      );
-    }
+    onChange(String(item.id), getSupplierDisplayName(item), item);
     setIsOpen(false);
   };
 
@@ -187,27 +151,14 @@ export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
             </div>
           ) : filteredOptions.length > 0 ? (
             filteredOptions.map((item) => {
-              const itemId = mode === "customers" ? item.id : item.value;
-              const nameLabel =
-                mode === "customers"
-                  ? item.companyName || item.legalName || "Unnamed Customer"
-                  : item.label || "Unnamed Business";
-
-              const isSelected = !!(
-                String(itemId) === String(value) ||
-                (value && String(nameLabel).toLowerCase() === String(value).toLowerCase())
-              );
-
-              const subLabel =
-                mode === "customers"
-                  ? item.customerNumber
-                    ? `No: ${item.customerNumber}`
-                    : item.email
-                  : `${item.customerNumber ? `No: ${item.customerNumber} | ` : ""}${item.description || item.email || ""}`;
+              const isSelected = String(item.id) === String(value);
+              const displayName = getSupplierDisplayName(item);
+              const hasCN = item.name_cn && item.name_cn.trim() !== "";
+              const subLabel = `ID: ${item.id}${hasCN ? ` | CN: ${item.name_cn}` : ""}`;
 
               return (
                 <div
-                  key={itemId}
+                  key={item.id}
                   onClick={() => handleSelect(item)}
                   className={`px-3.5 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors ${isSelected
                     ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
@@ -215,7 +166,7 @@ export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
                     }`}
                 >
                   <div className="flex flex-col min-w-0 pr-3">
-                    <span className="font-medium truncate">{nameLabel}</span>
+                    <span className="font-medium truncate">{displayName}</span>
                     {subLabel && (
                       <span className="text-[10px] text-gray-400 truncate">
                         {subLabel}

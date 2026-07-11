@@ -561,6 +561,7 @@ export type StarBusinessData = {
   customerId: string;
   companyName: string;
   legalName?: string;
+  customerNumber?: string;
   email?: string;
   contactEmail?: string;
   contactPhoneNumber?: string;
@@ -736,6 +737,7 @@ export const fetchStarBusinessesForDropdown = async (search?: string) => {
       return res.data.starBusinesses.map((business: StarBusinessData) => ({
         value: business.id,
         label: business.companyName,
+        customerNumber: business.customerNumber,
         description: `${business.city || ""}${business.city && business.country ? ", " : ""
           }${business.country || ""}`,
         email: business.email,

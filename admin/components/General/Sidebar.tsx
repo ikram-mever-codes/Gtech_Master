@@ -46,6 +46,7 @@ import {
   Globe as LucideGlobe,
   Percent as LucidePercent,
   CreditCard,
+  Hash,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -162,6 +163,12 @@ const allMenuItems: MenuEntry[] = [
         icon: LucidePercent,
         text: "Tax Profiles",
         path: "/tax-profiles",
+        resource: "Settings",
+      },
+      {
+        icon: Hash,
+        text: "Numbers",
+        path: "/numbers",
         resource: "Settings",
       },
     ],
@@ -752,5 +759,4 @@ const Sidebar = () => {
     </>
   );
 };
-
 export default Sidebar;

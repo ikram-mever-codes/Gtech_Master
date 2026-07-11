@@ -80,6 +80,7 @@ import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import ItemCreateModal from "@/components/Item/ItemCreateModal";
 import ParentModal from "@/components/Item/ParentModal";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
+import { SupplierSearchInput } from "@/components/UI/SupplierSearchInput";
 import { TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
 import { SuppliersPage } from "@/components/Supplier/SuppliersPage";
 import { formatDate } from "@/utils/date";
@@ -1770,25 +1771,21 @@ const ItemsManagementPage: React.FC = () => {
                       </select>
                     </div>
 
-                    <div className="flex-grow flex-shrink flex-1 min-w-[150px]">
-                      <select
+                    <div className="flex-grow flex-shrink flex-1 min-w-[200px]">
+                      <SupplierSearchInput
                         value={filters.supplier}
-                        onChange={(e) =>
-                          setFilters({ ...filters, supplier: e.target.value })
+                        onChange={(id) =>
+                          setFilters({ ...filters, supplier: id })
                         }
-                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                        placeholder="Supplier..."
+                        initialLabel={
                           filters.supplier
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-400 border-gray-300 bg-white"
-                        }`}
-                      >
-                        <option value="">Supplier...</option>
-                        {refSuppliers.map((s) => (
-                          <option key={s.id} value={s.id.toString()}>
-                            {`[${s.id}] ${s.company_name || s.name || ""}`}
-                          </option>
-                        ))}
-                      </select>
+                            ? refSuppliers.find((s) => s.id.toString() === filters.supplier)?.company_name ||
+                              refSuppliers.find((s) => s.id.toString() === filters.supplier)?.name ||
+                              ""
+                            : ""
+                        }
+                      />
                     </div>
                     <div className="w-[105px] flex-shrink-0">
                       <select

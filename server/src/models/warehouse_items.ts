@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from "typeorm";
 import { Item } from "./items";
 import { Category } from "./categories";
@@ -22,9 +23,11 @@ export class WarehouseItem {
   @Column({ default: 1, nullable: true })
   category_id!: number;
 
+  @Index()
   @Column({ type: "varchar", length: 13, nullable: true })
   ean?: string;
 
+  @Index()
   @Column({ type: "varchar", length: 100, nullable: true })
   item_no_de?: string;
 

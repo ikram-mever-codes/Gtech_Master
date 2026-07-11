@@ -49,6 +49,7 @@ import { Package } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { EntityTagSelector } from "@/components/Tags/TagManager";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
+import { SupplierSearchInput } from "@/components/UI/SupplierSearchInput";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -1205,25 +1206,16 @@ const ItemDetailsPage = () => {
                   </div>
                   <div className="md:col-span-2">
                     {editMode ? (
-                      <select
+                      <SupplierSearchInput
                         value={itemData.supplier_id?.toString() ?? ""}
-                        onChange={(e) => {
-                          const newSupplierId = parseInt(e.target.value);
+                        onChange={(id, name, fullObj) => {
+                          const newSupplierId = parseInt(id);
                           if (!newSupplierId) return;
 
                           const updated = { ...itemData };
                           updated.supplier_id = newSupplierId;
 
-                          const supplierDetail = allSuppliers.find(
-                            (s) => s.id === newSupplierId,
-                          );
-                          const supplierName = supplierDetail
-                            ? String(
-                              !hasChinese(supplierDetail.name || "")
-                                ? supplierDetail.name
-                                : supplierDetail.company_name || "Unknown",
-                            )
-                            : "Unknown";
+                          const supplierName = name;
                           let existingItem = updated.supplierItems?.find(
                             (si: any) =>
                               Number(si.supplierId) === Number(newSupplierId),
@@ -1281,15 +1273,13 @@ const ItemDetailsPage = () => {
 
                           setItemData(updated);
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                      >
-                        <option value="">Select a Supplier</option>
-                        {allSuppliers.map((s: any) => (
-                          <option key={s.id} value={s.id.toString()}>
-                            {`[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`}
-                          </option>
-                        ))}
-                      </select>
+                        initialLabel={
+                          (() => {
+                            const s = allSuppliers.find((s) => s.id === itemData.supplier_id);
+                            return s ? (s.company_name || s.name || "") : "";
+                          })()
+                        }
+                      />
                     ) : (
                       <span className="text-gray-900">
                         {(() => {
@@ -2966,23 +2956,17 @@ const ItemDetailsPage = () => {
             <label className="text-sm font-semibold text-gray-700">
               Select Supplier
             </label>
-            <div className="relative">
-              <select
-                value={selectedSupplierToLink}
-                onChange={(e) => setSelectedSupplierToLink(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#8CC21B] focus:border-transparent transition-all outline-none appearance-none"
-              >
-                <option value="">Choose a supplier...</option>
-                {allSuppliers.map((s) => (
-                  <option key={s.id} value={String(s.id)}>
-                    [{s.id}]{s.name && !hasChinese(s.name) ? " " + s.name : ""}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <ChevronRightIcon className="h-4 w-4 text-gray-400 rotate-90" />
-              </div>
-            </div>
+            <SupplierSearchInput
+              value={selectedSupplierToLink}
+              onChange={(id) => setSelectedSupplierToLink(id)}
+              placeholder="Choose a supplier..."
+              initialLabel={
+                (() => {
+                  const s = allSuppliers.find((s) => String(s.id) === String(selectedSupplierToLink));
+                  return s ? (s.company_name || s.name || "") : "";
+                })()
+              }
+            />
             <p className="text-xs text-gray-500 italic">
               Link an additional supplier to this item. You can then set
               specific prices and lead times for this source.

@@ -202,22 +202,39 @@ export const getItems = async (
       );
     }
 
-    // Item No / EAN — case-insensitive; checks item EAN, parent DE number,
-    // item name (EN/CN, where numbers like 0013-1080 may live), and the warehouse
     if (eanSearch) {
-      idQb.andWhere((qb2) => {
-        const whSub = qb2
-          .subQuery()
-          .select("wi_ean.id")
-          .from(WarehouseItem, "wi_ean")
-          .where(
-            "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
-          )
-          .andWhere("LOWER(wi_ean.item_no_de) LIKE :ean")
-          .getQuery();
-        return `(LOWER(item.ean) LIKE :ean OR LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR EXISTS ${whSub})`;
-      });
-      idQb.setParameter("ean", `%${eanSearch.toLowerCase()}%`);
+      const cleanSearch = eanSearch.trim();
+      const isNumeric = /^\d+$/.test(cleanSearch);
+
+      if (isNumeric) {
+        idQb.andWhere((qb2) => {
+          const whSub = qb2
+            .subQuery()
+            .select("wi_ean.id")
+            .from(WarehouseItem, "wi_ean")
+            .where(
+              "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
+            )
+            .andWhere("wi_ean.ean LIKE :ean")
+            .getQuery();
+          return `EXISTS ${whSub}`;
+        });
+        idQb.setParameter("ean", `${cleanSearch}%`);
+      } else {
+        idQb.andWhere((qb2) => {
+          const whSub = qb2
+            .subQuery()
+            .select("wi_ean.id")
+            .from(WarehouseItem, "wi_ean")
+            .where(
+              "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
+            )
+            .andWhere("LOWER(wi_ean.item_no_de) LIKE :ean")
+            .getQuery();
+          return `(LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR EXISTS ${whSub})`;
+        });
+        idQb.setParameter("ean", `%${cleanSearch.toLowerCase()}%`);
+      }
     }
 
     // Active status — skipped when searching by Item No, so inactive items
@@ -781,29 +798,29 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-              id: defaultSi.id,
-              supplierId: defaultSi.supplier_id,
-              supplierName:
-                defaultSi.supplier?.company_name ||
-                defaultSi.supplier?.name ||
-                "Unknown",
-              priceRMB: defaultSi.price_rmb?.toString() || "0",
-              isPO: defaultSi.is_po || "No",
-              moq: defaultSi.moq?.toString() || "0",
-              interval: defaultSi.oi?.toString() || "0",
-              leadTime: defaultSi.lead_time || "",
-              noteCN: defaultSi.note_cn || "",
-              url: defaultSi.url || "",
-            }
+            id: defaultSi.id,
+            supplierId: defaultSi.supplier_id,
+            supplierName:
+              defaultSi.supplier?.company_name ||
+              defaultSi.supplier?.name ||
+              "Unknown",
+            priceRMB: defaultSi.price_rmb?.toString() || "0",
+            isPO: defaultSi.is_po || "No",
+            moq: defaultSi.moq?.toString() || "0",
+            interval: defaultSi.oi?.toString() || "0",
+            leadTime: defaultSi.lead_time || "",
+            noteCN: defaultSi.note_cn || "",
+            url: defaultSi.url || "",
+          }
           : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            };
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -1940,9 +1957,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2018,17 +2035,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3588,23 +3605,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         let warehouseData: any = null;
@@ -3831,8 +3848,8 @@ export const exportNewItemsToCSV = async (
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
           warehouseData?.item_no_de ||
-            item.ItemID_DE?.toString() ||
-            item.id.toString(),
+          item.ItemID_DE?.toString() ||
+          item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",

@@ -1657,6 +1657,7 @@ export const getAllStarBusinesses = async (
           customerId: record.id,
           companyName: record.companyName,
           legalName: record.legalName,
+          customerNumber: record.customerNumber,
           email: record.email,
           contactEmail: record.contactEmail,
           contactPhoneNumber: record.contactPhoneNumber,

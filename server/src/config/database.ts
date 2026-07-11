@@ -46,6 +46,7 @@ import { Country } from "../models/country";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
 import { PaymentMethod } from "../models/payment_methods";
 import { ShippingMethod } from "../models/shipping_methods";
+import { NumberSequence } from "../models/number_sequence";
 
 dotenv.config();
 
@@ -105,13 +106,14 @@ export const AppDataSource = new DataSource({
     CompanyShippingAddress,
     PaymentMethod,
     ShippingMethod,
+    NumberSequence,
   ],
   extra: {
     ssl:
       process.env.DB_SSL === "true"
         ? {
-            rejectUnauthorized: false,
-          }
+          rejectUnauthorized: false,
+        }
         : false,
   },
   poolSize: 10,
@@ -173,6 +175,9 @@ export const initializeDatabase = async (): Promise<DataSource> => {
     }
 
     await bootstrapAdminUser();
+
+    const { NumberSequenceService } = await import("../services/number_sequence_service");
+    await NumberSequenceService.seedDefaultSequences();
 
     const { seedDatabase } = await import("../services/seedDatabase");
     await seedDatabase();
