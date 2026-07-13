@@ -72,6 +72,7 @@ import { ShoppingCart, Truck } from "lucide-react";
 
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
+import SegmentedControl from "@/components/UI/SegmentedControl";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrdersTable from "@/components/orders/OrdersTable";
@@ -201,6 +202,7 @@ const InvoiceListPage: React.FC = () => {
     () => (searchParams.get("tab") as InvoiceTab) || "orders",
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const [cargoStatusFilter, setCargoStatusFilter] = useState("Open");
   const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<keyof Invoice>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -1583,6 +1585,18 @@ const InvoiceListPage: React.FC = () => {
             )}
           </div>
 
+          {activeInvTab === "cargos" && (
+            <SegmentedControl
+              options={[
+                { value: "Open", label: "Open" },
+                { value: "Shipped", label: "Shipped" },
+                { value: "Delivered", label: "Delivered" },
+              ]}
+              value={cargoStatusFilter}
+              onChange={setCargoStatusFilter}
+            />
+          )}
+
           <button
             onClick={() => {
               if (activeInvTab === "cargos") {
@@ -2051,7 +2065,12 @@ const InvoiceListPage: React.FC = () => {
             className="bg-white rounded-[4px] border border-[#E9ECEF] p-4"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
           >
-            <CargosTab ref={cargosTabRef} searchTerm={orderNoFilter} />
+            <CargosTab
+              ref={cargosTabRef}
+              searchTerm={orderNoFilter}
+              statusFilter={cargoStatusFilter}
+              setStatusFilter={setCargoStatusFilter}
+            />
           </div>
         )}
 

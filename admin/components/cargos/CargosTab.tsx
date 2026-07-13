@@ -66,6 +66,8 @@ type Customer = {
 interface CargosTabProps {
     customers?: Customer[];
     searchTerm?: string;
+    statusFilter?: string;
+    setStatusFilter?: (s: string) => void;
 }
 
 const formatDateInput = (dateString: string | Date | undefined | null) => {
@@ -79,12 +81,19 @@ const formatCargoDateShort = (dateString: string | Date | undefined | null) => {
     return formatDate(dateString);
 };
 
-const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCustomers, searchTerm: externalSearchTerm }, ref) => {
+const CargosTab = React.forwardRef<any, CargosTabProps>(({
+    customers: externalCustomers,
+    searchTerm: externalSearchTerm,
+    statusFilter: externalStatusFilter,
+    setStatusFilter: externalSetStatusFilter
+}, ref) => {
     const [cargos, setCargos] = useState<CargoType[]>([]);
     const [loading, setLoading] = useState(false);
     const [localSearch, setLocalSearch] = useState("");
     const search = externalSearchTerm !== undefined ? externalSearchTerm : localSearch;
-    const [statusFilter, setStatusFilter] = useState("Open");
+    const [localStatusFilter, setLocalStatusFilter] = useState("Open");
+    const statusFilter = externalStatusFilter !== undefined ? externalStatusFilter : localStatusFilter;
+    const setStatusFilter = externalSetStatusFilter !== undefined ? externalSetStatusFilter : setLocalStatusFilter;
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 30,
@@ -607,45 +616,47 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
 
     return (
         <div>
-            <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="flex flex-row items-center gap-3 w-full">
-                    {externalSearchTerm === undefined && (
-                        <div className="flex-1 w-full relative">
-                            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search cargos..."
-                                value={localSearch}
-                                onChange={(e) => setLocalSearch(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
+            {externalSearchTerm === undefined && (
+                <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="flex flex-row items-center gap-3 w-full">
+                        {externalSearchTerm === undefined && (
+                            <div className="flex-1 w-full relative">
+                                <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search cargos..."
+                                    value={localSearch}
+                                    onChange={(e) => setLocalSearch(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
+                                />
+                            </div>
+                        )}
+                        <div className="shrink-0">
+                            <SegmentedControl
+                                options={[
+                                    { value: "Open", label: "Open" },
+                                    { value: "Shipped", label: "Shipped" },
+                                    { value: "Delivered", label: "Delivered" },
+                                ]}
+                                value={statusFilter}
+                                onChange={handleStatusFilterChange}
                             />
                         </div>
-                    )}
-                    <div className="shrink-0">
-                        <SegmentedControl
-                            options={[
-                                { value: "Open", label: "Open" },
-                                { value: "Shipped", label: "Shipped" },
-                                { value: "Delivered", label: "Delivered" },
-                            ]}
-                            value={statusFilter}
-                            onChange={handleStatusFilterChange}
-                        />
+                        {(search || statusFilter !== "Open") && (
+                            <button
+                                onClick={() => {
+                                    setLocalSearch("");
+                                    handleStatusFilterChange("Open");
+                                }}
+                                className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm justify-center"
+                            >
+                                <ArrowPathIcon className="w-4 h-4" />
+                                Reset
+                            </button>
+                        )}
                     </div>
-                    {(search || statusFilter !== "Open") && (
-                        <button
-                            onClick={() => {
-                                setLocalSearch("");
-                                handleStatusFilterChange("Open");
-                            }}
-                            className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm justify-center"
-                        >
-                            <ArrowPathIcon className="w-4 h-4" />
-                            Reset
-                        </button>
-                    )}
                 </div>
-            </div>
+            )}
             <div className="overflow-x-auto px-6 pb-6">
                 {loading && cargos.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">
@@ -847,7 +858,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                                                                                                 <div className="text-[10px] text-gray-400">{oi.item?.ean || "-"}</div>
                                                                                             </td>
                                                                                             <td className="px-3 py-2 text-center text-gray-800 font-semibold">{oi.qty || 1}</td>
-                                                                                            <td className="px-3 py-2 text-right text-gray-800 font-semibold">€{(oi.eur_special_price || oi.price || 0).toFixed(2)}</td>
+                                                                                            <td className="px-3 py-2 text-right text-gray-800 font-semibold">€{Number(oi.eur_special_price || oi.price || 0).toFixed(2)}</td>
                                                                                         </tr>
                                                                                     ))}
                                                                                 </tbody>
