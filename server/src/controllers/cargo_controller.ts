@@ -289,9 +289,31 @@ export const getAllCargos = async (
       .take(limitNum)
       .getManyAndCount();
 
+    const cargoIds = cargos.map((c) => c.id);
+    const itemCountsMap: { [key: number]: number } = {};
+    if (cargoIds.length > 0) {
+      const orderItemRepo = AppDataSource.getRepository(OrderItem);
+      const counts = await orderItemRepo
+        .createQueryBuilder("oi")
+        .select("oi.cargo_id", "cargoId")
+        .addSelect("COUNT(oi.id)", "count")
+        .where("oi.cargo_id IN (:...cargoIds)", { cargoIds })
+        .groupBy("oi.cargo_id")
+        .getRawMany();
+
+      counts.forEach((c) => {
+        itemCountsMap[Number(c.cargoId)] = Number(c.count);
+      });
+    }
+
+    const dataWithCounts = cargos.map((c) => ({
+      ...c,
+      assignedItemsCount: itemCountsMap[c.id] || 0,
+    }));
+
     res.status(200).json({
       success: true,
-      data: cargos,
+      data: dataWithCounts,
       pagination: {
         page: pageNum,
         limit: limitNum,

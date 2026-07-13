@@ -34,6 +34,11 @@ import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "../Genera
 import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
 import SegmentedControl from "@/components/UI/SegmentedControl";
 import { formatDate } from "@/utils/date";
+import CustomModal from "@/components/UI/CustomModal";
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
+import { getShippingAddresses } from "@/api/shipping_addresses";
+import { formatCountryCode } from "@/utils/address";
+import { ClipboardList } from "lucide-react";
 
 
 type Customer = {
@@ -93,6 +98,52 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
     };
 
     const [showModal, setShowModal] = useState(false);
+    const [expandedCargoIds, setExpandedCargoIds] = useState<Set<number>>(new Set());
+    const [cargoDetailsMap, setCargoDetailsMap] = useState<Record<number, { orders: any[]; orderItems: any[]; loading: boolean }>>({});
+
+    const toggleExpandCargo = async (cargoId: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newExpanded = new Set(expandedCargoIds);
+        if (newExpanded.has(cargoId)) {
+            newExpanded.delete(cargoId);
+            setExpandedCargoIds(newExpanded);
+        } else {
+            newExpanded.add(cargoId);
+            setExpandedCargoIds(newExpanded);
+
+            if (!cargoDetailsMap[cargoId]) {
+                setCargoDetailsMap(prev => ({
+                    ...prev,
+                    [cargoId]: { orders: [], orderItems: [], loading: true }
+                }));
+                try {
+                    const res: any = await getCargoOrders(cargoId);
+                    if (res && res.success) {
+                        setCargoDetailsMap(prev => ({
+                            ...prev,
+                            [cargoId]: {
+                                orders: res.data?.orders || [],
+                                orderItems: res.data?.orderItems || [],
+                                loading: false
+                            }
+                        }));
+                    } else {
+                        setCargoDetailsMap(prev => ({
+                            ...prev,
+                            [cargoId]: { orders: [], orderItems: [], loading: false }
+                        }));
+                    }
+                } catch (err) {
+                    console.error("Failed to load cargo orders", err);
+                    setCargoDetailsMap(prev => ({
+                        ...prev,
+                        [cargoId]: { orders: [], orderItems: [], loading: false }
+                    }));
+                }
+            }
+        }
+    };
+
     const [modalMode, setModalMode] = useState<"create" | "edit" | "view">("create");
     const [editingId, setEditingId] = useState<number | null>(null);
     const [isEditEnabled, setIsEditEnabled] = useState(false);
@@ -427,6 +478,114 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
         setFormData({ ...formData, [field]: value });
     };
 
+    const handleCustomerChange = async (customerId: string | undefined) => {
+        if (!customerId) {
+            setFormData(prev => ({
+                ...prev,
+                customer_id: undefined,
+                customer_type: "GT-Warehouse",
+                ...WAREHOUSE_BILL_TO,
+                ship_to_company_name: "",
+                ship_to_display_name: "",
+                ship_to_contact_person: "",
+                ship_to_contact_phone: "",
+                ship_to_country: "",
+                ship_to_city: "",
+                ship_to_postal_code: "",
+                ship_to_full_address: "",
+                ship_to_remarks: "",
+            }));
+            return;
+        }
+
+        const customer = customers.find(c => String(c.id) === String(customerId));
+        if (!customer) {
+            setFormData(prev => ({ ...prev, customer_id: customerId }));
+            return;
+        }
+
+        const billTo = {
+            customer_type: "Other Customer",
+            bill_to_company_name: customer.companyName || "",
+            bill_to_display_name: customer.companyName || "",
+            bill_to_phone_no: customer.contactPhoneNumber || customer.email || "",
+            bill_to_tax_no: customer.taxNumber || "",
+            bill_to_email: customer.email || "",
+            bill_to_website: "",
+            bill_to_contact_person: customer.legalName || "",
+            bill_to_contact_phone: customer.contactPhoneNumber || "",
+            bill_to_contact_mobile: "",
+            bill_to_contact_email: customer.contactEmail || "",
+            bill_to_country: customer.country || "",
+            bill_to_city: customer.city || "",
+            bill_to_postal_code: customer.postalCode || "",
+            bill_to_full_address: [customer.addressLine1 || customer.address || "", customer.addressLine2 || ""].filter(Boolean).join(" "),
+        };
+
+        let shipTo = {
+            ship_to_company_name: customer.companyName || "",
+            ship_to_display_name: customer.companyName || "",
+            ship_to_contact_person: customer.legalName || "",
+            ship_to_contact_phone: customer.contactPhoneNumber || "",
+            ship_to_country: "",
+            ship_to_city: "",
+            ship_to_postal_code: "",
+            ship_to_full_address: "",
+            ship_to_remarks: "",
+        };
+
+        try {
+            const res: any = await getShippingAddresses(String(customer.id));
+            const dbAddresses = res && res.success ? (res.data || []) : [];
+            const defaultAddress = dbAddresses.find((a: any) => a.is_default);
+
+            if (defaultAddress) {
+                const fullAddressStr = [
+                    defaultAddress.street,
+                    defaultAddress.address_additional_line || ""
+                ].filter(Boolean).join(" ");
+                shipTo.ship_to_country = defaultAddress.country?.name || "";
+                shipTo.ship_to_city = defaultAddress.city || "";
+                shipTo.ship_to_postal_code = defaultAddress.postal_code || "";
+                shipTo.ship_to_full_address = fullAddressStr;
+            } else {
+                const hasDelivery = !!(customer.deliveryAddressLine1 || customer.deliveryCity || customer.deliveryCountry);
+                if (hasDelivery) {
+                     shipTo.ship_to_country = customer.deliveryCountry || "";
+                     shipTo.ship_to_city = customer.deliveryCity || "";
+                     shipTo.ship_to_postal_code = customer.deliveryPostalCode || "";
+                     shipTo.ship_to_full_address = [customer.deliveryAddressLine1 || "", customer.deliveryAddressLine2 || ""].filter(Boolean).join(" ");
+                } else {
+                     shipTo.ship_to_country = customer.country || "";
+                     shipTo.ship_to_city = customer.city || "";
+                     shipTo.ship_to_postal_code = customer.postalCode || "";
+                     shipTo.ship_to_full_address = [customer.addressLine1 || customer.address || "", customer.addressLine2 || ""].filter(Boolean).join(" ");
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load customer shipping addresses", err);
+            const hasDelivery = !!(customer.deliveryAddressLine1 || customer.deliveryCity || customer.deliveryCountry);
+            if (hasDelivery) {
+                 shipTo.ship_to_country = customer.deliveryCountry || "";
+                 shipTo.ship_to_city = customer.deliveryCity || "";
+                 shipTo.ship_to_postal_code = customer.deliveryPostalCode || "";
+                 shipTo.ship_to_full_address = [customer.deliveryAddressLine1 || "", customer.deliveryAddressLine2 || ""].filter(Boolean).join(" ");
+            } else {
+                 shipTo.ship_to_country = customer.country || "";
+                 shipTo.ship_to_city = customer.city || "";
+                 shipTo.ship_to_postal_code = customer.postalCode || "";
+                 shipTo.ship_to_full_address = [customer.addressLine1 || customer.address || "", customer.addressLine2 || ""].filter(Boolean).join(" ");
+            }
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            customer_id: customerId,
+            ...billTo,
+            ...shipTo,
+        }));
+    };
+
     const selectedCustomer = useMemo(() => {
         if (!formData.customer_id) return null;
         return (customers as any[]).find((c) => String(c.id) === String(formData.customer_id)) || null;
@@ -434,7 +593,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
 
     const sectionTabs = [
         { key: "details" as const, label: "Cargo Details", icon: "📦" },
-        { key: "billto_shipto" as const, label: "Bill To / Ship To", icon: "📄" },
         { key: "orders" as const, label: "Assigned Orders", icon: "📋" },
     ];
 
@@ -507,6 +665,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
+                                    <th className="w-10 px-4 py-3"></th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
                                         ID
                                     </th>
@@ -544,57 +703,165 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {cargos.map((cargo) => (
-                                    <tr
-                                        key={cargo.id}
-                                        className="hover:bg-gray-50 cursor-pointer transition-colors"
-                                        onClick={() => handleOpenEdit(cargo.id)}
-                                    >
-                                        <td className="px-4 py-3 text-sm text-gray-800 font-bold">
-                                            {cargo.id}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800 font-semibold">
-                                            {cargo.cargo_no || "-"}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            <span className="text-[10px] font-bold text-[#495057]">
-                                                {cargo.cargo_status || "Open"}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800">
-                                            {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800">
-                                            {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800">
-                                            {formatCargoDateShort(cargo.dep_date)}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800">
-                                            {formatCargoDateShort(cargo.shipped_at)}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800">
-                                            {formatCargoDateShort(cargo.eta)}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800">
-                                            -
-                                        </td>
-                                        <td className="px-4 py-3 text-sm max-w-[120px] truncate">
-                                            {cargo.online_track ? (
-                                                <a
-                                                    href={cargo.online_track}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 hover:underline"
-                                                    onClick={(e) => e.stopPropagation()}
+                                    <React.Fragment key={cargo.id}>
+                                        <tr
+                                            className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                            onClick={() => handleOpenEdit(cargo.id)}
+                                        >
+                                            <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => toggleExpandCargo(cargo.id, e)}
+                                                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
                                                 >
-                                                    {cargo.online_track}
-                                                </a>
-                                            ) : "-"}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800 max-w-[150px] truncate">
-                                            {cargo.remark || cargo.note || "-"}
-                                        </td>
-                                    </tr>
+                                                    <ChevronRightIcon
+                                                        className={`h-4.5 w-4.5 transition-transform duration-200 ${
+                                                            expandedCargoIds.has(cargo.id) ? "rotate-90" : ""
+                                                        } ${
+                                                            (cargo.assignedItemsCount ?? 0) === 0
+                                                                ? "text-red-500 font-bold stroke-[3px]"
+                                                                : "text-gray-400"
+                                                        }`}
+                                                    />
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800 font-bold">
+                                                {cargo.id}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800 font-semibold">
+                                                {cargo.cargo_no || "-"}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                                <span className="text-[10px] font-bold text-[#495057]">
+                                                    {cargo.cargo_status || "Open"}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                                {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                                {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                                {formatCargoDateShort(cargo.dep_date)}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                                {formatCargoDateShort(cargo.shipped_at)}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                                {formatCargoDateShort(cargo.eta)}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                                -
+                                            </td>
+                                            <td className="px-4 py-3 text-sm max-w-[120px] truncate">
+                                                {cargo.online_track ? (
+                                                    <a
+                                                        href={cargo.online_track}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 hover:underline"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {cargo.online_track}
+                                                    </a>
+                                                ) : "-"}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800 max-w-[150px] truncate">
+                                                {cargo.remark || cargo.note || "-"}
+                                            </td>
+                                        </tr>
+                                        {expandedCargoIds.has(cargo.id) && (
+                                            <tr className="bg-gray-50/50 border-t border-b border-gray-100">
+                                                <td colSpan={12} className="px-6 py-4">
+                                                    <div>
+                                                        <div className="text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wider flex items-center gap-1.5 select-none">
+                                                            <ClipboardList className="h-4 w-4 text-blue-500" />
+                                                            <span>
+                                                                Assigned Orders &amp; Items for Cargo No:{" "}
+                                                                <strong className="text-gray-800">
+                                                                    {cargo.cargo_no || cargo.id}
+                                                                </strong>
+                                                            </span>
+                                                        </div>
+
+                                                        {(() => {
+                                                            const details = cargoDetailsMap[cargo.id] || { orders: [], orderItems: [], loading: false };
+                                                            if (details.loading) {
+                                                                return (
+                                                                    <div className="flex items-center gap-2 py-2 text-sm text-gray-500">
+                                                                        <ArrowPathIcon className="h-4 w-4 animate-spin text-gray-500 animate-infinite" />
+                                                                        <span>Loading orders and items...</span>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            if (details.orders.length === 0 && details.orderItems.length === 0) {
+                                                                return (
+                                                                    <div className="text-sm text-gray-400 py-2">
+                                                                        No assigned orders or items.
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                                    {/* Orders List */}
+                                                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                                                                        <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                                                            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Assigned Orders ({details.orders.length})</h4>
+                                                                        </div>
+                                                                        <div className="divide-y divide-gray-100 max-h-[250px] overflow-y-auto">
+                                                                            {details.orders.map((o: any) => (
+                                                                                <div key={o.id} className="p-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                                                                    <div>
+                                                                                        <div className="text-sm font-semibold text-gray-800">{o.order_no}</div>
+                                                                                        <div className="text-xs text-gray-400">ID: {o.id}</div>
+                                                                                    </div>
+                                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.order_status === "Delivered" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>
+                                                                                        {o.order_status}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Order Items List */}
+                                                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                                                                        <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                                                            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Assigned Order Items ({details.orderItems.length})</h4>
+                                                                        </div>
+                                                                        <div className="overflow-x-auto max-h-[250px] overflow-y-auto">
+                                                                            <table className="w-full text-left text-xs text-gray-600">
+                                                                                <thead className="bg-gray-100 border-b border-gray-200">
+                                                                                    <tr>
+                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500">Item Name</th>
+                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500">Model / EAN</th>
+                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500 text-center">Qty</th>
+                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500 text-right">Price</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody className="divide-y divide-gray-100">
+                                                                                    {details.orderItems.map((oi: any) => (
+                                                                                        <tr key={oi.id} className="hover:bg-gray-50 transition-colors">
+                                                                                            <td className="px-3 py-2 font-medium text-gray-800 max-w-[180px] truncate">{oi.item?.item_name || "Unknown"}</td>
+                                                                                            <td className="px-3 py-2 text-gray-500">
+                                                                                                <div>{oi.item?.model || "-"}</div>
+                                                                                                <div className="text-[10px] text-gray-400">{oi.item?.ean || "-"}</div>
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-center text-gray-800 font-semibold">{oi.qty || 1}</td>
+                                                                                            <td className="px-3 py-2 text-right text-gray-800 font-semibold">€{(oi.eur_special_price || oi.price || 0).toFixed(2)}</td>
+                                                                                        </tr>
+                                                                                    ))}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
@@ -634,210 +901,164 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                 </div>
             )}
 
-            {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-[4px] shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col">
-                        <ModalHeader
-                            entityName="Cargo"
-                            entityNo={modalMode !== "create" ? formData.cargo_no : undefined}
-                            icon={Truck}
-                            isEditMode={modalMode !== "create"}
-                            isEditEnabled={isEditEnabled}
-                            onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
-                            onClose={() => setShowModal(false)}
-                        />
+            <CustomModal
+                title=""
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                width="max-w-4xl"
+                showHeader={false}
+                noPadding={true}
+            >
+                <div className="flex flex-col max-h-[92vh]">
+                    <ModalHeader
+                        entityName="Cargo"
+                        entityNo={modalMode !== "create" ? formData.cargo_no : undefined}
+                        icon={Truck}
+                        isEditMode={modalMode !== "create"}
+                        isEditEnabled={isEditEnabled}
+                        onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
+                        onClose={() => setShowModal(false)}
+                    />
 
-                        <div className="px-6 py-2 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
-                            <nav className="flex space-x-1">
-                                {sectionTabs.map((tab) => (
-                                    <button
-                                        key={tab.key}
-                                        onClick={() => setActiveSection(tab.key)}
-                                        className={`px-4 py-2 rounded-[4px] text-sm font-medium transition-all flex items-center gap-2 ${activeSection === tab.key
-                                            ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                                            : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
-                                            }`}
-                                    >
-                                        <span>{tab.icon}</span>
-                                        {tab.label}
-                                    </button>
-                                ))}
-                            </nav>
-                        </div>
+                    <div className="px-6 py-2 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
+                        <nav className="flex space-x-1">
+                            {sectionTabs.map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setActiveSection(tab.key)}
+                                    className={`px-4 py-2 rounded-[4px] text-sm font-medium transition-all flex items-center gap-2 ${activeSection === tab.key
+                                        ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                                        : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
+                                        }`}
+                                >
+                                    <span>{tab.icon}</span>
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
 
-                        <div className="flex-1 overflow-y-auto p-6">
-                            {activeSection === "details" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Cargo No
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.cargo_no || ""}
-                                            onChange={(e) => updateField("cargo_no", e.target.value)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                            placeholder="Enter cargo number"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Cargo Type
-                                        </label>
-                                        <Select
-                                            className="text-sm"
-                                            classNames={{
-                                                control: () =>
-                                                    "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
-                                            }}
-                                            options={cargoTypeOptions}
-                                            value={cargoTypeOptions.find((opt) => opt.value === String(formData.cargo_type_id)) || null}
-                                            onChange={(newValue) => updateField("cargo_type_id", newValue?.value ? Number(newValue.value) : undefined)}
-                                            placeholder="Select cargo type..."
-                                            isSearchable
-                                            isClearable
-                                            isDisabled={!isEditEnabled}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
-                                        <select
-                                            value={formData.cargo_status || "Open"}
-                                            onChange={(e) => updateField("cargo_status", e.target.value)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                        >
-                                            {CARGO_STATUSES.map((s) => (
-                                                <option key={s.value} value={s.value}>
-                                                    {s.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Customer
-                                        </label>
-                                        <Select
-                                            className="text-sm"
-                                            classNames={{
-                                                control: () =>
-                                                    "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
-                                            }}
-                                            options={customerOptions}
-                                            value={customerOptions.find((opt) => opt.value === String(formData.customer_id)) || null}
-                                            onChange={(newValue) => updateField("customer_id", newValue?.value || undefined)}
-                                            placeholder="Search or select customer..."
-                                            isSearchable
-                                            isClearable
-                                            isDisabled={!isEditEnabled}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Pickup Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={formatDateInput(formData.pickup_date)}
-                                            onChange={(e) => updateField("pickup_date", e.target.value || null)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Departure Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={formatDateInput(formData.dep_date)}
-                                            onChange={(e) => updateField("dep_date", e.target.value || null)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            ETA (Estimated Arrival)
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={formatDateInput(formData.eta)}
-                                            onChange={(e) => updateField("eta", e.target.value || null)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Shipped At
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={formatDateInput(formData.shipped_at)}
-                                            onChange={(e) => updateField("shipped_at", e.target.value || null)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
-
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Note</label>
-                                        <input
-                                            type="text"
-                                            value={formData.note || ""}
-                                            onChange={(e) => updateField("note", e.target.value)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                            placeholder="Enter note"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Online Track
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.online_track || ""}
-                                            onChange={(e) => updateField("online_track", e.target.value)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                            placeholder="Enter tracking URL or ID"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Remark</label>
-                                        <textarea
-                                            value={formData.remark || ""}
-                                            onChange={(e) => updateField("remark", e.target.value)}
-                                            disabled={!isEditEnabled}
-                                            rows={2}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-none"
-                                            placeholder="Enter remark"
-                                        />
-                                    </div>
+                    <div className="flex-1 overflow-y-auto p-6">
+                        {activeSection === "details" && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Cargo Type
+                                    </label>
+                                    <Select
+                                        className="text-sm"
+                                        classNames={{
+                                            control: () =>
+                                                "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
+                                        }}
+                                        options={cargoTypeOptions}
+                                        value={cargoTypeOptions.find((opt) => opt.value === String(formData.cargo_type_id)) || null}
+                                        onChange={(newValue) => updateField("cargo_type_id", newValue?.value ? Number(newValue.value) : undefined)}
+                                        placeholder="Select cargo type..."
+                                        isSearchable
+                                        isClearable
+                                        isDisabled={!isEditEnabled}
+                                    />
                                 </div>
-                            )}
 
-                            {activeSection === "billto_shipto" && (
-                                <BillToShipToForm
-                                    data={formData}
-                                    onChange={updateField as any}
-                                    onBatchChange={handleBatchChange}
-                                    isEditEnabled={isEditEnabled}
-                                    selectedCustomer={selectedCustomer}
-                                />
-                            )}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Cargo No
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.cargo_no || ""}
+                                        onChange={(e) => updateField("cargo_no", e.target.value)}
+                                        disabled={!isEditEnabled}
+                                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                        placeholder="Enter cargo number"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Customer
+                                    </label>
+                                    <CustomerSearchInput
+                                        value={formData.customer_id || ""}
+                                        onChange={(id) => handleCustomerChange(id || undefined)}
+                                        disabled={!isEditEnabled}
+                                        placeholder="Search or select customer..."
+                                        mode="customers"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                                    <select
+                                        value={formData.cargo_status || "Open"}
+                                        onChange={(e) => updateField("cargo_status", e.target.value)}
+                                        disabled={!isEditEnabled}
+                                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                    >
+                                        {CARGO_STATUSES.map((s) => (
+                                            <option key={s.value} value={s.value}>
+                                                {s.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Pickup Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formatDateInput(formData.pickup_date)}
+                                        onChange={(e) => updateField("pickup_date", e.target.value || null)}
+                                        disabled={!isEditEnabled}
+                                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Departure Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formatDateInput(formData.dep_date)}
+                                        onChange={(e) => updateField("dep_date", e.target.value || null)}
+                                        disabled={!isEditEnabled}
+                                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        ETA (Estimated Arrival)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formatDateInput(formData.eta)}
+                                        onChange={(e) => updateField("eta", e.target.value || null)}
+                                        disabled={!isEditEnabled}
+                                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Remark</label>
+                                    <textarea
+                                        value={formData.remark || formData.note || ""}
+                                        onChange={(e) => {
+                                            updateField("remark", e.target.value);
+                                            updateField("note", e.target.value);
+                                        }}
+                                        disabled={!isEditEnabled}
+                                        rows={3}
+                                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-none"
+                                        placeholder="Enter remark"
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                             {activeSection === "orders" && (
                                 <div className="space-y-4">
@@ -994,9 +1215,8 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                             saveLabel={modalMode === "edit" ? "Update Cargo" : "Create Cargo"}
                             loading={loading}
                         />
-                    </div>
                 </div>
-            )}
+            </CustomModal>
         </div>
     );
 });

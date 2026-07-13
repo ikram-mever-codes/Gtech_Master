@@ -19,6 +19,7 @@ export type CargoType = {
     updated_at?: Date;
     orders?: any[];
     orderItems?: any[];
+    assignedItemsCount?: number;
 
     customer_type?: string;
 
