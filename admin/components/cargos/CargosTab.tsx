@@ -905,7 +905,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                         entityName="Cargo"
                         entityNo={modalMode !== "create"
                             ? `${formData.cargo_no || ""} ${selectedCustomer
-                                ? selectedCustomer.companyName || selectedCustomer.displayName || "GTech"
+                                ? selectedCustomer.displayName || "GTech"
                                 : "GTech"
                             } ${formData.cargo_status || "Open"}`
                             : undefined
