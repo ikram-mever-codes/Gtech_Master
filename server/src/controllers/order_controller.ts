@@ -922,13 +922,6 @@ export const generateLabelPDF = async (
       });
     }
 
-    if (
-      !brandingCustomer?.companyLabelPrintLogo &&
-      order?.customer?.companyLabelPrintLogo
-    ) {
-      brandingCustomer = order.customer;
-    }
-
     console.log("[label] logo decision:", {
       itemId,
       orderId: item.order_id,

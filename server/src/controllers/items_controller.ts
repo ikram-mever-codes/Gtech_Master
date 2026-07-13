@@ -217,9 +217,9 @@ export const getItems = async (
             )
             .andWhere("wi_ean.ean LIKE :ean")
             .getQuery();
-          return `EXISTS ${whSub}`;
+          return `(item.ean LIKE :ean OR EXISTS ${whSub})`;
         });
-        idQb.setParameter("ean", `${cleanSearch}%`);
+        idQb.setParameter("ean", `%${cleanSearch}%`);
       } else {
         idQb.andWhere((qb2) => {
           const whSub = qb2
@@ -231,7 +231,7 @@ export const getItems = async (
             )
             .andWhere("LOWER(wi_ean.item_no_de) LIKE :ean")
             .getQuery();
-          return `(LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR EXISTS ${whSub})`;
+          return `(LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR LOWER(item.ean) LIKE :ean OR EXISTS ${whSub})`;
         });
         idQb.setParameter("ean", `%${cleanSearch.toLowerCase()}%`);
       }
