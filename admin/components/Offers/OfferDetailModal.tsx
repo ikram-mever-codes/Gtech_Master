@@ -5,20 +5,15 @@ import {
   XMarkIcon,
   PencilIcon,
   TrashIcon,
-  PrinterIcon,
   PlusIcon,
   CheckCircleIcon,
-  CogIcon,
   ClipboardIcon,
   CalculatorIcon,
   LinkIcon,
   CubeIcon,
   BuildingOfficeIcon,
-  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
-import { DownloadCloudIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
-import CustomModal from "@/components/UI/CustomModal";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import {
@@ -27,45 +22,36 @@ import {
   deleteOffer,
   generateOfferPdf,
   downloadOfferPdf,
-  copyPastePrices,
   updateLineItem,
-  addQuantityPrice,
+  addPriceMatrixEntry,
   setActivePrice,
+  pasteMatrixPrices,
   createOfferLineItem,
   deleteOfferLineItem,
   createOfferFromInquiry,
   createOfferFromItem,
   formatCurrency,
-  formatUnitPrice,
-  formatTotalPrice,
-  formatUnitPriceForOffer,
-  calculateLineItemTotal,
-  calculateUnitPriceTotal,
-  calculateLineTotal,
-  getActivePrice,
-  getActivePriceType,
   getOfferStatuses,
-  getAvailableCurrencies,
   getOfferStatusColor,
-  offerUsesUnitPrices,
-  type UnitPrice,
+  deletePriceColumn,
 } from "@/api/offers";
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
 import { getItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
-import { formatDate, openOutlookWithOffer } from "@/utils/offers";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { BASE_URL } from "@/utils/constants";
+import { parseFlexibleNumber, formatMatrixPrice } from "@/utils/decimal";
+import { PrinterIcon } from "lucide-react";
+
+type PricingMode = "classic" | "matrix";
 
 interface OfferDetailModalProps {
   isOpen: boolean;
-  /** null => create mode (inline picker); string => view/edit an existing offer. */
   offerId: string | null;
   onClose: () => void;
-  /** Called after any change that should refresh the list behind the modal. */
   onChanged?: () => void;
   userRole?: UserRole;
 }
@@ -75,11 +61,6 @@ type SourceType = "inquiry" | "item";
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 
-/**
- * Generic, dropdown-fed option lists. Kept on the client so the UX is
- * consistent; the chosen value is stored as free text on the offer, which
- * means these can grow without a DB migration.
- */
 const PAYMENT_METHODS = [
   "Prepayment",
   "Bank transfer",
@@ -97,11 +78,6 @@ const SHIPPING_METHODS = [
   "Pickup",
 ];
 
-/**
- * Thumbnail resolution mirrors the Items page so selected items look the same
- * here. Duplicated intentionally to keep this modal self-contained rather than
- * coupling it to the Items page's internal helpers.
- */
 const resolveThumbUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
   if (url.includes("cloudinary.com")) return url;
@@ -137,7 +113,20 @@ const getItemCompany = (item: any): string =>
   item?.company ||
   "";
 
-/** Section wrapper for a consistent rhythm across the modal. */
+// --- Local pricing helpers (mode-aware, no dependency on legacy api helpers) --
+const getActiveMatrixEntry = (item: any) =>
+  (item?.priceMatrix || []).find((p: any) => p.isActive) || null;
+
+const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
+  if (pricingMode === "matrix") {
+    const active = getActiveMatrixEntry(item);
+    return active?.total ?? 0;
+  }
+  const qty = parseFlexibleNumber(item?.baseQuantity) ?? 1;
+  const price = parseFlexibleNumber(item?.basePrice) ?? 0;
+  return qty * price;
+};
+
 const Section: React.FC<{
   title: string;
   icon?: React.ReactNode;
@@ -156,7 +145,6 @@ const Section: React.FC<{
   </section>
 );
 
-/** Read/edit field. Shows plain text in view mode, an input in edit mode. */
 const Field: React.FC<{
   label: string;
   edit: boolean;
@@ -174,10 +162,6 @@ const Field: React.FC<{
   </div>
 );
 
-/**
- * Selected/selectable item row styled like the Items page: thumbnail, then
- * ItemName over "ItemNo - Company - isLabel".
- */
 const ItemRow: React.FC<{
   item: any;
   selected: boolean;
@@ -237,7 +221,6 @@ const ItemRow: React.FC<{
   );
 };
 
-/** Small selectable row used by the inquiry picker. */
 const PickerRow: React.FC<{
   selected: boolean;
   onClick: () => void;
@@ -267,7 +250,6 @@ const PickerRow: React.FC<{
   </div>
 );
 
-/** Read-only address block, reused for both customer and delivery address. */
 const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   addr,
   emptyText,
@@ -296,6 +278,34 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
         <div className="text-gray-500">Phone: {addr.contactPhone}</div>
       )}
     </div>
+  );
+};
+
+/** Text input accepting both "," and "." as decimal separator. */
+const DecimalInput: React.FC<{
+  value: string | number | null | undefined;
+  onCommit: (raw: string) => void;
+  className?: string;
+  placeholder?: string;
+}> = ({ value, onCommit, className, placeholder }) => {
+  const [local, setLocal] = useState(
+    value === null || value === undefined ? "" : String(value),
+  );
+
+  useEffect(() => {
+    setLocal(value === null || value === undefined ? "" : String(value));
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={className || inputCls}
+      value={local}
+      placeholder={placeholder}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => onCommit(local)}
+    />
   );
 };
 
@@ -343,22 +353,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     })();
   }, [isOpen]);
 
-  // create mode = the modal is open with no offer id yet.
   const isCreate = !offerId && !offer;
 
-  // Editable header/detail fields kept in a working copy; pricing persists live.
   const [form, setForm] = useState<any>({});
-
-  // Inline panels (kept inside this single modal instead of separate popups).
-  const [showSettings, setShowSettings] = useState(false);
   const [showCopyPaste, setShowCopyPaste] = useState(false);
   const [copyPasteData, setCopyPasteData] = useState("");
+  const [tierCount, setTierCount] = useState("3");
   const [newLine, setNewLine] = useState<{
     itemName: string;
     baseQuantity: string;
-  }>({ itemName: "", baseQuantity: "1" });
+  }>({
+    itemName: "",
+    baseQuantity: "1",
+  });
 
-  // --- Create-picker state (only used while isCreate) ----------------------
   const [creating, setCreating] = useState(false);
   const [sourceType, setSourceType] = useState<SourceType>("inquiry");
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -376,7 +384,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       .split("T")[0],
     paymentMethod: "",
     shippingMethod: "",
-    useUnitPrices: true,
+    pricingMode: "classic" as PricingMode,
     unitPriceDecimalPlaces: 3,
     totalPriceDecimalPlaces: 2,
     maxUnitPriceColumns: 3,
@@ -398,23 +406,19 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   }, [offerId]);
 
-  // Load offer when an id is present; reset everything when the modal opens.
   useEffect(() => {
     if (!isOpen) return;
     setEdit(false);
-    setShowSettings(false);
     setShowCopyPaste(false);
     setCopyPasteData("");
     if (offerId) {
       fetchOffer();
     } else {
-      // entering create mode fresh
       setOffer(null);
       resetCreatePicker();
     }
   }, [isOpen, offerId, fetchOffer]);
 
-  // Lazy-load source lists the first time we're in create mode.
   useEffect(() => {
     if (!isOpen || offerId) return;
     (async () => {
@@ -461,7 +465,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         .split("T")[0],
       paymentMethod: "",
       shippingMethod: "",
-      useUnitPrices: true,
+      pricingMode: "classic",
       unitPriceDecimalPlaces: 3,
       totalPriceDecimalPlaces: 2,
       maxUnitPriceColumns: 3,
@@ -482,10 +486,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       termsConditions: o.termsConditions || "",
       discountPercentage: o.discountPercentage ?? "",
       shippingCost: o.shippingCost ?? "",
+      taxRate: o.taxRate ?? 19,
       notes: o.notes || "",
       internalNotes: o.internalNotes || "",
       deliveryAddress: { ...(o.deliveryAddress || {}) },
-      useUnitPrices: !!o.useUnitPrices,
+      pricingMode: (o.pricingMode || "classic") as PricingMode,
       unitPriceDecimalPlaces: o.unitPriceDecimalPlaces || 3,
       totalPriceDecimalPlaces: o.totalPriceDecimalPlaces || 2,
       maxUnitPriceColumns: o.maxUnitPriceColumns || 3,
@@ -499,9 +504,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     if (updated.success) setOffer(updated.data);
   };
 
-  // =========================================================================
-  // CREATE FLOW (inline picker) — runs only while offerId === null
-  // =========================================================================
   const cPatch = (p: any) => setCreateForm((f: any) => ({ ...f, ...p }));
 
   const visibleInquiries = inquiries.filter((i) => {
@@ -514,9 +516,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     return matchCust && matchSearch;
   });
 
-  // Items are decoupled from the offer's customer: the customer is just the
-  // recipient. Show every item, filtered only by the search box. (MVP: any
-  // company can be offered any item — no cross-restriction.)
   const visibleItems = items.filter((it) => {
     const name = it.item_name || it.itemName || "";
     if (!sourceSearch) return true;
@@ -557,13 +556,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const canCreate = () => {
     if (!createForm.title?.trim()) return false;
     if (sourceType === "inquiry") return !!selectedInquiry;
-    // MVP: recipient customer required for item offers, but any item allowed.
     if (sourceType === "item")
       return !!filterCustomerId && selectedItems.length > 0;
     return false;
   };
 
-  // Creates the offer server-side, then flips THIS modal into edit view on it.
   const handleCreate = async () => {
     if (!canCreate()) return;
     setCreating(true);
@@ -574,7 +571,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         validUntil: createForm.validUntil,
         paymentMethod: createForm.paymentMethod || undefined,
         shippingMethod: createForm.shippingMethod || undefined,
-        useUnitPrices: createForm.useUnitPrices,
+        pricingMode: createForm.pricingMode,
         unitPriceDecimalPlaces: createForm.unitPriceDecimalPlaces,
         totalPriceDecimalPlaces: createForm.totalPriceDecimalPlaces,
         maxUnitPriceColumns: createForm.maxUnitPriceColumns,
@@ -625,15 +622,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         termsConditions: form.termsConditions,
         notes: form.notes,
         internalNotes: form.internalNotes,
-        // Delivery address is shown read-only at the top; still persisted as-is.
         deliveryAddress: form.deliveryAddress,
-        discountPercentage:
-          form.discountPercentage === ""
-            ? 0
-            : parseFloat(form.discountPercentage),
-        shippingCost:
-          form.shippingCost === "" ? 0 : parseFloat(form.shippingCost),
-        useUnitPrices: form.useUnitPrices,
+        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
+        shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
+        taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
+        pricingMode: form.pricingMode,
         unitPriceDecimalPlaces: form.unitPriceDecimalPlaces,
         totalPriceDecimalPlaces: form.totalPriceDecimalPlaces,
         maxUnitPriceColumns: form.maxUnitPriceColumns,
@@ -653,7 +646,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const handleCancelEdit = () => {
     setForm(buildForm(offer));
     setEdit(false);
-    setShowSettings(false);
     setShowCopyPaste(false);
   };
 
@@ -681,11 +673,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-  // --- Pricing handlers (persist immediately while in edit mode) ------------
-  const toggleUnitPricing = async (value: boolean) => {
+  const togglePricingMode = async (mode: PricingMode) => {
     try {
-      await updateOffer(offer.id, { useUnitPrices: value });
-      patch({ useUnitPrices: value });
+      await updateOffer(offer.id, { pricingMode: mode });
+      patch({ pricingMode: mode });
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -693,28 +684,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-  const saveSettings = async () => {
+  const setActive = async (lineItemId: string, idx: number) => {
     try {
-      await updateOffer(offer.id, {
-        unitPriceDecimalPlaces: form.unitPriceDecimalPlaces,
-        totalPriceDecimalPlaces: form.totalPriceDecimalPlaces,
-        maxUnitPriceColumns: form.maxUnitPriceColumns,
-      });
-      await refreshLocal();
-      setShowSettings(false);
-      onChanged?.();
-    } catch (e) {
-      console.error("Couldn't save settings:", e);
-    }
-  };
-
-  const setActive = async (
-    lineItemId: string,
-    type: "quantity" | "unit",
-    idx: number,
-  ) => {
-    try {
-      await setActivePrice(lineItemId, type, idx);
+      await setActivePrice(lineItemId, idx);
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -734,122 +706,48 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-  const updateUnitPriceRow = async (
+  const updateMatrixEntry = async (
     lineItemId: string,
-    upId: string,
-    updates: Partial<UnitPrice>,
+    entryId: string,
+    updates: { quantity?: string; price?: string; isActive?: boolean },
   ) => {
     const li = offer.lineItems.find((l: any) => l.id === lineItemId);
     if (!li) return;
-    const updated = (li.unitPrices || []).map((up: UnitPrice) =>
-      up.id === upId ? { ...up, ...updates } : up,
-    );
-    await persistLine(lineItemId, { unitPrices: updated });
-  };
-
-  const deleteUnitPriceRow = async (lineItemId: string, upId: string) => {
-    if (!window.confirm("Delete this unit price?")) return;
-    const li = offer.lineItems.find((l: any) => l.id === lineItemId);
-    if (!li) return;
-    const updated = (li.unitPrices || []).filter(
-      (up: UnitPrice) => up.id !== upId,
-    );
-    await persistLine(lineItemId, { unitPrices: updated });
-  };
-
-  const addUnitPriceRow = async (lineItemId: string) => {
-    const li = offer.lineItems.find((l: any) => l.id === lineItemId);
-    if (!li) return;
-    const next = [
-      ...(li.unitPrices || []),
-      {
-        id: `up-${Date.now()}`,
-        quantity: "1000",
-        unitPrice: 0,
-        totalPrice: 0,
-        isActive: (li.unitPrices || []).length === 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ];
-    await persistLine(lineItemId, { unitPrices: next });
-  };
-
-  // Delete a whole pricing column (a quantity tier) across every line item.
-  const deletePriceColumn = async (quantity: string) => {
-    if (
-      !window.confirm(
-        `Delete the ${quantity} column from all items in this offer?`,
-      )
-    )
-      return;
-    try {
-      // One update per line item so the change is atomic per row and reuses
-      // the existing updateLineItem endpoint (no extra API surface required).
-      const targets = (offer.lineItems || []).filter(
-        (li: any) => !li.isComponent,
-      );
-      for (const li of targets) {
-        if (offer.useUnitPrices) {
-          const after = (li.unitPrices || []).filter(
-            (up: UnitPrice) => String(up.quantity).trim() !== quantity.trim(),
-          );
-          if (after.length && !after.some((up: UnitPrice) => up.isActive))
-            after[0].isActive = true;
-          await updateLineItem(offer.id, li.id, { unitPrices: after });
-        } else {
-          const after = (li.quantityPrices || []).filter(
-            (qp: any) => String(qp.quantity).trim() !== quantity.trim(),
-          );
-          if (after.length && !after.some((qp: any) => qp.isActive))
-            after[0].isActive = true;
-          await updateLineItem(offer.id, li.id, { quantityPrices: after });
-        }
-      }
-      await refreshLocal();
-      onChanged?.();
-    } catch (e) {
-      console.error("Couldn't delete the pricing column:", e);
-    }
-  };
-
-  const updateQuantityPriceRow = async (
-    lineItemId: string,
-    idx: number,
-    updates: any,
-  ) => {
-    const li = offer.lineItems.find((l: any) => l.id === lineItemId);
-    if (!li) return;
-    const updated = (li.quantityPrices || []).map((qp: any, i: number) =>
-      i === idx ? { ...qp, ...updates } : qp,
-    );
-    await persistLine(lineItemId, { quantityPrices: updated });
-  };
-
-  const deleteQuantityPriceRow = async (lineItemId: string, idx: number) => {
-    if (!window.confirm("Delete this price level?")) return;
-    const li = offer.lineItems.find((l: any) => l.id === lineItemId);
-    if (!li) return;
-    const updated = (li.quantityPrices || []).filter(
-      (_: any, i: number) => i !== idx,
-    );
-    await persistLine(lineItemId, { quantityPrices: updated });
-  };
-
-  const addQuantityLevel = async (lineItemId: string) => {
-    const quantity = prompt("Enter quantity (e.g., 1000):");
-    const price = prompt(`Enter price per unit in ${offer.currency}:`);
-    if (!quantity || !price) return;
-    try {
-      await addQuantityPrice(lineItemId, {
+    const updated = (li.priceMatrix || []).map((p: any) => {
+      if (p.id !== entryId) return p;
+      const quantity =
+        updates.quantity !== undefined ? updates.quantity : p.quantity;
+      const price =
+        updates.price !== undefined
+          ? updates.price.trim() === "." || updates.price.trim() === ""
+            ? null
+            : parseFlexibleNumber(updates.price)
+          : p.price;
+      return {
+        ...p,
         quantity,
-        price: parseFloat(price),
-        isActive: false,
-      });
+        price,
+        isActive: updates.isActive ?? p.isActive,
+      };
+    });
+    await persistLine(lineItemId, { priceMatrix: updated });
+  };
+
+  const deleteMatrixEntry = async (lineItemId: string, entryId: string) => {
+    if (!window.confirm("Delete this price tier?")) return;
+    const li = offer.lineItems.find((l: any) => l.id === lineItemId);
+    if (!li) return;
+    const updated = (li.priceMatrix || []).filter((p: any) => p.id !== entryId);
+    await persistLine(lineItemId, { priceMatrix: updated });
+  };
+
+  const addMatrixEntry = async (lineItemId: string) => {
+    try {
+      await addPriceMatrixEntry(lineItemId, { quantity: "1000", price: null });
       await refreshLocal();
       onChanged?.();
     } catch (e) {
-      console.error("Couldn't add the price level:", e);
+      console.error("Couldn't add a price tier:", e);
     }
   };
 
@@ -861,7 +759,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     try {
       await createOfferLineItem(offer.id, {
         itemName: newLine.itemName.trim(),
-        baseQuantity: newLine.baseQuantity || "1",
+        baseQuantity: newLine.baseQuantity?.trim() || "1",
+        basePrice: 0,
       });
       setNewLine({ itemName: "", baseQuantity: "1" });
       await refreshLocal();
@@ -882,14 +781,23 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-  const handleCopyPaste = async () => {
+  const handlePasteMatrix = async () => {
     if (!copyPasteData.trim()) {
-      toast.error("Paste data from your spreadsheet first.", errorStyles);
+      toast.error("Paste the qty/price data first.", errorStyles);
+      return;
+    }
+    const tiers = parseInt(tierCount, 10);
+    if (!tiers || tiers < 1) {
+      toast.error("Enter how many quantity tiers to expect.", errorStyles);
       return;
     }
     try {
-      const res = await copyPastePrices(offer.id, { data: copyPasteData });
+      const res = await pasteMatrixPrices(offer.id, {
+        data: copyPasteData,
+        tierCount: tiers,
+      });
       if (res.success) {
+        toast.success(res.message || "Prices imported.", successStyles);
         setShowCopyPaste(false);
         setCopyPasteData("");
         await refreshLocal();
@@ -897,10 +805,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     } catch (e) {
       console.error("Couldn't import the pasted prices:", e);
+      toast.error("Couldn't parse that paste — check the format.", errorStyles);
     }
   };
 
-  // ------------------------------------------------------------------------
   const sourceBadge = () => {
     const map: Record<
       string,
@@ -935,16 +843,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   const visibleLineItems =
     offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
+  const pricingMode: PricingMode = offer?.pricingMode || "classic";
 
-  // Collect the distinct quantity tiers so a whole column can be deleted.
-  const priceColumns: string[] = (() => {
+  const priceTiers: string[] = (() => {
+    if (pricingMode !== "matrix") return [];
     const set = new Set<string>();
     visibleLineItems.forEach((li: any) => {
-      const rows = offer?.useUnitPrices ? li.unitPrices : li.quantityPrices;
-      (rows || []).forEach((r: any) => set.add(String(r.quantity).trim()));
+      (li.priceMatrix || []).forEach((r: any) =>
+        set.add(String(r.quantity).trim()),
+      );
     });
     return Array.from(set).sort(
-      (a, b) => (parseFloat(a) || 0) - (parseFloat(b) || 0),
+      (a, b) => (parseFlexibleNumber(a) || 0) - (parseFlexibleNumber(b) || 0),
     );
   })();
 
@@ -984,7 +894,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Source tabs */}
               <div className="grid grid-cols-2 gap-2">
                 {sourceTabs.map((t) => (
                   <button
@@ -1006,6 +915,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </button>
                 ))}
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Offer title *
@@ -1020,6 +930,29 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       : "Defaults to the first item's name"
                   }
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pricing mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["classic", "matrix"] as PricingMode[]).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => cPatch({ pricingMode: m })}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${
+                        createForm.pricingMode === m
+                          ? "border-primary bg-primary/5 text-primary font-semibold"
+                          : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {m === "classic"
+                        ? "Classic (1 qty · 1 price)"
+                        : "Matrix (many qty/price)"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1058,7 +991,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Recipient customer address preview (item flow) */}
               {sourceType === "item" && selectedCustomer && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
@@ -1113,7 +1045,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Source list */}
               <div className="space-y-2 max-h-56 overflow-y-auto">
                 {sourceType === "inquiry" &&
                   (visibleInquiries.length === 0 ? (
@@ -1134,9 +1065,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         }}
                         title={inq.name}
                         subtitle={`Customer: ${inq.customer?.companyName || "—"}`}
-                        meta={`${inq.requests?.length || 0} items · ${
-                          inq.isAssembly ? "Assembly" : "Standard"
-                        }`}
+                        meta={`${inq.requests?.length || 0} items · ${inq.isAssembly ? "Assembly" : "Standard"}`}
                       />
                     ))
                   ))}
@@ -1162,7 +1091,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   ))}
               </div>
 
-              {/* Selected items list (Items-page styling) */}
               {sourceType === "item" && selectedItems.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
@@ -1191,7 +1119,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Common fields — always available once a title exists */}
               <div className="space-y-4 border-t pt-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1242,7 +1169,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Create footer */}
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
               <button
                 onClick={onClose}
@@ -1266,7 +1192,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           </div>
         ) : (
           <>
-            {/* Header — shows offer title, and inquiry number when applicable */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1279,13 +1204,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </span>
                   )}
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${getOfferStatusColor(
-                      offer.status,
-                    )}`}
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${getOfferStatusColor(offer.status)}`}
                   >
                     {offer.status}
                   </span>
                   {sourceBadge()}
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-700">
+                    {pricingMode === "matrix"
+                      ? "Matrix pricing"
+                      : "Classic pricing"}
+                  </span>
                   {displayInquiryNo && (
                     <span className="text-sm font-bold text-gray-900 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
                       <LinkIcon className="h-3 w-3" />
@@ -1297,7 +1225,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   Offer {offer.offerNumber}
                 </p>
               </div>
+              // header actions: handlePdf was defined but had no button — wire
+              it up
               <div className="flex items-center gap-4 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handlePdf}
+                  title="Generate / download PDF"
+                  className="text-gray-500 hover:text-gray-700 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+                >
+                  <PrinterIcon className="h-5 w-5" />
+                </button>
                 <ViewEditToggle
                   isEditEnabled={edit}
                   onToggle={() => (edit ? handleCancelEdit() : setEdit(true))}
@@ -1423,7 +1361,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ deliveryTime: e.target.value })}
                     />
                   </Field>
-                  {/* Payment method — dropdown */}
                   <Field
                     label="Payment method"
                     edit={edit}
@@ -1445,7 +1382,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       ))}
                     </select>
                   </Field>
-                  {/* Shipping method — dropdown */}
                   <Field
                     label="Shipping method"
                     edit={edit}
@@ -1481,119 +1417,78 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ paymentTerms: e.target.value })}
                     />
                   </Field>
+                  <Field
+                    label="Tax rate"
+                    edit={edit}
+                    value={`${offer.taxRate ?? 19}%`}
+                  >
+                    <DecimalInput
+                      value={form.taxRate}
+                      onCommit={(raw) =>
+                        patch({ taxRate: parseFlexibleNumber(raw) ?? 19 })
+                      }
+                    />
+                  </Field>
                 </div>
               </div>
-              {/* Source */}
-              {/* {(offer.inquirySnapshot || offer.itemSnapshot) && (
-                <Section
-                  title="Source"
-                  icon={<LinkIcon className="h-4 w-4 text-gray-500" />}
-                >
-                  {offer.inquirySnapshot && (
-                    <div className="text-sm text-gray-700">
-                      <div className="font-medium text-gray-900">
-                        {offer.inquirySnapshot.name}
-                        {offer.inquirySnapshot.referenceNumber && (
-                          <span className="ml-2 text-xs text-gray-500">
-                            ({offer.inquirySnapshot.referenceNumber})
-                          </span>
-                        )}
-                      </div>
-                      {offer.inquirySnapshot.description && (
-                        <div className="text-gray-600">
-                          {offer.inquirySnapshot.description}
-                        </div>
-                      )}
-                      <div className="text-xs text-gray-500 mt-1">
-                        {offer.inquirySnapshot.isAssembly
-                          ? "Assembly"
-                          : "Standard"}{" "}
-                        · {offer.inquirySnapshot.requestsCount || 0} items ·
-                        Created {formatDate(offer.inquirySnapshot.createdAt)}
-                      </div>
-                    </div>
-                  )}
-                  {offer.itemSnapshot && (
-                    <div className="text-sm text-gray-700">
-                      <div className="font-medium text-gray-900">
-                        {offer.itemSnapshot.itemName}
-                        {offer.itemSnapshot.ean && (
-                          <span className="ml-2 text-xs text-gray-500">
-                            EAN {offer.itemSnapshot.ean}
-                          </span>
-                        )}
-                      </div>
-                      {offer.itemSnapshot.description && (
-                        <div className="text-gray-600">
-                          {offer.itemSnapshot.description}
-                        </div>
-                      )}
-                      <div className="text-xs text-gray-500 mt-1">
-                        Item ID: {offer.itemSnapshot.id}
-                      </div>
-                    </div>
-                  )}
-                </Section>
-              )} */}
 
-              {/* PRICING — the focus */}
+              {/* PRICING MODE */}
               <Section
                 title="Pricing"
                 icon={<CalculatorIcon className="h-4 w-4 text-gray-500" />}
                 right={
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600">
-                        Unit pricing
-                      </span>
+                  <div className="flex items-center gap-2">
+                    {(["classic", "matrix"] as PricingMode[]).map((m) => (
                       <button
+                        key={m}
                         disabled={!edit}
-                        onClick={() => toggleUnitPricing(!offer.useUnitPrices)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
-                          offer.useUnitPrices ? "bg-green-500" : "bg-gray-300"
+                        onClick={() => togglePricingMode(m)}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-colors disabled:opacity-50 ${
+                          pricingMode === m
+                            ? "border-primary bg-primary/5 text-primary font-semibold"
+                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
-                        <span
-                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                            offer.useUnitPrices
-                              ? "translate-x-5"
-                              : "translate-x-1"
-                          }`}
-                        />
+                        {m === "classic" ? "Classic" : "Matrix"}
                       </button>
-                    </div>
-                    {offer.useUnitPrices && (
+                    ))}
+                    {pricingMode === "matrix" && (
                       <button
                         disabled={!edit}
-                        onClick={() => setShowSettings((s) => !s)}
-                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50"
+                        onClick={() => setShowCopyPaste((s) => !s)}
+                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50 ml-2"
                       >
-                        <CogIcon className="h-4 w-4" />
-                        Settings
+                        <ClipboardIcon className="h-4 w-4" />
+                        Paste matrix
                       </button>
                     )}
-                    <button
-                      disabled={!edit}
-                      onClick={() => setShowCopyPaste((s) => !s)}
-                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50"
-                    >
-                      <ClipboardIcon className="h-4 w-4" />
-                      Copy/paste
-                    </button>
                   </div>
                 }
               >
-                {/* Delete-a-whole-column controls */}
-                {edit && priceColumns.length > 0 && (
+                {pricingMode === "matrix" && edit && priceTiers.length > 0 && (
                   <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
                     <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Delete a pricing column (applies to every item)
+                      Delete a tier (applies to every item)
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {priceColumns.map((q) => (
+                      {priceTiers.map((q) => (
                         <button
                           key={q}
-                          onClick={() => deletePriceColumn(q)}
+                          onClick={async () => {
+                            if (
+                              !window.confirm(
+                                `Delete the ${q} tier from all items?`,
+                              )
+                            )
+                              return;
+                            try {
+                              await deletePriceColumn(offer.id, q);
+                              await refreshLocal();
+                              onChanged?.();
+                            } catch (e) {
+                              console.error("Couldn't delete the tier:", e);
+                            }
+                          }}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-colors"
                         >
                           <TrashIcon className="h-3.5 w-3.5" />
@@ -1604,96 +1499,34 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 )}
 
-                {/* Inline settings panel */}
-                {showSettings && offer.useUnitPrices && (
-                  <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Unit price decimals
-                        </label>
-                        <select
-                          className={inputCls}
-                          value={form.unitPriceDecimalPlaces}
-                          onChange={(e) =>
-                            patch({
-                              unitPriceDecimalPlaces: parseInt(e.target.value),
-                            })
-                          }
-                        >
-                          <option value={2}>2</option>
-                          <option value={3}>3</option>
-                          <option value={4}>4</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Total decimals
-                        </label>
-                        <select
-                          className={inputCls}
-                          value={form.totalPriceDecimalPlaces}
-                          onChange={(e) =>
-                            patch({
-                              totalPriceDecimalPlaces: parseInt(e.target.value),
-                            })
-                          }
-                        >
-                          <option value={2}>2</option>
-                          <option value={3}>3</option>
-                          <option value={4}>4</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Max columns
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          className={inputCls}
-                          value={form.maxUnitPriceColumns}
-                          onChange={(e) => {
-                            const v = parseInt(e.target.value);
-                            if (v > 10) {
-                              toast.error("Max columns is 10.", errorStyles);
-                              return;
-                            }
-                            patch({ maxUnitPriceColumns: isNaN(v) ? 0 : v });
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end mt-3">
-                      <button
-                        onClick={saveSettings}
-                        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        Save settings
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Inline copy/paste panel */}
-                {showCopyPaste && (
+                {showCopyPaste && pricingMode === "matrix" && (
                   <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
                     <p className="text-xs text-blue-900 mb-2">
-                      One line per price level —{" "}
-                      <em>
-                        position, quantity,{" "}
-                        {offer.useUnitPrices ? "unit price" : "price"}
-                      </em>
-                      . Example: <code>1, 1000, 4.500</code>
+                      One value per line: optional label, then the quantity
+                      tiers, then each item's prices in the same tier order (a
+                      "." line between items is optional; a "." within a block
+                      means "not calculated"). Applied to the line items below,
+                      in order — add them first.
                     </p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        Quantity tiers
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
+                        value={tierCount}
+                        onChange={(e) => setTierCount(e.target.value)}
+                      />
+                    </div>
                     <textarea
-                      rows={6}
+                      rows={8}
                       value={copyPasteData}
                       onChange={(e) => setCopyPasteData(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono"
                       placeholder={
-                        "1, 1000, 4.500\n1, 5000, 4.200\n2, 1000, 8.750"
+                        "Muster\n50\n100\n200\n20,00\n17,32\n16,57\n.\n34,00\n21,21\n20,3"
                       }
                     />
                     <div className="flex justify-end gap-2 mt-2">
@@ -1707,7 +1540,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         Cancel
                       </button>
                       <button
-                        onClick={handleCopyPaste}
+                        onClick={handlePasteMatrix}
                         disabled={!copyPasteData.trim()}
                         className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                       >
@@ -1717,7 +1550,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 )}
 
-                {/* Line items + their price tables */}
                 <div className="space-y-4">
                   {visibleLineItems.length === 0 && (
                     <div className="text-center py-6 text-sm text-gray-500">
@@ -1726,15 +1558,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   )}
 
                   {visibleLineItems.map((item: any) => {
-                    const activePrice = getActivePrice(
-                      item,
-                      offer.useUnitPrices,
-                    );
-                    const activeType = getActivePriceType(
-                      item,
-                      offer.useUnitPrices,
-                    );
-                    const usesUnit = offerUsesUnitPrices(offer);
+                    const total = getLineItemTotal(item, pricingMode);
 
                     return (
                       <div
@@ -1754,23 +1578,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </div>
                           <div className="text-right flex flex-col items-end gap-1">
                             <div className="text-lg font-bold text-gray-900">
-                              {formatCurrency(
-                                calculateLineItemTotal(
-                                  item,
-                                  offer.useUnitPrices,
-                                ) || 0,
-                                offer.currency,
-                              )}
+                              {formatCurrency(total || 0, offer.currency)}
                             </div>
-                            {activePrice && (
-                              <div className="text-[11px] text-gray-500">
-                                Active:{" "}
-                                {activeType === "unit"
-                                  ? "Unit price"
-                                  : "Quantity price"}
-                              </div>
-                            )}
-                            {/* Remove-item button — always available in edit */}
                             {edit && (
                               <button
                                 onClick={() => removeLineItem(item.id)}
@@ -1783,25 +1592,69 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </div>
                         </div>
 
-                        {/* UNIT PRICES */}
-                        {usesUnit ? (
+                        {pricingMode === "classic" ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Quantity
+                              </label>
+                              {edit ? (
+                                <DecimalInput
+                                  value={item.baseQuantity}
+                                  onCommit={(raw) =>
+                                    persistLine(item.id, {
+                                      baseQuantity: raw.trim() || "1",
+                                    })
+                                  }
+                                />
+                              ) : (
+                                <div className="text-sm text-gray-900">
+                                  {item.baseQuantity || "1"} pcs
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Price / unit ({offer.currency})
+                              </label>
+                              {edit ? (
+                                <DecimalInput
+                                  value={item.basePrice}
+                                  onCommit={(raw) => {
+                                    const parsed = parseFlexibleNumber(raw);
+                                    persistLine(item.id, {
+                                      basePrice: parsed === null ? "0" : raw,
+                                    });
+                                  }}
+                                />
+                              ) : (
+                                <div className="text-sm text-gray-900">
+                                  {formatCurrency(
+                                    item.basePrice || 0,
+                                    offer.currency,
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium text-gray-900">
-                                Unit prices ({offer.unitPriceDecimalPlaces || 3}{" "}
-                                dp)
+                                Price matrix (
+                                {offer.unitPriceDecimalPlaces || 3} dp)
                               </h4>
                               {edit && (
                                 <button
-                                  onClick={() => addUnitPriceRow(item.id)}
+                                  onClick={() => addMatrixEntry(item.id)}
                                   className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center gap-1"
                                 >
                                   <PlusIcon className="h-3.5 w-3.5" />
-                                  Add unit price
+                                  Add tier
                                 </button>
                               )}
                             </div>
-                            {item.unitPrices?.length > 0 ? (
+                            {item.priceMatrix?.length > 0 ? (
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                   <thead className="bg-gray-50">
@@ -1810,7 +1663,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                         Quantity
                                       </th>
                                       <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Unit price
+                                        Price
                                       </th>
                                       <th className="px-3 py-2 text-left font-medium text-gray-700">
                                         Total
@@ -1822,36 +1675,29 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-200">
-                                    {item.unitPrices.map(
-                                      (up: UnitPrice, idx: number) => (
+                                    {item.priceMatrix.map(
+                                      (p: any, idx: number) => (
                                         <tr
-                                          key={up.id}
+                                          key={p.id}
                                           className="hover:bg-gray-50"
                                         >
                                           <td className="px-3 py-2">
                                             {edit ? (
                                               <input
                                                 className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
-                                                value={up.quantity}
-                                                onChange={(e) =>
-                                                  updateUnitPriceRow(
+                                                defaultValue={p.quantity}
+                                                onBlur={(e) =>
+                                                  updateMatrixEntry(
                                                     item.id,
-                                                    up.id,
+                                                    p.id,
                                                     {
                                                       quantity: e.target.value,
-                                                      totalPrice:
-                                                        calculateUnitPriceTotal(
-                                                          e.target.value,
-                                                          up.unitPrice,
-                                                          offer.totalPriceDecimalPlaces ||
-                                                            2,
-                                                        ),
                                                     },
                                                   )
                                                 }
                                               />
                                             ) : (
-                                              <span>{up.quantity} pcs</span>
+                                              <span>{p.quantity} pcs</span>
                                             )}
                                           </td>
                                           <td className="px-3 py-2">
@@ -1861,225 +1707,52 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                                   {offer.currency}
                                                 </span>
                                                 <input
-                                                  type="number"
-                                                  step={
-                                                    offer.unitPriceDecimalPlaces ===
-                                                    4
-                                                      ? "0.0001"
-                                                      : offer.unitPriceDecimalPlaces ===
-                                                          2
-                                                        ? "0.01"
-                                                        : "0.001"
-                                                  }
+                                                  type="text"
+                                                  inputMode="decimal"
                                                   className="w-28 px-2 py-1 text-sm border border-gray-300 rounded"
-                                                  value={up.unitPrice}
-                                                  onChange={(e) =>
-                                                    updateUnitPriceRow(
+                                                  defaultValue={
+                                                    p.price === null
+                                                      ? "."
+                                                      : String(p.price)
+                                                  }
+                                                  placeholder="."
+                                                  onBlur={(e) =>
+                                                    updateMatrixEntry(
                                                       item.id,
-                                                      up.id,
-                                                      {
-                                                        unitPrice: parseFloat(
-                                                          e.target.value,
-                                                        ),
-                                                        totalPrice:
-                                                          calculateUnitPriceTotal(
-                                                            up.quantity,
-                                                            parseFloat(
-                                                              e.target.value,
-                                                            ),
-                                                            offer.totalPriceDecimalPlaces ||
-                                                              2,
-                                                          ),
-                                                      },
+                                                      p.id,
+                                                      { price: e.target.value },
                                                     )
                                                   }
                                                 />
                                               </div>
                                             ) : (
                                               <span>
-                                                {formatUnitPriceForOffer(
-                                                  up.unitPrice,
-                                                  offer,
+                                                {formatMatrixPrice(
+                                                  p.price,
+                                                  offer.unitPriceDecimalPlaces ||
+                                                    3,
                                                 )}
                                               </span>
                                             )}
                                           </td>
                                           <td className="px-3 py-2 font-medium">
-                                            {formatTotalPrice(up.totalPrice)}
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            {up.isActive ? (
-                                              <CheckCircleIcon className="h-4 w-4 text-green-600" />
-                                            ) : edit ? (
-                                              <input
-                                                type="radio"
-                                                name={`active-unit-${item.id}`}
-                                                checked={up.isActive}
-                                                onChange={() =>
-                                                  setActive(
-                                                    item.id,
-                                                    "unit",
-                                                    idx,
-                                                  )
-                                                }
-                                                className="h-4 w-4 text-gray-600"
-                                              />
-                                            ) : (
-                                              <span className="text-gray-300">
-                                                —
-                                              </span>
-                                            )}
-                                          </td>
-                                          {edit && (
-                                            <td className="px-3 py-2 text-right">
-                                              <button
-                                                onClick={() =>
-                                                  deleteUnitPriceRow(
-                                                    item.id,
-                                                    up.id,
-                                                  )
-                                                }
-                                                className="text-rose-600 hover:text-rose-800 text-xs"
-                                              >
-                                                Delete
-                                              </button>
-                                            </td>
-                                          )}
-                                        </tr>
-                                      ),
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="text-center py-3 text-sm text-gray-500">
-                                No unit prices yet.
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          /* QUANTITY PRICES */
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-sm font-medium text-gray-900">
-                                Quantity-based prices
-                              </h4>
-                              {edit && (
-                                <button
-                                  onClick={() => addQuantityLevel(item.id)}
-                                  className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                                >
-                                  Add price level
-                                </button>
-                              )}
-                            </div>
-                            {item.quantityPrices?.length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Quantity
-                                      </th>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Unit price
-                                      </th>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Total
-                                      </th>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Active
-                                      </th>
-                                      {edit && <th className="px-3 py-2" />}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-200">
-                                    {item.quantityPrices.map(
-                                      (qp: any, idx: number) => (
-                                        <tr
-                                          key={idx}
-                                          className="hover:bg-gray-50"
-                                        >
-                                          <td className="px-3 py-2">
-                                            {edit ? (
-                                              <input
-                                                className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
-                                                value={qp.quantity}
-                                                onChange={(e) =>
-                                                  updateQuantityPriceRow(
-                                                    item.id,
-                                                    idx,
-                                                    {
-                                                      quantity: e.target.value,
-                                                      total: calculateLineTotal(
-                                                        e.target.value,
-                                                        qp.price,
-                                                      ),
-                                                    },
-                                                  )
-                                                }
-                                              />
-                                            ) : (
-                                              <span>{qp.quantity} pcs</span>
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            {edit ? (
-                                              <div className="flex items-center gap-1">
-                                                <span className="text-gray-500">
-                                                  {offer.currency}
-                                                </span>
-                                                <input
-                                                  type="number"
-                                                  step="0.001"
-                                                  className="w-28 px-2 py-1 text-sm border border-gray-300 rounded"
-                                                  value={qp.price}
-                                                  onChange={(e) =>
-                                                    updateQuantityPriceRow(
-                                                      item.id,
-                                                      idx,
-                                                      {
-                                                        price: parseFloat(
-                                                          e.target.value,
-                                                        ),
-                                                        total:
-                                                          calculateLineTotal(
-                                                            qp.quantity,
-                                                            parseFloat(
-                                                              e.target.value,
-                                                            ),
-                                                          ),
-                                                      },
-                                                    )
-                                                  }
-                                                />
-                                              </div>
-                                            ) : (
-                                              <span>
-                                                {formatCurrency(
-                                                  qp.price,
+                                            {p.total === null
+                                              ? "."
+                                              : formatCurrency(
+                                                  p.total,
                                                   offer.currency,
                                                 )}
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-2 font-medium">
-                                            {formatTotalPrice(qp.total)}
                                           </td>
                                           <td className="px-3 py-2">
-                                            {qp.isActive ? (
+                                            {p.isActive ? (
                                               <CheckCircleIcon className="h-4 w-4 text-green-600" />
-                                            ) : edit ? (
+                                            ) : edit && p.price !== null ? (
                                               <input
                                                 type="radio"
-                                                name={`active-qty-${item.id}`}
-                                                checked={qp.isActive}
+                                                name={`active-${item.id}`}
+                                                checked={p.isActive}
                                                 onChange={() =>
-                                                  setActive(
-                                                    item.id,
-                                                    "quantity",
-                                                    idx,
-                                                  )
+                                                  setActive(item.id, idx)
                                                 }
                                                 className="h-4 w-4 text-gray-600"
                                               />
@@ -2093,9 +1766,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                             <td className="px-3 py-2 text-right">
                                               <button
                                                 onClick={() =>
-                                                  deleteQuantityPriceRow(
+                                                  deleteMatrixEntry(
                                                     item.id,
-                                                    idx,
+                                                    p.id,
                                                   )
                                                 }
                                                 className="text-rose-600 hover:text-rose-800 text-xs"
@@ -2112,7 +1785,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               </div>
                             ) : (
                               <div className="text-center py-3 text-sm text-gray-500">
-                                No quantity prices yet.
+                                No tiers yet — add one, or paste a matrix above.
                               </div>
                             )}
                           </div>
@@ -2121,7 +1794,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     );
                   })}
 
-                  {/* Add line item (edit mode) */}
                   {edit && (
                     <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
                       <div className="flex-1">
@@ -2167,7 +1839,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </Section>
 
-              {/* Totals */}
               <Section
                 title="Totals"
                 icon={<CalculatorIcon className="h-4 w-4 text-gray-500" />}
@@ -2179,16 +1850,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       edit={edit}
                       value={`${offer.discountPercentage || 0}%`}
                     >
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        className={inputCls}
+                      <DecimalInput
                         value={form.discountPercentage}
-                        onChange={(e) =>
-                          patch({ discountPercentage: e.target.value })
-                        }
+                        onCommit={(raw) => patch({ discountPercentage: raw })}
                       />
                     </Field>
                     <Field
@@ -2199,15 +1863,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         offer.currency,
                       )}
                     >
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className={inputCls}
+                      <DecimalInput
                         value={form.shippingCost}
-                        onChange={(e) =>
-                          patch({ shippingCost: e.target.value })
-                        }
+                        onCommit={(raw) => patch({ shippingCost: raw })}
                       />
                     </Field>
                   </div>
@@ -2236,7 +1894,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-gray-600">VAT (19%)</span>
+                      <span className="text-gray-600">
+                        VAT ({offer.taxRate ?? 19}%)
+                      </span>
                       <span className="font-medium">
                         {formatCurrency(offer.taxAmount || 0, offer.currency)}
                       </span>
@@ -2304,7 +1964,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
               <div>
                 {edit && userRole === UserRole.ADMIN && (

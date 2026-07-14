@@ -10,8 +10,10 @@ import {
   BeforeInsert,
   BeforeUpdate,
 } from "typeorm";
+import { v4 as uuidv4 } from "uuid";
 import { Inquiry } from "./inquiry";
 import { Customer } from "./customers";
+import { numericTransformer } from "../utils/numeric-transformer";
 
 export type OfferStatus =
   | "Draft"
@@ -24,25 +26,24 @@ export type OfferStatus =
 
 export type Currency = "RMB" | "HKD" | "EUR" | "USD";
 
-/**
- * Where an offer originated. An offer can now be created from an inquiry
- * (the original flow), directly from an existing catalogue item, or as a
- * blank offer attached to a customer.
- */
 export type OfferSourceType = "inquiry" | "item" | "customer";
 
-export interface QuantityPrice {
-  quantity: string;
-  price: number;
-  isActive: boolean;
-  total: number;
-}
+/**
+ * Classic: exactly one quantity, one price, one tax rate, one subtotal
+ * per line. Matrix (Qty_price_matrix): many quantity/price pairs per line.
+ */
+export type PricingMode = "classic" | "matrix";
 
-export interface UnitPrice {
+/**
+ * One cell of the quantity/price matrix. `price: null` is the client's "."
+ * placeholder — a tier that intentionally has no calculated price yet,
+ * shown as "." rather than 0 or a blank cell.
+ */
+export interface PriceMatrixEntry {
   id: string;
   quantity: string;
-  unitPrice: number;
-  totalPrice: number;
+  price: number | null;
+  total: number | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -66,10 +67,6 @@ export interface CustomerSnapshot {
   additionalInfo?: string;
 }
 
-/**
- * Frozen copy of the catalogue item an offer was generated from, so the
- * offer stays meaningful even if the item later changes.
- */
 export interface ItemSnapshot {
   id: string;
   itemName: string;
@@ -109,17 +106,9 @@ export class Offer {
   @Column({ type: "varchar", length: 255 })
   title!: string;
 
-  /**
-   * Discriminator for how the offer was created. Defaults to "inquiry"
-   * to keep existing rows valid after migration.
-   */
   @Column({ type: "varchar", length: 20, default: "inquiry" })
   sourceType!: OfferSourceType;
 
-  // --- Source: Inquiry (now optional) ------------------------------------
-  // Previously required + CASCADE delete. An offer can now exist without an
-  // inquiry (when created from an item or a customer), so this is nullable
-  // and deleting the inquiry only detaches it instead of removing the offer.
   @ManyToOne(() => Inquiry, (inquiry) => inquiry.offers, {
     nullable: true,
     onDelete: "SET NULL",
@@ -133,14 +122,12 @@ export class Offer {
   @Column({ type: "json", nullable: true })
   inquirySnapshot?: InquirySnapshot | null;
 
-  // --- Source: Item ------------------------------------------------------
   @Column({ name: "item_id", type: "varchar", length: 100, nullable: true })
   itemId?: string | null;
 
   @Column({ type: "json", nullable: true })
   itemSnapshot?: ItemSnapshot | null;
 
-  // --- Source: Customer (always captured as a snapshot) ------------------
   @Column({ name: "customer_id", type: "varchar", length: 100, nullable: true })
   customerId?: string | null;
 
@@ -186,8 +173,6 @@ export class Offer {
   @Column({ type: "text", nullable: true })
   paymentTerms?: string;
 
-  // --- Payment & shipping method (dropdown-fed, kept as free varchar so the
-  // option lists can evolve in the UI without a DB migration each time) ---
   @Column({ type: "varchar", length: 100, nullable: true })
   paymentMethod?: string;
 
@@ -204,12 +189,27 @@ export class Offer {
   })
   currency!: Currency;
 
+  /** Classic vs Qty_price_matrix, per line. Set at offer level. */
+  @Column({ type: "varchar", length: 20, default: "classic" })
+  pricingMode!: PricingMode;
+
+  /** Document-level, editable tax rate as a percentage (e.g. 19 = 19%). */
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
+    default: 19,
+    transformer: numericTransformer,
+  })
+  taxRate!: number;
+
   @Column({
     type: "decimal",
     precision: 10,
     scale: 2,
     default: 0,
     nullable: true,
+    transformer: numericTransformer,
   })
   discountPercentage!: number;
 
@@ -219,10 +219,18 @@ export class Offer {
     scale: 2,
     default: 0,
     nullable: true,
+    transformer: numericTransformer,
   })
   discountAmount!: number;
 
-  @Column({ type: "text", nullable: true })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    nullable: true,
+    transformer: numericTransformer,
+  })
   subtotal!: number;
 
   @Column({
@@ -231,20 +239,31 @@ export class Offer {
     scale: 2,
     default: 0,
     nullable: true,
+    transformer: numericTransformer,
   })
   shippingCost!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0 })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   taxAmount!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0 })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   totalAmount!: number;
 
-  // External comment shown to the customer (printed on the offer PDF).
   @Column({ type: "text", nullable: true })
   notes?: string;
 
-  // Internal comment, never shown to the customer.
   @Column({ type: "text", nullable: true })
   internalNotes?: string;
 
@@ -260,9 +279,7 @@ export class Offer {
   @Column({ type: "text", nullable: true })
   assemblyNotes?: string;
 
-  @Column({ type: "boolean", default: false })
-  useUnitPrices!: boolean;
-
+  /** Matrix-mode display settings. Unused in classic mode. */
   @Column({ type: "integer", default: 3, nullable: true })
   unitPriceDecimalPlaces!: number;
 
@@ -272,8 +289,9 @@ export class Offer {
   @Column({ type: "integer", default: 3, nullable: true })
   maxUnitPriceColumns!: number;
 
+  /** Template tiers applied to new/synced line items in matrix mode. */
   @Column({ type: "json", nullable: true })
-  defaultUnitPrices?: UnitPrice[];
+  defaultPriceMatrix?: PriceMatrixEntry[];
 
   @Column({ type: "text", nullable: true })
   pdfPath?: string;
@@ -321,25 +339,8 @@ export class Offer {
   calculateTotals() {
     if (this.lineItems && this.lineItems.length > 0) {
       this.subtotal = this.lineItems.reduce((sum, item) => {
-        if (
-          this.useUnitPrices &&
-          item.unitPrices &&
-          item.unitPrices.length > 0
-        ) {
-          const activeUnitPrice = item.unitPrices.find((up) => up.isActive);
-          if (activeUnitPrice) {
-            return sum + (activeUnitPrice.totalPrice || 0);
-          }
-        } else if (item.quantityPrices && item.quantityPrices.length > 0) {
-          const activePrice = item.quantityPrices.find((qp) => qp.isActive);
-          if (activePrice) {
-            return sum + (activePrice.total || 0);
-          }
-        } else if (item.basePrice && item.baseQuantity) {
-          const quantity = parseFloat(item.baseQuantity) || 1;
-          return sum + item.basePrice * quantity;
-        }
-        return sum + (item.lineTotal || 0);
+        if (item.isComponent) return sum;
+        return sum + (item.getLineTotal(this.pricingMode) || 0);
       }, 0);
     }
 
@@ -349,72 +350,32 @@ export class Offer {
 
     const taxableAmount =
       this.subtotal - this.discountAmount + (this.shippingCost || 0);
-    this.taxAmount = taxableAmount * 0.19;
-
+    const rate = (this.taxRate ?? 19) / 100;
+    this.taxAmount = taxableAmount * rate;
     this.totalAmount = taxableAmount + this.taxAmount;
   }
 
   @BeforeInsert()
-  initializeDefaultUnitPrices() {
-    if (this.useUnitPrices && !this.defaultUnitPrices) {
-      this.defaultUnitPrices = [
-        {
-          id: `unit-price-default-1-${Date.now()}`,
-          quantity: "1000",
-          unitPrice: 0,
-          totalPrice: 0,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: `unit-price-default-2-${Date.now()}`,
-          quantity: "5000",
-          unitPrice: 0,
-          totalPrice: 0,
-          isActive: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: `unit-price-default-3-${Date.now()}`,
-          quantity: "10000",
-          unitPrice: 0,
-          totalPrice: 0,
-          isActive: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
+  initializeDefaultPriceMatrix() {
+    if (this.pricingMode === "matrix" && !this.defaultPriceMatrix) {
+      const now = new Date();
+      this.defaultPriceMatrix = ["1000", "5000", "10000"].map((q, i) => ({
+        id: uuidv4(),
+        quantity: q,
+        price: null,
+        total: null,
+        isActive: i === 0,
+        createdAt: now,
+        updatedAt: now,
+      }));
     }
   }
 
-  getActiveUnitPrice(): UnitPrice | null {
-    if (
-      this.useUnitPrices &&
-      this.defaultUnitPrices &&
-      this.defaultUnitPrices.length > 0
-    ) {
-      return this.defaultUnitPrices.find((up) => up.isActive) || null;
+  getActiveDefaultTier(): PriceMatrixEntry | null {
+    if (this.pricingMode === "matrix" && this.defaultPriceMatrix?.length) {
+      return this.defaultPriceMatrix.find((t) => t.isActive) || null;
     }
     return null;
-  }
-
-  updateLineItemsForUnitPricing(): void {
-    if (!this.lineItems) return;
-
-    this.lineItems.forEach((lineItem) => {
-      if (
-        this.useUnitPrices &&
-        (!lineItem.unitPrices || lineItem.unitPrices.length === 0)
-      ) {
-        lineItem.unitPrices = this.defaultUnitPrices
-          ? JSON.parse(JSON.stringify(this.defaultUnitPrices))
-          : [];
-      }
-
-      lineItem.calculateLineTotal(this.useUnitPrices);
-    });
   }
 
   constructor(partial?: Partial<Offer>) {
@@ -445,7 +406,6 @@ export class OfferLineItem {
   @Column({ name: "requested_item_id", nullable: true })
   requestedItemId?: string;
 
-  /** Set when this line was generated from a catalogue item. */
   @Column({
     name: "source_item_id",
     type: "varchar",
@@ -478,11 +438,16 @@ export class OfferLineItem {
   @Column({ type: "float", nullable: true })
   length?: number;
 
+  // --- Classic mode: exactly one quantity, one price -----------------------
   @Column({ type: "varchar", length: 100, nullable: true })
-  quantity?: string;
+  baseQuantity?: string;
 
+  @Column({ type: "decimal", precision: 12, scale: 3, nullable: true })
+  basePrice?: number;
+
+  // --- Matrix mode: many quantity/price pairs -------------------------------
   @Column({ type: "json", nullable: true })
-  unitPrices?: UnitPrice[];
+  priceMatrix?: PriceMatrixEntry[];
 
   @Column({ type: "decimal", precision: 12, scale: 3, nullable: true })
   purchasePrice?: number;
@@ -493,15 +458,6 @@ export class OfferLineItem {
     nullable: true,
   })
   purchaseCurrency?: string;
-
-  @Column({ type: "json", nullable: true })
-  quantityPrices?: QuantityPrice[];
-
-  @Column({ type: "varchar", length: 100, nullable: true })
-  baseQuantity?: string;
-
-  @Column({ type: "decimal", precision: 10, scale: 3, nullable: true })
-  basePrice?: number;
 
   @Column({ type: "decimal", precision: 10, scale: 3, nullable: true })
   samplePrice?: number;
@@ -535,88 +491,57 @@ export class OfferLineItem {
 
   @BeforeInsert()
   @BeforeUpdate()
-  calculateLineTotal(useUnitPrices?: boolean) {
-    const shouldUseUnitPrices =
-      useUnitPrices !== undefined
-        ? useUnitPrices
-        : this.offer?.useUnitPrices || false;
+  calculateLineTotal(pricingMode?: PricingMode) {
+    const mode = pricingMode || this.offer?.pricingMode || "classic";
 
-    if (shouldUseUnitPrices && this.unitPrices && this.unitPrices.length > 0) {
-      const activeUnitPrice = this.unitPrices.find((up) => up.isActive);
-      if (activeUnitPrice) {
-        this.lineTotal = activeUnitPrice.totalPrice || 0;
+    if (mode === "matrix" && this.priceMatrix && this.priceMatrix.length > 0) {
+      const active = this.priceMatrix.find((p) => p.isActive);
+      if (active && active.total !== null) {
+        this.lineTotal = active.total;
         return;
       }
     }
 
-    if (this.quantityPrices && this.quantityPrices.length > 0) {
-      const activePrice = this.quantityPrices.find((qp) => qp.isActive);
-      if (activePrice) {
-        this.lineTotal = activePrice.total || 0;
-        return;
-      }
-    }
-
-    if (this.basePrice && this.baseQuantity) {
-      const quantity = parseFloat(this.baseQuantity) || 1;
-      this.lineTotal = this.basePrice * quantity;
-    }
+    // Classic mode never carries a null price/quantity past this point.
+    const price = Number(this.basePrice) || 0;
+    const quantity = parseFloat(this.baseQuantity || "1") || 1;
+    this.lineTotal = price * quantity;
   }
 
-  getActivePrice(useUnitPrices?: boolean): QuantityPrice | UnitPrice | null {
-    const shouldUseUnitPrices =
-      useUnitPrices !== undefined
-        ? useUnitPrices
-        : this.offer?.useUnitPrices || false;
-
-    if (shouldUseUnitPrices && this.unitPrices && this.unitPrices.length > 0) {
-      return this.unitPrices.find((up) => up.isActive) || null;
-    } else if (this.quantityPrices && this.quantityPrices.length > 0) {
-      return this.quantityPrices.find((qp) => qp.isActive) || null;
-    }
-    return null;
+  getLineTotal(pricingMode?: PricingMode): number {
+    this.calculateLineTotal(pricingMode);
+    return this.lineTotal || 0;
   }
 
-  getActivePriceType(useUnitPrices?: boolean): "quantity" | "unit" | null {
-    const activePrice = this.getActivePrice(useUnitPrices);
-    if (activePrice) {
-      return "totalPrice" in activePrice ? "unit" : "quantity";
-    }
-    return null;
+  getActiveMatrixEntry(): PriceMatrixEntry | null {
+    return (this.priceMatrix || []).find((p) => p.isActive) || null;
   }
 
-  formatUnitPrice(price: number, offer?: Offer): string {
-    const decimalPlaces = offer?.unitPriceDecimalPlaces || 3;
-    if (isNaN(price) || !isFinite(price)) {
-      return `0.${"0".repeat(decimalPlaces)}`;
-    }
-    return price.toFixed(decimalPlaces);
+  formatPrice(price: number | null, decimals = 3): string {
+    if (price === null || price === undefined) return ".";
+    return price.toFixed(decimals);
   }
 
-  formatTotalPrice(price: number, offer?: Offer): string {
-    const decimalPlaces = offer?.totalPriceDecimalPlaces || 2;
-    if (isNaN(price) || !isFinite(price)) {
-      return `0.${"0".repeat(decimalPlaces)}`;
-    }
-    return price.toFixed(decimalPlaces);
+  formatTotalPrice(price: number, decimals = 2): string {
+    if (isNaN(price) || !isFinite(price)) return `0.${"0".repeat(decimals)}`;
+    return price.toFixed(decimals);
   }
 
-  syncUnitPricesWithOffer(offer: Offer): void {
-    if (offer.useUnitPrices && offer.defaultUnitPrices) {
-      this.unitPrices = JSON.parse(JSON.stringify(offer.defaultUnitPrices));
-
-      if (this.unitPrices && this.unitPrices.length > 0) {
-        const existingPrices = this.unitPrices || [];
-        this.unitPrices.forEach((newUp, index) => {
-          const existingUp = existingPrices.find(
-            (up) => up.quantity === newUp.quantity,
-          );
-          if (existingUp) {
-            newUp.unitPrice = existingUp.unitPrice;
-            newUp.totalPrice = existingUp.totalPrice;
-          }
-        });
-      }
+  /** Applies the offer's tier template to this line, keeping any already-entered prices for matching tiers. */
+  syncPriceMatrixWithOffer(offer: Offer): void {
+    if (offer.pricingMode === "matrix" && offer.defaultPriceMatrix) {
+      const existing = this.priceMatrix || [];
+      this.priceMatrix = offer.defaultPriceMatrix.map((tpl) => {
+        const match = existing.find((e) => e.quantity === tpl.quantity);
+        return match
+          ? {
+              ...tpl,
+              price: match.price,
+              total: match.total,
+              isActive: match.isActive,
+            }
+          : { ...tpl };
+      });
     }
   }
 

@@ -17,8 +17,6 @@ router.post(
   authorize(UserRole.SALES),
   offerController.createOfferFromInquiry.bind(offerController),
 );
-// NEW: create an offer from an existing item (customer prefilled from the
-// item's linked customer, or an explicit customerId in the body)
 router.post(
   "/from-item/:itemId",
   authorize(UserRole.SALES),
@@ -60,8 +58,6 @@ router.post(
   "/:id/generate-pdf",
   offerController.generatePdf.bind(offerController),
 );
-
-// Offer PDF generation
 router.get(
   "/:id/download-pdf",
   offerController.generateAndDownloadPdf.bind(offerController),
@@ -70,7 +66,6 @@ router.get(
 // ---------------------------------------------------------------------------
 // Line item operations
 // ---------------------------------------------------------------------------
-// NEW: add a line item to an offer (needed for customer/blank offers)
 router.post(
   "/:offerId/line-items",
   offerController.createLineItem.bind(offerController),
@@ -79,7 +74,6 @@ router.put(
   "/:offerId/line-items/:lineItemId",
   offerController.updateLineItem.bind(offerController),
 );
-// NEW: delete a line item
 router.delete(
   "/:offerId/line-items/:lineItemId",
   offerController.deleteLineItem.bind(offerController),
@@ -89,49 +83,57 @@ router.put(
   offerController.bulkUpdateLineItems.bind(offerController),
 );
 
-// Price management operations
+// ---------------------------------------------------------------------------
+// Matrix pricing operations
+// ---------------------------------------------------------------------------
+// Add a single tier to one line item's price matrix
 router.post(
-  "/line-items/:lineItemId/quantity-prices",
-  offerController.addQuantityPrice.bind(offerController),
-);
-router.post(
-  "/line-items/:lineItemId/unit-prices",
-  offerController.addUnitPrice.bind(offerController),
+  "/line-items/:lineItemId/price-matrix",
+  offerController.addPriceMatrixEntry.bind(offerController),
 );
 
-// Unit price operations (offer level)
-router.post(
-  "/:offerId/toggle-unit-prices",
-  offerController.toggleOfferUnitPrices.bind(offerController),
-);
+// Set which tier is active for a line item (no priceType segment anymore —
+// matrix is the only mode with tiers)
 router.put(
-  "/:offerId/bulk-update-unit-prices",
-  offerController.bulkUpdateOfferUnitPrices.bind(offerController),
-);
-router.post(
-  "/:offerId/sync-unit-prices",
-  offerController.syncUnitPricesAcrossOffer.bind(offerController),
-);
-
-// Set active price for line items
-router.put(
-  "/line-items/:lineItemId/active-price/:priceType/:priceIndex",
+  "/line-items/:lineItemId/active-price/:priceIndex",
   offerController.setActivePrice.bind(offerController),
 );
 
-// Copy/paste operations
+// Switch an offer between Classic and Matrix pricing
 router.post(
-  "/:offerId/copy-paste-prices",
-  offerController.copyPastePrices.bind(offerController),
+  "/:offerId/pricing-mode",
+  offerController.togglePricingMode.bind(offerController),
 );
 
+// Re-apply the offer's tier template across all its line items
+router.post(
+  "/:offerId/sync-price-matrix",
+  offerController.syncPriceMatrixAcrossOffer.bind(offerController),
+);
+
+// Delete one tier (quantity column) from every line item on the offer
+router.delete(
+  "/:offerId/price-column",
+  offerController.deletePriceColumn.bind(offerController),
+);
+
+// Paste-in matrix import — the client's primary entry point
+router.post(
+  "/:offerId/paste-matrix",
+  offerController.pasteMatrixPrices.bind(offerController),
+);
+
+// ---------------------------------------------------------------------------
 // Inquiry-specific offers
+// ---------------------------------------------------------------------------
 router.get(
   "/inquiry/:inquiryId",
   offerController.getOffersByInquiry.bind(offerController),
 );
 
+// ---------------------------------------------------------------------------
 // Statistics and metadata
+// ---------------------------------------------------------------------------
 router.get(
   "/statistics",
   offerController.getOfferStatistics.bind(offerController),
