@@ -430,16 +430,8 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                 }
             });
 
-            let finalStatus = formData.cargo_status || "Open";
-            if (cleanFormData.shipped_at) {
-                finalStatus = "Shipped";
-            } else if (finalStatus === "Shipped") {
-                finalStatus = "Open";
-            }
-
             const payload: any = {
                 ...cleanFormData,
-                cargo_status: finalStatus,
                 orders: assignedOrderIds,
             };
 
@@ -455,7 +447,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
             setLoading(false);
         }
     };
-
 
     const handleDelete = async (id: number) => {
         if (!confirm("Are you sure you want to delete this cargo? This action cannot be undone.")) return;
@@ -489,6 +480,18 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
     const updateField = (field: string, value: any) => {
         setFormData({ ...formData, [field]: value });
     };
+
+    const handleMarkAsShippedClick = () => {
+        if (confirm("Are you sure you want to mark this cargo as Shipped? This will change status to 'Shipped' and auto-fill the shipped date with today's date.")) {
+            const today = new Date().toISOString().split('T')[0];
+            setFormData(prev => ({
+                ...prev,
+                cargo_status: "Shipped",
+                shipped_at: today
+            }));
+        }
+    };
+
 
     const handleCustomerChange = async (customerId: string | undefined) => {
         if (!customerId) {
@@ -978,6 +981,19 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Pickup Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formatDateInput(formData.pickup_date)}
+                                    onChange={(e) => updateField("pickup_date", e.target.value || null)}
+                                    disabled={!isEditEnabled}
+                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                                     ETD (Estimated Departure)
                                 </label>
                                 <input
@@ -988,7 +1004,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                     className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                             </div>
-
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -1002,10 +1017,22 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                     className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                             </div>
+
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Shipped At
-                                </label>
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <label className="block text-sm font-medium text-gray-700">
+                                        Shipped At
+                                    </label>
+                                    {isEditEnabled && formData.cargo_status !== "Shipped" && (
+                                        <button
+                                            type="button"
+                                            onClick={handleMarkAsShippedClick}
+                                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-all cursor-pointer"
+                                        >
+                                            🚢 Ship Cargo
+                                        </button>
+                                    )}
+                                </div>
                                 <input
                                     type="date"
                                     value={formatDateInput(formData.shipped_at)}
@@ -1014,7 +1041,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                     className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                             </div>
-
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Remark</label>
                                 <textarea

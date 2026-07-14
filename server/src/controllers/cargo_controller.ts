@@ -395,12 +395,6 @@ export const createCargo = async (
       }
     }
 
-    if (cargoData.shipped_at) {
-      cargoData.cargo_status = "Shipped";
-    } else if (cargoData.cargo_status === "Shipped") {
-      cargoData.cargo_status = "Open";
-    }
-
     const cargo = cargoRepo.create(cargoData as Partial<Cargo>);
     const savedCargo = await cargoRepo.save(cargo);
 
