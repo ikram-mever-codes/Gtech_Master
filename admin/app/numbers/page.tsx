@@ -373,13 +373,22 @@ export default function NumberSequencesPage() {
           <div className="p-6 space-y-4">
             <div>
               <label className={labelClass}>Sequence Key (Fixed once created)</label>
-              <input
-                type="text"
-                placeholder="e.g. customer_id, cargo_no"
+              <select
                 value={sequenceKey}
                 onChange={(e) => setSequenceKey(e.target.value)}
                 className={inputClass}
-              />
+              >
+                <option value="">Select a sequence key...</option>
+                <option value="offer">offer (Angebot)</option>
+                <option value="order">order (Auftrag)</option>
+                <option value="transfer_order">transfer_order (Bestellung)</option>
+                <option value="invoice">invoice (Rechnung)</option>
+                <option value="invoice_correction">invoice_correction (Rechnungskorrektur)</option>
+                <option value="delivery_note">delivery_note (Lieferschein)</option>
+                <option value="customer">customer (Kunden-Nr. / Customer Number)</option>
+                <option value="cargo">cargo (Cargo-Nr. / Cargo Number)</option>
+                <option value="closed_ci">closed_ci (Verifizierte CI-Nr.)</option>
+              </select>
             </div>
             <div>
               <label className={labelClass}>Display Name</label>
@@ -389,7 +398,8 @@ export default function NumberSequencesPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className={inputClass}
-              />
+              >
+              </input>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -423,7 +433,7 @@ export default function NumberSequencesPage() {
                 className={inputClass}
               />
               <span className="text-[10px] text-gray-400 mt-1 block">
-                Placeholders: {"{prefix}"}, {"{yy}"} (year), {"{mm}"} (month), {"{number}"} (padded running number)
+                Placeholders: {"{prefix}"}, {"{yyyy}"} (4-digit year), {"{yy}"} (2-digit year), {"{mm}"} (month), {"{number}"} (padded running number)
               </span>
             </div>
             <div>

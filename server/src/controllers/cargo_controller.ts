@@ -9,6 +9,7 @@ import { Customer } from "../models/customers";
 import { Taric } from "../models/tarics";
 import { CargoType } from "../models/cargo_types";
 import { Like, IsNull, In } from "typeorm";
+import { NumberSequenceService } from "../services/number_sequence_service";
 
 export const generateInvoicesForOrders = async (
   orderIds: number[],
@@ -385,6 +386,14 @@ export const createCargo = async (
 
     const { id, created_at, updated_at, orders, orderItems, ...cargoData } =
       req.body;
+
+    if (!cargoData.cargo_no || !cargoData.cargo_no.trim()) {
+      try {
+        cargoData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
+      } catch (err) {
+        console.warn("Could not generate cargo number using sequence service:", err);
+      }
+    }
 
     const cargo = cargoRepo.create(cargoData as Partial<Cargo>);
     const savedCargo = await cargoRepo.save(cargo);

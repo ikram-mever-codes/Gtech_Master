@@ -30,12 +30,14 @@ export class NumberSequenceService {
     runningNo: number,
   ): string {
     const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
+    const yyyy = String(now.getFullYear());
+    const yy = yyyy.slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const number = String(runningNo).padStart(sequence.minDigits, "0");
 
     return sequence.formatPattern
       .replace("{prefix}", sequence.prefix)
+      .replace("{yyyy}", yyyy)
       .replace("{yy}", yy)
       .replace("{mm}", mm)
       .replace("{number}", number);
@@ -46,16 +48,38 @@ export class NumberSequenceService {
   static async seedDefaultSequences(): Promise<void> {
     const repo = AppDataSource.getRepository(NumberSequence);
     const defaults = [
-      { sequenceKey: "offer", name: "Angebot", prefix: "A" },
-      { sequenceKey: "order", name: "Auftrag", prefix: "B" },
-      { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE" },
-      { sequenceKey: "invoice", name: "Rechnung", prefix: "R" },
+      { sequenceKey: "offer", name: "Angebot", prefix: "A", minDigits: 2 },
+      { sequenceKey: "order", name: "Auftrag", prefix: "B", minDigits: 2 },
+      { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", minDigits: 2 },
+      { sequenceKey: "invoice", name: "Rechnung", prefix: "R", minDigits: 2 },
       {
         sequenceKey: "invoice_correction",
         name: "Rechnungskorrektur",
         prefix: "RK",
+        minDigits: 2,
       },
-      { sequenceKey: "delivery_note", name: "Lieferschein", prefix: "L" },
+      { sequenceKey: "delivery_note", name: "Lieferschein", prefix: "L", minDigits: 2 },
+      {
+        sequenceKey: "customer",
+        name: "Kunde",
+        prefix: "K",
+        formatPattern: "{prefix}{number}",
+        minDigits: 6,
+      },
+      {
+        sequenceKey: "cargo",
+        name: "Cargo",
+        prefix: "C",
+        formatPattern: "{prefix}{yyyy}-{number}",
+        minDigits: 4,
+      },
+      {
+        sequenceKey: "closed_ci",
+        name: "Commercial Invoice",
+        prefix: "CI",
+        formatPattern: "{prefix}{yy}{mm}{number}",
+        minDigits: 3,
+      },
     ];
 
     for (const def of defaults) {
@@ -64,7 +88,7 @@ export class NumberSequenceService {
       });
       if (!exists) {
         await repo.save(
-          repo.create({ ...def, minDigits: 2, nextRunningNo: 1 }),
+          repo.create({ ...def, minDigits: def.minDigits, nextRunningNo: 1 }),
         );
       }
     }

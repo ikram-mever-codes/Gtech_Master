@@ -19,8 +19,8 @@ import bcrypt from "bcryptjs";
 import { User } from "../models/users";
 import { Invoice } from "../models/invoice";
 import { RequestedItem } from "../models/requested_items";
-import { ContactPerson } from "../models/contact_person";
 import { Country } from "../models/country";
+import { NumberSequenceService } from "../services/number_sequence_service";
 
 export const BUSINESS_SOURCE = {
   GOOGLE_MAPS: "Google Maps",
@@ -669,6 +669,15 @@ export const createBusiness = async (
       }
     }
 
+    let finalCustomerNumber = trimmedCustomerNumber;
+    if (!finalCustomerNumber) {
+      try {
+        finalCustomerNumber = await NumberSequenceService.getNextNumber("customer");
+      } catch (err) {
+        console.warn("Could not generate customer number using sequence service:", err);
+      }
+    }
+
     const shouldBeStarBusiness =
       isDeviceMaker === "Yes" &&
       starBusinessDetails?.inSeries === true &&
@@ -678,7 +687,7 @@ export const createBusiness = async (
         const customer = new Customer();
         customer.companyName = trimmedDisplayName;
         customer.legalName = dbLegalName ? dbLegalName.trim() : undefined;
-        customer.customerNumber = trimmedCustomerNumber || undefined;
+        customer.customerNumber = finalCustomerNumber || undefined;
         customer.companyLabelPrintLogo = companyLabelPrintLogo
           ? companyLabelPrintLogo.trim()
           : undefined;
