@@ -1671,7 +1671,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
               <div className="grid grid-cols-6 gap-4">
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer No (Leave blank to auto-generate)
+                    Customer No (Leave blank autogenerate)
                   </label>
                   <input
                     type="text"
@@ -1687,7 +1687,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Auto-generated if left blank"
                   />
                 </div>
-
 
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
