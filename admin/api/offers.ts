@@ -947,8 +947,8 @@ export const createOfferFromItem = async (
   itemId: string,
   payload: CreateOfferFromItemPayload,
 ) => {
-  const { data } = await api.post(`/offers/from-item/${itemId}`, payload);
-  return data;
+  const res = await api.post(`/offers/from-item/${itemId}`, payload);
+  return res;
 };
 
 export const createOfferLineItem = async (

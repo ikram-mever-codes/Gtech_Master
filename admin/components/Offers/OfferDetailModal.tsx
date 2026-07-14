@@ -57,7 +57,7 @@ import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 import { formatDate, openOutlookWithOffer } from "@/utils/offers";
 import { UserRole } from "@/utils/interfaces";
-import { errorStyles } from "@/utils/constants";
+import { errorStyles, successStyles } from "@/utils/constants";
 import { BASE_URL } from "@/utils/constants";
 
 interface OfferDetailModalProps {
@@ -120,10 +120,10 @@ const resolveThumbUrl = (url: string | null | undefined): string | null => {
 const getItemThumb = (item: any): string | null =>
   resolveThumbUrl(
     item?.photo ||
-    item?.pix_path_eBay ||
-    item?.pictures?.shopPicture ||
-    (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-    null,
+      item?.pix_path_eBay ||
+      item?.pictures?.shopPicture ||
+      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+      null,
   );
 
 const getItemCompany = (item: any): string =>
@@ -192,10 +192,11 @@ const ItemRow: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
-        ? "border-primary bg-primary/5"
-        : "border-gray-200 hover:bg-gray-50"
-        }`}
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
+          ? "border-primary bg-primary/5"
+          : "border-gray-200 hover:bg-gray-50"
+      }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -246,10 +247,11 @@ const PickerRow: React.FC<{
 }> = ({ selected, onClick, title, subtitle, meta }) => (
   <div
     onClick={onClick}
-    className={`p-3 border rounded-lg cursor-pointer transition-all ${selected
-      ? "border-primary bg-primary/5"
-      : "border-gray-200 hover:bg-gray-50"
-      }`}
+    className={`p-3 border rounded-lg cursor-pointer transition-all ${
+      selected
+        ? "border-primary bg-primary/5"
+        : "border-gray-200 hover:bg-gray-50"
+    }`}
   >
     <div className="flex justify-between items-start">
       <div className="min-w-0">
@@ -305,7 +307,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   userRole,
 }) => {
   const [offer, setOffer] = useState<any>(null);
-  const displayInquiryNo = offer?.inquirySnapshot?.referenceNumber ||
+  const displayInquiryNo =
+    offer?.inquirySnapshot?.referenceNumber ||
     offer?.inquirySnapshot?.inquiryNo ||
     offer?.inquiry?.referenceNumber ||
     offer?.inquiry?.inquiryNo ||
@@ -324,8 +327,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           getAllPaymentMethods(true).catch(() => ({ data: [] })),
           getAllShippingMethods(true).catch(() => ({ data: [] })),
         ]);
-        setDbPaymentMethods(Array.isArray(pmRes?.data) ? pmRes.data.filter((pm: any) => pm.is_active) : []);
-        setDbShippingMethods(Array.isArray(smRes?.data) ? smRes.data.filter((sm: any) => sm.is_active) : []);
+        setDbPaymentMethods(
+          Array.isArray(pmRes?.data)
+            ? pmRes.data.filter((pm: any) => pm.is_active)
+            : [],
+        );
+        setDbShippingMethods(
+          Array.isArray(smRes?.data)
+            ? smRes.data.filter((sm: any) => sm.is_active)
+            : [],
+        );
       } catch (e) {
         console.error("Failed to load payment/shipping methods:", e);
       }
@@ -579,13 +590,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           itemIds: selectedItems.map((it) => String(it.id)),
         });
       }
-
       if (res?.success && res.data?.id) {
         onChanged?.();
-        // Flip into the normal detail/edit view on the brand-new offer.
+        toast.success("Offer created successfully.", successStyles);
         setOffer(res.data);
         setForm(buildForm(res.data));
-        setEdit(true); // open straight into edit so pricing can be entered
+        setEdit(true);
       }
     } catch (e) {
       console.error("Error creating offer:", e);
@@ -943,17 +953,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     label: string;
     icon: React.ReactNode;
   }[] = [
-      {
-        key: "inquiry",
-        label: "From inquiry",
-        icon: <LinkIcon className="h-4 w-4" />,
-      },
-      {
-        key: "item",
-        label: "Customer + item(s)",
-        icon: <CubeIcon className="h-4 w-4" />,
-      },
-    ];
+    {
+      key: "inquiry",
+      label: "From inquiry",
+      icon: <LinkIcon className="h-4 w-4" />,
+    },
+    {
+      key: "item",
+      label: "Customer + item(s)",
+      icon: <CubeIcon className="h-4 w-4" />,
+    },
+  ];
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -985,10 +995,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSelectedInquiry(null);
                       setSelectedItems([]);
                     }}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${sourceType === t.key
-                      ? "border-primary bg-primary/5 text-primary font-semibold"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+                      sourceType === t.key
+                        ? "border-primary bg-primary/5 text-primary font-semibold"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
                   >
                     {t.icon}
                     {t.label}
@@ -1085,15 +1096,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       addr={
                         selectedCustomer.deliveryAddressLine1
                           ? {
-                            contactName:
-                              selectedCustomer.legalName ||
-                              selectedCustomer.companyName,
-                            street: selectedCustomer.deliveryAddressLine1,
-                            postalCode: selectedCustomer.deliveryPostalCode,
-                            city: selectedCustomer.deliveryCity,
-                            country: selectedCustomer.deliveryCountry,
-                            contactPhone: selectedCustomer.contactPhoneNumber,
-                          }
+                              contactName:
+                                selectedCustomer.legalName ||
+                                selectedCustomer.companyName,
+                              street: selectedCustomer.deliveryAddressLine1,
+                              postalCode: selectedCustomer.deliveryPostalCode,
+                              city: selectedCustomer.deliveryCity,
+                              country: selectedCustomer.deliveryCountry,
+                              contactPhone: selectedCustomer.contactPhoneNumber,
+                            }
                           : null
                       }
                       emptyText="Same as customer address."
@@ -1123,8 +1134,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         }}
                         title={inq.name}
                         subtitle={`Customer: ${inq.customer?.companyName || "—"}`}
-                        meta={`${inq.requests?.length || 0} items · ${inq.isAssembly ? "Assembly" : "Standard"
-                          }`}
+                        meta={`${inq.requests?.length || 0} items · ${
+                          inq.isAssembly ? "Assembly" : "Standard"
+                        }`}
                       />
                     ))
                   ))}
@@ -1181,8 +1193,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
               {/* Common fields — always available once a title exists */}
               <div className="space-y-4 border-t pt-4">
-
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1196,7 +1206,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select…</option>
-                      {(dbPaymentMethods.length > 0 ? dbPaymentMethods.map((pm: any) => pm.name) : PAYMENT_METHODS).map((m) => (
+                      {(dbPaymentMethods.length > 0
+                        ? dbPaymentMethods.map((pm: any) => pm.name)
+                        : PAYMENT_METHODS
+                      ).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1215,7 +1228,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select…</option>
-                      {(dbShippingMethods.length > 0 ? dbShippingMethods.map((sm: any) => sm.name) : SHIPPING_METHODS).map((m) => (
+                      {(dbShippingMethods.length > 0
+                        ? dbShippingMethods.map((sm: any) => sm.name)
+                        : SHIPPING_METHODS
+                      ).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1223,8 +1239,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </select>
                   </div>
                 </div>
-
-
               </div>
             </div>
 
@@ -1338,19 +1352,31 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
                         checked={
                           !form.deliveryAddress?.street ||
-                          form.deliveryAddress?.street === (offer.customerSnapshot?.address || offer.customerSnapshot?.street || "")
+                          form.deliveryAddress?.street ===
+                            (offer.customerSnapshot?.address ||
+                              offer.customerSnapshot?.street ||
+                              "")
                         }
                         onChange={(e) => {
                           if (e.target.checked) {
                             patch({
                               deliveryAddress: {
-                                contactName: offer.customerSnapshot?.legalName || offer.customerSnapshot?.companyName || "",
-                                street: offer.customerSnapshot?.address || offer.customerSnapshot?.street || "",
-                                postalCode: offer.customerSnapshot?.postalCode || "",
+                                contactName:
+                                  offer.customerSnapshot?.legalName ||
+                                  offer.customerSnapshot?.companyName ||
+                                  "",
+                                street:
+                                  offer.customerSnapshot?.address ||
+                                  offer.customerSnapshot?.street ||
+                                  "",
+                                postalCode:
+                                  offer.customerSnapshot?.postalCode || "",
                                 city: offer.customerSnapshot?.city || "",
                                 country: offer.customerSnapshot?.country || "",
-                                contactPhone: offer.customerSnapshot?.contactPhoneNumber || "",
-                              }
+                                contactPhone:
+                                  offer.customerSnapshot?.contactPhoneNumber ||
+                                  "",
+                              },
                             });
                           } else {
                             patch({
@@ -1361,7 +1387,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 city: "",
                                 country: "",
                                 contactPhone: "",
-                              }
+                              },
                             });
                           }
                         }}
@@ -1409,7 +1435,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ paymentMethod: e.target.value })}
                     >
                       <option value="">Select…</option>
-                      {(dbPaymentMethods.length > 0 ? dbPaymentMethods.map((pm: any) => pm.name) : PAYMENT_METHODS).map((m) => (
+                      {(dbPaymentMethods.length > 0
+                        ? dbPaymentMethods.map((pm: any) => pm.name)
+                        : PAYMENT_METHODS
+                      ).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1430,7 +1459,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       }
                     >
                       <option value="">Select…</option>
-                      {(dbShippingMethods.length > 0 ? dbShippingMethods.map((sm: any) => sm.name) : SHIPPING_METHODS).map((m) => (
+                      {(dbShippingMethods.length > 0
+                        ? dbShippingMethods.map((sm: any) => sm.name)
+                        : SHIPPING_METHODS
+                      ).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -1517,14 +1549,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       <button
                         disabled={!edit}
                         onClick={() => toggleUnitPricing(!offer.useUnitPrices)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${offer.useUnitPrices ? "bg-green-500" : "bg-gray-300"
-                          }`}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
+                          offer.useUnitPrices ? "bg-green-500" : "bg-gray-300"
+                        }`}
                       >
                         <span
-                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${offer.useUnitPrices
-                            ? "translate-x-5"
-                            : "translate-x-1"
-                            }`}
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                            offer.useUnitPrices
+                              ? "translate-x-5"
+                              : "translate-x-1"
+                          }`}
                         />
                       </button>
                     </div>
@@ -1810,7 +1844,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                                           e.target.value,
                                                           up.unitPrice,
                                                           offer.totalPriceDecimalPlaces ||
-                                                          2,
+                                                            2,
                                                         ),
                                                     },
                                                   )
@@ -1830,10 +1864,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                                   type="number"
                                                   step={
                                                     offer.unitPriceDecimalPlaces ===
-                                                      4
+                                                    4
                                                       ? "0.0001"
                                                       : offer.unitPriceDecimalPlaces ===
-                                                        2
+                                                          2
                                                         ? "0.01"
                                                         : "0.001"
                                                   }
@@ -1854,7 +1888,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                                               e.target.value,
                                                             ),
                                                             offer.totalPriceDecimalPlaces ||
-                                                            2,
+                                                              2,
                                                           ),
                                                       },
                                                     )
@@ -2304,7 +2338,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           </>
         )}
       </div>
-    </div >
+    </div>
   );
 };
 
