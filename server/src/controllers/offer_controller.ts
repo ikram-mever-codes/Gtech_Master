@@ -90,6 +90,10 @@ import { ConvertInquiryToItemDto, ItemGenerator } from "./inquiry_controller";
 import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
+import { resolveGtechFonts } from "../utils/gtech_fonts";
+import { registerGtechFonts, fontRegular, fontMedium, fontSemiBold, drawGtechBrandLayer } from "../services/gtechDocumentTemplate";
+
+
 import { In } from "typeorm";
 
 const formatCountry = (country?: string | null): string => {
@@ -3244,38 +3248,25 @@ export class OfferController {
 
       const totals = calculateTotals(offer);
 
+      const gtechFonts = resolveGtechFonts();
+
       const doc = new PDFDocument({
-        margin: 50,
+        margin: 0,           // we control all margins via coordinates
         size: "A4",
         bufferPages: true,
       });
 
       const pageWidth = 595.28;
       const pageHeight = 841.89;
-      const margin = 50;
 
-      const leftAlignX = margin;
-      const rightAlignX = 350;
-      const centerColumnX = 200;
-      const rightColumnX = 420;
+      // GTech spec coordinate helpers
+      const MM = (v: number) => v * 2.8346; // mm → pt
 
-      const companyInfo = {
-        name: "GTech Industries GmbH",
-        address: "Antonio-Segni-Str. 4",
-        city: "44263 Dortmund",
-        country: "Deutschland",
-        phone: "+49 231 58697565",
-        email: "info@gtech.de",
-        website: "www.gtech.de",
-        registrationNumber: "Amtsgericht Dortmund HRB38470",
-        ceo: "Geschäftsführer Joschua Grenzheuser",
-        vatId: "DE291514916",
-        taxNumber: "316/5733/1295",
-        weeeNumber: "DE 66370256",
-        iban: "DE16 4404 0037 0210 9288 00",
-        bic: "COBADEFFXXX",
-        bank: "Commerzbank Dortmund",
-      };
+      // Named layout zones per GTech spec
+      const LEFT_X = MM(18);         // 18mm = 51pt (main left margin)
+      const INFO_BOX_X = MM(125);    // 125mm = document info block x
+      const TABLE_END_X = MM(192);   // 18 + 174 = 192mm right edge
+      const CONTENT_WIDTH = MM(174); // 174mm content width
 
       const uploadsDir = path.join(__dirname, "../../uploads/offers");
       if (!fs.existsSync(uploadsDir)) {
@@ -3293,38 +3284,15 @@ export class OfferController {
         writeStream.on("error", reject);
       });
 
-      let yPos = 50;
-      const logoPath = path.join(process.cwd(), "assets", "logo.png");
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, leftAlignX, yPos, { fit: [100, 50] });
-      }
-      const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
+      // Register Inter fonts
+      registerGtechFonts(doc, gtechFonts);
 
-      doc.fontSize(12).font("Helvetica-Bold");
-      doc.text(companyInfo.name, rightAlignX, yPos);
+      const R = fontRegular(gtechFonts);     // Inter Regular
+      const M = fontMedium(gtechFonts);      // Inter Medium
+      const SB = fontSemiBold(gtechFonts);   // Inter SemiBold
 
-      yPos += 15;
-      doc.fontSize(10).font("Helvetica");
-      doc.text(companyInfo.address, rightAlignX, yPos);
-      yPos += 12;
-      doc.text(companyInfo.city, rightAlignX, yPos);
-      yPos += 12;
-      doc.text(companyInfo.country, rightAlignX, yPos);
-
-      yPos += 15;
-      doc.text(companyInfo.phone, rightAlignX, yPos);
-      yPos += 12;
-      doc.text(companyInfo.email, rightAlignX, yPos);
-      yPos += 12;
-      doc.text(companyInfo.website, rightAlignX, yPos);
-      yPos = 180;
-      doc.fontSize(8).font("Helvetica");
-      doc.fillColor("#666666");
-      doc.text(
-        `${companyInfo.name} - ${companyInfo.address} - ${companyInfo.city}`,
-        leftAlignX,
-        yPos,
-      );
+      // ── Draw brand layer on page 1 ─────────────────────────────
+      drawGtechBrandLayer(doc, gtechFonts);
 
       let customer: any = {};
       if (offer.customerSnapshot) {
@@ -3337,33 +3305,39 @@ export class OfferController {
           customer = offer.customerSnapshot;
         }
       }
-      yPos += 20;
-      doc.fontSize(12).font("Helvetica-Bold");
-      doc.fillColor("#000000");
-      doc.text(customer.companyName || "", leftAlignX, yPos);
 
-      yPos += 15;
-      doc.fontSize(10).font("Helvetica");
-      if (customer.legalName && customer.legalName !== customer.companyName) {
-        doc.text(customer.legalName, leftAlignX, yPos);
-        yPos += 12;
-      } else if (
-        customer.additionalInfo &&
-        customer.additionalInfo !== "Additional Info"
-      ) {
-        doc.text(customer.additionalInfo, leftAlignX, yPos);
-        yPos += 12;
+      let addrY = MM(55);
+      doc.fillColor("#3F4446");
+
+      // Company name — Inter Medium 10pt
+      if (customer.companyName) {
+        doc.font(M).fontSize(10).text(customer.companyName, MM(25), addrY, {
+          width: MM(80),
+          lineBreak: false,
+        });
+        addrY += 13;
       }
 
-      doc.text(customer.address || customer.street || "", leftAlignX, yPos);
-      yPos += 12;
+      // Legal name if different
+      doc.font(R).fontSize(10);
+      if (customer.legalName && customer.legalName !== customer.companyName) {
+        doc.text(customer.legalName, MM(25), addrY, { width: MM(80), lineBreak: false });
+        addrY += 12;
+      } else if (customer.additionalInfo && customer.additionalInfo !== "Additional Info") {
+        doc.text(customer.additionalInfo, MM(25), addrY, { width: MM(80), lineBreak: false });
+        addrY += 12;
+      }
 
-      doc.text(
-        `${customer.postalCode || ""} ${customer.city || ""}`.trim(),
-        leftAlignX,
-        yPos,
-      );
-      yPos += 12;
+      if (customer.address || customer.street) {
+        doc.text(customer.address || customer.street || "", MM(25), addrY, { width: MM(80), lineBreak: false });
+        addrY += 12;
+      }
+
+      const cityLine = `${customer.postalCode || ""} ${customer.city || ""}`.trim();
+      if (cityLine) {
+        doc.text(cityLine, MM(25), addrY, { width: MM(80), lineBreak: false });
+        addrY += 12;
+      }
 
       const displayCountry = formatCountry(customer.country);
       if (
@@ -3372,12 +3346,11 @@ export class OfferController {
         displayCountry.toUpperCase() !== "GERMANY" &&
         displayCountry.toUpperCase() !== "DEUTSCHLAND"
       ) {
-        doc.text(displayCountry, leftAlignX, yPos);
-        yPos += 12;
+        doc.text(displayCountry, MM(25), addrY, { width: MM(80), lineBreak: false });
+        addrY += 12;
       }
 
-      const customerVatId =
-        customer.vatId || customer.vatTaxId || customer.taxNumber || "";
+      const customerVatId = customer.vatId || customer.vatTaxId || customer.taxNumber || "";
       if (
         customerVatId &&
         displayCountry &&
@@ -3385,70 +3358,63 @@ export class OfferController {
         displayCountry.toUpperCase() !== "GERMANY" &&
         displayCountry.toUpperCase() !== "DEUTSCHLAND"
       ) {
-        doc.text(`VAT ID: ${customerVatId}`, leftAlignX, yPos);
-        yPos += 12;
+        doc.text(`VAT ID: ${customerVatId}`, MM(25), addrY, { width: MM(80), lineBreak: false });
+        addrY += 12;
       }
 
-      const boxY = 180;
-      const boxWidth = 180;
-      const boxHeight = 120;
-
-      doc.lineWidth(0.3);
-      doc.rect(rightAlignX, boxY, boxWidth, boxHeight).stroke("#CCCCCC");
-      doc
-        .rect(rightAlignX, boxY, boxWidth, 30)
-        .fillAndStroke("#CCCCCC", "#CCCCCC");
-      doc.fontSize(15).font("Helvetica-Bold");
-      doc.fillColor("#000000");
-      doc.text("Angebot", rightAlignX + 5, boxY + 8);
-
-      const detailsStartY = boxY + 40;
-      doc.fontSize(10).font("Helvetica");
-
+      // ── Document info block ────────────────────────────────────
+      // Spec: x=125mm, y=50mm, Inter 8.5pt #3F4446 – right-aligned label/value pairs
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
         : "Alexander";
 
-      const offerDetails = [
+      const infoItems = [
         ["Angebotsnr.", offer.offerNumber || ""],
         ["Datum", formatDate(offer.createdAt)],
         ["Gültig bis", formatDate(offer.validUntil)],
         ["Ansprechpartner", contactName],
-        [
-          "Kundennr.",
-          offer.inquiry?.customer?.customerNumber ||
-          customer.customerNumber ||
-          "-",
-        ],
+        ["Kundennr.", offer.inquiry?.customer?.customerNumber || customer.customerNumber || "—"],
       ];
 
-      offerDetails.forEach((detail, index) => {
-        const detailY = detailsStartY + index * 15;
-        doc.text(detail[0], rightAlignX + 10, detailY);
-        doc.font("Helvetica-Bold");
-        doc.text(detail[1], rightAlignX + 90, detailY);
-        doc.font("Helvetica");
+      let infoY = MM(50);
+      const LABEL_W = MM(35);
+      const VALUE_X = INFO_BOX_X + LABEL_W + 4;
+      const VALUE_W = MM(65) - LABEL_W - 4;
+
+      doc.fontSize(8.5).fillColor("#3F4446");
+      infoItems.forEach(([label, value]) => {
+        doc.font(R).text(label, INFO_BOX_X, infoY, { width: LABEL_W, lineBreak: false });
+        doc.font(M).text(value, VALUE_X, infoY, { width: VALUE_W, lineBreak: false });
+        infoY += 12;
       });
 
-      yPos = 320;
-      doc.fontSize(10).font("Helvetica");
-      if (offer.deliveryTime) {
-        doc.text(`Lieferzeit: ${offer.deliveryTime}`, leftAlignX, yPos);
-      }
-      if (offer.shippingMethod) {
-        doc.text(`Versandart: ${offer.shippingMethod}`, leftAlignX + 250, yPos);
-        yPos += 15;
-      }
-      if (offer.deliveryTerms) {
-        doc.text(
-          `Lieferbedingungen: ${offer.deliveryTerms}`,
-          leftAlignX + 250,
-          yPos,
-        );
+      // ── Document title ─────────────────────────────────────────
+      // Spec: x=18mm, y=95mm, Inter SemiBold 18pt #3F4446
+      doc
+        .font(SB)
+        .fontSize(18)
+        .fillColor("#3F4446")
+        .text("Angebot", LEFT_X, MM(95));
+
+      // ── Optional delivery info block ───────────────────────────
+      let yPos = MM(108);
+      doc.font(R).fontSize(9.5).fillColor("#3F4446");
+
+      if (offer.deliveryTime || offer.shippingMethod || offer.deliveryTerms) {
+        const deliveryParts: string[] = [];
+        if (offer.deliveryTime) deliveryParts.push(`Lieferzeit: ${offer.deliveryTime}`);
+        if (offer.shippingMethod) deliveryParts.push(`Versandart: ${offer.shippingMethod}`);
+        if (offer.deliveryTerms) deliveryParts.push(`Lieferbedingungen: ${offer.deliveryTerms}`);
+        doc.text(deliveryParts.join("   ·   "), LEFT_X, yPos, { width: CONTENT_WIDTH });
+        yPos += 14;
       }
 
-      yPos += 20;
+      // ── Positions table start ──────────────────────────────────
+      // Spec: x=18mm, y=115mm (or after intro text), Inter 8.5pt
+      yPos = Math.max(yPos + 5, MM(115));
       const tableY = yPos;
+
+
 
       const columns = [
         { header: "Pos", width: 25, align: "left" },
@@ -3463,31 +3429,32 @@ export class OfferController {
 
       const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
       const rowHeight = 40;
-      const headerHeight = 35;
+      const headerHeight = 22;
 
-      doc.lineWidth(0.3);
-      doc
-        .rect(leftAlignX, tableY, tableWidth, headerHeight)
-        .fillAndStroke("#E8E8E8", "#333333");
-      doc.fontSize(9).font("Helvetica-Bold");
-      doc.fillColor("#000000");
+      // Table header — white background, Inter SemiBold 8pt, #3F4446
+      doc.font(SB).fontSize(8).fillColor("#3F4446");
 
-      let currentX = leftAlignX;
+      let currentX = LEFT_X;
       columns.forEach((col) => {
-        doc.text(col.header, currentX + 3, tableY + 8, {
+        doc.text(col.header, currentX + 3, tableY + 6, {
           width: col.width - 6,
           align: col.align as "center" | "left" | "right" | "justify",
+          lineBreak: false,
         });
         currentX += col.width;
       });
 
-      doc.lineWidth(0.3);
+      // Green header underline per GTech spec
       doc
-        .moveTo(leftAlignX, tableY + headerHeight)
-        .lineTo(leftAlignX + tableWidth, tableY + headerHeight)
-        .stroke("#333333");
+        .moveTo(LEFT_X, tableY + headerHeight)
+        .lineTo(LEFT_X + tableWidth, tableY + headerHeight)
+        .lineWidth(0.75)
+        .strokeColor("#2F6B46")
+        .stroke();
 
-      doc.fontSize(9).font("Helvetica");
+      doc.font(R).fontSize(8.5).fillColor("#3F4446");
+
+
 
       const getActivePrice = (lineItem: any, offerUsesUnitPrices: boolean) => {
         if (
@@ -3565,62 +3532,55 @@ export class OfferController {
             });
           }
           const designationWidth = columns[3].width - 6;
-          doc.fontSize(9);
-          if (fontSource) {
-            try {
-              doc.font(fontSource, 0);
-            } catch (e) {
-              doc.font("Helvetica");
-            }
-          } else {
-            doc.font("Helvetica");
-          }
+          doc.font(R).fontSize(8.5);
           const textHeight = doc.heightOfString(nameText, {
             width: designationWidth,
           });
-          doc.font("Helvetica");
-          const computedRowHeight = Math.max(40, textHeight + 12);
-          if (currentY + computedRowHeight > pageHeight - 120) {
-            doc.lineWidth(0.3);
+          doc.font(R).fontSize(8.5);
+          const computedRowHeight = Math.max(36, textHeight + 12);
+          if (currentY + computedRowHeight > MM(265)) {
+            // End of page separator
             doc
-              .moveTo(leftAlignX, currentY)
-              .lineTo(leftAlignX + tableWidth, currentY)
-              .stroke("#333333");
+              .moveTo(LEFT_X, currentY)
+              .lineTo(LEFT_X + tableWidth, currentY)
+              .lineWidth(0.5)
+              .strokeColor("#CCCCCC")
+              .stroke();
 
             doc.addPage();
 
-            const newTableY = 60;
-            doc.lineWidth(0.3);
-            doc
-              .rect(leftAlignX, newTableY, tableWidth, headerHeight)
-              .fillAndStroke("#E8E8E8", "#333333");
-            doc.fontSize(9).font("Helvetica-Bold");
-            doc.fillColor("#000000");
+            // Brand layer on continuation page
+            drawGtechBrandLayer(doc, gtechFonts);
 
-            let tempX = leftAlignX;
+            const newTableY = MM(30);
+            // Continuation table header
+            doc.font(SB).fontSize(8).fillColor("#3F4446");
+            let tempX = LEFT_X;
             columns.forEach((col) => {
-              doc.text(col.header, tempX + 3, newTableY + 8, {
+              doc.text(col.header, tempX + 3, newTableY + 6, {
                 width: col.width - 6,
                 align: col.align as "center" | "left" | "right" | "justify",
+                lineBreak: false,
               });
               tempX += col.width;
             });
-
-            doc.lineWidth(0.3);
             doc
-              .moveTo(leftAlignX, newTableY + headerHeight)
-              .lineTo(leftAlignX + tableWidth, newTableY + headerHeight)
-              .stroke("#333333");
+              .moveTo(LEFT_X, newTableY + headerHeight)
+              .lineTo(LEFT_X + tableWidth, newTableY + headerHeight)
+              .lineWidth(0.75)
+              .strokeColor("#2F6B46")
+              .stroke();
 
+            doc.font(R).fontSize(8.5).fillColor("#3F4446");
             currentY = newTableY + headerHeight;
           }
 
+
           if (rowIndex % 2 === 1) {
             doc
-              .rect(leftAlignX, currentY, tableWidth, computedRowHeight)
+              .rect(LEFT_X, currentY, tableWidth, computedRowHeight)
               .fill("#FAFAFA");
           }
-
           const rowData = [
             (rowIndex + 1).toString(),
             item.material || item.id.substring(0, 8),
@@ -3632,211 +3592,167 @@ export class OfferController {
             `${formatNumber(grossTotalNum, 2)} ${offer.currency || "EUR"}`,
           ];
 
-          currentX = leftAlignX;
+          currentX = LEFT_X;
           rowData.forEach((data, colIndex) => {
-            const align: any = columns[colIndex].align;
-            let textX = currentX + 3;
-
-            if (align === "right") {
-              textX = currentX + columns[colIndex].width - 3;
-            } else if (align === "center") {
-              textX = currentX + columns[colIndex].width / 2;
-            }
-
-            if (colIndex === 3 && fontSource) {
-              try {
-                doc.font(fontSource, 0);
-              } catch (e) {
-                doc.font("Helvetica");
-              }
-            } else {
-              doc.font("Helvetica");
-            }
-
-            doc.fillColor("#000000");
-            doc.text(data, textX, currentY + 6, {
+            doc.font(R).fontSize(8.5).fillColor("#3F4446");
+            doc.text(data, currentX + 3, currentY + 5, {
               width: columns[colIndex].width - 6,
-              align: align,
+              align: columns[colIndex].align as any,
+              lineBreak: false,
             });
             currentX += columns[colIndex].width;
           });
 
-          doc.font("Helvetica");
-
           if (rowIndex < customerItems.length - 1) {
-            doc.lineWidth(0.5);
             doc
-              .moveTo(leftAlignX, currentY + computedRowHeight)
-              .lineTo(leftAlignX + tableWidth, currentY + computedRowHeight)
-              .stroke("#E0E0E0");
+              .moveTo(LEFT_X, currentY + computedRowHeight)
+              .lineTo(LEFT_X + tableWidth, currentY + computedRowHeight)
+              .lineWidth(0.3)
+              .strokeColor("#DEDEDE")
+              .stroke();
           }
 
           currentY += computedRowHeight;
         });
       }
 
-      doc.lineWidth(0.3);
+      // Draw bottom table boundary line
       doc
-        .moveTo(leftAlignX, currentY)
-        .lineTo(leftAlignX + tableWidth, currentY)
-        .stroke("#333333");
+        .moveTo(LEFT_X, currentY)
+        .lineTo(LEFT_X + tableWidth, currentY)
+        .lineWidth(0.5)
+        .strokeColor("#DEDEDE")
+        .stroke();
 
-      yPos = currentY + 30;
-      if (yPos + 150 > pageHeight - 120) {
+      // Total positioning calculations
+      yPos = currentY + 20;
+
+      // Ensure totals fit before the footer area (starts at MM(265) = 751pt)
+      if (yPos + 120 > MM(265)) {
         doc.addPage();
-        yPos = 60;
+        drawGtechBrandLayer(doc, gtechFonts);
+        yPos = MM(30);
       }
 
-      doc.fontSize(10).font("Helvetica");
-      doc.text("Gesamtpreis Netto", rightAlignX, yPos);
+      // Totals Block aligned to right (approx x = 340pt / MM(120), width = 200pt)
+      const TOTALS_LABEL_X = MM(120);
+      const TOTALS_VAL_X = MM(160);
+      const TOTALS_VAL_W = MM(32);
+
+      doc.font(R).fontSize(9.5).fillColor("#3F4446");
+
+      // Subtotal (Netto)
+      doc.text("Gesamtpreis Netto", TOTALS_LABEL_X, yPos);
       doc.text(
         `${Number(totals.subtotal || 0).toFixed(2)} ${offer.currency || "EUR"}`,
-        rightAlignX + 120,
+        TOTALS_VAL_X,
         yPos,
-        { align: "right" },
+        { align: "right", width: TOTALS_VAL_W }
       );
 
+      // Discount
       if (Number(totals.discountAmount || 0) > 0) {
-        yPos += 18;
-        doc.text(
-          `Rabatt (${offer.discountPercentage || 0}%)`,
-          rightAlignX,
-          yPos,
-        );
+        yPos += 16;
+        doc.text(`Rabatt (${offer.discountPercentage || 0}%)`, TOTALS_LABEL_X, yPos);
         doc.text(
           `-${Number(totals.discountAmount).toFixed(2)} ${offer.currency || "EUR"}`,
-          rightAlignX + 120,
+          TOTALS_VAL_X,
           yPos,
-          { align: "right" },
+          { align: "right", width: TOTALS_VAL_W }
         );
       }
 
+      // Shipping
       if (Number(totals.shippingCost || 0) > 0) {
-        yPos += 18;
-        doc.text("Versandkosten", rightAlignX, yPos);
+        yPos += 16;
+        doc.text("Versandkosten", TOTALS_LABEL_X, yPos);
         doc.text(
           `${Number(totals.shippingCost).toFixed(2)} ${offer.currency || "EUR"}`,
-          rightAlignX + 120,
+          TOTALS_VAL_X,
           yPos,
-          { align: "right" },
+          { align: "right", width: TOTALS_VAL_W }
         );
       }
 
+      // Tax (MwSt)
       const taxRatePercent = offer.taxRate ? Number(offer.taxRate) : 19;
-      yPos += 18;
-      doc.text(`MwSt. ${taxRatePercent.toFixed(2)}%`, rightAlignX, yPos);
+      yPos += 16;
+      doc.text(`MwSt. ${taxRatePercent.toFixed(2)}%`, TOTALS_LABEL_X, yPos);
       doc.text(
         `${Number(totals.taxAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
-        rightAlignX + 120,
+        TOTALS_VAL_X,
         yPos,
-        { align: "right" },
+        { align: "right", width: TOTALS_VAL_W }
       );
 
-      yPos += 20;
-      doc.lineWidth(0.3);
+      // Gross Total (Brutto) - Gray highlight box #ECEAE6 (GTech preference)
+      yPos += 22;
       doc
-        .rect(rightAlignX - 5, yPos - 3, 200, 22)
-        .fillAndStroke("#F5F5F5", "#CCCCCC");
-      doc.fontSize(11).font("Helvetica-Bold");
-      doc.fillColor("#000000");
-      doc.text("Gesamtpreis Brutto", rightAlignX, yPos + 5);
+        .rect(TOTALS_LABEL_X - 6, yPos - 4, MM(72), 22)
+        .fill("#ECEAE6");
+
+      doc.font(SB).fontSize(10).fillColor("#3F4446");
+      doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
       doc.text(
         `${Number(totals.totalAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
-        rightAlignX + 120,
-        yPos + 5,
-        { align: "right" },
+        TOTALS_VAL_X,
+        yPos,
+        { align: "right", width: TOTALS_VAL_W }
       );
+
+      // ── Notes & Terms ──────────────────────────────────────────
       yPos += 35;
       let notesHeight = 15;
       if (offer.paymentTerms) notesHeight += 15;
       if (offer.paymentMethod) notesHeight += 15;
-      if (offer.notes)
-        notesHeight +=
-          doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
-
-      if (yPos + notesHeight > pageHeight - 120) {
-        doc.addPage();
-        yPos = 60;
+      if (offer.notes) {
+        notesHeight += doc.heightOfString(`Hinweise: ${offer.notes}`, { width: CONTENT_WIDTH }) + 5;
       }
 
-      doc.fontSize(10).font("Helvetica");
-      doc.fillColor("#000000");
+      if (yPos + notesHeight > MM(265)) {
+        doc.addPage();
+        drawGtechBrandLayer(doc, gtechFonts);
+        yPos = MM(30);
+      }
 
-      doc.text("All prices are net prices.", leftAlignX, yPos);
-      yPos += 15;
+      doc.font(R).fontSize(9).fillColor("#3F4446");
+      doc.text("All prices are net prices.", LEFT_X, yPos);
+      yPos += 14;
 
       if (offer.paymentMethod) {
-        doc.text(`Zahlungsart: ${offer.paymentMethod}`, leftAlignX, yPos);
-        yPos += 15;
+        doc.text(`Zahlungsart: ${offer.paymentMethod}`, LEFT_X, yPos);
+        yPos += 14;
       }
 
       if (offer.paymentTerms) {
-        doc.text(
-          `Zahlungsbedingungen: ${offer.paymentTerms}`,
-          leftAlignX,
-          yPos,
-        );
-        yPos += 15;
+        doc.text(`Zahlungsbedingungen: ${offer.paymentTerms}`, LEFT_X, yPos);
+        yPos += 14;
       }
 
       if (offer.notes) {
-        doc.text(`Hinweise: ${offer.notes}`, leftAlignX, yPos, { width: 500 });
+        doc.text(`Hinweise: ${offer.notes}`, LEFT_X, yPos, { width: CONTENT_WIDTH });
       }
 
+      // ── Page Numbers loop ──────────────────────────────────────
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
         const pNum = i + 1;
 
-        const footerY = pageHeight - 120;
-        doc.lineWidth(0.5);
+        // Draw page numbers in the bottom margin per GTech spec
+        // Spec: x ≈ 180mm (510pt), y ≈ 285mm (808pt), Inter Regular 7pt #3F4446
         doc
-          .moveTo(leftAlignX, footerY - 15)
-          .lineTo(pageWidth - margin, footerY - 15)
-          .stroke("#CCCCCC");
-
-        doc.fontSize(8).fillColor("#666666");
-        if (fontSource) {
-          try {
-            doc.font(fontSource);
-          } catch (e) {
-            doc.font("Helvetica");
-          }
-        } else {
-          doc.font("Helvetica");
-        }
-
-        doc.font("Helvetica-Bold");
-        doc.text(companyInfo.name, leftAlignX, footerY);
-        doc.font("Helvetica");
-        doc.text(`IBAN: ${companyInfo.iban}`, leftAlignX, footerY + 12);
-        doc.text(`BIC: ${companyInfo.bic}`, leftAlignX, footerY + 24);
-        doc.text(companyInfo.bank, leftAlignX, footerY + 36);
-
-        doc.text(companyInfo.registrationNumber, centerColumnX, footerY);
-        doc.text(companyInfo.ceo, centerColumnX, footerY + 12);
-        doc.text(`Ust.-ID: ${companyInfo.vatId}`, centerColumnX, footerY + 24);
-        doc.text(
-          `SteuerNR: ${companyInfo.taxNumber}`,
-          centerColumnX,
-          footerY + 36,
-        );
-        doc.text(
-          `WEEE-Reg.-Nr. ${companyInfo.weeeNumber}`,
-          centerColumnX,
-          footerY + 48,
-        );
-
-        doc.text(`Angebotsnr:`, rightColumnX, footerY);
-        doc.font("Helvetica-Bold");
-        doc.text(`${offer.offerNumber || "N/A"}`, rightColumnX + 60, footerY);
-        doc.font("Helvetica");
-        doc.text(
-          `Seite ${pNum} / ${pages.count}`,
-          rightColumnX + 60,
-          footerY + 48,
-        );
+          .font(R)
+          .fontSize(7)
+          .fillColor("#3F4446")
+          .text(
+            `Seite ${pNum} / ${pages.count}`,
+            MM(180),
+            MM(282),
+            { align: "right", width: MM(12), lineBreak: false }
+          );
       }
+
 
       doc.end();
       await pdfWritePromise;
