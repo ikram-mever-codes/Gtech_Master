@@ -1225,8 +1225,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   Offer {offer.offerNumber}
                 </p>
               </div>
-              // header actions: handlePdf was defined but had no button — wire
-              it up
+
               <div className="flex items-center gap-4 flex-shrink-0">
                 <button
                   type="button"
