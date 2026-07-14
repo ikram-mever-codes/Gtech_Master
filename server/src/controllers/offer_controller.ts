@@ -3739,8 +3739,6 @@ export class OfferController {
         doc.switchToPage(i);
         const pNum = i + 1;
 
-        // Draw page numbers in the bottom margin per GTech spec
-        // Spec: x ≈ 180mm (510pt), y ≈ 285mm (808pt), Inter Regular 7pt #3F4446
         doc
           .font(R)
           .fontSize(7)

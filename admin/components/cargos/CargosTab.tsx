@@ -430,8 +430,16 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                 }
             });
 
+            let finalStatus = formData.cargo_status || "Open";
+            if (cleanFormData.shipped_at) {
+                finalStatus = "Shipped";
+            } else if (finalStatus === "Shipped") {
+                finalStatus = "Open";
+            }
+
             const payload: any = {
                 ...cleanFormData,
+                cargo_status: finalStatus,
                 orders: assignedOrderIds,
             };
 
@@ -447,6 +455,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
             setLoading(false);
         }
     };
+
 
     const handleDelete = async (id: number) => {
         if (!confirm("Are you sure you want to delete this cargo? This action cannot be undone.")) return;
@@ -941,7 +950,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Cargo No (Leave blank to auto-generate)
+                                    Cargo No (Leave blank auto-generate)
                                 </label>
                                 <input
                                     type="text"
@@ -969,20 +978,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Pickup Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={formatDateInput(formData.pickup_date)}
-                                    onChange={(e) => updateField("pickup_date", e.target.value || null)}
-                                    disabled={!isEditEnabled}
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Departure Date
+                                    ETD (Estimated Departure)
                                 </label>
                                 <input
                                     type="date"
@@ -992,6 +988,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                     className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                             </div>
+
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
