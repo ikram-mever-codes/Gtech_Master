@@ -1688,7 +1688,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Company Name (full legal name) *
