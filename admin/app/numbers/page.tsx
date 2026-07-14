@@ -23,6 +23,18 @@ import CustomButton from "@/components/UI/CustomButton";
 import ModalHeader from "@/components/UI/ModalHeader";
 import ModalFooter from "@/components/UI/ModalFooter";
 
+const ALL_SEQUENCE_KEYS: { key: string; label: string }[] = [
+  { key: "offer", label: "offer — Angebot" },
+  { key: "order", label: "order — Auftrag" },
+  { key: "transfer_order", label: "transfer_order — Bestellung" },
+  { key: "invoice", label: "invoice — Rechnung" },
+  { key: "invoice_correction", label: "invoice_correction — Rechnungskorrektur" },
+  { key: "delivery_note", label: "delivery_note — Lieferschein" },
+  { key: "customer", label: "customer — Kunden-Nr. (Customer Number)" },
+  { key: "cargo", label: "cargo — Cargo-Nr. (Cargo Number)" },
+  { key: "closed_ci", label: "closed_ci — Verifizierte CI-Nr." },
+];
+
 export default function NumberSequencesPage() {
   const [sequences, setSequences] = useState<NumberSequence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -371,25 +383,39 @@ export default function NumberSequencesPage() {
             onClose={resetForm}
           />
           <div className="p-6 space-y-4">
-            <div>
-              <label className={labelClass}>Sequence Key (Fixed once created)</label>
-              <select
-                value={sequenceKey}
-                onChange={(e) => setSequenceKey(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select a sequence key...</option>
-                <option value="offer">offer (Angebot)</option>
-                <option value="order">order (Auftrag)</option>
-                <option value="transfer_order">transfer_order (Bestellung)</option>
-                <option value="invoice">invoice (Rechnung)</option>
-                <option value="invoice_correction">invoice_correction (Rechnungskorrektur)</option>
-                <option value="delivery_note">delivery_note (Lieferschein)</option>
-                <option value="customer">customer (Kunden-Nr. / Customer Number)</option>
-                <option value="cargo">cargo (Cargo-Nr. / Cargo Number)</option>
-                <option value="closed_ci">closed_ci (Verifizierte CI-Nr.)</option>
-              </select>
-            </div>
+            {(() => {
+              const configuredKeys = new Set(sequences.map((s) => s.sequenceKey));
+              const openKeys = ALL_SEQUENCE_KEYS.filter((k) => !configuredKeys.has(k.key));
+              return (
+                <div>
+                  <label className={labelClass}>
+                    Sequence Key (Fixed once created)
+                    {openKeys.length === 0 ? (
+                      <span className="ml-2 text-[10px] text-green-600 font-normal normal-case">All keys configured ✓</span>
+                    ) : (
+                      <span className="ml-2 text-[10px] text-amber-500 font-normal normal-case">{openKeys.length} open key{openKeys.length !== 1 ? "s" : ""} available</span>
+                    )}
+                  </label>
+                  {openKeys.length === 0 ? (
+                    <div className="w-full px-4 py-2.5 border border-green-200 rounded-xl text-sm bg-green-50 text-green-700">
+                      ✓ All supported sequence keys are already configured.
+                    </div>
+                  ) : (
+                    <select
+                      value={sequenceKey}
+                      onChange={(e) => setSequenceKey(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Select an open sequence key...</option>
+                      {openKeys.map((k) => (
+                        <option key={k.key} value={k.key}>{k.label}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              );
+            })()}
+
             <div>
               <label className={labelClass}>Display Name</label>
               <input
