@@ -941,7 +941,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Cargo No
+                                    Cargo No (Leave blank to auto-generate)
                                 </label>
                                 <input
                                     type="text"
@@ -949,9 +949,10 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                     onChange={(e) => updateField("cargo_no", e.target.value)}
                                     disabled={!isEditEnabled}
                                     className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                    placeholder="Enter cargo number"
+                                    placeholder="Auto-generated if left blank"
                                 />
                             </div>
+
 
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1.5">

@@ -1671,7 +1671,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
               <div className="grid grid-cols-6 gap-4">
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer No
+                    Customer No (Leave blank to auto-generate)
                   </label>
                   <input
                     type="text"
@@ -1684,9 +1684,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     }
                     disabled={businessFieldDisabled}
                     className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium font-mono text-gray-800"
-                    placeholder="K-1001"
+                    placeholder="Auto-generated if left blank"
                   />
                 </div>
+
 
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">

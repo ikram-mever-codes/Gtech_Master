@@ -162,24 +162,16 @@ export function drawGtechBrandLayer(
     .lineWidth(markStyle.lineWidth)
     .strokeColor(markStyle.strokeColor)
     .stroke();
-
-  // ── Footer separator line ─────────────────────────────────────
-  // Spec: x=18mm, y≈265mm, w=174mm, 0.75pt, #3F4446
   doc
     .moveTo(mm(18), mm(265))
     .lineTo(mm(18) + mm(174), mm(265))
     .lineWidth(0.75)
     .strokeColor(COLOR_TEXT)
     .stroke();
-
-  // ── Footer text (3 columns) ────────────────────────────────────
-  // Spec: y≈270mm, Inter Regular 7.2pt, #3F4446
   doc.fontSize(7.2).font(reg).fillColor(COLOR_TEXT);
 
   const footerY = mm(268);
   const lineH = 9.5;
-
-  // Left column: x=18mm
   FOOTER.left.forEach((line, i) => {
     if (i === 0) doc.font(fontSemiBold(fonts));
     else doc.font(reg);
@@ -188,8 +180,6 @@ export function drawGtechBrandLayer(
       lineBreak: false,
     });
   });
-
-  // Center column: x=78mm
   doc.font(reg);
   FOOTER.center.forEach((line, i) => {
     doc.text(line, mm(78), footerY + i * lineH, {
@@ -197,8 +187,6 @@ export function drawGtechBrandLayer(
       lineBreak: false,
     });
   });
-
-  // Right column: x=150mm
   FOOTER.right.forEach((line, i) => {
     doc.text(line, mm(150), footerY + i * lineH, {
       width: mm(42),
