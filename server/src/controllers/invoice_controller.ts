@@ -15,6 +15,7 @@ import { In, Like } from "typeorm";
 import { getRMBPriceFromSupplier } from "./items_controller";
 import { WarehouseItem } from "../models/warehouse_items";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
+import { NumberSequenceService } from "../services/number_sequence_service";
 
 export class InvoiceController {
   static createInvoice = async (
@@ -1442,31 +1443,39 @@ export class InvoiceController {
       }
 
       if (!invoice.invoiceNumber || !invoice.invoiceNumber.startsWith("CI")) {
-        const allCisInvoices = await invoiceRepository.find({
-          where: {
-            invoiceNumber: Like("CI%")
-          }
-        });
+        let generatedNo = "";
+        try {
+          generatedNo = await NumberSequenceService.getNextNumber("closed_ci");
+        } catch (err) {
+          console.warn("Could not generate closed CI number using sequence service, falling back to manual generation:", err);
+          const allCisInvoices = await invoiceRepository.find({
+            where: {
+              invoiceNumber: Like("CI%")
+            }
+          });
 
-        let maxSeq = 0;
-        for (const inv of allCisInvoices) {
-          const numStr = inv.invoiceNumber;
-          if (numStr && numStr.length > 6) {
-            const seqStr = numStr.substring(6);
-            const seqVal = parseInt(seqStr, 10);
-            if (!isNaN(seqVal) && seqVal > maxSeq) {
-              maxSeq = seqVal;
+          let maxSeq = 0;
+          for (const inv of allCisInvoices) {
+            const numStr = inv.invoiceNumber;
+            if (numStr && numStr.length > 6) {
+              const seqStr = numStr.substring(6);
+              const seqVal = parseInt(seqStr, 10);
+              if (!isNaN(seqVal) && seqVal > maxSeq) {
+                maxSeq = seqVal;
+              }
             }
           }
+
+          const nextSeq = maxSeq + 1;
+          const now = new Date();
+          const yy = now.getFullYear().toString().slice(-2);
+          const mm = (now.getMonth() + 1).toString().padStart(2, "0");
+          const prefix = `CI${yy}${mm}`;
+          generatedNo = `${prefix}${nextSeq.toString().padStart(3, "0")}`;
         }
 
-        const nextSeq = maxSeq + 1;
-        const now = new Date();
-        const yy = now.getFullYear().toString().slice(-2);
-        const mm = (now.getMonth() + 1).toString().padStart(2, "0");
-        const prefix = `CI${yy}${mm}`;
-        invoice.invoiceNumber = `${prefix}${nextSeq.toString().padStart(3, "0")}`;
-        invoice.invoiceDate = now;
+        invoice.invoiceNumber = generatedNo;
+        invoice.invoiceDate = new Date();
 
         const pdfUrl = await InvoiceController.generateInvoicePDF(invoice);
         invoice.pdfUrl = pdfUrl;
