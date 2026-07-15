@@ -923,13 +923,27 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                 <div className="flex flex-col">
                     <ModalHeader
                         entityName="Cargo"
-                        entityNo={modalMode !== "create"
-                            ? `${formData.cargo_no || ""} ${selectedCustomer
-                                ? selectedCustomer.displayName || "GTech"
-                                : "GTech"
-                            } ${formData.cargo_status || "Open"}`
-                            : undefined
-                        }
+                        entityNo={modalMode !== "create" ? (
+                            <span className="flex items-center gap-2.5 font-semibold text-base sm:text-lg">
+                                <span className="text-[#8CC21B] font-mono font-bold">
+                                    {formData.cargo_no || "N/A"}
+                                </span>
+                                <span className="text-gray-300 font-normal">|</span>
+                                <span className="text-gray-600 font-medium">
+                                    {selectedCustomer ? selectedCustomer.displayName || "GTech" : "GTech"}
+                                </span>
+                                <span className="text-gray-300 font-normal">|</span>
+                                <span className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-bold select-none ${formData.cargo_status === "Delivered"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : formData.cargo_status === "Shipped"
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-blue-100 text-blue-800"
+                                    }`}>
+                                    {formData.cargo_status || "Open"}
+                                </span>
+                            </span>
+                        ) : undefined}
+
                         icon={Truck}
                         isEditMode={modalMode !== "create"}
                         isEditEnabled={isEditEnabled}
@@ -1090,5 +1104,4 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
         </div>
     );
 });
-
 export default CargosTab;
