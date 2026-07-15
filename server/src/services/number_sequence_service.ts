@@ -129,10 +129,15 @@ export class NumberSequenceService {
         where: { sequenceKey: def.sequenceKey },
       });
       if (!exists) {
+        const startNo = def.sequenceKey === "customer" ? 83777 : 1;
         await repo.save(
-          repo.create({ ...def, minDigits: def.minDigits, nextRunningNo: 1 }),
+          repo.create({ ...def, minDigits: def.minDigits, nextRunningNo: startNo }),
         );
+      } else if (def.sequenceKey === "customer" && exists.nextRunningNo < 83777) {
+        exists.nextRunningNo = 83777;
+        await repo.save(exists);
       }
     }
+
   }
 }

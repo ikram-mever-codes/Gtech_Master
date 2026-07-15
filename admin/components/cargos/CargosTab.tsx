@@ -492,6 +492,14 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
         }
     };
 
+    const handleMarkAsDeliveredClick = () => {
+        if (confirm("Are you sure you want to mark this cargo as Delivered?")) {
+            setFormData(prev => ({
+                ...prev,
+                cargo_status: "Delivered"
+            }));
+        }
+    };
 
     const handleCustomerChange = async (customerId: string | undefined) => {
         if (!customerId) {
@@ -1023,7 +1031,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                     <label className="block text-sm font-medium text-gray-700">
                                         Shipped At
                                     </label>
-                                    {isEditEnabled && formData.cargo_status !== "Shipped" && (
+                                    {isEditEnabled && formData.cargo_status !== "Shipped" && formData.cargo_status !== "Delivered" && (
                                         <button
                                             type="button"
                                             onClick={handleMarkAsShippedClick}
@@ -1032,6 +1040,16 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                             🚢 Ship Cargo
                                         </button>
                                     )}
+                                    {isEditEnabled && formData.cargo_status === "Shipped" && (
+                                        <button
+                                            type="button"
+                                            onClick={handleMarkAsDeliveredClick}
+                                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-all cursor-pointer"
+                                        >
+                                            📦 Deliver Cargo
+                                        </button>
+                                    )}
+
                                 </div>
                                 <input
                                     type="date"
