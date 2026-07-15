@@ -95,6 +95,13 @@ export class Customer {
   @Column({ unique: true, nullable: true })
   customerNumber?: string;
 
+  @Column({ name: "default_payment_method", nullable: true })
+  defaultPaymentMethod?: string;
+
+  @Column({ name: "default_shipping_method", nullable: true })
+  defaultShippingMethod?: string;
+
+
   @Column({ nullable: true })
   avatar?: string;
 

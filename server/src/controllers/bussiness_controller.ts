@@ -523,7 +523,10 @@ export const createBusiness = async (
       debtor_no,
       default_tax_profile_id,
       vat_id_status,
+      defaultPaymentMethod,
+      defaultShippingMethod,
     } = req.body;
+
 
     const user = (req as any).user;
 
@@ -697,6 +700,9 @@ export const createBusiness = async (
         customer.vat_id_status = vat_id_status || "unchecked";
         customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
         customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
+        customer.defaultPaymentMethod = defaultPaymentMethod ? defaultPaymentMethod.trim() : undefined;
+        customer.defaultShippingMethod = defaultShippingMethod ? defaultShippingMethod.trim() : undefined;
+
 
         if (isStarCustomer) {
           customer.stage = "star_customer";
@@ -1043,7 +1049,10 @@ export const updateBusiness = async (
       debtor_no,
       default_tax_profile_id,
       vat_id_status,
+      defaultPaymentMethod,
+      defaultShippingMethod,
     } = updateData;
+
 
     const user = (req as any).user;
 
@@ -1242,6 +1251,13 @@ export const updateBusiness = async (
         if (vat_id_status !== undefined) {
           customer.vat_id_status = vat_id_status || "unchecked";
         }
+        if (defaultPaymentMethod !== undefined) {
+          customer.defaultPaymentMethod = defaultPaymentMethod ? defaultPaymentMethod.trim() : undefined;
+        }
+        if (defaultShippingMethod !== undefined) {
+          customer.defaultShippingMethod = defaultShippingMethod ? defaultShippingMethod.trim() : undefined;
+        }
+
         if (asanaLink !== undefined) {
           customer.asanaLink = asanaLink ? asanaLink.trim() : null;
         }

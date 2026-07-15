@@ -1020,7 +1020,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </label>
                   <CustomerSearchInput
                     value={filterCustomerId}
-                    onChange={(id) => setFilterCustomerId(id)}
+                    onChange={(id) => {
+                      setFilterCustomerId(id);
+                      if (id) {
+                        const cust = customers.find((c) => String(c.id) === String(id));
+                        if (cust) {
+                          cPatch({
+                            paymentMethod: cust.defaultPaymentMethod || "",
+                            shippingMethod: cust.defaultShippingMethod || "",
+                          });
+                        }
+                      }
+                    }}
                     placeholder={
                       sourceType === "item"
                         ? "Select a customer..."
@@ -1047,7 +1058,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Recipient customer address preview (item flow) */}
               {sourceType === "item" && selectedCustomer && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
@@ -1119,8 +1129,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           setCreateForm((f: any) => ({
                             ...f,
                             title: inq.name,
+                            paymentMethod: inq.customer?.defaultPaymentMethod || f.paymentMethod || "",
+                            shippingMethod: inq.customer?.defaultShippingMethod || f.shippingMethod || "",
                           }));
                         }}
+
                         title={inq.name}
                         subtitle={`Customer: ${inq.customer?.companyName || "—"}`}
                         meta={`${inq.requests?.length || 0} items · ${inq.isAssembly ? "Assembly" : "Standard"
@@ -1397,7 +1410,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ deliveryTime: e.target.value })}
                     />
                   </Field>
-                  {/* Payment method — dropdown */}
                   <Field
                     label="Payment method"
                     edit={edit}
@@ -1416,7 +1428,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       ))}
                     </select>
                   </Field>
-                  {/* Shipping method — dropdown */}
                   <Field
                     label="Shipping method"
                     edit={edit}
