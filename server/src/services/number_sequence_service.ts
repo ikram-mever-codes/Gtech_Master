@@ -1,5 +1,22 @@
 import { AppDataSource } from "../config/database";
 import { NumberSequence } from "../models/number_sequence";
+import { Customer } from "../models/customers";
+import { Cargo } from "../models/cargos";
+import { Invoice } from "../models/invoice";
+import { Offer } from "../models/offer";
+import { Order } from "../models/orders";
+
+const entityMapping: Record<string, { entity: any; column: string }> = {
+  customer: { entity: Customer, column: "customerNumber" },
+  cargo: { entity: Cargo, column: "cargo_no" },
+  closed_ci: { entity: Invoice, column: "invoiceNumber" },
+  offer: { entity: Offer, column: "offerNumber" },
+  order: { entity: Order, column: "order_no" },
+  transfer_order: { entity: Order, column: "order_no" },
+  invoice: { entity: Invoice, column: "invoiceNumber" },
+  invoice_correction: { entity: Invoice, column: "invoiceNumber" },
+  delivery_note: { entity: Invoice, column: "invoiceNumber" },
+};
 
 export class NumberSequenceService {
   static async getNextNumber(sequenceKey: string): Promise<string> {
@@ -17,11 +34,36 @@ export class NumberSequenceService {
         throw new Error(`Number sequence "${sequenceKey}" is not active`);
       }
 
-      const runningNo = sequence.nextRunningNo;
+      let runningNo = sequence.nextRunningNo;
+      let generatedNumber = "";
+      let isDuplicate = true;
+
+      const mapping = entityMapping[sequenceKey];
+
+      while (isDuplicate) {
+        generatedNumber = this.formatNumber(sequence, runningNo);
+
+        if (mapping) {
+          const existing = await manager.getRepository(mapping.entity)
+            .createQueryBuilder("entity")
+            .where(`entity.${mapping.column} = :val`, { val: generatedNumber })
+            .getOne();
+
+          if (existing) {
+            // Already taken, increment running number and check again
+            runningNo++;
+          } else {
+            isDuplicate = false;
+          }
+        } else {
+          isDuplicate = false;
+        }
+      }
+
       sequence.nextRunningNo = runningNo + 1;
       await manager.save(sequence);
 
-      return this.formatNumber(sequence, runningNo);
+      return generatedNumber;
     });
   }
 
@@ -87,10 +129,15 @@ export class NumberSequenceService {
         where: { sequenceKey: def.sequenceKey },
       });
       if (!exists) {
+        const startNo = def.sequenceKey === "customer" ? 83777 : 1;
         await repo.save(
-          repo.create({ ...def, minDigits: def.minDigits, nextRunningNo: 1 }),
+          repo.create({ ...def, minDigits: def.minDigits, nextRunningNo: startNo }),
         );
+      } else if (def.sequenceKey === "customer" && exists.nextRunningNo < 83777) {
+        exists.nextRunningNo = 83777;
+        await repo.save(exists);
       }
     }
+
   }
 }

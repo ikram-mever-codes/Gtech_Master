@@ -5,7 +5,7 @@ import ViewEditToggle from "./ViewEditToggle";
 
 interface ModalHeaderProps {
   entityName: string;
-  entityNo?: string | number | null;
+  entityNo?: React.ReactNode;
   icon?: React.ComponentType<any>;
   isEditMode: boolean;
   isEditEnabled: boolean;
@@ -24,8 +24,6 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
   onClose,
   extraHeaderElements,
 }) => {
-  const titleText = entityNo ? `${entityName} ${entityNo}` : entityName;
-
   return (
     <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
       <div className="flex items-center gap-3 min-w-0">
@@ -35,8 +33,9 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
           </div>
         )}
         <div className="flex items-center gap-2.5 min-w-0">
-          <h2 className="text-xl font-bold text-gray-900 truncate">
-            {titleText}
+          <h2 className="text-xl font-bold text-gray-900 truncate flex items-center gap-2">
+            <span>{entityName}</span>
+            {entityNo && <span className="inline-flex items-center gap-2">{entityNo}</span>}
           </h2>
           {extraHeaderElements}
         </div>
