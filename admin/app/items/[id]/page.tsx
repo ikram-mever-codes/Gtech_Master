@@ -1016,7 +1016,9 @@ const ItemDetailsPage = () => {
           is_SnSI: updatedData.others?.isSnSI ? "Y" : "N",
           item_no_de: updatedData.others?.noDE,
           item_name_de: updatedData.others?.nameDE,
+          item_name_en: updatedData.others?.nameEN,
         },
+
         photo: updatedData.pictures?.shopPicture,
         pix_path: updatedData.pictures?.pixPath,
         pix_path_eBay: updatedData.pictures?.ebayPictures,

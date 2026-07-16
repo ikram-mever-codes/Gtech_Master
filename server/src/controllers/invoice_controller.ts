@@ -452,6 +452,14 @@ export class InvoiceController {
           leftAlignX,
           yPos
         );
+        yPos += 15;
+        const dueDays = invoice.customer?.defaultPaymentDueDays !== undefined && invoice.customer?.defaultPaymentDueDays !== null ? invoice.customer.defaultPaymentDueDays : 7;
+        doc.text(
+          `Zahlungsziel: ${dueDays} Tage`,
+          leftAlignX,
+          yPos
+        );
+
 
         if (invoice.notes) {
           yPos += 15;

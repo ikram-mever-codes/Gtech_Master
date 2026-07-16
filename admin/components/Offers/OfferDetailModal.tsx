@@ -347,7 +347,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     baseQuantity: string;
   }>({ itemName: "", baseQuantity: "1" });
 
-  // --- Create-picker state (only used while isCreate) ----------------------
   const [creating, setCreating] = useState(false);
   const [sourceType, setSourceType] = useState<SourceType>("inquiry");
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -365,6 +364,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       .split("T")[0],
     paymentMethod: "",
     shippingMethod: "",
+    paymentTerms: "",
     useUnitPrices: true,
     unitPriceDecimalPlaces: 3,
     totalPriceDecimalPlaces: 2,
@@ -450,12 +450,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         .split("T")[0],
       paymentMethod: "",
       shippingMethod: "",
+      paymentTerms: "",
       useUnitPrices: true,
       unitPriceDecimalPlaces: 3,
       totalPriceDecimalPlaces: 2,
       maxUnitPriceColumns: 3,
     });
   }
+
 
   function buildForm(o: any) {
     return {
@@ -563,6 +565,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         validUntil: createForm.validUntil,
         paymentMethod: createForm.paymentMethod || undefined,
         shippingMethod: createForm.shippingMethod || undefined,
+        paymentTerms: createForm.paymentTerms || undefined,
         useUnitPrices: createForm.useUnitPrices,
         unitPriceDecimalPlaces: createForm.unitPriceDecimalPlaces,
         totalPriceDecimalPlaces: createForm.totalPriceDecimalPlaces,
@@ -1028,10 +1031,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           cPatch({
                             paymentMethod: cust.defaultPaymentMethod || "",
                             shippingMethod: cust.defaultShippingMethod || "",
+                            paymentTerms: `${cust.defaultPaymentDueDays !== undefined && cust.defaultPaymentDueDays !== null ? cust.defaultPaymentDueDays : 7} Tage netto`,
                           });
                         }
                       }
                     }}
+
                     placeholder={
                       sourceType === "item"
                         ? "Select a customer..."
@@ -1131,8 +1136,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             title: inq.name,
                             paymentMethod: inq.customer?.defaultPaymentMethod || f.paymentMethod || "",
                             shippingMethod: inq.customer?.defaultShippingMethod || f.shippingMethod || "",
+                            paymentTerms: inq.customer?.defaultPaymentDueDays !== undefined && inq.customer?.defaultPaymentDueDays !== null ? `${inq.customer.defaultPaymentDueDays} Tage netto` : (f.paymentTerms || ""),
                           }));
                         }}
+
 
                         title={inq.name}
                         subtitle={`Customer: ${inq.customer?.companyName || "—"}`}

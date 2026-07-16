@@ -1384,11 +1384,11 @@ export const updateItem = async (
     }
 
     const warehouseItemData = req.body.warehouseItemData;
-    if (warehouseItemData) {
-      let warehouseItem = await warehouseRepository.findOne({
-        where: { item_id: item.id },
-      });
-      if (warehouseItem) {
+    let warehouseItem = await warehouseRepository.findOne({
+      where: { item_id: item.id },
+    });
+    if (warehouseItem) {
+      if (warehouseItemData) {
         Object.assign(warehouseItem, {
           is_stock_item:
             warehouseItemData.is_stock_item ?? warehouseItem.is_stock_item,
@@ -1402,11 +1402,20 @@ export const updateItem = async (
           item_no_de: warehouseItemData.item_no_de ?? warehouseItem.item_no_de,
           item_name_de:
             warehouseItemData.item_name_de ?? warehouseItem.item_name_de,
+          item_name_en:
+            warehouseItemData.item_name_en ?? warehouseItem.item_name_en,
+          is_no_auto_order:
+            warehouseItemData.is_no_auto_order ?? warehouseItem.is_no_auto_order,
+          is_SnSI:
+            warehouseItemData.is_SnSI ?? warehouseItem.is_SnSI,
         });
-        await warehouseRepository.save(warehouseItem);
       }
-    }
+      if (item.item_name && warehouseItem.item_name_en !== item.item_name && (!warehouseItemData || !warehouseItemData.item_name_en)) {
+        warehouseItem.item_name_en = item.item_name;
+      }
 
+      await warehouseRepository.save(warehouseItem);
+    }
     return res.status(200).json({
       success: true,
       message: "Item updated successfully",

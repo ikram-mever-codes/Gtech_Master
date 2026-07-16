@@ -294,7 +294,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
     vat_id_status: "unchecked",
     defaultPaymentMethod: "",
     defaultShippingMethod: "",
+    defaultPaymentDueDays: 7,
   };
+
   const [businessForm, setBusinessForm] = useState<any>({
     ...emptyBusinessForm,
   });
@@ -304,7 +306,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
   const [newBusinessTags, setNewBusinessTags] = useState<Tag[]>([]);
   const [newContactTags, setNewContactTags] = useState<Tag[]>([]);
-
 
   const [urlParamHandled, setUrlParamHandled] = useState(false);
   const [displayNameHandled, setDisplayNameHandled] = useState(false);
@@ -950,6 +951,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         vat_id_status: businessForm.vat_id_status,
         defaultPaymentMethod: businessForm.defaultPaymentMethod || null,
         defaultShippingMethod: businessForm.defaultShippingMethod || null,
+        defaultPaymentDueDays: businessForm.defaultPaymentDueDays !== undefined && businessForm.defaultPaymentDueDays !== null ? parseInt(businessForm.defaultPaymentDueDays) : 7,
       };
 
       if (businessModalMode === "edit" && editingBusinessId) {
@@ -2083,6 +2085,27 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         ))}
                       </select>
                     </div>
+
+                    <div className="col-span-6 md:col-span-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Payment Due (in days)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={businessForm.defaultPaymentDueDays !== undefined ? businessForm.defaultPaymentDueDays : 7}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            defaultPaymentDueDays: e.target.value !== "" ? parseInt(e.target.value) : "",
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
+                        placeholder="7"
+                      />
+                    </div>
+
 
 
                     <div className="col-span-6 md:col-span-3">
