@@ -525,7 +525,9 @@ export const createBusiness = async (
       vat_id_status,
       defaultPaymentMethod,
       defaultShippingMethod,
+      defaultPaymentDueDays,
     } = req.body;
+
 
 
     const user = (req as any).user;
@@ -702,7 +704,7 @@ export const createBusiness = async (
         customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
         customer.defaultPaymentMethod = defaultPaymentMethod ? defaultPaymentMethod.trim() : undefined;
         customer.defaultShippingMethod = defaultShippingMethod ? defaultShippingMethod.trim() : undefined;
-
+        customer.defaultPaymentDueDays = defaultPaymentDueDays !== undefined && defaultPaymentDueDays !== null ? parseInt(defaultPaymentDueDays) : 7;
 
         if (isStarCustomer) {
           customer.stage = "star_customer";
@@ -1051,7 +1053,9 @@ export const updateBusiness = async (
       vat_id_status,
       defaultPaymentMethod,
       defaultShippingMethod,
+      defaultPaymentDueDays,
     } = updateData;
+
 
 
     const user = (req as any).user;
@@ -1256,6 +1260,9 @@ export const updateBusiness = async (
         }
         if (defaultShippingMethod !== undefined) {
           customer.defaultShippingMethod = defaultShippingMethod ? defaultShippingMethod.trim() : undefined;
+        }
+        if (defaultPaymentDueDays !== undefined) {
+          customer.defaultPaymentDueDays = defaultPaymentDueDays !== null && defaultPaymentDueDays !== "" ? parseInt(defaultPaymentDueDays) : 7;
         }
 
         if (asanaLink !== undefined) {

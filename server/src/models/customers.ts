@@ -101,6 +101,8 @@ export class Customer {
   @Column({ name: "default_shipping_method", nullable: true })
   defaultShippingMethod?: string;
 
+  @Column({ name: "default_payment_due_days", type: "int", default: 7 })
+  defaultPaymentDueDays!: number;
 
   @Column({ nullable: true })
   avatar?: string;

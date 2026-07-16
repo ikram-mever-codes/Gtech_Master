@@ -385,6 +385,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     paymentMethod: "",
     shippingMethod: "",
     pricingMode: "classic" as PricingMode,
+    paymentTerms: "",
+    useUnitPrices: true,
     unitPriceDecimalPlaces: 3,
     totalPriceDecimalPlaces: 2,
     maxUnitPriceColumns: 3,
@@ -466,6 +468,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       paymentMethod: "",
       shippingMethod: "",
       pricingMode: "classic",
+      paymentTerms: "",
+      useUnitPrices: true,
       unitPriceDecimalPlaces: 3,
       totalPriceDecimalPlaces: 2,
       maxUnitPriceColumns: 3,
@@ -572,6 +576,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         paymentMethod: createForm.paymentMethod || undefined,
         shippingMethod: createForm.shippingMethod || undefined,
         pricingMode: createForm.pricingMode,
+        paymentTerms: createForm.paymentTerms || undefined,
+        useUnitPrices: createForm.useUnitPrices,
         unitPriceDecimalPlaces: createForm.unitPriceDecimalPlaces,
         totalPriceDecimalPlaces: createForm.totalPriceDecimalPlaces,
         maxUnitPriceColumns: createForm.maxUnitPriceColumns,
@@ -967,11 +973,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     onChange={(id) => {
                       setFilterCustomerId(id);
                       if (id) {
-                        const cust = customers.find((c) => String(c.id) === String(id));
+                        const cust = customers.find(
+                          (c) => String(c.id) === String(id),
+                        );
                         if (cust) {
                           cPatch({
                             paymentMethod: cust.defaultPaymentMethod || "",
                             shippingMethod: cust.defaultShippingMethod || "",
+                            paymentTerms: `${cust.defaultPaymentDueDays !== undefined && cust.defaultPaymentDueDays !== null ? cust.defaultPaymentDueDays : 7} Tage netto`,
                           });
                         }
                       }
@@ -1072,11 +1081,22 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           setCreateForm((f: any) => ({
                             ...f,
                             title: inq.name,
-                            paymentMethod: inq.customer?.defaultPaymentMethod || f.paymentMethod || "",
-                            shippingMethod: inq.customer?.defaultShippingMethod || f.shippingMethod || "",
+                            paymentMethod:
+                              inq.customer?.defaultPaymentMethod ||
+                              f.paymentMethod ||
+                              "",
+                            shippingMethod:
+                              inq.customer?.defaultShippingMethod ||
+                              f.shippingMethod ||
+                              "",
+                            paymentTerms:
+                              inq.customer?.defaultPaymentDueDays !==
+                                undefined &&
+                              inq.customer?.defaultPaymentDueDays !== null
+                                ? `${inq.customer.defaultPaymentDueDays} Tage netto`
+                                : f.paymentTerms || "",
                           }));
                         }}
-
                         title={inq.name}
                         subtitle={`Customer: ${inq.customer?.companyName || "—"}`}
                         meta={`${inq.requests?.length || 0} items · ${inq.isAssembly ? "Assembly" : "Standard"}`}
@@ -1229,7 +1249,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       : "Classic pricing"}
                   </span>
                   {displayInquiryNo && (
-                    <span className="text-sm font-bold text-gray-900 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
+                    <span className="text-sm font-bold text-gray-900 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
                       <LinkIcon className="h-3 w-3" />
                       {displayInquiryNo}
                     </span>
