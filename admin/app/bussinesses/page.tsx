@@ -64,6 +64,9 @@ import {
   type SearchFilters,
 } from "@/api/bussiness";
 import { getAllCountries } from "@/api/countries";
+import { getAllPaymentMethods } from "@/api/payment_methods";
+import { getAllShippingMethods } from "@/api/shipping_methods";
+
 import { ShippingAddressManager } from "@/components/Businesses/ShippingAddressManager";
 import {
   getAllContactPersons,
@@ -289,14 +292,19 @@ const CombinedBusinessContactsContent: React.FC = () => {
     debtor_no: "",
     default_tax_profile_id: "",
     vat_id_status: "unchecked",
+    defaultPaymentMethod: "",
+    defaultShippingMethod: "",
   };
   const [businessForm, setBusinessForm] = useState<any>({
     ...emptyBusinessForm,
   });
   const [taxProfiles, setTaxProfiles] = useState<any[]>([]);
   const [dbCountries, setDbCountries] = useState<any[]>([]);
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
+  const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
   const [newBusinessTags, setNewBusinessTags] = useState<Tag[]>([]);
   const [newContactTags, setNewContactTags] = useState<Tag[]>([]);
+
 
   const [urlParamHandled, setUrlParamHandled] = useState(false);
   const [displayNameHandled, setDisplayNameHandled] = useState(false);
@@ -420,9 +428,23 @@ const CombinedBusinessContactsContent: React.FC = () => {
         console.error("Failed to load countries", error);
       }
     };
+    const loadPaymentAndShippingMethods = async () => {
+      try {
+        const [pmRes, smRes]: any = await Promise.all([
+          getAllPaymentMethods(true).catch(() => ({ data: [] })),
+          getAllShippingMethods(true).catch(() => ({ data: [] })),
+        ]);
+        setDbPaymentMethods(Array.isArray(pmRes?.data) ? pmRes.data.filter((pm: any) => pm.is_active) : []);
+        setDbShippingMethods(Array.isArray(smRes?.data) ? smRes.data.filter((sm: any) => sm.is_active) : []);
+      } catch (e) {
+        console.error("Failed to load payment/shipping methods:", e);
+      }
+    };
     loadTaxProfiles();
     loadCountries();
+    loadPaymentAndShippingMethods();
   }, []);
+
 
   const filteredBusinesses = useMemo(() => {
     const cn = clientFilters.companyName.trim().toLowerCase();
@@ -888,7 +910,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
       debtor_no: business.debtor_no || "",
       default_tax_profile_id: business.default_tax_profile_id || "",
       vat_id_status: business.vat_id_status || "unchecked",
+      defaultPaymentMethod: business.defaultPaymentMethod || "",
+      defaultShippingMethod: business.defaultShippingMethod || "",
     });
+
 
     setNewBusinessTags(business.tags || []);
     displayNameTouched.current = true;
@@ -923,7 +948,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
         debtor_no: businessForm.debtor_no,
         default_tax_profile_id: businessForm.default_tax_profile_id || null,
         vat_id_status: businessForm.vat_id_status,
+        defaultPaymentMethod: businessForm.defaultPaymentMethod || null,
+        defaultShippingMethod: businessForm.defaultShippingMethod || null,
       };
+
       if (businessModalMode === "edit" && editingBusinessId) {
         await updateBusiness(editingBusinessId, payload);
       } else {
@@ -2007,6 +2035,55 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         ))}
                       </select>
                     </div>
+
+                    <div className="col-span-6 md:col-span-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Default Payment Method
+                      </label>
+                      <select
+                        value={businessForm.defaultPaymentMethod || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            defaultPaymentMethod: e.target.value || "",
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                      >
+                        <option value="">None / Not Assigned</option>
+                        {(dbPaymentMethods.length > 0 ? dbPaymentMethods.map((pm: any) => pm.name) : ["Prepayment", "Bank transfer", "Cash on delivery", "Invoice", "Credit card", "PayPal"]).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-6 md:col-span-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Default Shipping Method
+                      </label>
+                      <select
+                        value={businessForm.defaultShippingMethod || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            defaultShippingMethod: e.target.value || "",
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                      >
+                        <option value="">None / Not Assigned</option>
+                        {(dbShippingMethods.length > 0 ? dbShippingMethods.map((sm: any) => sm.name) : ["Standard shipping", "Express shipping", "Freight", "Courier", "Pickup"]).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
 
                     <div className="col-span-6 md:col-span-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">

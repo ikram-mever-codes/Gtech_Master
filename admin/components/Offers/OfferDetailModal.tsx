@@ -964,7 +964,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </label>
                   <CustomerSearchInput
                     value={filterCustomerId}
-                    onChange={(id) => setFilterCustomerId(id)}
+                    onChange={(id) => {
+                      setFilterCustomerId(id);
+                      if (id) {
+                        const cust = customers.find((c) => String(c.id) === String(id));
+                        if (cust) {
+                          cPatch({
+                            paymentMethod: cust.defaultPaymentMethod || "",
+                            shippingMethod: cust.defaultShippingMethod || "",
+                          });
+                        }
+                      }
+                    }}
                     placeholder={
                       sourceType === "item"
                         ? "Select a customer..."
@@ -1061,8 +1072,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           setCreateForm((f: any) => ({
                             ...f,
                             title: inq.name,
+                            paymentMethod: inq.customer?.defaultPaymentMethod || f.paymentMethod || "",
+                            shippingMethod: inq.customer?.defaultShippingMethod || f.shippingMethod || "",
                           }));
                         }}
+
                         title={inq.name}
                         subtitle={`Customer: ${inq.customer?.companyName || "—"}`}
                         meta={`${inq.requests?.length || 0} items · ${inq.isAssembly ? "Assembly" : "Standard"}`}

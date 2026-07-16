@@ -35,10 +35,39 @@ export class NumberSequenceService {
       }
 
       let runningNo = sequence.nextRunningNo;
+      const mapping = entityMapping[sequenceKey];
+
+      if (mapping) {
+        const maxRecord = await manager.getRepository(mapping.entity)
+          .createQueryBuilder("entity")
+          .orderBy(`entity.${mapping.column}`, "DESC")
+          .getOne();
+
+        const defaultStart = sequenceKey === "customer" ? 83777 : 1;
+
+        if (!maxRecord) {
+          runningNo = defaultStart;
+        } else {
+          const maxVal = maxRecord[mapping.column];
+          const match = String(maxVal).match(/\d+$/);
+          if (match) {
+            let maxNum = parseInt(match[0], 10);
+
+            if (sequenceKey === "closed_ci" && match[0].length > sequence.minDigits) {
+              const suffix = match[0].slice(-sequence.minDigits);
+              maxNum = parseInt(suffix, 10);
+            }
+
+            const nextAligned = maxNum + 1;
+            if (runningNo > nextAligned) {
+              runningNo = Math.max(defaultStart, nextAligned);
+            }
+          }
+        }
+      }
+
       let generatedNumber = "";
       let isDuplicate = true;
-
-      const mapping = entityMapping[sequenceKey];
 
       while (isDuplicate) {
         generatedNumber = this.formatNumber(sequence, runningNo);
@@ -50,7 +79,6 @@ export class NumberSequenceService {
             .getOne();
 
           if (existing) {
-            // Already taken, increment running number and check again
             runningNo++;
           } else {
             isDuplicate = false;
@@ -66,6 +94,7 @@ export class NumberSequenceService {
       return generatedNumber;
     });
   }
+
 
   private static formatNumber(
     sequence: NumberSequence,
@@ -85,8 +114,6 @@ export class NumberSequenceService {
       .replace("{number}", number);
   }
 
-  // Run once (e.g. on app bootstrap or via a migration) to create the
-  // sequences for Customer Documents.
   static async seedDefaultSequences(): Promise<void> {
     const repo = AppDataSource.getRepository(NumberSequence);
     const defaults = [

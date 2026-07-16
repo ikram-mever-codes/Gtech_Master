@@ -373,7 +373,30 @@ const InvoiceGenerator: React.FC = () => {
                             setSelectedCustomer(customer);
                             setCustomerSearchTerm(customer.companyName);
                             setShowCustomerDropdown(false);
+                            setInvoiceData((prev) => {
+                              const pm = (customer as any).defaultPaymentMethod;
+                              const sm = (customer as any).defaultShippingMethod;
+                              const updated = { ...prev };
+                              if (pm) {
+                                const lowerPm = pm.toLowerCase().replace(/\s+/g, "_");
+                                if (["bank_transfer", "credit_card", "cash", "check"].includes(lowerPm)) {
+                                  updated.paymentMethod = lowerPm;
+                                } else {
+                                  updated.paymentMethod = pm;
+                                }
+                              }
+                              if (sm) {
+                                const lowerSm = sm.toLowerCase().replace(/\s+/g, "_");
+                                if (["standard", "express", "overnight", "pickup"].includes(lowerSm)) {
+                                  updated.shippingMethod = lowerSm;
+                                } else {
+                                  updated.shippingMethod = sm;
+                                }
+                              }
+                              return updated;
+                            });
                           }}
+
                           className="p-4 cursor-pointer border-b last:border-b-0 transition-colors duration-150 hover:bg-[#F8F9FA]"
                           style={{ borderColor: "#F1F3F5" }}
                         >
@@ -748,8 +771,6 @@ const InvoiceGenerator: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Enhanced Invoice Items */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
