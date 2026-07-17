@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Inquiry } from "./inquiry";
 import { Customer } from "./customers";
 import { numericTransformer } from "../utils/numeric-transformer";
+import { parseFlexibleNumber } from "../utils/decimal";
 
 export type OfferStatus =
   | "Draft"
@@ -502,12 +503,10 @@ export class OfferLineItem {
       }
     }
 
-    // Classic mode never carries a null price/quantity past this point.
     const price = Number(this.basePrice) || 0;
-    const quantity = parseFloat(this.baseQuantity || "1") || 1;
+    const quantity = parseFlexibleNumber(this.baseQuantity) || 1;
     this.lineTotal = price * quantity;
   }
-
   getLineTotal(pricingMode?: PricingMode): number {
     this.calculateLineTotal(pricingMode);
     return this.lineTotal || 0;
