@@ -707,7 +707,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <img
                       src={getThumb(previewItem)!}
                       alt="thumb"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-white"
+
                       onError={(e) =>
                         ((e.target as HTMLImageElement).style.display = "none")
                       }

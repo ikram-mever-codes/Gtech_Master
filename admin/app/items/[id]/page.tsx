@@ -2697,7 +2697,8 @@ const ItemDetailsPage = () => {
                         <img
                           src={getCorrectUrl(pic.url)}
                           alt={`Item ${index + 1}`}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain bg-white"
+
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.src =
