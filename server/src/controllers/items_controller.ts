@@ -170,7 +170,7 @@ export const getItems = async (
     const isActive = ((req.query.isActive as string) || "").trim();
     const category = ((req.query.category as string) || "").trim();
     const supplier = ((req.query.supplier as string) || "").trim();
-    const company = ((req.query.company as string) || "").trim(); // customer_id
+    const company = ((req.query.company as string) || "").trim();
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
 
@@ -243,7 +243,6 @@ export const getItems = async (
       idQb.andWhere("item.isActive = :isActive", { isActive });
     }
 
-    // Category by name
     if (category) {
       idQb.andWhere(
         "(category.name = :category OR item.supp_cat = :category)",
@@ -251,12 +250,10 @@ export const getItems = async (
       );
     }
 
-    // Supplier
     if (supplier) {
       idQb.andWhere("item.supplier_id = :supplier", { supplier });
     }
 
-    // Company (customer)
     if (company) {
       const companyStr = (company as string).trim();
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyStr);
@@ -270,7 +267,6 @@ export const getItems = async (
       }
     }
 
-    // isLabel — tolerant of boolean / tinyint / 'Y'/'N' storage
     if (isLabel === "Y") {
       idQb.andWhere("item.isLabelPrint IN (:...labelTrue)", {
         labelTrue: [1, "1", "Y", true],
@@ -282,7 +278,6 @@ export const getItems = async (
       );
     }
 
-    // Tags — include
     incTags.forEach((tid, i) => {
       idQb.andWhere((qb2) => {
         const sub = qb2
@@ -297,7 +292,6 @@ export const getItems = async (
       idQb.setParameter(`incTag${i}`, tid);
     });
 
-    // Tags — exclude
     if (excTags.length) {
       idQb.andWhere((qb2) => {
         const sub = qb2

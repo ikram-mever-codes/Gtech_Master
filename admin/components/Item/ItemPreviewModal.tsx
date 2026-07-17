@@ -127,10 +127,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-        item?.pix_path_eBay ||
-        item?.pictures?.shopPicture ||
-        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-        null,
+      item?.pix_path_eBay ||
+      item?.pictures?.shopPicture ||
+      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+      null,
     );
 
   const getCompany = (item: any) =>
@@ -144,7 +144,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
     item?.company ||
     "";
 
-  // Searchable customer options for the Company dropdown (deduped + sorted).
   const customerOptions = useMemo(() => {
     const seen = new Map<string, { value: string; label: string }>();
     customers
@@ -187,10 +186,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           parent_id: raw.parent_id || null,
           parent: raw.parent
             ? {
-                ...raw.parent,
-                de_no: raw.parent.de_no,
-                name_de: raw.parent.name_de,
-              }
+              ...raw.parent,
+              de_no: raw.parent.de_no,
+              name_de: raw.parent.name_de,
+            }
             : null,
           item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
@@ -228,10 +227,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           (si: any) =>
             si.isDefault || Number(si.supplierId) === Number(activeSupplierId),
         );
-
-        // --- Defensive field mapping ---------------------------------------
-        // getItemById may not flatten these the way the list endpoint does,
-        // so pull each value from every plausible location with fallbacks.
         const catName =
           (typeof raw.category === "string"
             ? raw.category
@@ -272,23 +267,23 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             raw.supplierItem ||
             (def
               ? {
-                  priceRMB: def.priceRMB || "0",
-                  isPO: def.isPO || "No",
-                  moq: def.moq || "0",
-                  interval: def.interval || "0",
-                  leadTime: def.leadTime || "",
-                  noteCN: def.noteCN || "",
-                  url: def.url || "",
-                }
+                priceRMB: def.priceRMB || "0",
+                isPO: def.isPO || "No",
+                moq: def.moq || "0",
+                interval: def.interval || "0",
+                leadTime: def.leadTime || "",
+                noteCN: def.noteCN || "",
+                url: def.url || "",
+              }
               : {
-                  priceRMB: "0",
-                  isPO: "No",
-                  moq: "0",
-                  interval: "0",
-                  leadTime: "",
-                  noteCN: "",
-                  url: "",
-                }),
+                priceRMB: "0",
+                isPO: "No",
+                moq: "0",
+                interval: "0",
+                leadTime: "",
+                noteCN: "",
+                url: "",
+              }),
           parent: raw.parent
             ? { ...raw.parent, isActive: toBool(raw.parent?.isActive) }
             : null,
@@ -320,7 +315,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Always open in view mode — edit must be explicitly enabled each time.
     setPreviewEdit(false);
 
     const loadOptions = async () => {
@@ -699,7 +693,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           </div>
         ) : (
           <>
-            {/* Header with thumbnail, title, toggle, and close */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
@@ -742,8 +735,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </button>
               </div>
             </div>
-
-            {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-5">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
@@ -759,10 +750,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     setPreviewItem((p: any) =>
                       p
                         ? {
-                            ...p,
-                            tags: newTags,
-                            tagOrder: newTags.map((t) => t.id).join(","),
-                          }
+                          ...p,
+                          tags: newTags,
+                          tagOrder: newTags.map((t) => t.id).join(","),
+                        }
                         : p,
                     )
                   }
@@ -1175,7 +1166,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   />
                 </div>
                 {!previewItem?.attachments ||
-                previewItem.attachments.length === 0 ? (
+                  previewItem.attachments.length === 0 ? (
                   <p className="text-xs text-gray-400">
                     No attachments for this item.
                   </p>
@@ -1253,13 +1244,13 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                           <img
                             src={resolveUrl(url)!}
                             alt={`pic-${i}`}
-                            className="w-full h-full object-cover cursor-pointer"
+                            className="w-full h-full object-contain bg-white cursor-pointer"
                             onClick={() =>
                               window.open(resolveUrl(url)!, "_blank")
                             }
                             onError={(e) =>
-                              ((e.target as HTMLImageElement).src =
-                                "https://placehold.co/200x200?text=—")
+                            ((e.target as HTMLImageElement).src =
+                              "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>
@@ -1268,7 +1259,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   );
                 })()}
               </div>
-              {/* Footer */}
               <div className="flex justify-between gap-2 pt-6 mt-6 border-t">
                 <div>
                   {previewEdit && (
