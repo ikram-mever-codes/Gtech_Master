@@ -1652,17 +1652,22 @@ export const generateCommercialInvoicePDF = async (
     const customer = invoice.customer || cargo?.customer;
     const customerAddress = resolveCustomerAddress(customer);
 
+    const GTECH_GMBH = {
+      name: "GTech Industries GmbH",
+      street: "Antonio-Segni-Str. 4",
+      city: "44263 Dortmund",
+      country: "Germany",
+      phone: "+4923158697565",
+      eori: "DE977540238364617",
+    };
+
     const hasCargoBillTo = !!(
       cargo?.bill_to_display_name || cargo?.bill_to_company_name
     );
 
     const rawBillName = hasCargoBillTo
       ? cargo!.bill_to_company_name || cargo!.bill_to_display_name || ""
-      : cargo?.ship_to_company_name ||
-      cargo?.ship_to_display_name ||
-      customer?.legalName ||
-      customer?.companyName ||
-      "";
+      : GTECH_GMBH.name;
     const billToName =
       rawBillName
         .replace(/^GTech$/i, "GTech Industries GmbH")
@@ -1671,25 +1676,23 @@ export const generateCommercialInvoicePDF = async (
 
     const billToStreet = hasCargoBillTo
       ? cargo?.bill_to_full_address || customerAddress.street
-      : cargo?.ship_to_full_address || customerAddress.street;
+      : GTECH_GMBH.street;
     const billToCity = hasCargoBillTo
       ? cargo?.bill_to_city
         ? formatPostalCity(cargo.bill_to_postal_code, cargo.bill_to_city)
         : formatPostalCity(customerAddress.postalCode, customerAddress.city)
-      : cargo?.ship_to_city
-        ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
-        : formatPostalCity(customerAddress.postalCode, customerAddress.city);
+      : GTECH_GMBH.city;
     const billToCountry = formatCountry(
       hasCargoBillTo
         ? cargo?.bill_to_country || customerAddress.country || "Germany"
-        : cargo?.ship_to_country || customerAddress.country || "Germany"
+        : GTECH_GMBH.country
     );
     const billToPhone = hasCargoBillTo
       ? cargo?.bill_to_phone_no || customerAddress.phone
-      : cargo?.ship_to_contact_phone || customerAddress.phone;
+      : GTECH_GMBH.phone;
     const billToEori = hasCargoBillTo
       ? cargo?.bill_to_tax_no || customer?.taxNumber || ""
-      : customer?.taxNumber || "";
+      : GTECH_GMBH.eori;
 
     const shipToCompany =
       cargo?.ship_to_company_name ||
@@ -1852,19 +1855,11 @@ export const generateCommercialInvoicePDF = async (
         doc.font("Helvetica").fillColor("#000000");
       }
     }
-    const GTECH_GMBH = {
-      name: "GTech Industries GmbH",
-      street: "Antonio-Segni-Str. 4",
-      city: "44263 Dortmund",
-      country: "Germany",
-      phone: "+4923158697565",
-      eori: "DE977540238364617",
-    };
     const isGTechBillTo = data.billTo.name === "GTech Industries GmbH";
     const isSameAddr =
-      !hasCargoBillTo ||
-      (data.billTo.name === data.shipTo.company &&
-        data.billTo.street === data.shipTo.street);
+      data.billTo.name === data.shipTo.company &&
+      data.billTo.street === data.shipTo.street;
+
     const addrY = 125;
     if (isSameAddr) {
       const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
