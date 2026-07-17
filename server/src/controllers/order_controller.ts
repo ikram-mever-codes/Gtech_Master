@@ -1661,38 +1661,12 @@ export const generateCommercialInvoicePDF = async (
       eori: "DE977540238364617",
     };
 
-    const hasCargoBillTo = !!(
-      cargo?.bill_to_display_name || cargo?.bill_to_company_name
-    );
-
-    const rawBillName = hasCargoBillTo
-      ? cargo!.bill_to_company_name || cargo!.bill_to_display_name || ""
-      : GTECH_GMBH.name;
-    const billToName =
-      rawBillName
-        .replace(/^GTech$/i, "GTech Industries GmbH")
-        .replace(/^GTech[-\s]?Warehouse$/i, "GTech Industries GmbH") ||
-      "GTech Industries GmbH";
-
-    const billToStreet = hasCargoBillTo
-      ? cargo?.bill_to_full_address || customerAddress.street
-      : GTECH_GMBH.street;
-    const billToCity = hasCargoBillTo
-      ? cargo?.bill_to_city
-        ? formatPostalCity(cargo.bill_to_postal_code, cargo.bill_to_city)
-        : formatPostalCity(customerAddress.postalCode, customerAddress.city)
-      : GTECH_GMBH.city;
-    const billToCountry = formatCountry(
-      hasCargoBillTo
-        ? cargo?.bill_to_country || customerAddress.country || "Germany"
-        : GTECH_GMBH.country
-    );
-    const billToPhone = hasCargoBillTo
-      ? cargo?.bill_to_phone_no || customerAddress.phone
-      : GTECH_GMBH.phone;
-    const billToEori = hasCargoBillTo
-      ? cargo?.bill_to_tax_no || customer?.taxNumber || ""
-      : GTECH_GMBH.eori;
+    const billToName = GTECH_GMBH.name;
+    const billToStreet = GTECH_GMBH.street;
+    const billToCity = GTECH_GMBH.city;
+    const billToCountry = GTECH_GMBH.country;
+    const billToPhone = GTECH_GMBH.phone;
+    const billToEori = GTECH_GMBH.eori;
 
     const shipToCompany =
       cargo?.ship_to_company_name ||
