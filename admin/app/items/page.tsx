@@ -360,7 +360,6 @@ const ItemsManagementPage: React.FC = () => {
       height: r.height ?? fb.height ?? "",
       price: r.price ?? fb.price ?? "",
       transfer_price_EUR: r.transfer_price_EUR ?? fb.transfer_price_EUR ?? "",
-      // Misc
       remark: pick(r.remark, fb.remark),
       photo: r.photo ?? fb.photo ?? null,
       pix_path: r.pix_path ?? fb.pix_path ?? null,
@@ -504,7 +503,6 @@ const ItemsManagementPage: React.FC = () => {
     fetchTab(activeTab, true);
   }, [auditFilter]);
 
-  // items have painted, or the first time a modal that needs it opens.
   const loadReferenceData = useCallback(async () => {
     if (refDataLoadingRef.current || refDataLoaded) return;
     refDataLoadingRef.current = true;
@@ -572,7 +570,6 @@ const ItemsManagementPage: React.FC = () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemsFirstLoaded]);
 
   useEffect(() => {
