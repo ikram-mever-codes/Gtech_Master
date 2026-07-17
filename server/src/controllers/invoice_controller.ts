@@ -796,11 +796,15 @@ export class InvoiceController {
           cargoCommentMap.get(inv.orderNumber || "") ||
           "";
 
-        const rawBillTo = typeof cargo?.bill_to_company_name === "string" && cargo.bill_to_company_name.trim()
-          ? cargo.bill_to_company_name.trim()
-          : typeof cargo?.bill_to_display_name === "string" && cargo.bill_to_display_name.trim()
-            ? cargo.bill_to_display_name.trim()
-            : "GTech-Warehouse";
+        const isCI = inv.invoiceNumber && inv.invoiceNumber.startsWith("CI");
+        const rawBillTo = isCI
+          ? "GTech Industries GmbH"
+          : (typeof cargo?.bill_to_company_name === "string" && cargo.bill_to_company_name.trim()
+              ? cargo.bill_to_company_name.trim()
+              : typeof cargo?.bill_to_display_name === "string" && cargo.bill_to_display_name.trim()
+                ? cargo.bill_to_display_name.trim()
+                : "GTech-Warehouse");
+
 
         const rawShipTo = typeof cargo?.ship_to_company_name === "string" && cargo.ship_to_company_name.trim().length > 1
           ? cargo.ship_to_company_name.trim()
@@ -1086,6 +1090,8 @@ export class InvoiceController {
               return s.length > 1 ? s : null;
             })(),
             bill_to: (() => {
+              const isCI = invoice.invoiceNumber && invoice.invoiceNumber.startsWith("CI");
+              if (isCI) return "GTech Industries GmbH";
               const v = cargo.bill_to_company_name ?? cargo.bill_to_display_name ?? null;
               if (!v || typeof v !== "string") return "GTech-Warehouse";
               const s = v.trim();
