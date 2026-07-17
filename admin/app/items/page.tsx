@@ -161,6 +161,8 @@ const ItemsManagementPage: React.FC = () => {
   const [previewQuality, setPreviewQuality] = useState<any[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const isExplicitlyClosedRef = useRef(false);
+  const lastItemIdRef = useRef<string | null>(null);
   const pictureInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPictures, setUploadingPictures] = useState(false);
   const [page, setPage] = useState(() => {
@@ -665,12 +667,14 @@ const ItemsManagementPage: React.FC = () => {
   const [showItemModal, setShowItemModal] = useState(false);
 
   const openItemPreview = (row: any) => {
+    isExplicitlyClosedRef.current = false;
     setPreviewRow(row);
     setPreviewEdit(false);
     setShowItemPreview(true);
     loadReferenceData();
   };
   const closePreview = () => {
+    isExplicitlyClosedRef.current = true;
     setShowItemPreview(false);
     setPreviewRow(null);
     setPreviewItem(null);
@@ -696,7 +700,11 @@ const ItemsManagementPage: React.FC = () => {
 
   useEffect(() => {
     const itemIdParam = searchParams.get("itemId");
-    if (itemIdParam && !showItemPreview) {
+    if (itemIdParam !== lastItemIdRef.current) {
+      isExplicitlyClosedRef.current = false;
+      lastItemIdRef.current = itemIdParam;
+    }
+    if (itemIdParam && !showItemPreview && !isExplicitlyClosedRef.current) {
       const foundRow = tabData.items.find((item) => String(item.id) === String(itemIdParam));
       if (foundRow) {
         openItemPreview(foundRow);
