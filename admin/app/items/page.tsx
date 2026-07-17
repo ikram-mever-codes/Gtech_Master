@@ -347,23 +347,19 @@ const ItemsManagementPage: React.FC = () => {
       supplier_id: String(pick(r.supplier_id, fb.supplier_id) || ""),
       taric_id: String(pick(r.taric_id, fb.taric_id) || ""),
       parent_id: pick(r.parent_id, r.parent?.id, fb.parent_id),
-      // Company / customer
       customer_id: String(
         pick(r.customer_id, r.customer?.id, fb.customer_id) || "",
       ),
       customer_name: getCompany(r) || getCompany(fb) || "",
-      // Status / flags
       isActive: pick(r.isActive, r.is_active, fb.is_active, "Y"),
       isLabelPrint: r.isLabelPrint ?? fb.isLabelPrint ?? false,
       is_new: pick(r.is_new, fb.is_new, "N"),
-      // Dimensions / pricing
       weight: r.weight ?? fb.weight ?? "",
       length: r.length ?? fb.length ?? "",
       width: r.width ?? fb.width ?? "",
       height: r.height ?? fb.height ?? "",
       price: r.price ?? fb.price ?? "",
       transfer_price_EUR: r.transfer_price_EUR ?? fb.transfer_price_EUR ?? "",
-      // Misc
       remark: pick(r.remark, fb.remark),
       photo: r.photo ?? fb.photo ?? null,
       pix_path: r.pix_path ?? fb.pix_path ?? null,
@@ -507,7 +503,6 @@ const ItemsManagementPage: React.FC = () => {
     fetchTab(activeTab, true);
   }, [auditFilter]);
 
-  // items have painted, or the first time a modal that needs it opens.
   const loadReferenceData = useCallback(async () => {
     if (refDataLoadingRef.current || refDataLoaded) return;
     refDataLoadingRef.current = true;
@@ -575,7 +570,6 @@ const ItemsManagementPage: React.FC = () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemsFirstLoaded]);
 
   useEffect(() => {
@@ -587,7 +581,6 @@ const ItemsManagementPage: React.FC = () => {
     setPage(1);
   }, [filters, taricSearch, activeTab]);
 
-  // Reset to page 1 when filters change — but not on first mount (preserve ?page=N)
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
@@ -599,13 +592,21 @@ const ItemsManagementPage: React.FC = () => {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+
     if (page > 1) params.set("page", String(page));
     else params.delete("page");
+
+    if (showItemPreview && previewRow?.id) {
+      params.set("itemId", String(previewRow.id));
+    } else {
+      params.delete("itemId");
+    }
+
     const qs = params.toString();
     router.replace(`${window.location.pathname}${qs ? `?${qs}` : ""}`, {
       scroll: false,
     });
-  }, [page, router]);
+  }, [page, showItemPreview, previewRow?.id, router]);
 
   const reloadItems = useCallback(async () => {
     await fetchTab("items", true);
@@ -684,19 +685,7 @@ const ItemsManagementPage: React.FC = () => {
     setCustomerSearch("");
     setShowCustomerDropdown(false);
   };
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (showItemPreview && previewRow?.id) {
-      params.set("itemId", String(previewRow.id));
-    } else {
-      params.delete("itemId");
-    }
-    const qs = params.toString();
-    router.replace(`${window.location.pathname}${qs ? `?${qs}` : ""}`, {
-      scroll: false,
-    });
-  }, [showItemPreview, previewRow?.id, router]);
+
 
   useEffect(() => {
     const itemIdParam = searchParams.get("itemId");

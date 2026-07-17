@@ -1404,6 +1404,12 @@ export const updateItem = async (
             warehouseItemData.is_SnSI ?? warehouseItem.is_SnSI,
         });
       }
+      if (warehouseItemData && warehouseItemData.item_name_en && item.item_name !== warehouseItemData.item_name_en) {
+        item.item_name = warehouseItemData.item_name_en;
+        item.is_updated = true;
+        await itemRepository.save(item);
+      }
+
       if (item.item_name && warehouseItem.item_name_en !== item.item_name && (!warehouseItemData || !warehouseItemData.item_name_en)) {
         warehouseItem.item_name_en = item.item_name;
       }
