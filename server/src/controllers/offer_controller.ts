@@ -3323,7 +3323,13 @@ export class OfferController {
       const titleBoxX = MM(125);
       const titleBoxY = MM(48);
       const titleBoxW = MM(67);
-      const titleBoxH = 22;
+
+      doc.font(R).fontSize(9.5);
+      const titleTextW = titleBoxW - 65;
+      const titleHeight = offer.title
+        ? doc.heightOfString(offer.title, { width: titleTextW })
+        : 14;
+      const titleBoxH = Math.max(22, titleHeight + 8);
 
       doc
         .rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH)
@@ -3333,17 +3339,16 @@ export class OfferController {
         .font(SB)
         .fontSize(14)
         .fillColor("#3F4446")
-        .text("Angebot", titleBoxX + 8, titleBoxY + 4, { lineBreak: false });
+        .text("Angebot", titleBoxX + 6, titleBoxY + 4, { lineBreak: false });
 
       if (offer.title) {
         doc
           .font(R)
-          .fontSize(11)
+          .fontSize(9.5)
           .fillColor("#3F4446")
-          .text(offer.title, titleBoxX + 70, titleBoxY + 6, {
-            width: titleBoxW - 75,
+          .text(offer.title, titleBoxX + 60, titleBoxY + 4, {
+            width: titleTextW,
             align: "right",
-            lineBreak: false,
           });
       }
 
@@ -3360,7 +3365,7 @@ export class OfferController {
         ["Kundennr.", offer.inquiry?.customer?.customerNumber || customer.customerNumber || "—"],
       ];
 
-      let infoY = titleBoxY + titleBoxH + 8;
+      let infoY = titleBoxY + titleBoxH + 6;
       const LABEL_W = MM(32);
       const VALUE_X = titleBoxX + LABEL_W + 4;
       const VALUE_W = titleBoxW - LABEL_W - 4;
@@ -3368,7 +3373,7 @@ export class OfferController {
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
         if (!label && !value) {
-          infoY += 6;
+          infoY += 4;
           return;
         }
         doc.font(R).text(label, titleBoxX, infoY, { width: LABEL_W, lineBreak: false });
@@ -3376,7 +3381,7 @@ export class OfferController {
         infoY += 12;
       });
 
-      let yPos = Math.max(addrY + 10, MM(98));
+      let yPos = Math.max(addrY + 10, infoY + 10, MM(98));
       if (offer.shippingMethod || offer.deliveryTime || offer.deliveryTerms) {
         doc.font(R).fontSize(9.5).fillColor("#3F4446");
         const deliveryParts: string[] = [];
