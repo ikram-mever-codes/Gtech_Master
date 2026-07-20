@@ -63,6 +63,7 @@ import {
   type Business,
   type SearchFilters,
 } from "@/api/bussiness";
+import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import { getAllCountries } from "@/api/countries";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
@@ -1280,32 +1281,21 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         <tr className="hover:bg-gray-50 transition-colors align-top">
                           <td className="px-3 py-3">
                             <div className="flex items-start gap-2">
-                              <button
-                                onClick={(e) => {
+                              <ExpandRowArrow
+                                isExpanded={expandedBusinessIds.has(business.id)}
+                                isEmpty={!business.contacts || business.contacts.length === 0}
+                                onToggle={(e) => {
                                   e.stopPropagation();
                                   toggleBusinessContacts(business.id);
                                 }}
-                                className={`${!business.contacts ||
-                                  business.contacts.length === 0
-                                  ? "text-red-500 hover:text-red-700"
-                                  : "text-gray-400 hover:text-gray-700"
-                                  } flex-shrink-0 mt-0.5`}
                                 title={
-                                  !business.contacts ||
-                                    business.contacts.length === 0
+                                  !business.contacts || business.contacts.length === 0
                                     ? "No contacts yet"
                                     : expandedBusinessIds.has(business.id)
                                       ? "Hide contacts"
                                       : "Show contacts"
                                 }
-                              >
-                                <ChevronRightIcon
-                                  className={`h-4 w-4 transition-transform duration-200 ${expandedBusinessIds.has(business.id)
-                                    ? "rotate-90"
-                                    : ""
-                                    }`}
-                                />
-                              </button>
+                              />
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p

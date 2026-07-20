@@ -82,6 +82,8 @@ import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
+import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
+import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -232,6 +234,7 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
   const [modalActiveTab, setModalActiveTab] = useState<"taric" | "items">("taric");
+  const [expandedDocIds, setExpandedDocIds] = useState<Set<string | number>>(new Set());
 
   const handleOpenInvoiceDetails = async (invoice: Invoice) => {
     setSelectedInvoice(invoice);
@@ -1584,6 +1587,32 @@ const InvoiceListPage: React.FC = () => {
   const commercialColumns: ColumnDef<any>[] = useMemo(() => {
     return [
       {
+        header: "",
+        width: "36px",
+        align: "center",
+        render: (row) => {
+          const keys = [row.id, row._id, row.order_no, row.invoiceNumber].filter(Boolean);
+          const isExpanded = keys.some((k) => expandedDocIds.has(k));
+          return (
+            <ExpandRowArrow
+              isExpanded={isExpanded}
+              onToggle={(e) => {
+                e.stopPropagation();
+                setExpandedDocIds((prev) => {
+                  const next = new Set(prev);
+                  if (isExpanded) {
+                    keys.forEach((k) => next.delete(k));
+                  } else {
+                    keys.forEach((k) => next.add(k));
+                  }
+                  return next;
+                });
+              }}
+            />
+          );
+        },
+      },
+      {
         header: "date_created",
         width: "100px",
         align: "center",
@@ -1811,7 +1840,7 @@ const InvoiceListPage: React.FC = () => {
         },
       },
     ];
-  }, [activeInvTab, router]);
+  }, [activeInvTab, router, expandedDocIds]);
 
   const totalAmount = filteredInvoices.reduce(
     (sum, inv) => sum + (Number(inv.grossTotal) || 0),
@@ -2126,44 +2155,61 @@ const InvoiceListPage: React.FC = () => {
           <OffersPage embedded={true} />
         )}
 
-        {(activeInvTab === "auftrag" ||
-          activeInvTab === "bestellung") && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
-              <DataTable
-                data={currentItems}
-                columns={commercialColumns}
-                loading={
-                  activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                    ? loadingOrders
-                    : loading
+        {activeInvTab !== "angebot" && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
+            <DataTable
+              data={currentItems}
+              columns={commercialColumns}
+              loading={
+                activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                  ? loadingOrders
+                  : loading
+              }
+              emptyMessage={`No ${activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                ? "Orders"
+                : "Invoices"
+                } Found`}
+              getRowClassName={(row) => {
+                if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+                  const isExpress = (row.comment || "").toLowerCase().includes("express");
+                  return isExpress ? "bg-red-50" : "";
                 }
-                emptyMessage={`No ${activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                    ? "Orders"
-                    : "Invoices"
-                  } Found`}
-                getRowClassName={(row) => {
-                  if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
-                    const isExpress = (row.comment || "").toLowerCase().includes("express");
-                    return isExpress ? "bg-red-50" : "";
-                  }
-                  return "";
-                }}
-                onRowClick={(row) => {
-                  if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
-                    handleViewOrder(row);
-                  } else {
-                    handleOpenInvoiceDetails(row);
-                  }
-                }}
-              />
+                return "";
+              }}
+              expandedRowIds={expandedDocIds}
+              renderRowDetails={(row) => {
+                const items = row.items || row.lineItems || [];
+                const isOrder = activeInvTab === "auftrag" || activeInvTab === "bestellung";
+                const docNumber = isOrder ? row.order_no : (row.invoiceNumber || row.id);
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA] rounded-b-[4px] mt-4">
-                  <div className="text-[11px] font-medium text-[#6C757D]">
-                    Showing {startIndex + 1} to{" "}
-                    {Math.min(endIndex, filteredItems.length)} of{" "}
-                    {filteredItems.length} documents
-                  </div>
+                return (
+                  <DocumentLineItemsSubTable
+                    items={items}
+                    currency={row.currency || "EUR"}
+                    title={`Line Items (${items.length}) — ${isOrder ? `Order No: ${docNumber}` : `Invoice: ${docNumber}`}`}
+                    totalAmount={Number(row.netTotal || row.grossTotal || row.totalAmount || 0)}
+                    type={isOrder ? "order" : "invoice"}
+                    getSupplierName={getSupplierName}
+                    getOrderStatusColor={getOrderStatusColor}
+                  />
+                );
+              }}
+              onRowClick={(row) => {
+                if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+                  handleViewOrder(row);
+                } else {
+                  handleOpenInvoiceDetails(row);
+                }
+              }}
+            />
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA] rounded-b-[4px] mt-4">
+                <div className="text-[11px] font-medium text-[#6C757D]">
+                  Showing {startIndex + 1} to{" "}
+                  {Math.min(endIndex, filteredItems.length)} of{" "}
+                  {filteredItems.length} documents
+                </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}

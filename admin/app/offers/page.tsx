@@ -9,7 +9,7 @@ import {
   CalendarIcon,
   FunnelIcon,
 } from "@heroicons/react/24/outline";
-import { BadgePercent, FileDown } from "lucide-react";
+import { BadgePercent, FileDown, ChevronRight, ChevronDown } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
@@ -25,6 +25,8 @@ import {
 } from "@/api/offers";
 import { formatDate } from "@/utils/offers";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
+import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
+import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
   `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
@@ -57,6 +59,17 @@ const OffersPage: React.FC<OffersPageProps> = ({ embedded = false }) => {
 
   const [detailOfferId, setDetailOfferId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [expandedOfferIds, setExpandedOfferIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandOffer = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedOfferIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const fetchOffers = useCallback(async () => {
     setLoading(true);
@@ -186,195 +199,223 @@ const OffersPage: React.FC<OffersPageProps> = ({ embedded = false }) => {
         )}
       </div>
 
-        <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="inline-flex items-center gap-3">
-                <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-                <span className="text-gray-600">Loading offers…</span>
-              </div>
+      <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="inline-flex items-center gap-3">
+              <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
+              <span className="text-gray-600">Loading offers…</span>
             </div>
-          ) : offers.length === 0 ? (
-            <div className="p-8 text-center">
-              <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No offers found</p>
-              <p className="text-gray-500 text-sm mt-2">
-                Create one from an inquiry, or from a customer and item(s).
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Offer
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Customer
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status &amp; expiry
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {offers.map((offer: any) => (
-                    <tr
-                      key={offer.id}
-                      onClick={() => openDetail(offer)}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          {offer.offerNumber}
-                          {offer.revision > 1 && (
-                            <span className="ml-2 text-xs text-gray-500">
-                              Rev. {offer.revision}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-600 truncate max-w-[16rem]">
-                          {offer.title}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                          Created {formatDate(offer.createdAt)}
-                          {offer.useUnitPrices && (
-                            <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
-                              Unit pricing
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <BuildingOfficeIcon className="h-4 w-4 text-gray-400" />
-                          <div className="text-sm font-medium text-gray-900 truncate max-w-[12rem]">
-                            {offer.customerSnapshot?.companyName}
+          </div>
+        ) : offers.length === 0 ? (
+          <div className="p-8 text-center">
+            <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No offers found</p>
+            <p className="text-gray-500 text-sm mt-2">
+              Create one from an inquiry, or from a customer and item(s).
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="w-9 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Offer
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status &amp; expiry
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {offers.map((offer: any) => {
+                  const isExpanded = expandedOfferIds.has(offer.id);
+                  const lineItems = offer.lineItems?.filter((li: any) => !li.isComponent) || [];
+
+                  return (
+                    <React.Fragment key={offer.id}>
+                      <tr
+                        onClick={() => openDetail(offer)}
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        <td
+                          className="px-2 py-3 text-center"
+                          onClick={(e) => toggleExpandOffer(offer.id, e)}
+                        >
+                          <ExpandRowArrow
+                            isExpanded={isExpanded}
+                            onToggle={(e) => toggleExpandOffer(offer.id, e)}
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-gray-900">
+                            {offer.offerNumber}
+                            {offer.revision > 1 && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                Rev. {offer.revision}
+                              </span>
+                            )}
                           </div>
-                        </div>
-                        {offer.customerSnapshot?.vatId && (
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            VAT: {offer.customerSnapshot.vatId}
+                          <div className="text-sm text-gray-600 truncate max-w-[16rem]">
+                            {offer.title}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="text-sm font-bold text-gray-900">
-                          {formatCurrency(
-                            offer.totalAmount || 0,
-                            offer.currency,
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {offer.lineItems?.filter((li: any) => !li.isComponent)
-                            .length || 0}{" "}
-                          items
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1 items-center">
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
-                              offer.status,
-                            )}`}
-                          >
-                            {offer.status}
-                          </span>
-                          {offer.validUntil && (
-                            <div className="flex items-center gap-1 text-xs text-gray-600">
-                              <CalendarIcon className="h-3 w-3 text-gray-500" />
-                              {formatDate(offer.validUntil)}
+                          <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                            Created {formatDate(offer.createdAt)}
+                            {offer.useUnitPrices && (
+                              <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
+                                Unit pricing
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <BuildingOfficeIcon className="h-4 w-4 text-gray-400" />
+                            <div className="text-sm font-medium text-gray-900 truncate max-w-[12rem]">
+                              {offer.customerSnapshot?.companyName}
+                            </div>
+                          </div>
+                          {offer.customerSnapshot?.vatId && (
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              VAT: {offer.customerSnapshot.vatId}
                             </div>
                           )}
-                        </div>
-                      </td>
-                      <td
-                        className="px-4 py-3 text-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          title="Download Angebot PDF"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              await downloadOfferPdf(
-                                offer.id,
-                                offer.offerNumber,
-                              );
-                            } catch (_) { }
-                          }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="text-sm font-bold text-gray-900">
+                            {formatCurrency(
+                              offer.totalAmount || 0,
+                              offer.currency,
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {lineItems.length} items
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1 items-center">
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
+                                offer.status,
+                              )}`}
+                            >
+                              {offer.status}
+                            </span>
+                            {offer.validUntil && (
+                              <div className="flex items-center gap-1 text-xs text-gray-600">
+                                <CalendarIcon className="h-3 w-3 text-gray-500" />
+                                {formatDate(offer.validUntil)}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td
+                          className="px-4 py-3 text-center"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <FileDown className="h-3.5 w-3.5" />
-                          PDF
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                          <button
+                            title="Download Angebot PDF"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await downloadOfferPdf(
+                                  offer.id,
+                                  offer.offerNumber,
+                                );
+                              } catch (_) { }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                            PDF
+                          </button>
+                        </td>
+                      </tr>
 
-          {totalPages > 1 && (
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Showing {(currentPage - 1) * itemsPerPage + 1}–
-                {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
-                {totalRecords}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const p = Math.max(1, currentPage - 1);
-                    setCurrentPage(p);
-                    setFilters({ ...filters, page: p });
-                  }}
-                  disabled={currentPage === 1}
-                  className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                  const p = i + 1;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => {
-                        setCurrentPage(p);
-                        setFilters({ ...filters, page: p });
-                      }}
-                      className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
-                        ? "bg-gray-600 text-white"
-                        : "bg-white border border-gray-300 hover:bg-gray-50"
-                        }`}
-                    >
-                      {p}
-                    </button>
+                      {isExpanded && (
+                        <tr className="bg-emerald-50/20 border-b border-gray-200">
+                          <td colSpan={6} className="px-6 py-4">
+                            <DocumentLineItemsSubTable
+                              items={lineItems}
+                              currency={offer.currency}
+                              title={`Line Items List (${lineItems.length}) — Offer ${offer.offerNumber}`}
+                              totalAmount={offer.totalAmount}
+                              type="offer"
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
-                <button
-                  onClick={() => {
-                    const p = Math.min(totalPages, currentPage + 1);
-                    setCurrentPage(p);
-                    setFilters({ ...filters, page: p });
-                  }}
-                  disabled={currentPage === totalPages}
-                  className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Showing {(currentPage - 1) * itemsPerPage + 1}–
+              {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
+              {totalRecords}
             </div>
-          )}
-        </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const p = Math.max(1, currentPage - 1);
+                  setCurrentPage(p);
+                  setFilters({ ...filters, page: p });
+                }}
+                disabled={currentPage === 1}
+                className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                const p = i + 1;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setCurrentPage(p);
+                      setFilters({ ...filters, page: p });
+                    }}
+                    className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
+                      ? "bg-gray-600 text-white"
+                      : "bg-white border border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => {
+                  const p = Math.min(totalPages, currentPage + 1);
+                  setCurrentPage(p);
+                  setFilters({ ...filters, page: p });
+                }}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 

@@ -63,6 +63,7 @@ import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { MessagesSquare, ClipboardList } from "lucide-react";
+import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import PageHeader from "@/components/UI/PageHeader";
 import ModalHeader from "@/components/UI/ModalHeader";
 import ModalFooter from "@/components/UI/ModalFooter";
@@ -1614,32 +1615,21 @@ const CombinedInquiriesPageContent = () => {
                       <tr className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
+                            <ExpandRowArrow
+                              isExpanded={expandedInquiryIds.has(inquiry.id)}
+                              isEmpty={!inquiry.requests || inquiry.requests.length === 0}
+                              onToggle={(e) => {
                                 e.stopPropagation();
                                 toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`${!inquiry.requests ||
-                                inquiry.requests.length === 0
-                                ? "text-red-500 hover:text-red-700"
-                                : "text-gray-400 hover:text-gray-700"
-                                } flex-shrink-0 mt-0.5`}
                               title={
-                                !inquiry.requests ||
-                                  inquiry.requests.length === 0
+                                !inquiry.requests || inquiry.requests.length === 0
                                   ? "No request items yet"
                                   : expandedInquiryIds.has(inquiry.id)
                                     ? "Hide requests"
                                     : "Show requests"
                               }
-                            >
-                              <ChevronRightIcon
-                                className={`h-4 w-4 transition-transform duration-200 ${expandedInquiryIds.has(inquiry.id)
-                                  ? "rotate-90"
-                                  : ""
-                                  }`}
-                              />
-                            </button>
+                            />
                             <div
                               className="cursor-pointer flex flex-col"
                               onClick={() => handleInquiryClick(inquiry)}

@@ -18,6 +18,8 @@ export type DataTableProps<T> = {
     getRowClassName?: (row: T, index: number) => string;
     renderRowDetails?: (row: T, index: number) => React.ReactNode;
     expandedRowId?: string | number | null;
+    expandedRowIds?: (string | number)[] | Set<string | number>;
+    isRowExpanded?: (row: T, index: number) => boolean;
     onRowClick?: (row: T, index: number, event: React.MouseEvent) => void;
     headerClassName?: string;
     thClassName?: string;
@@ -34,6 +36,8 @@ export function DataTable<T>({
     getRowClassName,
     renderRowDetails,
     expandedRowId,
+    expandedRowIds,
+    isRowExpanded,
     onRowClick,
     headerClassName,
     thClassName,
@@ -88,7 +92,33 @@ export function DataTable<T>({
                         </tr>
                     ) : (
                         data.map((row, idx) => {
-                            const isExpanded = expandedRowId !== undefined && expandedRowId !== null && ((row as any).id === expandedRowId || (row as any)._id === expandedRowId);
+                            const possibleKeys = [
+                                (row as any).id,
+                                (row as any)._id,
+                                (row as any).order_no,
+                                (row as any).invoiceNumber,
+                                (row as any).offerNumber,
+                                idx
+                            ].filter((v) => v !== undefined && v !== null);
+
+                            let isExpanded = false;
+                            if (isRowExpanded) {
+                                isExpanded = isRowExpanded(row, idx);
+                            } else if (expandedRowIds) {
+                                if (expandedRowIds instanceof Set) {
+                                    isExpanded = possibleKeys.some(
+                                        (k) => expandedRowIds.has(k) || expandedRowIds.has(String(k)) || (!isNaN(Number(k)) && expandedRowIds.has(Number(k)))
+                                    );
+                                } else if (Array.isArray(expandedRowIds)) {
+                                    isExpanded = possibleKeys.some(
+                                        (k) => expandedRowIds.includes(k) || expandedRowIds.includes(String(k)) || (!isNaN(Number(k)) && expandedRowIds.includes(Number(k)))
+                                    );
+                                }
+                            } else if (expandedRowId !== undefined && expandedRowId !== null) {
+                                isExpanded = possibleKeys.some(
+                                    (k) => k === expandedRowId || String(k) === String(expandedRowId)
+                                );
+                            }
 
                             return (
                                 <React.Fragment key={(row as any).id || (row as any)._id || idx}>

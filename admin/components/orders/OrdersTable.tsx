@@ -5,6 +5,8 @@ import Select from "react-select";
 import { toast } from "react-hot-toast";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { formatDate } from "@/utils/date";
+import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
+import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -51,6 +53,7 @@ export default function OrdersTable({
   router,
 }: OrdersTableProps) {
   const [editingSupplierId, setEditingSupplierId] = useState<number | string | null>(null);
+  const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string | number>>(new Set());
 
   const isOrderItems = activeTab === "order_items";
 
@@ -135,7 +138,6 @@ export default function OrdersTable({
       render: (row) => {
         const itemDetails = itemById.get(String(row.item_id));
         const sid = Number(row.supplier_id || row.item?.supplier_id || itemDetails?.supplier_id || 0);
-
         let sname = null;
         if (sid > 0) {
           sname = getSupplierName?.(sid);
@@ -346,6 +348,32 @@ export default function OrdersTable({
   };
 
   const orderColumns: ColumnDef<any>[] = [
+    {
+      header: "",
+      width: "36px",
+      align: "center",
+      render: (row) => {
+        const keys = [row.order_no, row.id, (row as any)._id].filter(Boolean);
+        const isExpanded = keys.some((k) => expandedOrderIds.has(k));
+        return (
+          <ExpandRowArrow
+            isExpanded={isExpanded}
+            onToggle={(e) => {
+              e.stopPropagation();
+              setExpandedOrderIds((prev) => {
+                const next = new Set(prev);
+                if (isExpanded) {
+                  keys.forEach((k) => next.delete(k));
+                } else {
+                  keys.forEach((k) => next.add(k));
+                }
+                return next;
+              });
+            }}
+          />
+        );
+      },
+    },
     {
       header: "No",
       width: "40px",
@@ -595,6 +623,16 @@ export default function OrdersTable({
         const isExpress = (row.comment || "").toLowerCase().includes("express");
         return isExpress ? "bg-red-50" : "";
       }}
+      expandedRowIds={expandedOrderIds}
+      renderRowDetails={!isOrderItems ? (row) => (
+        <DocumentLineItemsSubTable
+          items={row.items || []}
+          title={`Order Items (${row.items?.length || 0}) — Order No: ${row.order_no}`}
+          type="order"
+          getSupplierName={getSupplierName}
+          getOrderStatusColor={getOrderStatusColor}
+        />
+      ) : undefined}
       onRowClick={(row, idx, e) => {
         const target = e.target as HTMLElement;
         if (target.closest('button, a, input, select, textarea, [role="button"], .interactive')) {

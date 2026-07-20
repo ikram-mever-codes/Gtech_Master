@@ -3323,12 +3323,14 @@ export class OfferController {
       const titleBoxX = MM(125);
       const titleBoxY = MM(48);
       const titleBoxW = MM(67);
+      const ANGEBOT_LABEL_W = 55;
+      const titleTextX = titleBoxX + ANGEBOT_LABEL_W + 4;
+      const titleTextW = titleBoxW - ANGEBOT_LABEL_W - 8;
 
       doc.font(R).fontSize(9.5);
-      const titleTextW = titleBoxW - 65;
       const titleHeight = offer.title
         ? doc.heightOfString(offer.title, { width: titleTextW })
-        : 14;
+        : 0;
       const titleBoxH = Math.max(22, titleHeight + 8);
 
       doc
@@ -3339,16 +3341,20 @@ export class OfferController {
         .font(SB)
         .fontSize(14)
         .fillColor("#3F4446")
-        .text("Angebot", titleBoxX + 6, titleBoxY + 4, { lineBreak: false });
+        .text("Angebot", titleBoxX + 6, titleBoxY + 5, {
+          lineBreak: false,
+          width: ANGEBOT_LABEL_W,
+        });
 
       if (offer.title) {
         doc
           .font(R)
           .fontSize(9.5)
           .fillColor("#3F4446")
-          .text(offer.title, titleBoxX + 60, titleBoxY + 4, {
+          .text(offer.title, titleTextX, titleBoxY + 5, {
             width: titleTextW,
             align: "right",
+            lineBreak: true,
           });
       }
 
