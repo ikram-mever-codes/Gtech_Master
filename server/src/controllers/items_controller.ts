@@ -2222,9 +2222,7 @@ export const updateParent = async (
     });
 
     parent.updated_at = new Date();
-
     await parentRepository.save(parent);
-
     return res.status(200).json({
       success: true,
       message: "Parent updated successfully",
