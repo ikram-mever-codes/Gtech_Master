@@ -1670,8 +1670,8 @@ export const generateCommercialInvoicePDF = async (
 
     const shipToCompany =
       cargo?.ship_to_company_name ||
-      customer?.legalName ||
       customer?.companyName ||
+      customer?.legalName ||
       "";
     const shipToStreet = cargo?.ship_to_full_address || customerAddress.street;
     const shipToCity = cargo?.ship_to_city
@@ -1909,6 +1909,7 @@ export const generateCommercialInvoicePDF = async (
     const rightX = 412;
     const rightW = 143;
 
+    // Invoice No
     doc
       .font("Helvetica")
       .fontSize(11)
@@ -1916,7 +1917,17 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica-Bold")
       .text(data.invoiceNo);
 
+    // Date — directly below Invoice No (as requested)
     rightY = 140;
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .text("Date: ", rightX, rightY, { continued: true, width: rightW })
+      .font("Helvetica-Bold")
+      .text(data.date);
+
+    // Customer No
+    rightY = 165;
     doc
       .font("Helvetica")
       .fontSize(11)
@@ -1924,21 +1935,14 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica-Bold")
       .text(data.customerNo || "N/A");
 
-    rightY = 165;
+    // Cargo No
+    rightY = 190;
     doc
       .font("Helvetica")
       .fontSize(11)
       .text("Cargo No.: ", rightX, rightY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.cargoNo);
-
-    rightY = 190;
-    doc
-      .font("Helvetica")
-      .fontSize(11)
-      .text("Date: ", rightX, rightY, { continued: true, width: rightW })
-      .font("Helvetica-Bold")
-      .text(data.date);
     doc
       .fontSize(15)
       .font("Helvetica-Bold")

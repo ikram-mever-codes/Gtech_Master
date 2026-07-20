@@ -445,8 +445,21 @@ export const updateCargo = async (
       ...updateData
     } = req.body;
 
+    const oldCargoNo = cargo.cargo_no;
     cargoRepo.merge(cargo, updateData);
     const updatedCargo = await cargoRepo.save(cargo);
+
+    const newCargoNo = updatedCargo.cargo_no;
+    if (oldCargoNo && newCargoNo && oldCargoNo !== newCargoNo) {
+      const invoiceRepo = AppDataSource.getRepository(Invoice);
+      await invoiceRepo
+        .createQueryBuilder()
+        .update(Invoice)
+        .set({ orderNumber: newCargoNo })
+        .where("orderNumber = :oldNo", { oldNo: oldCargoNo })
+        .execute();
+      console.log(`[Cargo] cargo_no changed from "${oldCargoNo}" → "${newCargoNo}": updated linked invoices.`);
+    }
 
     if (Array.isArray(orders)) {
       const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
@@ -480,6 +493,7 @@ export const updateCargo = async (
     return next(error);
   }
 };
+
 
 export const deleteCargo = async (
   req: Request,

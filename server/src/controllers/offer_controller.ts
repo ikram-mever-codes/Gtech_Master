@@ -3324,18 +3324,14 @@ export class OfferController {
       const titleBoxY = MM(48);
       const titleBoxW = MM(67);
 
-      // Measure "Angebot" label width at 14pt SemiBold so we never truncate/wrap it
       doc.font(SB).fontSize(14);
-      const angebotLabelW = doc.widthOfString("Angebot") + 8; // +8 padding
-
+      const angebotLabelW = doc.widthOfString("Angebot") + 8;
       const titleTextX = titleBoxX + angebotLabelW;
-      const titleTextW = titleBoxW - angebotLabelW - 4; // 4pt right margin
-
+      const titleTextW = titleBoxW - angebotLabelW - 4;
       doc.font(R).fontSize(9.5);
       const titleHeight = offer.title
         ? doc.heightOfString(offer.title, { width: titleTextW })
         : 0;
-      // min 22pt; grow to contain wrapped title
       const titleBoxH = Math.max(22, titleHeight + 8);
 
       doc
