@@ -34,6 +34,8 @@ import {
   getOfferStatuses,
   getOfferStatusColor,
   deletePriceColumn,
+  getOfferLinkedDocuments,
+  type LinkedDocumentsResult,
 } from "@/api/offers";
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
@@ -44,6 +46,7 @@ import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { BASE_URL } from "@/utils/constants";
 import { parseFlexibleNumber, formatMatrixPrice } from "@/utils/decimal";
+import { formatDate } from "@/utils/offers";
 import { PrinterIcon } from "lucide-react";
 
 type PricingMode = "classic" | "matrix";
@@ -77,6 +80,111 @@ const SHIPPING_METHODS = [
   "Courier",
   "Pickup",
 ];
+
+// ---------------------------------------------------------------------------
+// Tax profile logic
+//
+//  - Shipping country DE                         -> DE-VAT
+//  - Shipping country in EU (IGL) + no VAT ID     -> EU_no_valid_VAT_ID
+//  - Shipping country in EU (IGL) + has VAT ID    -> EU_IGL
+//  - Shipping country outside EU / DE             -> third_country
+//
+// "Valid VAT ID" is approximated here as "a VAT ID is present on the
+// customer snapshot" — wire this up to a real VIES validation flag on the
+// customer record once one exists.
+// ---------------------------------------------------------------------------
+type TaxProfile = "DE-VAT" | "EU_no_valid_VAT_ID" | "EU_IGL" | "third_country";
+
+const DE_NAMES = new Set(["DE", "GERMANY", "DEUTSCHLAND"]);
+
+const EU_IGL_COUNTRIES = new Set([
+  "AT",
+  "AUSTRIA",
+  "ÖSTERREICH",
+  "BE",
+  "BELGIUM",
+  "BELGIEN",
+  "BG",
+  "BULGARIA",
+  "HR",
+  "CROATIA",
+  "CY",
+  "CYPRUS",
+  "CZ",
+  "CZECH REPUBLIC",
+  "CZECHIA",
+  "DK",
+  "DENMARK",
+  "EE",
+  "ESTONIA",
+  "FI",
+  "FINLAND",
+  "FR",
+  "FRANCE",
+  "GR",
+  "GREECE",
+  "HU",
+  "HUNGARY",
+  "IE",
+  "IRELAND",
+  "IT",
+  "ITALY",
+  "LV",
+  "LATVIA",
+  "LT",
+  "LITHUANIA",
+  "LU",
+  "LUXEMBOURG",
+  "MT",
+  "MALTA",
+  "NL",
+  "NETHERLANDS",
+  "PL",
+  "POLAND",
+  "PT",
+  "PORTUGAL",
+  "RO",
+  "ROMANIA",
+  "SK",
+  "SLOVAKIA",
+  "SI",
+  "SLOVENIA",
+  "ES",
+  "SPAIN",
+  "SE",
+  "SWEDEN",
+]);
+
+const TAX_PROFILE_LABELS: Record<TaxProfile, string> = {
+  "DE-VAT": "DE-VAT — German VAT applies",
+  EU_no_valid_VAT_ID:
+    "EU_no_valid_VAT_ID — local VAT applies (no VAT ID on file)",
+  EU_IGL: "EU_IGL — intra-community supply, reverse charge",
+  third_country: "third_country — export, no VAT",
+};
+
+const getTaxProfile = (offer: any): TaxProfile | null => {
+  const country = (
+    offer?.deliveryAddress?.country ||
+    offer?.customerSnapshot?.country ||
+    ""
+  )
+    .trim()
+    .toUpperCase();
+  if (!country) return null;
+  if (DE_NAMES.has(country)) return "DE-VAT";
+  if (EU_IGL_COUNTRIES.has(country)) {
+    const vatId = (offer?.customerSnapshot?.vatId || "").trim();
+    return vatId ? "EU_IGL" : "EU_no_valid_VAT_ID";
+  }
+  return "third_country";
+};
+
+const formatWeight = (kg: number): string =>
+  `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })} kg`;
 
 const resolveThumbUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
@@ -126,6 +234,12 @@ const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
   const price = parseFlexibleNumber(item?.basePrice) ?? 0;
   return qty * price;
 };
+
+/** An item counts as "Artikel" if it traces back to a catalog item (either
+ * picked directly or inherited from an inquiry request); anything added by
+ * hand with just a name is a "Freitext" line. */
+const isFreetextLine = (item: any): boolean =>
+  !item?.sourceItemId && !item?.requestedItemId;
 
 const Section: React.FC<{
   title: string;
@@ -309,6 +423,42 @@ const DecimalInput: React.FC<{
   );
 };
 
+/** Plain text input that commits on blur — used for the classic spreadsheet
+ * cells (item no., name, remark) so every keystroke doesn't trigger a save. */
+const TextCellInput: React.FC<{
+  value: string | null | undefined;
+  onCommit: (raw: string) => void;
+  className?: string;
+  placeholder?: string;
+}> = ({ value, onCommit, className, placeholder }) => {
+  const [local, setLocal] = useState(value || "");
+
+  useEffect(() => {
+    setLocal(value || "");
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      className={
+        className ||
+        "w-full px-1.5 py-1 text-sm border border-gray-300 rounded bg-white"
+      }
+      value={local}
+      placeholder={placeholder}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => onCommit(local)}
+    />
+  );
+};
+
+const LINKED_DOC_LABELS: Record<keyof LinkedDocumentsResult, string> = {
+  orders: "Orders",
+  invoices: "Invoices",
+  invoiceCorrections: "Invoice corrections",
+  deliveryNotes: "Delivery notes",
+};
+
 export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   isOpen,
   offerId,
@@ -328,6 +478,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [edit, setEdit] = useState(false);
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
+
+  const [linkedDocs, setLinkedDocs] = useState<LinkedDocumentsResult | null>(
+    null,
+  );
+  const [linkedDocsLoading, setLinkedDocsLoading] = useState(false);
+
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [itemPickerSearch, setItemPickerSearch] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -413,6 +571,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setEdit(false);
     setShowCopyPaste(false);
     setCopyPasteData("");
+    setShowItemPicker(false);
+    setItemPickerSearch("");
     if (offerId) {
       fetchOffer();
     } else {
@@ -450,6 +610,34 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     })();
   }, [isOpen, offerId]);
+
+  // Load the item catalog lazily for the "add existing item" picker when
+  // editing an existing offer (the effect above only runs during creation).
+  useEffect(() => {
+    if (!showItemPicker || items.length > 0) return;
+    (async () => {
+      try {
+        const res: any = await getItems({ limit: 1000 });
+        setItems(Array.isArray(res?.data) ? res.data : res?.data?.items || []);
+      } catch (e) {
+        console.error("Error loading items:", e);
+      }
+    })();
+  }, [showItemPicker, items.length]);
+
+  // Linked documents (orders / invoices / invoice corrections / delivery
+  // notes) tied to this specific offer.
+  useEffect(() => {
+    if (!offer?.id) {
+      setLinkedDocs(null);
+      return;
+    }
+    setLinkedDocsLoading(true);
+    getOfferLinkedDocuments(offer.id)
+      .then((res: any) => setLinkedDocs(res.success ? res.data : null))
+      .catch(() => setLinkedDocs(null))
+      .finally(() => setLinkedDocsLoading(false));
+  }, [offer?.id]);
 
   if (!isOpen) return null;
 
@@ -531,6 +719,19 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         .toLowerCase()
         .includes(q) ||
       String(it.customer?.companyName || "")
+        .toLowerCase()
+        .includes(q)
+    );
+  });
+
+  const itemPickerList = items.filter((it) => {
+    if (!itemPickerSearch) return true;
+    const q = itemPickerSearch.toLowerCase();
+    const name = it.item_name || it.itemName || "";
+    return (
+      name.toLowerCase().includes(q) ||
+      String(it.ean || "").includes(itemPickerSearch) ||
+      String(it.model || "")
         .toLowerCase()
         .includes(q)
     );
@@ -653,6 +854,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setForm(buildForm(offer));
     setEdit(false);
     setShowCopyPaste(false);
+    setShowItemPicker(false);
   };
 
   const handleDelete = async () => {
@@ -759,7 +961,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   const addLineItem = async () => {
     if (!newLine.itemName.trim()) {
-      toast.error("Enter an item name first.", errorStyles);
+      toast.error("Enter a name for the Freizeile first.", errorStyles);
       return;
     }
     try {
@@ -769,6 +971,24 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         basePrice: 0,
       });
       setNewLine({ itemName: "", baseQuantity: "1" });
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't add the Freizeile:", e);
+    }
+  };
+
+  const addExistingItem = async (it: any) => {
+    try {
+      await createOfferLineItem(offer.id, {
+        itemName: it.item_name || it.itemName || "Item",
+        material: it.model || (it.ean ? String(it.ean) : undefined),
+        basePrice: 0,
+        weight: it.weight,
+        sourceItemId: String(it.id),
+      });
+      setShowItemPicker(false);
+      setItemPickerSearch("");
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -863,6 +1083,30 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       (a, b) => (parseFlexibleNumber(a) || 0) - (parseFlexibleNumber(b) || 0),
     );
   })();
+
+  // --- Weight totals ---------------------------------------------------
+  const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
+    const qty =
+      pricingMode === "matrix"
+        ? (parseFlexibleNumber(getActiveMatrixEntry(li)?.quantity) ?? 1)
+        : (parseFlexibleNumber(li.baseQuantity) ?? 1);
+    return sum + (parseFlexibleNumber(li.weight) ?? 0) * qty;
+  }, 0);
+  const extraWeightKg = visibleLineItems.reduce(
+    (sum: number, li: any) => sum + (parseFlexibleNumber(li.extraWeight) ?? 0),
+    0,
+  );
+  const totalWeightKg = netWeightKg + extraWeightKg;
+
+  // --- Tax profile -------------------------------------------------------
+  const taxProfile = offer ? getTaxProfile(offer) : null;
+
+  // --- Linked documents ---------------------------------------------------
+  const linkedDocsCount = linkedDocs
+    ? (
+        Object.keys(LINKED_DOC_LABELS) as (keyof LinkedDocumentsResult)[]
+      ).reduce((sum: any, key) => sum + (linkedDocs[key]?.length || 0), 0)
+    : 0;
 
   const sourceTabs: {
     key: SourceType;
@@ -1465,6 +1709,46 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </div>
 
+              {/* WEIGHT & TAX PROFILE */}
+              <Section
+                title="Weight & tax profile"
+                icon={<CalculatorIcon className="h-4 w-4 text-gray-500" />}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Field
+                    label="Net weight (items)"
+                    edit={false}
+                    value={formatWeight(netWeightKg)}
+                  />
+                  <Field
+                    label="Extra weight"
+                    edit={false}
+                    value={formatWeight(extraWeightKg)}
+                  />
+                  <Field
+                    label="Total weight"
+                    edit={false}
+                    value={formatWeight(totalWeightKg)}
+                  />
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field
+                    label="Tax profile"
+                    edit={false}
+                    value={
+                      taxProfile
+                        ? TAX_PROFILE_LABELS[taxProfile]
+                        : "No shipping country set"
+                    }
+                  />
+                  <Field
+                    label="Subsequent tax (VAT amount)"
+                    edit={false}
+                    value={formatCurrency(offer.taxAmount || 0, offer.currency)}
+                  />
+                </div>
+              </Section>
+
               {/* PRICING MODE */}
               <Section
                 title="Pricing"
@@ -1583,94 +1867,346 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 )}
 
-                <div className="space-y-4">
-                  {visibleLineItems.length === 0 && (
-                    <div className="text-center py-6 text-sm text-gray-500">
-                      No line items yet.
-                    </div>
-                  )}
-
-                  {visibleLineItems.map((item: any) => {
-                    const total = getLineItemTotal(item, pricingMode);
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="p-4 border border-gray-200 rounded-lg bg-white"
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {item.position}. {item.itemName}
-                            </div>
-                            {item.description && (
-                              <div className="text-sm text-gray-600 mt-0.5">
-                                {item.description}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-right flex flex-col items-end gap-1">
-                            <div className="text-lg font-bold text-gray-900">
-                              {formatCurrency(total || 0, offer.currency)}
-                            </div>
-                            {edit && (
-                              <button
-                                onClick={() => removeLineItem(item.id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 text-xs text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors"
+                {pricingMode === "classic" ? (
+                  <div className="space-y-3">
+                    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100 border-b border-gray-200">
+                          <tr>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
+                              Pos
+                            </th>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-24">
+                              Art
+                            </th>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                              Art.-Nr.
+                            </th>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                              Bezeichnung
+                            </th>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                              Hinweis
+                            </th>
+                            <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
+                              MwSt.
+                            </th>
+                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                              Menge
+                            </th>
+                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                              Netto-Preis
+                            </th>
+                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                              Netto gesamt
+                            </th>
+                            {edit && <th className="w-10" />}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {visibleLineItems.length === 0 && (
+                            <tr>
+                              <td
+                                colSpan={edit ? 10 : 9}
+                                className="text-center py-6 text-sm text-gray-500"
                               >
-                                <TrashIcon className="h-3.5 w-3.5" />
-                                Remove item
-                              </button>
-                            )}
-                          </div>
+                                No line items yet.
+                              </td>
+                            </tr>
+                          )}
+                          {visibleLineItems.map((item: any) => {
+                            const freetext = isFreetextLine(item);
+                            const total = getLineItemTotal(item, "classic");
+                            const qtyDisplay = Math.round(
+                              parseFlexibleNumber(item.baseQuantity) ?? 1,
+                            );
+                            return (
+                              <tr
+                                key={item.id}
+                                className={freetext ? "bg-gray-50/70" : ""}
+                              >
+                                <td className="px-2 py-2 text-gray-500">
+                                  {item.position}
+                                </td>
+                                <td className="px-2 py-2">
+                                  <span
+                                    className={`text-[11px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${
+                                      freetext
+                                        ? "bg-gray-200 text-gray-700"
+                                        : "bg-blue-50 text-blue-700"
+                                    }`}
+                                  >
+                                    {freetext ? "Freitext" : "Artikel"}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-2">
+                                  {edit ? (
+                                    <TextCellInput
+                                      value={item.material}
+                                      placeholder="Art.-Nr."
+                                      onCommit={(raw) =>
+                                        persistLine(item.id, { material: raw })
+                                      }
+                                    />
+                                  ) : (
+                                    <span>{item.material || "—"}</span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2">
+                                  {edit ? (
+                                    <TextCellInput
+                                      value={item.itemName}
+                                      onCommit={(raw) =>
+                                        persistLine(item.id, {
+                                          itemName: raw || item.itemName,
+                                        })
+                                      }
+                                    />
+                                  ) : (
+                                    <span>{item.itemName}</span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2">
+                                  {edit ? (
+                                    <TextCellInput
+                                      value={item.notes}
+                                      placeholder="Remark"
+                                      onCommit={(raw) =>
+                                        persistLine(item.id, { notes: raw })
+                                      }
+                                    />
+                                  ) : (
+                                    <span className="text-gray-600">
+                                      {item.notes || "—"}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2 text-center text-gray-600">
+                                  {offer.taxRate ?? 19}%
+                                </td>
+                                <td className="px-2 py-2">
+                                  {edit ? (
+                                    <DecimalInput
+                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                      value={item.baseQuantity}
+                                      onCommit={(raw) =>
+                                        persistLine(item.id, {
+                                          baseQuantity: raw.trim() || "1",
+                                        })
+                                      }
+                                    />
+                                  ) : (
+                                    <div className="text-right">
+                                      {qtyDisplay}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2">
+                                  {edit ? (
+                                    <DecimalInput
+                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                      value={item.basePrice}
+                                      onCommit={(raw) => {
+                                        const parsed = parseFlexibleNumber(raw);
+                                        persistLine(item.id, {
+                                          basePrice:
+                                            parsed === null ? "0" : raw,
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="text-right">
+                                      {formatCurrency(
+                                        item.basePrice || 0,
+                                        offer.currency,
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2 text-right font-medium">
+                                  {formatCurrency(total || 0, offer.currency)}
+                                </td>
+                                {edit && (
+                                  <td className="px-2 py-2 text-center">
+                                    <button
+                                      onClick={() => removeLineItem(item.id)}
+                                      className="text-rose-500 hover:text-rose-700"
+                                      title="Remove line"
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+
+                          {/* Shipping method — always the last row */}
+                          <tr className="bg-gray-100/80">
+                            <td className="px-2 py-2 text-gray-400">
+                              {visibleLineItems.length + 1}
+                            </td>
+                            <td className="px-2 py-2">
+                              <span className="text-[11px] px-1.5 py-0.5 rounded font-medium bg-gray-300 text-gray-800 whitespace-nowrap">
+                                Versand
+                              </span>
+                            </td>
+                            <td className="px-2 py-2 text-gray-400">—</td>
+                            <td className="px-2 py-2 text-gray-700">
+                              {offer.shippingMethod || "No shipping method set"}
+                            </td>
+                            <td className="px-2 py-2 text-gray-400">—</td>
+                            <td className="px-2 py-2 text-center text-gray-600">
+                              {offer.taxRate ?? 19}%
+                            </td>
+                            <td className="px-2 py-2 text-right text-gray-600">
+                              1
+                            </td>
+                            <td className="px-2 py-2 text-right text-gray-600">
+                              {formatCurrency(
+                                offer.shippingCost || 0,
+                                offer.currency,
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-right font-medium text-gray-700">
+                              {formatCurrency(
+                                offer.shippingCost || 0,
+                                offer.currency,
+                              )}
+                            </td>
+                            {edit && <td />}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {edit && (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => setShowItemPicker((s) => !s)}
+                            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1"
+                          >
+                            <PlusIcon className="h-3.5 w-3.5" />
+                            Add existing item
+                          </button>
                         </div>
 
-                        {pricingMode === "classic" ? (
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Quantity
-                              </label>
-                              {edit ? (
-                                <DecimalInput
-                                  value={item.baseQuantity}
-                                  onCommit={(raw) =>
-                                    persistLine(item.id, {
-                                      baseQuantity: raw.trim() || "1",
-                                    })
-                                  }
-                                />
-                              ) : (
-                                <div className="text-sm text-gray-900">
-                                  {item.baseQuantity || "1"} pcs
+                        {showItemPicker && (
+                          <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+                            <input
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                              placeholder="Search items…"
+                              value={itemPickerSearch}
+                              onChange={(e) =>
+                                setItemPickerSearch(e.target.value)
+                              }
+                            />
+                            <div className="max-h-48 overflow-y-auto space-y-1.5">
+                              {itemPickerList.length === 0 ? (
+                                <div className="text-center text-sm text-gray-500 py-3">
+                                  No items match.
                                 </div>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Price / unit ({offer.currency})
-                              </label>
-                              {edit ? (
-                                <DecimalInput
-                                  value={item.basePrice}
-                                  onCommit={(raw) => {
-                                    const parsed = parseFlexibleNumber(raw);
-                                    persistLine(item.id, {
-                                      basePrice: parsed === null ? "0" : raw,
-                                    });
-                                  }}
-                                />
                               ) : (
-                                <div className="text-sm text-gray-900">
-                                  {formatCurrency(
-                                    item.basePrice || 0,
-                                    offer.currency,
-                                  )}
-                                </div>
+                                itemPickerList.map((it) => (
+                                  <ItemRow
+                                    key={it.id}
+                                    item={it}
+                                    selected={false}
+                                    onClick={() => addExistingItem(it)}
+                                  />
+                                ))
                               )}
                             </div>
                           </div>
-                        ) : (
+                        )}
+
+                        <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Freizeile — text
+                            </label>
+                            <input
+                              className={inputCls}
+                              value={newLine.itemName}
+                              placeholder="e.g., Custom bracket"
+                              onChange={(e) =>
+                                setNewLine((n) => ({
+                                  ...n,
+                                  itemName: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="w-28">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Quantity
+                            </label>
+                            <input
+                              className={inputCls}
+                              value={newLine.baseQuantity}
+                              onChange={(e) =>
+                                setNewLine((n) => ({
+                                  ...n,
+                                  baseQuantity: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <button
+                            onClick={addLineItem}
+                            className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
+                          >
+                            <PlusIcon className="h-4 w-4" />
+                            Add Freizeile
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {visibleLineItems.length === 0 && (
+                      <div className="text-center py-6 text-sm text-gray-500">
+                        No line items yet.
+                      </div>
+                    )}
+
+                    {visibleLineItems.map((item: any) => {
+                      const total = getLineItemTotal(item, pricingMode);
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-4 border border-gray-200 rounded-lg bg-white"
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {item.position}. {item.itemName}
+                              </div>
+                              {item.description && (
+                                <div className="text-sm text-gray-600 mt-0.5">
+                                  {item.description}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right flex flex-col items-end gap-1">
+                              <div className="text-lg font-bold text-gray-900">
+                                {formatCurrency(total || 0, offer.currency)}
+                              </div>
+                              {edit && (
+                                <button
+                                  onClick={() => removeLineItem(item.id)}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors"
+                                >
+                                  <TrashIcon className="h-3.5 w-3.5" />
+                                  Remove item
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium text-gray-900">
@@ -1822,54 +2358,54 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    })}
 
-                  {edit && (
-                    <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
-                      <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          New item name
-                        </label>
-                        <input
-                          className={inputCls}
-                          value={newLine.itemName}
-                          placeholder="e.g., Custom bracket"
-                          onChange={(e) =>
-                            setNewLine((n) => ({
-                              ...n,
-                              itemName: e.target.value,
-                            }))
-                          }
-                        />
+                    {edit && (
+                      <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            New item name
+                          </label>
+                          <input
+                            className={inputCls}
+                            value={newLine.itemName}
+                            placeholder="e.g., Custom bracket"
+                            onChange={(e) =>
+                              setNewLine((n) => ({
+                                ...n,
+                                itemName: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="w-28">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Quantity
+                          </label>
+                          <input
+                            className={inputCls}
+                            value={newLine.baseQuantity}
+                            onChange={(e) =>
+                              setNewLine((n) => ({
+                                ...n,
+                                baseQuantity: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <button
+                          onClick={addLineItem}
+                          className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
+                        >
+                          <PlusIcon className="h-4 w-4" />
+                          Add item
+                        </button>
                       </div>
-                      <div className="w-28">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Quantity
-                        </label>
-                        <input
-                          className={inputCls}
-                          value={newLine.baseQuantity}
-                          onChange={(e) =>
-                            setNewLine((n) => ({
-                              ...n,
-                              baseQuantity: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <button
-                        onClick={addLineItem}
-                        className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
-                      >
-                        <PlusIcon className="h-4 w-4" />
-                        Add item
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </Section>
 
               <Section
@@ -1942,6 +2478,55 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </div>
                   </div>
                 </div>
+              </Section>
+
+              {/* LINKED DOCUMENTS */}
+              <Section
+                title="Linked documents"
+                icon={<LinkIcon className="h-4 w-4 text-gray-500" />}
+              >
+                {linkedDocsLoading ? (
+                  <div className="text-sm text-gray-500 py-2">
+                    Loading linked documents…
+                  </div>
+                ) : linkedDocsCount > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {(
+                      Object.keys(
+                        LINKED_DOC_LABELS,
+                      ) as (keyof LinkedDocumentsResult)[]
+                    ).map((key) => {
+                      const list = linkedDocs?.[key] || [];
+                      if (list.length === 0) return null;
+                      return (
+                        <div key={key}>
+                          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                            {LINKED_DOC_LABELS[key]}
+                          </p>
+                          <ul className="space-y-1">
+                            {list.map((d) => (
+                              <li
+                                key={d.id}
+                                className="flex justify-between text-gray-700"
+                              >
+                                <span>{d.number}</span>
+                                {d.date && (
+                                  <span className="text-gray-400">
+                                    {formatDate(d.date)}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No linked documents yet.
+                  </p>
+                )}
               </Section>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

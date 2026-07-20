@@ -439,6 +439,24 @@ export class OfferLineItem {
   @Column({ type: "float", nullable: true })
   length?: number;
 
+  /** Extra weight, decimal-capable (e.g. 0.1, 2, 4.5). */
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  extraWeight?: number;
+
+  /** Expected delivery date for this line item. */
+  @Column({ type: "date", nullable: true })
+  expectedDeliveryDate?: Date;
+
+  /** UI highlight color for this offer line (e.g. "#FFEE58" or a named color). */
+  @Column({ type: "varchar", length: 20, nullable: true })
+  highlightColor?: string;
+
   // --- Classic mode: exactly one quantity, one price -----------------------
   @Column({ type: "varchar", length: 100, nullable: true })
   baseQuantity?: string;

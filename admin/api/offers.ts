@@ -61,6 +61,8 @@ export interface OfferLineItem {
   length?: number;
   purchasePrice?: number;
   purchaseCurrency?: "RMB" | "HKD" | "EUR" | "USD";
+  sourceItemId?: string;
+  requestedItemId?: string;
 
   // Classic mode
   baseQuantity?: string;
@@ -77,6 +79,14 @@ export interface OfferLineItem {
   isComponent: boolean;
   parentItemId?: string;
   notes?: string;
+
+  /** Extra weight, decimal-capable (e.g. 0.1, 2, 4.5). */
+  extraWeight?: number;
+  /** Expected delivery date for this line item. */
+  expectedDeliveryDate?: Date | string;
+  /** UI highlight color for this offer line (e.g. "#FFEE58"). */
+  highlightColor?: string;
+
   createdAt: Date;
   updatedAt: Date;
   activePrice?: PriceMatrixEntry | null;
@@ -119,6 +129,11 @@ export interface CreateLineItemPayload {
   baseQuantity?: string;
   basePrice?: number | string;
   notes?: string;
+  extraWeight?: number | string;
+  expectedDeliveryDate?: Date | string;
+  highlightColor?: string;
+  weight?: number | string;
+  sourceItemId?: string;
 }
 
 export interface Offer {
@@ -226,6 +241,9 @@ export interface UpdateLineItemPayload {
   lineTotal?: number | string;
   position?: number;
   notes?: string;
+  extraWeight?: number | string;
+  expectedDeliveryDate?: Date | string;
+  highlightColor?: string;
 }
 
 export interface BulkUpdateLineItemsPayload {
@@ -236,6 +254,9 @@ export interface BulkUpdateLineItemsPayload {
     samplePrice?: number | string;
     lineTotal?: number | string;
     notes?: string;
+    extraWeight?: number | string;
+    expectedDeliveryDate?: Date | string;
+    highlightColor?: string;
   }>;
 }
 
@@ -246,6 +267,20 @@ export interface OfferSearchFilters {
   status?: string;
   page?: number;
   limit?: number;
+}
+
+export interface LinkedDocumentRef {
+  id: string;
+  number: string;
+  date?: string;
+  status?: string;
+}
+
+export interface LinkedDocumentsResult {
+  orders?: LinkedDocumentRef[];
+  invoices?: LinkedDocumentRef[];
+  invoiceCorrections?: LinkedDocumentRef[];
+  deliveryNotes?: LinkedDocumentRef[];
 }
 
 export const getOfferStatuses = () => [
@@ -488,6 +523,21 @@ export const getOfferStatistics = async () => {
   } catch (error) {
     handleApiError(error, "Failed to fetch offer statistics");
     throw error;
+  }
+};
+
+// Orders / invoices / invoice corrections / delivery notes linked to this
+// offer. Fails soft (returns an empty result) instead of throwing, since this
+// depends on Order/Invoice/DeliveryNote modules that may not be wired in on
+// every environment yet.
+export const getOfferLinkedDocuments = async (
+  offerId: string,
+): Promise<{ success: boolean; data: LinkedDocumentsResult | null }> => {
+  try {
+    const response: any = await api.get(`/offers/${offerId}/linked-documents`);
+    return response?.success ? response : { success: false, data: null };
+  } catch (error) {
+    return { success: false, data: null };
   }
 };
 

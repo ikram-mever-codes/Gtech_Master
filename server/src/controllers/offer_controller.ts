@@ -440,6 +440,18 @@ export class UpdateLineItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  extraWeight?: number | string;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  expectedDeliveryDate?: Date;
+
+  @IsOptional()
+  @IsString()
+  highlightColor?: string;
 }
 
 export class BulkUpdateLineItemsDto {
@@ -451,6 +463,9 @@ export class BulkUpdateLineItemsDto {
     samplePrice?: number | string;
     lineTotal?: number | string;
     notes?: string;
+    extraWeight?: number | string;
+    expectedDeliveryDate?: string | Date;
+    highlightColor?: string;
   }>;
 }
 
@@ -613,6 +628,25 @@ export class CreateLineItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  extraWeight?: number | string;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  expectedDeliveryDate?: Date;
+
+  @IsOptional()
+  @IsString()
+  highlightColor?: string;
+
+  @IsOptional()
+  weight?: number | string;
+
+  @IsOptional()
+  @IsString()
+  sourceItemId?: string;
 }
 
 export class OfferController {
@@ -1222,6 +1256,9 @@ export class OfferController {
         ) + 1;
       const basePrice = parseFlexibleNumber(body.basePrice) ?? 0;
       const baseQuantity = body.baseQuantity?.trim() || "1";
+      const extraWeight = parseFlexibleNumber(body.extraWeight);
+      const expectedDeliveryDate = coerceDate(body.expectedDeliveryDate);
+      const weight = parseFlexibleNumber(body.weight);
 
       const lineItem = this.lineItemRepository.create({
         offer,
@@ -1235,6 +1272,11 @@ export class OfferController {
         notes: body.notes,
         position: nextPosition,
         priceMatrix: offer.pricingMode === "matrix" ? [] : undefined,
+        extraWeight: extraWeight ?? undefined,
+        expectedDeliveryDate,
+        highlightColor: body.highlightColor,
+        weight: weight ?? undefined,
+        sourceItemId: body.sourceItemId || undefined,
         lineTotal:
           basePrice !== null
             ? basePrice * (parseFlexibleNumber(body.baseQuantity) || 1)
@@ -1995,6 +2037,15 @@ export class OfferController {
       ) {
         (updateLineItemDto as any).baseQuantity = "1";
       }
+      if (updateLineItemDto.extraWeight !== undefined) {
+        (updateLineItemDto as any).extraWeight =
+          parseFlexibleNumber(updateLineItemDto.extraWeight) ?? undefined;
+      }
+      if (updateLineItemDto.expectedDeliveryDate !== undefined) {
+        (updateLineItemDto as any).expectedDeliveryDate = coerceDate(
+          updateLineItemDto.expectedDeliveryDate,
+        );
+      }
       Object.assign(lineItem, updateLineItemDto);
 
       if (offer.pricingMode === "matrix" && lineItem.priceMatrix?.length) {
@@ -2185,6 +2236,15 @@ export class OfferController {
               itemUpdate.lineTotal,
             );
           if (itemUpdate.notes !== undefined) lineItem.notes = itemUpdate.notes;
+          if (itemUpdate.extraWeight !== undefined)
+            lineItem.extraWeight =
+              parseFlexibleNumber(itemUpdate.extraWeight) ?? undefined;
+          if (itemUpdate.expectedDeliveryDate !== undefined)
+            lineItem.expectedDeliveryDate = coerceDate(
+              itemUpdate.expectedDeliveryDate,
+            );
+          if (itemUpdate.highlightColor !== undefined)
+            lineItem.highlightColor = itemUpdate.highlightColor;
 
           const updatedItem = await this.lineItemRepository.save(lineItem);
           results.push(updatedItem);
@@ -3389,6 +3449,43 @@ export class OfferController {
           details: error.message,
         });
       }
+    }
+  }
+
+  // ==========================================================================
+  // Linked documents (orders / invoices / invoice corrections / delivery
+  // notes) tied to this offer. Returns an empty-but-valid shape until the
+  // Order/Invoice/DeliveryNote entities are wired in here — the frontend
+  // already handles an empty result gracefully.
+  // ==========================================================================
+  async getLinkedDocuments(request: Request, response: Response) {
+    try {
+      const { id } = request.params;
+      const offer = await this.offerRepository.findOne({ where: { id } });
+      if (!offer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Offer not found" });
+      }
+
+      // TODO: replace with real queries once Order / Invoice / DeliveryNote
+      // repositories are available, e.g. filtering by offer.id or
+      // offer.offerNumber.
+      return response.status(200).json({
+        success: true,
+        data: {
+          orders: [],
+          invoices: [],
+          invoiceCorrections: [],
+          deliveryNotes: [],
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching linked documents:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
     }
   }
 
