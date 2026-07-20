@@ -556,7 +556,16 @@ const CombinedInquiriesPageContent = () => {
         requests: requestsData,
       } as UpdateInquiryPayload);
 
-      fetchInquiries();
+      setInquiries((prev) =>
+        prev.map((inq) =>
+          inq.id === inquiryId ? { ...inq, status: newStatus as any } : inq
+        )
+      );
+      setAllInquiries((prev) =>
+        prev.map((inq) =>
+          inq.id === inquiryId ? { ...inq, status: newStatus as any } : inq
+        )
+      );
     } catch (error) {
       console.error("Error updating inquiry status:", error);
     }
@@ -687,12 +696,12 @@ const CombinedInquiriesPageContent = () => {
           inquiryData = [...inquiryData].sort((a: any, b: any) => {
             const valA =
               a.total_potential_k_eur !== undefined &&
-              a.total_potential_k_eur !== null
+                a.total_potential_k_eur !== null
                 ? Number(a.total_potential_k_eur)
                 : 0;
             const valB =
               b.total_potential_k_eur !== undefined &&
-              b.total_potential_k_eur !== null
+                b.total_potential_k_eur !== null
                 ? Number(b.total_potential_k_eur)
                 : 0;
             return inquiryFilters.sortOrder === "ASC"
@@ -981,8 +990,7 @@ const CombinedInquiriesPageContent = () => {
       fetchInquiries();
     } catch (error) {
       console.error(
-        `Error ${
-          inquiryModalMode === "edit" ? "updating" : "creating"
+        `Error ${inquiryModalMode === "edit" ? "updating" : "creating"
         } inquiry:`,
         error,
       );
@@ -1383,9 +1391,8 @@ const CombinedInquiriesPageContent = () => {
   };
   const formatTaricDisplay = (taric: any) => {
     if (!taric) return "";
-    return `${taric.id} - ${taric.code || "No code"} - ${
-      taric.name_de || taric.name_en || taric.name_cn || "No name"
-    }`;
+    return `${taric.id} - ${taric.code || "No code"} - ${taric.name_de || taric.name_en || taric.name_cn || "No name"
+      }`;
   };
   const getConversionFormFieldsWithOptions = () => {
     const fields = getConversionFormFields(existingDimensionFields);
@@ -1612,15 +1619,14 @@ const CombinedInquiriesPageContent = () => {
                                 e.stopPropagation();
                                 toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`${
-                                !inquiry.requests ||
+                              className={`${!inquiry.requests ||
                                 inquiry.requests.length === 0
-                                  ? "text-red-500 hover:text-red-700"
-                                  : "text-gray-400 hover:text-gray-700"
-                              } flex-shrink-0 mt-0.5`}
+                                ? "text-red-500 hover:text-red-700"
+                                : "text-gray-400 hover:text-gray-700"
+                                } flex-shrink-0 mt-0.5`}
                               title={
                                 !inquiry.requests ||
-                                inquiry.requests.length === 0
+                                  inquiry.requests.length === 0
                                   ? "No request items yet"
                                   : expandedInquiryIds.has(inquiry.id)
                                     ? "Hide requests"
@@ -1628,11 +1634,10 @@ const CombinedInquiriesPageContent = () => {
                               }
                             >
                               <ChevronRightIcon
-                                className={`h-4 w-4 transition-transform duration-200 ${
-                                  expandedInquiryIds.has(inquiry.id)
-                                    ? "rotate-90"
-                                    : ""
-                                }`}
+                                className={`h-4 w-4 transition-transform duration-200 ${expandedInquiryIds.has(inquiry.id)
+                                  ? "rotate-90"
+                                  : ""
+                                  }`}
                               />
                             </button>
                             <div
@@ -1673,7 +1678,7 @@ const CombinedInquiriesPageContent = () => {
                             <div className="text-xs text-gray-600 truncate mt-0.5">
                               {inquiry.contactPerson
                                 ? `${inquiry.contactPerson.name || ""} ${inquiry.contactPerson.familyName || ""}`.trim() ||
-                                  "-"
+                                "-"
                                 : "-"}
                             </div>
                           </div>
@@ -1712,7 +1717,7 @@ const CombinedInquiriesPageContent = () => {
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-900 font-medium">
                           {inquiry.total_potential_k_eur !== undefined &&
-                          inquiry.total_potential_k_eur !== null
+                            inquiry.total_potential_k_eur !== null
                             ? Math.round(inquiry.total_potential_k_eur)
                             : "-"}
                         </td>
@@ -1789,31 +1794,31 @@ const CombinedInquiriesPageContent = () => {
                               inquiry.requests?.some(
                                 (r: any) => r.asanaLink,
                               )) && (
-                              <a
-                                href={
-                                  inquiry.asanaLink ||
-                                  inquiry.requests?.find(
-                                    (r: any) => r.asanaLink,
-                                  )?.asanaLink
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-purple-500 hover:text-purple-700 transition-colors shrink-0"
-                                title="Open Asana task"
-                              >
-                                <svg
-                                  className="h-4 w-4"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
+                                <a
+                                  href={
+                                    inquiry.asanaLink ||
+                                    inquiry.requests?.find(
+                                      (r: any) => r.asanaLink,
+                                    )?.asanaLink
+                                  }
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-purple-500 hover:text-purple-700 transition-colors shrink-0"
+                                  title="Open Asana task"
                                 >
-                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                  <circle cx="12" cy="8.5" r="1.5" />
-                                  <circle cx="8.5" cy="14.5" r="1.5" />
-                                  <circle cx="15.5" cy="14.5" r="1.5" />
-                                </svg>
-                              </a>
-                            )}
+                                  <svg
+                                    className="h-4 w-4"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                    <circle cx="12" cy="8.5" r="1.5" />
+                                    <circle cx="8.5" cy="14.5" r="1.5" />
+                                    <circle cx="15.5" cy="14.5" r="1.5" />
+                                  </svg>
+                                </a>
+                              )}
                           </div>
                         </td>
                       </tr>
@@ -1879,11 +1884,10 @@ const CombinedInquiriesPageContent = () => {
                                             );
                                             setShowRequestDetailModal(true);
                                           }}
-                                          className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${
-                                            request.priority === "High"
-                                              ? "bg-red-50/50"
-                                              : ""
-                                          }`}
+                                          className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${request.priority === "High"
+                                            ? "bg-red-50/50"
+                                            : ""
+                                            }`}
                                         >
                                           <td className="px-4 py-3">
                                             <div className="w-[8rem]">
@@ -1901,7 +1905,7 @@ const CombinedInquiriesPageContent = () => {
                                             <td className="px-3 py-3 text-center">
                                               <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
                                                 {request.images &&
-                                                request.images.length > 0 ? (
+                                                  request.images.length > 0 ? (
                                                   <img
                                                     src={request.images[0]}
                                                     alt="Item"
@@ -1933,7 +1937,7 @@ const CombinedInquiriesPageContent = () => {
                                             <div className="text-sm font-medium text-gray-900">
                                               {request.targetPrice !==
                                                 undefined &&
-                                              request.targetPrice !== null
+                                                request.targetPrice !== null
                                                 ? `${request.targetPrice} €`
                                                 : "-"}
                                             </div>
@@ -1942,11 +1946,11 @@ const CombinedInquiriesPageContent = () => {
                                             <div className="text-sm font-bold text-blue-600">
                                               {request.annualPotentialKEur !==
                                                 undefined &&
-                                              request.annualPotentialKEur !==
+                                                request.annualPotentialKEur !==
                                                 null
                                                 ? Math.round(
-                                                    request.annualPotentialKEur,
-                                                  )
+                                                  request.annualPotentialKEur,
+                                                )
                                                 : "-"}
                                             </div>
                                           </td>
@@ -1967,10 +1971,10 @@ const CombinedInquiriesPageContent = () => {
                                                       (req: any) =>
                                                         req.id === request.id
                                                           ? {
-                                                              ...req,
-                                                              requestStatus:
-                                                                nextStatus,
-                                                            }
+                                                            ...req,
+                                                            requestStatus:
+                                                              nextStatus,
+                                                          }
                                                           : req,
                                                     ),
                                                   })),
@@ -1985,12 +1989,12 @@ const CombinedInquiriesPageContent = () => {
                                                           inq.requests?.map(
                                                             (req: any) =>
                                                               req.id ===
-                                                              request.id
+                                                                request.id
                                                                 ? {
-                                                                    ...req,
-                                                                    requestStatus:
-                                                                      nextStatus,
-                                                                  }
+                                                                  ...req,
+                                                                  requestStatus:
+                                                                    nextStatus,
+                                                                }
                                                                 : req,
                                                           ),
                                                       }),
@@ -2158,11 +2162,10 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         key={pageNum}
                         onClick={() => setInquiryCurrentPage(pageNum)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          inquiryCurrentPage === pageNum
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -2173,11 +2176,10 @@ const CombinedInquiriesPageContent = () => {
                       <span className="px-1 text-gray-500">...</span>
                       <button
                         onClick={() => setInquiryCurrentPage(inquiryTotalPages)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          inquiryCurrentPage === inquiryTotalPages
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          }`}
                       >
                         {inquiryTotalPages}
                       </button>
@@ -2276,11 +2278,10 @@ const CombinedInquiriesPageContent = () => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="space-y-6">
             <div
-              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
-                inquiryFormData.isAssembly
-                  ? "bg-red-50 border border-red-200/70"
-                  : "bg-transparent"
-              }`}
+              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                ? "bg-red-50 border border-red-200/70"
+                : "bg-transparent"
+                }`}
             >
               <div>
                 <div className="grid grid-cols-2 gap-4">
@@ -2483,8 +2484,8 @@ const CombinedInquiriesPageContent = () => {
                       value={
                         inquiryFormData.next_followup_at
                           ? new Date(inquiryFormData.next_followup_at)
-                              .toISOString()
-                              .split("T")[0]
+                            .toISOString()
+                            .split("T")[0]
                           : ""
                       }
                       onChange={(e) =>
@@ -2973,11 +2974,10 @@ const CombinedInquiriesPageContent = () => {
               </div>
             </div>
             <div
-              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
-                inquiryFormData.isAssembly
-                  ? "bg-green-50 border border-green-200/70 mt-2"
-                  : "bg-transparent"
-              }`}
+              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                ? "bg-green-50 border border-green-200/70 mt-2"
+                : "bg-transparent"
+                }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -3006,15 +3006,14 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         type="button"
                         onClick={() => toggleRequestExpansion(index)}
-                        className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
-                          expandedRequestIndex === index
-                            ? inquiryFormData.isAssembly
-                              ? "bg-green-100"
-                              : "bg-gray-100"
-                            : inquiryFormData.isAssembly
-                              ? "bg-green-50 hover:bg-green-100"
-                              : "bg-gray-50 hover:bg-gray-100"
-                        }`}
+                        className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
+                          ? inquiryFormData.isAssembly
+                            ? "bg-green-100"
+                            : "bg-gray-100"
+                          : inquiryFormData.isAssembly
+                            ? "bg-green-50 hover:bg-green-100"
+                            : "bg-gray-50 hover:bg-gray-100"
+                          }`}
                       >
                         <div className="flex items-center gap-2">
                           {expandedRequestIndex === index ? (
@@ -3621,21 +3620,21 @@ const CombinedInquiriesPageContent = () => {
                 conversionInquiryData.width ||
                 conversionInquiryData.height ||
                 conversionInquiryData.length) && (
-                <div className="col-span-2">
-                  <span className="text-gray-600">Dimensions:</span>
-                  <span className="ml-2">
-                    {conversionInquiryData.weight &&
-                      `${conversionInquiryData.weight}kg `}
-                    {conversionInquiryData.length &&
-                      `${conversionInquiryData.length}×`}
-                    {conversionInquiryData.width &&
-                      `${conversionInquiryData.width}×`}
-                    {conversionInquiryData.height &&
-                      `${conversionInquiryData.height}`}
-                    cm
-                  </span>
-                </div>
-              )}
+                  <div className="col-span-2">
+                    <span className="text-gray-600">Dimensions:</span>
+                    <span className="ml-2">
+                      {conversionInquiryData.weight &&
+                        `${conversionInquiryData.weight}kg `}
+                      {conversionInquiryData.length &&
+                        `${conversionInquiryData.length}×`}
+                      {conversionInquiryData.width &&
+                        `${conversionInquiryData.width}×`}
+                      {conversionInquiryData.height &&
+                        `${conversionInquiryData.height}`}
+                      cm
+                    </span>
+                  </div>
+                )}
             </div>
           )}
           {conversionType === "request" && conversionRequestData && (
@@ -3671,21 +3670,21 @@ const CombinedInquiriesPageContent = () => {
                 conversionRequestData.width ||
                 conversionRequestData.height ||
                 conversionRequestData.length) && (
-                <div className="col-span-2">
-                  <span className="text-gray-600">Dimensions:</span>
-                  <span className="ml-2">
-                    {conversionRequestData.weight &&
-                      `${conversionRequestData.weight}kg `}
-                    {conversionRequestData.length &&
-                      `${conversionRequestData.length}×`}
-                    {conversionRequestData.width &&
-                      `${conversionRequestData.width}×`}
-                    {conversionRequestData.height &&
-                      `${conversionRequestData.height}`}
-                    cm
-                  </span>
-                </div>
-              )}
+                  <div className="col-span-2">
+                    <span className="text-gray-600">Dimensions:</span>
+                    <span className="ml-2">
+                      {conversionRequestData.weight &&
+                        `${conversionRequestData.weight}kg `}
+                      {conversionRequestData.length &&
+                        `${conversionRequestData.length}×`}
+                      {conversionRequestData.width &&
+                        `${conversionRequestData.width}×`}
+                      {conversionRequestData.height &&
+                        `${conversionRequestData.height}`}
+                      cm
+                    </span>
+                  </div>
+                )}
             </div>
           )}
         </div>
@@ -3811,11 +3810,10 @@ const CombinedInquiriesPageContent = () => {
                             : e.target.value,
                       })
                     }
-                    className={`w-full px-3 py-2 text-sm border ${
-                      field.required && !conversionFormData[field.name]
-                        ? "border-red-300"
-                        : "border-gray-300/80"
-                    } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
+                    className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
+                      ? "border-red-300"
+                      : "border-gray-300/80"
+                      } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
                     placeholder={field.placeholder}
                     min={field.min}
                     step={field.step}
@@ -3824,9 +3822,8 @@ const CombinedInquiriesPageContent = () => {
                 )}
                 {field.description && (
                   <p
-                    className={`text-xs mt-1 ${
-                      field.required ? "text-red-600" : "text-gray-500"
-                    }`}
+                    className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
+                      }`}
                   >
                     {field.description}
                   </p>

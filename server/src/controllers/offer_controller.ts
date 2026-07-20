@@ -463,16 +463,13 @@ export class PasteMatrixDto {
   tierCount!: number;
 }
 
-// ---------------------------------------------------------------------------
 export class CreateOfferFromItemDto {
   @IsOptional()
   @IsString()
   customerId?: string;
-
   @IsOptional()
   @IsString()
   title?: string;
-
   @IsOptional()
   @IsEnum(["RMB", "HKD", "EUR", "USD"])
   currency?: "RMB" | "HKD" | "EUR" | "USD";
@@ -1143,7 +1140,6 @@ export class OfferController {
       });
 
       const savedOffer = await this.offerRepository.save(offer);
-
       const lineItems = orderedItems.map((item, idx) => {
         const snap = this.buildItemSnapshot(item);
         return this.lineItemRepository.create({
@@ -1288,12 +1284,6 @@ export class OfferController {
       });
     }
   }
-
-  // ==========================================================================
-  // DELETE A PRICING TIER (a whole quantity column) ACROSS EVERY LINE ITEM
-  // DELETE /offers/:offerId/price-column?quantity=1000
-  // Matrix mode only.
-  // ==========================================================================
   async deletePriceColumn(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -2802,9 +2792,14 @@ export class OfferController {
         bufferPages: true,
       });
 
+      const pageWidth = 595.28;
+      const pageHeight = 841.89;
+
       const MM = (v: number) => v * 2.8346;
+
       const LEFT_X = MM(18);
       const INFO_BOX_X = MM(125);
+      const TABLE_END_X = MM(192);
       const CONTENT_WIDTH = MM(174);
 
       const uploadsDir = path.join(__dirname, "../../uploads/offers");
@@ -2919,6 +2914,31 @@ export class OfferController {
         addrY += 12;
       }
 
+      const titleBoxX = MM(125);
+      const titleBoxY = MM(48);
+      const titleBoxW = MM(67);
+      const titleBoxH = 22;
+
+      doc.rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH).fill("#D1D5DB");
+
+      doc
+        .font(SB)
+        .fontSize(14)
+        .fillColor("#3F4446")
+        .text("Angebot", titleBoxX + 8, titleBoxY + 4, { lineBreak: false });
+
+      if (offer.title) {
+        doc
+          .font(R)
+          .fontSize(11)
+          .fillColor("#3F4446")
+          .text(offer.title, titleBoxX + 70, titleBoxY + 6, {
+            width: titleBoxW - 75,
+            align: "right",
+            lineBreak: false,
+          });
+      }
+
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
         : "Alexander";
@@ -2928,6 +2948,7 @@ export class OfferController {
         ["Datum", formatDate(offer.createdAt)],
         ["Gültig bis", formatDate(offer.validUntil)],
         ["Ansprechpartner", contactName],
+        ["", ""],
         [
           "Kundennr.",
           offer.inquiry?.customer?.customerNumber ||
@@ -2936,46 +2957,43 @@ export class OfferController {
         ],
       ];
 
-      let infoY = MM(50);
-      const LABEL_W = MM(35);
-      const VALUE_X = INFO_BOX_X + LABEL_W + 4;
-      const VALUE_W = MM(65) - LABEL_W - 4;
+      let infoY = titleBoxY + titleBoxH + 8;
+      const LABEL_W = MM(32);
+      const VALUE_X = titleBoxX + LABEL_W + 4;
+      const VALUE_W = titleBoxW - LABEL_W - 4;
 
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
+        if (!label && !value) {
+          infoY += 6;
+          return;
+        }
         doc
           .font(R)
-          .text(label, INFO_BOX_X, infoY, { width: LABEL_W, lineBreak: false });
+          .text(label, titleBoxX, infoY, { width: LABEL_W, lineBreak: false });
         doc
           .font(M)
           .text(value, VALUE_X, infoY, { width: VALUE_W, lineBreak: false });
         infoY += 12;
       });
 
-      doc
-        .font(SB)
-        .fontSize(18)
-        .fillColor("#3F4446")
-        .text("Angebot", LEFT_X, MM(95));
-
-      let yPos = MM(108);
-      doc.font(R).fontSize(9.5).fillColor("#3F4446");
-
-      if (offer.deliveryTime || offer.shippingMethod || offer.deliveryTerms) {
+      let yPos = Math.max(addrY + 10, MM(98));
+      if (offer.shippingMethod || offer.deliveryTime || offer.deliveryTerms) {
+        doc.font(R).fontSize(9.5).fillColor("#3F4446");
         const deliveryParts: string[] = [];
-        if (offer.deliveryTime)
-          deliveryParts.push(`Lieferzeit: ${offer.deliveryTime}`);
         if (offer.shippingMethod)
           deliveryParts.push(`Versandart: ${offer.shippingMethod}`);
+        if (offer.deliveryTime)
+          deliveryParts.push(`Lieferzeit: ${offer.deliveryTime}`);
         if (offer.deliveryTerms)
           deliveryParts.push(`Lieferbedingungen: ${offer.deliveryTerms}`);
         doc.text(deliveryParts.join("   ·   "), LEFT_X, yPos, {
           width: CONTENT_WIDTH,
         });
-        yPos += 14;
+        yPos += 16;
       }
 
-      yPos = Math.max(yPos + 5, MM(115));
+      yPos = Math.max(yPos + 5, MM(112));
       const tableY = yPos;
 
       const columns = [
@@ -2983,22 +3001,24 @@ export class OfferController {
         { header: "Art. Nr.", width: 60, align: "left" },
         { header: "Menge", width: 40, align: "left" },
         { header: "Bezeichnung", width: 155, align: "left" },
-        { header: "Gesamt\n(Netto)", width: 55, align: "left" },
-        { header: "MwSt", width: 45, align: "left" },
-        { header: "E-Preis", width: 55, align: "left" },
-        { header: "Gesamt\n(Brutto)", width: 60, align: "left" },
+        { header: "Gesamt\n(Netto)", width: 60, align: "right" },
+        { header: "MwSt", width: 40, align: "center" },
+        { header: "E-Preis", width: 55, align: "right" },
+        { header: "Gesamt\n(Brutto)", width: 59, align: "right" },
       ];
 
       const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
-      const headerHeight = 22;
+      const headerHeight = 24;
 
-      doc.font(SB).fontSize(8).fillColor("#3F4446");
+      doc.rect(LEFT_X, tableY, tableWidth, headerHeight).fill("#D1D5DB");
+      doc.font(SB).fontSize(8.5).fillColor("#3F4446");
+
       let currentX = LEFT_X;
       columns.forEach((col) => {
-        doc.text(col.header, currentX + 3, tableY + 6, {
-          width: col.width - 6,
+        const headerYOffset = col.header.includes("\n") ? 3 : 7;
+        doc.text(col.header, currentX + 2, tableY + headerYOffset, {
+          width: col.width - 4,
           align: col.align as any,
-          lineBreak: false,
         });
         currentX += col.width;
       });
@@ -3006,11 +3026,37 @@ export class OfferController {
       doc
         .moveTo(LEFT_X, tableY + headerHeight)
         .lineTo(LEFT_X + tableWidth, tableY + headerHeight)
-        .lineWidth(0.75)
-        .strokeColor("#2F6B46")
+        .lineWidth(0.8)
+        .strokeColor("#3F4446")
         .stroke();
 
+      const formatGermanNum = (numVal: any, decimals: number = 2): string => {
+        const num = getSafeNumber(numVal);
+        const factor = Math.pow(10, decimals);
+        const rounded = Math.round((num + Number.EPSILON) * factor) / factor;
+        return rounded.toLocaleString("de-DE", {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        });
+      };
+
       doc.font(R).fontSize(8.5).fillColor("#3F4446");
+
+      const getActivePrice = (lineItem: any, offerUsesUnitPrices: boolean) => {
+        if (
+          offerUsesUnitPrices &&
+          lineItem.unitPrices &&
+          lineItem.unitPrices.length > 0
+        ) {
+          return lineItem.unitPrices.find((up: any) => up.isActive) || null;
+        } else if (
+          lineItem.quantityPrices &&
+          lineItem.quantityPrices.length > 0
+        ) {
+          return lineItem.quantityPrices.find((qp: any) => qp.isActive) || null;
+        }
+        return null;
+      };
 
       let currentY = tableY + headerHeight;
       const vatRatePercent = getSafeNumber(offer.taxRate ?? 19);
@@ -3156,62 +3202,81 @@ export class OfferController {
         yPos = MM(30);
       }
 
-      const TOTALS_LABEL_X = MM(120);
-      const TOTALS_VAL_X = MM(160);
-      const TOTALS_VAL_W = MM(32);
+      const TOTALS_LABEL_X = MM(115);
+      const TOTALS_VAL_X = MM(158);
+      const TOTALS_VAL_W = MM(34);
 
       doc.font(R).fontSize(9.5).fillColor("#3F4446");
 
-      doc.text("Gesamtpreis Netto", TOTALS_LABEL_X, yPos);
-      doc.text(
-        `${Number(totals.subtotal || 0).toFixed(2)} ${offer.currency || "EUR"}`,
-        TOTALS_VAL_X,
-        yPos,
-        { align: "right", width: TOTALS_VAL_W },
-      );
-
-      if (Number(totals.discountAmount || 0) > 0) {
-        yPos += 16;
-        doc.text(
-          `Rabatt (${offer.discountPercentage || 0}%)`,
-          TOTALS_LABEL_X,
-          yPos,
-        );
-        doc.text(
-          `-${Number(totals.discountAmount).toFixed(2)} ${offer.currency || "EUR"}`,
+      doc.font(M).text("Gesamtpreis Netto", TOTALS_LABEL_X, yPos);
+      doc
+        .font(M)
+        .text(
+          `${formatGermanNum(totals.subtotal, 2)} ${offer.currency || "EUR"}`,
           TOTALS_VAL_X,
           yPos,
           { align: "right", width: TOTALS_VAL_W },
         );
+
+      if (Number(totals.discountAmount || 0) > 0) {
+        yPos += 16;
+        doc
+          .font(R)
+          .text(
+            `Rabatt (${offer.discountPercentage || 0}%)`,
+            TOTALS_LABEL_X,
+            yPos,
+          );
+        doc
+          .font(R)
+          .text(
+            `-${formatGermanNum(totals.discountAmount, 2)} ${offer.currency || "EUR"}`,
+            TOTALS_VAL_X,
+            yPos,
+            { align: "right", width: TOTALS_VAL_W },
+          );
       }
 
       if (Number(totals.shippingCost || 0) > 0) {
         yPos += 16;
-        doc.text("Versandkosten", TOTALS_LABEL_X, yPos);
-        doc.text(
-          `${Number(totals.shippingCost).toFixed(2)} ${offer.currency || "EUR"}`,
+        doc.font(R).text("Versandkosten", TOTALS_LABEL_X, yPos);
+        doc
+          .font(R)
+          .text(
+            `${formatGermanNum(totals.shippingCost, 2)} ${offer.currency || "EUR"}`,
+            TOTALS_VAL_X,
+            yPos,
+            { align: "right", width: TOTALS_VAL_W },
+          );
+      }
+
+      const taxRatePercent = offer.taxRate ? Number(offer.taxRate) : 19;
+      yPos += 16;
+      doc
+        .font(R)
+        .text(
+          `MwSt. ${formatGermanNum(taxRatePercent, 2)}%`,
+          TOTALS_LABEL_X,
+          yPos,
+        );
+      doc
+        .font(R)
+        .text(
+          `${formatGermanNum(totals.taxAmount, 2)} ${offer.currency || "EUR"}`,
           TOTALS_VAL_X,
           yPos,
           { align: "right", width: TOTALS_VAL_W },
         );
-      }
-
-      yPos += 16;
-      doc.text(`MwSt. ${vatRatePercent.toFixed(2)}%`, TOTALS_LABEL_X, yPos);
-      doc.text(
-        `${Number(totals.taxAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
-        TOTALS_VAL_X,
-        yPos,
-        { align: "right", width: TOTALS_VAL_W },
-      );
 
       yPos += 22;
-      doc.rect(TOTALS_LABEL_X - 6, yPos - 4, MM(72), 22).fill("#ECEAE6");
+      const bruttoBoxX = TOTALS_LABEL_X - 6;
+      const bruttoBoxW = TOTALS_VAL_X + TOTALS_VAL_W - bruttoBoxX + 4;
+      doc.rect(bruttoBoxX, yPos - 4, bruttoBoxW, 20).fill("#D1D5DB");
 
       doc.font(SB).fontSize(10).fillColor("#3F4446");
       doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
       doc.text(
-        `${Number(totals.totalAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
+        `${formatGermanNum(totals.totalAmount, 2)} ${offer.currency || "EUR"}`,
         TOTALS_VAL_X,
         yPos,
         { align: "right", width: TOTALS_VAL_W },
@@ -3258,11 +3323,11 @@ export class OfferController {
         const pNum = i + 1;
         doc
           .font(R)
-          .fontSize(7)
+          .fontSize(7.5)
           .fillColor("#3F4446")
-          .text(`Seite ${pNum} / ${pages.count}`, MM(180), MM(282), {
+          .text(`${pNum}/${pages.count}`, MM(170), MM(282), {
             align: "right",
-            width: MM(12),
+            width: MM(22),
             lineBreak: false,
           });
       }
@@ -3314,44 +3379,7 @@ export class OfferController {
         });
       }
 
-      const offer = await this.offerRepository.findOne({
-        where: { id: id },
-        relations: ["lineItems"],
-      });
-
-      if (!offer) {
-        return response.status(404).json({
-          success: false,
-          message: "Offer not found.",
-        });
-      }
-
-      const uploadsDir = path.join(__dirname, "../../uploads/offers");
-      const pdfFileName = `${offer.offerNumber || "offer"}.pdf`;
-      const pdfPath = path.join(uploadsDir, pdfFileName);
-
-      if (fs.existsSync(pdfPath)) {
-        response.setHeader("Content-Type", "application/pdf");
-        response.setHeader(
-          "Content-Disposition",
-          `attachment; filename="${pdfFileName}"`,
-        );
-        response.setHeader(
-          "Access-Control-Expose-Headers",
-          "Content-Disposition",
-        );
-        const fileStream = fs.createReadStream(pdfPath);
-        fileStream.pipe(response);
-        return new Promise<void>((resolve, reject) => {
-          response.on("finish", resolve);
-          response.on("error", (err) => {
-            console.error("Streaming error:", err);
-            reject(err);
-          });
-        });
-      } else {
-        return this.generatePdf(request, response);
-      }
+      return this.generatePdf(request, response);
     } catch (error: any) {
       console.error("Fatal Controller Error:", error);
       if (!response.headersSent) {

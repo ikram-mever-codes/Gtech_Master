@@ -1219,8 +1219,15 @@ export class InvoiceController {
         items = items.map((it: any) => ({ ...it, client: it.client || derivedClient }));
       }
 
+      const formatGermanDate = (dateVal: any): string => {
+        if (!dateVal) return "";
+        const d = typeof dateVal === "string" ? new Date(dateVal) : dateVal;
+        if (!(d instanceof Date) || isNaN(d.getTime())) return String(dateVal);
+        return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+      };
+
       const cargoNo = invoice.orderNumber || "N/A";
-      const dateStr = new Date(invoice.invoiceDate).toISOString().split("T")[0];
+      const dateStr = formatGermanDate(invoice.invoiceDate);
 
       doc.rect(30, 30, 535, 20).stroke();
       doc.fontSize(10).font("Helvetica-Bold").text("GTech Industries Limited", 30, 37, { align: "center", width: 535 });

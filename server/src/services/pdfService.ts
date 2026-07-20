@@ -174,7 +174,10 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
         drawGridRow(gridTop + rowH, "Contact person:", so.supplier?.contact_person || "", "Address:", so.supplier?.full_address || "", rowH * 1.8);
         drawGridRow(gridTop + rowH * 2.8, "Description:", so.po_description || so.remark || "");
         const poNo = so.ref_no || `GTO202600${so.id}`;
-        const poDate = new Date(so.created_at).toLocaleDateString("en-GB");
+        const poDateObj = new Date(so.created_at);
+        const poDate = !isNaN(poDateObj.getTime())
+          ? `${poDateObj.getDate()}.${poDateObj.getMonth() + 1}.${poDateObj.getFullYear()}`
+          : "";
         drawGridRow(gridTop + rowH * 3.8, "PO No.:", poNo, "Date:", poDate);
 
         const tableTop = gridTop + rowH * 5.5;
@@ -342,7 +345,11 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
             const pNum = i + 1;
             doc.moveTo(40, 780).lineTo(555, 780).strokeColor("#cccccc").lineWidth(0.5).stroke();
             doc.fontSize(7).fillColor("#666666").font(regularFont);
-            doc.text(new Date(so.created_at).toLocaleDateString("en-GB"), 40, 790);
+            const footerDateObj = new Date(so.created_at);
+            const footerDateStr = !isNaN(footerDateObj.getTime())
+              ? `${footerDateObj.getDate()}.${footerDateObj.getMonth() + 1}.${footerDateObj.getFullYear()}`
+              : "";
+            doc.text(footerDateStr, 40, 790);
             doc.text(so.po_description || so.remark || "", 0, 790, { align: "center" });
             doc.text(`Page ${pNum} / ${pages.count}`, 515, 790);
             doc.text("This is a GTech system-generated Purchase Order. Please contact us for any queries.", 0, 805, { align: "center" });

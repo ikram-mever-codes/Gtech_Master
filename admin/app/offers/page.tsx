@@ -9,7 +9,7 @@ import {
   CalendarIcon,
   FunnelIcon,
 } from "@heroicons/react/24/outline";
-import { BadgePercent } from "lucide-react";
+import { BadgePercent, FileDown } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
@@ -19,6 +19,7 @@ import {
   formatCurrency,
   getOfferStatuses,
   getOfferStatusColor,
+  downloadOfferPdf,
   type Offer,
   type OfferSearchFilters,
 } from "@/api/offers";
@@ -26,12 +27,11 @@ import { formatDate } from "@/utils/offers";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
-  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
   }`;
 
 const OffersPage: React.FC = () => {
@@ -51,7 +51,6 @@ const OffersPage: React.FC = () => {
     limit: 20,
   });
 
-  // ONE modal for everything. offerId === null => create; a string => view/edit.
   const [detailOfferId, setDetailOfferId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
 
@@ -75,13 +74,10 @@ const OffersPage: React.FC = () => {
     fetchOffers();
   }, [fetchOffers]);
 
-  // Open the single modal in create mode (no offer id yet).
   const openCreate = () => {
     setDetailOfferId(null);
     setShowDetail(true);
   };
-
-  // Open the single modal on an existing offer.
   const openDetail = (offer: Offer) => {
     setDetailOfferId(offer.id);
     setShowDetail(true);
@@ -90,7 +86,6 @@ const OffersPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-6 flex justify-between items-center">
           <PageHeader title="Offers" icon={BadgePercent} />
           <div className="flex gap-2">
@@ -118,7 +113,6 @@ const OffersPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
             <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
@@ -161,7 +155,6 @@ const OffersPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Table */}
         <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
@@ -194,6 +187,9 @@ const OffersPage: React.FC = () => {
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status &amp; expiry
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -268,6 +264,27 @@ const OffersPage: React.FC = () => {
                           )}
                         </div>
                       </td>
+                      <td
+                        className="px-4 py-3 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          title="Download Angebot PDF"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await downloadOfferPdf(
+                                offer.id,
+                                offer.offerNumber,
+                              );
+                            } catch (_) { }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
+                        >
+                          <FileDown className="h-3.5 w-3.5" />
+                          PDF
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -275,7 +292,6 @@ const OffersPage: React.FC = () => {
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
               <div className="text-sm text-gray-700">
@@ -304,11 +320,10 @@ const OffersPage: React.FC = () => {
                         setCurrentPage(p);
                         setFilters({ ...filters, page: p });
                       }}
-                      className={`px-2 py-1 text-sm rounded-lg ${
-                        currentPage === p
-                          ? "bg-gray-600 text-white"
-                          : "bg-white border border-gray-300 hover:bg-gray-50"
-                      }`}
+                      className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
+                        ? "bg-gray-600 text-white"
+                        : "bg-white border border-gray-300 hover:bg-gray-50"
+                        }`}
                     >
                       {p}
                     </button>
@@ -331,8 +346,6 @@ const OffersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ===================== THE single popup ===================== */}
-      {/* offerId null => create (inline picker inside the modal); string => view/edit. */}
       {showDetail && (
         <OfferDetailModal
           isOpen={showDetail}
