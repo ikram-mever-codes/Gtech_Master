@@ -250,6 +250,10 @@ export class CreateOfferDto {
   @IsOptional()
   @IsArray()
   defaultPriceMatrix?: PriceMatrixEntryDto[];
+
+  @IsOptional()
+  @IsString()
+  highlightColor?: string;
 }
 
 export class UpdateOfferDto {
@@ -342,6 +346,10 @@ export class UpdateOfferDto {
   @IsOptional()
   @IsString()
   internalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  highlightColor?: string;
 
   @IsOptional()
   @IsObject()
@@ -943,6 +951,7 @@ export class OfferController {
         shippingCost: createOfferDto.shippingCost || 0,
         notes: createOfferDto.notes,
         internalNotes: createOfferDto.internalNotes,
+        highlightColor: createOfferDto.highlightColor,
         isAssembly: inquiry.isAssembly,
         assemblyName: createOfferDto.assemblyName || inquiry.name,
         assemblyDescription:
@@ -1854,6 +1863,7 @@ export class OfferController {
         "termsConditions",
         "notes",
         "internalNotes",
+        "highlightColor",
         "currency",
         "deliveryAddress",
         "pricingMode",
@@ -2977,13 +2987,7 @@ export class OfferController {
       const titleBoxX = MM(125);
       const titleBoxY = MM(48);
       const titleBoxW = MM(67);
-
-      doc.font(R).fontSize(9.5);
-      const titleTextW = titleBoxW - 65;
-      const titleHeight = offer.title
-        ? doc.heightOfString(offer.title, { width: titleTextW })
-        : 14;
-      const titleBoxH = Math.max(22, titleHeight + 8);
+      const titleBoxH = 22;
 
       doc.rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH).fill("#D1D5DB");
 
@@ -2991,16 +2995,17 @@ export class OfferController {
         .font(SB)
         .fontSize(14)
         .fillColor("#3F4446")
-        .text("Angebot", titleBoxX + 6, titleBoxY + 4, { lineBreak: false });
+        .text("Angebot", titleBoxX + 8, titleBoxY + 4, { lineBreak: false });
 
       if (offer.title) {
         doc
           .font(R)
-          .fontSize(9.5)
+          .fontSize(11)
           .fillColor("#3F4446")
-          .text(offer.title, titleBoxX + 60, titleBoxY + 4, {
-            width: titleTextW,
+          .text(offer.title, titleBoxX + 70, titleBoxY + 6, {
+            width: titleBoxW - 75,
             align: "right",
+            lineBreak: false,
           });
       }
 
@@ -3022,7 +3027,7 @@ export class OfferController {
         ],
       ];
 
-      let infoY = titleBoxY + titleBoxH + 6;
+      let infoY = titleBoxY + titleBoxH + 8;
       const LABEL_W = MM(32);
       const VALUE_X = titleBoxX + LABEL_W + 4;
       const VALUE_W = titleBoxW - LABEL_W - 4;
@@ -3030,7 +3035,7 @@ export class OfferController {
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
         if (!label && !value) {
-          infoY += 4;
+          infoY += 6;
           return;
         }
         doc
@@ -3042,7 +3047,7 @@ export class OfferController {
         infoY += 12;
       });
 
-      let yPos = Math.max(addrY + 10, infoY + 10, MM(98));
+      let yPos = Math.max(addrY + 10, MM(98));
       if (offer.shippingMethod || offer.deliveryTime || offer.deliveryTerms) {
         doc.font(R).fontSize(9.5).fillColor("#3F4446");
         const deliveryParts: string[] = [];

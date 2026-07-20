@@ -35,6 +35,18 @@ const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
         : "text-gray-900 border-gray-300 bg-white"
   }`;
 
+/** Picks a readable text color (black/white) for a given highlight background,
+ * so the row stays legible regardless of how light or dark the chosen color is. */
+const getContrastTextColor = (hex: string): string => {
+  const clean = hex.replace("#", "");
+  if (clean.length !== 6) return "#111827";
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#111827" : "#ffffff";
+};
+
 const OffersPage: React.FC<any> = ({ embedded = false }) => {
   const { user } = useSelector((state: RootState) => state.user);
 
@@ -222,93 +234,156 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {offers.map((offer: any) => (
-                  <tr
-                    key={offer.id}
-                    onClick={() => openDetail(offer)}
-                    className="hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">
-                        {offer.offerNumber}
-                        {offer.revision > 1 && (
-                          <span className="ml-2 text-xs text-gray-500">
-                            Rev. {offer.revision}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-600 truncate max-w-[16rem]">
-                        {offer.title}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                        Created {formatDate(offer.createdAt)}
-                        {offer.useUnitPrices && (
-                          <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
-                            Unit pricing
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <BuildingOfficeIcon className="h-4 w-4 text-gray-400" />
-                        <div className="text-sm font-medium text-gray-900 truncate max-w-[12rem]">
-                          {offer.customerSnapshot?.companyName}
-                        </div>
-                      </div>
-                      {offer.customerSnapshot?.vatId && (
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          VAT: {offer.customerSnapshot.vatId}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="text-sm font-bold text-gray-900">
-                        {formatCurrency(offer.totalAmount || 0, offer.currency)}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {offer.lineItems?.filter((li: any) => !li.isComponent)
-                          .length || 0}{" "}
-                        items
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1 items-center">
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
-                            offer.status,
-                          )}`}
+                {offers.map((offer: any) => {
+                  const rowColor = offer.highlightColor || null;
+                  const rowTextColor = rowColor
+                    ? getContrastTextColor(rowColor)
+                    : undefined;
+                  return (
+                    <tr
+                      key={offer.id}
+                      onClick={() => openDetail(offer)}
+                      className={`transition-colors cursor-pointer ${
+                        rowColor ? "" : "hover:bg-gray-50"
+                      }`}
+                      style={
+                        rowColor
+                          ? { backgroundColor: rowColor, color: rowTextColor }
+                          : undefined
+                      }
+                    >
+                      <td className="px-4 py-3">
+                        <div
+                          className="text-sm font-medium"
+                          style={{ color: rowTextColor }}
                         >
-                          {offer.status}
-                        </span>
-                        {offer.validUntil && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600">
-                            <CalendarIcon className="h-3 w-3 text-gray-500" />
-                            {formatDate(offer.validUntil)}
+                          {!rowColor && (
+                            <span className="text-gray-900">
+                              {offer.offerNumber}
+                            </span>
+                          )}
+                          {rowColor && offer.offerNumber}
+                          {offer.revision > 1 && (
+                            <span
+                              className={`ml-2 text-xs ${
+                                rowColor ? "" : "text-gray-500"
+                              }`}
+                            >
+                              Rev. {offer.revision}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          className={`text-sm truncate max-w-[16rem] ${
+                            rowColor ? "" : "text-gray-600"
+                          }`}
+                        >
+                          {offer.title}
+                        </div>
+                        <div
+                          className={`text-xs mt-1 flex items-center gap-2 ${
+                            rowColor ? "opacity-80" : "text-gray-400"
+                          }`}
+                        >
+                          Created {formatDate(offer.createdAt)}
+                          {offer.useUnitPrices && (
+                            <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
+                              Unit pricing
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <BuildingOfficeIcon
+                            className={`h-4 w-4 ${
+                              rowColor ? "opacity-70" : "text-gray-400"
+                            }`}
+                          />
+                          <div
+                            className={`text-sm font-medium truncate max-w-[12rem] ${
+                              rowColor ? "" : "text-gray-900"
+                            }`}
+                          >
+                            {offer.customerSnapshot?.companyName}
+                          </div>
+                        </div>
+                        {offer.customerSnapshot?.vatId && (
+                          <div
+                            className={`text-xs mt-0.5 ${
+                              rowColor ? "opacity-80" : "text-gray-500"
+                            }`}
+                          >
+                            VAT: {offer.customerSnapshot.vatId}
                           </div>
                         )}
-                      </div>
-                    </td>
-                    <td
-                      className="px-4 py-3 text-center"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        title="Download Angebot PDF"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            await downloadOfferPdf(offer.id, offer.offerNumber);
-                          } catch (_) {}
-                        }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="text-sm font-bold">
+                          {formatCurrency(
+                            offer.totalAmount || 0,
+                            offer.currency,
+                          )}
+                        </div>
+                        <div
+                          className={`text-xs ${
+                            rowColor ? "opacity-80" : "text-gray-500"
+                          }`}
+                        >
+                          {offer.lineItems?.filter((li: any) => !li.isComponent)
+                            .length || 0}{" "}
+                          items
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1 items-center">
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
+                              offer.status,
+                            )}`}
+                          >
+                            {offer.status}
+                          </span>
+                          {offer.validUntil && (
+                            <div
+                              className={`flex items-center gap-1 text-xs ${
+                                rowColor ? "opacity-80" : "text-gray-600"
+                              }`}
+                            >
+                              <CalendarIcon
+                                className={`h-3 w-3 ${
+                                  rowColor ? "" : "text-gray-500"
+                                }`}
+                              />
+                              {formatDate(offer.validUntil)}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        className="px-4 py-3 text-center"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <FileDown className="h-3.5 w-3.5" />
-                        PDF
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <button
+                          title="Download Angebot PDF"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await downloadOfferPdf(
+                                offer.id,
+                                offer.offerNumber,
+                              );
+                            } catch (_) {}
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
+                        >
+                          <FileDown className="h-3.5 w-3.5" />
+                          PDF
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

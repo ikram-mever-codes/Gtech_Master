@@ -186,6 +186,15 @@ const formatWeight = (kg: number): string =>
     maximumFractionDigits: 3,
   })} kg`;
 
+/** Converts any date-ish value to the "yyyy-MM-dd" shape a native
+ * <input type="date"> expects; returns "" when there's nothing valid. */
+const toDateInputValue = (value: any): string => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+};
+
 const resolveThumbUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
   if (url.includes("cloudinary.com")) return url;
@@ -634,7 +643,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
     setLinkedDocsLoading(true);
     getOfferLinkedDocuments(offer.id)
-      .then((res: any) => setLinkedDocs(res.success ? res.data : null))
+      .then((res) => setLinkedDocs(res.success ? res.data : null))
       .catch(() => setLinkedDocs(null))
       .finally(() => setLinkedDocsLoading(false));
   }, [offer?.id]);
@@ -681,6 +690,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       taxRate: o.taxRate ?? 19,
       notes: o.notes || "",
       internalNotes: o.internalNotes || "",
+      highlightColor: o.highlightColor || "",
       deliveryAddress: { ...(o.deliveryAddress || {}) },
       pricingMode: (o.pricingMode || "classic") as PricingMode,
       unitPriceDecimalPlaces: o.unitPriceDecimalPlaces || 3,
@@ -829,6 +839,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         termsConditions: form.termsConditions,
         notes: form.notes,
         internalNotes: form.internalNotes,
+        highlightColor: form.highlightColor ?? "",
         deliveryAddress: form.deliveryAddress,
         discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
         shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
@@ -903,14 +914,24 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   };
 
   const persistLine = async (lineItemId: string, payload: any) => {
-    const res = await updateLineItem(offer.id, lineItemId, payload);
-    if (res?.success || res?.data) {
-      setOffer((prev: any) => ({
-        ...prev,
-        lineItems: prev.lineItems.map((li: any) =>
-          li.id === lineItemId ? res.data : li,
-        ),
-      }));
+    try {
+      const res: any = await updateLineItem(offer.id, lineItemId, payload);
+      // updateLineItem() already unwraps the response to the line item
+      // itself (see api/offers.ts: `return response.data ?? response`), so
+      // `res` normally IS the updated line item. Handle both shapes
+      // defensively in case that unwrapping ever changes.
+      const updatedItem = res?.data ?? res;
+      if (updatedItem?.id) {
+        setOffer((prev: any) => ({
+          ...prev,
+          lineItems: prev.lineItems.map((li: any) =>
+            li.id === lineItemId ? updatedItem : li,
+          ),
+        }));
+      }
+    } catch (e) {
+      console.error("Couldn't save line item change:", e);
+      toast.error("Couldn't save that change.", errorStyles);
     }
   };
 
@@ -1105,7 +1126,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const linkedDocsCount = linkedDocs
     ? (
         Object.keys(LINKED_DOC_LABELS) as (keyof LinkedDocumentsResult)[]
-      ).reduce((sum: any, key) => sum + (linkedDocs[key]?.length || 0), 0)
+      ).reduce((sum, key) => sum + (linkedDocs[key]?.length || 0), 0)
     : 0;
 
   const sourceTabs: {
@@ -1629,12 +1650,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <Field
                     label="Delivery Date"
                     edit={edit}
-                    value={offer.deliveryTime}
+                    value={
+                      offer.deliveryTime ? formatDate(offer.deliveryTime) : ""
+                    }
                   >
                     <input
+                      type="date"
                       className={inputCls}
-                      value={form.deliveryTime}
-                      placeholder="e.g., 4–6 weeks"
+                      value={toDateInputValue(form.deliveryTime)}
                       onChange={(e) => patch({ deliveryTime: e.target.value })}
                     />
                   </Field>
@@ -1706,6 +1729,47 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       }
                     />
                   </Field>
+                  <Field
+                    label="Offer color"
+                    edit={edit}
+                    value=""
+                    render={() =>
+                      offer.highlightColor ? (
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-block w-4 h-4 rounded border border-gray-300"
+                            style={{ backgroundColor: offer.highlightColor }}
+                          />
+                          <span className="text-gray-600">
+                            {offer.highlightColor}
+                          </span>
+                        </div>
+                      ) : (
+                        "—"
+                      )
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        className="w-9 h-9 p-0 border border-gray-300 rounded cursor-pointer"
+                        value={form.highlightColor || "#ffffff"}
+                        onChange={(e) =>
+                          patch({ highlightColor: e.target.value })
+                        }
+                        title="Highlight color for this offer's row in the offers list"
+                      />
+                      {form.highlightColor && (
+                        <button
+                          type="button"
+                          onClick={() => patch({ highlightColor: "" })}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </Field>
                 </div>
               </div>
 
@@ -1722,9 +1786,30 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   />
                   <Field
                     label="Extra weight"
-                    edit={false}
+                    edit={edit}
                     value={formatWeight(extraWeightKg)}
-                  />
+                  >
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className={inputCls}
+                      defaultValue={
+                        visibleLineItems[0]?.extraWeight === null ||
+                        visibleLineItems[0]?.extraWeight === undefined
+                          ? ""
+                          : String(visibleLineItems[0].extraWeight)
+                      }
+                      placeholder="0"
+                      disabled={visibleLineItems.length === 0}
+                      onBlur={(e) => {
+                        if (!visibleLineItems[0]) return;
+                        persistLine(visibleLineItems[0].id, {
+                          extraWeight:
+                            e.target.value.trim() === "" ? "0" : e.target.value,
+                        });
+                      }}
+                    />
+                  </Field>
                   <Field
                     label="Total weight"
                     edit={false}
@@ -1894,11 +1979,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
                               Menge
                             </th>
+                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-24">
+                              Zusatzgew.
+                            </th>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-36">
+                              Liefer-Datum
+                            </th>
                             <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                               Netto-Preis
                             </th>
                             <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                               Netto gesamt
+                            </th>
+                            <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
+                              Line color
                             </th>
                             {edit && <th className="w-10" />}
                           </tr>
@@ -1907,7 +2001,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           {visibleLineItems.length === 0 && (
                             <tr>
                               <td
-                                colSpan={edit ? 10 : 9}
+                                colSpan={edit ? 13 : 12}
                                 className="text-center py-6 text-sm text-gray-500"
                               >
                                 No line items yet.
@@ -1920,10 +2014,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             const qtyDisplay = Math.round(
                               parseFlexibleNumber(item.baseQuantity) ?? 1,
                             );
+                            const rowColor = item.highlightColor || null;
                             return (
                               <tr
                                 key={item.id}
-                                className={freetext ? "bg-gray-50/70" : ""}
+                                className={
+                                  !rowColor && freetext ? "bg-gray-50/70" : ""
+                                }
+                                style={
+                                  rowColor
+                                    ? { backgroundColor: rowColor }
+                                    : undefined
+                                }
                               >
                                 <td className="px-2 py-2 text-gray-500">
                                   {item.position}
@@ -2003,6 +2105,60 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 </td>
                                 <td className="px-2 py-2">
                                   {edit ? (
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                      defaultValue={
+                                        item.extraWeight === null ||
+                                        item.extraWeight === undefined
+                                          ? ""
+                                          : String(item.extraWeight)
+                                      }
+                                      placeholder="0"
+                                      onBlur={(e) =>
+                                        persistLine(item.id, {
+                                          extraWeight:
+                                            e.target.value.trim() === ""
+                                              ? "0"
+                                              : e.target.value,
+                                        })
+                                      }
+                                    />
+                                  ) : (
+                                    <div className="text-right text-gray-600">
+                                      {formatWeight(
+                                        parseFlexibleNumber(item.extraWeight) ??
+                                          0,
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2">
+                                  {edit ? (
+                                    <input
+                                      type="date"
+                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded"
+                                      defaultValue={toDateInputValue(
+                                        item.expectedDeliveryDate,
+                                      )}
+                                      onChange={(e) =>
+                                        persistLine(item.id, {
+                                          expectedDeliveryDate:
+                                            e.target.value || null,
+                                        })
+                                      }
+                                    />
+                                  ) : (
+                                    <span className="text-gray-600">
+                                      {item.expectedDeliveryDate
+                                        ? formatDate(item.expectedDeliveryDate)
+                                        : "—"}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2">
+                                  {edit ? (
                                     <DecimalInput
                                       className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                                       value={item.basePrice}
@@ -2025,6 +2181,46 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 </td>
                                 <td className="px-2 py-2 text-right font-medium">
                                   {formatCurrency(total || 0, offer.currency)}
+                                </td>
+                                <td className="px-2 py-2 text-center">
+                                  {edit ? (
+                                    <div className="flex items-center justify-center gap-1">
+                                      <input
+                                        type="color"
+                                        className="w-7 h-7 p-0 border border-gray-300 rounded cursor-pointer"
+                                        value={item.highlightColor || "#ffffff"}
+                                        onChange={(e) =>
+                                          persistLine(item.id, {
+                                            highlightColor: e.target.value,
+                                          })
+                                        }
+                                        title="Row highlight color"
+                                      />
+                                      {item.highlightColor && (
+                                        <button
+                                          onClick={() =>
+                                            persistLine(item.id, {
+                                              highlightColor: null,
+                                            })
+                                          }
+                                          className="text-gray-400 hover:text-gray-600 text-xs"
+                                          title="Clear color"
+                                        >
+                                          ×
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : item.highlightColor ? (
+                                    <span
+                                      className="inline-block w-4 h-4 rounded border border-gray-300 mx-auto"
+                                      style={{
+                                        backgroundColor: item.highlightColor,
+                                      }}
+                                      title={item.highlightColor}
+                                    />
+                                  ) : (
+                                    <span className="text-gray-300">—</span>
+                                  )}
                                 </td>
                                 {edit && (
                                   <td className="px-2 py-2 text-center">
@@ -2062,6 +2258,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <td className="px-2 py-2 text-right text-gray-600">
                               1
                             </td>
+                            <td className="px-2 py-2 text-right text-gray-400">
+                              —
+                            </td>
+                            <td className="px-2 py-2 text-gray-400">—</td>
                             <td className="px-2 py-2 text-right text-gray-600">
                               {formatCurrency(
                                 offer.shippingCost || 0,
@@ -2073,6 +2273,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 offer.shippingCost || 0,
                                 offer.currency,
                               )}
+                            </td>
+                            <td className="px-2 py-2 text-center text-gray-400">
+                              —
                             </td>
                             {edit && <td />}
                           </tr>

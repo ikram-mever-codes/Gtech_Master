@@ -169,6 +169,7 @@ export interface Offer {
   totalAmount: number;
   notes?: string;
   internalNotes?: string;
+  highlightColor?: string;
   isAssembly: boolean;
   assemblyName?: string;
   assemblyDescription?: string;
@@ -211,6 +212,7 @@ export interface CreateOfferPayload {
   shippingCost?: number;
   notes?: string;
   internalNotes?: string;
+  highlightColor?: string;
   deliveryAddress?: DeliveryAddress;
   assemblyName?: string;
   assemblyDescription?: string;

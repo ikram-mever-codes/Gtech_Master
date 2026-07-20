@@ -268,6 +268,10 @@ export class Offer {
   @Column({ type: "text", nullable: true })
   internalNotes?: string;
 
+  /** Highlight color for this offer's row in the offers list (e.g. "#FFEE58"). */
+  @Column({ type: "varchar", length: 20, nullable: true })
+  highlightColor?: string;
+
   @Column({ type: "boolean", default: false })
   isAssembly!: boolean;
 
