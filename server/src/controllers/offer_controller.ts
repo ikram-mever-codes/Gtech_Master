@@ -462,22 +462,13 @@ export class CopyPastePricesDto {
   data!: string;
 }
 
-// ---------------------------------------------------------------------------
-// New DTOs: creating offers from an Item or a Customer, and adding line items
-// to an offer that did not originate from an inquiry.
-// ---------------------------------------------------------------------------
-
 export class CreateOfferFromItemDto {
-  // Item-sourced offers may target a customer that differs from the item's
-  // own customer; if omitted we fall back to the item's customer.
   @IsOptional()
   @IsString()
   customerId?: string;
-
   @IsOptional()
   @IsString()
   title?: string;
-
   @IsOptional()
   @IsEnum(["RMB", "HKD", "EUR", "USD"])
   currency?: "RMB" | "HKD" | "EUR" | "USD";
@@ -642,10 +633,6 @@ export class OfferController {
     return `OFF-${year}${month}-${sequence.toString().padStart(4, "0")}`;
   }
 
-  // -------------------------------------------------------------------------
-  // Shared helpers for building snapshots from a Customer entity. Used by the
-  // inquiry/item/customer create paths so the snapshot shape stays identical.
-  // -------------------------------------------------------------------------
   private buildCustomerSnapshot(customer: Customer | any): CustomerSnapshot {
     return {
       id: customer.id,
@@ -695,8 +682,6 @@ export class OfferController {
     try {
       const { inquiryId } = request.params;
 
-      // Coerce the date before validation so a plain "YYYY-MM-DD" string from
-      // the client can't fail @IsDate when implicit conversion doesn't run.
       const bodyForDto = {
         ...request.body,
         validUntil: coerceDate(request.body?.validUntil),
@@ -977,7 +962,6 @@ export class OfferController {
           .json({ success: false, message: "No matching items found." });
       }
 
-      // Recipient customer: body.customerId wins, else first item's customer.
       let customer: any = null;
       if (body.customerId) {
         customer = await this.customerRepository.findOne({
@@ -1004,7 +988,6 @@ export class OfferController {
         ? this.createDefaultUnitPrices()
         : [];
 
-      // Top-level snapshot reflects the first item (keeps single-item contract).
       const primary = orderedItems[0];
       const primarySnapshot: ItemSnapshot = this.buildItemSnapshot(primary);
 
@@ -1046,8 +1029,6 @@ export class OfferController {
       });
 
       const savedOffer = await this.offerRepository.save(offer);
-
-      // One line item per selected item, positioned in the requested order.
       const lineItems = orderedItems.map((item, idx) => {
         const snap = this.buildItemSnapshot(item);
         return this.lineItemRepository.create({
@@ -1097,11 +1078,7 @@ export class OfferController {
       });
     }
   }
-  // ==========================================================================
-  // ADD A LINE ITEM TO AN EXISTING OFFER
-  // POST /offers/:offerId/line-items
-  // Needed for customer/blank offers (and ad-hoc additions to any offer).
-  // ==========================================================================
+
   async createLineItem(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -1169,10 +1146,6 @@ export class OfferController {
     }
   }
 
-  // ==========================================================================
-  // DELETE A LINE ITEM
-  // DELETE /offers/:offerId/line-items/:lineItemId
-  // ==========================================================================
   async deleteLineItem(request: Request, response: Response) {
     try {
       const { offerId, lineItemId } = request.params;
@@ -1198,13 +1171,6 @@ export class OfferController {
       });
     }
   }
-
-  // ==========================================================================
-  // DELETE A PRICING COLUMN (a whole quantity tier) ACROSS EVERY LINE ITEM
-  // DELETE /offers/:offerId/price-column?quantity=1000
-  // Unit-price offers show prices as columns shared by all line items; this
-  // removes the tier with the matching quantity from each line item at once.
-  // ==========================================================================
   async deletePriceColumn(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -1269,8 +1235,6 @@ export class OfferController {
         }
       }
 
-      // Also drop the column from the offer-level template so newly added
-      // line items don't reintroduce it.
       if (offer.useUnitPrices && offer.defaultUnitPrices) {
         offer.defaultUnitPrices = offer.defaultUnitPrices.filter(
           (up: UnitPrice) => String(up.quantity).trim() !== target,
@@ -3251,7 +3215,7 @@ export class OfferController {
       const gtechFonts = resolveGtechFonts();
 
       const doc = new PDFDocument({
-        margin: 0,           // we control all margins via coordinates
+        margin: 0,
         size: "A4",
         bufferPages: true,
       });
@@ -3259,14 +3223,12 @@ export class OfferController {
       const pageWidth = 595.28;
       const pageHeight = 841.89;
 
-      // GTech spec coordinate helpers
-      const MM = (v: number) => v * 2.8346; // mm → pt
+      const MM = (v: number) => v * 2.8346;
 
-      // Named layout zones per GTech spec
-      const LEFT_X = MM(18);         // 18mm = 51pt (main left margin)
-      const INFO_BOX_X = MM(125);    // 125mm = document info block x
-      const TABLE_END_X = MM(192);   // 18 + 174 = 192mm right edge
-      const CONTENT_WIDTH = MM(174); // 174mm content width
+      const LEFT_X = MM(18);
+      const INFO_BOX_X = MM(125);
+      const TABLE_END_X = MM(192);
+      const CONTENT_WIDTH = MM(174);
 
       const uploadsDir = path.join(__dirname, "../../uploads/offers");
       if (!fs.existsSync(uploadsDir)) {
@@ -3284,14 +3246,12 @@ export class OfferController {
         writeStream.on("error", reject);
       });
 
-      // Register Inter fonts
       registerGtechFonts(doc, gtechFonts);
 
-      const R = fontRegular(gtechFonts);     // Inter Regular
-      const M = fontMedium(gtechFonts);      // Inter Medium
-      const SB = fontSemiBold(gtechFonts);   // Inter SemiBold
+      const R = fontRegular(gtechFonts);
+      const M = fontMedium(gtechFonts);
+      const SB = fontSemiBold(gtechFonts);
 
-      // ── Draw brand layer on page 1 ─────────────────────────────
       drawGtechBrandLayer(doc, gtechFonts);
 
       let customer: any = {};
@@ -3309,7 +3269,6 @@ export class OfferController {
       let addrY = MM(55);
       doc.fillColor("#3F4446");
 
-      // Company name — Inter Medium 10pt
       if (customer.companyName) {
         doc.font(M).fontSize(10).text(customer.companyName, MM(25), addrY, {
           width: MM(80),
@@ -3318,7 +3277,6 @@ export class OfferController {
         addrY += 13;
       }
 
-      // Legal name if different
       doc.font(R).fontSize(10);
       if (customer.legalName && customer.legalName !== customer.companyName) {
         doc.text(customer.legalName, MM(25), addrY, { width: MM(80), lineBreak: false });
@@ -3362,8 +3320,33 @@ export class OfferController {
         addrY += 12;
       }
 
-      // ── Document info block ────────────────────────────────────
-      // Spec: x=125mm, y=50mm, Inter 8.5pt #3F4446 – right-aligned label/value pairs
+      const titleBoxX = MM(125);
+      const titleBoxY = MM(48);
+      const titleBoxW = MM(67);
+      const titleBoxH = 22;
+
+      doc
+        .rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH)
+        .fill("#D1D5DB");
+
+      doc
+        .font(SB)
+        .fontSize(14)
+        .fillColor("#3F4446")
+        .text("Angebot", titleBoxX + 8, titleBoxY + 4, { lineBreak: false });
+
+      if (offer.title) {
+        doc
+          .font(R)
+          .fontSize(11)
+          .fillColor("#3F4446")
+          .text(offer.title, titleBoxX + 70, titleBoxY + 6, {
+            width: titleBoxW - 75,
+            align: "right",
+            lineBreak: false,
+          });
+      }
+
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
         : "Alexander";
@@ -3373,88 +3356,87 @@ export class OfferController {
         ["Datum", formatDate(offer.createdAt)],
         ["Gültig bis", formatDate(offer.validUntil)],
         ["Ansprechpartner", contactName],
+        ["", ""],
         ["Kundennr.", offer.inquiry?.customer?.customerNumber || customer.customerNumber || "—"],
       ];
 
-      let infoY = MM(50);
-      const LABEL_W = MM(35);
-      const VALUE_X = INFO_BOX_X + LABEL_W + 4;
-      const VALUE_W = MM(65) - LABEL_W - 4;
+      let infoY = titleBoxY + titleBoxH + 8;
+      const LABEL_W = MM(32);
+      const VALUE_X = titleBoxX + LABEL_W + 4;
+      const VALUE_W = titleBoxW - LABEL_W - 4;
 
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
-        doc.font(R).text(label, INFO_BOX_X, infoY, { width: LABEL_W, lineBreak: false });
+        if (!label && !value) {
+          infoY += 6;
+          return;
+        }
+        doc.font(R).text(label, titleBoxX, infoY, { width: LABEL_W, lineBreak: false });
         doc.font(M).text(value, VALUE_X, infoY, { width: VALUE_W, lineBreak: false });
         infoY += 12;
       });
 
-      // ── Document title ─────────────────────────────────────────
-      // Spec: x=18mm, y=95mm, Inter SemiBold 18pt #3F4446
-      doc
-        .font(SB)
-        .fontSize(18)
-        .fillColor("#3F4446")
-        .text("Angebot", LEFT_X, MM(95));
-
-      // ── Optional delivery info block ───────────────────────────
-      let yPos = MM(108);
-      doc.font(R).fontSize(9.5).fillColor("#3F4446");
-
-      if (offer.deliveryTime || offer.shippingMethod || offer.deliveryTerms) {
+      let yPos = Math.max(addrY + 10, MM(98));
+      if (offer.shippingMethod || offer.deliveryTime || offer.deliveryTerms) {
+        doc.font(R).fontSize(9.5).fillColor("#3F4446");
         const deliveryParts: string[] = [];
-        if (offer.deliveryTime) deliveryParts.push(`Lieferzeit: ${offer.deliveryTime}`);
         if (offer.shippingMethod) deliveryParts.push(`Versandart: ${offer.shippingMethod}`);
+        if (offer.deliveryTime) deliveryParts.push(`Lieferzeit: ${offer.deliveryTime}`);
         if (offer.deliveryTerms) deliveryParts.push(`Lieferbedingungen: ${offer.deliveryTerms}`);
         doc.text(deliveryParts.join("   ·   "), LEFT_X, yPos, { width: CONTENT_WIDTH });
-        yPos += 14;
+        yPos += 16;
       }
 
-      // ── Positions table start ──────────────────────────────────
-      // Spec: x=18mm, y=115mm (or after intro text), Inter 8.5pt
-      yPos = Math.max(yPos + 5, MM(115));
+      yPos = Math.max(yPos + 5, MM(112));
       const tableY = yPos;
-
-
 
       const columns = [
         { header: "Pos", width: 25, align: "left" },
         { header: "Art. Nr.", width: 60, align: "left" },
         { header: "Menge", width: 40, align: "left" },
         { header: "Bezeichnung", width: 155, align: "left" },
-        { header: "Gesamt\n(Netto)", width: 55, align: "left" },
-        { header: "MwSt", width: 45, align: "left" },
-        { header: "E-Preis", width: 55, align: "left" },
-        { header: "Gesamt\n(Brutto)", width: 60, align: "left" },
+        { header: "Gesamt\n(Netto)", width: 60, align: "right" },
+        { header: "MwSt", width: 40, align: "center" },
+        { header: "E-Preis", width: 55, align: "right" },
+        { header: "Gesamt\n(Brutto)", width: 59, align: "right" },
       ];
 
       const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
-      const rowHeight = 40;
-      const headerHeight = 22;
+      const headerHeight = 24;
 
-      // Table header — white background, Inter SemiBold 8pt, #3F4446
-      doc.font(SB).fontSize(8).fillColor("#3F4446");
+      doc
+        .rect(LEFT_X, tableY, tableWidth, headerHeight)
+        .fill("#D1D5DB");
+      doc.font(SB).fontSize(8.5).fillColor("#3F4446");
 
       let currentX = LEFT_X;
       columns.forEach((col) => {
-        doc.text(col.header, currentX + 3, tableY + 6, {
-          width: col.width - 6,
-          align: col.align as "center" | "left" | "right" | "justify",
-          lineBreak: false,
+        const headerYOffset = col.header.includes("\n") ? 3 : 7;
+        doc.text(col.header, currentX + 2, tableY + headerYOffset, {
+          width: col.width - 4,
+          align: col.align as any,
         });
         currentX += col.width;
       });
 
-      // Green header underline per GTech spec
       doc
         .moveTo(LEFT_X, tableY + headerHeight)
         .lineTo(LEFT_X + tableWidth, tableY + headerHeight)
-        .lineWidth(0.75)
-        .strokeColor("#2F6B46")
+        .lineWidth(0.8)
+        .strokeColor("#3F4446")
         .stroke();
 
+      const formatGermanNum = (numVal: any, decimals: number = 2): string => {
+        const num = getSafeNumber(numVal);
+        const factor = Math.pow(10, decimals);
+        const rounded = Math.round((num + Number.EPSILON) * factor) / factor;
+        return rounded.toLocaleString("de-DE", {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        });
+      };
+
       doc.font(R).fontSize(8.5).fillColor("#3F4446");
-
-
 
       const getActivePrice = (lineItem: any, offerUsesUnitPrices: boolean) => {
         if (
@@ -3539,7 +3521,6 @@ export class OfferController {
           doc.font(R).fontSize(8.5);
           const computedRowHeight = Math.max(36, textHeight + 12);
           if (currentY + computedRowHeight > MM(265)) {
-            // End of page separator
             doc
               .moveTo(LEFT_X, currentY)
               .lineTo(LEFT_X + tableWidth, currentY)
@@ -3549,11 +3530,9 @@ export class OfferController {
 
             doc.addPage();
 
-            // Brand layer on continuation page
             drawGtechBrandLayer(doc, gtechFonts);
 
             const newTableY = MM(30);
-            // Continuation table header
             doc.font(SB).fontSize(8).fillColor("#3F4446");
             let tempX = LEFT_X;
             columns.forEach((col) => {
@@ -3586,10 +3565,10 @@ export class OfferController {
             item.material || item.id.substring(0, 8),
             qtyStr,
             nameText,
-            `${formatNumber(netTotalNum, 2)} ${offer.currency || "EUR"}`,
+            `${formatGermanNum(netTotalNum, 2)} ${offer.currency || "EUR"}`,
             `${vatRate}%`,
-            `${formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3)} ${offer.currency || "EUR"}`,
-            `${formatNumber(grossTotalNum, 2)} ${offer.currency || "EUR"}`,
+            `${formatGermanNum(unitPriceNum, offer.unitPriceDecimalPlaces || 3)} ${offer.currency || "EUR"}`,
+            `${formatGermanNum(grossTotalNum, 2)} ${offer.currency || "EUR"}`,
           ];
 
           currentX = LEFT_X;
@@ -3616,7 +3595,6 @@ export class OfferController {
         });
       }
 
-      // Draw bottom table boundary line
       doc
         .moveTo(LEFT_X, currentY)
         .lineTo(LEFT_X + tableWidth, currentY)
@@ -3624,83 +3602,76 @@ export class OfferController {
         .strokeColor("#DEDEDE")
         .stroke();
 
-      // Total positioning calculations
       yPos = currentY + 20;
 
-      // Ensure totals fit before the footer area (starts at MM(265) = 751pt)
       if (yPos + 120 > MM(265)) {
         doc.addPage();
         drawGtechBrandLayer(doc, gtechFonts);
         yPos = MM(30);
       }
 
-      // Totals Block aligned to right (approx x = 340pt / MM(120), width = 200pt)
-      const TOTALS_LABEL_X = MM(120);
-      const TOTALS_VAL_X = MM(160);
-      const TOTALS_VAL_W = MM(32);
+      const TOTALS_LABEL_X = MM(115);
+      const TOTALS_VAL_X = MM(158);
+      const TOTALS_VAL_W = MM(34);
 
       doc.font(R).fontSize(9.5).fillColor("#3F4446");
 
-      // Subtotal (Netto)
-      doc.text("Gesamtpreis Netto", TOTALS_LABEL_X, yPos);
-      doc.text(
-        `${Number(totals.subtotal || 0).toFixed(2)} ${offer.currency || "EUR"}`,
+      doc.font(M).text("Gesamtpreis Netto", TOTALS_LABEL_X, yPos);
+      doc.font(M).text(
+        `${formatGermanNum(totals.subtotal, 2)} ${offer.currency || "EUR"}`,
         TOTALS_VAL_X,
         yPos,
         { align: "right", width: TOTALS_VAL_W }
       );
 
-      // Discount
       if (Number(totals.discountAmount || 0) > 0) {
         yPos += 16;
-        doc.text(`Rabatt (${offer.discountPercentage || 0}%)`, TOTALS_LABEL_X, yPos);
-        doc.text(
-          `-${Number(totals.discountAmount).toFixed(2)} ${offer.currency || "EUR"}`,
+        doc.font(R).text(`Rabatt (${offer.discountPercentage || 0}%)`, TOTALS_LABEL_X, yPos);
+        doc.font(R).text(
+          `-${formatGermanNum(totals.discountAmount, 2)} ${offer.currency || "EUR"}`,
           TOTALS_VAL_X,
           yPos,
           { align: "right", width: TOTALS_VAL_W }
         );
       }
 
-      // Shipping
       if (Number(totals.shippingCost || 0) > 0) {
         yPos += 16;
-        doc.text("Versandkosten", TOTALS_LABEL_X, yPos);
-        doc.text(
-          `${Number(totals.shippingCost).toFixed(2)} ${offer.currency || "EUR"}`,
+        doc.font(R).text("Versandkosten", TOTALS_LABEL_X, yPos);
+        doc.font(R).text(
+          `${formatGermanNum(totals.shippingCost, 2)} ${offer.currency || "EUR"}`,
           TOTALS_VAL_X,
           yPos,
           { align: "right", width: TOTALS_VAL_W }
         );
       }
 
-      // Tax (MwSt)
       const taxRatePercent = offer.taxRate ? Number(offer.taxRate) : 19;
       yPos += 16;
-      doc.text(`MwSt. ${taxRatePercent.toFixed(2)}%`, TOTALS_LABEL_X, yPos);
-      doc.text(
-        `${Number(totals.taxAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
+      doc.font(R).text(`MwSt. ${formatGermanNum(taxRatePercent, 2)}%`, TOTALS_LABEL_X, yPos);
+      doc.font(R).text(
+        `${formatGermanNum(totals.taxAmount, 2)} ${offer.currency || "EUR"}`,
         TOTALS_VAL_X,
         yPos,
         { align: "right", width: TOTALS_VAL_W }
       );
 
-      // Gross Total (Brutto) - Gray highlight box #ECEAE6 (GTech preference)
       yPos += 22;
+      const bruttoBoxX = TOTALS_LABEL_X - 6;
+      const bruttoBoxW = (TOTALS_VAL_X + TOTALS_VAL_W) - bruttoBoxX + 4;
       doc
-        .rect(TOTALS_LABEL_X - 6, yPos - 4, MM(72), 22)
-        .fill("#ECEAE6");
+        .rect(bruttoBoxX, yPos - 4, bruttoBoxW, 20)
+        .fill("#D1D5DB");
 
       doc.font(SB).fontSize(10).fillColor("#3F4446");
       doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
       doc.text(
-        `${Number(totals.totalAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
+        `${formatGermanNum(totals.totalAmount, 2)} ${offer.currency || "EUR"}`,
         TOTALS_VAL_X,
         yPos,
         { align: "right", width: TOTALS_VAL_W }
       );
 
-      // ── Notes & Terms ──────────────────────────────────────────
       yPos += 35;
       let notesHeight = 15;
       if (offer.paymentTerms) notesHeight += 15;
@@ -3733,7 +3704,6 @@ export class OfferController {
         doc.text(`Hinweise: ${offer.notes}`, LEFT_X, yPos, { width: CONTENT_WIDTH });
       }
 
-      // ── Page Numbers loop ──────────────────────────────────────
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
@@ -3741,16 +3711,15 @@ export class OfferController {
 
         doc
           .font(R)
-          .fontSize(7)
+          .fontSize(7.5)
           .fillColor("#3F4446")
           .text(
-            `Seite ${pNum} / ${pages.count}`,
-            MM(180),
+            `${pNum}/${pages.count}`,
+            MM(170),
             MM(282),
-            { align: "right", width: MM(12), lineBreak: false }
+            { align: "right", width: MM(22), lineBreak: false }
           );
       }
-
 
       doc.end();
       await pdfWritePromise;
@@ -3799,44 +3768,7 @@ export class OfferController {
         });
       }
 
-      const offer = await this.offerRepository.findOne({
-        where: { id: id },
-        relations: ["lineItems"],
-      });
-
-      if (!offer) {
-        return response.status(404).json({
-          success: false,
-          message: "Offer not found.",
-        });
-      }
-
-      const uploadsDir = path.join(__dirname, "../../uploads/offers");
-      const pdfFileName = `${offer.offerNumber || "offer"}.pdf`;
-      const pdfPath = path.join(uploadsDir, pdfFileName);
-
-      if (fs.existsSync(pdfPath)) {
-        response.setHeader("Content-Type", "application/pdf");
-        response.setHeader(
-          "Content-Disposition",
-          `attachment; filename="${pdfFileName}"`,
-        );
-        response.setHeader(
-          "Access-Control-Expose-Headers",
-          "Content-Disposition",
-        );
-        const fileStream = fs.createReadStream(pdfPath);
-        fileStream.pipe(response);
-        return new Promise<void>((resolve, reject) => {
-          response.on("finish", resolve);
-          response.on("error", (err) => {
-            console.error("Streaming error:", err);
-            reject(err);
-          });
-        });
-      } else {
-        return this.generatePdf(request, response);
-      }
+      return this.generatePdf(request, response);
     } catch (error: any) {
       console.error("Fatal Controller Error:", error);
       if (!response.headersSent) {
@@ -3973,9 +3905,6 @@ export class OfferController {
     }
   }
 
-  // Generic, dropdown-friendly payment & shipping method lists. Kept in the
-  // controller (not the DB) so the UI can offer consistent options without a
-  // schema change; the chosen value is stored as free text on the offer.
   async getPaymentMethods(request: Request, response: Response) {
     try {
       const methods = [

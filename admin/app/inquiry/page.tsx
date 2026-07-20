@@ -1620,9 +1620,9 @@ const CombinedInquiriesPageContent = () => {
                                 toggleInquiryRequests(inquiry.id);
                               }}
                               className={`${!inquiry.requests ||
-                                  inquiry.requests.length === 0
-                                  ? "text-red-500 hover:text-red-700"
-                                  : "text-gray-400 hover:text-gray-700"
+                                inquiry.requests.length === 0
+                                ? "text-red-500 hover:text-red-700"
+                                : "text-gray-400 hover:text-gray-700"
                                 } flex-shrink-0 mt-0.5`}
                               title={
                                 !inquiry.requests ||
@@ -1635,8 +1635,8 @@ const CombinedInquiriesPageContent = () => {
                             >
                               <ChevronRightIcon
                                 className={`h-4 w-4 transition-transform duration-200 ${expandedInquiryIds.has(inquiry.id)
-                                    ? "rotate-90"
-                                    : ""
+                                  ? "rotate-90"
+                                  : ""
                                   }`}
                               />
                             </button>
@@ -1885,8 +1885,8 @@ const CombinedInquiriesPageContent = () => {
                                             setShowRequestDetailModal(true);
                                           }}
                                           className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${request.priority === "High"
-                                              ? "bg-red-50/50"
-                                              : ""
+                                            ? "bg-red-50/50"
+                                            : ""
                                             }`}
                                         >
                                           <td className="px-4 py-3">
@@ -2163,8 +2163,8 @@ const CombinedInquiriesPageContent = () => {
                         key={pageNum}
                         onClick={() => setInquiryCurrentPage(pageNum)}
                         className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
                           }`}
                       >
                         {pageNum}
@@ -2177,8 +2177,8 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         onClick={() => setInquiryCurrentPage(inquiryTotalPages)}
                         className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
                           }`}
                       >
                         {inquiryTotalPages}
@@ -2279,8 +2279,8 @@ const CombinedInquiriesPageContent = () => {
           <div className="space-y-6">
             <div
               className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                  ? "bg-red-50 border border-red-200/70"
-                  : "bg-transparent"
+                ? "bg-red-50 border border-red-200/70"
+                : "bg-transparent"
                 }`}
             >
               <div>
@@ -2975,8 +2975,8 @@ const CombinedInquiriesPageContent = () => {
             </div>
             <div
               className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                  ? "bg-green-50 border border-green-200/70 mt-2"
-                  : "bg-transparent"
+                ? "bg-green-50 border border-green-200/70 mt-2"
+                : "bg-transparent"
                 }`}
             >
               <div>
@@ -3007,12 +3007,12 @@ const CombinedInquiriesPageContent = () => {
                         type="button"
                         onClick={() => toggleRequestExpansion(index)}
                         className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
-                            ? inquiryFormData.isAssembly
-                              ? "bg-green-100"
-                              : "bg-gray-100"
-                            : inquiryFormData.isAssembly
-                              ? "bg-green-50 hover:bg-green-100"
-                              : "bg-gray-50 hover:bg-gray-100"
+                          ? inquiryFormData.isAssembly
+                            ? "bg-green-100"
+                            : "bg-gray-100"
+                          : inquiryFormData.isAssembly
+                            ? "bg-green-50 hover:bg-green-100"
+                            : "bg-gray-50 hover:bg-gray-100"
                           }`}
                       >
                         <div className="flex items-center gap-2">
@@ -3811,8 +3811,8 @@ const CombinedInquiriesPageContent = () => {
                       })
                     }
                     className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
-                        ? "border-red-300"
-                        : "border-gray-300/80"
+                      ? "border-red-300"
+                      : "border-gray-300/80"
                       } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
                     placeholder={field.placeholder}
                     min={field.min}
