@@ -685,7 +685,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
     <div
       className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 ${zIndex}`}
     >
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100">
         {previewLoading || !previewItem ? (
           <div className="p-6 py-20 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
@@ -700,7 +700,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <img
                       src={getThumb(previewItem)!}
                       alt="thumb"
-                      className="w-full h-full object-contain bg-white"
+                      className="w-full h-full object-contain bg-white p-1"
 
                       onError={(e) =>
                         ((e.target as HTMLImageElement).style.display = "none")

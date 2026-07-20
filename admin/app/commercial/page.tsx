@@ -1860,31 +1860,29 @@ const InvoiceListPage: React.FC = () => {
             </button>
           </div>
         )}
-        {activeInvTab !== "angebot" && (
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <PageHeader
-                title="Commercial"
-                icon={DollarSign}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setMode("create");
-                    setShowModal(true);
-                  }}
-                  className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  New Order
-                </button>
-              )}
-            </div>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <PageHeader
+              title="Commercial"
+              icon={DollarSign}
+            />
           </div>
-        )}
+          <div className="flex items-center gap-3">
+            {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
+              <button
+                onClick={() => {
+                  resetForm();
+                  setMode("create");
+                  setShowModal(true);
+                }}
+                className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                New Order
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
           {invoiceTabs.map((tab) => (
@@ -2125,7 +2123,7 @@ const InvoiceListPage: React.FC = () => {
         )}
 
         {activeInvTab === "angebot" && (
-          <OffersPage />
+          <OffersPage embedded={true} />
         )}
 
         {(activeInvTab === "auftrag" ||

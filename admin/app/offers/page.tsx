@@ -34,7 +34,11 @@ const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
       : "text-gray-900 border-gray-300 bg-white"
   }`;
 
-const OffersPage: React.FC = () => {
+interface OffersPageProps {
+  embedded?: boolean;
+}
+
+const OffersPage: React.FC<OffersPageProps> = ({ embedded = false }) => {
   const { user } = useSelector((state: RootState) => state.user);
 
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -83,9 +87,9 @@ const OffersPage: React.FC = () => {
     setShowDetail(true);
   };
 
-  return (
-    <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
-      <div className="max-w-7xl mx-auto">
+  const mainContent = (
+    <>
+      {!embedded && (
         <div className="mb-6 flex justify-between items-center">
           <PageHeader title="Offers" icon={BadgePercent} />
           <div className="flex gap-2">
@@ -112,48 +116,75 @@ const OffersPage: React.FC = () => {
             </CustomButton>
           </div>
         </div>
+      )}
 
-        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
-            <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
-            <div className="w-64 shrink-0">
-              <input
-                type="text"
-                placeholder="Search offers…"
-                value={filters.search || ""}
-                onChange={(e) =>
-                  setFilters({ ...filters, search: e.target.value, page: 1 })
-                }
-                className={getInputClass(!!filters.search)}
-              />
-            </div>
-            <div className="w-48 shrink-0">
-              <select
-                value={filters.status || ""}
-                onChange={(e) =>
-                  setFilters({ ...filters, status: e.target.value, page: 1 })
-                }
-                className={getInputClass(!!filters.status, !filters.status)}
-              >
-                <option value="">All statuses</option>
-                {getOfferStatuses().map((s: any) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={() =>
-                setFilters({ ...filters, search: "", status: "", page: 1 })
+      <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
+          <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
+          <div className="w-64 shrink-0">
+            <input
+              type="text"
+              placeholder="Search offers…"
+              value={filters.search || ""}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value, page: 1 })
               }
-              className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-            >
-              <ArrowPathIcon className="w-4 h-4" />
-              Reset
-            </button>
+              className={getInputClass(!!filters.search)}
+            />
           </div>
+          <div className="w-48 shrink-0">
+            <select
+              value={filters.status || ""}
+              onChange={(e) =>
+                setFilters({ ...filters, status: e.target.value, page: 1 })
+              }
+              className={getInputClass(!!filters.status, !filters.status)}
+            >
+              <option value="">All statuses</option>
+              {getOfferStatuses().map((s: any) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() =>
+              setFilters({ ...filters, search: "", status: "", page: 1 })
+            }
+            className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+          >
+            <ArrowPathIcon className="w-4 h-4" />
+            Reset
+          </button>
         </div>
+
+        {embedded && (
+          <div className="flex gap-2 shrink-0">
+            <CustomButton
+              onClick={fetchOffers}
+              disabled={loading}
+              gradient
+              size="small"
+              startIcon={
+                <ArrowPathIcon
+                  className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                />
+              }
+            >
+              Refresh
+            </CustomButton>
+            <CustomButton
+              gradient
+              onClick={openCreate}
+              size="small"
+              startIcon={<PlusIcon className="h-4 w-4" />}
+            >
+              New offer
+            </CustomButton>
+          </div>
+        )}
+      </div>
 
         <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
           {loading ? (
@@ -344,7 +375,18 @@ const OffersPage: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+    </>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        mainContent
+      ) : (
+        <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
+          <div className="max-w-7xl mx-auto">{mainContent}</div>
+        </div>
+      )}
 
       {showDetail && (
         <OfferDetailModal
@@ -358,7 +400,7 @@ const OffersPage: React.FC = () => {
           userRole={user?.role}
         />
       )}
-    </div>
+    </>
   );
 };
 

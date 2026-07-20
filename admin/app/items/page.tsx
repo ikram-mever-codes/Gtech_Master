@@ -1157,7 +1157,7 @@ const ItemsManagementPage: React.FC = () => {
                     <img
                       src={thumb}
                       alt="thumb"
-                      className="w-full h-full object-contain bg-white"
+                      className="w-full h-full object-contain bg-white p-1"
 
                       onError={(e) =>
                         ((e.target as HTMLImageElement).style.display = "none")
