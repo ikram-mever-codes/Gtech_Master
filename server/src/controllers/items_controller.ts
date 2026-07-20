@@ -1404,17 +1404,19 @@ export const updateItem = async (
             warehouseItemData.is_SnSI ?? warehouseItem.is_SnSI,
         });
       }
-      if (warehouseItemData && warehouseItemData.item_name_en && item.item_name !== warehouseItemData.item_name_en) {
-        item.item_name = warehouseItemData.item_name_en;
+      const newEnglishName = req.body.item_name || warehouseItemData?.item_name_en;
+      if (newEnglishName) {
+        item.item_name = newEnglishName;
         item.is_updated = true;
         await itemRepository.save(item);
+        if (warehouseItem) {
+          warehouseItem.item_name_en = newEnglishName;
+        }
       }
 
-      if (item.item_name && warehouseItem.item_name_en !== item.item_name && (!warehouseItemData || !warehouseItemData.item_name_en)) {
-        warehouseItem.item_name_en = item.item_name;
+      if (warehouseItem) {
+        await warehouseRepository.save(warehouseItem);
       }
-
-      await warehouseRepository.save(warehouseItem);
     }
     return res.status(200).json({
       success: true,

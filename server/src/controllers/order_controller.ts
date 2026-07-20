@@ -1670,7 +1670,6 @@ export const generateCommercialInvoicePDF = async (
 
     const shipToCompany =
       cargo?.ship_to_company_name ||
-      cargo?.ship_to_display_name ||
       customer?.legalName ||
       customer?.companyName ||
       "";
@@ -1693,7 +1692,8 @@ export const generateCommercialInvoicePDF = async (
     const shipToPhone =
       cargo?.ship_to_contact_phone || customerAddress.phone || "";
 
-    const customerID: string = (() => {
+    const customerNo: string = (() => {
+      if (customer?.customerNumber) return customer.customerNumber;
       if ((customer as any)?.businessDetails?.customerNumber)
         return String((customer as any).businessDetails.customerNumber);
       if (customer?.id)
@@ -1705,13 +1705,30 @@ export const generateCommercialInvoicePDF = async (
       return "";
     })();
 
+    const formatGermanDate = (dateVal: any): string => {
+      if (!dateVal) return "";
+      const d = typeof dateVal === "string" ? new Date(dateVal) : dateVal;
+      if (!(d instanceof Date) || isNaN(d.getTime())) return String(dateVal);
+      const day = d.getDate();
+      const month = d.getMonth() + 1;
+      const year = d.getFullYear();
+      return `${day}.${month}.${year}`;
+    };
+
+    const isClosedInvoice =
+      invoice.status === "closed" ||
+      invoice.status === "Closed" ||
+      (invoice as any).isClosed;
+
+    const invoiceNoVal = (invoice.invoiceNumber || "").replace(/-/g, "").trim();
+    const formattedDateVal = formatGermanDate(invoice.invoiceDate);
+    const cargoNoVal = (cargo?.cargo_no || invoice.orderNumber || "").trim();
+
     const data = {
-      invoiceNo: (invoice.invoiceNumber || "").replace(/-/g, ""),
-      date: invoice.invoiceDate
-        ? new Date(invoice.invoiceDate).toISOString().split("T")[0]
-        : "",
-      cargoNo: cargo?.cargo_no || invoice.orderNumber || "",
-      customerID,
+      invoiceNo: isClosedInvoice ? (invoiceNoVal || "Draft") : (invoiceNoVal || "Draft"),
+      date: isClosedInvoice ? (formattedDateVal || "Draft") : (formattedDateVal || "Draft"),
+      cargoNo: isClosedInvoice ? (cargoNoVal || "Draft") : (cargoNoVal || "Draft"),
+      customerNo,
       billTo: {
         name: billToName,
         street: billToStreet,
@@ -1843,19 +1860,15 @@ export const generateCommercialInvoicePDF = async (
       const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
       const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
 
-      doc
-        .fillColor("black")
-        .font("Helvetica-Bold")
-        .fontSize(11)
-        .text(bName, 40, addrY);
-      doc
-        .font("Helvetica")
-        .fontSize(10)
-        .text(bStreet, 40, addrY + 15)
-        .text(bCity, 40, addrY + 28)
-        .text(bCountry, 40, addrY + 41)
-        .text(bPhone, 40, addrY + 55);
-      doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, addrY + 69);
+      let billY = addrY;
+      doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text(bName, 40, billY, { width: 360 });
+      billY = doc.y + 2;
+      doc.font("Helvetica").fontSize(9.5);
+      if (bStreet) { doc.text(bStreet, 40, billY, { width: 360 }); billY = doc.y + 1; }
+      if (bCity) { doc.text(bCity, 40, billY, { width: 360 }); billY = doc.y + 1; }
+      if (bCountry) { doc.text(bCountry, 40, billY, { width: 360 }); billY = doc.y + 1; }
+      if (bPhone) { doc.text(bPhone, 40, billY, { width: 360 }); billY = doc.y + 1; }
+      if (bEori) { doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, billY, { width: 360 }); }
     } else {
       const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
       const bStreet = isGTechBillTo ? GTECH_GMBH.street : data.billTo.street;
@@ -1869,59 +1882,63 @@ export const generateCommercialInvoicePDF = async (
         .font("Helvetica-Bold")
         .fontSize(10.5)
         .text("BILL TO:", 40, addrY - 3)
-        .text("SHIP TO:", 240, addrY - 3);
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(11)
-        .text(bName, 40, addrY + 13);
-      doc
-        .font("Helvetica")
-        .fontSize(10)
-        .text(bStreet, 40, addrY + 33)
-        .text(bCity, 40, addrY + 46)
-        .text(bCountry, 40, addrY + 59)
-        .text(bPhone, 40, addrY + 73);
-      doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, addrY + 87);
+        .text("SHIP TO:", 205, addrY - 3);
 
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(11)
-        .text(data.shipTo.company, 240, addrY + 13);
-      doc
-        .font("Helvetica")
-        .fontSize(10)
-        .text(data.shipTo.contact, 240, addrY + 27)
-        .text(data.shipTo.street, 240, addrY + 41)
-        .text(data.shipTo.city, 240, addrY + 57)
-        .text(data.shipTo.country, 240, addrY + 70)
-        .text(data.shipTo.phone, 240, addrY + 83);
+      let billY = addrY + 12;
+      doc.font("Helvetica-Bold").fontSize(10.5).text(bName, 40, billY, { width: 155 });
+      billY = doc.y + 1;
+      doc.font("Helvetica").fontSize(9.5);
+      if (bStreet) { doc.text(bStreet, 40, billY, { width: 155 }); billY = doc.y + 1; }
+      if (bCity) { doc.text(bCity, 40, billY, { width: 155 }); billY = doc.y + 1; }
+      if (bCountry) { doc.text(bCountry, 40, billY, { width: 155 }); billY = doc.y + 1; }
+      if (bPhone) { doc.text(bPhone, 40, billY, { width: 155 }); billY = doc.y + 1; }
+      if (bEori) { doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, billY, { width: 155 }); }
+
+      let shipY = addrY + 12;
+      doc.font("Helvetica-Bold").fontSize(10.5).text(data.shipTo.company, 205, shipY, { width: 195 });
+      shipY = doc.y + 1;
+      doc.font("Helvetica").fontSize(9.5);
+      if (data.shipTo.contact) { doc.text(data.shipTo.contact, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+      if (data.shipTo.street) { doc.text(data.shipTo.street, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+      if (data.shipTo.city) { doc.text(data.shipTo.city, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+      if (data.shipTo.country) { doc.text(data.shipTo.country, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+      if (data.shipTo.phone) { doc.text(data.shipTo.phone, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
     }
-    let rightY = 130;
+
+    let rightY = 115;
+    const rightX = 412;
+    const rightW = 143;
+
     doc
       .font("Helvetica")
-      .fontSize(12)
-      .text("Customer ID: ", 420, rightY, { continued: true })
-      .font("Helvetica-Bold")
-      .text(data.customerID || "");
-    rightY = 157;
-    doc
-      .font("Helvetica")
-      .fontSize(12)
-      .text("Date: ", 420, rightY, { continued: true })
-      .font("Helvetica-Bold")
-      .text(data.date);
-    rightY = 184;
-    doc
-      .font("Helvetica")
-      .text("Invoice No: ", 420, rightY, { continued: true })
+      .fontSize(11)
+      .text("Invoice No: ", rightX, rightY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.invoiceNo);
-    rightY = 211;
+
+    rightY = 140;
     doc
       .font("Helvetica")
-      .text("Cargo No.: ", 420, rightY, { continued: true })
+      .fontSize(11)
+      .text("Customer No.: ", rightX, rightY, { continued: true, width: rightW })
+      .font("Helvetica-Bold")
+      .text(data.customerNo || "N/A");
+
+    rightY = 165;
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .text("Cargo No.: ", rightX, rightY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.cargoNo);
+
+    rightY = 190;
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .text("Date: ", rightX, rightY, { continued: true, width: rightW })
+      .font("Helvetica-Bold")
+      .text(data.date);
     doc
       .fontSize(15)
       .font("Helvetica-Bold")

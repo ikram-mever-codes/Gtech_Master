@@ -102,11 +102,20 @@ const EditableInfoRow = ({
           onChange={(e) => {
             if (itemData) {
               const updated = { ...itemData };
+              const val = e.target.value;
               if (field.includes(".")) {
                 const [parent, child] = field.split(".");
-                (updated as any)[parent][child] = e.target.value;
+                if (!(updated as any)[parent]) (updated as any)[parent] = {};
+                (updated as any)[parent][child] = val;
+                if (field === "others.nameEN") {
+                  updated.name = val;
+                }
               } else {
-                (updated as any)[field] = e.target.value;
+                (updated as any)[field] = val;
+                if (field === "name") {
+                  if (!updated.others) updated.others = {};
+                  updated.others.nameEN = val;
+                }
               }
               setItemData(updated);
             }
@@ -401,8 +410,16 @@ const ItemDetailsPage = () => {
         si.isDefault || Number(si.supplierId) === Number(activeSupplierId),
     );
 
+    const effectiveEngName =
+      rawItem.item_name ||
+      rawItem.name ||
+      rawItem.others?.nameEN ||
+      rawItem.warehouseItem?.item_name_en ||
+      "";
+
     return {
       ...rawItem,
+      name: effectiveEngName,
       id: rawItem.id || currentItemData?.id,
       supplier_id: activeSupplierId,
       customer_id: rawItem.customer_id ?? rawItem.customer?.id ?? null,
@@ -443,6 +460,7 @@ const ItemDetailsPage = () => {
       },
       others: {
         ...rawItem.others,
+        nameEN: effectiveEngName || rawItem.others?.nameEN || "",
         isQTYdiv: toBool(rawItem.others?.isQTYdiv),
         isMeter: toBool(rawItem.others?.isMeter),
         isPU: toBool(rawItem.others?.isPU),
@@ -1016,7 +1034,7 @@ const ItemDetailsPage = () => {
           is_SnSI: updatedData.others?.isSnSI ? "Y" : "N",
           item_no_de: updatedData.others?.noDE,
           item_name_de: updatedData.others?.nameDE,
-          item_name_en: updatedData.others?.nameEN,
+          item_name_en: updatedData.name || updatedData.others?.nameEN,
         },
 
         photo: updatedData.pictures?.shopPicture,
