@@ -180,14 +180,6 @@ export default function TagsPage() {
           </button>
         ))}
       </div>
-      <button
-        onClick={fetchTags}
-        className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
-        title="Refresh"
-      >
-        <RefreshCw className="h-4.5 w-4.5" />
-        Refresh
-      </button>
     </div>
   );
 

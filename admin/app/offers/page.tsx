@@ -121,19 +121,6 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
           <PageHeader title="Offers" icon={BadgePercent} />
           <div className="flex gap-2">
             <CustomButton
-              onClick={fetchOffers}
-              disabled={loading}
-              gradient
-              size="small"
-              startIcon={
-                <ArrowPathIcon
-                  className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                />
-              }
-            >
-              Refresh
-            </CustomButton>
-            <CustomButton
               gradient
               onClick={openCreate}
               size="small"

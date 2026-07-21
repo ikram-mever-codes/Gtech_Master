@@ -1428,16 +1428,6 @@ const CombinedInquiriesPageContent = () => {
             <PageHeader title="Inquiries" icon={MessagesSquare} />
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={fetchInquiries}
-              disabled={inquiryLoading}
-              className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              <ArrowPathIcon
-                className={`h-4 w-4 ${inquiryLoading ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
             <CustomButton
               gradient={true}
               onClick={() => {

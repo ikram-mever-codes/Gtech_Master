@@ -1597,28 +1597,6 @@ const InvoiceListPage: React.FC = () => {
             />
           )}
 
-          <button
-            onClick={() => {
-              if (activeInvTab === "cargos") {
-                cargosTabRef.current?.fetchCargos?.();
-              } else if (activeInvTab === "cargo_type") {
-                cargoTypesTabRef.current?.fetchCargoTypes?.();
-              } else if (activeInvTab === "orders" || activeInvTab === "order_items") {
-                fetchOrders();
-              } else {
-                setLoading(true);
-                loadInvoices();
-              }
-            }}
-            disabled={loading || loadingOrders}
-            className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
-            title="Refresh"
-          >
-            <RefreshCw
-              className={`h-4.5 w-4.5 ${loading || loadingOrders ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </button>
         </div>
 
         {(activeInvTab === "orders" || activeInvTab === "order_items") && (

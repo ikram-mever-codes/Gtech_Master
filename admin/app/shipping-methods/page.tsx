@@ -193,14 +193,6 @@ export default function ShippingMethodsPage() {
           className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white"
         />
       </div>
-      <button
-        onClick={fetchData}
-        className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
-        title="Refresh"
-      >
-        <RefreshCw className="h-4.5 w-4.5" />
-        Refresh
-      </button>
     </div>
   );
 
@@ -235,9 +227,8 @@ export default function ShippingMethodsPage() {
                 <tr
                   key={sm.id}
                   onClick={() => handleRowClick(sm)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
-                    !sm.is_active ? "opacity-60" : ""
-                  }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!sm.is_active ? "opacity-60" : ""
+                    }`}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">
                     {sm.name}
@@ -370,11 +361,10 @@ export default function ShippingMethodsPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          selectedMethod.is_active
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-gray-100 text-gray-400 border border-gray-200"
-                        }`}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_active
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-gray-100 text-gray-400 border border-gray-200"
+                          }`}
                       >
                         {selectedMethod.is_active ? (
                           <CheckCircle className="w-3.5 h-3.5" />
@@ -414,4 +404,4 @@ export default function ShippingMethodsPage() {
       modalContent={modalContent}
     />
   );
-}
+};

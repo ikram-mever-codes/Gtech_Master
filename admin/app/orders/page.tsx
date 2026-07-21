@@ -25,6 +25,7 @@ import {
   ScissorsIcon,
   ArrowRightCircleIcon,
   ChevronDownIcon,
+  FunnelIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -74,6 +75,15 @@ import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuanti
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import { formatDate } from "@/utils/date";
+
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
+    }`;
+};
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 type Item = {
@@ -1532,9 +1542,9 @@ const OrderPage: React.FC = () => {
                 <CustomButton
                   gradient={true}
                   onClick={openCreate}
-                  className="px-4 py-2.5 text-sm bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl shadow-sm transition-all font-semibold flex items-center gap-2"
+                  size="small"
+                  startIcon={<PlusIcon className="h-4 w-4" />}
                 >
-                  <PlusIcon className="h-5 w-5 text-white" />
                   New Order
                 </CustomButton>
               </div>
@@ -1588,56 +1598,57 @@ const OrderPage: React.FC = () => {
             </nav>
           </div>
 
-          <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
-              <input
-                type="text"
-                placeholder={
-                  activeTab === "nso"
-                    ? "Search NSOs..."
-                    : activeTab === "supplier_orders"
-                      ? "Search Supplier Orders..."
-                      : activeTab === "purchase_order"
-                        ? "Search purchase orders..."
-                        : activeTab === "problems"
-                          ? "Search items..."
-                          : "Search reprint items..."
-                }
-                value={
-                  activeTab === "nso"
-                    ? nsoSearch
-                    : activeTab === "supplier_orders"
-                      ? supplierOrderSearch
-                      : activeTab === "purchase_order"
-                        ? poSearch
-                        : reprintSearch
-                }
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (activeTab === "nso") setNsoSearch(val);
-                  else if (activeTab === "supplier_orders") setSupplierOrderSearch(val);
-                  else if (activeTab === "purchase_order") setPoSearch(val);
-                  else setReprintSearch(val);
-                }}
-                className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
-              />
+          <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
+              <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
+              <div className="w-64 shrink-0">
+                <input
+                  type="text"
+                  placeholder={
+                    activeTab === "nso"
+                      ? "Search NSOs..."
+                      : activeTab === "supplier_orders"
+                        ? "Search Supplier Orders..."
+                        : activeTab === "purchase_order"
+                          ? "Search purchase orders..."
+                          : activeTab === "problems"
+                            ? "Search items..."
+                            : "Search reprint items..."
+                  }
+                  value={
+                    activeTab === "nso"
+                      ? nsoSearch
+                      : activeTab === "supplier_orders"
+                        ? supplierOrderSearch
+                        : activeTab === "purchase_order"
+                          ? poSearch
+                          : reprintSearch
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (activeTab === "nso") setNsoSearch(val);
+                    else if (activeTab === "supplier_orders") setSupplierOrderSearch(val);
+                    else if (activeTab === "purchase_order") setPoSearch(val);
+                    else setReprintSearch(val);
+                  }}
+                  className={getInputClass(!!(activeTab === "nso" ? nsoSearch : activeTab === "supplier_orders" ? supplierOrderSearch : activeTab === "purchase_order" ? poSearch : reprintSearch))}
+                />
+              </div>
+              {(nsoSearch || supplierOrderSearch || poSearch || reprintSearch) && (
+                <button
+                  onClick={() => {
+                    setNsoSearch("");
+                    setSupplierOrderSearch("");
+                    setPoSearch("");
+                    setReprintSearch("");
+                  }}
+                  className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                >
+                  <ArrowPathIcon className="w-4 h-4" />
+                  Reset
+                </button>
+              )}
             </div>
-
-            <button
-              onClick={() => {
-                fetchOrders();
-                fetchSupplierOrders();
-              }}
-              disabled={loadingOrders || loadingSupplierOrders}
-              className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
-              title="Refresh"
-            >
-              <RefreshCw
-                className={`h-4.5 w-4.5 ${loadingOrders || loadingSupplierOrders ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

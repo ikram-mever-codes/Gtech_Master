@@ -313,15 +313,7 @@ const AdminCustomersPage = () => {
               />
             </Paper>
 
-            <CustomButton
-              startIcon={<RefreshCw color="white" size={18} />}
-              gradient
-              shadow="large"
-              onClick={handleRefresh}
-              disabled={refreshing}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </CustomButton>
+
           </div>
         </div>
 

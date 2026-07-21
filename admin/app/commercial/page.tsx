@@ -1913,33 +1913,6 @@ const InvoiceListPage: React.FC = () => {
             />
           </div>
           <div className="flex items-center gap-3">
-            <CustomButton
-              onClick={() => {
-                if (activeInvTab === "angebot") {
-                  fetchOffers();
-                } else if (
-                  activeInvTab === "auftrag" ||
-                  activeInvTab === "bestellung"
-                ) {
-                  fetchOrders();
-                  fetchOffers();
-                } else {
-                  setLoading(true);
-                  loadInvoices();
-                  if (activeInvTab === "lieferschein") fetchCustomers();
-                }
-              }}
-              disabled={loading || loadingOrders || loadingOffers}
-              gradient
-              size="small"
-              startIcon={
-                <RefreshCw
-                  className={`h-4 w-4 ${loading || loadingOrders || loadingOffers ? "animate-spin" : ""}`}
-                />
-              }
-            >
-              Refresh
-            </CustomButton>
 
             {activeInvTab === "angebot" && (
               <CustomButton
