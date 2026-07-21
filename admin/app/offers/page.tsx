@@ -34,16 +34,13 @@ import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
-  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
   }`;
 
-/** Picks a readable text color (black/white) for a given highlight background,
- * so the row stays legible regardless of how light or dark the chosen color is. */
 const getContrastTextColor = (hex: string): string => {
   const clean = hex.replace("#", "");
   if (clean.length !== 6) return "#111827";
@@ -188,7 +185,7 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
           </button>
         </div>
 
-        {embedded && (
+        {!embedded && (
           <div className="flex gap-2 shrink-0">
             <CustomButton
               onClick={fetchOffers}
@@ -256,153 +253,170 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {offers.map((offer: any) => {
+                  const isExpanded = expandedOfferIds.has(offer.id);
+                  const lineItems = offer.lineItems?.filter((li: any) => !li.isComponent) || [];
                   const rowColor = offer.highlightColor || null;
                   const rowTextColor = rowColor
                     ? getContrastTextColor(rowColor)
                     : undefined;
+
                   return (
-                    <tr
-                      key={offer.id}
-                      onClick={() => openDetail(offer)}
-                      className={`transition-colors cursor-pointer ${
-                        rowColor ? "" : "hover:bg-gray-50"
-                      }`}
-                      style={
-                        rowColor
-                          ? { backgroundColor: rowColor, color: rowTextColor }
-                          : undefined
-                      }
-                    >
-                      <td className="px-4 py-3">
-                        <div
-                          className="text-sm font-medium"
-                          style={{ color: rowTextColor }}
-                        >
-                          {!rowColor && (
-                            <span className="text-gray-900">
-                              {offer.offerNumber}
-                            </span>
-                          )}
-                          {rowColor && offer.offerNumber}
-                          {offer.revision > 1 && (
-                            <span
-                              className={`ml-2 text-xs ${
-                                rowColor ? "" : "text-gray-500"
-                              }`}
-                            >
-                              Rev. {offer.revision}
-                            </span>
-                          )}
-                        </div>
-                        <div
-                          className={`text-sm truncate max-w-[16rem] ${
-                            rowColor ? "" : "text-gray-600"
+                    <React.Fragment key={offer.id}>
+                      <tr
+                        onClick={() => openDetail(offer)}
+                        className={`transition-colors cursor-pointer ${rowColor ? "" : "hover:bg-gray-50"
                           }`}
+                        style={
+                          rowColor
+                            ? { backgroundColor: rowColor, color: rowTextColor }
+                            : undefined
+                        }
+                      >
+                        <td
+                          className="px-2 py-3 text-center"
+                          onClick={(e) => toggleExpandOffer(offer.id, e)}
                         >
-                          {offer.title}
-                        </div>
-                        <div
-                          className={`text-xs mt-1 flex items-center gap-2 ${
-                            rowColor ? "opacity-80" : "text-gray-400"
-                          }`}
-                        >
-                          Created {formatDate(offer.createdAt)}
-                          {offer.useUnitPrices && (
-                            <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
-                              Unit pricing
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <BuildingOfficeIcon
-                            className={`h-4 w-4 ${
-                              rowColor ? "opacity-70" : "text-gray-400"
-                            }`}
+                          <ExpandRowArrow
+                            isExpanded={isExpanded}
+                            isEmpty={lineItems.length === 0}
+                            title={lineItems.length === 0 ? "No items in this offer" : isExpanded ? "Collapse items" : "Expand items"}
+                            onToggle={(e) => toggleExpandOffer(offer.id, e)}
                           />
+                        </td>
+                        <td className="px-4 py-3">
                           <div
-                            className={`text-sm font-medium truncate max-w-[12rem] ${
-                              rowColor ? "" : "text-gray-900"
-                            }`}
+                            className="text-sm font-medium"
+                            style={{ color: rowTextColor }}
                           >
-                            {offer.customerSnapshot?.companyName}
+                            {!rowColor && (
+                              <span className="text-gray-900">
+                                {offer.offerNumber}
+                              </span>
+                            )}
+                            {rowColor && offer.offerNumber}
+                            {offer.revision > 1 && (
+                              <span
+                                className={`ml-2 text-xs ${rowColor ? "" : "text-gray-500"
+                                  }`}
+                              >
+                                Rev. {offer.revision}
+                              </span>
+                            )}
                           </div>
-                        </div>
-                        {offer.customerSnapshot?.vatId && (
                           <div
-                            className={`text-xs mt-0.5 ${
-                              rowColor ? "opacity-80" : "text-gray-500"
-                            }`}
-                          >
-                            VAT: {offer.customerSnapshot.vatId}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="text-sm font-bold">
-                          {formatCurrency(
-                            offer.totalAmount || 0,
-                            offer.currency,
-                          )}
-                        </div>
-                        <div
-                          className={`text-xs ${
-                            rowColor ? "opacity-80" : "text-gray-500"
-                          }`}
-                        >
-                          {offer.lineItems?.filter((li: any) => !li.isComponent)
-                            .length || 0}{" "}
-                          items
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1 items-center">
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
-                              offer.status,
-                            )}`}
-                          >
-                            {offer.status}
-                          </span>
-                          {offer.validUntil && (
-                            <div
-                              className={`flex items-center gap-1 text-xs ${
-                                rowColor ? "opacity-80" : "text-gray-600"
+                            className={`text-sm truncate max-w-[16rem] ${rowColor ? "" : "text-gray-600"
                               }`}
-                            >
-                              <CalendarIcon
-                                className={`h-3 w-3 ${
-                                  rowColor ? "" : "text-gray-500"
+                          >
+                            {offer.title}
+                          </div>
+                          <div
+                            className={`text-xs mt-1 flex items-center gap-2 ${rowColor ? "opacity-80" : "text-gray-400"
+                              }`}
+                          >
+                            Created {formatDate(offer.createdAt)}
+                            {offer.useUnitPrices && (
+                              <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
+                                Unit pricing
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <BuildingOfficeIcon
+                              className={`h-4 w-4 ${rowColor ? "opacity-70" : "text-gray-400"
                                 }`}
-                              />
-                              {formatDate(offer.validUntil)}
+                            />
+                            <div
+                              className={`text-sm font-medium truncate max-w-[12rem] ${rowColor ? "" : "text-gray-900"
+                                }`}
+                            >
+                              {offer.customerSnapshot?.companyName}
+                            </div>
+                          </div>
+                          {offer.customerSnapshot?.vatId && (
+                            <div
+                              className={`text-xs mt-0.5 ${rowColor ? "opacity-80" : "text-gray-500"
+                                }`}
+                            >
+                              VAT: {offer.customerSnapshot.vatId}
                             </div>
                           )}
-                        </div>
-                      </td>
-                      <td
-                        className="px-4 py-3 text-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          title="Download Angebot PDF"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              await downloadOfferPdf(
-                                offer.id,
-                                offer.offerNumber,
-                              );
-                            } catch (_) {}
-                          }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="text-sm font-bold">
+                            {formatCurrency(
+                              offer.totalAmount || 0,
+                              offer.currency,
+                            )}
+                          </div>
+                          <div
+                            className={`text-xs ${rowColor ? "opacity-80" : "text-gray-500"
+                              }`}
+                          >
+                            {lineItems.length} items
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1 items-center">
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
+                                offer.status,
+                              )}`}
+                            >
+                              {offer.status}
+                            </span>
+                            {offer.validUntil && (
+                              <div
+                                className={`flex items-center gap-1 text-xs ${rowColor ? "opacity-80" : "text-gray-600"
+                                  }`}
+                              >
+                                <CalendarIcon
+                                  className={`h-3 w-3 ${rowColor ? "" : "text-gray-500"
+                                    }`}
+                                />
+                                {formatDate(offer.validUntil)}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td
+                          className="px-4 py-3 text-center"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <FileDown className="h-3.5 w-3.5" />
-                          PDF
-                        </button>
-                      </td>
-                    </tr>
+                          <button
+                            title="Download Angebot PDF"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await downloadOfferPdf(
+                                  offer.id,
+                                  offer.offerNumber,
+                                );
+                              } catch (_) { }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                            PDF
+                          </button>
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr className="bg-emerald-50/20 border-b border-gray-200">
+                          <td colSpan={6} className="px-6 py-4">
+                            <DocumentLineItemsSubTable
+                              items={lineItems}
+                              currency={offer.currency}
+                              title={`Line Items List (${lineItems.length}) — Offer ${offer.offerNumber}`}
+                              totalAmount={offer.totalAmount}
+                              type="offer"
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -438,11 +452,10 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
                       setCurrentPage(p);
                       setFilters({ ...filters, page: p });
                     }}
-                    className={`px-2 py-1 text-sm rounded-lg ${
-                      currentPage === p
-                        ? "bg-gray-600 text-white"
-                        : "bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
+                    className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
+                      ? "bg-gray-600 text-white"
+                      : "bg-white border border-gray-300 hover:bg-gray-50"
+                      }`}
                   >
                     {p}
                   </button>

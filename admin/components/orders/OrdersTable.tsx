@@ -355,9 +355,15 @@ export default function OrdersTable({
       render: (row) => {
         const keys = [row.order_no, row.id, (row as any)._id].filter(Boolean);
         const isExpanded = keys.some((k) => expandedOrderIds.has(k));
+        const items = row.items || row.lineItems || [];
+        const count = items.length > 0 ? items.length : (row.item_count !== undefined ? Number(row.item_count) : 0);
+        const isEmpty = count === 0;
+
         return (
           <ExpandRowArrow
             isExpanded={isExpanded}
+            isEmpty={isEmpty}
+            title={isEmpty ? "No items in this order" : isExpanded ? "Collapse items" : "Expand items"}
             onToggle={(e) => {
               e.stopPropagation();
               setExpandedOrderIds((prev) => {

@@ -1875,12 +1875,12 @@ export const generateCommercialInvoicePDF = async (
     if (bEori) { doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, billY, { width: 155 }); }
 
     const shipNameY = addrY + 12;
-    const shipName = data.shipTo.company || "";
+    const primaryShipName = (data.shipTo.contact || data.shipTo.company || "").trim();
     doc
       .fillColor("black")
       .font("Helvetica-Bold")
       .fontSize(10.5)
-      .text(shipName, 205, shipNameY, { width: 350, lineBreak: false });
+      .text(primaryShipName, 205, shipNameY, { width: 350, lineBreak: false });
 
     const metaY = shipNameY + 15;
     doc
@@ -1899,7 +1899,10 @@ export const generateCommercialInvoicePDF = async (
 
     let shipY = metaY;
     doc.font("Helvetica").fontSize(9.5);
-    if (data.shipTo.contact) { doc.text(data.shipTo.contact, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+    if (data.shipTo.contact && primaryShipName !== data.shipTo.contact) {
+      doc.text(data.shipTo.contact, 205, shipY, { width: 195 });
+      shipY = doc.y + 1;
+    }
     if (data.shipTo.street) { doc.text(data.shipTo.street, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
     if (data.shipTo.city) { doc.text(data.shipTo.city, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
     if (data.shipTo.country) { doc.text(data.shipTo.country, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
@@ -1916,8 +1919,6 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica-Bold")
       .fillColor("black")
       .text(`Commercial Invoice  ${data.invoiceNo}`, 0, 240, { align: "center" });
-
-
 
     const tableTop = 272;
     doc

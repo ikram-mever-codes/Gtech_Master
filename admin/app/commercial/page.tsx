@@ -1602,9 +1602,15 @@ const InvoiceListPage: React.FC = () => {
         render: (row) => {
           const keys = [row.id, row._id, row.order_no, row.invoiceNumber].filter(Boolean);
           const isExpanded = keys.some((k) => expandedDocIds.has(k));
+          const items = row.items || row.lineItems || [];
+          const count = items.length > 0 ? items.length : (row.item_count !== undefined ? Number(row.item_count) : (row.itemsCount !== undefined ? Number(row.itemsCount) : 0));
+          const isEmpty = count === 0;
+
           return (
             <ExpandRowArrow
               isExpanded={isExpanded}
+              isEmpty={isEmpty}
+              title={isEmpty ? "No items in this document" : isExpanded ? "Collapse items" : "Expand items"}
               onToggle={(e) => {
                 e.stopPropagation();
                 setExpandedDocIds((prev) => {
