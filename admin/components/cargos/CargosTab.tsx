@@ -1087,6 +1087,29 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                     placeholder="Enter remark"
                                 />
                             </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Online Tracking URL
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.online_track || ""}
+                                    onChange={(e) => updateField("online_track", e.target.value)}
+                                    disabled={!isEditEnabled}
+                                    placeholder="Paste tracking link here (e.g. https://www.fedex.com/track?...)"
+                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                />
+                                {formData.online_track && (
+                                    <a
+                                        href={formData.online_track}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-500 hover:underline"
+                                    >
+                                        🔗 Open tracking link
+                                    </a>
+                                )}
+                            </div>
                         </div>
                     </div>
 

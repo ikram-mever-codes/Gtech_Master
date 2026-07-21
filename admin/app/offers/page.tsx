@@ -9,7 +9,12 @@ import {
   CalendarIcon,
   FunnelIcon,
 } from "@heroicons/react/24/outline";
-import { BadgePercent, FileDown } from "lucide-react";
+import {
+  BadgePercent,
+  FileDown,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
@@ -25,6 +30,8 @@ import {
 } from "@/api/offers";
 import { formatDate } from "@/utils/offers";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
+import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
+import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
   `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
@@ -66,6 +73,19 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
 
   const [detailOfferId, setDetailOfferId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [expandedOfferIds, setExpandedOfferIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const toggleExpandOffer = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedOfferIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const fetchOffers = useCallback(async () => {
     setLoading(true);

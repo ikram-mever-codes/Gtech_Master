@@ -2987,15 +2987,27 @@ export class OfferController {
       const titleBoxX = MM(125);
       const titleBoxY = MM(48);
       const titleBoxW = MM(67);
-      const titleBoxH = 22;
+
+      doc.font(SB).fontSize(14);
+      const angebotLabelW = doc.widthOfString("Angebot") + 8;
+      const titleTextX = titleBoxX + angebotLabelW;
+      const titleTextW = titleBoxW - angebotLabelW - 4;
+      doc.font(R).fontSize(9.5);
+      const titleHeight = offer.title
+        ? doc.heightOfString(offer.title, { width: titleTextW })
+        : 0;
+      const titleBoxH = Math.max(22, titleHeight + 8);
 
       doc.rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH).fill("#D1D5DB");
 
+      // "Angebot" label — no width constraint so it never wraps
       doc
         .font(SB)
         .fontSize(14)
         .fillColor("#3F4446")
-        .text("Angebot", titleBoxX + 8, titleBoxY + 4, { lineBreak: false });
+        .text("Angebot", titleBoxX + 6, titleBoxY + 5, {
+          lineBreak: false,
+        });
 
       if (offer.title) {
         doc
@@ -3062,10 +3074,8 @@ export class OfferController {
         });
         yPos += 16;
       }
-
       yPos = Math.max(yPos + 5, MM(112));
       const tableY = yPos;
-
       const columns = [
         { header: "Pos", width: 25, align: "left" },
         { header: "Art. Nr.", width: 60, align: "left" },
