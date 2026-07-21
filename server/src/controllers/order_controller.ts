@@ -1846,107 +1846,52 @@ export const generateCommercialInvoicePDF = async (
         doc.font("Helvetica").fillColor("#000000");
       }
     }
-    const isGTechBillTo = data.billTo.name === "GTech Industries GmbH";
-    const isSameAddr =
-      data.billTo.name === data.shipTo.company &&
-      data.billTo.street === data.shipTo.street;
+    const addrY = 118;
+    const shipName = data.shipTo.company || data.billTo.name || "";
+    doc
+      .fillColor("black")
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .text(shipName, 40, addrY, { width: 370, lineBreak: false });
 
-    const addrY = 125;
-    if (isSameAddr) {
-      const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
-      const bStreet = isGTechBillTo ? GTECH_GMBH.street : data.billTo.street;
-      const bCity = isGTechBillTo ? GTECH_GMBH.city : data.billTo.city;
-      const bCountry = isGTechBillTo ? GTECH_GMBH.country : data.billTo.country;
-      const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
-      const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
-
-      let billY = addrY;
-      doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text(bName, 40, billY, { width: 360 });
-      billY = doc.y + 2;
-      doc.font("Helvetica").fontSize(9.5);
-      if (bStreet) { doc.text(bStreet, 40, billY, { width: 360 }); billY = doc.y + 1; }
-      if (bCity) { doc.text(bCity, 40, billY, { width: 360 }); billY = doc.y + 1; }
-      if (bCountry) { doc.text(bCountry, 40, billY, { width: 360 }); billY = doc.y + 1; }
-      if (bPhone) { doc.text(bPhone, 40, billY, { width: 360 }); billY = doc.y + 1; }
-      if (bEori) { doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, billY, { width: 360 }); }
-    } else {
-      const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
-      const bStreet = isGTechBillTo ? GTECH_GMBH.street : data.billTo.street;
-      const bCity = isGTechBillTo ? GTECH_GMBH.city : data.billTo.city;
-      const bCountry = isGTechBillTo ? GTECH_GMBH.country : data.billTo.country;
-      const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
-      const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
-
-      doc
-        .fillColor("black")
-        .font("Helvetica-Bold")
-        .fontSize(10.5)
-        .text("BILL TO:", 40, addrY - 3)
-        .text("SHIP TO:", 205, addrY - 3);
-
-      let billY = addrY + 12;
-      doc.font("Helvetica-Bold").fontSize(10.5).text(bName, 40, billY, { width: 155 });
-      billY = doc.y + 1;
-      doc.font("Helvetica").fontSize(9.5);
-      if (bStreet) { doc.text(bStreet, 40, billY, { width: 155 }); billY = doc.y + 1; }
-      if (bCity) { doc.text(bCity, 40, billY, { width: 155 }); billY = doc.y + 1; }
-      if (bCountry) { doc.text(bCountry, 40, billY, { width: 155 }); billY = doc.y + 1; }
-      if (bPhone) { doc.text(bPhone, 40, billY, { width: 155 }); billY = doc.y + 1; }
-      if (bEori) { doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, billY, { width: 155 }); }
-
-      let shipY = addrY + 12;
-      doc.font("Helvetica-Bold").fontSize(10.5).text(data.shipTo.company, 205, shipY, { width: 195 });
-      shipY = doc.y + 1;
-      doc.font("Helvetica").fontSize(9.5);
-      if (data.shipTo.contact) { doc.text(data.shipTo.contact, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-      if (data.shipTo.street) { doc.text(data.shipTo.street, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-      if (data.shipTo.city) { doc.text(data.shipTo.city, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-      if (data.shipTo.country) { doc.text(data.shipTo.country, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-      if (data.shipTo.phone) { doc.text(data.shipTo.phone, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-    }
-
-    let rightY = 115;
     const rightX = 412;
     const rightW = 143;
-
-    // Invoice No
     doc
       .font("Helvetica")
-      .fontSize(11)
+      .fontSize(10)
+      .text("Date: ", rightX, addrY, { continued: true, width: rightW })
+      .font("Helvetica-Bold")
+      .text(data.date);
+
+    let rightY = addrY + 16;
+    doc
+      .font("Helvetica")
+      .fontSize(10)
       .text("Invoice No: ", rightX, rightY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.invoiceNo);
 
-    // Date — directly below Invoice No (as requested)
-    rightY = 140;
+    rightY += 16;
     doc
       .font("Helvetica")
-      .fontSize(11)
-      .text("Date: ", rightX, rightY, { continued: true, width: rightW })
-      .font("Helvetica-Bold")
-      .text(data.date);
-
-    // Customer No
-    rightY = 165;
-    doc
-      .font("Helvetica")
-      .fontSize(11)
+      .fontSize(10)
       .text("Customer No.: ", rightX, rightY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.customerNo || "N/A");
 
-    // Cargo No
-    rightY = 190;
+    rightY += 16;
     doc
       .font("Helvetica")
-      .fontSize(11)
+      .fontSize(10)
       .text("Cargo No.: ", rightX, rightY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.cargoNo);
+
     doc
       .fontSize(15)
       .font("Helvetica-Bold")
-      .text("Commercial Invoice", 0, 240, { align: "center" });
+      .fillColor("black")
+      .text(`Commercial Invoice  ${data.invoiceNo}`, 0, 220, { align: "center" });
 
     const tableTop = 272;
     doc
