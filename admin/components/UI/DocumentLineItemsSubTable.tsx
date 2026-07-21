@@ -25,6 +25,8 @@ export interface DocumentLineItem {
   item_status?: string;
   cargo_id?: number | string;
   remarks?: string;
+  remark?: string;
+  description?: string;
   unitPrices?: any[];
   quantityPrices?: any[];
 }
@@ -76,6 +78,7 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
                 <th className="px-3 py-2 text-center w-10">#</th>
                 {type === "order" && <th className="px-3 py-2">EAN</th>}
                 <th className="px-3 py-2">Item Name</th>
+                <th className="px-3 py-2">Remark</th>
                 <th className="px-3 py-2 text-right">Price</th>
                 <th className="px-3 py-2 text-center">QTY</th>
                 <th className="px-3 py-2 text-right">Total</th>
@@ -157,6 +160,9 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
                     )}
                     <td className="px-3 py-2 font-semibold text-gray-900">
                       {name}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500 max-w-[200px] truncate" title={it.remarks || it.remark || it.description || ""}>
+                      {it.remarks || it.remark || it.description || "-"}
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-gray-700">
                       {type === "offer"
