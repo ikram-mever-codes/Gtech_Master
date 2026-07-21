@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import Select from "react-select";
+import { FunnelIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import {
   Search,
   Filter,
@@ -1993,33 +1994,50 @@ const InvoiceListPage: React.FC = () => {
 
         {activeInvTab !== "angebot" && (
           <>
-            <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                <Filter className="w-5 h-5 text-[#8CC21B]" />
-              </div>
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={
-                    (activeInvTab === "rechnung" || activeInvTab === "rk")
-                      ? "Search invoices, customers, or order numbers..."
-                      : "Search order no, customer, comment..."
-                  }
-                  value={
-                    (activeInvTab === "rechnung" || activeInvTab === "rk")
-                      ? searchTerm
-                      : orderNoFilter
-                  }
-                  onChange={(e) => {
-                    if (activeInvTab === "rechnung" || activeInvTab === "rk") {
-                      setSearchTerm(e.target.value);
-                    } else {
-                      setOrderNoFilter(e.target.value);
+            <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
+                <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
+                <div className="w-64 shrink-0">
+                  <input
+                    type="text"
+                    placeholder={
+                      (activeInvTab === "rechnung" || activeInvTab === "rk")
+                        ? "Search invoices, customers..."
+                        : "Search order no, customer..."
                     }
-                  }}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
-                />
+                    value={
+                      (activeInvTab === "rechnung" || activeInvTab === "rk")
+                        ? searchTerm
+                        : orderNoFilter
+                    }
+                    onChange={(e) => {
+                      if (activeInvTab === "rechnung" || activeInvTab === "rk") {
+                        setSearchTerm(e.target.value);
+                      } else {
+                        setOrderNoFilter(e.target.value);
+                      }
+                    }}
+                    className={getInputClass(!!(activeInvTab === "rechnung" || activeInvTab === "rk" ? searchTerm : orderNoFilter))}
+                  />
+                </div>
+                {(activeInvTab === "rechnung" || activeInvTab === "rk") && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                  >
+                    <ArrowPathIcon className="w-4 h-4" />
+                    Reset
+                  </button>
+                )}
+                {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
+                  <button
+                    onClick={() => setOrderNoFilter("")}
+                    className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                  >
+                    <ArrowPathIcon className="w-4 h-4" />
+                    Reset
+                  </button>
+                )}
               </div>
             </div>
 
