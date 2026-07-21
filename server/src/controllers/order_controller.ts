@@ -1709,8 +1709,8 @@ export const generateCommercialInvoicePDF = async (
       if (!dateVal) return "";
       const d = typeof dateVal === "string" ? new Date(dateVal) : dateVal;
       if (!(d instanceof Date) || isNaN(d.getTime())) return String(dateVal);
-      const day = d.getDate();
-      const month = d.getMonth() + 1;
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
       const year = d.getFullYear();
       return `${day}.${month}.${year}`;
     };
@@ -1846,52 +1846,78 @@ export const generateCommercialInvoicePDF = async (
         doc.font("Helvetica").fillColor("#000000");
       }
     }
-    const addrY = 118;
-    const shipName = data.shipTo.company || data.billTo.name || "";
+    const addrY = 125;
+    const rightX = 412;
+    const rightW = 143;
+
     doc
       .fillColor("black")
       .font("Helvetica-Bold")
-      .fontSize(11)
-      .text(shipName, 40, addrY, { width: 370, lineBreak: false });
+      .fontSize(10.5)
+      .text("BILL TO:", 40, addrY - 3)
+      .text("SHIP TO:", 205, addrY - 3);
 
-    const rightX = 412;
-    const rightW = 143;
+    const bName = GTECH_GMBH.name;
+    const bStreet = GTECH_GMBH.street;
+    const bCity = GTECH_GMBH.city;
+    const bCountry = GTECH_GMBH.country;
+    const bPhone = GTECH_GMBH.phone;
+    const bEori = GTECH_GMBH.eori;
+
+    let billY = addrY + 12;
+    doc.font("Helvetica-Bold").fontSize(10.5).text(bName, 40, billY, { width: 155 });
+    billY = doc.y + 1;
+    doc.font("Helvetica").fontSize(9.5);
+    if (bStreet) { doc.text(bStreet, 40, billY, { width: 155 }); billY = doc.y + 1; }
+    if (bCity) { doc.text(bCity, 40, billY, { width: 155 }); billY = doc.y + 1; }
+    if (bCountry) { doc.text(bCountry, 40, billY, { width: 155 }); billY = doc.y + 1; }
+    if (bPhone) { doc.text(bPhone, 40, billY, { width: 155 }); billY = doc.y + 1; }
+    if (bEori) { doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, billY, { width: 155 }); }
+
+    const shipNameY = addrY + 12;
+    const shipName = data.shipTo.company || "";
     doc
-      .font("Helvetica")
-      .fontSize(10)
-      .text("Date: ", rightX, addrY, { continued: true, width: rightW })
+      .fillColor("black")
       .font("Helvetica-Bold")
-      .text(data.date);
+      .fontSize(10.5)
+      .text(shipName, 205, shipNameY, { width: 350, lineBreak: false });
 
-    let rightY = addrY + 16;
+    const metaY = shipNameY + 15;
     doc
       .font("Helvetica")
       .fontSize(10)
-      .text("Invoice No: ", rightX, rightY, { continued: true, width: rightW })
-      .font("Helvetica-Bold")
-      .text(data.invoiceNo);
-
-    rightY += 16;
-    doc
-      .font("Helvetica")
-      .fontSize(10)
-      .text("Customer No.: ", rightX, rightY, { continued: true, width: rightW })
+      .text("Customer No.: ", rightX, metaY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.customerNo || "N/A");
 
-    rightY += 16;
     doc
       .font("Helvetica")
       .fontSize(10)
-      .text("Cargo No.: ", rightX, rightY, { continued: true, width: rightW })
+      .text("Cargo No.: ", rightX, metaY + 14, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.cargoNo);
+
+    let shipY = metaY;
+    doc.font("Helvetica").fontSize(9.5);
+    if (data.shipTo.contact) { doc.text(data.shipTo.contact, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+    if (data.shipTo.street) { doc.text(data.shipTo.street, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+    if (data.shipTo.city) { doc.text(data.shipTo.city, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+    if (data.shipTo.country) { doc.text(data.shipTo.country, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
+    if (data.shipTo.phone) { doc.text(data.shipTo.phone, 205, shipY, { width: 195 }); }
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .fillColor("black")
+      .text(data.date, rightX, 220, { align: "right", width: rightW });
 
     doc
       .fontSize(15)
       .font("Helvetica-Bold")
       .fillColor("black")
-      .text(`Commercial Invoice  ${data.invoiceNo}`, 0, 220, { align: "center" });
+      .text(`Commercial Invoice  ${data.invoiceNo}`, 0, 240, { align: "center" });
+
+
 
     const tableTop = 272;
     doc
