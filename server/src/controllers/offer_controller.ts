@@ -3340,7 +3340,6 @@ export class OfferController {
         .rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH)
         .fill("#D1D5DB");
 
-      // "Angebot" label — no width constraint so it never wraps
       doc
         .font(SB)
         .fontSize(14)

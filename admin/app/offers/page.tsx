@@ -172,7 +172,7 @@ const OffersPage: React.FC<OffersPageProps> = ({ embedded = false }) => {
           </button>
         </div>
 
-        {embedded && (
+        {!embedded && (
           <div className="flex gap-2 shrink-0">
             <CustomButton
               onClick={fetchOffers}
@@ -200,46 +200,50 @@ const OffersPage: React.FC<OffersPageProps> = ({ embedded = false }) => {
       </div>
 
       <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-flex items-center gap-3">
-              <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-              <span className="text-gray-600">Loading offers…</span>
-            </div>
-          </div>
-        ) : offers.length === 0 ? (
-          <div className="p-8 text-center">
-            <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No offers found</p>
-            <p className="text-gray-500 text-sm mt-2">
-              Create one from an inquiry, or from a customer and item(s).
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="w-9 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Offer
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Amount
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status &amp; expiry
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {loading && offers.length === 0 ? (
                 <tr>
-                  <th className="w-9 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Offer
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status &amp; expiry
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <td colSpan={6} className="p-8 text-center">
+                    <div className="inline-flex items-center gap-3">
+                      <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
+                      <span className="text-gray-600">Loading offers…</span>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {offers.map((offer: any) => {
+              ) : offers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center">
+                    <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No offers found</p>
+                    <p className="text-gray-500 text-sm mt-2">
+                      Create one from an inquiry, or from a customer and item(s).
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                offers.map((offer: any) => {
                   const isExpanded = expandedOfferIds.has(offer.id);
                   const lineItems = offer.lineItems?.filter((li: any) => !li.isComponent) || [];
 
@@ -358,11 +362,11 @@ const OffersPage: React.FC<OffersPageProps> = ({ embedded = false }) => {
                       )}
                     </React.Fragment>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {totalPages > 1 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
@@ -445,4 +449,4 @@ const OffersPage: React.FC<OffersPageProps> = ({ embedded = false }) => {
   );
 };
 
-export default OffersPage;
+export default OffersPage as any;
