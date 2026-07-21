@@ -2992,15 +2992,16 @@ export class OfferController {
       const angebotLabelW = doc.widthOfString("Angebot") + 8;
       const titleTextX = titleBoxX + angebotLabelW;
       const titleTextW = titleBoxW - angebotLabelW - 4;
-      doc.font(R).fontSize(9.5);
+
+      const fontTitleSize = offer.title && offer.title.length > 35 ? 8.5 : 9.5;
+      doc.font(R).fontSize(fontTitleSize);
       const titleHeight = offer.title
-        ? doc.heightOfString(offer.title, { width: titleTextW })
+        ? doc.heightOfString(offer.title, { width: titleTextW - 6 })
         : 0;
-      const titleBoxH = Math.max(22, titleHeight + 8);
+      const titleBoxH = Math.max(22, titleHeight + 10);
 
       doc.rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH).fill("#D1D5DB");
 
-      // "Angebot" label — no width constraint so it never wraps
       doc
         .font(SB)
         .fontSize(14)
@@ -3012,7 +3013,7 @@ export class OfferController {
       if (offer.title) {
         doc
           .font(R)
-          .fontSize(11)
+          .fontSize(fontTitleSize)
           .fillColor("#3F4446")
           .text(offer.title, titleBoxX + 70, titleBoxY + 6, {
             width: titleBoxW - 75,
