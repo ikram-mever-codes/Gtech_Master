@@ -1,5 +1,12 @@
 "use client";
-import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+  Suspense,
+} from "react";
 import Select from "react-select";
 import {
   Search,
@@ -83,12 +90,13 @@ import { formatCountryCode } from "@/utils/address";
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 interface Invoice {
@@ -100,6 +108,8 @@ interface Invoice {
   deliveryDate: string;
   netTotal: number;
   taxAmount: number;
+  dueDate?: string;
+
   pdfUrl: string;
   grossTotal: number;
   paidAmount: number;
@@ -182,10 +192,7 @@ type Item = {
 
 type Option = { value: string; label: string };
 
-
-
 type InvoiceTab = (typeof invoiceTabs)[number]["id"];
-
 
 const InvoiceListPage: React.FC = () => {
   const router = useRouter();
@@ -231,7 +238,9 @@ const InvoiceListPage: React.FC = () => {
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
-  const [modalActiveTab, setModalActiveTab] = useState<"taric" | "items">("taric");
+  const [modalActiveTab, setModalActiveTab] = useState<"taric" | "items">(
+    "taric",
+  );
 
   const handleOpenInvoiceDetails = async (invoice: Invoice) => {
     setSelectedInvoice(invoice);
@@ -254,7 +263,12 @@ const InvoiceListPage: React.FC = () => {
         if (response.success) {
           setExpandedStates((prev) => ({
             ...prev,
-            [invoice.id]: { taric: true, items: true, data: response.data, loading: false },
+            [invoice.id]: {
+              taric: true,
+              items: true,
+              data: response.data,
+              loading: false,
+            },
           }));
         }
       } catch (error) {
@@ -275,7 +289,6 @@ const InvoiceListPage: React.FC = () => {
   const [splitQty, setSplitQty] = useState<number>(0);
   const [newQty, setNewQty] = useState<number>(0);
   const [targetCargoId, setTargetCargoId] = useState<string>("");
-
 
   const [expandedPriceItemId, setExpandedPriceItemId] = useState<string | null>(
     null,
@@ -340,7 +353,13 @@ const InvoiceListPage: React.FC = () => {
     if (form.supplier_id) return itemsBySupplier;
     if (form.category_id) return itemsByCategory;
     return itemsAll;
-  }, [form.supplier_id, itemsBySupplier, form.category_id, itemsByCategory, itemsAll]);
+  }, [
+    form.supplier_id,
+    itemsBySupplier,
+    form.category_id,
+    itemsByCategory,
+    itemsAll,
+  ]);
 
   const loadingItems =
     loadingItemsAll ||
@@ -355,7 +374,16 @@ const InvoiceListPage: React.FC = () => {
       (isTab1 ? !!form.category_id || !!form.supplier_id : true) &&
       (isTab2 ? !!form.customer_id : true);
     return hasItems && hasComment && tabOk;
-  }, [isConvertMode, orderItems.length, form.comment, form.category_id, form.supplier_id, form.customer_id, isTab1, isTab2]);
+  }, [
+    isConvertMode,
+    orderItems.length,
+    form.comment,
+    form.category_id,
+    form.supplier_id,
+    form.customer_id,
+    isTab1,
+    isTab2,
+  ]);
 
   const resetForm = useCallback(() => {
     setForm({
@@ -669,7 +697,9 @@ const InvoiceListPage: React.FC = () => {
 
       if (activeInvTab === "orders") {
         await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)], false);
-        toast.success(`Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`);
+        toast.success(
+          `Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`,
+        );
         setShowREModal(false);
         await fetchOrders();
       } else {
@@ -909,8 +939,6 @@ const InvoiceListPage: React.FC = () => {
     printWindow.document.close();
   };
 
-
-
   const fetchCategories = useCallback(async () => {
     try {
       const response = await getCategories();
@@ -978,7 +1006,12 @@ const InvoiceListPage: React.FC = () => {
     (supplierId: any) => {
       const s = suppliers.find((c) => String(c.id) === String(supplierId));
       if (!s) return String(supplierId);
-      const englishName = (s.name && !hasChinese(s.name)) ? s.name : ((s.company_name && !hasChinese(s.company_name)) ? s.company_name : null);
+      const englishName =
+        s.name && !hasChinese(s.name)
+          ? s.name
+          : s.company_name && !hasChinese(s.company_name)
+            ? s.company_name
+            : null;
       if (englishName) return englishName;
       const chineseName = s.name_cn || s.company_name || s.name;
       if (chineseName) return chineseName;
@@ -1007,33 +1040,52 @@ const InvoiceListPage: React.FC = () => {
       if (filterParam === "unassigned_cargo") {
         allItems = allItems.filter((i: any) => !i.cargo_id || i.cargo_id === 0);
       } else if (filterParam === "purchase_problem") {
-        allItems = allItems.filter((i: any) =>
-          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("purchase") || i.problems.toLowerCase().includes("buy"))) ||
-          (i.status && String(i.status).toLowerCase().includes("purchase"))
+        allItems = allItems.filter(
+          (i: any) =>
+            (i.problems &&
+              i.problems !== "" &&
+              (i.problems.toLowerCase().includes("purchase") ||
+                i.problems.toLowerCase().includes("buy"))) ||
+            (i.status && String(i.status).toLowerCase().includes("purchase")),
         );
       } else if (filterParam === "check_problem") {
-        allItems = allItems.filter((i: any) =>
-          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("check") || i.problems.toLowerCase().includes("verify")))
+        allItems = allItems.filter(
+          (i: any) =>
+            i.problems &&
+            i.problems !== "" &&
+            (i.problems.toLowerCase().includes("check") ||
+              i.problems.toLowerCase().includes("verify")),
         );
       } else if (filterParam === "rmb_special_no_value") {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
           const price = i.rmb_price || it.rmb_price || it.RMB_Price || 0;
-          return it.is_rmb_special === "Y" && (!price || parseFloat(String(price)) === 0);
+          return (
+            it.is_rmb_special === "Y" &&
+            (!price || parseFloat(String(price)) === 0)
+          );
         });
       } else if (filterParam === "eur_special_no_value") {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
-          const hasEUR = (it.price && parseFloat(String(it.price)) > 0) || (it.transfer_price_EUR && parseFloat(String(it.transfer_price_EUR)) > 0);
+          const hasEUR =
+            (it.price && parseFloat(String(it.price)) > 0) ||
+            (it.transfer_price_EUR &&
+              parseFloat(String(it.transfer_price_EUR)) > 0);
           return it.is_eur_special === "Y" && !hasEUR;
         });
       } else if (filterParam === "dimension_special_no_value") {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
-          const hasDim = (it.weight && parseFloat(String(it.weight)) > 0) &&
-            (it.length && parseFloat(String(it.length)) > 0) &&
-            (it.width && parseFloat(String(it.width)) > 0) &&
-            (it.height && parseFloat(String(it.height)) > 0);
+          const hasDim =
+            it.weight &&
+            parseFloat(String(it.weight)) > 0 &&
+            it.length &&
+            parseFloat(String(it.length)) > 0 &&
+            it.width &&
+            parseFloat(String(it.width)) > 0 &&
+            it.height &&
+            parseFloat(String(it.height)) > 0;
           return it.is_dimension_special === "Y" && !hasDim;
         });
       }
@@ -1041,20 +1093,26 @@ const InvoiceListPage: React.FC = () => {
 
     if (!orderNoFilter) return allItems;
     const s = orderNoFilter.toLowerCase();
-    return allItems.filter((i) =>
-      String(i.order_no).toLowerCase().includes(s) ||
-      String(i.ean || i.item?.ean || "").toLowerCase().includes(s) ||
-      String(i.item_name || i.itemName || i.item?.item_name || "").toLowerCase().includes(s)
+    return allItems.filter(
+      (i) =>
+        String(i.order_no).toLowerCase().includes(s) ||
+        String(i.ean || i.item?.ean || "")
+          .toLowerCase()
+          .includes(s) ||
+        String(i.item_name || i.itemName || i.item?.item_name || "")
+          .toLowerCase()
+          .includes(s),
     );
   }, [orders, orderNoFilter, searchParams]);
 
   const filteredOrders = useMemo(() => {
     if (!orderNoFilter) return orders;
     const s = orderNoFilter.toLowerCase();
-    return orders.filter((o: any) =>
-      String(o.order_no).toLowerCase().includes(s) ||
-      String(o.id).toLowerCase().includes(s) ||
-      (o.comment || "").toLowerCase().includes(s),
+    return orders.filter(
+      (o: any) =>
+        String(o.order_no).toLowerCase().includes(s) ||
+        String(o.id).toLowerCase().includes(s) ||
+        (o.comment || "").toLowerCase().includes(s),
     );
   }, [orders, orderNoFilter]);
 
@@ -1068,8 +1126,9 @@ const InvoiceListPage: React.FC = () => {
     setViewItems(
       (order.items || []).map((it: any) => ({
         ...it,
-        itemName: it.item?.item_name || it.item?.name || it.itemName || "Unknown",
-      }))
+        itemName:
+          it.item?.item_name || it.item?.name || it.itemName || "Unknown",
+      })),
     );
     setShowViewModal(true);
   };
@@ -1093,16 +1152,17 @@ const InvoiceListPage: React.FC = () => {
     setShowSPModal(true);
   };
 
-  const handleAssignSupplier = async (orderItemId: number | string, supplierId: number, baseItemId?: number | string) => {
+  const handleAssignSupplier = async (
+    orderItemId: number | string,
+    supplierId: number,
+    baseItemId?: number | string,
+  ) => {
     try {
       await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
       if (baseItemId) {
         await updateItem(Number(baseItemId), { supplier_id: supplierId });
       }
-      await Promise.all([
-        fetchOrders(),
-        fetchAllItems()
-      ]);
+      await Promise.all([fetchOrders(), fetchAllItems()]);
       toast.success("Supplier assigned successfully");
     } catch (error) {
       console.error("Failed to assign supplier:", error);
@@ -1133,7 +1193,15 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      const validTabs = ["orders", "order_items", "open_invoices", "closed_invoices", "cargos", "cargo_type", "packing_list"];
+      const validTabs = [
+        "orders",
+        "order_items",
+        "open_invoices",
+        "closed_invoices",
+        "cargos",
+        "cargo_type",
+        "packing_list",
+      ];
       if (validTabs.includes(tabParam)) {
         setActiveInvTab(tabParam as InvoiceTab);
       }
@@ -1292,19 +1360,28 @@ const InvoiceListPage: React.FC = () => {
   const handleMarkAsPaid = async (invoiceId: string) => {
     try {
       const invoice = invoices.find((inv) => inv.id === invoiceId);
-      if (!invoice || invoice.freightCost === null || invoice.freightCost === undefined || Number(invoice.freightCost) <= 0) {
-        toast.error("Please provide a freight cost by editing the invoice before verifying it.");
+      if (
+        !invoice ||
+        invoice.freightCost === null ||
+        invoice.freightCost === undefined ||
+        Number(invoice.freightCost) <= 0
+      ) {
+        toast.error(
+          "Please provide a freight cost by editing the invoice before verifying it.",
+        );
         return;
       }
       if (!invoice.description || !invoice.description.trim()) {
-        toast.error("Please provide a description by editing the invoice before verifying it.");
+        toast.error(
+          "Please provide a description by editing the invoice before verifying it.",
+        );
         return;
       }
 
       setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
       await markInvoiceAsPaid(invoiceId);
       await loadInvoices();
-      setSelectedInvoice((prev) => prev ? { ...prev, status: "paid" } : null);
+      setSelectedInvoice((prev) => (prev ? { ...prev, status: "paid" } : null));
       toast.success("Invoice verified successfully");
     } catch (error) {
       console.error("Failed to mark as paid:", error);
@@ -1318,7 +1395,12 @@ const InvoiceListPage: React.FC = () => {
       toast.error("Description is required");
       return;
     }
-    if (invoiceEditForm.freightCost === "" || invoiceEditForm.freightCost === null || invoiceEditForm.freightCost === undefined || Number(invoiceEditForm.freightCost) <= 0) {
+    if (
+      invoiceEditForm.freightCost === "" ||
+      invoiceEditForm.freightCost === null ||
+      invoiceEditForm.freightCost === undefined ||
+      Number(invoiceEditForm.freightCost) <= 0
+    ) {
       toast.error("Freight Cost must be greater than 0");
       return;
     }
@@ -1333,12 +1415,16 @@ const InvoiceListPage: React.FC = () => {
       });
       setEditingInvoiceId(null);
       await loadInvoices();
-      setSelectedInvoice((prev) => prev ? {
-        ...prev,
-        description: invoiceEditForm.description,
-        freightCost: invoiceEditForm.freightCost,
-        remark: invoiceEditForm.remark,
-      } : null);
+      setSelectedInvoice((prev) =>
+        prev
+          ? {
+              ...prev,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
+          : null,
+      );
       toast.success("Invoice changes saved successfully");
     } catch (error) {
       console.error("Failed to save invoice edits:", error);
@@ -1437,34 +1523,42 @@ const InvoiceListPage: React.FC = () => {
       style={{ backgroundColor: "#F8F9FA", color: "#212529" }}
     >
       <div className="w-full mx-auto p-0">
-        {searchParams.get("filter") && searchParams.get("hide_banner") !== "true" && (
-          <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
-            <div className="flex items-center gap-2">
-              <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>
-              <span className="font-semibold text-gray-800">
-                {(() => {
-                  switch (searchParams.get("filter")) {
-                    case "unassigned_cargo": return "Order items unassigned to cargo";
-                    case "rmb_special_no_value": return "RMB Special SET with no value";
-                    case "eur_special_no_value": return "EUR Special SET with no value";
-                    case "dimension_special_no_value": return "Dimension Special SET with no value";
-                    default: return searchParams.get("filter");
-                  }
-                })()}
-              </span>
+        {searchParams.get("filter") &&
+          searchParams.get("hide_banner") !== "true" && (
+            <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">
+                  ⚠️ Reports & Control Health Audit View Active:
+                </span>
+                <span className="font-semibold text-gray-800">
+                  {(() => {
+                    switch (searchParams.get("filter")) {
+                      case "unassigned_cargo":
+                        return "Order items unassigned to cargo";
+                      case "rmb_special_no_value":
+                        return "RMB Special SET with no value";
+                      case "eur_special_no_value":
+                        return "EUR Special SET with no value";
+                      case "dimension_special_no_value":
+                        return "Dimension Special SET with no value";
+                      default:
+                        return searchParams.get("filter");
+                    }
+                  })()}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete("filter");
+                  window.location.href = `/invoices?${params.toString()}`;
+                }}
+                className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
+              >
+                Clear Audit Filter
+              </button>
             </div>
-            <button
-              onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete("filter");
-                window.location.href = `/invoices?${params.toString()}`;
-              }}
-              className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
-            >
-              Clear Audit Filter
-            </button>
-          </div>
-        )}
+          )}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <PageHeader
@@ -1505,7 +1599,7 @@ const InvoiceListPage: React.FC = () => {
                 <Plus className="h-4 w-4" />
                 New Cargo Type
               </button>
-            ) : (activeInvTab === "orders" || activeInvTab === "order_items") ? (
+            ) : activeInvTab === "orders" || activeInvTab === "order_items" ? (
               <button
                 onClick={() => {
                   resetForm();
@@ -1529,10 +1623,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </button>
@@ -1545,7 +1640,8 @@ const InvoiceListPage: React.FC = () => {
             <input
               type="text"
               placeholder={
-                (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices")
+                activeInvTab === "open_invoices" ||
+                activeInvTab === "closed_invoices"
                   ? "Search invoices, customers, or order numbers..."
                   : activeInvTab === "cargos"
                     ? "Search cargos..."
@@ -1556,12 +1652,16 @@ const InvoiceListPage: React.FC = () => {
                         : "Search..."
               }
               value={
-                (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices")
+                activeInvTab === "open_invoices" ||
+                activeInvTab === "closed_invoices"
                   ? searchTerm
                   : orderNoFilter
               }
               onChange={(e) => {
-                if (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices") {
+                if (
+                  activeInvTab === "open_invoices" ||
+                  activeInvTab === "closed_invoices"
+                ) {
                   setSearchTerm(e.target.value);
                 } else {
                   setOrderNoFilter(e.target.value);
@@ -1569,10 +1669,16 @@ const InvoiceListPage: React.FC = () => {
               }}
               className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
             />
-            {((activeInvTab === "open_invoices" || activeInvTab === "closed_invoices") ? searchTerm : orderNoFilter) && (
+            {(activeInvTab === "open_invoices" ||
+            activeInvTab === "closed_invoices"
+              ? searchTerm
+              : orderNoFilter) && (
               <button
                 onClick={() => {
-                  if (activeInvTab === "open_invoices" || activeInvTab === "closed_invoices") {
+                  if (
+                    activeInvTab === "open_invoices" ||
+                    activeInvTab === "closed_invoices"
+                  ) {
                     setSearchTerm("");
                   } else {
                     setOrderNoFilter("");
@@ -1603,7 +1709,10 @@ const InvoiceListPage: React.FC = () => {
                 cargosTabRef.current?.fetchCargos?.();
               } else if (activeInvTab === "cargo_type") {
                 cargoTypesTabRef.current?.fetchCargoTypes?.();
-              } else if (activeInvTab === "orders" || activeInvTab === "order_items") {
+              } else if (
+                activeInvTab === "orders" ||
+                activeInvTab === "order_items"
+              ) {
                 fetchOrders();
               } else {
                 setLoading(true);
@@ -1640,7 +1749,9 @@ const InvoiceListPage: React.FC = () => {
               </div>
             )}
             <OrdersTable
-              orders={activeInvTab === "orders" ? filteredOrders : orderItemsFlat}
+              orders={
+                activeInvTab === "orders" ? filteredOrders : orderItemsFlat
+              }
               loading={loadingOrders}
               getCategoryName={getCategoryName}
               getSupplierName={getSupplierName}
@@ -1665,400 +1776,407 @@ const InvoiceListPage: React.FC = () => {
 
         {(activeInvTab === "open_invoices" ||
           activeInvTab === "closed_invoices") && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#E8F5E8" }}
-                    >
-                      <FileText
-                        className="w-5 h-5"
-                        style={{ color: "#059669" }}
-                      />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Total Invoices
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        {filteredInvoices.length}
-                      </p>
-                    </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+              <div
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#E8F5E8" }}
+                  >
+                    <FileText
+                      className="w-5 h-5"
+                      style={{ color: "#059669" }}
+                    />
                   </div>
-                </div>
-
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#E8F5E8" }}
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
                     >
-                      <DollarSign
-                        className="w-5 h-5"
-                        style={{ color: "#2E7D32" }}
-                      />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Total Amount
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        $
-                        {Number(totalAmount).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#E8F4D6" }}
+                      Total Invoices
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
                     >
-                      <CheckCircle
-                        className="w-5 h-5"
-                        style={{ color: "#8CC21B" }}
-                      />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Paid Amount
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        ${Number(totalPaid).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-[4px]"
-                      style={{ backgroundColor: "#FFF3E0" }}
-                    >
-                      <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
-                    </div>
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: "#6C757D" }}
-                      >
-                        Outstanding
-                      </p>
-                      <p
-                        className="text-xl font-bold"
-                        style={{ color: "#212529" }}
-                      >
-                        ${Number(outstandingAmount).toFixed(2)}
-                      </p>
-                    </div>
+                      {filteredInvoices.length}
+                    </p>
                   </div>
                 </div>
               </div>
 
-
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                      <p className="text-xs text-[#6C757D]">
-                        Loading invoices...
-                      </p>
-                    </div>
+              <div
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#E8F5E8" }}
+                  >
+                    <DollarSign
+                      className="w-5 h-5"
+                      style={{ color: "#2E7D32" }}
+                    />
                   </div>
-                ) : filteredInvoices.length === 0 ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
-                      <h3 className="text-lg font-medium mb-1 text-[#212529]">
-                        No invoices found
-                      </h3>
-                      <p className="text-xs text-[#6C757D]">
-                        Try adjusting your search or filters
-                      </p>
-                    </div>
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
+                    >
+                      Total Amount
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
+                    >
+                      $
+                      {Number(totalAmount).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
                   </div>
-                ) : (
-                  <>
-                    <div className="hidden lg:block overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
-                          <tr>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                #
-                              </th>
-                            )}
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              <div className="flex items-center gap-1.5">ID</div>
-                            </th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Invoice No
-                              </th>
-                            )}
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Bill To
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Ship To
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Cargo No.
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Date created"
-                                : "Closed Date"}
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Count Item"
-                                : "Item Count"}
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "QTY"
-                                : "Total Qty"}
-                            </th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Total Price
-                              </th>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#F1F3F5]">
-                          {currentInvoices.map((invoice, index) => {
-                            return (
-                              <React.Fragment key={invoice.id}>
-                                <tr
-                                  onClick={() => handleOpenInvoiceDetails(invoice)}
-                                  className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium"
-                                >
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-[#212529]">
-                                      {startIndex + index + 1}
-                                    </td>
-                                  )}
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-bold">
-                                    {invoice.id.slice(-5).toUpperCase()}
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                                      {invoice.invoiceNumber || "N/A"}
-                                    </td>
-                                  )}
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {(() => {
-                                      const v = invoice.bill_to;
-                                      if (!v || typeof v === "object")
-                                        return "N/A";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "N/A";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {(() => {
-                                      const v = invoice.ship_to;
-                                      if (!v || typeof v === "object") return "-";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "-";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.cargo?.cargo_no || "No Cargo"}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {formatDate(invoice.invoiceDate)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.customItemCount ??
-                                      invoice.items?.length ??
-                                      0}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                    {invoice.customTotalQty ??
-                                      invoice.items?.reduce(
-                                        (sum: any, item: any) =>
-                                          sum + item.quantity,
-                                        0,
-                                      ) ??
-                                      0}
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                      {Number(invoice.grossTotal).toLocaleString(
-                                        undefined,
-                                        {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        },
-                                      )}
-                                    </td>
-                                  )}
-                                </tr>
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                </div>
+              </div>
 
-                    <div className="lg:hidden divide-y divide-[#F1F3F5]">
-                      {currentInvoices.map((invoice) => (
-                        <div
-                          key={invoice.id}
-                          onClick={() => handleOpenInvoiceDetails(invoice)}
-                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
-                                {invoice.id.slice(-5).toUpperCase()}
-                              </div>
-                              <div className="font-bold text-sm text-[#212529]">
-                                {activeInvTab === "closed_invoices"
-                                  ? invoice.invoiceNumber
-                                  : `ID: ${invoice.id.slice(-5)}`}
-                              </div>
+              <div
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#E8F4D6" }}
+                  >
+                    <CheckCircle
+                      className="w-5 h-5"
+                      style={{ color: "#8CC21B" }}
+                    />
+                  </div>
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
+                    >
+                      Paid Amount
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
+                    >
+                      ${Number(totalPaid).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-[4px]"
+                    style={{ backgroundColor: "#FFF3E0" }}
+                  >
+                    <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
+                  </div>
+                  <div>
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "#6C757D" }}
+                    >
+                      Outstanding
+                    </p>
+                    <p
+                      className="text-xl font-bold"
+                      style={{ color: "#212529" }}
+                    >
+                      ${Number(outstandingAmount).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
+                    <p className="text-xs text-[#6C757D]">
+                      Loading invoices...
+                    </p>
+                  </div>
+                </div>
+              ) : filteredInvoices.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
+                    <h3 className="text-lg font-medium mb-1 text-[#212529]">
+                      No invoices found
+                    </h3>
+                    <p className="text-xs text-[#6C757D]">
+                      Try adjusting your search or filters
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
+                        <tr>
+                          {activeInvTab === "closed_invoices" && (
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              #
+                            </th>
+                          )}
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            <div className="flex items-center gap-1.5">ID</div>
+                          </th>
+                          {activeInvTab === "closed_invoices" && (
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Invoice No
+                            </th>
+                          )}
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Bill To
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Ship To
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Cargo No.
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            {activeInvTab === "open_invoices"
+                              ? "Date created"
+                              : "Closed Date"}
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            {activeInvTab === "open_invoices"
+                              ? "Count Item"
+                              : "Item Count"}
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            {activeInvTab === "open_invoices"
+                              ? "QTY"
+                              : "Total Qty"}
+                          </th>
+                          {activeInvTab === "closed_invoices" && (
+                            <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Total Price
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#F1F3F5]">
+                        {currentInvoices.map((invoice, index) => {
+                          return (
+                            <React.Fragment key={invoice.id}>
+                              <tr
+                                onClick={() =>
+                                  handleOpenInvoiceDetails(invoice)
+                                }
+                                className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium"
+                              >
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs text-[#212529]">
+                                    {startIndex + index + 1}
+                                  </td>
+                                )}
+                                <td className="py-4 px-4 text-xs text-[#212529] font-bold">
+                                  {invoice.id.slice(-5).toUpperCase()}
+                                </td>
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
+                                    {invoice.invoiceNumber || "N/A"}
+                                  </td>
+                                )}
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {(() => {
+                                    const v = invoice.bill_to;
+                                    if (!v || typeof v === "object")
+                                      return "N/A";
+                                    const s = String(v).trim();
+                                    return s.length > 1 ? s : "N/A";
+                                  })()}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#6C757D]">
+                                  {(() => {
+                                    const v = invoice.ship_to;
+                                    if (!v || typeof v === "object") return "-";
+                                    const s = String(v).trim();
+                                    return s.length > 1 ? s : "-";
+                                  })()}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {invoice.cargo?.cargo_no || "No Cargo"}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#495057]">
+                                  {formatDate(invoice.invoiceDate)}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {invoice.customItemCount ??
+                                    invoice.items?.length ??
+                                    0}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529] font-medium">
+                                  {invoice.customTotalQty ??
+                                    invoice.items?.reduce(
+                                      (sum: any, item: any) =>
+                                        sum + item.quantity,
+                                      0,
+                                    ) ??
+                                    0}
+                                </td>
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                    {Number(invoice.grossTotal).toLocaleString(
+                                      undefined,
+                                      {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      },
+                                    )}
+                                  </td>
+                                )}
+                              </tr>
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="lg:hidden divide-y divide-[#F1F3F5]">
+                    {currentInvoices.map((invoice) => (
+                      <div
+                        key={invoice.id}
+                        onClick={() => handleOpenInvoiceDetails(invoice)}
+                        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
+                              {invoice.id.slice(-5).toUpperCase()}
                             </div>
-                            <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
-                              style={getStatusColor(invoice.status)}
-                            >
-                              {invoice.status}
+                            <div className="font-bold text-sm text-[#212529]">
+                              {activeInvTab === "closed_invoices"
+                                ? invoice.invoiceNumber
+                                : `ID: ${invoice.id.slice(-5)}`}
+                            </div>
+                          </div>
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
+                            style={getStatusColor(invoice.status)}
+                          >
+                            {invoice.status}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">Customer</span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.customer?.companyName}
                             </span>
                           </div>
-
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Customer</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customer?.companyName}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">
-                                {activeInvTab === "open_invoices"
-                                  ? "Cargo"
-                                  : "Cargo No."}
-                              </span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.cargo?.cargo_no || "-"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Items / Qty</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customItemCount ?? invoice.items?.length ?? 0} /{" "}
-                                {invoice.customTotalQty ?? (invoice.items?.reduce(
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">
+                              {activeInvTab === "open_invoices"
+                                ? "Cargo"
+                                : "Cargo No."}
+                            </span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.cargo?.cargo_no || "-"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">Items / Qty</span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.customItemCount ??
+                                invoice.items?.length ??
+                                0}{" "}
+                              /{" "}
+                              {invoice.customTotalQty ??
+                                invoice.items?.reduce(
                                   (sum, item) => sum + item.quantity,
                                   0,
-                                ) ?? 0)}
+                                ) ??
+                                0}
+                            </span>
+                          </div>
+                          {activeInvTab === "closed_invoices" && (
+                            <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
+                              <span className="text-[#6C757D]">
+                                Total Price
+                              </span>
+                              <span className="text-[#212529]">
+                                ${Number(invoice.grossTotal).toFixed(2)}
                               </span>
                             </div>
-                            {activeInvTab === "closed_invoices" && (
-                              <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
-                                <span className="text-[#6C757D]">
-                                  Total Price
-                                </span>
-                                <span className="text-[#212529]">
-                                  ${Number(invoice.grossTotal).toFixed(2)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
-                        <div className="text-[11px] font-medium text-[#6C757D]">
-                          Showing {startIndex + 1} to{" "}
-                          {Math.min(endIndex, filteredInvoices.length)} of{" "}
-                          {filteredInvoices.length} invoices
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() =>
-                              setCurrentPage(Math.max(1, currentPage - 1))
-                            }
-                            disabled={currentPage === 1}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
-                          {[...Array(totalPages)].map((_, i) => (
-                            <button
-                              key={i + 1}
-                              onClick={() => setCurrentPage(i + 1)}
-                              className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                                }`}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() =>
-                              setCurrentPage(
-                                Math.min(totalPages, currentPage + 1),
-                              )
-                            }
-                            disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </>
-          )}
+                    ))}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
+                      <div className="text-[11px] font-medium text-[#6C757D]">
+                        Showing {startIndex + 1} to{" "}
+                        {Math.min(endIndex, filteredInvoices.length)} of{" "}
+                        {filteredInvoices.length} invoices
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
+                        </button>
+                        {[...Array(totalPages)].map((_, i) => (
+                          <button
+                            key={i + 1}
+                            onClick={() => setCurrentPage(i + 1)}
+                            className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                              currentPage === i + 1
+                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1),
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
 
         {activeInvTab === "cargos" && (
           <div
@@ -2083,8 +2201,6 @@ const InvoiceListPage: React.FC = () => {
           </div>
         )}
 
-
-
         {activeInvTab === "packing_list" && (
           <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm">
             <PackingListTab searchTerm={orderNoFilter} />
@@ -2100,7 +2216,10 @@ const InvoiceListPage: React.FC = () => {
                     Invoice Details
                   </h2>
                   <p className="text-xs text-gray-500 mt-1">
-                    ID: {selectedInvoice.id} {selectedInvoice.invoiceNumber ? `| Invoice No: ${selectedInvoice.invoiceNumber}` : ""}
+                    ID: {selectedInvoice.id}{" "}
+                    {selectedInvoice.invoiceNumber
+                      ? `| Invoice No: ${selectedInvoice.invoiceNumber}`
+                      : ""}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2139,7 +2258,8 @@ const InvoiceListPage: React.FC = () => {
                             await downloadCommercialInvoice(
                               selectedInvoice.id,
                               selectedInvoice.invoiceNumber,
-                              selectedInvoice.cargo?.cargo_no || selectedInvoice.cargoNo
+                              selectedInvoice.cargo?.cargo_no ||
+                                selectedInvoice.cargoNo,
                             );
                           } catch (error) {
                             console.error("PDF Generation failed", error);
@@ -2174,71 +2294,129 @@ const InvoiceListPage: React.FC = () => {
               <div className="p-6 space-y-6 flex-1 text-black">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Customer</span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">{selectedInvoice.customer?.companyName || "N/A"}</span>
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                      Customer
+                    </span>
+                    <span className="text-sm font-semibold text-gray-800 block mt-1">
+                      {selectedInvoice.customer?.companyName || "N/A"}
+                    </span>
                     {selectedInvoice.customer?.email && (
-                      <span className="text-xs text-gray-500 block mt-0.5">{selectedInvoice.customer.email}</span>
+                      <span className="text-xs text-gray-500 block mt-0.5">
+                        {selectedInvoice.customer.email}
+                      </span>
                     )}
                   </div>
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Bill To / Ship To</span>
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                      Bill To / Ship To
+                    </span>
                     <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      Bill To: {typeof selectedInvoice.bill_to === "string" ? selectedInvoice.bill_to : "N/A"}
+                      Bill To:{" "}
+                      {typeof selectedInvoice.bill_to === "string"
+                        ? selectedInvoice.bill_to
+                        : "N/A"}
                     </span>
                     <span className="text-xs text-gray-500 block mt-0.5">
-                      Ship To: {typeof selectedInvoice.ship_to === "string" ? selectedInvoice.ship_to : "N/A"}
+                      Ship To:{" "}
+                      {typeof selectedInvoice.ship_to === "string"
+                        ? selectedInvoice.ship_to
+                        : "N/A"}
                     </span>
                   </div>
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Cargo No / Dates</span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">Cargo: {selectedInvoice.cargo?.cargo_no || "No Cargo"}</span>
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                      Cargo No / Dates
+                    </span>
+                    <span className="text-sm font-semibold text-gray-800 block mt-1">
+                      Cargo: {selectedInvoice.cargo?.cargo_no || "No Cargo"}
+                    </span>
                     <span className="text-xs text-gray-500 block mt-0.5">
                       Date: {formatDate(selectedInvoice.invoiceDate)}
                     </span>
+                    <span className="text-xs text-gray-500 block mt-0.5">
+                      Delivery: {formatDate(selectedInvoice.deliveryDate)}
+                    </span>
+                    {selectedInvoice.dueDate && (
+                      <span className="text-xs font-semibold text-amber-700 block mt-0.5">
+                        Due: {formatDate(selectedInvoice.dueDate)}
+                      </span>
+                    )}
                   </div>
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Items / Totals</span>
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                      Items / Totals
+                    </span>
                     <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      {selectedInvoice.customItemCount ?? selectedInvoice.items?.length ?? 0} Items | {selectedInvoice.customTotalQty ?? 0} Qty
+                      {selectedInvoice.customItemCount ??
+                        selectedInvoice.items?.length ??
+                        0}{" "}
+                      Items | {selectedInvoice.customTotalQty ?? 0} Qty
                     </span>
                     {activeInvTab === "closed_invoices" && (
                       <span className="text-sm font-bold text-emerald-600 block mt-0.5">
-                        Total: ${Number(selectedInvoice.grossTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        Total: $
+                        {Number(selectedInvoice.grossTotal).toLocaleString(
+                          undefined,
+                          { minimumFractionDigits: 2 },
+                        )}
                       </span>
                     )}
                   </div>
                 </div>
                 {activeInvTab === "open_invoices" && (
                   <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Edit Invoice Details</h3>
+                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      Edit Invoice Details
+                    </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Description *</label>
+                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                          Description *
+                        </label>
                         <input
                           type="text"
                           value={invoiceEditForm.description}
-                          onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, description: e.target.value })}
+                          onChange={(e) =>
+                            setInvoiceEditForm({
+                              ...invoiceEditForm,
+                              description: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
                           placeholder="Description (e.g. Freight cost)"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Freight Cost *</label>
+                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                          Freight Cost *
+                        </label>
                         <input
                           type="number"
                           step="0.01"
                           value={invoiceEditForm.freightCost}
-                          onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, freightCost: e.target.value })}
+                          onChange={(e) =>
+                            setInvoiceEditForm({
+                              ...invoiceEditForm,
+                              freightCost: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
                           placeholder="Freight Cost"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Remark</label>
+                      <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                        Remark
+                      </label>
                       <textarea
                         value={invoiceEditForm.remark}
-                        onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, remark: e.target.value })}
+                        onChange={(e) =>
+                          setInvoiceEditForm({
+                            ...invoiceEditForm,
+                            remark: e.target.value,
+                          })
+                        }
                         rows={2}
                         className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
                         placeholder="Remark"
@@ -2246,7 +2424,9 @@ const InvoiceListPage: React.FC = () => {
                     </div>
                     <div className="flex justify-end pt-2">
                       <button
-                        onClick={() => handleSaveInvoiceEdit(selectedInvoice.id)}
+                        onClick={() =>
+                          handleSaveInvoiceEdit(selectedInvoice.id)
+                        }
                         disabled={actionLoading[`save-${selectedInvoice.id}`]}
                         className="px-4 py-2 text-xs font-bold text-white bg-[#059669] rounded-lg hover:bg-green-700 flex items-center gap-1.5 shadow-md disabled:opacity-50"
                       >
@@ -2264,19 +2444,21 @@ const InvoiceListPage: React.FC = () => {
                   <div className="flex border-b border-gray-200">
                     <button
                       onClick={() => setModalActiveTab("taric")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "taric"
-                        ? "border-[#8CC21B] text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "taric"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                     >
                       Taric Summary
                     </button>
                     <button
                       onClick={() => setModalActiveTab("items")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "items"
-                        ? "border-[#8CC21B] text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "items"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                     >
                       Items List
                     </button>
@@ -2287,7 +2469,9 @@ const InvoiceListPage: React.FC = () => {
                       <div className="flex items-center justify-center py-12">
                         <div className="text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                          <p className="text-xs text-[#6C757D]">Loading data details...</p>
+                          <p className="text-xs text-[#6C757D]">
+                            Loading data details...
+                          </p>
                         </div>
                       </div>
                     ) : modalActiveTab === "taric" ? (
@@ -2296,389 +2480,500 @@ const InvoiceListPage: React.FC = () => {
                           Items shown in invoice based on Taric
                         </h4>
                         <SpreadSheet
-                          data={expandedStates[selectedInvoice.id]?.data?.taricGroups || []}
+                          data={
+                            expandedStates[selectedInvoice.id]?.data
+                              ?.taricGroups || []
+                          }
                           loading={expandedStates[selectedInvoice.id]?.loading}
                           showTotals={true}
                           columns={
                             activeInvTab === "closed_invoices"
                               ? [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => it.taricNameEn,
-                                  width: "250px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span style={it.isProjectItem ? { color: "#F59E0B", fontWeight: 600 } : undefined}>
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) => (it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-"),
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => it.totalQty,
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => it.unitPrice || "0.00",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "100px",
-                                },
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "250px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 600,
+                                              }
+                                            : undefined
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate
+                                        ? `${Number(it.dutyRate).toFixed(2)}`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                      }),
+                                    width: "100px",
+                                  },
+                                ]
                               : [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => it.taricNameEn,
-                                  width: "250px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span style={it.isProjectItem ? { color: "#F59E0B", fontWeight: 600 } : undefined}>
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) => (it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-"),
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => it.totalQty,
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => it.unitPrice || "0.00",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "100px",
-                                },
-                                {
-                                  header: "Operation",
-                                  render: (group: any) => (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTaricGroup(group);
-                                        setSelectedTaricCode("");
-                                        setShowTaricModal(true);
-                                      }}
-                                      className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
-                                    >
-                                      <RefreshCw className="w-3 h-3" /> Set taric
-                                    </button>
-                                  ),
-                                  width: "110px",
-                                },
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "250px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 600,
+                                              }
+                                            : undefined
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate
+                                        ? `${Number(it.dutyRate).toFixed(2)}`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                      }),
+                                    width: "100px",
+                                  },
+                                  {
+                                    header: "Operation",
+                                    render: (group: any) => (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedTaricGroup(group);
+                                          setSelectedTaricCode("");
+                                          setShowTaricModal(true);
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
+                                      >
+                                        <RefreshCw className="w-3 h-3" /> Set
+                                        taric
+                                      </button>
+                                    ),
+                                    width: "110px",
+                                  },
+                                ]
                           }
                           expandedRowId={null}
                           totalCols={
                             activeInvTab === "closed_invoices"
                               ? [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) => s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "80px",
-                                },
-                                {
-                                  value: (
-                                    expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) => s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "100px",
-                                  align: "left",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "80px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    }),
+                                    width: "100px",
+                                    align: "left",
+                                  },
+                                ]
                               : [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) => s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "80px",
-                                },
-                                {
-                                  value: (
-                                    expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) => s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "100px",
-                                  align: "left",
-                                },
-                                {
-                                  value: "",
-                                  width: "110px",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "80px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    }),
+                                    width: "100px",
+                                    align: "left",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "110px",
+                                  },
+                                ]
                           }
                         />
                       </div>
                     ) : (
                       <SpreadSheet
-                        data={expandedStates[selectedInvoice.id]?.data?.detailedItems || []}
+                        data={
+                          expandedStates[selectedInvoice.id]?.data
+                            ?.detailedItems || []
+                        }
                         loading={expandedStates[selectedInvoice.id]?.loading}
                         columns={
                           activeInvTab === "closed_invoices"
                             ? [
-                              {
-                                header: "#",
-                                render: (_: any, idx: number) => idx + 1,
-                                width: "40px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) => it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div className="line-clamp-2 leading-tight py-1" title={it.item?.item_name}>
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "350px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) => it.set_taric_code || it.item?.taric?.code || "-",
-                                width: "100px",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => <span className="font-bold">{it.qty}</span>,
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) => it.eur_special_price || it._fallbackEk || "0",
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice = Number(it.eur_special_price || it._fallbackEk) || 0;
-                                  const totalPrice = (it.qty || 0) * unitPrice;
-                                  return <span className="font-bold text-[#10B981]">{totalPrice.toFixed(2)}</span>;
+                                {
+                                  header: "#",
+                                  render: (_: any, idx: number) => idx + 1,
+                                  width: "40px",
                                 },
-                                width: "80px",
-                                align: "center",
-                              },
-                            ]
-                            : [
-                              {
-                                header: "ID",
-                                render: (it: any) => (
-                                  <div className="flex flex-col gap-1.5 p-1">
-                                    <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
-                                      <FileText className="w-3 h-3" /> {it.id}
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setNewQty(it.qty_label || it.qty);
-                                          setQtyRemarks(it.remarks_cn || "");
-                                          setShowQTYModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
-                                      >
-                                        <Package className="w-2.5 h-2.5" /> QtyLabel
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setSplitQty(Math.floor(it.qty * 0.5));
-                                          setTargetCargoId("");
-                                          setSplitRemarks(it.remarks_cn || "");
-                                          setShowSPModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
-                                      >
-                                        <Scissors className="w-2.5 h-2.5" /> Split
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setTargetCargoId(it.cargo_id || "");
-                                          setShowREModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
-                                      >
-                                        <RefreshCw className="w-2.5 h-2.5" /> ReAssign
-                                      </button>
-                                    </div>
-                                  </div>
-                                ),
-                                width: "100px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) => it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div className="line-clamp-3 leading-tight break-words" title={it.item?.item_name}>
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "250px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) => it.set_taric_code || it.item?.taric?.code,
-                                width: "90px",
-                              },
-                              {
-                                header: "Remark",
-                                render: (it: any) => `// ${it.remark_de || ""}`,
-                                width: "80px",
-                              },
-                              {
-                                header: "Order_no",
-                                render: (it: any) => it.order?.order_no || "-",
-                                width: "80px",
-                              },
-                              {
-                                header: "SOID",
-                                render: (it: any) => it.supplier_order_id || "-",
-                                width: "50px",
-                              },
-                              {
-                                header: "Status",
-                                render: (it: any) => it.status,
-                                width: "60px",
-                              },
-                              {
-                                header: "V(dm³)",
-                                render: (it: any) => it.v?.toFixed(2),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "W(kg)",
-                                render: (it: any) => it.w?.toFixed(2),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <div className="flex flex-col items-center">
-                                    <span className="font-bold">
-                                      {it.qty_label ? `${it.qty_label}/${it.qty}` : it.qty}
-                                    </span>
-                                  </div>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) => it.eur_special_price || it._fallbackEk || "0",
-                                width: "45px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice = Number(it.eur_special_price || it._fallbackEk) || 0;
-                                  const totalPrice = (it.qty || 0) * unitPrice;
-                                  return <span className="font-bold text-[#10B981]">{totalPrice.toFixed(2)}</span>;
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
                                 },
-                                width: "65px",
-                                align: "center",
-                              },
-                              {
-                                header: "Action",
-                                render: (it: any) =>
-                                  it.item?.is_eur_special === "Y" &&
-                                    (!it.eur_special_price || Number(it.eur_special_price) === 0) ? (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setExpandedPriceItemId(expandedPriceItemId === it.id ? null : it.id);
-                                        setEditingPrice(it.eur_special_price || 0);
-                                      }}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-2 leading-tight py-1"
+                                      title={it.item?.item_name}
                                     >
-                                      <DollarSign className="w-3.5 h-3.5" /> SET EUR PRICE
-                                    </button>
-                                  ) : null,
-                                width: "120px",
-                              },
-                            ]
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "350px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) =>
+                                    it.set_taric_code ||
+                                    it.item?.taric?.code ||
+                                    "-",
+                                  width: "100px",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <span className="font-bold">{it.qty}</span>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    it.eur_special_price ||
+                                    it._fallbackEk ||
+                                    "0",
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        {totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "80px",
+                                  align: "center",
+                                },
+                              ]
+                            : [
+                                {
+                                  header: "ID",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col gap-1.5 p-1">
+                                      <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
+                                        <FileText className="w-3 h-3" /> {it.id}
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setNewQty(it.qty_label || it.qty);
+                                            setQtyRemarks(it.remarks_cn || "");
+                                            setShowQTYModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
+                                        >
+                                          <Package className="w-2.5 h-2.5" />{" "}
+                                          QtyLabel
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setSplitQty(
+                                              Math.floor(it.qty * 0.5),
+                                            );
+                                            setTargetCargoId("");
+                                            setSplitRemarks(
+                                              it.remarks_cn || "",
+                                            );
+                                            setShowSPModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
+                                        >
+                                          <Scissors className="w-2.5 h-2.5" />{" "}
+                                          Split
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setTargetCargoId(it.cargo_id || "");
+                                            setShowREModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
+                                        >
+                                          <RefreshCw className="w-2.5 h-2.5" />{" "}
+                                          ReAssign
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ),
+                                  width: "100px",
+                                },
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-3 leading-tight break-words"
+                                      title={it.item?.item_name}
+                                    >
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "250px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) =>
+                                    it.set_taric_code || it.item?.taric?.code,
+                                  width: "90px",
+                                },
+                                {
+                                  header: "Remark",
+                                  render: (it: any) =>
+                                    `// ${it.remark_de || ""}`,
+                                  width: "80px",
+                                },
+                                {
+                                  header: "Order_no",
+                                  render: (it: any) =>
+                                    it.order?.order_no || "-",
+                                  width: "80px",
+                                },
+                                {
+                                  header: "SOID",
+                                  render: (it: any) =>
+                                    it.supplier_order_id || "-",
+                                  width: "50px",
+                                },
+                                {
+                                  header: "Status",
+                                  render: (it: any) => it.status,
+                                  width: "60px",
+                                },
+                                {
+                                  header: "V(dm³)",
+                                  render: (it: any) => it.v?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "W(kg)",
+                                  render: (it: any) => it.w?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col items-center">
+                                      <span className="font-bold">
+                                        {it.qty_label
+                                          ? `${it.qty_label}/${it.qty}`
+                                          : it.qty}
+                                      </span>
+                                    </div>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    it.eur_special_price ||
+                                    it._fallbackEk ||
+                                    "0",
+                                  width: "45px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        {totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "65px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "Action",
+                                  render: (it: any) =>
+                                    it.item?.is_eur_special === "Y" &&
+                                    (!it.eur_special_price ||
+                                      Number(it.eur_special_price) === 0) ? (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedPriceItemId(
+                                            expandedPriceItemId === it.id
+                                              ? null
+                                              : it.id,
+                                          );
+                                          setEditingPrice(
+                                            it.eur_special_price || 0,
+                                          );
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
+                                      >
+                                        <DollarSign className="w-3.5 h-3.5" />{" "}
+                                        SET EUR PRICE
+                                      </button>
+                                    ) : null,
+                                  width: "120px",
+                                },
+                              ]
                         }
                         expandedRowId={expandedPriceItemId}
                         renderRowDetails={(it: any) => (
@@ -2697,7 +2992,9 @@ const InvoiceListPage: React.FC = () => {
                                     type="number"
                                     step="0.01"
                                     value={editingPrice}
-                                    onChange={(e) => setEditingPrice(Number(e.target.value))}
+                                    onChange={(e) =>
+                                      setEditingPrice(Number(e.target.value))
+                                    }
                                     className="w-full px-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
                                     placeholder="0.00"
                                   />
@@ -2742,12 +3039,12 @@ const InvoiceListPage: React.FC = () => {
             onClose={() => setShowREModal(false)}
             title={
               selectedItem.cargo_id
-                ? (selectedItem.order_no
+                ? selectedItem.order_no
                   ? `Reassign Order No: ${selectedItem.order_no}`
-                  : `Reassign Item ID: ${selectedItem.id}`)
-                : (selectedItem.order_no
+                  : `Reassign Item ID: ${selectedItem.id}`
+                : selectedItem.order_no
                   ? `Assign Order No: ${selectedItem.order_no}`
-                  : `Assign Item ID: ${selectedItem.id}`)
+                  : `Assign Item ID: ${selectedItem.id}`
             }
           >
             <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
@@ -2757,11 +3054,15 @@ const InvoiceListPage: React.FC = () => {
                 </label>
                 <Select
                   className="text-sm"
-                  menuPortalTarget={typeof window !== "undefined" ? document.body : undefined}
+                  menuPortalTarget={
+                    typeof window !== "undefined" ? document.body : undefined
+                  }
                   styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
                   options={cargos
                     .filter((c) => {
-                      const status = (c.cargo_status || "").trim().toLowerCase();
+                      const status = (c.cargo_status || "")
+                        .trim()
+                        .toLowerCase();
                       return status !== "shipped" && status !== "delivered";
                     })
                     .map((c) => ({
@@ -2796,7 +3097,9 @@ const InvoiceListPage: React.FC = () => {
                   className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  {selectedItem.cargo_id ? "Confirm Reassign" : "Confirm Assign"}
+                  {selectedItem.cargo_id
+                    ? "Confirm Reassign"
+                    : "Confirm Assign"}
                 </button>
               </div>
             </div>
@@ -2835,11 +3138,15 @@ const InvoiceListPage: React.FC = () => {
                   Target Cargo (Optional)
                 </label>
                 <Select
-                  menuPortalTarget={typeof window !== "undefined" ? document.body : undefined}
+                  menuPortalTarget={
+                    typeof window !== "undefined" ? document.body : undefined
+                  }
                   styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
                   options={cargos
                     .filter((c) => {
-                      const status = (c.cargo_status || "").trim().toLowerCase();
+                      const status = (c.cargo_status || "")
+                        .trim()
+                        .toLowerCase();
                       return status !== "shipped" && status !== "delivered";
                     })
                     .map((c) => ({
@@ -2989,7 +3296,6 @@ const InvoiceListPage: React.FC = () => {
           </CustomModal>
         )}
 
-
         <OrderDetailsModal
           isOpen={showViewModal}
           onClose={closeView}
@@ -3004,11 +3310,7 @@ const InvoiceListPage: React.FC = () => {
             isOpen={showModal}
             onClose={closeModal}
             width="max-w-4xl"
-            title={
-              mode === "edit"
-                ? "Edit Order"
-                : "Create New Order"
-            }
+            title={mode === "edit" ? "Edit Order" : "Create New Order"}
             footer={
               <div className="flex gap-3">
                 <button
@@ -3018,7 +3320,9 @@ const InvoiceListPage: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
+                  onClick={
+                    mode === "edit" ? handleUpdateOrder : handleCreateOrder
+                  }
                   className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all font-bold"
                 >
                   {mode === "edit" ? "Update Order" : "Create Order"}
@@ -3029,7 +3333,9 @@ const InvoiceListPage: React.FC = () => {
             <div className="space-y-4 text-black">
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Category:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Category:
+                  </label>
                   <select
                     value={form.category_id}
                     onChange={(e) => handleCategoryChange(e.target.value)}
@@ -3044,7 +3350,9 @@ const InvoiceListPage: React.FC = () => {
                   </select>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Supplier:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Supplier:
+                  </label>
                   <select
                     value={form.supplier_id}
                     onChange={(e) => handleSupplierChange(e.target.value)}
@@ -3060,7 +3368,9 @@ const InvoiceListPage: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select Item then quantity:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Item then quantity:
+                </label>
                 <ItemSelectorWithQuantity
                   items={effectiveItems}
                   selectedItemId={selectedItemId}
@@ -3070,10 +3380,14 @@ const InvoiceListPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Comment:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Comment:
+                </label>
                 <textarea
                   value={form.comment}
-                  onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, comment: e.target.value }))
+                  }
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
                   placeholder="Enter order comment..."
                   rows={3}
@@ -3084,25 +3398,48 @@ const InvoiceListPage: React.FC = () => {
                   <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
                     <thead className="bg-gray-100 text-gray-800">
                       <tr>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">ID</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b w-[120px]">Item name</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">Qty</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">Item remark</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">Price</th>
-                        <th className="px-4 py-2 text-center text-sm font-medium border-b">Action</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
+                          ID
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b w-[120px]">
+                          Item name
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
+                          Qty
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
+                          Item remark
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
+                          Price
+                        </th>
+                        <th className="px-4 py-2 text-center text-sm font-medium border-b">
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="text-gray-700">
                       {orderItems.map((row) => (
                         <tr key={row.item_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm border-b">{row.item_id}</td>
-                          <td className="px-4 py-2 text-sm border-b"><div className="line-clamp-2 leading-tight max-w-[120px]">{row.itemName}</div></td>
+                          <td className="px-4 py-2 text-sm border-b">
+                            {row.item_id}
+                          </td>
+                          <td className="px-4 py-2 text-sm border-b">
+                            <div className="line-clamp-2 leading-tight max-w-[120px]">
+                              {row.itemName}
+                            </div>
+                          </td>
                           <td className="px-4 py-2 text-sm border-b">
                             <input
                               type="number"
                               min={1}
                               value={row.qty}
-                              onChange={(e) => handleUpdateOrderItemQty(row.item_id, Number(e.target.value))}
+                              onChange={(e) =>
+                                handleUpdateOrderItemQty(
+                                  row.item_id,
+                                  Number(e.target.value),
+                                )
+                              }
                               className="w-16 px-2 py-1 border border-gray-300 rounded-[4px] text-black"
                             />
                           </td>
@@ -3110,11 +3447,18 @@ const InvoiceListPage: React.FC = () => {
                             <input
                               type="text"
                               value={row.remark_de}
-                              onChange={(e) => handleUpdateOrderItemRemark(row.item_id, e.target.value)}
+                              onChange={(e) =>
+                                handleUpdateOrderItemRemark(
+                                  row.item_id,
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-2 py-1 border border-gray-300 rounded-[4px] text-black"
                             />
                           </td>
-                          <td className="px-4 py-2 text-sm border-b">{row.price} {row.currency}</td>
+                          <td className="px-4 py-2 text-sm border-b">
+                            {row.price} {row.currency}
+                          </td>
                           <td className="px-4 py-2 text-center border-b">
                             <button
                               onClick={() => handleRemoveOrderItem(row.item_id)}

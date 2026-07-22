@@ -599,6 +599,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           getAllCustomers({ limit: 1000 }),
           getItems({ limit: 1000 }).catch(() => ({ data: [] })),
         ]);
+
+        console.log("Fetched sources:", custRes);
         setInquiries(
           Array.isArray(inqRes?.data)
             ? inqRes.data
@@ -751,6 +753,22 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     (c: any) => String(c.id) === String(filterCustomerId),
   );
 
+  useEffect(() => {
+    if (sourceType !== "item") return;
+    if (!selectedCustomer) return;
+    setCreateForm((f: any) => ({
+      ...f,
+      paymentMethod: selectedCustomer.defaultPaymentMethod || f.paymentMethod,
+      shippingMethod:
+        selectedCustomer.defaultShippingMethod || f.shippingMethod,
+      paymentTerms:
+        selectedCustomer.defaultPaymentDueDays !== undefined &&
+        selectedCustomer.defaultPaymentDueDays !== null
+          ? `${selectedCustomer.defaultPaymentDueDays} Tage netto`
+          : f.paymentTerms,
+    }));
+  }, [selectedCustomer, sourceType]);
+
   const toggleItem = (it: any) => {
     setSelectedItems((prev) => {
       const exists = prev.some((p) => String(p.id) === String(it.id));
@@ -805,11 +823,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         });
       }
       if (res?.success && res.data?.id) {
-        onChanged?.();
         toast.success("Offer created successfully.", successStyles);
-        setOffer(res.data);
-        setForm(buildForm(res.data));
-        setEdit(true);
+        onChanged?.();
+        onClose();
       }
     } catch (e) {
       console.error("Error creating offer:", e);
@@ -1235,21 +1251,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </label>
                   <CustomerSearchInput
                     value={filterCustomerId}
-                    onChange={(id) => {
-                      setFilterCustomerId(id);
-                      if (id) {
-                        const cust = customers.find(
-                          (c) => String(c.id) === String(id),
-                        );
-                        if (cust) {
-                          cPatch({
-                            paymentMethod: cust.defaultPaymentMethod || "",
-                            shippingMethod: cust.defaultShippingMethod || "",
-                            paymentTerms: `${cust.defaultPaymentDueDays !== undefined && cust.defaultPaymentDueDays !== null ? cust.defaultPaymentDueDays : 7} Tage netto`,
-                          });
-                        }
-                      }
-                    }}
+                    onChange={(id) => setFilterCustomerId(id)}
                     placeholder={
                       sourceType === "item"
                         ? "Select a customer..."
@@ -1418,53 +1420,65 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               )}
 
-              <div className="space-y-4 border-t pt-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Payment method
-                    </label>
-                    <select
-                      value={createForm.paymentMethod}
-                      onChange={(e) =>
-                        cPatch({ paymentMethod: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select…</option>
-                      {(dbPaymentMethods.length > 0
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment method
+                </label>
+                <select
+                  value={createForm.paymentMethod}
+                  onChange={(e) => cPatch({ paymentMethod: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select…</option>
+                  {createForm.paymentMethod &&
+                    !(
+                      dbPaymentMethods.length > 0
                         ? dbPaymentMethods.map((pm: any) => pm.name)
                         : PAYMENT_METHODS
-                      ).map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Shipping method
-                    </label>
-                    <select
-                      value={createForm.shippingMethod}
-                      onChange={(e) =>
-                        cPatch({ shippingMethod: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select…</option>
-                      {(dbShippingMethods.length > 0
+                    ).includes(createForm.paymentMethod) && (
+                      <option value={createForm.paymentMethod}>
+                        {createForm.paymentMethod}
+                      </option>
+                    )}
+                  {(dbPaymentMethods.length > 0
+                    ? dbPaymentMethods.map((pm: any) => pm.name)
+                    : PAYMENT_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Shipping method
+                </label>
+                <select
+                  value={createForm.shippingMethod}
+                  onChange={(e) => cPatch({ shippingMethod: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select…</option>
+                  {createForm.shippingMethod &&
+                    !(
+                      dbShippingMethods.length > 0
                         ? dbShippingMethods.map((sm: any) => sm.name)
                         : SHIPPING_METHODS
-                      ).map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                    ).includes(createForm.shippingMethod) && (
+                      <option value={createForm.shippingMethod}>
+                        {createForm.shippingMethod}
+                      </option>
+                    )}
+                  {(dbShippingMethods.length > 0
+                    ? dbShippingMethods.map((sm: any) => sm.name)
+                    : SHIPPING_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

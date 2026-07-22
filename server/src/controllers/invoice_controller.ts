@@ -17,11 +17,22 @@ import { WarehouseItem } from "../models/warehouse_items";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
 import { NumberSequenceService } from "../services/number_sequence_service";
 
+const calculateDueDate = (
+  deliveryDate: Date | string,
+  dueDays: number,
+): Date => {
+  const base =
+    typeof deliveryDate === "string" ? new Date(deliveryDate) : deliveryDate;
+  const due = new Date(base);
+  due.setDate(due.getDate() + dueDays);
+  return due;
+};
+
 export class InvoiceController {
   static createInvoice = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     const customerRepository = AppDataSource.getRepository(Customer);
@@ -32,20 +43,22 @@ export class InvoiceController {
 
       const orderNumber = invoiceData.orderNumber;
       if (!orderNumber) {
-        return res.status(400).json({ message: "Order Number/Cargo Number is required" });
+        return res
+          .status(400)
+          .json({ message: "Order Number/Cargo Number is required" });
       }
 
       const cargoRepo = AppDataSource.getRepository(Cargo);
       const orderRepo = AppDataSource.getRepository(Order);
 
       let associatedCargo = await cargoRepo.findOne({
-        where: { cargo_no: orderNumber }
+        where: { cargo_no: orderNumber },
       });
 
       if (!associatedCargo) {
         const order = await orderRepo.findOne({
           where: { order_no: orderNumber },
-          relations: ["cargo"]
+          relations: ["cargo"],
         });
         if (order && order.cargo) {
           associatedCargo = order.cargo;
@@ -54,7 +67,8 @@ export class InvoiceController {
 
       if (!associatedCargo) {
         return res.status(400).json({
-          message: "Invoice cannot be created because the provided Order Number/Cargo Number is not assigned to any Cargo."
+          message:
+            "Invoice cannot be created because the provided Order Number/Cargo Number is not assigned to any Cargo.",
         });
       }
 
@@ -65,11 +79,21 @@ export class InvoiceController {
         return res.status(404).json({ message: "Customer not found" });
       }
 
+      const dueDays =
+        customer.defaultPaymentDueDays !== undefined &&
+        customer.defaultPaymentDueDays !== null
+          ? customer.defaultPaymentDueDays
+          : 7;
+
+      const dueDate = invoiceData.deliveryDate
+        ? calculateDueDate(invoiceData.deliveryDate, dueDays)
+        : undefined;
+
       const invoice = invoiceRepository.create({
         ...invoiceData,
+        dueDate,
         customer,
       });
-
       const savedInvoice: any = await invoiceRepository.save(invoice);
 
       if (req.body.items && req.body.items.length > 0) {
@@ -87,9 +111,8 @@ export class InvoiceController {
         relations: ["customer", "items"],
       });
 
-      const pdfUrl = await InvoiceController.generateInvoicePDF(
-        completeInvoice
-      );
+      const pdfUrl =
+        await InvoiceController.generateInvoicePDF(completeInvoice);
       await invoiceRepository.update(savedInvoice.id, { pdfUrl });
 
       return res.status(201).json({
@@ -157,18 +180,31 @@ export class InvoiceController {
         const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
         if (fontSource) {
           try {
-            const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-            doc.font(fontSource, 0).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
+            const chineseAddress =
+              "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
+            doc
+              .font(fontSource, 0)
+              .fontSize(8)
+              .text(chineseAddress, leftAlignX + 220, yPos, {
+                lineBreak: false,
+              });
             doc.font("Helvetica");
           } catch (e: any) {
             console.error(`[CJK-DEBUG] Render failed:`, e.message);
             if (process.platform === "win32") {
-              try { doc.font("C:\\Windows\\Fonts\\msyh.ttc", 0).fontSize(8).text("中国安徽...", leftAlignX + 220, yPos); } catch (e) { }
+              try {
+                doc
+                  .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
+                  .fontSize(8)
+                  .text("中国安徽...", leftAlignX + 220, yPos);
+              } catch (e) {}
             }
             doc.font("Helvetica");
           }
         } else {
-          console.warn("[CJK-DEBUG] No CJK font path cached — Chinese will show as boxes!");
+          console.warn(
+            "[CJK-DEBUG] No CJK font path cached — Chinese will show as boxes!",
+          );
         }
         doc.fontSize(12).font("Helvetica-Bold");
         doc.text(companyInfo.name, rightAlignX, yPos);
@@ -196,13 +232,19 @@ export class InvoiceController {
         doc.text(
           `${companyInfo.name} - ${companyInfo.address} - ${companyInfo.city}`,
           leftAlignX,
-          yPos
+          yPos,
         );
 
         if (fontSource) {
           try {
-            const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-            doc.font(fontSource, 0).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
+            const chineseAddress =
+              "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
+            doc
+              .font(fontSource, 0)
+              .fontSize(8)
+              .text(chineseAddress, leftAlignX + 220, yPos, {
+                lineBreak: false,
+              });
             doc.font("Helvetica");
           } catch (e: any) {
             console.error("[CJK-DEBUG] Render failed:", e.message);
@@ -213,17 +255,22 @@ export class InvoiceController {
         yPos += 20;
         doc.fontSize(12).font("Helvetica-Bold");
         doc.fillColor("#000000");
-        doc.text(invoice.customer?.companyName || "Internal / ETL Order", leftAlignX, yPos);
+        doc.text(
+          invoice.customer?.companyName || "Internal / ETL Order",
+          leftAlignX,
+          yPos,
+        );
 
         yPos += 15;
         doc.fontSize(10).font("Helvetica");
         doc.text(invoice.customer?.addressLine1 || "", leftAlignX, yPos);
         yPos += 12;
         doc.text(
-          `${invoice.customer?.postalCode || ""} ${invoice.customer?.city || ""
-            }`.trim(),
+          `${invoice.customer?.postalCode || ""} ${
+            invoice.customer?.city || ""
+          }`.trim(),
           leftAlignX,
-          yPos
+          yPos,
         );
         const boxY = 180;
         const boxWidth = 180;
@@ -249,6 +296,12 @@ export class InvoiceController {
             "Lieferdatum",
             new Date(invoice.deliveryDate).toLocaleDateString("de-DE"),
           ],
+          [
+            "Fälligkeitsdatum",
+            invoice.dueDate
+              ? new Date(invoice.dueDate).toLocaleDateString("de-DE")
+              : "-",
+          ],
           ["Kundennr.", invoice.customer?.id?.substring(0, 8) || "N/A"],
         ];
 
@@ -266,7 +319,7 @@ export class InvoiceController {
         doc.text(
           `Auftrags Nr: ${invoice.orderNumber || ""}`,
           leftAlignX + 250,
-          yPos
+          yPos,
         );
 
         yPos += 20;
@@ -320,8 +373,17 @@ export class InvoiceController {
             `${item.taxRate || 19}%`,
             (() => {
               let up = 0;
-              if (item.unitPrice !== undefined && item.unitPrice !== null && Number(item.unitPrice) !== 0) up = Number(item.unitPrice);
-              else if (item.item?.transfer_price_EUR !== undefined && item.item?.transfer_price_EUR !== null) up = Number(item.item.transfer_price_EUR);
+              if (
+                item.unitPrice !== undefined &&
+                item.unitPrice !== null &&
+                Number(item.unitPrice) !== 0
+              )
+                up = Number(item.unitPrice);
+              else if (
+                item.item?.transfer_price_EUR !== undefined &&
+                item.item?.transfer_price_EUR !== null
+              )
+                up = Number(item.item.transfer_price_EUR);
               else up = Number(item.unitPrice || 0);
               return up.toFixed(2);
             })(),
@@ -372,7 +434,7 @@ export class InvoiceController {
           `${Number(invoice.netTotal || 0).toFixed(2)} €`,
           rightAlignX + 120,
           yPos,
-          { align: "right" }
+          { align: "right" },
         );
 
         yPos += 18;
@@ -381,7 +443,7 @@ export class InvoiceController {
           `${Number(invoice.taxAmount || 0).toFixed(2)} €`,
           rightAlignX + 120,
           yPos,
-          { align: "right" }
+          { align: "right" },
         );
 
         yPos += 20;
@@ -396,7 +458,7 @@ export class InvoiceController {
           `${Number(invoice.grossTotal || 0).toFixed(2)} €`,
           rightAlignX + 120,
           yPos + 5,
-          { align: "right" }
+          { align: "right" },
         );
 
         if (invoice.paidAmount > 0) {
@@ -404,16 +466,16 @@ export class InvoiceController {
           doc.fontSize(10).font("Helvetica");
           doc.text(
             `Zahlung (Vorkasse Überweisung) vom ${new Date().toLocaleDateString(
-              "de-DE"
+              "de-DE",
             )}`,
             rightAlignX,
-            yPos
+            yPos,
           );
           doc.text(
             `${Number(invoice.paidAmount).toFixed(2)} €`,
             rightAlignX + 120,
             yPos,
-            { align: "right" }
+            { align: "right" },
           );
 
           yPos += 15;
@@ -423,7 +485,7 @@ export class InvoiceController {
             `${Number(invoice.outstandingAmount || 0).toFixed(2)} €`,
             rightAlignX + 120,
             yPos,
-            { align: "right" }
+            { align: "right" },
           );
         }
 
@@ -434,33 +496,42 @@ export class InvoiceController {
           doc.text(
             `Ihre USt-IdNr: ${invoice.customer.taxNumber}`,
             leftAlignX,
-            yPos
+            yPos,
           );
           yPos += 15;
         }
 
         doc.text(
-          `Zahlungsart: ${invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
+          `Zahlungsart: ${
+            invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
           }`,
           leftAlignX,
-          yPos
+          yPos,
         );
         yPos += 15;
         doc.text(
-          `Versandart: ${invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
+          `Versandart: ${
+            invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
           }`,
           leftAlignX,
-          yPos
+          yPos,
         );
         yPos += 15;
-        const dueDays = invoice.customer?.defaultPaymentDueDays !== undefined && invoice.customer?.defaultPaymentDueDays !== null ? invoice.customer.defaultPaymentDueDays : 7;
+        const dueDays =
+          invoice.customer?.defaultPaymentDueDays !== undefined &&
+          invoice.customer?.defaultPaymentDueDays !== null
+            ? invoice.customer.defaultPaymentDueDays
+            : 7;
+        const dueDateLabel = invoice.dueDate
+          ? new Date(invoice.dueDate).toLocaleDateString("de-DE")
+          : "";
         doc.text(
-          `Zahlungsziel: ${dueDays} Tage`,
+          dueDateLabel
+            ? `Zahlungsziel: ${dueDays} Tage (fällig bis ${dueDateLabel})`
+            : `Zahlungsziel: ${dueDays} Tage`,
           leftAlignX,
-          yPos
+          yPos,
         );
-
-
         if (invoice.notes) {
           yPos += 15;
           doc.text(`Hinweise: ${invoice.notes}`, leftAlignX, yPos);
@@ -470,7 +541,7 @@ export class InvoiceController {
         doc.text(
           "Wir danken Ihnen für Ihr Vertrauen und die gute Zusammenarbeit. Wir freuen uns über Ihre Weiterempfehlung.",
           leftAlignX,
-          yPos
+          yPos,
         );
 
         const footerY = pageHeight - 120;
@@ -496,12 +567,12 @@ export class InvoiceController {
         doc.text(
           `SteuerNR: ${companyInfo.taxNumber}`,
           centerColumnX,
-          footerY + 36
+          footerY + 36,
         );
         doc.text(
           `WEEE-Reg.-Nr. ${companyInfo.weeeNumber}`,
           centerColumnX,
-          footerY + 48
+          footerY + 48,
         );
 
         doc.text(`Auftrags Nr:`, rightColumnX, footerY);
@@ -527,7 +598,7 @@ export class InvoiceController {
   static downloadInvoicePDF = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     try {
       const { invoiceId } = req.params;
@@ -551,22 +622,30 @@ export class InvoiceController {
       let filePath = path.join(process.cwd(), invoice.pdfUrl);
 
       if (!fs.existsSync(filePath)) {
-        console.warn(`[Invoice] PDF file missing for invoice ${invoice.invoiceNumber}, regenerating...`);
+        console.warn(
+          `[Invoice] PDF file missing for invoice ${invoice.invoiceNumber}, regenerating...`,
+        );
         try {
           const newPdfUrl = await InvoiceController.generateInvoicePDF(invoice);
           await invoiceRepository.update(invoiceId, { pdfUrl: newPdfUrl });
           invoice.pdfUrl = newPdfUrl;
           filePath = path.join(process.cwd(), newPdfUrl);
         } catch (genError) {
-          console.error(`[Invoice] PDF regeneration failed for ${invoice.invoiceNumber}:`, genError);
-          return res.status(500).json({ message: "PDF file could not be found or regenerated. Please contact support." });
+          console.error(
+            `[Invoice] PDF regeneration failed for ${invoice.invoiceNumber}:`,
+            genError,
+          );
+          return res.status(500).json({
+            message:
+              "PDF file could not be found or regenerated. Please contact support.",
+          });
         }
       }
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=invoice_${invoice.invoiceNumber}.pdf`
+        `attachment; filename=invoice_${invoice.invoiceNumber}.pdf`,
       );
 
       const fileStream = fs.createReadStream(filePath);
@@ -580,7 +659,7 @@ export class InvoiceController {
   static updateInvoice = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     const itemRepository = AppDataSource.getRepository(InvoiceItem);
@@ -591,16 +670,38 @@ export class InvoiceController {
 
       const invoice = await invoiceRepository.findOne({
         where: { id },
-        relations: ["items"],
+        relations: ["items", "customer"],
       });
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      if (invoiceData.description !== undefined && !invoiceData.description.trim()) {
+
+      if (invoiceData.deliveryDate) {
+        const dueDays =
+          invoice.customer?.defaultPaymentDueDays !== undefined &&
+          invoice.customer?.defaultPaymentDueDays !== null
+            ? invoice.customer.defaultPaymentDueDays
+            : 7;
+        invoiceData.dueDate = calculateDueDate(
+          invoiceData.deliveryDate,
+          dueDays,
+        );
+      }
+
+      if (
+        invoiceData.description !== undefined &&
+        !invoiceData.description.trim()
+      ) {
         return res.status(400).json({ message: "Description is required" });
       }
-      if (invoiceData.freightCost !== undefined && (invoiceData.freightCost === null || Number(invoiceData.freightCost) <= 0)) {
-        return res.status(400).json({ message: "Freight Cost must be greater than 0" });
+      if (
+        invoiceData.freightCost !== undefined &&
+        (invoiceData.freightCost === null ||
+          Number(invoiceData.freightCost) <= 0)
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Freight Cost must be greater than 0" });
       }
       invoiceRepository.merge(invoice, invoiceData);
       const updatedInvoice = await invoiceRepository.save(invoice);
@@ -632,7 +733,7 @@ export class InvoiceController {
   static deleteInvoice = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     const invoiceItemRepository = AppDataSource.getRepository(InvoiceItem);
@@ -660,20 +761,25 @@ export class InvoiceController {
   static getAllInvoices = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
 
     try {
       const invoices = await invoiceRepository.find({
-        relations: ["customer", "customer.businessDetails", "customer.starCustomerDetails", "items"],
+        relations: [
+          "customer",
+          "customer.businessDetails",
+          "customer.starCustomerDetails",
+          "items",
+        ],
         order: { invoiceDate: "DESC" },
       });
 
       const orderNumbers = invoices.map((i) => i.orderNumber).filter(Boolean);
       const orders = await AppDataSource.getRepository(Order).find({
         where: { order_no: In(orderNumbers) },
-        relations: ["cargo", "cargo.customer"]
+        relations: ["cargo", "cargo.customer"],
       });
 
       const orderIds = orders.map((o) => o.id);
@@ -704,15 +810,21 @@ export class InvoiceController {
         }
       });
 
-      const allCargoIds = allCargos.map(c => c.id).filter(Boolean);
+      const allCargoIds = allCargos.map((c) => c.id).filter(Boolean);
       const cargoCommentMap = new Map<string, string>();
       if (allCargoIds.length > 0) {
-        const allCargoOrders = await AppDataSource.getRepository(CargoOrder).find({
+        const allCargoOrders = await AppDataSource.getRepository(
+          CargoOrder,
+        ).find({
           where: { cargo_id: In(allCargoIds) },
           relations: ["cargo", "order"],
         });
         allCargoOrders.forEach((co) => {
-          if (co.cargo?.cargo_no && co.order?.comment && !cargoCommentMap.has(co.cargo.cargo_no)) {
+          if (
+            co.cargo?.cargo_no &&
+            co.order?.comment &&
+            !cargoCommentMap.has(co.cargo.cargo_no)
+          ) {
             cargoCommentMap.set(co.cargo.cargo_no, co.order.comment);
           }
         });
@@ -741,100 +853,125 @@ export class InvoiceController {
       const orderItemSummaryByCargoId = new Map();
       orderItemsRaw.forEach((row: any) => {
         if (row.order_id) {
-          const current = orderItemSummaryByOrderId.get(row.order_id) || { total_qty: 0, count_items: 0, total_price: 0 };
+          const current = orderItemSummaryByOrderId.get(row.order_id) || {
+            total_qty: 0,
+            count_items: 0,
+            total_price: 0,
+          };
           orderItemSummaryByOrderId.set(row.order_id, {
             total_qty: current.total_qty + Number(row.total_qty),
             count_items: current.count_items + Number(row.count_items),
-            total_price: current.total_price + Number(row.total_price)
+            total_price: current.total_price + Number(row.total_price),
           });
         }
         if (row.cargo_id) {
-          const current = orderItemSummaryByCargoId.get(row.cargo_id) || { total_qty: 0, count_items: 0, total_price: 0 };
+          const current = orderItemSummaryByCargoId.get(row.cargo_id) || {
+            total_qty: 0,
+            count_items: 0,
+            total_price: 0,
+          };
           orderItemSummaryByCargoId.set(row.cargo_id, {
             total_qty: current.total_qty + Number(row.total_qty),
             count_items: current.count_items + Number(row.count_items),
-            total_price: current.total_price + Number(row.total_price)
+            total_price: current.total_price + Number(row.total_price),
           });
         }
       });
 
       const orderIdMap = new Map();
-      orders.forEach(o => orderIdMap.set(o.order_no, o.id));
+      orders.forEach((o) => orderIdMap.set(o.order_no, o.id));
 
-      const data = invoices.map((inv) => {
-        const cargo = orderToCargoMap.get(inv.orderNumber);
+      const data = invoices
+        .map((inv) => {
+          const cargo = orderToCargoMap.get(inv.orderNumber);
 
-        let customItemCount = 0;
-        let customTotalQty = 0;
-        let calculatedGrossTotal = Number(inv.grossTotal) || 0;
+          let customItemCount = 0;
+          let customTotalQty = 0;
+          let calculatedGrossTotal = Number(inv.grossTotal) || 0;
 
-        if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
-          const stats = orderItemSummaryByCargoId.get(cargo.id);
-          customItemCount = stats.count_items;
-          customTotalQty = stats.total_qty;
-          if (calculatedGrossTotal === 0) calculatedGrossTotal = stats.total_price;
-        } else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
-          const orderId = orderIdMap.get(inv.orderNumber);
-          if (orderItemSummaryByOrderId.has(orderId)) {
-            const stats = orderItemSummaryByOrderId.get(orderId);
+          if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
+            const stats = orderItemSummaryByCargoId.get(cargo.id);
             customItemCount = stats.count_items;
             customTotalQty = stats.total_qty;
-            if (calculatedGrossTotal === 0) calculatedGrossTotal = stats.total_price;
+            if (calculatedGrossTotal === 0)
+              calculatedGrossTotal = stats.total_price;
+          } else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
+            const orderId = orderIdMap.get(inv.orderNumber);
+            if (orderItemSummaryByOrderId.has(orderId)) {
+              const stats = orderItemSummaryByOrderId.get(orderId);
+              customItemCount = stats.count_items;
+              customTotalQty = stats.total_qty;
+              if (calculatedGrossTotal === 0)
+                calculatedGrossTotal = stats.total_price;
+            }
           }
-        }
-        if (customItemCount === 0 && inv.items) {
-          customItemCount = inv.items.length;
-          customTotalQty = inv.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-        }
+          if (customItemCount === 0 && inv.items) {
+            customItemCount = inv.items.length;
+            customTotalQty = inv.items.reduce(
+              (sum, item) => sum + Number(item.quantity || 0),
+              0,
+            );
+          }
 
-        const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
+          const cargoNo =
+            cargo?.cargo_no ||
+            (inv.orderNumber && !orderIdMap.has(inv.orderNumber)
+              ? inv.orderNumber
+              : undefined);
 
-        const order = orders.find(o => o.order_no === inv.orderNumber);
-        const orderComment =
-          order?.comment ||
-          cargoCommentMap.get(cargo?.cargo_no || "") ||
-          cargoCommentMap.get(inv.orderNumber || "") ||
-          "";
+          const order = orders.find((o) => o.order_no === inv.orderNumber);
+          const orderComment =
+            order?.comment ||
+            cargoCommentMap.get(cargo?.cargo_no || "") ||
+            cargoCommentMap.get(inv.orderNumber || "") ||
+            "";
 
-        const isCI = inv.invoiceNumber && inv.invoiceNumber.startsWith("CI");
-        const rawBillTo = isCI
-          ? "GTech Industries GmbH"
-          : (typeof cargo?.bill_to_company_name === "string" && cargo.bill_to_company_name.trim()
+          const isCI = inv.invoiceNumber && inv.invoiceNumber.startsWith("CI");
+          const rawBillTo = isCI
+            ? "GTech Industries GmbH"
+            : typeof cargo?.bill_to_company_name === "string" &&
+                cargo.bill_to_company_name.trim()
               ? cargo.bill_to_company_name.trim()
-              : typeof cargo?.bill_to_display_name === "string" && cargo.bill_to_display_name.trim()
+              : typeof cargo?.bill_to_display_name === "string" &&
+                  cargo.bill_to_display_name.trim()
                 ? cargo.bill_to_display_name.trim()
-                : "GTech-Warehouse");
+                : "GTech-Warehouse";
 
+          const rawShipTo =
+            typeof cargo?.ship_to_company_name === "string" &&
+            cargo.ship_to_company_name.trim().length > 1
+              ? cargo.ship_to_company_name.trim()
+              : typeof cargo?.ship_to_display_name === "string" &&
+                  cargo.ship_to_display_name.trim().length > 1
+                ? cargo.ship_to_display_name.trim()
+                : typeof inv.customer?.companyName === "string" &&
+                    inv.customer.companyName.trim()
+                  ? inv.customer.companyName.trim()
+                  : "-";
 
-        const rawShipTo = typeof cargo?.ship_to_company_name === "string" && cargo.ship_to_company_name.trim().length > 1
-          ? cargo.ship_to_company_name.trim()
-          : typeof cargo?.ship_to_display_name === "string" && cargo.ship_to_display_name.trim().length > 1
-            ? cargo.ship_to_display_name.trim()
-            : typeof inv.customer?.companyName === "string" && inv.customer.companyName.trim()
-              ? inv.customer.companyName.trim()
-              : "-";
-
-        return {
-          ...inv,
-          grossTotal: calculatedGrossTotal,
-          bill_to: rawBillTo,
-          ship_to: rawShipTo,
-          customItemCount,
-          customTotalQty,
-          cargoNo: cargoNo || inv.orderNumber,
-          cargoId: cargo?.id || null,
-          cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null,
-          orderComment,
-        };
-      })
+          return {
+            ...inv,
+            grossTotal: calculatedGrossTotal,
+            bill_to: rawBillTo,
+            ship_to: rawShipTo,
+            customItemCount,
+            customTotalQty,
+            cargoNo: cargoNo || inv.orderNumber,
+            cargoId: cargo?.id || null,
+            cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null,
+            orderComment,
+          };
+        })
         .filter((inv): inv is any => inv !== null);
 
       const finalDataMap = new Map();
-      data.forEach(inv => {
+      data.forEach((inv) => {
         finalDataMap.set(inv.id, inv);
       });
 
-      return res.status(200).json({ success: true, data: Array.from(finalDataMap.values()) });
+      return res
+        .status(200)
+        .json({ success: true, data: Array.from(finalDataMap.values()) });
     } catch (error) {
       console.error(error);
       return next(error);
@@ -844,7 +981,7 @@ export class InvoiceController {
   static getInvoiceById = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
 
@@ -869,7 +1006,7 @@ export class InvoiceController {
   static getInvoicesByCustomer = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
 
@@ -891,7 +1028,7 @@ export class InvoiceController {
   static getInvoiceExpandedDetails = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     const cargoRepository = AppDataSource.getRepository(Cargo);
@@ -906,7 +1043,9 @@ export class InvoiceController {
       });
 
       if (!invoice) {
-        return res.status(404).json({ success: false, message: "Invoice not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Invoice not found" });
       }
 
       const orderNumber = invoice.orderNumber;
@@ -936,7 +1075,9 @@ export class InvoiceController {
 
       const getEffectiveTaricCode = (oi: any): string => {
         const itemTaricCode = oi.item?.taric?.code || "";
-        const rawCode = oi.set_taric_code ? oi.set_taric_code.toString() : itemTaricCode;
+        const rawCode = oi.set_taric_code
+          ? oi.set_taric_code.toString()
+          : itemTaricCode;
         if (rawCode) {
           const codes = rawCode.split("/");
           return codes.length > 1 ? codes[1].trim() : codes[0].trim();
@@ -946,7 +1087,10 @@ export class InvoiceController {
 
       const getGroupKey = (oi: any): string => {
         const itemTaricCode = oi.item?.taric?.code || "";
-        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+        const isProjectItem =
+          !itemTaricCode ||
+          itemTaricCode === "0" ||
+          itemTaricCode === "0000000000";
 
         if (oi.set_taric_code) {
           const codes = oi.set_taric_code.split("/");
@@ -971,37 +1115,51 @@ export class InvoiceController {
       });
 
       const uniqueManualCodes = [...new Set(manualTaricCodes)];
-      const manualTarics = uniqueManualCodes.length > 0
-        ? await AppDataSource.getRepository(Taric).find({ where: { code: In(uniqueManualCodes) } })
-        : [];
-      const manualTaricMap = new Map(manualTarics.map(t => [t.code, t]));
+      const manualTarics =
+        uniqueManualCodes.length > 0
+          ? await AppDataSource.getRepository(Taric).find({
+              where: { code: In(uniqueManualCodes) },
+            })
+          : [];
+      const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
       const taricGroupsMap = new Map<string, any>();
       orderItems.forEach((oi: any) => {
         const item = oi.item;
         const taric = item?.taric;
         const itemTaricCode = taric?.code || "";
-        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+        const isProjectItem =
+          !itemTaricCode ||
+          itemTaricCode === "0" ||
+          itemTaricCode === "0000000000";
         const groupKey = getGroupKey(oi);
 
         if (!taricGroupsMap.has(groupKey)) {
           let displayCode = oi.item?.taric?.code || "-";
-          let displayName = taric?.name_en || (isProjectItem ? "Project Item" : "Unknown");
+          let displayName =
+            taric?.name_en || (isProjectItem ? "Project Item" : "Unknown");
           let displayRate = taric?.duty_rate || 0;
 
           if (oi.set_taric_code) {
             const codes = oi.set_taric_code.split("/");
-            const targetCode = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+            const targetCode =
+              codes.length > 1 ? codes[1].trim() : codes[0].trim();
             displayCode = targetCode;
 
             const mTaric = manualTaricMap.get(targetCode);
             if (mTaric) {
               displayName = mTaric.name_en || displayName;
-              displayRate = mTaric.duty_rate !== undefined ? mTaric.duty_rate : displayRate;
+              displayRate =
+                mTaric.duty_rate !== undefined ? mTaric.duty_rate : displayRate;
             }
           }
 
-          let unitPrice = oi?.eur_special_price || oi?.price || item?.transfer_price_EUR || item?.price || 0;
+          let unitPrice =
+            oi?.eur_special_price ||
+            oi?.price ||
+            item?.transfer_price_EUR ||
+            item?.price ||
+            0;
           if (!unitPrice && (oi?.rmb_special_price || 0) > 0) {
             unitPrice = oi.rmb_special_price * 0.13;
           }
@@ -1020,7 +1178,12 @@ export class InvoiceController {
 
         const group = taricGroupsMap.get(groupKey)!;
         group.totalQty += oi.qty || 0;
-        let currentPrice = oi?.eur_special_price || oi?.price || item?.transfer_price_EUR || item?.price || 0;
+        let currentPrice =
+          oi?.eur_special_price ||
+          oi?.price ||
+          item?.transfer_price_EUR ||
+          item?.price ||
+          0;
         if (!currentPrice && (oi?.rmb_special_price || 0) > 0) {
           currentPrice = oi.rmb_special_price * 0.13;
         }
@@ -1036,15 +1199,17 @@ export class InvoiceController {
         return g;
       });
 
-      const itemsWithFallbacks = await Promise.all([...orderItems]
-        .map(async (oi: any) => {
+      const itemsWithFallbacks = await Promise.all(
+        [...orderItems].map(async (oi: any) => {
           const item = oi.item;
 
           let ean = item?.ean || "-";
           if (ean === "-" && item?.id) {
-            const wi = await AppDataSource.getRepository(WarehouseItem).findOne({
-              where: { item_id: item.id }
-            });
+            const wi = await AppDataSource.getRepository(WarehouseItem).findOne(
+              {
+                where: { item_id: item.id },
+              },
+            );
             if (wi?.ean) ean = wi.ean;
           }
 
@@ -1052,7 +1217,12 @@ export class InvoiceController {
           if (!rmbPrice && item?.id) {
             rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
           }
-          let eurPrice = oi.eur_special_price || oi.price || item?.transfer_price_EUR || item?.price || 0;
+          let eurPrice =
+            oi.eur_special_price ||
+            oi.price ||
+            item?.transfer_price_EUR ||
+            item?.price ||
+            0;
           if (!eurPrice && rmbPrice) {
             eurPrice = rmbPrice * 0.13;
           }
@@ -1064,40 +1234,57 @@ export class InvoiceController {
             _effectiveTaricCode: getEffectiveTaricCode(oi),
             _fallbackEan: ean,
             _fallbackRmb: rmbPrice,
-            _fallbackEk: eurPrice
+            _fallbackEk: eurPrice,
           };
-        }));
+        }),
+      );
 
       const sortedItems = itemsWithFallbacks.sort((a: any, b: any) => {
-        const codeCompare = (a._effectiveTaricCode || "").localeCompare(b._effectiveTaricCode || "");
+        const codeCompare = (a._effectiveTaricCode || "").localeCompare(
+          b._effectiveTaricCode || "",
+        );
         if (codeCompare !== 0) return codeCompare;
         return (a.item?.item_name || "").localeCompare(b.item?.item_name || "");
       });
 
-      const orderNosInCargo = [...new Set(orderItems.map((oi: any) => oi.order?.order_no).filter(Boolean))];
+      const orderNosInCargo = [
+        ...new Set(
+          orderItems.map((oi: any) => oi.order?.order_no).filter(Boolean),
+        ),
+      ];
 
       return res.json({
         success: true,
         data: {
           invoice,
-          cargo: cargo ? {
-            id: cargo.id,
-            cargo_no: cargo.cargo_no,
-            ship_to: (() => {
-              const v = cargo.ship_to_company_name ?? cargo.ship_to_display_name ?? null;
-              if (!v || typeof v !== "string") return null;
-              const s = v.trim();
-              return s.length > 1 ? s : null;
-            })(),
-            bill_to: (() => {
-              const isCI = invoice.invoiceNumber && invoice.invoiceNumber.startsWith("CI");
-              if (isCI) return "GTech Industries GmbH";
-              const v = cargo.bill_to_company_name ?? cargo.bill_to_display_name ?? null;
-              if (!v || typeof v !== "string") return "GTech-Warehouse";
-              const s = v.trim();
-              return s.length > 1 ? s : "GTech-Warehouse";
-            })(),
-          } : null,
+          cargo: cargo
+            ? {
+                id: cargo.id,
+                cargo_no: cargo.cargo_no,
+                ship_to: (() => {
+                  const v =
+                    cargo.ship_to_company_name ??
+                    cargo.ship_to_display_name ??
+                    null;
+                  if (!v || typeof v !== "string") return null;
+                  const s = v.trim();
+                  return s.length > 1 ? s : null;
+                })(),
+                bill_to: (() => {
+                  const isCI =
+                    invoice.invoiceNumber &&
+                    invoice.invoiceNumber.startsWith("CI");
+                  if (isCI) return "GTech Industries GmbH";
+                  const v =
+                    cargo.bill_to_company_name ??
+                    cargo.bill_to_display_name ??
+                    null;
+                  if (!v || typeof v !== "string") return "GTech-Warehouse";
+                  const s = v.trim();
+                  return s.length > 1 ? s : "GTech-Warehouse";
+                })(),
+              }
+            : null,
           orderNosInCargo,
           detailedItems: sortedItems,
           taricGroups,
@@ -1109,25 +1296,37 @@ export class InvoiceController {
     }
   };
 
-  static updatePackingListData = async (req: Request, res: Response, next: NextFunction) => {
+  static updatePackingListData = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     try {
       const { id } = req.params;
       const { packingListData } = req.body;
       const invoice = await invoiceRepository.findOne({ where: { id } });
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!invoice)
+        return res.status(404).json({ message: "Invoice not found" });
 
       invoice.packingListData = packingListData;
       await invoiceRepository.save(invoice);
 
-      return res.json({ success: true, message: "Packing list data updated successfully" });
+      return res.json({
+        success: true,
+        message: "Packing list data updated successfully",
+      });
     } catch (error) {
       console.error(error);
       return next(error);
     }
   };
 
-  static downloadPackingListPDF = async (req: Request, res: Response, next: NextFunction) => {
+  static downloadPackingListPDF = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     const orderRepository = AppDataSource.getRepository(Order);
     const cargoRepository = AppDataSource.getRepository(Cargo);
@@ -1136,35 +1335,47 @@ export class InvoiceController {
       const { id } = req.params;
       const invoice = await invoiceRepository.findOne({
         where: { id },
-        relations: ["customer", "items", "items.item"]
+        relations: ["customer", "items", "items.item"],
       });
 
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!invoice)
+        return res.status(404).json({ message: "Invoice not found" });
 
       const doc = new PDFDocument({ margin: 30, size: "A4" });
       const filename = `Packing_List_${invoice.invoiceNumber}.pdf`;
 
-      res.setHeader("Content-disposition", `attachment; filename="${filename}"`);
+      res.setHeader(
+        "Content-disposition",
+        `attachment; filename="${filename}"`,
+      );
       res.setHeader("Content-type", "application/pdf");
       doc.pipe(res);
 
       let items: any[] = [];
       let orderComment = "";
 
-      if (invoice.packingListData && Array.isArray(invoice.packingListData) && invoice.packingListData.length > 0) {
+      if (
+        invoice.packingListData &&
+        Array.isArray(invoice.packingListData) &&
+        invoice.packingListData.length > 0
+      ) {
         items = invoice.packingListData;
       } else {
         const orderNumber = invoice.orderNumber;
         let orderItems: any[] = [];
 
-        const cargo = await cargoRepository.findOne({ where: { cargo_no: orderNumber } });
+        const cargo = await cargoRepository.findOne({
+          where: { cargo_no: orderNumber },
+        });
         if (cargo) {
           orderItems = await orderItemRepository.find({
             where: { cargo_id: cargo.id },
             relations: ["item", "item.taric", "order"],
           });
         } else {
-          const order = await orderRepository.findOne({ where: { order_no: orderNumber } });
+          const order = await orderRepository.findOne({
+            where: { order_no: orderNumber },
+          });
           if (order) {
             orderComment = order.comment || "";
             orderItems = await orderItemRepository.find({
@@ -1175,12 +1386,21 @@ export class InvoiceController {
         }
 
         if (!orderComment && orderItems.length > 0) {
-          orderComment = orderItems.find((oi: any) => oi.order?.comment)?.order?.comment || "";
+          orderComment =
+            orderItems.find((oi: any) => oi.order?.comment)?.order?.comment ||
+            "";
           if (!orderComment) {
-            const distinctOrderIds = [...new Set(orderItems.map((oi: any) => oi.order_id).filter(Boolean))];
+            const distinctOrderIds = [
+              ...new Set(
+                orderItems.map((oi: any) => oi.order_id).filter(Boolean),
+              ),
+            ];
             if (distinctOrderIds.length > 0) {
-              const relatedOrders = await orderRepository.find({ where: { id: In(distinctOrderIds as number[]) } });
-              orderComment = relatedOrders.find((o: any) => o.comment)?.comment || "";
+              const relatedOrders = await orderRepository.find({
+                where: { id: In(distinctOrderIds as number[]) },
+              });
+              orderComment =
+                relatedOrders.find((o: any) => o.comment)?.comment || "";
             }
           }
         }
@@ -1188,7 +1408,8 @@ export class InvoiceController {
         items = orderItems.map((oi: any, idx: number) => {
           const item = oi.item;
           const taric = item?.taric;
-          const desc = taric?.description_en || taric?.name_en || item?.item_name || "";
+          const desc =
+            taric?.description_en || taric?.name_en || item?.item_name || "";
           return {
             id: oi.id || idx,
             description: desc,
@@ -1216,7 +1437,10 @@ export class InvoiceController {
 
       const derivedClient = extractClients(orderComment);
       if (derivedClient) {
-        items = items.map((it: any) => ({ ...it, client: it.client || derivedClient }));
+        items = items.map((it: any) => ({
+          ...it,
+          client: it.client || derivedClient,
+        }));
       }
 
       const formatGermanDate = (dateVal: any): string => {
@@ -1230,12 +1454,30 @@ export class InvoiceController {
       const dateStr = formatGermanDate(invoice.invoiceDate);
 
       doc.rect(30, 30, 535, 20).stroke();
-      doc.fontSize(10).font("Helvetica-Bold").text("GTech Industries Limited", 30, 37, { align: "center", width: 535 });
+      doc
+        .fontSize(10)
+        .font("Helvetica-Bold")
+        .text("GTech Industries Limited", 30, 37, {
+          align: "center",
+          width: 535,
+        });
 
       doc.rect(30, 50, 535, 15).stroke();
-      doc.fontSize(8).font("Helvetica").text("Yongxin Road, Bowang Town, Bowang, Maanshan, Anhui, China", 30, 54, { align: "center", width: 535 });
+      doc
+        .fontSize(8)
+        .font("Helvetica")
+        .text(
+          "Yongxin Road, Bowang Town, Bowang, Maanshan, Anhui, China",
+          30,
+          54,
+          { align: "center", width: 535 },
+        );
       doc.rect(30, 65, 535, 15).fillAndStroke("#f0f0f0", "#000000");
-      doc.fillColor("#000000").fontSize(9).font("Helvetica-Bold").text("Packing List", 30, 69, { align: "center", width: 535 });
+      doc
+        .fillColor("#000000")
+        .fontSize(9)
+        .font("Helvetica-Bold")
+        .text("Packing List", 30, 69, { align: "center", width: 535 });
       doc.fillColor("#000000");
 
       const RX = 430;
@@ -1248,63 +1490,178 @@ export class InvoiceController {
       doc.moveTo(75, 80).lineTo(75, 95).stroke();
       doc.rect(RX, 80, RW, 15).stroke();
       doc.text("Invoice No.:", RX + 3, 84, { width: RL - 3 });
-      doc.moveTo(RX + RL, 80).lineTo(RX + RL, 95).stroke();
-      doc.font("Helvetica").fontSize(7.5).text(invoice.invoiceNumber, RX + RL + 3, 84, { width: RV - 5 });
+      doc
+        .moveTo(RX + RL, 80)
+        .lineTo(RX + RL, 95)
+        .stroke();
+      doc
+        .font("Helvetica")
+        .fontSize(7.5)
+        .text(invoice.invoiceNumber, RX + RL + 3, 84, { width: RV - 5 });
 
       doc.rect(30, 95, LW, 20).stroke();
-      doc.fillColor("#000000").fontSize(8).font("Helvetica").text("GTech Industries GmbH", 35, 101);
+      doc
+        .fillColor("#000000")
+        .fontSize(8)
+        .font("Helvetica")
+        .text("GTech Industries GmbH", 35, 101);
 
       doc.rect(RX, 95, RW, 20).stroke();
-      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8).text("Cargo No.", RX + 3, 101, { width: RL - 3 });
-      doc.moveTo(RX + RL, 95).lineTo(RX + RL, 115).stroke();
-      doc.font("Helvetica").fontSize(7.5).text(cargoNo, RX + RL + 3, 101, { width: RV - 5 });
+      doc
+        .fillColor("#000000")
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text("Cargo No.", RX + 3, 101, { width: RL - 3 });
+      doc
+        .moveTo(RX + RL, 95)
+        .lineTo(RX + RL, 115)
+        .stroke();
+      doc
+        .font("Helvetica")
+        .fontSize(7.5)
+        .text(cargoNo, RX + RL + 3, 101, { width: RV - 5 });
 
       doc.rect(30, 115, LW, 15).stroke();
-      doc.fontSize(8).text("Antonio-Segni-Str. 4 44263 Dortmund Germany, Tel: +4923158697565", 35, 119);
+      doc
+        .fontSize(8)
+        .text(
+          "Antonio-Segni-Str. 4 44263 Dortmund Germany, Tel: +4923158697565",
+          35,
+          119,
+        );
 
       doc.rect(RX, 115, RW, 15).stroke();
-      doc.font("Helvetica-Bold").fontSize(8).text("Date:", RX + 3, 119, { width: RL - 3 });
-      doc.moveTo(RX + RL, 115).lineTo(RX + RL, 130).stroke();
-      doc.font("Helvetica").fontSize(8).text(dateStr, RX + RL + 3, 119, { width: RV - 5 });
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text("Date:", RX + 3, 119, { width: RL - 3 });
+      doc
+        .moveTo(RX + RL, 115)
+        .lineTo(RX + RL, 130)
+        .stroke();
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .text(dateStr, RX + RL + 3, 119, { width: RV - 5 });
 
       doc.rect(30, 130, LW, 15).stroke();
       doc.text("Mr. Markus Entner", 35, 134);
       doc.rect(RX, 130, RW, 15).stroke();
 
       let itemY = 155;
-      const colWidths = { desc: 215, qty: 35, client: 45, pack: 55, weight: 60, measure: 65, volume: 55 };
+      const colWidths = {
+        desc: 215,
+        qty: 35,
+        client: 45,
+        pack: 55,
+        weight: 60,
+        measure: 65,
+        volume: 55,
+      };
       const colX = {
         desc: 30,
         qty: 30 + colWidths.desc,
         client: 30 + colWidths.desc + colWidths.qty,
         pack: 30 + colWidths.desc + colWidths.qty + colWidths.client,
-        weight: 30 + colWidths.desc + colWidths.qty + colWidths.client + colWidths.pack,
-        measure: 30 + colWidths.desc + colWidths.qty + colWidths.client + colWidths.pack + colWidths.weight,
-        volume: 30 + colWidths.desc + colWidths.qty + colWidths.client + colWidths.pack + colWidths.weight + colWidths.measure,
+        weight:
+          30 +
+          colWidths.desc +
+          colWidths.qty +
+          colWidths.client +
+          colWidths.pack,
+        measure:
+          30 +
+          colWidths.desc +
+          colWidths.qty +
+          colWidths.client +
+          colWidths.pack +
+          colWidths.weight,
+        volume:
+          30 +
+          colWidths.desc +
+          colWidths.qty +
+          colWidths.client +
+          colWidths.pack +
+          colWidths.weight +
+          colWidths.measure,
       };
 
       doc.rect(30, itemY, 535, 30).stroke();
       doc.fillColor("#000000").fontSize(8).font("Helvetica-Bold");
-      doc.text("Description of goods", colX.desc, itemY + 10, { width: colWidths.desc, align: "center" });
-      doc.text("QTY", colX.qty, itemY + 10, { width: colWidths.qty, align: "center" });
-      doc.text("Clients", colX.client, itemY + 10, { width: colWidths.client, align: "center" });
-      doc.text("Packages", colX.pack, itemY + 10, { width: colWidths.pack, align: "center" });
-      doc.text("Weight (kg)", colX.weight, itemY + 10, { width: colWidths.weight, align: "center" });
-      doc.text("Measure (cm)", colX.measure, itemY + 4, { width: colWidths.measure, align: "center" });
+      doc.text("Description of goods", colX.desc, itemY + 10, {
+        width: colWidths.desc,
+        align: "center",
+      });
+      doc.text("QTY", colX.qty, itemY + 10, {
+        width: colWidths.qty,
+        align: "center",
+      });
+      doc.text("Clients", colX.client, itemY + 10, {
+        width: colWidths.client,
+        align: "center",
+      });
+      doc.text("Packages", colX.pack, itemY + 10, {
+        width: colWidths.pack,
+        align: "center",
+      });
+      doc.text("Weight (kg)", colX.weight, itemY + 10, {
+        width: colWidths.weight,
+        align: "center",
+      });
+      doc.text("Measure (cm)", colX.measure, itemY + 4, {
+        width: colWidths.measure,
+        align: "center",
+      });
       doc.rect(colX.measure, itemY + 15, colWidths.measure, 15).stroke();
-      doc.text("L", colX.measure, itemY + 19, { width: colWidths.measure / 3, align: "center" });
-      doc.text("B", colX.measure + colWidths.measure / 3, itemY + 19, { width: colWidths.measure / 3, align: "center" });
-      doc.text("H", colX.measure + (colWidths.measure / 3) * 2, itemY + 19, { width: colWidths.measure / 3, align: "center" });
-      doc.text("Total Volume (cbm)", colX.volume, itemY + 4, { width: colWidths.volume, align: "center" });
+      doc.text("L", colX.measure, itemY + 19, {
+        width: colWidths.measure / 3,
+        align: "center",
+      });
+      doc.text("B", colX.measure + colWidths.measure / 3, itemY + 19, {
+        width: colWidths.measure / 3,
+        align: "center",
+      });
+      doc.text("H", colX.measure + (colWidths.measure / 3) * 2, itemY + 19, {
+        width: colWidths.measure / 3,
+        align: "center",
+      });
+      doc.text("Total Volume (cbm)", colX.volume, itemY + 4, {
+        width: colWidths.volume,
+        align: "center",
+      });
 
-      doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + 30).stroke();
-      doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + 30).stroke();
-      doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + 30).stroke();
-      doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + 30).stroke();
-      doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + 30).stroke();
-      doc.moveTo(colX.measure + colWidths.measure / 3, itemY + 15).lineTo(colX.measure + colWidths.measure / 3, itemY + 30).stroke();
-      doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 15).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 30).stroke();
-      doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + 30).stroke();
+      doc
+        .moveTo(colX.qty, itemY)
+        .lineTo(colX.qty, itemY + 30)
+        .stroke();
+      doc
+        .moveTo(colX.client, itemY)
+        .lineTo(colX.client, itemY + 30)
+        .stroke();
+      doc
+        .moveTo(colX.pack, itemY)
+        .lineTo(colX.pack, itemY + 30)
+        .stroke();
+      doc
+        .moveTo(colX.weight, itemY)
+        .lineTo(colX.weight, itemY + 30)
+        .stroke();
+      doc
+        .moveTo(colX.measure, itemY)
+        .lineTo(colX.measure, itemY + 30)
+        .stroke();
+      doc
+        .moveTo(colX.measure + colWidths.measure / 3, itemY + 15)
+        .lineTo(colX.measure + colWidths.measure / 3, itemY + 30)
+        .stroke();
+      doc
+        .moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 15)
+        .lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 30)
+        .stroke();
+      doc
+        .moveTo(colX.volume, itemY)
+        .lineTo(colX.volume, itemY + 30)
+        .stroke();
 
       itemY += 30;
       doc.font("Helvetica");
@@ -1312,7 +1669,10 @@ export class InvoiceController {
       let totalQty = 0;
       let grandTotalWeight = 0;
       let grandTotalVolume = 0;
-      const clientTotals: Record<string, { weight: number, volume: number, label: string }> = {};
+      const clientTotals: Record<
+        string,
+        { weight: number; volume: number; label: string }
+      > = {};
 
       for (const item of items) {
         const rowHeight = 25;
@@ -1331,100 +1691,216 @@ export class InvoiceController {
         grandTotalWeight += wt;
         grandTotalVolume += volume;
 
-        const client = (item.client && item.client.trim()) ? item.client.trim() : "";
+        const client =
+          item.client && item.client.trim() ? item.client.trim() : "";
         const clientKey = client || "__unknown__";
-        if (!clientTotals[clientKey]) clientTotals[clientKey] = { weight: 0, volume: 0, label: client };
+        if (!clientTotals[clientKey])
+          clientTotals[clientKey] = { weight: 0, volume: 0, label: client };
         clientTotals[clientKey].weight += wt;
         clientTotals[clientKey].volume += volume;
 
         doc.rect(30, itemY, 535, rowHeight).stroke();
-        doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + rowHeight).stroke();
-        doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + rowHeight).stroke();
-        doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + rowHeight).stroke();
-        doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + rowHeight).stroke();
-        doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + rowHeight).stroke();
-        doc.moveTo(colX.measure + colWidths.measure / 3, itemY).lineTo(colX.measure + colWidths.measure / 3, itemY + rowHeight).stroke();
-        doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + rowHeight).stroke();
-        doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + rowHeight).stroke();
+        doc
+          .moveTo(colX.qty, itemY)
+          .lineTo(colX.qty, itemY + rowHeight)
+          .stroke();
+        doc
+          .moveTo(colX.client, itemY)
+          .lineTo(colX.client, itemY + rowHeight)
+          .stroke();
+        doc
+          .moveTo(colX.pack, itemY)
+          .lineTo(colX.pack, itemY + rowHeight)
+          .stroke();
+        doc
+          .moveTo(colX.weight, itemY)
+          .lineTo(colX.weight, itemY + rowHeight)
+          .stroke();
+        doc
+          .moveTo(colX.measure, itemY)
+          .lineTo(colX.measure, itemY + rowHeight)
+          .stroke();
+        doc
+          .moveTo(colX.measure + colWidths.measure / 3, itemY)
+          .lineTo(colX.measure + colWidths.measure / 3, itemY + rowHeight)
+          .stroke();
+        doc
+          .moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY)
+          .lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + rowHeight)
+          .stroke();
+        doc
+          .moveTo(colX.volume, itemY)
+          .lineTo(colX.volume, itemY + rowHeight)
+          .stroke();
 
         const textY = itemY + 8;
         doc.fillColor("#000000").fontSize(7);
-        doc.text(item.description || "", colX.desc + 4, itemY + 5, { width: colWidths.desc - 8, lineBreak: true });
+        doc.text(item.description || "", colX.desc + 4, itemY + 5, {
+          width: colWidths.desc - 8,
+          lineBreak: true,
+        });
         doc.fontSize(8);
-        const fmt2 = (n: number) => n > 0 ? parseFloat(n.toFixed(2)).toString() : "";
-        doc.text(qty > 0 ? qty.toString() : "",
-          colX.qty, textY, { width: colWidths.qty, align: "center" });
-        doc.text(client,
-          colX.client, textY, { width: colWidths.client, align: "center" });
-        doc.text(item.package || "",
-          colX.pack, textY, { width: colWidths.pack, align: "center" });
-        doc.text(wt > 0 ? parseFloat(wt.toFixed(2)).toString() : "",
-          colX.weight, textY, { width: colWidths.weight, align: "center" });
-        doc.text(fmt2(len),
-          colX.measure, textY, { width: colWidths.measure / 3, align: "center" });
-        doc.text(fmt2(wid),
-          colX.measure + colWidths.measure / 3, textY, { width: colWidths.measure / 3, align: "center" });
-        doc.text(fmt2(ht),
-          colX.measure + (colWidths.measure / 3) * 2, textY, { width: colWidths.measure / 3, align: "center" });
-        doc.text(volume > 0 ? volume.toFixed(3) : "",
-          colX.volume, textY, { width: colWidths.volume, align: "center" });
+        const fmt2 = (n: number) =>
+          n > 0 ? parseFloat(n.toFixed(2)).toString() : "";
+        doc.text(qty > 0 ? qty.toString() : "", colX.qty, textY, {
+          width: colWidths.qty,
+          align: "center",
+        });
+        doc.text(client, colX.client, textY, {
+          width: colWidths.client,
+          align: "center",
+        });
+        doc.text(item.package || "", colX.pack, textY, {
+          width: colWidths.pack,
+          align: "center",
+        });
+        doc.text(
+          wt > 0 ? parseFloat(wt.toFixed(2)).toString() : "",
+          colX.weight,
+          textY,
+          { width: colWidths.weight, align: "center" },
+        );
+        doc.text(fmt2(len), colX.measure, textY, {
+          width: colWidths.measure / 3,
+          align: "center",
+        });
+        doc.text(fmt2(wid), colX.measure + colWidths.measure / 3, textY, {
+          width: colWidths.measure / 3,
+          align: "center",
+        });
+        doc.text(fmt2(ht), colX.measure + (colWidths.measure / 3) * 2, textY, {
+          width: colWidths.measure / 3,
+          align: "center",
+        });
+        doc.text(volume > 0 ? volume.toFixed(3) : "", colX.volume, textY, {
+          width: colWidths.volume,
+          align: "center",
+        });
 
         itemY += rowHeight;
       }
 
-      const clientKeys = Object.keys(clientTotals).filter(k => k !== "__unknown__");
-      const namedClients = clientKeys.map(k => ({ key: k, ...clientTotals[k] }));
+      const clientKeys = Object.keys(clientTotals).filter(
+        (k) => k !== "__unknown__",
+      );
+      const namedClients = clientKeys.map((k) => ({
+        key: k,
+        ...clientTotals[k],
+      }));
 
-      const totalsRowHeight = (namedClients.length > 0 ? namedClients.length : 1) * 15;
+      const totalsRowHeight =
+        (namedClients.length > 0 ? namedClients.length : 1) * 15;
       doc.rect(30, itemY, 535, totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.measure + colWidths.measure / 3, itemY).lineTo(colX.measure + colWidths.measure / 3, itemY + totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + totalsRowHeight + 15).stroke();
-      doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + totalsRowHeight + 15).stroke();
+      doc
+        .moveTo(colX.qty, itemY)
+        .lineTo(colX.qty, itemY + totalsRowHeight + 15)
+        .stroke();
+      doc
+        .moveTo(colX.client, itemY)
+        .lineTo(colX.client, itemY + totalsRowHeight + 15)
+        .stroke();
+      doc
+        .moveTo(colX.pack, itemY)
+        .lineTo(colX.pack, itemY + totalsRowHeight + 15)
+        .stroke();
+      doc
+        .moveTo(colX.weight, itemY)
+        .lineTo(colX.weight, itemY + totalsRowHeight + 15)
+        .stroke();
+      doc
+        .moveTo(colX.measure, itemY)
+        .lineTo(colX.measure, itemY + totalsRowHeight + 15)
+        .stroke();
+      doc
+        .moveTo(colX.measure + colWidths.measure / 3, itemY)
+        .lineTo(
+          colX.measure + colWidths.measure / 3,
+          itemY + totalsRowHeight + 15,
+        )
+        .stroke();
+      doc
+        .moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY)
+        .lineTo(
+          colX.measure + (colWidths.measure / 3) * 2,
+          itemY + totalsRowHeight + 15,
+        )
+        .stroke();
+      doc
+        .moveTo(colX.volume, itemY)
+        .lineTo(colX.volume, itemY + totalsRowHeight + 15)
+        .stroke();
 
       doc.font("Helvetica-Bold").fontSize(8);
-      doc.text("Total", colX.desc, itemY + 5, { width: colWidths.desc, align: "center" });
-      doc.text(totalQty.toString(), colX.qty, itemY + 5, { width: colWidths.qty, align: "center" });
+      doc.text("Total", colX.desc, itemY + 5, {
+        width: colWidths.desc,
+        align: "center",
+      });
+      doc.text(totalQty.toString(), colX.qty, itemY + 5, {
+        width: colWidths.qty,
+        align: "center",
+      });
 
       let currentY = itemY;
       namedClients.forEach((c) => {
         doc.fontSize(8).font("Helvetica-Bold");
-        doc.text(c.label, colX.client, currentY + 5, { width: colWidths.client, align: "center" });
+        doc.text(c.label, colX.client, currentY + 5, {
+          width: colWidths.client,
+          align: "center",
+        });
         doc.font("Helvetica");
-        doc.text(`${c.weight.toFixed(2)} kg`, colX.weight, currentY + 5, { width: colWidths.weight, align: "center" });
-        doc.text(`${c.volume.toFixed(2)} m³`, colX.volume, currentY + 5, { width: colWidths.volume, align: "center" });
+        doc.text(`${c.weight.toFixed(2)} kg`, colX.weight, currentY + 5, {
+          width: colWidths.weight,
+          align: "center",
+        });
+        doc.text(`${c.volume.toFixed(2)} m³`, colX.volume, currentY + 5, {
+          width: colWidths.volume,
+          align: "center",
+        });
         doc.moveTo(colX.client, currentY).lineTo(565, currentY).stroke();
         currentY += 15;
       });
 
-      doc.rect(colX.client, currentY, 565 - colX.client, 15).fillAndStroke("#f0f0f0", "#000000");
+      doc
+        .rect(colX.client, currentY, 565 - colX.client, 15)
+        .fillAndStroke("#f0f0f0", "#000000");
       doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
-      doc.text("Total", colX.client, currentY + 4, { width: colWidths.client, align: "center" });
+      doc.text("Total", colX.client, currentY + 4, {
+        width: colWidths.client,
+        align: "center",
+      });
       doc.font("Helvetica");
-      doc.text(`${grandTotalWeight.toFixed(2)} kg`, colX.weight, currentY + 4, { width: colWidths.weight, align: "center" });
-      doc.text(`${grandTotalVolume.toFixed(2)} m³`, colX.volume, currentY + 4, { width: colWidths.volume, align: "center" });
+      doc.text(`${grandTotalWeight.toFixed(2)} kg`, colX.weight, currentY + 4, {
+        width: colWidths.weight,
+        align: "center",
+      });
+      doc.text(`${grandTotalVolume.toFixed(2)} m³`, colX.volume, currentY + 4, {
+        width: colWidths.volume,
+        align: "center",
+      });
 
       itemY = currentY + 15;
       doc.rect(30, itemY, 535, 15).stroke();
       doc.fontSize(8).font("Helvetica-Bold");
-      const uniquePackages = [...new Set(items.map((i: any) => i.package).filter(Boolean))];
+      const uniquePackages = [
+        ...new Set(items.map((i: any) => i.package).filter(Boolean)),
+      ];
       const pTypeCount = items.reduce((acc: Record<string, number>, i: any) => {
         if (i.pType) acc[i.pType] = (acc[i.pType] || 0) + 1;
         return acc;
       }, {});
-      const pTypeSummary = Object.entries(pTypeCount).map(([t, n]) => `${n} ${t}`).join(" + ");
-      const pkgText = pTypeSummary ? `${uniquePackages.length} (${pTypeSummary})` : `${uniquePackages.length}`;
+      const pTypeSummary = Object.entries(pTypeCount)
+        .map(([t, n]) => `${n} ${t}`)
+        .join(" + ");
+      const pkgText = pTypeSummary
+        ? `${uniquePackages.length} (${pTypeSummary})`
+        : `${uniquePackages.length}`;
       doc.text(`No. of packages: ${pkgText}`, 35, itemY + 4);
 
       itemY += 15;
       doc.rect(30, itemY, 535, 15).stroke();
-      const uniqueClientLabels = [...new Set(
-        namedClients.map(c => c.label).filter(Boolean)
-      )];
+      const uniqueClientLabels = [
+        ...new Set(namedClients.map((c) => c.label).filter(Boolean)),
+      ];
       const shippingMarks = uniqueClientLabels.join(", ");
       doc.text(`Shipping Marks: ${shippingMarks}`, 35, itemY + 4);
 
@@ -1439,27 +1915,37 @@ export class InvoiceController {
     }
   };
 
-  static markAsPaid = async (req: Request, res: Response, next: NextFunction) => {
+  static markAsPaid = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     try {
       const { id } = req.params;
       const invoice = await invoiceRepository.findOne({
         where: { id },
-        relations: ["customer", "items", "items.item"]
+        relations: ["customer", "items", "items.item"],
       });
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!invoice)
+        return res.status(404).json({ message: "Invoice not found" });
 
-      if (invoice.freightCost === null || invoice.freightCost === undefined || Number(invoice.freightCost) <= 0) {
+      if (
+        invoice.freightCost === null ||
+        invoice.freightCost === undefined ||
+        Number(invoice.freightCost) <= 0
+      ) {
         return res.status(400).json({
           success: false,
-          message: "Freight cost must be provided and greater than 0 before verifying the invoice."
+          message:
+            "Freight cost must be provided and greater than 0 before verifying the invoice.",
         });
       }
 
       if (!invoice.description || !invoice.description.trim()) {
         return res.status(400).json({
           success: false,
-          message: "Description must be provided before verifying the invoice."
+          message: "Description must be provided before verifying the invoice.",
         });
       }
 
@@ -1468,11 +1954,14 @@ export class InvoiceController {
         try {
           generatedNo = await NumberSequenceService.getNextNumber("closed_ci");
         } catch (err) {
-          console.warn("Could not generate closed CI number using sequence service, falling back to manual generation:", err);
+          console.warn(
+            "Could not generate closed CI number using sequence service, falling back to manual generation:",
+            err,
+          );
           const allCisInvoices = await invoiceRepository.find({
             where: {
-              invoiceNumber: Like("CI%")
-            }
+              invoiceNumber: Like("CI%"),
+            },
           });
 
           let maxSeq = 0;
@@ -1508,18 +1997,27 @@ export class InvoiceController {
       invoice.closedAt = new Date();
 
       await invoiceRepository.save(invoice);
-      return res.json({ success: true, message: "Invoice marked as paid", data: invoice });
+      return res.json({
+        success: true,
+        message: "Invoice marked as paid",
+        data: invoice,
+      });
     } catch (error) {
       return next(error);
     }
   };
 
-  static cancelInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  static cancelInvoice = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     try {
       const { id } = req.params;
       const invoice = await invoiceRepository.findOne({ where: { id } });
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!invoice)
+        return res.status(404).json({ message: "Invoice not found" });
       (invoice as any).status = "cancelled";
       (invoice as any).closedAt = new Date();
       await invoiceRepository.save(invoice);
