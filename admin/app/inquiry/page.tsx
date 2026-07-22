@@ -78,6 +78,7 @@ import {
 import { syncEntityTags } from "@/api/tags";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { formatDate } from "@/utils/date";
+import { sortData } from "@/hooks/useTableSort";
 
 export interface Customer {
   id: string;
@@ -293,6 +294,47 @@ const CombinedInquiriesPageContent = () => {
     }));
   };
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const renderSortableHeader = (field: string, label: string, align: 'left' | 'center' | 'right' = 'left') => {
+    const isSorted = inquiryFilters.sortBy === field;
+    const isAsc = inquiryFilters.sortOrder === 'ASC';
+
+    return (
+      <th
+        className={`px-2 py-3 text-${align} text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 transition-colors group ${field === 'name' ? 'min-w-[13rem]' : ''}`}
+        onClick={() => handleSort(field)}
+      >
+        <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          {field === 'name' && (
+            <div className="w-8 shrink-0" />
+          )}
+          <span>{label}</span>
+          {isSorted ? (
+            isAsc ? (
+              <ChevronUpIcon className="h-4 w-4 text-[#8CC21B] stroke-[3px]" />
+            ) : (
+              <ChevronDownIcon className="h-4 w-4 text-[#8CC21B] stroke-[3px]" />
+            )
+          ) : (
+            <span className="text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity">
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 10l5-5 5 5M7 14l5 5 5-5"
+                />
+              </svg>
+            </span>
+          )}
+        </div>
+      </th>
+    );
+  };
   const [newInquiryTags, setNewInquiryTags] = useState<Tag[]>([]);
   const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
   const [inquiryLoading, setInquiryLoading] = useState(false);
@@ -693,30 +735,35 @@ const CombinedInquiriesPageContent = () => {
             });
           });
         }
-        if (inquiryFilters.sortBy === "total_potential_k_eur") {
-          inquiryData = [...inquiryData].sort((a: any, b: any) => {
-            const valA =
-              a.total_potential_k_eur !== undefined &&
-                a.total_potential_k_eur !== null
-                ? Number(a.total_potential_k_eur)
-                : 0;
-            const valB =
-              b.total_potential_k_eur !== undefined &&
-                b.total_potential_k_eur !== null
-                ? Number(b.total_potential_k_eur)
-                : 0;
-            return inquiryFilters.sortOrder === "ASC"
-              ? valA - valB
-              : valB - valA;
-          });
-        } else if (inquiryFilters.sortBy === "createdAt") {
-          inquiryData = [...inquiryData].sort((a: any, b: any) => {
-            const timeA = new Date(a.createdAt || 0).getTime();
-            const timeB = new Date(b.createdAt || 0).getTime();
-            return inquiryFilters.sortOrder === "ASC"
-              ? timeA - timeB
-              : timeB - timeA;
-          });
+        // Client-side sorting using sortData helper
+        if (inquiryFilters.sortBy && inquiryFilters.sortOrder) {
+          const customSortValues: Record<string, (row: any) => any> = {
+            "requests.length": (row) => row.requests?.length || 0,
+            highestPriority: (row) => {
+              const requests = row.requests || [];
+              if (requests.length === 0) return 0;
+              const priorityMap: Record<string, number> = { Low: 1, Normal: 2, Medium: 3, High: 4, Urgent: 5 };
+              let maxPrioVal = 0;
+              requests.forEach((r: any) => {
+                const val = priorityMap[r.priority] || 2;
+                if (val > maxPrioVal) maxPrioVal = val;
+              });
+              return maxPrioVal;
+            },
+            "customer.companyName": (row) => row.customer?.companyName || row.customer?.legalName || row.customer?.name || "",
+            "createdAt": (row) => new Date(row.createdAt || 0).getTime(),
+            "next_followup_at": (row) => new Date(row.next_followup_at || 0).getTime(),
+            "owner_user_id": (row) => {
+              const ownerUser = users.find((u) => u.id === row.owner_user_id);
+              return ownerUser?.name || "";
+            }
+          };
+          inquiryData = sortData(
+            inquiryData,
+            inquiryFilters.sortBy,
+            inquiryFilters.sortOrder,
+            customSortValues
+          );
         }
 
         setAllInquiries(inquiryData);
@@ -1428,16 +1475,6 @@ const CombinedInquiriesPageContent = () => {
             <PageHeader title="Inquiries" icon={MessagesSquare} />
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={fetchInquiries}
-              disabled={inquiryLoading}
-              className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              <ArrowPathIcon
-                className={`h-4 w-4 ${inquiryLoading ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
             <CustomButton
               gradient={true}
               onClick={() => {
@@ -1547,73 +1584,27 @@ const CombinedInquiriesPageContent = () => {
               <table className="w-full">
                 <thead className="bg-gray-200/50 border-b border-gray-200/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Inquiry
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Company / Contacts
-                    </th>
+                    {renderSortableHeader("name", "Inquiry", "left")}
+                    {renderSortableHeader("customer.companyName", "Company / Contacts", "left")}
                     {showPicColumn && (
                       <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                         Pic
                       </th>
                     )}
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Request Items
-                    </th>
-                    <th
-                      className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 transition-colors group"
-                      onClick={() => handleSort("total_potential_k_eur")}
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        <span>VP</span>
-                        {inquiryFilters.sortBy === "total_potential_k_eur" ? (
-                          inquiryFilters.sortOrder === "ASC" ? (
-                            <ChevronUpIcon className="h-4 w-4 text-blue-600 stroke-[3px]" />
-                          ) : (
-                            <ChevronDownIcon className="h-4 w-4 text-blue-600 stroke-[3px]" />
-                          )
-                        ) : (
-                          <span className="text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity">
-                            <svg
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M7 10l5-5 5 5M7 14l5 5 5-5"
-                              />
-                            </svg>
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Highest Priority
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Next Action
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Follow-up
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Owner
-                    </th>
+                    {renderSortableHeader("requests.length", "Request Items", "center")}
+                    {renderSortableHeader("total_potential_k_eur", "VP", "center")}
+                    {renderSortableHeader("status", "Status", "center")}
+                    {renderSortableHeader("highestPriority", "Priority", "center")}
+                    {renderSortableHeader("next_action", "Next Action", "left")}
+                    {renderSortableHeader("next_followup_at", "Follow-up", "center")}
+                    {renderSortableHeader("owner_user_id", "Owner", "left")}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200/50">
                   {inquiries.map((inquiry) => (
                     <React.Fragment key={inquiry.id}>
                       <tr className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-3 min-w-[13rem]">
                           <div className="flex items-center gap-2">
                             <ExpandRowArrow
                               isExpanded={expandedInquiryIds.has(inquiry.id)}

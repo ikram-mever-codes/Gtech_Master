@@ -289,14 +289,7 @@ export default function UsersPage() {
         </Select>
       </FormControl>
 
-      <button
-        onClick={handleRefresh}
-        className="p-2 px-3 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-xs font-semibold"
-        title="Refresh"
-      >
-        <RefreshCw className="h-4 w-4" />
-        Refresh
-      </button>
+
 
       <Typography
         variant="body2"

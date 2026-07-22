@@ -2739,30 +2739,13 @@ const AdminAllItemsPage = () => {
               </button>
             )}
 
-            {currentTab === 0 ? (
-              <>
-                <button
-                  onClick={async () => await handleRefetchItemData()}
-                  className="px-3 py-2 text-xs bg-white text-[#8CC21B] border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-semibold flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Refetch WaWi
-                </button>
-                <button
-                  onClick={() => loadAllItems()}
-                  className="px-3 py-2 text-xs bg-white text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-semibold flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Refresh
-                </button>
-              </>
-            ) : (
+            {currentTab === 0 && (
               <button
-                onClick={() => loadAllItems()}
-                className="px-3 py-2 text-xs bg-white text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-semibold flex items-center gap-1.5"
+                onClick={async () => await handleRefetchItemData()}
+                className="px-3 py-2 text-xs bg-white text-[#8CC21B] border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-semibold flex items-center gap-1.5"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Refresh Logs
+                Refetch WaWi
               </button>
             )}
 
