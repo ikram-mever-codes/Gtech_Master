@@ -1049,14 +1049,21 @@ const InvoiceListPage: React.FC = () => {
   }, [orders, orderNoFilter, searchParams]);
 
   const filteredOrders = useMemo(() => {
-    if (!orderNoFilter) return orders;
+    let list = orders;
+    const filterParam = searchParams.get("filter");
+    if (filterParam === "unassigned_cargo") {
+      list = list.filter((o: any) =>
+        (o.items || []).some((i: any) => !i.cargo_id || i.cargo_id === 0)
+      );
+    }
+    if (!orderNoFilter) return list;
     const s = orderNoFilter.toLowerCase();
-    return orders.filter((o: any) =>
+    return list.filter((o: any) =>
       String(o.order_no).toLowerCase().includes(s) ||
       String(o.id).toLowerCase().includes(s) ||
       (o.comment || "").toLowerCase().includes(s),
     );
-  }, [orders, orderNoFilter]);
+  }, [orders, orderNoFilter, searchParams]);
 
   const handleGoToItems = (orderNo: string) => {
     setOrderNoFilter(orderNo);
@@ -1444,7 +1451,7 @@ const InvoiceListPage: React.FC = () => {
               <span className="font-semibold text-gray-800">
                 {(() => {
                   switch (searchParams.get("filter")) {
-                    case "unassigned_cargo": return "Order items unassigned to cargo";
+                    case "unassigned_cargo": return "Orders unassigned to cargo";
                     case "rmb_special_no_value": return "RMB Special SET with no value";
                     case "eur_special_no_value": return "EUR Special SET with no value";
                     case "dimension_special_no_value": return "Dimension Special SET with no value";

@@ -1884,7 +1884,7 @@ const InvoiceListPage: React.FC = () => {
               <span className="font-semibold text-gray-800">
                 {(() => {
                   switch (searchParams.get("filter")) {
-                    case "unassigned_cargo": return "Order items unassigned to cargo";
+                    case "unassigned_cargo": return "Orders unassigned to cargo";
                     case "rmb_special_no_value": return "RMB Special SET with no value";
                     case "eur_special_no_value": return "EUR Special SET with no value";
                     case "dimension_special_no_value": return "Dimension Special SET with no value";
