@@ -64,10 +64,21 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { FunnelIcon, XMarkIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
 import PageHeader from "@/components/UI/PageHeader";
 import theme from "@/styles/theme";
+
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
+  }`;
+};
 import {
   deleteCustomer,
   getAllCustomers,
@@ -332,6 +343,7 @@ const CustomersPage = () => {
     {
       key: "company",
       label: "Company",
+      sortValue: (row: any) => row.companyName || "",
       render: (value: any, row: any) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Badge
@@ -395,6 +407,7 @@ const CustomersPage = () => {
     {
       key: "contact",
       label: "Contact Info",
+      sortValue: (row: any) => row.contactPhoneNumber || row.city || "",
       render: (value: any, row: any) => (
         <Stack spacing={0.5}>
           {row.contactPhoneNumber && (
@@ -417,6 +430,7 @@ const CustomersPage = () => {
     {
       key: "createdAt",
       label: "Registered",
+      sortValue: (row: any) => (row.createdAt ? new Date(row.createdAt).getTime() : 0),
       render: (value: any) => (
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <Calendar size={14} style={{ marginRight: 6, color: "#5f6368" }} />
@@ -429,11 +443,13 @@ const CustomersPage = () => {
     {
       key: "accountVerificationStatus",
       label: "Status",
+      sortValue: (row: any) => row.accountVerificationStatus || "",
       render: (value: any) => renderStatusChip(value),
     },
     {
       key: "actions",
       label: "Actions",
+      sortable: false,
       render: (value: any, row: any) => (
         <Stack direction="row" spacing={0.5}>
           {row.accountVerificationStatus ===
@@ -795,105 +811,66 @@ const CustomersPage = () => {
               </Card>
             </Grid>
           </Grid>
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: 1,
-              border: "1px solid #e8eaed",
-              background: "linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)",
-              p: 3,
-            }}
-          >
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Paper
-                elevation={0}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  px: 2,
-                  py: 1,
-                  flex: 1,
-                  maxWidth: 400,
-                  borderRadius: 1,
-                  border: "1px solid #e8eaed",
-                  backgroundColor: "white",
-                }}
-              >
-                <LucideSearch
-                  size={20}
-                  style={{ color: "#5f6368", marginRight: 12 }}
-                />
-                <InputBase
+          <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                <FunnelIcon className="w-5 h-5 text-gray-400" />
+              </div>
+
+              <div className="relative flex-1 min-w-[240px]">
+                <input
+                  type="text"
                   placeholder="Search customers..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  sx={{
-                    flex: 1,
-                    "& input": {
-                      padding: "4px 0",
-                    },
-                  }}
+                  className={getInputClass(!!searchText)}
                 />
-              </Paper>
+                {searchText && (
+                  <button
+                    onClick={() => setSearchText("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
 
-              <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
-                <Select
-                  multiple
-                  value={filters.status}
+              <div className="w-48 shrink-0">
+                <select
+                  value={filters.status[0] || ""}
                   onChange={(e) =>
                     setFilters({
                       ...filters,
-                      status: e.target.value as string[],
+                      status: e.target.value ? [e.target.value] : [],
                     })
                   }
-                  renderValue={(selected) => selected.join(", ")}
-                  sx={{
-                    borderRadius: 1,
-                    backgroundColor: "white",
-                    "& .MuiSelect-select": {
-                      py: 1.2,
-                    },
-                  }}
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        borderRadius: 1,
-                        mt: 1,
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      },
-                    },
-                  }}
+                  className={getInputClass(filters.status.length > 0, filters.status.length === 0)}
                 >
+                  <option value="" className="text-gray-400">
+                    Status...
+                  </option>
                   {Object.values(CustomerVerificationStatus).map((status) => (
-                    <MenuItem key={status} value={status}>
-                      <Checkbox checked={filters.status.includes(status)} />
-                      <ListItemText primary={formatStatus(status)} />
-                    </MenuItem>
+                    <option key={status} value={status} className="text-gray-900 font-normal">
+                      {formatStatus(status)}
+                    </option>
                   ))}
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <Button
-                variant="outlined"
-                startIcon={<RefreshCw size={16} />}
-                onClick={handleRefresh}
-                sx={{
-                  borderRadius: 1,
-                  borderColor: "#e8eaed",
-                  color: "#5f6368",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  "&:hover": {
-                    borderColor: theme.palette.primary.main,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  },
-                }}
-              >
-                Refresh
-              </Button>
-            </Stack>
-          </Paper>
+              {(searchText || filters.status.length > 0) && (
+                <button
+                  onClick={() => {
+                    setSearchText("");
+                    setFilters({ status: [] });
+                  }}
+                  className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                >
+                  <ArrowPathIcon className="w-4 h-4" />
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
         </Box>
 
         {error && (

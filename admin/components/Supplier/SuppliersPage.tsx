@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
     MagnifyingGlassIcon,
     FunnelIcon,
@@ -11,7 +11,10 @@ import {
     TruckIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
+    ChevronUpIcon,
+    ChevronDownIcon,
 } from "@heroicons/react/24/outline";
+import { useTableSort, sortData } from "@/hooks/useTableSort";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import ModalHeader from "@/components/UI/ModalHeader";
@@ -92,6 +95,39 @@ export const SuppliersPage = React.forwardRef<
     const [formData, setFormData] = useState<Partial<Supplier>>(initialFormData);
     const [isEditEnabled, setIsEditEnabled] = useState(false);
     const [activeSection, setActiveSection] = useState<"general" | "address" | "contact" | "banking" | "financial">("general");
+
+    const { sortBy, sortOrder, handleSort } = useTableSort();
+
+    const sortedSuppliers = useMemo(() => {
+        return sortData(suppliers, sortBy, sortOrder, {
+            name: (s) => (s.name || '').toLowerCase(),
+            name_cn: (s) => (s.name_cn || '').toLowerCase(),
+            company_name: (s) => (s.company_name || '').toLowerCase(),
+            contact_person: (s) => (s.contact_person || '').toLowerCase(),
+            city: (s) => (s.city || '').toLowerCase(),
+            email: (s) => (s.email || '').toLowerCase(),
+            phone: (s) => (s.phone || '').toLowerCase(),
+            created_at: (s) => (s.created_at ? new Date(s.created_at).getTime() : 0),
+        });
+    }, [suppliers, sortBy, sortOrder]);
+
+    const renderSortIcon = (field: string) => {
+        if (sortBy === field) {
+            if (sortOrder === 'ASC') {
+                return <ChevronUpIcon className="h-3.5 w-3.5 text-[#8CC21B] stroke-[3px]" />;
+            }
+            if (sortOrder === 'DESC') {
+                return <ChevronDownIcon className="h-3.5 w-3.5 text-[#8CC21B] stroke-[3px]" />;
+            }
+        }
+        return (
+            <span className="text-gray-400 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+                </svg>
+            </span>
+        );
+    };
 
     const formatDate = (dateString: string | Date | undefined) => {
         return centralFormatDate(dateString);
@@ -221,7 +257,7 @@ export const SuppliersPage = React.forwardRef<
             <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 w-full">
                     <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                        <FunnelIcon className="w-5 h-5 text-[#8CC21B]" />
+                        <FunnelIcon className="w-5 h-5 text-gray-400" />
                     </div>
                     <div className="relative flex-grow flex-shrink flex-1 min-w-[240px]">
                         <div className="relative">
@@ -284,20 +320,60 @@ export const SuppliersPage = React.forwardRef<
                                 <thead className="bg-gray-50 border-b border-gray-200">
                                     <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-3 w-10 text-center">#</th>
-                                        <th className="px-4 py-3">Name</th>
-                                        <th className="px-4 py-3">Chinese Name</th>
-                                        <th className="px-4 py-3">Company</th>
-                                        <th className="px-4 py-3">Contact</th>
-                                        <th className="px-4 py-3">City</th>
-                                        <th className="px-4 py-3">Email</th>
-                                        <th className="px-4 py-3">Phone</th>
-                                        <th className="px-4 py-3">Created</th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('name')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>Name</span>
+                                                {renderSortIcon('name')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('name_cn')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>Chinese Name</span>
+                                                {renderSortIcon('name_cn')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('company_name')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>Company</span>
+                                                {renderSortIcon('company_name')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('contact_person')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>Contact</span>
+                                                {renderSortIcon('contact_person')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('city')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>City</span>
+                                                {renderSortIcon('city')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('email')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>Email</span>
+                                                {renderSortIcon('email')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('phone')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>Phone</span>
+                                                {renderSortIcon('phone')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-900 group" onClick={() => handleSort('created_at')}>
+                                            <div className="inline-flex items-center gap-1.5">
+                                                <span>Created</span>
+                                                {renderSortIcon('created_at')}
+                                            </div>
+                                        </th>
                                         <th className="px-4 py-3">Tags</th>
                                         <th className="px-4 py-3 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-sm">
-                                    {suppliers.length === 0 ? (
+                                    {sortedSuppliers.length === 0 ? (
                                         <tr>
                                             <td
                                                 colSpan={11}
@@ -308,7 +384,7 @@ export const SuppliersPage = React.forwardRef<
                                             </td>
                                         </tr>
                                     ) : (
-                                        suppliers.map((supplier, index) => (
+                                        sortedSuppliers.map((supplier, index) => (
                                             <tr
                                                 key={supplier.id}
                                                 className="hover:bg-gray-50/50 cursor-pointer transition-colors"

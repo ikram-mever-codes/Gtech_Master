@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback, use } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -8,6 +8,8 @@ import {
   EnvelopeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   XMarkIcon,
   ArrowDownTrayIcon,
   UserGroupIcon,
@@ -16,6 +18,7 @@ import {
   ExclamationCircleIcon,
   PencilIcon,
 } from "@heroicons/react/24/outline";
+import { useTableSort, sortData } from "@/hooks/useTableSort";
 import { toast } from "react-hot-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Linkedin, Users, Building2, UserCheck, BookUser } from "lucide-react";
@@ -109,6 +112,47 @@ const ContactPersonsPage: React.FC = () => {
   const [editModeEnabled, setEditModeEnabled] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notesModalData, setNotesModalData] = useState<any>(null);
+
+  const { sortBy, sortOrder, handleSort } = useTableSort();
+
+  const sortedContactPersons = useMemo(() => {
+    return sortData(contactPersons, sortBy, sortOrder, {
+      businessName: (c) => c.businessName || '',
+      name: (c) => `${c.name || ''} ${c.familyName || ''}`.trim(),
+      email: (c) => c.email || c.phone || '',
+      stateLinkedIn: (c) => c.stateLinkedIn || '',
+      contact: (c) => c.contact || '',
+    });
+  }, [contactPersons, sortBy, sortOrder]);
+
+  const sortedDecisionMakers = useMemo(() => {
+    return sortData(decisionMakers, sortBy, sortOrder, {
+      businessName: (c) => c.businessName || '',
+      name: (c) => `${c.name || ''} ${c.familyName || ''}`.trim(),
+      email: (c) => c.email || c.phone || '',
+      contact: (c) => c.contact || '',
+      stateLinkedIn: (c) => c.stateLinkedIn || '',
+      decisionMakerState: (c) => c.decisionMakerState || '',
+    });
+  }, [decisionMakers, sortBy, sortOrder]);
+
+  const renderSortIcon = (field: string) => {
+    if (sortBy === field) {
+      if (sortOrder === 'ASC') {
+        return <ChevronUpIcon className="h-4 w-4 text-[#8CC21B] stroke-[3px]" />;
+      }
+      if (sortOrder === 'DESC') {
+        return <ChevronDownIcon className="h-4 w-4 text-[#8CC21B] stroke-[3px]" />;
+      }
+    }
+    return (
+      <span className="text-gray-400 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+        </svg>
+      </span>
+    );
+  };
 
   const itemsPerPage = 20;
 
@@ -905,20 +949,50 @@ const ContactPersonsPage: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-gray-50/50 border-b border-gray-200/50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Business
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('businessName')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Business</span>
+                            {renderSortIcon('businessName')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Name
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('name')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Name</span>
+                            {renderSortIcon('name')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Contact
+                        <th
+                          className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('email')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Contact</span>
+                            {renderSortIcon('email')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          LinkedIn
+                        <th
+                          className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('stateLinkedIn')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>LinkedIn</span>
+                            {renderSortIcon('stateLinkedIn')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Type
+                        <th
+                          className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('contact')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Type</span>
+                            {renderSortIcon('contact')}
+                          </div>
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Note{" "}
@@ -929,7 +1003,7 @@ const ContactPersonsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200/50">
-                      {contactPersons.map((contact) => (
+                      {sortedContactPersons.map((contact) => (
                         <tr
                           key={contact.id}
                           className="hover:bg-gray-50/50 transition-colors"
@@ -1221,24 +1295,59 @@ const ContactPersonsPage: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-gray-50/50 border-b border-gray-200/50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Business
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('businessName')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Business</span>
+                            {renderSortIcon('businessName')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Name
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('name')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Name</span>
+                            {renderSortIcon('name')}
+                          </div>
                         </th>
-
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Contact
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('email')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Contact</span>
+                            {renderSortIcon('email')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Type
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('contact')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Type</span>
+                            {renderSortIcon('contact')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          LinkedIn State
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('stateLinkedIn')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>LinkedIn State</span>
+                            {renderSortIcon('stateLinkedIn')}
+                          </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Decision Maker State
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 group"
+                          onClick={() => handleSort('decisionMakerState')}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>Decision Maker State</span>
+                            {renderSortIcon('decisionMakerState')}
+                          </div>
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Note
@@ -1249,7 +1358,7 @@ const ContactPersonsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200/50">
-                      {decisionMakers.map((contact) => (
+                      {sortedDecisionMakers.map((contact) => (
                         <tr
                           key={contact.id}
                           className="hover:bg-gray-50/50 transition-colors cursor-pointer"
