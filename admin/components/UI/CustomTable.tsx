@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   LucideMoreVertical,
   LucideSearch,
@@ -11,13 +11,16 @@ import {
   LucideChevronUp,
   LucideMail,
 } from "lucide-react";
+import { sortData } from "@/hooks/useTableSort";
 
-interface TableColumn {
+export interface TableColumn {
   key: string;
   label: string;
   align?: "left" | "center" | "right";
   width?: string;
   render?: (value: any, row: any) => React.ReactNode;
+  sortable?: boolean;
+  sortValue?: (row: any) => any;
 }
 
 interface TableProps {
@@ -58,22 +61,29 @@ const CustomTable: React.FC<TableProps> = ({
 
   const hasActionsColumn = columns.some((col) => col.key === "actions");
 
-  const filteredData = data.filter((row) =>
-    Object.values(row).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const filteredData = useMemo(() => {
+    return data.filter((row) =>
+      Object.values(row).some((value) =>
+        String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  }, [data, searchTerm]);
 
-  const sortedData = [...filteredData].sort((a, b) => {
-    if (!sortConfig) return 0;
-    if (a[sortConfig.key] < b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? -1 : 1;
-    }
-    if (a[sortConfig.key] > b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? 1 : -1;
-    }
-    return 0;
-  });
+  const sortedData = useMemo(() => {
+    if (!sortConfig) return filteredData;
+    const customSortValues: Record<string, (row: any) => any> = {};
+    columns.forEach((col) => {
+      if (col.sortValue) {
+        customSortValues[col.key] = col.sortValue;
+      }
+    });
+    return sortData(
+      filteredData,
+      sortConfig.key,
+      sortConfig.direction === "asc" ? "ASC" : "DESC",
+      customSortValues
+    );
+  }, [filteredData, sortConfig, columns]);
 
   const totalPages = Math.ceil(sortedData.length / pageSize);
   const paginatedData = pagination
@@ -87,6 +97,13 @@ const CustomTable: React.FC<TableProps> = ({
       sortConfig.direction === "asc"
     ) {
       direction = "desc";
+    } else if (
+      sortConfig &&
+      sortConfig.key === key &&
+      sortConfig.direction === "desc"
+    ) {
+      setSortConfig(null);
+      return;
     }
     setSortConfig({ key, direction });
   };
@@ -218,29 +235,52 @@ const CustomTable: React.FC<TableProps> = ({
         <table className="w-full divide-y divide-[#E9ECEF]">
           <thead className="bg-[#F8F9FA]">
             <tr>
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  scope="col"
-                  className={`px-6 py-3.5 text-${column.align || "left"
-                    } text-xs font-semibold text-[#262A2E] uppercase tracking-wide cursor-pointer transition-colors font-poppins`}
-                  onClick={() => requestSort(column.key)}
-                  style={{ width: column.width }}
-                >
-                  <div className="flex items-center font-bold text-md justify-between">
-                    {column.label}
-                    {sortConfig?.key === column.key && (
-                      <span className="text-[#8CC21B]">
-                        {sortConfig.direction === "asc" ? (
-                          <LucideChevronUp className="w-4 h-4" />
-                        ) : (
-                          <LucideChevronDown className="w-4 h-4" />
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </th>
-              ))}
+              {columns.map((column) => {
+                const isSortable = column.key !== "actions" && column.sortable !== false;
+                const isActive = sortConfig?.key === column.key;
+                return (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    className={`px-6 py-3.5 text-${column.align || "left"} text-xs font-semibold text-[#262A2E] uppercase tracking-wide transition-colors font-poppins group ${
+                      isSortable ? "cursor-pointer select-none hover:text-[#8CC21B]" : ""
+                    }`}
+                    onClick={() => isSortable && requestSort(column.key)}
+                    style={{ width: column.width }}
+                  >
+                    <div className="inline-flex items-center gap-1.5 font-bold text-md">
+                      <span>{column.label}</span>
+                      {isSortable && (
+                        <span className="shrink-0">
+                          {isActive ? (
+                            sortConfig.direction === "asc" ? (
+                              <LucideChevronUp className="w-4 h-4 text-[#8CC21B]" />
+                            ) : (
+                              <LucideChevronDown className="w-4 h-4 text-[#8CC21B]" />
+                            )
+                          ) : (
+                            <span className="text-gray-400 opacity-65 group-hover:opacity-100 transition-opacity">
+                              <svg
+                                className="h-3.5 w-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M7 10l5-5 5 5M7 14l5 5 5-5"
+                                />
+                              </svg>
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
               {(onView || onEdit || onDelete || onResendVerification) &&
                 !hasActionsColumn && (
                   <th

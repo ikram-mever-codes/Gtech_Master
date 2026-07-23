@@ -1558,7 +1558,7 @@ const OrderPage: React.FC = () => {
                 <span className="font-semibold text-gray-800">
                   {(() => {
                     switch (searchParams.get("filter")) {
-                      case "unassigned_cargo": return "Order items unassigned to cargo";
+                      case "unassigned_cargo": return "Orders unassigned to cargo";
                       case "purchase_problem": return "Orders with purchase problem";
                       case "check_problem": return "Orders with Check Problem";
                       default: return searchParams.get("filter");

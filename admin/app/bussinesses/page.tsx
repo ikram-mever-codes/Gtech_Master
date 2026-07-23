@@ -15,6 +15,8 @@ import {
   EnvelopeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   XMarkIcon,
   ArrowDownTrayIcon,
   UserGroupIcon,
@@ -33,6 +35,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-hot-toast";
+import { useTableSort, sortData } from "@/hooks/useTableSort";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Linkedin, Building2, PlusIcon, HandshakeIcon } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
@@ -488,6 +491,35 @@ const CombinedBusinessContactsContent: React.FC = () => {
       filteredBusinesses.slice(startIndex, startIndex + itemsPerPage),
     );
   }, [currentPage, filteredBusinesses]);
+
+  const { sortBy, sortOrder, handleSort } = useTableSort();
+
+  const sortedBusinesses = useMemo(() => {
+    return sortData(businesses, sortBy, sortOrder, {
+      company: (b: any) => (b.displayName || b.companyName || b.name || '').toLowerCase(),
+      address: (b: any) => (buildFullAddress(b) || '').toLowerCase(),
+      website: (b: any) => (b.website || '').toLowerCase(),
+      note: (b: any) => (b.note || '').toLowerCase(),
+    });
+  }, [businesses, sortBy, sortOrder]);
+
+  const renderSortIcon = (field: string) => {
+    if (sortBy === field) {
+      if (sortOrder === 'ASC') {
+        return <ChevronUpIcon className="h-4 w-4 text-[#8CC21B] stroke-[3px]" />;
+      }
+      if (sortOrder === 'DESC') {
+        return <ChevronDownIcon className="h-4 w-4 text-[#8CC21B] stroke-[3px]" />;
+      }
+    }
+    return (
+      <span className="text-gray-400 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+        </svg>
+      </span>
+    );
+  };
 
   const fetchStarBusinessesForModal = async (search?: string) => {
     try {
@@ -1133,7 +1165,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-              <FunnelIcon className="w-5 h-5 text-primary" />
+              <FunnelIcon className="w-5 h-5 text-gray-400" />
             </div>
 
             <div className="w-52 shrink-0">
@@ -1261,22 +1293,46 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 <table className="min-w-full border-collapse">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Company
+                      <th
+                        className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 group"
+                        onClick={() => handleSort('company')}
+                      >
+                        <div className="inline-flex items-center gap-1.5">
+                          <span>Company</span>
+                          {renderSortIcon('company')}
+                        </div>
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Address
+                      <th
+                        className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 group"
+                        onClick={() => handleSort('address')}
+                      >
+                        <div className="inline-flex items-center gap-1.5">
+                          <span>Address</span>
+                          {renderSortIcon('address')}
+                        </div>
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Website
+                      <th
+                        className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 group"
+                        onClick={() => handleSort('website')}
+                      >
+                        <div className="inline-flex items-center gap-1.5">
+                          <span>Website</span>
+                          {renderSortIcon('website')}
+                        </div>
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Note
+                      <th
+                        className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 group"
+                        onClick={() => handleSort('note')}
+                      >
+                        <div className="inline-flex items-center gap-1.5">
+                          <span>Note</span>
+                          {renderSortIcon('note')}
+                        </div>
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {businesses.map((business: any) => (
+                    {sortedBusinesses.map((business: any) => (
                       <React.Fragment key={business.id}>
                         <tr className="hover:bg-gray-50 transition-colors align-top">
                           <td className="px-3 py-3">

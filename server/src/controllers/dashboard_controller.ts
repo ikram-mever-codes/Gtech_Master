@@ -117,7 +117,9 @@ export const getAuditReports = async (req: Request, res: Response) => {
         .createQueryBuilder("oi")
         .innerJoin("oi.order", "o")
         .where("oi.cargo_id IS NULL OR oi.cargo_id = 0")
-        .getCount(),
+        .select("COUNT(DISTINCT oi.order_id)", "cnt")
+        .getRawOne()
+        .then((res) => Number(res?.cnt || 0)),
 
       AppDataSource.getRepository(OrderItem)
         .createQueryBuilder("oi")
@@ -306,7 +308,7 @@ export const getAuditReports = async (req: Request, res: Response) => {
         currencyRates,
         controlData: {
           orders: [
-            { label: "Order items unassigned to cargo", count: unassignedCargoCount, type: "unassigned_cargo" },
+            { label: "Orders unassigned to cargo", count: unassignedCargoCount, type: "unassigned_cargo" },
             { label: "Orders with purchase problem", count: purchaseProblemsCount, type: "purchase_problem" },
             { label: "Orders with Check Problem", count: checkProblemsCount, type: "check_problem" },
             { label: "RMB Special SET with no value", count: rmbSpecialNoValueCount, type: "rmb_special_no_value" },

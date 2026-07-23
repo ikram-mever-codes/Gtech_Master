@@ -28,7 +28,7 @@ export default function Dashboard() {
 
   const [controlData, setControlData] = useState({
     orders: [
-      { label: "Order items unassigned to cargo", count: 0, type: "unassigned_cargo" },
+      { label: "Orders unassigned to cargo", count: 0, type: "unassigned_cargo" },
       { label: "Orders with purchase problem", count: 0, type: "purchase_problem" },
       { label: "Orders with Check Problem", count: 0, type: "check_problem" },
       { label: "RMB Special SET with no value", count: 0, type: "rmb_special_no_value" },
@@ -97,7 +97,7 @@ export default function Dashboard() {
   const handleNavigation = (category: string, type: string) => {
     if (category === "orders") {
       if (type === "unassigned_cargo") {
-        router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
+        router.push(`/invoices?tab=orders&filter=${type}&hide_banner=true`);
       } else if (type === "purchase_problem" || type === "check_problem") {
         router.push(`/orders?tab=problems&filter=${type}&hide_banner=true`);
       } else if (
