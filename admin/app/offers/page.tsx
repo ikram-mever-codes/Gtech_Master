@@ -34,6 +34,8 @@ import OfferDetailModal from "@/components/Offers/OfferDetailModal";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
+import { isValueMatching, isDateInPreset } from "@/app/commercial/page";
+
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
   `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
     ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
@@ -52,7 +54,7 @@ const getContrastTextColor = (hex: string): string => {
   return luminance > 0.6 ? "#111827" : "#ffffff";
 };
 
-const OffersPage: React.FC<any> = ({ embedded = false }) => {
+const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
   const { user } = useSelector((state: RootState) => state.user);
 
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -114,6 +116,50 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
     setShowDetail(true);
   };
 
+  const displayOffers = React.useMemo(() => {
+    let list = offers;
+    if (!docFilters) return list;
+    const {
+      documentNo,
+      customerNo,
+      customerName,
+      valueOperator,
+      valueAmount,
+      status,
+      datePreset,
+      dateFrom,
+      dateTo,
+    } = docFilters;
+
+    return list.filter((offer: any) => {
+      if (documentNo?.trim()) {
+        const s = documentNo.toLowerCase().trim();
+        if (!String(offer.offerNumber || "").toLowerCase().includes(s)) return false;
+      }
+      if (customerNo?.trim()) {
+        const s = customerNo.toLowerCase().trim();
+        const cNo = String(offer.customerSnapshot?.customerNumber || offer.customerSnapshot?.id || "").toLowerCase();
+        if (!cNo.includes(s)) return false;
+      }
+      if (customerName?.trim()) {
+        const s = customerName.toLowerCase().trim();
+        const cName = String(offer.customerSnapshot?.companyName || offer.customerSnapshot?.name || "").toLowerCase();
+        if (!cName.includes(s)) return false;
+      }
+      if (valueAmount?.trim()) {
+        const val = Number(offer.subtotal || offer.totalAmount || 0);
+        if (!isValueMatching(val, valueOperator, valueAmount)) return false;
+      }
+      if (status) {
+        if (String(offer.status || "").toLowerCase() !== status.toLowerCase()) return false;
+      }
+      if (datePreset && datePreset !== "all") {
+        if (!isDateInPreset(offer.createdAt, datePreset, dateFrom, dateTo)) return false;
+      }
+      return true;
+    });
+  }, [offers, docFilters]);
+
   const mainContent = (
     <>
       {!embedded && (
@@ -132,48 +178,48 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
         </div>
       )}
 
-      <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
-          <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
-          <div className="w-64 shrink-0">
-            <input
-              type="text"
-              placeholder="Search offers…"
-              value={filters.search || ""}
-              onChange={(e) =>
-                setFilters({ ...filters, search: e.target.value, page: 1 })
+      {!embedded && (
+        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
+            <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
+            <div className="w-64 shrink-0">
+              <input
+                type="text"
+                placeholder="Search offers…"
+                value={filters.search || ""}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value, page: 1 })
+                }
+                className={getInputClass(!!filters.search)}
+              />
+            </div>
+            <div className="w-48 shrink-0">
+              <select
+                value={filters.status || ""}
+                onChange={(e) =>
+                  setFilters({ ...filters, status: e.target.value, page: 1 })
+                }
+                className={getInputClass(!!filters.status, !filters.status)}
+              >
+                <option value="">All statuses</option>
+                {getOfferStatuses().map((s: any) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() =>
+                setFilters({ ...filters, search: "", status: "", page: 1 })
               }
-              className={getInputClass(!!filters.search)}
-            />
-          </div>
-          <div className="w-48 shrink-0">
-            <select
-              value={filters.status || ""}
-              onChange={(e) =>
-                setFilters({ ...filters, status: e.target.value, page: 1 })
-              }
-              className={getInputClass(!!filters.status, !filters.status)}
+              className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
             >
-              <option value="">All statuses</option>
-              {getOfferStatuses().map((s: any) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              <ArrowPathIcon className="w-4 h-4" />
+              Reset
+            </button>
           </div>
-          <button
-            onClick={() =>
-              setFilters({ ...filters, search: "", status: "", page: 1 })
-            }
-            className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-          >
-            <ArrowPathIcon className="w-4 h-4" />
-            Reset
-          </button>
-        </div>
 
-        {!embedded && (
           <div className="flex gap-2 shrink-0">
             <CustomButton
               onClick={fetchOffers}
@@ -197,8 +243,8 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
               New offer
             </CustomButton>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
         {loading ? (
@@ -240,7 +286,7 @@ const OffersPage: React.FC<any> = ({ embedded = false }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {offers.map((offer: any) => {
+                {displayOffers.map((offer: any) => {
                   const isExpanded = expandedOfferIds.has(offer.id);
                   const lineItems = offer.lineItems?.filter((li: any) => !li.isComponent) || [];
                   const rowColor = offer.highlightColor || null;

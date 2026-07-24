@@ -99,6 +99,135 @@ const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
     }`;
 };
 
+export interface CommercialFilters {
+  documentNo: string;
+  customerNo: string;
+  customerName: string;
+  valueOperator: "=" | ">" | "<";
+  valueAmount: string;
+  status: string;
+  datePreset: "all" | "today" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
+  dateFrom: string;
+  dateTo: string;
+}
+
+export const initialCommercialFilters: CommercialFilters = {
+  documentNo: "",
+  customerNo: "",
+  customerName: "",
+  valueOperator: "=",
+  valueAmount: "",
+  status: "",
+  datePreset: "all",
+  dateFrom: "",
+  dateTo: "",
+};
+
+export const isValueMatching = (
+  docValue: number,
+  operator: string,
+  enteredStr: string
+) => {
+  if (!enteredStr || enteredStr.trim() === "") return true;
+  const normalizedStr = enteredStr.replace(",", ".").trim();
+  const numVal = parseFloat(normalizedStr);
+  if (isNaN(numVal)) return true;
+
+  const docRounded = Math.round(docValue * 100) / 100;
+  const numRounded = Math.round(numVal * 100) / 100;
+
+  if (operator === "=") {
+    return Math.abs(docRounded - numRounded) < 0.01;
+  }
+  if (operator === ">" || operator === "&gt;") {
+    return docRounded > numRounded;
+  }
+  if (operator === "<" || operator === "&lt;") {
+    return docRounded < numRounded;
+  }
+  return true;
+};
+
+export const parseCustomDate = (inputStr: string, isEnd = false) => {
+  if (!inputStr || !inputStr.trim()) return null;
+  const str = inputStr.trim();
+  if (str.includes(".")) {
+    const parts = str.split(".");
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        return isEnd
+          ? new Date(year, month, day, 23, 59, 59, 999)
+          : new Date(year, month, day, 0, 0, 0, 0);
+      }
+    }
+  }
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  if (isEnd) d.setHours(23, 59, 59, 999);
+  else d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+export const isDateInPreset = (
+  dateStr: string | Date | undefined,
+  preset: string,
+  customFrom?: string,
+  customTo?: string
+) => {
+  if (!dateStr || preset === "all") return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+  if (preset === "today") {
+    return d >= startOfToday && d <= endOfToday;
+  }
+
+  if (preset === "this_month") {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return d >= startOfMonth && d <= endOfMonth;
+  }
+
+  if (preset === "last_month") {
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return d >= startOfLastMonth && d <= endOfLastMonth;
+  }
+
+  if (preset === "this_year") {
+    const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+    const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    return d >= startOfYear && d <= endOfYear;
+  }
+
+  if (preset === "last_year") {
+    const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
+    const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+    return d >= startOfLastYear && d <= endOfLastYear;
+  }
+
+  if (preset === "custom") {
+    if (customFrom) {
+      const fromD = parseCustomDate(customFrom);
+      if (fromD && d < fromD) return false;
+    }
+    if (customTo) {
+      const toD = parseCustomDate(customTo, true);
+      if (toD && d > toD) return false;
+    }
+    return true;
+  }
+
+  return true;
+};
+
 interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -330,9 +459,19 @@ const InvoiceListPage: React.FC = () => {
   const [loadingItemsAll, setLoadingItemsAll] = useState(false);
   const [loadingItemsByCategory, setLoadingItemsByCategory] = useState(false);
   const [loadingItemsBySupplier, setLoadingItemsBySupplier] = useState(false);
-  const [orderNoFilter, setOrderNoFilter] = useState<string>(
-    () => searchParams.get("order_no") || "",
-  );
+  const [docFilters, setDocFilters] = useState<CommercialFilters>(initialCommercialFilters);
+
+  const isAnyFilterActive = useMemo(() => {
+    return (
+      !!docFilters.documentNo.trim() ||
+      !!docFilters.customerNo.trim() ||
+      !!docFilters.customerName.trim() ||
+      !!docFilters.valueAmount.trim() ||
+      !!docFilters.status ||
+      docFilters.datePreset !== "all" ||
+      !!searchTerm
+    );
+  }, [docFilters, searchTerm]);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewOrder, setViewOrder] = useState<any>(null);
   const [viewItems, setViewItems] = useState<any[]>([]);
@@ -1152,27 +1291,27 @@ const InvoiceListPage: React.FC = () => {
       }
     }
 
-    if (!orderNoFilter) return allItems;
-    const s = orderNoFilter.toLowerCase();
+    if (!docFilters.documentNo) return allItems;
+    const s = docFilters.documentNo.toLowerCase();
     return allItems.filter((i) =>
       String(i.order_no).toLowerCase().includes(s) ||
       String(i.ean || i.item?.ean || "").toLowerCase().includes(s) ||
       String(i.item_name || i.itemName || i.item?.item_name || "").toLowerCase().includes(s)
     );
-  }, [orders, orderNoFilter, searchParams]);
+  }, [orders, docFilters.documentNo, searchParams]);
 
   const filteredOrders = useMemo(() => {
-    if (!orderNoFilter) return orders;
-    const s = orderNoFilter.toLowerCase();
+    if (!docFilters.documentNo) return orders;
+    const s = docFilters.documentNo.toLowerCase();
     return orders.filter((o: any) =>
       String(o.order_no).toLowerCase().includes(s) ||
       String(o.id).toLowerCase().includes(s) ||
       (o.comment || "").toLowerCase().includes(s),
     );
-  }, [orders, orderNoFilter]);
+  }, [orders, docFilters.documentNo]);
 
   const handleGoToItems = (orderNo: string) => {
-    setOrderNoFilter(orderNo);
+    setDocFilters((prev) => ({ ...prev, documentNo: orderNo }));
     setActiveInvTab("auftrag");
   };
 
@@ -1224,20 +1363,18 @@ const InvoiceListPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadInvoices();
+    fetchOrders();
+    fetchOffers();
+    fetchSuppliers();
+    fetchCategories();
+  }, [fetchOrders, fetchOffers, fetchSuppliers, fetchCategories]);
+
+  useEffect(() => {
     if (activeInvTab === "lieferschein") {
       fetchCustomers();
-    }
-    if (
-      activeInvTab === "angebot" ||
-      activeInvTab === "auftrag" ||
-      activeInvTab === "bestellung"
-    ) {
-      fetchOrders();
-      fetchOffers();
-      fetchCustomers();
-      fetchCategories();
-      fetchSuppliers();
+    } else if (activeInvTab === "rechnung" || activeInvTab === "rk") {
+      loadInvoices();
+    } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
       fetchAllItems();
     }
   }, [activeInvTab]);
@@ -1245,11 +1382,11 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", activeInvTab);
-    if (orderNoFilter) params.set("order_no", orderNoFilter);
+    if (docFilters.documentNo) params.set("order_no", docFilters.documentNo);
     else params.delete("order_no");
     const qs = params.toString();
     router.replace(qs ? `/commercial?${qs}` : "/commercial", { scroll: false });
-  }, [activeInvTab, orderNoFilter, router, searchParams]);
+  }, [activeInvTab, docFilters.documentNo, router, searchParams]);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -1268,7 +1405,7 @@ const InvoiceListPage: React.FC = () => {
     }
     const orderNo = searchParams.get("order_no");
     if (orderNo !== null) {
-      setOrderNoFilter(orderNo);
+      setDocFilters((prev) => ({ ...prev, documentNo: orderNo }));
     }
   }, [searchParams]);
 
@@ -1585,8 +1722,97 @@ const InvoiceListPage: React.FC = () => {
         }
       });
     }
-    return list;
-  }, [activeInvTab, offers, orders, invoices, searchTerm]);
+
+    const {
+      documentNo,
+      customerNo,
+      customerName,
+      valueOperator,
+      valueAmount,
+      status,
+      datePreset,
+      dateFrom,
+      dateTo,
+    } = docFilters;
+
+    return list.filter((item: any) => {
+      // 1. DocumentNo
+      if (documentNo.trim()) {
+        const s = documentNo.toLowerCase().trim();
+        const docNo = String(
+          item.offerNumber ||
+          item.order_no ||
+          item.invoiceNumber ||
+          item.id ||
+          ""
+        ).toLowerCase();
+        if (!docNo.includes(s)) return false;
+      }
+
+      // 2. CustomerNo
+      if (customerNo.trim()) {
+        const s = customerNo.toLowerCase().trim();
+        const cNo = String(
+          item.customer?.customerNumber ||
+          item.customer?.id ||
+          item.customer_id ||
+          item.customerSnapshot?.customerNumber ||
+          item.customerSnapshot?.id ||
+          ""
+        ).toLowerCase();
+        if (!cNo.includes(s)) return false;
+      }
+
+      // 3. CustomerName
+      if (customerName.trim()) {
+        const s = customerName.toLowerCase().trim();
+        const cName = String(
+          item.customer?.companyName ||
+          item.customer_name ||
+          item.bill_to ||
+          item.ship_to ||
+          item.customerSnapshot?.companyName ||
+          item.customerSnapshot?.name ||
+          ""
+        ).toLowerCase();
+        if (!cName.includes(s)) return false;
+      }
+
+      // 4. Value
+      if (valueAmount.trim()) {
+        let val = 0;
+        if (activeInvTab === "angebot") {
+          val = Number(item.subtotal || item.totalAmount || 0);
+        } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+          val = (item.items || []).reduce(
+            (sum: number, it: any) => sum + Number(it.price || 0) * Number(it.qty || 0),
+            0
+          );
+        } else {
+          val = Number(item.netTotal || item.grossTotal || 0);
+        }
+        if (!isValueMatching(val, valueOperator, valueAmount)) return false;
+      }
+
+      // 5. Status
+      if (status) {
+        const itemStatus = String(item.status || "").toLowerCase();
+        if (itemStatus !== status.toLowerCase()) return false;
+      }
+
+      // 6. Date Created
+      if (datePreset && datePreset !== "all") {
+        const docDate =
+          item.createdAt ||
+          item.created_at ||
+          item.date_created ||
+          item.invoiceDate;
+        if (!isDateInPreset(docDate, datePreset, dateFrom, dateTo)) return false;
+      }
+
+      return true;
+    });
+  }, [activeInvTab, offers, orders, invoices, searchTerm, docFilters]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1961,58 +2187,156 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
+        <div className="mb-6 p-3.5 bg-white border border-gray-200 rounded-md shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+              <FunnelIcon className="w-5 h-5 text-gray-400" />
+            </div>
+
+            <div className="w-36 shrink-0">
+              <input
+                type="text"
+                placeholder="DocumentNo..."
+                value={docFilters.documentNo}
+                onChange={(e) => setDocFilters((p) => ({ ...p, documentNo: e.target.value }))}
+                className={getInputClass(!!docFilters.documentNo)}
+              />
+            </div>
+
+            <div className="w-32 shrink-0">
+              <input
+                type="text"
+                placeholder="CustomerNo..."
+                value={docFilters.customerNo}
+                onChange={(e) => setDocFilters((p) => ({ ...p, customerNo: e.target.value }))}
+                className={getInputClass(!!docFilters.customerNo)}
+              />
+            </div>
+
+            <div className="w-40 shrink-0">
+              <input
+                type="text"
+                placeholder="CustomerName..."
+                value={docFilters.customerName}
+                onChange={(e) => setDocFilters((p) => ({ ...p, customerName: e.target.value }))}
+                className={getInputClass(!!docFilters.customerName)}
+              />
+            </div>
+
+            <div className="flex items-center gap-1 w-44 shrink-0">
+              <select
+                value={docFilters.valueOperator}
+                onChange={(e) => setDocFilters((p) => ({ ...p, valueOperator: e.target.value as any }))}
+                className="w-14 px-2 py-2 text-sm border border-gray-300 rounded-md bg-white font-bold text-gray-700 focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+              >
+                <option value="=">=</option>
+                <option value="&gt;">{">"}</option>
+                <option value="&lt;">{"<"}</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Value..."
+                value={docFilters.valueAmount}
+                onChange={(e) => setDocFilters((p) => ({ ...p, valueAmount: e.target.value }))}
+                className={getInputClass(!!docFilters.valueAmount)}
+              />
+            </div>
+
+            <div className="w-36 shrink-0">
+              <select
+                value={docFilters.status}
+                onChange={(e) => setDocFilters((p) => ({ ...p, status: e.target.value }))}
+                className={getInputClass(!!docFilters.status, !docFilters.status)}
+              >
+                <option value="" className="text-gray-400">All Statuses...</option>
+                {activeInvTab === "angebot" ? (
+                  <>
+                    <option value="draft" className="text-gray-900 font-normal">Draft</option>
+                    <option value="sent" className="text-gray-900 font-normal">Sent</option>
+                    <option value="approved" className="text-gray-900 font-normal">Approved</option>
+                    <option value="rejected" className="text-gray-900 font-normal">Rejected</option>
+                  </>
+                ) : activeInvTab === "rechnung" || activeInvTab === "rk" ? (
+                  <>
+                    <option value="draft" className="text-gray-900 font-normal">Draft</option>
+                    <option value="sent" className="text-gray-900 font-normal">Sent</option>
+                    <option value="paid" className="text-gray-900 font-normal">Paid</option>
+                    <option value="overdue" className="text-gray-900 font-normal">Overdue</option>
+                    <option value="cancelled" className="text-gray-900 font-normal">Cancelled</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="1" className="text-gray-900 font-normal">Draft / New</option>
+                    <option value="2" className="text-gray-900 font-normal">In Progress</option>
+                    <option value="3" className="text-gray-900 font-normal">Completed</option>
+                    <option value="4" className="text-gray-900 font-normal">Converted</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div className="w-40 shrink-0">
+              <select
+                value={docFilters.datePreset}
+                onChange={(e) => setDocFilters((p) => ({ ...p, datePreset: e.target.value as any }))}
+                className={getInputClass(docFilters.datePreset !== "all", docFilters.datePreset === "all")}
+              >
+                <option value="all" className="text-gray-400">All Dates...</option>
+                <option value="today" className="text-gray-900 font-normal">Today</option>
+                <option value="this_month" className="text-gray-900 font-normal">This Month</option>
+                <option value="last_month" className="text-gray-900 font-normal">Last Month</option>
+                <option value="this_year" className="text-gray-900 font-normal">This Year</option>
+                <option value="last_year" className="text-gray-900 font-normal">Last Year</option>
+                <option value="custom" className="text-gray-900 font-normal">Custom Range</option>
+              </select>
+            </div>
+
+            {isAnyFilterActive && (
+              <button
+                onClick={() => {
+                  setDocFilters(initialCommercialFilters);
+                  setSearchTerm("");
+                }}
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
+              </button>
+            )}
+          </div>
+
+          {docFilters.datePreset === "custom" && (
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
+              <span className="font-bold text-gray-500 uppercase tracking-wider">Custom Date Range:</span>
+              <div className="w-40">
+                <input
+                  type="text"
+                  placeholder="From (dd.mm.yyyy)..."
+                  value={docFilters.dateFrom}
+                  onChange={(e) => setDocFilters((p) => ({ ...p, dateFrom: e.target.value }))}
+                  className={getInputClass(!!docFilters.dateFrom)}
+                />
+              </div>
+              <span className="text-gray-400 font-bold">to</span>
+              <div className="w-40">
+                <input
+                  type="text"
+                  placeholder="To (dd.mm.yyyy)..."
+                  value={docFilters.dateTo}
+                  onChange={(e) => setDocFilters((p) => ({ ...p, dateTo: e.target.value }))}
+                  className={getInputClass(!!docFilters.dateTo)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         {activeInvTab === "angebot" && (
-          <OffersPage embedded={true} />
+          <OffersPage embedded={true} docFilters={docFilters} />
         )}
 
         {activeInvTab !== "angebot" && (
           <>
-            <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
-                <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
-                <div className="w-64 shrink-0">
-                  <input
-                    type="text"
-                    placeholder={
-                      (activeInvTab === "rechnung" || activeInvTab === "rk")
-                        ? "Search invoices, customers..."
-                        : "Search order no, customer..."
-                    }
-                    value={
-                      (activeInvTab === "rechnung" || activeInvTab === "rk")
-                        ? searchTerm
-                        : orderNoFilter
-                    }
-                    onChange={(e) => {
-                      if (activeInvTab === "rechnung" || activeInvTab === "rk") {
-                        setSearchTerm(e.target.value);
-                      } else {
-                        setOrderNoFilter(e.target.value);
-                      }
-                    }}
-                    className={getInputClass(!!(activeInvTab === "rechnung" || activeInvTab === "rk" ? searchTerm : orderNoFilter))}
-                  />
-                </div>
-                {(activeInvTab === "rechnung" || activeInvTab === "rk") && (
-                  <button
-                    onClick={() => setSearchTerm("")}
-                    className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                  >
-                    <ArrowPathIcon className="w-4 h-4" />
-                    Reset
-                  </button>
-                )}
-                {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
-                  <button
-                    onClick={() => setOrderNoFilter("")}
-                    className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                  >
-                    <ArrowPathIcon className="w-4 h-4" />
-                    Reset
-                  </button>
-                )}
-              </div>
-            </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
               <DataTable
