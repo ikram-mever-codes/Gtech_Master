@@ -34,7 +34,7 @@ import OfferDetailModal from "@/components/Offers/OfferDetailModal";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
-import { isValueMatching, isDateInPreset } from "@/app/commercial/page";
+import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
   `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
