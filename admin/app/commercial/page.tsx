@@ -217,6 +217,7 @@ const InvoiceListPage: React.FC = () => {
   );
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const [offerRefreshKey, setOfferRefreshKey] = useState(0);
 
   const handleOpenOfferModal = (id: string | null = null) => {
     setSelectedOfferId(id);
@@ -1271,6 +1272,7 @@ const InvoiceListPage: React.FC = () => {
       loadInvoices();
     } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
       fetchAllItems();
+      fetchOrders();
     }
   }, [activeInvTab]);
 
@@ -2229,7 +2231,7 @@ const InvoiceListPage: React.FC = () => {
         </div>
 
         {activeInvTab === "angebot" && (
-          <OffersPage embedded={true} docFilters={docFilters} />
+          <OffersPage embedded={true} docFilters={docFilters} onOrderConverted={fetchOrders} refreshTrigger={offerRefreshKey} />
         )}
 
         {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
@@ -3534,8 +3536,12 @@ const InvoiceListPage: React.FC = () => {
             onClose={() => {
               setShowOfferModal(false);
               setSelectedOfferId(null);
+              setOfferRefreshKey((prev) => prev + 1);
             }}
-            onChanged={fetchOffers}
+            onChanged={() => {
+              fetchOffers();
+              setOfferRefreshKey((prev) => prev + 1);
+            }}
             userRole={user?.role}
           />
         )}

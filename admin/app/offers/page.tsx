@@ -58,7 +58,7 @@ const getContrastTextColor = (hex: string): string => {
   return luminance > 0.6 ? "#111827" : "#ffffff";
 };
 
-const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
+const OffersPage: React.FC<any> = ({ embedded = false, docFilters, onOrderConverted, refreshTrigger }) => {
   const { user } = useSelector((state: RootState) => state.user);
 
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -109,7 +109,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
 
   useEffect(() => {
     fetchOffers();
-  }, [fetchOffers]);
+  }, [fetchOffers, refreshTrigger]);
 
   const openCreate = () => {
     setDetailOfferId(null);
@@ -119,8 +119,6 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
     setDetailOfferId(offer.id);
     setShowDetail(true);
   };
-
-
   const handleConvertOfferToAuftrag = async (offer: any, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
@@ -162,6 +160,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
         comment: `Converted from Offer ${offer.offerNumber}${offer.discountAmount ? ` [Discount: €${offer.discountAmount}]` : offer.discountPercentage ? ` [Discount: ${offer.discountPercentage}%]` : ""}`,
         status: 1,
         items: validItems,
+        source_offer_id: offer.id,
       };
       await createOrder(payload as any);
       try {
@@ -170,6 +169,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
       }
       toast.success(`Offer ${offer.offerNumber} converted to Auftrag!`, { id: "convert-offer-toast" });
       fetchOffers();
+      onOrderConverted?.();
     } catch (err) {
       console.error(err);
       toast.error("Failed to convert offer to Auftrag", { id: "convert-offer-toast" });
@@ -484,11 +484,10 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                               title={offer.highlightColor === "#ECEAE6" ? "Already converted to Auftrag" : "Convert Offer to Auftrag Order"}
                               onClick={(e) => handleConvertOfferToAuftrag(offer, e)}
                               disabled={offer.highlightColor === "#ECEAE6"}
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap ${
-                                offer.highlightColor === "#ECEAE6"
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
-                                  : "text-white bg-[#2F6B46] hover:bg-[#255638] cursor-pointer"
-                              }`}
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap ${offer.highlightColor === "#ECEAE6"
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                                : "text-white bg-[#2F6B46] hover:bg-[#255638] cursor-pointer"
+                                }`}
                             >
                               <MoveRight className="h-3.5 w-3.5" />
                             </button>
@@ -604,6 +603,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
           onClose={() => {
             setShowDetail(false);
             setDetailOfferId(null);
+            fetchOffers();
           }}
           onChanged={fetchOffers}
           userRole={user?.role}

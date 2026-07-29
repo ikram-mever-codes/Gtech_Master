@@ -111,7 +111,7 @@ export const createOrder = async (
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    const { category_id, customer_id, supplier_id, status, comment, items } =
+    const { category_id, customer_id, supplier_id, status, comment, items, source_offer_id } =
       req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -120,6 +120,19 @@ export const createOrder = async (
 
     const orderRepo = queryRunner.manager.getRepository(Order);
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
+
+    // Duplicate guard: if this offer was already converted, reject with 409
+    if (source_offer_id) {
+      const existingOrder = await orderRepo.findOne({
+        where: { source_offer_id },
+      });
+      if (existingOrder) {
+        throw new ErrorHandler(
+          `Auftrag ${existingOrder.order_no} already exists for this Angebot. Duplicate conversion is not allowed.`,
+          409,
+        );
+      }
+    }
 
     const lastOrder = await orderRepo
       .createQueryBuilder("o")
@@ -143,6 +156,7 @@ export const createOrder = async (
       supplier_id: supplier_id || null,
       status: status ?? 1,
       comment: comment || null,
+      source_offer_id: source_offer_id || null,
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -228,6 +242,7 @@ export const createOrder = async (
           "Unassigned",
         status: finalOrder!.status,
         comment: finalOrder!.comment,
+        source_offer_id: finalOrder!.source_offer_id || null,
         created_at: finalOrder!.created_at,
         updated_at: finalOrder!.updated_at,
         items: lines.map((oi) => ({
@@ -400,6 +415,7 @@ export const updateOrder = async (
           "Unassigned",
         status: finalOrder!.status,
         comment: finalOrder!.comment,
+        source_offer_id: finalOrder!.source_offer_id || null,
         created_at: finalOrder!.created_at,
         updated_at: finalOrder!.updated_at,
         items: freshItems.map((oi: any) => ({

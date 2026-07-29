@@ -46,6 +46,7 @@ export type CreateOrderPayload = {
   comment: string;
   items: CreateOrderItemLine[];
   status?: number;
+  source_offer_id?: string;
 };
 
 export type UpdateOrderPayload = {

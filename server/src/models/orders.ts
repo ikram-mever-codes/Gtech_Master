@@ -37,6 +37,9 @@ export class Order {
   @Column({ type: "text", nullable: true })
   comment?: string;
 
+  @Column({ name: "source_offer_id", type: "uuid", nullable: true })
+  source_offer_id?: string | null;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   date_created?: string;
 

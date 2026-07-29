@@ -807,9 +807,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       if (res?.success && res.data?.id) {
         onChanged?.();
         toast.success("Offer created successfully.", successStyles);
-        setOffer(res.data);
-        setForm(buildForm(res.data));
-        setEdit(true);
+        onClose();
       }
     } catch (e) {
       console.error("Error creating offer:", e);
