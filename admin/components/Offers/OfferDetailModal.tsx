@@ -57,6 +57,7 @@ interface OfferDetailModalProps {
   onClose: () => void;
   onChanged?: () => void;
   userRole?: UserRole;
+  fetchOffers?: any;
 }
 
 type SourceType = "inquiry" | "item";
@@ -474,6 +475,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   onClose,
   onChanged,
   userRole,
+  fetchOffers,
 }) => {
   const [offer, setOffer] = useState<any>(null);
   const displayInquiryNo =
@@ -793,7 +795,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       return !!filterCustomerId && selectedItems.length > 0;
     return false;
   };
-
   const handleCreate = async () => {
     if (!canCreate()) return;
     setCreating(true);
@@ -822,14 +823,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           itemIds: selectedItems.map((it) => String(it.id)),
         });
       }
-      if (res?.success && res.data?.id) {
-        toast.success("Offer created successfully.", successStyles);
-        onChanged?.();
-        onClose();
-      }
+      toast.success("Offer created successfully.", successStyles);
+      window.location.reload();
     } catch (e) {
       console.error("Error creating offer:", e);
-    } finally {
       setCreating(false);
     }
   };
