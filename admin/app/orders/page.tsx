@@ -1454,9 +1454,9 @@ const OrderPage: React.FC = () => {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
           const hasDim = (it.weight && parseFloat(String(it.weight)) > 0) &&
-                          (it.length && parseFloat(String(it.length)) > 0) &&
-                          (it.width && parseFloat(String(it.width)) > 0) &&
-                          (it.height && parseFloat(String(it.height)) > 0);
+            (it.length && parseFloat(String(it.length)) > 0) &&
+            (it.width && parseFloat(String(it.width)) > 0) &&
+            (it.height && parseFloat(String(it.height)) > 0);
           return it.is_dimension_special === "Y" && !hasDim;
         });
       }
@@ -1472,9 +1472,16 @@ const OrderPage: React.FC = () => {
   }, [orders, orderNoFilter, searchParams]);
 
   const filteredOrders = useMemo(() => {
-    if (!orderNoFilter) return orders;
+    let list = orders.filter(
+      (o: any) =>
+        o.status !== 1 ||
+        o.is_fulfilled ||
+        (o.comment || "").includes("[Moved to Fulfillment]") ||
+        !String(o.order_no).startsWith("MA")
+    );
+    if (!orderNoFilter) return list;
     const s = orderNoFilter.toLowerCase();
-    return orders.filter((o: any) =>
+    return list.filter((o: any) =>
       String(o.order_no).toLowerCase().includes(s) ||
       String(o.id).toLowerCase().includes(s) ||
       (o.comment || "").toLowerCase().includes(s),
@@ -2895,14 +2902,14 @@ const OrderPage: React.FC = () => {
         </div>
       )}
 
-        <OrderDetailsModal
-          isOpen={showViewModal}
-          onClose={closeView}
-          viewOrder={viewOrder}
-          viewItems={viewItems}
-          getCategoryName={getCategoryName}
-          getSupplierName={getSupplierName}
-        />
+      <OrderDetailsModal
+        isOpen={showViewModal}
+        onClose={closeView}
+        viewOrder={viewOrder}
+        viewItems={viewItems}
+        getCategoryName={getCategoryName}
+        getSupplierName={getSupplierName}
+      />
 
       {showModal && !isSOEditing && (
         <CustomModal
@@ -3505,5 +3512,4 @@ const OrderPageWrapper: React.FC = () => (
     <OrderPage />
   </Suspense>
 );
-
 export default OrderPageWrapper;

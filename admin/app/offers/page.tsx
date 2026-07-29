@@ -15,13 +15,17 @@ import {
   ChevronRight,
   ChevronDown,
   Filter,
+  MoveRight,
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
+import { toast } from "react-hot-toast";
+import { createOrder } from "@/api/orders";
 import {
   getAllOffers,
+  updateOffer,
   formatCurrency,
   getOfferStatuses,
   getOfferStatusColor,
@@ -115,6 +119,63 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
     setDetailOfferId(offer.id);
     setShowDetail(true);
   };
+
+
+  const handleConvertOfferToAuftrag = async (offer: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    if (offer.highlightColor === "#ECEAE6") {
+      toast.error(`Offer ${offer.offerNumber} has already been converted to Auftrag.`, {
+        id: "convert-offer-toast",
+        duration: 4000,
+      });
+      return;
+    }
+
+    try {
+      toast.loading(`Converting Offer ${offer.offerNumber} to Auftrag...`, { id: "convert-offer-toast" });
+      const lineItems = offer.lineItems?.filter((li: any) => !li.isComponent) || [];
+      const validItems = lineItems
+        .map((x: any) => {
+          const rawId = x.sourceItemId || x.itemId || x.item_id || x.id;
+          const numericId = rawId !== null && rawId !== undefined ? Number(rawId) : NaN;
+          if (!Number.isFinite(numericId) || numericId <= 0) return null;
+          return {
+            item_id: numericId,
+            qty: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
+            price: Number(x.basePrice || x.unitPrice || x.price || 0),
+            remark_de: x.notes || x.description || x.itemName || null,
+          };
+        })
+        .filter(Boolean);
+
+      if (validItems.length === 0) {
+        toast.error(
+          `Cannot convert "${offer.offerNumber}": none of the line items are linked to a catalog item. Please ensure items have a valid sourceItemId.`,
+          { id: "convert-offer-toast", duration: 6000 }
+        );
+        return;
+      }
+
+      const payload = {
+        customer_id: offer.customer_id || offer.customerSnapshot?.id || null,
+        comment: `Converted from Offer ${offer.offerNumber}${offer.discountAmount ? ` [Discount: €${offer.discountAmount}]` : offer.discountPercentage ? ` [Discount: ${offer.discountPercentage}%]` : ""}`,
+        status: 1,
+        items: validItems,
+      };
+      await createOrder(payload as any);
+      try {
+        await updateOffer(offer.id, { highlightColor: "#ECEAE6" });
+      } catch (_) {
+      }
+      toast.success(`Offer ${offer.offerNumber} converted to Auftrag!`, { id: "convert-offer-toast" });
+      fetchOffers();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to convert offer to Auftrag", { id: "convert-offer-toast" });
+    }
+  };
+
 
   const displayOffers = React.useMemo(() => {
     let list = offers;
@@ -418,22 +479,35 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                           className="px-4 py-3 text-center"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <button
-                            title="Download Angebot PDF"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                await downloadOfferPdf(
-                                  offer.id,
-                                  offer.offerNumber,
-                                );
-                              } catch (_) { }
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
-                          >
-                            <FileDown className="h-3.5 w-3.5" />
-                            PDF
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5 font-poppins">
+                            <button
+                              title={offer.highlightColor === "#ECEAE6" ? "Already converted to Auftrag" : "Convert Offer to Auftrag Order"}
+                              onClick={(e) => handleConvertOfferToAuftrag(offer, e)}
+                              disabled={offer.highlightColor === "#ECEAE6"}
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap ${
+                                offer.highlightColor === "#ECEAE6"
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                                  : "text-white bg-[#2F6B46] hover:bg-[#255638] cursor-pointer"
+                              }`}
+                            >
+                              <MoveRight className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              title="Download Angebot PDF"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await downloadOfferPdf(
+                                    offer.id,
+                                    offer.offerNumber,
+                                  );
+                                } catch (_) { }
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap"
+                            >
+                              <FileDown className="h-3.5 w-3.5" /> PDF
+                            </button>
+                          </div>
                         </td>
                       </tr>
 

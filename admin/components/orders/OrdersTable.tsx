@@ -7,6 +7,7 @@ import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { formatDate } from "@/utils/date";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
+import { MoveRight } from "lucide-react";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -23,6 +24,7 @@ export type OrdersTableProps = {
   canDelete: boolean;
   showConvert?: boolean;
   onConvert?: (o: any) => void;
+  onFulfill?: (o: any) => void;
   onReassign: (o: any) => void;
   activeTab: string;
   itemById: Map<string, any>;
@@ -43,6 +45,7 @@ export default function OrdersTable({
   onDelete,
   canDelete,
   onConvert,
+  onFulfill,
   onReassign,
   onGoToItems,
   activeTab,
@@ -285,7 +288,7 @@ export default function OrdersTable({
                 onReassign(row);
               }}
               title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
-              className="px-1.5 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-0.5"
+              className="px-1.5 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md flex items-center gap-0.5"
             >
               <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
             </button>
@@ -320,6 +323,23 @@ export default function OrdersTable({
   );
 
   const ActionCell = ({ row }: { row: any }) => {
+    if (activeTab === "auftrag" || activeTab === "bestellung") {
+      return (
+        <div className="flex items-center justify-center font-poppins">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onFulfill) onFulfill(row);
+              else if (onEdit) onEdit(row);
+            }}
+            title="Move to Fulfillment"
+            className="px-2.5 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md flex items-center gap-1"
+          >
+            <MoveRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
+    }
     const hasCargo = !!row.cargo_id;
     return (
       <div className="flex items-center justify-center gap-1.5">
@@ -329,7 +349,7 @@ export default function OrdersTable({
             onReassign(row);
           }}
           title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
-          className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+          className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md flex items-center gap-1"
         >
           <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
         </button>
@@ -339,7 +359,7 @@ export default function OrdersTable({
             onEdit(row);
           }}
           title="Edit Order"
-          className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+          className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
         >
           Edit
         </button>
