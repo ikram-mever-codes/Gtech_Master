@@ -766,7 +766,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       paymentTerms:
         selectedCustomer.defaultPaymentDueDays !== undefined &&
         selectedCustomer.defaultPaymentDueDays !== null
-          ? `${selectedCustomer.defaultPaymentDueDays} Tage netto`
+          ? `${selectedCustomer.defaultPaymentDueDays}`
           : f.paymentTerms,
     }));
   }, [selectedCustomer, sourceType]);
@@ -1357,7 +1357,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               inq.customer?.defaultPaymentDueDays !==
                                 undefined &&
                               inq.customer?.defaultPaymentDueDays !== null
-                                ? `${inq.customer.defaultPaymentDueDays} Tage netto`
+                                ? `${inq.customer.defaultPaymentDueDays}`
                                 : f.paymentTerms || "",
                           }));
                         }}
@@ -1717,7 +1717,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </select>
                   </Field>
                   <Field
-                    label="Payment terms"
+                    label="Payment Due Days"
                     edit={edit}
                     value={offer.paymentTerms}
                   >
@@ -2503,7 +2503,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <Field
+                    {/* <Field
                       label="Discount %"
                       edit={edit}
                       value={`${offer.discountPercentage || 0}%`}
@@ -2512,7 +2512,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         value={form.discountPercentage}
                         onCommit={(raw) => patch({ discountPercentage: raw })}
                       />
-                    </Field>
+                    </Field> */}
                     <Field
                       label="Shipping cost"
                       edit={edit}
