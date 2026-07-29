@@ -1975,9 +1975,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
                               Pos
                             </th>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-24">
-                              Art
-                            </th>
                             <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
                               Art.-Nr.
                             </th>
@@ -1993,21 +1990,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
                               Menge
                             </th>
-                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-24">
-                              Zusatzgew.
-                            </th>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-36">
-                              Liefer-Datum
-                            </th>
+
                             <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                               Netto-Preis
                             </th>
                             <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                               Netto gesamt
                             </th>
-                            <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
-                              Line color
-                            </th>
+
                             {edit && <th className="w-10" />}
                           </tr>
                         </thead>
@@ -2015,7 +2005,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           {visibleLineItems.length === 0 && (
                             <tr>
                               <td
-                                colSpan={edit ? 13 : 12}
+                                colSpan={edit ? 9 : 8}
                                 className="text-center py-6 text-sm text-gray-500"
                               >
                                 No line items yet.
@@ -2028,13 +2018,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             const qtyDisplay = Math.round(
                               parseFlexibleNumber(item.baseQuantity) ?? 1,
                             );
-                            const rowColor = item.highlightColor || null;
+                            const rowColor =
+                              item.highlightColor ||
+                              (freetext ? "#D8964A" : null);
                             return (
                               <tr
                                 key={item.id}
-                                className={
-                                  !rowColor && freetext ? "bg-gray-50/70" : ""
-                                }
                                 style={
                                   rowColor
                                     ? { backgroundColor: rowColor }
@@ -2043,17 +2032,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               >
                                 <td className="px-2 py-2 text-gray-500">
                                   {item.position}
-                                </td>
-                                <td className="px-2 py-2">
-                                  <span
-                                    className={`text-[11px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${
-                                      freetext
-                                        ? "bg-gray-200 text-gray-700"
-                                        : "bg-blue-50 text-blue-700"
-                                    }`}
-                                  >
-                                    {freetext ? "Freitext" : "Artikel"}
-                                  </span>
                                 </td>
                                 <td className="px-2 py-2">
                                   {edit ? (
@@ -2117,60 +2095,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-2 py-2">
-                                  {edit ? (
-                                    <input
-                                      type="text"
-                                      inputMode="decimal"
-                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
-                                      defaultValue={
-                                        item.extraWeight === null ||
-                                        item.extraWeight === undefined
-                                          ? ""
-                                          : String(item.extraWeight)
-                                      }
-                                      placeholder="0"
-                                      onBlur={(e) =>
-                                        persistLine(item.id, {
-                                          extraWeight:
-                                            e.target.value.trim() === ""
-                                              ? "0"
-                                              : e.target.value,
-                                        })
-                                      }
-                                    />
-                                  ) : (
-                                    <div className="text-right text-gray-600">
-                                      {formatWeight(
-                                        parseFlexibleNumber(item.extraWeight) ??
-                                          0,
-                                      )}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-2 py-2">
-                                  {edit ? (
-                                    <input
-                                      type="date"
-                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded"
-                                      defaultValue={toDateInputValue(
-                                        item.expectedDeliveryDate,
-                                      )}
-                                      onChange={(e) =>
-                                        persistLine(item.id, {
-                                          expectedDeliveryDate:
-                                            e.target.value || null,
-                                        })
-                                      }
-                                    />
-                                  ) : (
-                                    <span className="text-gray-600">
-                                      {item.expectedDeliveryDate
-                                        ? formatDate(item.expectedDeliveryDate)
-                                        : "—"}
-                                    </span>
-                                  )}
-                                </td>
+
                                 <td className="px-2 py-2">
                                   {edit ? (
                                     <DecimalInput
@@ -2196,46 +2121,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 <td className="px-2 py-2 text-right font-medium">
                                   {formatCurrency(total || 0, offer.currency)}
                                 </td>
-                                <td className="px-2 py-2 text-center">
-                                  {edit ? (
-                                    <div className="flex items-center justify-center gap-1">
-                                      <input
-                                        type="color"
-                                        className="w-7 h-7 p-0 border border-gray-300 rounded cursor-pointer"
-                                        value={item.highlightColor || "#ffffff"}
-                                        onChange={(e) =>
-                                          persistLine(item.id, {
-                                            highlightColor: e.target.value,
-                                          })
-                                        }
-                                        title="Row highlight color"
-                                      />
-                                      {item.highlightColor && (
-                                        <button
-                                          onClick={() =>
-                                            persistLine(item.id, {
-                                              highlightColor: null,
-                                            })
-                                          }
-                                          className="text-gray-400 hover:text-gray-600 text-xs"
-                                          title="Clear color"
-                                        >
-                                          ×
-                                        </button>
-                                      )}
-                                    </div>
-                                  ) : item.highlightColor ? (
-                                    <span
-                                      className="inline-block w-4 h-4 rounded border border-gray-300 mx-auto"
-                                      style={{
-                                        backgroundColor: item.highlightColor,
-                                      }}
-                                      title={item.highlightColor}
-                                    />
-                                  ) : (
-                                    <span className="text-gray-300">—</span>
-                                  )}
-                                </td>
+
                                 {edit && (
                                   <td className="px-2 py-2 text-center">
                                     <button
@@ -2256,26 +2142,19 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <td className="px-2 py-2 text-gray-400">
                               {visibleLineItems.length + 1}
                             </td>
-                            <td className="px-2 py-2">
-                              <span className="text-[11px] px-1.5 py-0.5 rounded font-medium bg-gray-300 text-gray-800 whitespace-nowrap">
-                                Versand
-                              </span>
-                            </td>
                             <td className="px-2 py-2 text-gray-400">—</td>
                             <td className="px-2 py-2 text-gray-700">
                               {offer.shippingMethod || "No shipping method set"}
                             </td>
-                            <td className="px-2 py-2 text-gray-400">—</td>
+
+                            <td className="px-0 py-2 text-center text-gray-400"></td>
                             <td className="px-2 py-2 text-center text-gray-600">
                               {offer.taxRate ?? 19}%
                             </td>
                             <td className="px-2 py-2 text-right text-gray-600">
                               1
                             </td>
-                            <td className="px-2 py-2 text-right text-gray-400">
-                              —
-                            </td>
-                            <td className="px-2 py-2 text-gray-400">—</td>
+
                             <td className="px-2 py-2 text-right text-gray-600">
                               {formatCurrency(
                                 offer.shippingCost || 0,
@@ -2288,15 +2167,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 offer.currency,
                               )}
                             </td>
-                            <td className="px-2 py-2 text-center text-gray-400">
-                              —
-                            </td>
                             {edit && <td />}
                           </tr>
                         </tbody>
                       </table>
                     </div>
-
                     {edit && (
                       <div className="space-y-3">
                         <div className="flex flex-wrap gap-2">

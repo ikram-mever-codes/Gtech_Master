@@ -448,18 +448,6 @@ export class UpdateLineItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  extraWeight?: number | string;
-
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  expectedDeliveryDate?: Date;
-
-  @IsOptional()
-  @IsString()
-  highlightColor?: string;
 }
 
 export class BulkUpdateLineItemsDto {
@@ -471,9 +459,6 @@ export class BulkUpdateLineItemsDto {
     samplePrice?: number | string;
     lineTotal?: number | string;
     notes?: string;
-    extraWeight?: number | string;
-    expectedDeliveryDate?: string | Date;
-    highlightColor?: string;
   }>;
 }
 
@@ -636,18 +621,6 @@ export class CreateLineItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  extraWeight?: number | string;
-
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  expectedDeliveryDate?: Date;
-
-  @IsOptional()
-  @IsString()
-  highlightColor?: string;
 
   @IsOptional()
   weight?: number | string;
@@ -1265,8 +1238,6 @@ export class OfferController {
         ) + 1;
       const basePrice = parseFlexibleNumber(body.basePrice) ?? 0;
       const baseQuantity = body.baseQuantity?.trim() || "1";
-      const extraWeight = parseFlexibleNumber(body.extraWeight);
-      const expectedDeliveryDate = coerceDate(body.expectedDeliveryDate);
       const weight = parseFlexibleNumber(body.weight);
 
       const lineItem = this.lineItemRepository.create({
@@ -1281,9 +1252,6 @@ export class OfferController {
         notes: body.notes,
         position: nextPosition,
         priceMatrix: offer.pricingMode === "matrix" ? [] : undefined,
-        extraWeight: extraWeight ?? undefined,
-        expectedDeliveryDate,
-        highlightColor: body.highlightColor,
         weight: weight ?? undefined,
         sourceItemId: body.sourceItemId || undefined,
         lineTotal:
@@ -2047,15 +2015,7 @@ export class OfferController {
       ) {
         (updateLineItemDto as any).baseQuantity = "1";
       }
-      if (updateLineItemDto.extraWeight !== undefined) {
-        (updateLineItemDto as any).extraWeight =
-          parseFlexibleNumber(updateLineItemDto.extraWeight) ?? undefined;
-      }
-      if (updateLineItemDto.expectedDeliveryDate !== undefined) {
-        (updateLineItemDto as any).expectedDeliveryDate = coerceDate(
-          updateLineItemDto.expectedDeliveryDate,
-        );
-      }
+
       Object.assign(lineItem, updateLineItemDto);
 
       if (offer.pricingMode === "matrix" && lineItem.priceMatrix?.length) {
@@ -2246,15 +2206,11 @@ export class OfferController {
               itemUpdate.lineTotal,
             );
           if (itemUpdate.notes !== undefined) lineItem.notes = itemUpdate.notes;
-          if (itemUpdate.extraWeight !== undefined)
-            lineItem.extraWeight =
-              parseFlexibleNumber(itemUpdate.extraWeight) ?? undefined;
+
           if (itemUpdate.expectedDeliveryDate !== undefined)
             lineItem.expectedDeliveryDate = coerceDate(
               itemUpdate.expectedDeliveryDate,
             );
-          if (itemUpdate.highlightColor !== undefined)
-            lineItem.highlightColor = itemUpdate.highlightColor;
 
           const updatedItem = await this.lineItemRepository.save(lineItem);
           results.push(updatedItem);

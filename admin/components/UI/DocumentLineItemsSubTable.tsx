@@ -41,7 +41,9 @@ export interface DocumentLineItemsSubTableProps {
   getOrderStatusColor?: (status: any) => string;
 }
 
-export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps> = ({
+export const DocumentLineItemsSubTable: React.FC<
+  DocumentLineItemsSubTableProps
+> = ({
   items = [],
   currency = "EUR",
   title,
@@ -53,19 +55,7 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
   const visibleItems = items.filter((it: any) => !it.isComponent);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm font-poppins select-text">
-      <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
-        <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          {title || `Line Items (${visibleItems.length})`}
-        </h4>
-        {totalAmount !== undefined && (
-          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-            Total: {type === "offer" ? formatCurrency(totalAmount, currency) : `€${totalAmount.toFixed(2)}`}
-          </span>
-        )}
-      </div>
-
+    <div className="bg-white rounded-xl border border-gray-200 p-0 shadow-sm font-poppins select-text">
       {visibleItems.length === 0 ? (
         <p className="text-xs text-gray-400 italic py-3 text-center">
           No line items in this document.
@@ -84,7 +74,9 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
                 <th className="px-3 py-2 text-right">Total</th>
                 {type === "order" && <th className="px-3 py-2">Supplier</th>}
                 <th className="px-3 py-2 text-center">Status</th>
-                {type === "order" && <th className="px-3 py-2 text-center">Cargo ID</th>}
+                {type === "order" && (
+                  <th className="px-3 py-2 text-center">Cargo ID</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -105,27 +97,27 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
 
                 const uPrice = Number(
                   activePrice?.unitPrice ??
-                  activePrice?.price ??
-                  it.rmb_special_price ??
-                  it.rmb_price ??
-                  it.unitPrice ??
-                  it.price ??
-                  0
+                    activePrice?.price ??
+                    it.rmb_special_price ??
+                    it.rmb_price ??
+                    it.unitPrice ??
+                    it.price ??
+                    0,
                 );
 
                 const qtyVal = Number(
                   activePrice?.quantity ||
-                  it.qty ||
-                  it.quantity ||
-                  it.baseQuantity ||
-                  1
+                    it.qty ||
+                    it.quantity ||
+                    it.baseQuantity ||
+                    1,
                 );
 
                 const tPrice = Number(
                   activePrice?.totalPrice ??
-                  it.total ??
-                  it.totalPrice ??
-                  uPrice * qtyVal
+                    it.total ??
+                    it.totalPrice ??
+                    uPrice * qtyVal,
                 );
 
                 const sname =
@@ -137,7 +129,7 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
                 const statusBadge = getOrderStatusColor ? (
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getOrderStatusColor(
-                      statusVal
+                      statusVal,
                     )}`}
                   >
                     {statusVal}
@@ -149,7 +141,10 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
                 );
 
                 return (
-                  <tr key={it.id || idx} className="hover:bg-gray-50/80 transition-colors">
+                  <tr
+                    key={it.id || idx}
+                    className="hover:bg-gray-50/80 transition-colors"
+                  >
                     <td className="px-3 py-2 text-center font-mono text-gray-400">
                       {idx + 1}
                     </td>
@@ -161,7 +156,10 @@ export const DocumentLineItemsSubTable: React.FC<DocumentLineItemsSubTableProps>
                     <td className="px-3 py-2 font-semibold text-gray-900">
                       {name}
                     </td>
-                    <td className="px-3 py-2 text-gray-500 max-w-[200px] truncate" title={it.remarks || it.remark || it.description || ""}>
+                    <td
+                      className="px-3 py-2 text-gray-500 max-w-[200px] truncate"
+                      title={it.remarks || it.remark || it.description || ""}
+                    >
                       {it.remarks || it.remark || it.description || "-"}
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-gray-700">

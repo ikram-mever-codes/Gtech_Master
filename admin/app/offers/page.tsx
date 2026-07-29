@@ -37,11 +37,12 @@ import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable
 import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
-  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
+  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
   }`;
 
 const getContrastTextColor = (hex: string): string => {
@@ -134,16 +135,29 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
     return list.filter((offer: any) => {
       if (documentNo?.trim()) {
         const s = documentNo.toLowerCase().trim();
-        if (!String(offer.offerNumber || "").toLowerCase().includes(s)) return false;
+        if (
+          !String(offer.offerNumber || "")
+            .toLowerCase()
+            .includes(s)
+        )
+          return false;
       }
       if (customerNo?.trim()) {
         const s = customerNo.toLowerCase().trim();
-        const cNo = String(offer.customerSnapshot?.customerNumber || offer.customerSnapshot?.id || "").toLowerCase();
+        const cNo = String(
+          offer.customerSnapshot?.customerNumber ||
+            offer.customerSnapshot?.id ||
+            "",
+        ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
       if (customerName?.trim()) {
         const s = customerName.toLowerCase().trim();
-        const cName = String(offer.customerSnapshot?.companyName || offer.customerSnapshot?.name || "").toLowerCase();
+        const cName = String(
+          offer.customerSnapshot?.companyName ||
+            offer.customerSnapshot?.name ||
+            "",
+        ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
       if (valueAmount?.trim()) {
@@ -151,10 +165,12 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
         if (!isValueMatching(val, valueOperator, valueAmount)) return false;
       }
       if (status) {
-        if (String(offer.status || "").toLowerCase() !== status.toLowerCase()) return false;
+        if (String(offer.status || "").toLowerCase() !== status.toLowerCase())
+          return false;
       }
       if (datePreset && datePreset !== "all") {
-        if (!isDateInPreset(offer.createdAt, datePreset, dateFrom, dateTo)) return false;
+        if (!isDateInPreset(offer.createdAt, datePreset, dateFrom, dateTo))
+          return false;
       }
       return true;
     });
@@ -288,7 +304,8 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
               <tbody className="divide-y divide-gray-200">
                 {displayOffers.map((offer: any) => {
                   const isExpanded = expandedOfferIds.has(offer.id);
-                  const lineItems = offer.lineItems?.filter((li: any) => !li.isComponent) || [];
+                  const lineItems =
+                    offer.lineItems?.filter((li: any) => !li.isComponent) || [];
                   const rowColor = offer.highlightColor || null;
                   const rowTextColor = rowColor
                     ? getContrastTextColor(rowColor)
@@ -298,8 +315,9 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                     <React.Fragment key={offer.id}>
                       <tr
                         onClick={() => openDetail(offer)}
-                        className={`transition-colors cursor-pointer ${rowColor ? "" : "hover:bg-gray-50"
-                          }`}
+                        className={`transition-colors cursor-pointer ${
+                          rowColor ? "" : "hover:bg-gray-50"
+                        }`}
                         style={
                           rowColor
                             ? { backgroundColor: rowColor, color: rowTextColor }
@@ -313,7 +331,13 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                           <ExpandRowArrow
                             isExpanded={isExpanded}
                             isEmpty={lineItems.length === 0}
-                            title={lineItems.length === 0 ? "No items in this offer" : isExpanded ? "Collapse items" : "Expand items"}
+                            title={
+                              lineItems.length === 0
+                                ? "No items in this offer"
+                                : isExpanded
+                                  ? "Collapse items"
+                                  : "Expand items"
+                            }
                             onToggle={(e) => toggleExpandOffer(offer.id, e)}
                           />
                         </td>
@@ -330,22 +354,25 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                             {rowColor && offer.offerNumber}
                             {offer.revision > 1 && (
                               <span
-                                className={`ml-2 text-xs ${rowColor ? "" : "text-gray-500"
-                                  }`}
+                                className={`ml-2 text-xs ${
+                                  rowColor ? "" : "text-gray-500"
+                                }`}
                               >
                                 Rev. {offer.revision}
                               </span>
                             )}
                           </div>
                           <div
-                            className={`text-sm truncate max-w-[16rem] ${rowColor ? "" : "text-gray-600"
-                              }`}
+                            className={`text-sm truncate max-w-[16rem] ${
+                              rowColor ? "" : "text-gray-600"
+                            }`}
                           >
                             {offer.title}
                           </div>
                           <div
-                            className={`text-xs mt-1 flex items-center gap-2 ${rowColor ? "opacity-80" : "text-gray-400"
-                              }`}
+                            className={`text-xs mt-1 flex items-center gap-2 ${
+                              rowColor ? "opacity-80" : "text-gray-400"
+                            }`}
                           >
                             Created {formatDate(offer.createdAt)}
                             {offer.useUnitPrices && (
@@ -358,20 +385,23 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <BuildingOfficeIcon
-                              className={`h-4 w-4 ${rowColor ? "opacity-70" : "text-gray-400"
-                                }`}
+                              className={`h-4 w-4 ${
+                                rowColor ? "opacity-70" : "text-gray-400"
+                              }`}
                             />
                             <div
-                              className={`text-sm font-medium truncate max-w-[12rem] ${rowColor ? "" : "text-gray-900"
-                                }`}
+                              className={`text-sm font-medium truncate max-w-[12rem] ${
+                                rowColor ? "" : "text-gray-900"
+                              }`}
                             >
                               {offer.customerSnapshot?.companyName}
                             </div>
                           </div>
                           {offer.customerSnapshot?.vatId && (
                             <div
-                              className={`text-xs mt-0.5 ${rowColor ? "opacity-80" : "text-gray-500"
-                                }`}
+                              className={`text-xs mt-0.5 ${
+                                rowColor ? "opacity-80" : "text-gray-500"
+                              }`}
                             >
                               VAT: {offer.customerSnapshot.vatId}
                             </div>
@@ -385,8 +415,9 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                             )}
                           </div>
                           <div
-                            className={`text-xs ${rowColor ? "opacity-80" : "text-gray-500"
-                              }`}
+                            className={`text-xs ${
+                              rowColor ? "opacity-80" : "text-gray-500"
+                            }`}
                           >
                             {lineItems.length} items
                           </div>
@@ -402,12 +433,14 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                             </span>
                             {offer.validUntil && (
                               <div
-                                className={`flex items-center gap-1 text-xs ${rowColor ? "opacity-80" : "text-gray-600"
-                                  }`}
+                                className={`flex items-center gap-1 text-xs ${
+                                  rowColor ? "opacity-80" : "text-gray-600"
+                                }`}
                               >
                                 <CalendarIcon
-                                  className={`h-3 w-3 ${rowColor ? "" : "text-gray-500"
-                                    }`}
+                                  className={`h-3 w-3 ${
+                                    rowColor ? "" : "text-gray-500"
+                                  }`}
                                 />
                                 {formatDate(offer.validUntil)}
                               </div>
@@ -427,7 +460,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                                   offer.id,
                                   offer.offerNumber,
                                 );
-                              } catch (_) { }
+                              } catch (_) {}
                             }}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors whitespace-nowrap"
                           >
@@ -443,7 +476,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                             <DocumentLineItemsSubTable
                               items={lineItems}
                               currency={offer.currency}
-                              title={`Line Items List (${lineItems.length}) — Offer ${offer.offerNumber}`}
+                              title={``}
                               totalAmount={offer.totalAmount}
                               type="offer"
                             />
@@ -486,10 +519,11 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                       setCurrentPage(p);
                       setFilters({ ...filters, page: p });
                     }}
-                    className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
-                      ? "bg-gray-600 text-white"
-                      : "bg-white border border-gray-300 hover:bg-gray-50"
-                      }`}
+                    className={`px-2 py-1 text-sm rounded-lg ${
+                      currentPage === p
+                        ? "bg-gray-600 text-white"
+                        : "bg-white border border-gray-300 hover:bg-gray-50"
+                    }`}
                   >
                     {p}
                   </button>
