@@ -382,7 +382,11 @@ const OffersPage: React.FC<any> = ({
         if (!cName.includes(s)) return false;
       }
       if (valueAmount?.trim()) {
-        const val = Number(offer.subtotal || offer.totalAmount || 0);
+        const val = Number(
+          offer.totalAmount !== undefined && offer.totalAmount !== null
+            ? offer.totalAmount
+            : offer.subtotal || 0,
+        );
         if (!isValueMatching(val, valueOperator, valueAmount)) return false;
       }
       if (status) {

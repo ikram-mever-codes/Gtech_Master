@@ -1791,7 +1791,11 @@ const InvoiceListPage: React.FC = () => {
       if (valueAmount.trim()) {
         let val = 0;
         if (activeInvTab === "angebot") {
-          val = Number(item.subtotal || item.totalAmount || 0);
+          val = Number(
+            item.totalAmount !== undefined && item.totalAmount !== null
+              ? item.totalAmount
+              : item.subtotal || 0,
+          );
         } else if (
           activeInvTab === "auftrag" ||
           activeInvTab === "bestellung"
@@ -2057,7 +2061,11 @@ const InvoiceListPage: React.FC = () => {
         render: (row) => {
           let val = 0;
           if (activeInvTab === "angebot") {
-            val = Number(row.subtotal || row.totalAmount || 0);
+            val = Number(
+              row.totalAmount !== undefined && row.totalAmount !== null
+                ? row.totalAmount
+                : row.subtotal || 0,
+            );
           } else if (
             activeInvTab === "auftrag" ||
             activeInvTab === "bestellung"
