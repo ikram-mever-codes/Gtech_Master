@@ -555,17 +555,23 @@ const InvoiceListPage: React.FC = () => {
 
   const handleMoveToFulfillment = async (order: any) => {
     try {
-      toast.loading(`Moving order ${order.order_no} to Fulfillment...`, { id: "fulfill-order-toast" });
+      toast.loading(`Moving order ${order.order_no} to Fulfillment...`, {
+        id: "fulfill-order-toast",
+      });
       await updateOrder(order.id, {
         status: 2,
         comment: `${order.comment || ""} [Moved to Fulfillment]`.trim(),
         is_fulfilled: true,
       } as any);
-      toast.success(`Order ${order.order_no} moved to Fulfillment!`, { id: "fulfill-order-toast" });
+      toast.success(`Order ${order.order_no} moved to Fulfillment!`, {
+        id: "fulfill-order-toast",
+      });
       fetchOrders();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to move order to Fulfillment", { id: "fulfill-order-toast" });
+      toast.error("Failed to move order to Fulfillment", {
+        id: "fulfill-order-toast",
+      });
     }
   };
 
@@ -1675,7 +1681,7 @@ const InvoiceListPage: React.FC = () => {
           String(o.order_no).startsWith("MA") &&
           o.status !== 2 &&
           !o.is_fulfilled &&
-          !(o.comment || "").includes("[Moved to Fulfillment]")
+          !(o.comment || "").includes("[Moved to Fulfillment]"),
       );
     } else if (activeInvTab === "bestellung") {
       list = orders.filter(
@@ -1683,7 +1689,7 @@ const InvoiceListPage: React.FC = () => {
           !String(o.order_no).startsWith("MA") &&
           o.status !== 2 &&
           !o.is_fulfilled &&
-          !(o.comment || "").includes("[Moved to Fulfillment]")
+          !(o.comment || "").includes("[Moved to Fulfillment]"),
       );
     } else if (activeInvTab === "rechnung") {
       list = invoices.filter(
@@ -2107,15 +2113,11 @@ const InvoiceListPage: React.FC = () => {
                 </button>
               </div>
             );
-<<<<<<< HEAD
           } else if (
             activeInvTab === "auftrag" ||
             activeInvTab === "bestellung"
           ) {
             const hasCargo = !!row.cargo_id;
-=======
-          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
->>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
             return (
               <div className="flex items-center justify-center font-poppins">
                 <button
@@ -2495,49 +2497,20 @@ const InvoiceListPage: React.FC = () => {
         </div>
 
         {activeInvTab === "angebot" && (
-          <OffersPage embedded={true} docFilters={docFilters} onOrderConverted={fetchOrders} refreshTrigger={offerRefreshKey} />
+          <OffersPage
+            embedded={true}
+            docFilters={docFilters}
+            onOrderConverted={fetchOrders}
+            refreshTrigger={offerRefreshKey}
+          />
         )}
 
-<<<<<<< HEAD
         {activeInvTab !== "angebot" && (
-=======
-        {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
-            <OrdersTable
-              orders={currentItems}
-              loading={loadingOrders}
-              getCategoryName={getCategoryName}
-              getSupplierName={getSupplierName}
-              getOrderStatusColor={getOrderStatusColor}
-              onView={(o) => {
-                setViewOrder(o);
-                setViewItems(o.items || []);
-                setShowViewModal(true);
-              }}
-              onFulfill={handleMoveToFulfillment}
-              onEdit={handleEditOrder}
-              onDelete={handleDeleteOrder}
-              canDelete={user?.role === UserRole.ADMIN}
-              onGoToItems={handleGoToItems}
-              onReassign={handleOpenReassignModal}
-              activeTab={activeInvTab}
-              itemById={itemById}
-              onSplit={handleOpenSplitModal}
-              suppliers={suppliers}
-              onAssignSupplier={handleAssignSupplier}
-              router={router}
-            />
-          </div>
-        )}
-
-        {activeInvTab !== "angebot" && activeInvTab !== "auftrag" && activeInvTab !== "bestellung" && (
->>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
           <>
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
               <DataTable
                 data={currentItems}
                 columns={commercialColumns}
-<<<<<<< HEAD
                 loading={
                   activeInvTab === "auftrag" || activeInvTab === "bestellung"
                     ? loadingOrders
@@ -2568,21 +2541,11 @@ const InvoiceListPage: React.FC = () => {
                   const docNumber = isOrder
                     ? row.order_no
                     : row.invoiceNumber || row.id;
-=======
-                loading={loading}
-                emptyMessage="No Invoices Found"
-                getRowClassName={() => ""}
-                expandedRowIds={expandedDocIds}
-                renderRowDetails={(row) => {
-                  const items = row.items || row.lineItems || [];
-                  const docNumber = row.invoiceNumber || row.id;
->>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
 
                   return (
                     <DocumentLineItemsSubTable
                       items={items}
                       currency={row.currency || "EUR"}
-<<<<<<< HEAD
                       title={`Line Items (${items.length}) — ${isOrder ? `Order No: ${docNumber}` : `Invoice: ${docNumber}`}`}
                       totalAmount={Number(
                         row.subtotal ||
@@ -2592,18 +2555,12 @@ const InvoiceListPage: React.FC = () => {
                           0,
                       )}
                       type={isOrder ? "order" : "invoice"}
-=======
-                      title={`Line Items (${items.length}) — Invoice: ${docNumber}`}
-                      totalAmount={Number(row.subtotal || row.netTotal || row.grossTotal || row.totalAmount || 0)}
-                      type="invoice"
->>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
                       getSupplierName={getSupplierName}
                       getOrderStatusColor={getOrderStatusColor}
                     />
                   );
                 }}
                 onRowClick={(row) => {
-<<<<<<< HEAD
                   if (
                     activeInvTab === "auftrag" ||
                     activeInvTab === "bestellung"
@@ -2612,9 +2569,6 @@ const InvoiceListPage: React.FC = () => {
                   } else {
                     handleOpenInvoiceDetails(row);
                   }
-=======
-                  handleOpenInvoiceDetails(row);
->>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
                 }}
               />
 
@@ -4105,9 +4059,4 @@ const InvoiceListPageWrapper: React.FC = () => (
     <InvoiceListPage />
   </Suspense>
 );
-<<<<<<< HEAD
 export default InvoiceListPageWrapper;
-=======
-
-export default InvoiceListPageWrapper;
->>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
