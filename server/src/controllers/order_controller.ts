@@ -127,66 +127,32 @@ export const createOrder = async (
     const orderRepo = queryRunner.manager.getRepository(Order);
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
-    let order: Order;
-    let existingOrder: Order | null = null;
-
-    if (source_offer_id) {
-      existingOrder = await orderRepo.findOne({
-        where: { source_offer_id },
-      });
-    }
-
     const seqKey = "order";
-
-    if (existingOrder) {
-      order = existingOrder;
-      order.customer_id = customer_id || order.customer_id || null;
-      order.category_id = category_id || order.category_id || null;
-      order.supplier_id = supplier_id || order.supplier_id || null;
-      order.comment = comment || order.comment || null;
-      order.status = status ?? order.status ?? 1;
-      order.updated_at = new Date();
-
-      if (!order.order_no || (!order.order_no.startsWith("B") && !order.order_no.startsWith("MA"))) {
-        try {
-          order.order_no = await NumberSequenceService.getNextNumber(seqKey);
-        } catch (_) {
-          const now = new Date();
-          const yy = String(now.getFullYear()).slice(-2);
-          const mm = String(now.getMonth() + 1).padStart(2, "0");
-          order.order_no = `B${yy}${mm}-1`;
-        }
-      }
-
-      await orderRepo.save(order);
-      await orderItemsRepo.delete({ order_id: order.id });
-    } else {
-      let generatedorder_no = "";
-      try {
-        generatedorder_no = await NumberSequenceService.getNextNumber(seqKey);
-      } catch (e) {
-        const now = new Date();
-        const yy = String(now.getFullYear()).slice(-2);
-        const mm = String(now.getMonth() + 1).padStart(2, "0");
-        generatedorder_no = `B${yy}${mm}-1`;
-      }
-
+    let generatedorder_no = "";
+    try {
+      generatedorder_no = await NumberSequenceService.getNextNumber(seqKey);
+    } catch (e) {
       const now = new Date();
-      order = orderRepo.create({
-        order_no: generatedorder_no,
-        category_id: category_id || null,
-        customer_id: customer_id || null,
-        supplier_id: supplier_id || null,
-        status: status ?? 1,
-        comment: comment || null,
-        source_offer_id: source_offer_id || null,
-        date_created: now.toISOString(),
-        created_at: now,
-        updated_at: now,
-      });
-
-      await orderRepo.save(order);
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      generatedorder_no = `B${yy}${mm}-1`;
     }
+
+    const now = new Date();
+    const order = orderRepo.create({
+      order_no: generatedorder_no,
+      category_id: category_id || null,
+      customer_id: customer_id || null,
+      supplier_id: supplier_id || null,
+      status: status ?? 1,
+      comment: comment || null,
+      source_offer_id: source_offer_id || null,
+      date_created: now.toISOString(),
+      created_at: now,
+      updated_at: now,
+    });
+
+    await orderRepo.save(order);
 
     const itemRepo = queryRunner.manager.getRepository(Item);
     const supplierItemRepo = queryRunner.manager.getRepository(SupplierItem);
