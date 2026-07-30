@@ -35,6 +35,7 @@ import {
 } from "@/api/offers";
 import { formatDate } from "@/utils/offers";
 import { parseFlexibleNumber } from "@/utils/decimal";
+import { BASE_URL } from "@/utils/constants";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 
@@ -64,6 +65,27 @@ const getContrastTextColor = (hex: string): string => {
   return luminance > 0.6 ? "#111827" : "#ffffff";
 };
 
+const resolveThumbUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (url.includes("cloudinary.com")) return url;
+  if (url.includes("/uploads/")) {
+    const fileName = url.split("/uploads/").pop();
+    try {
+      const apiOrigin = new URL(BASE_URL).origin;
+      return `${apiOrigin}/uploads/${fileName}`;
+    } catch {
+      return url;
+    }
+  }
+  return url;
+};
+
+/** Thumbnail for an offer line item — the line item's own `photo` column
+ * (populated from the source Item at offer-creation time; see
+ * createOfferFromItem / the getOfferById backfill). */
+const getLineItemThumb = (item: any): string | null =>
+  resolveThumbUrl(item?.photo || null);
+
 // --- Mirrors the classic-mode line items table in OfferDetailModal --------
 // Kept here (read-only) so the expanded row on the Offers list looks
 // identical to what you see inside the offer detail modal, instead of the
@@ -85,6 +107,9 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
     <table className="w-full text-sm">
       <thead className="bg-gray-100 border-b border-gray-200">
         <tr>
+          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
+            Pic
+          </th>
           <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
             Pos
           </th>
@@ -114,7 +139,7 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
       <tbody className="divide-y divide-gray-200">
         {lineItems.length === 0 && (
           <tr>
-            <td colSpan={8} className="text-center py-6 text-sm text-gray-500">
+            <td colSpan={9} className="text-center py-6 text-sm text-gray-500">
               No line items yet.
             </td>
           </tr>
@@ -126,11 +151,28 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
             parseFlexibleNumber(item.baseQuantity) ?? 1,
           );
           const rowColor = item.highlightColor || (freetext ? "#D8964A" : null);
+          const thumb = getLineItemThumb(item);
           return (
             <tr
               key={item.id}
               style={rowColor ? { backgroundColor: rowColor } : undefined}
             >
+              <td className="px-2 py-2">
+                <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                  {thumb ? (
+                    <img
+                      src={thumb}
+                      alt="thumb"
+                      className="w-full h-full object-cover"
+                      onError={(e) =>
+                        ((e.target as HTMLImageElement).style.display = "none")
+                      }
+                    />
+                  ) : (
+                    <span className="text-gray-300 text-[10px]">—</span>
+                  )}
+                </div>
+              </td>
               <td className="px-2 py-2 text-gray-500">{item.position}</td>
               <td className="px-2 py-2">
                 <span>{item.itemNo || item.material || "—"}</span>
@@ -161,6 +203,7 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
 
         {/* Shipping method — always the last row, same as OfferDetailModal */}
         <tr className="bg-gray-100/80">
+          <td className="px-2 py-2 text-gray-400"></td>
           <td className="px-2 py-2 text-gray-400">{lineItems.length + 1}</td>
           <td className="px-2 py-2 text-gray-400">—</td>
           <td className="px-2 py-2 text-gray-700">
@@ -307,9 +350,6 @@ const OffersPage: React.FC<any> = ({
       try {
         await updateOffer(offer.id, { highlightColor: "#ECEAE6" });
       } catch (_) {}
-      // toast.success(`Offer ${offer.offerNumber} converted to Auftrag!`, {
-      //   id: "convert-offer-toast",
-      // });
       fetchOffers();
       onOrderConverted?.();
     } catch (err) {

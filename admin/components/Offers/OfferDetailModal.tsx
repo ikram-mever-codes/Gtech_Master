@@ -220,6 +220,13 @@ const getItemThumb = (item: any): string | null =>
       null,
   );
 
+/** Thumbnail for an OFFER LINE ITEM specifically — the line item's own
+ * `photo` column (populated from the source Item at offer-creation time,
+ * see createOfferFromItem / the getOfferById backfill), not the catalog
+ * item lookups used elsewhere in this file for the item picker. */
+const getLineItemThumb = (item: any): string | null =>
+  resolveThumbUrl(item?.photo || null);
+
 const getItemCompany = (item: any): string =>
   item?.customer_name ||
   item?.company_display_name ||
@@ -1968,6 +1975,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       <table className="w-full text-sm">
                         <thead className="bg-gray-100 border-b border-gray-200">
                           <tr>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
+                              Pic
+                            </th>
                             <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
                               Pos
                             </th>
@@ -2001,7 +2011,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           {visibleLineItems.length === 0 && (
                             <tr>
                               <td
-                                colSpan={edit ? 9 : 8}
+                                colSpan={edit ? 10 : 9}
                                 className="text-center py-6 text-sm text-gray-500"
                               >
                                 No line items yet.
@@ -2017,6 +2027,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             const rowColor =
                               item.highlightColor ||
                               (freetext ? "#D8964A" : null);
+                            const thumb = getLineItemThumb(item);
                             return (
                               <tr
                                 key={item.id}
@@ -2026,6 +2037,26 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     : undefined
                                 }
                               >
+                                <td className="px-2 py-2">
+                                  <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                                    {thumb ? (
+                                      <img
+                                        src={thumb}
+                                        alt="thumb"
+                                        className="w-full h-full object-cover"
+                                        onError={(e) =>
+                                          ((
+                                            e.target as HTMLImageElement
+                                          ).style.display = "none")
+                                        }
+                                      />
+                                    ) : (
+                                      <span className="text-gray-300 text-[10px]">
+                                        —
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
                                 <td className="px-2 py-2 text-gray-500">
                                   {item.position}
                                 </td>
@@ -2135,6 +2166,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
                           {/* Shipping method — always the last row */}
                           <tr className="bg-gray-100/80">
+                            <td className="px-2 py-2 text-gray-400"></td>
                             <td className="px-2 py-2 text-gray-400">
                               {visibleLineItems.length + 1}
                             </td>
@@ -2262,6 +2294,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
                     {visibleLineItems.map((item: any) => {
                       const total = getLineItemTotal(item, pricingMode);
+                      const thumb = getLineItemThumb(item);
 
                       return (
                         <div
@@ -2269,15 +2302,35 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           className="p-4 border border-gray-200 rounded-lg bg-white"
                         >
                           <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <div className="font-medium text-gray-900">
-                                {item.position}. {item.itemName}
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                                {thumb ? (
+                                  <img
+                                    src={thumb}
+                                    alt="thumb"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) =>
+                                      ((
+                                        e.target as HTMLImageElement
+                                      ).style.display = "none")
+                                    }
+                                  />
+                                ) : (
+                                  <span className="text-gray-300 text-xs">
+                                    —
+                                  </span>
+                                )}
                               </div>
-                              {item.description && (
-                                <div className="text-sm text-gray-600 mt-0.5">
-                                  {item.description}
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-900">
+                                  {item.position}. {item.itemName}
                                 </div>
-                              )}
+                                {item.description && (
+                                  <div className="text-sm text-gray-600 mt-0.5">
+                                    {item.description}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <div className="text-right flex flex-col items-end gap-1">
                               <div className="text-lg font-bold text-gray-900">
