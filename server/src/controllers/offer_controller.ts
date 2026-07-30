@@ -1742,20 +1742,20 @@ export class OfferController {
       }
 
       // ---------------------------------------------------------------
-      // Backfill `material` (Art.-Nr.) / `basePrice` (Price) from the
-      // originating Item whenever a line item is missing them — e.g. for
-      // line items created before this snapshot logic existed, or ones
-      // whose sourceItemId points to an item that never had these set on
-      // creation. Only touches line items that actually have a
-      // sourceItemId and are missing the value; never overwrites a value
-      // that's already there (so manual edits in the offer itself are
-      // preserved).
+      // Backfill `material` (Art.-Nr.) / `basePrice` (Price) / `photo`
+      // (thumbnail) from the originating Item whenever a line item is
+      // missing them — e.g. for line items created before this snapshot
+      // logic existed, or ones whose sourceItemId points to an item that
+      // never had these set on creation. Only touches line items that
+      // actually have a sourceItemId and are missing the value; never
+      // overwrites a value that's already there (so manual edits in the
+      // offer itself are preserved).
       //
-      // UPDATED: `material` is now derived the same way `de_no` is derived
-      // in getItemById — warehouse item_no_de first, falling back to
-      // parent.de_no — instead of the previous ItemID_DE/parent_no_de
-      // guess, so it matches what createOfferFromItem now stores and what
-      // the item detail view shows.
+      // `material` is derived the same way `de_no` is derived in
+      // getItemById — warehouse item_no_de first, falling back to
+      // parent.de_no — so it matches what createOfferFromItem stores and
+      // what the item detail view shows. `photo` is simply copied from the
+      // source Item's own `photo` column.
       // ---------------------------------------------------------------
       if (offer.lineItems && offer.lineItems.length > 0) {
         const missingIds = offer.lineItems
@@ -1766,7 +1766,10 @@ export class OfferController {
                 li.material === undefined ||
                 li.material === "" ||
                 li.basePrice === null ||
-                li.basePrice === undefined),
+                li.basePrice === undefined ||
+                li.photo === null ||
+                li.photo === undefined ||
+                li.photo === ""),
           )
           .map((li: any) => Number(li.sourceItemId))
           .filter((id: number) => !isNaN(id));
@@ -1831,6 +1834,16 @@ export class OfferController {
             }
             if (li.basePrice === null || li.basePrice === undefined) {
               li.basePrice = src.price ?? 0;
+              needsSave = true;
+            }
+            // NEW: backfill the line item's thumbnail from the source
+            // Item's own `photo` column whenever it's missing.
+            if (
+              li.photo === null ||
+              li.photo === undefined ||
+              li.photo === ""
+            ) {
+              li.photo = src.photo || undefined;
               needsSave = true;
             }
           }
@@ -1912,18 +1925,59 @@ export class OfferController {
         }
       }
 
+      // ---------------------------------------------------------------
+      // NEW: for any line item across this page of offers that's missing
+      // `photo` but has a `sourceItemId`, look up the source Item's own
+      // `photo` column and fill it in on the response. This is a
+      // read-only fill — unlike getOfferById's backfill, we deliberately
+      // do NOT persist it back to the line item here, since that would
+      // mean a save per offer on every single list page load. Once a
+      // given offer is opened in the detail view, getOfferById's backfill
+      // will persist it permanently, and subsequent list loads won't need
+      // this fallback for that offer anymore.
+      // ---------------------------------------------------------------
+      const missingPhotoIds = Array.from(
+        new Set(
+          offers
+            .flatMap((offer: any) => offer.lineItems || [])
+            .filter(
+              (li: any) =>
+                li.sourceItemId &&
+                (li.photo === null ||
+                  li.photo === undefined ||
+                  li.photo === ""),
+            )
+            .map((li: any) => Number(li.sourceItemId))
+            .filter((id: number) => !isNaN(id)),
+        ),
+      );
+
+      let photoByItemId = new Map<string, string | undefined>();
+      if (missingPhotoIds.length > 0) {
+        const itemRepository = AppDataSource.getRepository(Item);
+        const sourceItems = await itemRepository.find({
+          where: { id: In(missingPhotoIds) },
+          select: ["id", "photo"],
+        });
+        photoByItemId = new Map(
+          sourceItems.map((it: any) => [String(it.id), it.photo || undefined]),
+        );
+      }
+
       // Same alias as getOfferById — the "Art.-Nr." cell reads
       // `item.itemNo` in edit mode and `item.material` in view mode, so
-      // expose both to the same stored value here too. (List view
-      // intentionally does NOT run the getOfferById backfill above — that
-      // does per-row Item/WarehouseItem lookups plus a save, which is fine
-      // for a single-offer detail fetch but too expensive to run for every
-      // offer on every page load here.)
+      // expose both to the same stored value here too.
       const offersWithItemNo = offers.map((offer: any) => ({
         ...offer,
         lineItems: (offer.lineItems || []).map((item: any) => ({
           ...item,
           itemNo: item.material,
+          photo:
+            item.photo ||
+            (item.sourceItemId
+              ? photoByItemId.get(String(item.sourceItemId))
+              : undefined) ||
+            item.photo,
         })),
       }));
 
