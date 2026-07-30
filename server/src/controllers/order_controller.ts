@@ -136,7 +136,7 @@ export const createOrder = async (
       });
     }
 
-    const seqKey = "transfer_order";
+    const seqKey = "order";
 
     if (existingOrder) {
       order = existingOrder;
@@ -147,14 +147,14 @@ export const createOrder = async (
       order.status = status ?? order.status ?? 1;
       order.updated_at = new Date();
 
-      if (!order.order_no || !order.order_no.startsWith("DE")) {
+      if (!order.order_no || (!order.order_no.startsWith("B") && !order.order_no.startsWith("MA"))) {
         try {
           order.order_no = await NumberSequenceService.getNextNumber(seqKey);
         } catch (_) {
           const now = new Date();
           const yy = String(now.getFullYear()).slice(-2);
           const mm = String(now.getMonth() + 1).padStart(2, "0");
-          order.order_no = `DE${yy}${mm}-1`;
+          order.order_no = `B${yy}${mm}-1`;
         }
       }
 
@@ -168,7 +168,7 @@ export const createOrder = async (
         const now = new Date();
         const yy = String(now.getFullYear()).slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, "0");
-        generatedorder_no = `DE${yy}${mm}-1`;
+        generatedorder_no = `B${yy}${mm}-1`;
       }
 
       const now = new Date();
@@ -522,20 +522,34 @@ export const getAllOrders = async (
     const orders = await qb.getMany();
 
     for (const ord of orders) {
-      if (
-        ord.order_no &&
-        (ord.order_no.startsWith("B") || ord.order_no.startsWith("MA"))
-      ) {
-        const parts = ord.order_no.split("-");
-        const suffix = parts[parts.length - 1];
-        const now = new Date();
-        const yy = String(now.getFullYear()).slice(-2);
-        const mm = String(now.getMonth() + 1).padStart(2, "0");
-        const newDeNo = `DE${yy}${mm}-${suffix}`;
-        ord.order_no = newDeNo;
-        try {
-          await orderRepo.update(ord.id, { order_no: newDeNo });
-        } catch (_) {}
+      if (!ord.order_no) continue;
+      const isFulfilledOrder =
+        ord.status === 2 ||
+        (ord as any).is_fulfilled ||
+        (ord.comment && ord.comment.includes("[Moved to Fulfillment]"));
+
+      const parts = ord.order_no.split("-");
+      const suffix = parts[parts.length - 1];
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+
+      if (isFulfilledOrder) {
+        if (ord.order_no.startsWith("B") || ord.order_no.startsWith("MA")) {
+          const newDeNo = `DE${yy}${mm}-${suffix}`;
+          ord.order_no = newDeNo;
+          try {
+            await orderRepo.update(ord.id, { order_no: newDeNo });
+          } catch (_) {}
+        }
+      } else {
+        if (ord.order_no.startsWith("DE")) {
+          const newBNo = `B${yy}${mm}-${suffix}`;
+          ord.order_no = newBNo;
+          try {
+            await orderRepo.update(ord.id, { order_no: newBNo });
+          } catch (_) {}
+        }
       }
     }
 
