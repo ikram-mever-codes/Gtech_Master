@@ -34,11 +34,16 @@ import {
   type OfferSearchFilters,
 } from "@/api/offers";
 import { formatDate } from "@/utils/offers";
+import { parseFlexibleNumber } from "@/utils/decimal";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
-import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 
 import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
+// WEIGHT
+// Taric
+// Price
+// Item name
+// Item Number
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
   `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
@@ -58,6 +63,125 @@ const getContrastTextColor = (hex: string): string => {
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.6 ? "#111827" : "#ffffff";
 };
+
+// --- Mirrors the classic-mode line items table in OfferDetailModal --------
+// Kept here (read-only) so the expanded row on the Offers list looks
+// identical to what you see inside the offer detail modal, instead of the
+// generic DocumentLineItemsSubTable used for orders/invoices.
+const isFreetextLine = (item: any): boolean =>
+  !item?.sourceItemId && !item?.requestedItemId;
+
+const getClassicLineTotal = (item: any): number => {
+  const qty = parseFlexibleNumber(item?.baseQuantity) ?? 1;
+  const price = parseFlexibleNumber(item?.basePrice) ?? 0;
+  return qty * price;
+};
+
+const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
+  offer,
+  lineItems,
+}) => (
+  <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+    <table className="w-full text-sm">
+      <thead className="bg-gray-100 border-b border-gray-200">
+        <tr>
+          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
+            Pos
+          </th>
+          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+            Art.-Nr.
+          </th>
+          <th className="px-2 py-2 text-left font-semibold text-gray-600">
+            Bezeichnung
+          </th>
+          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+            Hinweis
+          </th>
+          <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
+            MwSt.
+          </th>
+          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+            Menge
+          </th>
+          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+            Netto-Preis
+          </th>
+          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+            Netto gesamt
+          </th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-200">
+        {lineItems.length === 0 && (
+          <tr>
+            <td colSpan={8} className="text-center py-6 text-sm text-gray-500">
+              No line items yet.
+            </td>
+          </tr>
+        )}
+        {lineItems.map((item: any) => {
+          const freetext = isFreetextLine(item);
+          const total = getClassicLineTotal(item);
+          const qtyDisplay = Math.round(
+            parseFlexibleNumber(item.baseQuantity) ?? 1,
+          );
+          const rowColor = item.highlightColor || (freetext ? "#D8964A" : null);
+          return (
+            <tr
+              key={item.id}
+              style={rowColor ? { backgroundColor: rowColor } : undefined}
+            >
+              <td className="px-2 py-2 text-gray-500">{item.position}</td>
+              <td className="px-2 py-2">
+                <span>{item.itemNo || item.material || "—"}</span>
+              </td>
+              <td className="px-2 py-2">
+                <span>{item.itemName || "—"}</span>
+              </td>
+              <td className="px-2 py-2">
+                <span className="text-gray-600">{item.notes || "—"}</span>
+              </td>
+              <td className="px-2 py-2 text-center text-gray-600">
+                {offer.taxRate ?? 19}%
+              </td>
+              <td className="px-2 py-2">
+                <div className="text-right">{qtyDisplay}</div>
+              </td>
+              <td className="px-2 py-2">
+                <div className="text-right">
+                  {formatCurrency(item.basePrice || 0, offer.currency)}
+                </div>
+              </td>
+              <td className="px-2 py-2 text-right font-medium">
+                {formatCurrency(total || 0, offer.currency)}
+              </td>
+            </tr>
+          );
+        })}
+
+        {/* Shipping method — always the last row, same as OfferDetailModal */}
+        <tr className="bg-gray-100/80">
+          <td className="px-2 py-2 text-gray-400">{lineItems.length + 1}</td>
+          <td className="px-2 py-2 text-gray-400">—</td>
+          <td className="px-2 py-2 text-gray-700">
+            {offer.shippingMethod || "No shipping method set"}
+          </td>
+          <td className="px-0 py-2 text-center text-gray-400"></td>
+          <td className="px-2 py-2 text-center text-gray-600">
+            {offer.taxRate ?? 19}%
+          </td>
+          <td className="px-2 py-2 text-right text-gray-600">1</td>
+          <td className="px-2 py-2 text-right text-gray-600">
+            {formatCurrency(offer.shippingCost || 0, offer.currency)}
+          </td>
+          <td className="px-2 py-2 text-right font-medium text-gray-700">
+            {formatCurrency(offer.shippingCost || 0, offer.currency)}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+);
 
 const OffersPage: React.FC<any> = ({
   embedded = false,
@@ -130,6 +254,10 @@ const OffersPage: React.FC<any> = ({
     e?: React.MouseEvent,
   ) => {
     if (e) e.stopPropagation();
+    const prompt = window.confirm(
+      "Do you want to convert this offer to an Auftrag?",
+    );
+    if (!prompt) return;
 
     if (offer.highlightColor === "#ECEAE6") {
       toast.error(
@@ -543,13 +671,10 @@ const OffersPage: React.FC<any> = ({
 
                       {isExpanded && (
                         <tr className="bg-emerald-50/20 border-b border-gray-200">
-                          <td colSpan={6} className="px-6 py-4">
-                            <DocumentLineItemsSubTable
-                              items={lineItems}
-                              currency={offer.currency}
-                              title={``}
-                              totalAmount={offer.totalAmount}
-                              type="offer"
+                          <td colSpan={5} className="px-6 py-4">
+                            <OfferLineItemsTable
+                              offer={offer}
+                              lineItems={lineItems}
                             />
                           </td>
                         </tr>

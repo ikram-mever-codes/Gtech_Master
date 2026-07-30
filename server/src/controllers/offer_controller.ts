@@ -104,6 +104,7 @@ import {
 } from "../services/gtechDocumentTemplate";
 
 import { In } from "typeorm";
+import { WarehouseItem } from "../models/warehouse_items";
 
 const formatCountry = (country?: string | null): string => {
   if (!country) return "";
@@ -1066,9 +1067,12 @@ export class OfferController {
       }
 
       const itemRepository = AppDataSource.getRepository(Item);
+      // NEW: also load "parent" — de_no lives on the Item's parent record,
+      // not on Item itself (see getItemById, which resolves de_no the same
+      // way: warehouse item_no_de first, falling back to parent.de_no).
       const fetchedItems: any[] = await itemRepository.find({
         where: { id: In(requestedIds) },
-        relations: ["customer", "taric"],
+        relations: ["customer", "taric", "parent"],
       });
 
       if (fetchedItems.length === 0) {
@@ -1087,6 +1091,40 @@ export class OfferController {
           .status(404)
           .json({ success: false, message: "No matching items found." });
       }
+
+      // NEW: batch-load warehouse records for all requested items, matched
+      // the same way getItemById matches a single item — by ItemID_DE first,
+      // falling back to item_id — so `de_no` here resolves identically to
+      // what the item detail view shows.
+      const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
+      const itemIdDEs = orderedItems
+        .map((it) => it.ItemID_DE)
+        .filter((v): v is number => !!v);
+
+      let warehouseItems: any[] = [];
+      try {
+        warehouseItems = await warehouseRepository.find({
+          where: itemIdDEs.length
+            ? [
+                { ItemID_DE: In(itemIdDEs) },
+                { item_id: In(orderedItems.map((it) => it.id)) },
+              ]
+            : { item_id: In(orderedItems.map((it) => it.id)) },
+        });
+      } catch (e: any) {
+        console.warn(
+          "warehouse_items table not available while creating offer from item:",
+          e?.message,
+        );
+      }
+
+      const getDeNo = (it: any): string => {
+        const warehouseMatch =
+          warehouseItems.find(
+            (wi) => it.ItemID_DE && wi.ItemID_DE === it.ItemID_DE,
+          ) || warehouseItems.find((wi) => wi.item_id === it.id);
+        return warehouseMatch?.item_no_de || it.parent?.de_no || "";
+      };
 
       let customer: any = null;
       if (body.customerId) {
@@ -1159,23 +1197,11 @@ export class OfferController {
         const snap = this.buildItemSnapshot(item);
 
         // ---------------------------------------------------------------
-        // NEW: pull the price and item number straight from the source
-        // Item entity, so the offer line item starts pre-filled with the
-        // item's own values instead of only whatever buildItemSnapshot()
-        // already derives.
-        //
-        // - basePrice  <- item.price (the Item entity's own `price` column)
-        // - material   <- item's item number. Item doesn't have a plain
-        //   "itemNo" column itself; ItemID_DE is the closest direct
-        //   identifier on the entity, with parent_no_de as a fallback for
-        //   items that only carry the number via their parent link.
-        //   Adjust this fallback chain if your "item no" should come from
-        //   a different column.
+        // basePrice <- item.price (the Item entity's own `price` column)
+        // material  <- item's de_no, resolved the same way getItemById
+        //   resolves it: warehouse item_no_de first, falling back to
+        //   parent.de_no.
         // ---------------------------------------------------------------
-        const itemNo = item.ItemID_DE
-          ? String(item.ItemID_DE)
-          : item.parent_no_de || "";
-
         return this.lineItemRepository.create({
           offer: savedOffer,
           offerId: savedOffer.id,
@@ -1191,7 +1217,7 @@ export class OfferController {
           purchaseCurrency: snap.purchaseCurrency,
           baseQuantity: body.baseQuantity || "1",
           basePrice: item.price ?? 0,
-          material: itemNo,
+          material: getDeNo(item),
           position: idx + 1,
           priceMatrix:
             pricingMode === "matrix"
@@ -1226,6 +1252,7 @@ export class OfferController {
       });
     }
   }
+
   async createLineItem(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -1623,7 +1650,6 @@ export class OfferController {
       console.error("Error calculating offer totals:", error);
     }
   }
-
   async getOfferById(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -1659,7 +1685,7 @@ export class OfferController {
       }
 
       // ---------------------------------------------------------------
-      // NEW: backfill `material` (Art.-Nr.) / `basePrice` (Price) from the
+      // Backfill `material` (Art.-Nr.) / `basePrice` (Price) from the
       // originating Item whenever a line item is missing them — e.g. for
       // line items created before this snapshot logic existed, or ones
       // whose sourceItemId points to an item that never had these set on
@@ -1667,6 +1693,12 @@ export class OfferController {
       // sourceItemId and are missing the value; never overwrites a value
       // that's already there (so manual edits in the offer itself are
       // preserved).
+      //
+      // UPDATED: `material` is now derived the same way `de_no` is derived
+      // in getItemById — warehouse item_no_de first, falling back to
+      // parent.de_no — instead of the previous ItemID_DE/parent_no_de
+      // guess, so it matches what createOfferFromItem now stores and what
+      // the item detail view shows.
       // ---------------------------------------------------------------
       if (offer.lineItems && offer.lineItems.length > 0) {
         const missingIds = offer.lineItems
@@ -1686,10 +1718,45 @@ export class OfferController {
           const itemRepository = AppDataSource.getRepository(Item);
           const sourceItems = await itemRepository.find({
             where: { id: In(Array.from(new Set(missingIds))) },
+            relations: ["parent"],
           });
           const itemById = new Map(
             sourceItems.map((it: any) => [String(it.id), it]),
           );
+
+          // Batch-load warehouse records for these items, matched the same
+          // way getItemById matches a single item — by ItemID_DE first,
+          // falling back to item_id.
+          const warehouseRepository =
+            AppDataSource.getRepository(WarehouseItem);
+          const itemIdDEs = sourceItems
+            .map((it: any) => it.ItemID_DE)
+            .filter((v: any): v is number => !!v);
+
+          let warehouseItems: any[] = [];
+          try {
+            warehouseItems = await warehouseRepository.find({
+              where: itemIdDEs.length
+                ? [
+                    { ItemID_DE: In(itemIdDEs) },
+                    { item_id: In(sourceItems.map((it: any) => it.id)) },
+                  ]
+                : { item_id: In(sourceItems.map((it: any) => it.id)) },
+            });
+          } catch (e: any) {
+            console.warn(
+              "warehouse_items table not available while backfilling offer line items:",
+              e?.message,
+            );
+          }
+
+          const getDeNo = (it: any): string => {
+            const warehouseMatch =
+              warehouseItems.find(
+                (wi) => it.ItemID_DE && wi.ItemID_DE === it.ItemID_DE,
+              ) || warehouseItems.find((wi) => wi.item_id === it.id);
+            return warehouseMatch?.item_no_de || it.parent?.de_no || "";
+          };
 
           let needsSave = false;
           for (const li of offer.lineItems as any[]) {
@@ -1702,9 +1769,7 @@ export class OfferController {
               li.material === undefined ||
               li.material === ""
             ) {
-              li.material = src.ItemID_DE
-                ? String(src.ItemID_DE)
-                : src.parent_no_de || "";
+              li.material = getDeNo(src);
               needsSave = true;
             }
             if (li.basePrice === null || li.basePrice === undefined) {
@@ -1790,6 +1855,13 @@ export class OfferController {
         }
       }
 
+      // Same alias as getOfferById — the "Art.-Nr." cell reads
+      // `item.itemNo` in edit mode and `item.material` in view mode, so
+      // expose both to the same stored value here too. (List view
+      // intentionally does NOT run the getOfferById backfill above — that
+      // does per-row Item/WarehouseItem lookups plus a save, which is fine
+      // for a single-offer detail fetch but too expensive to run for every
+      // offer on every page load here.)
       const offersWithItemNo = offers.map((offer: any) => ({
         ...offer,
         lineItems: (offer.lineItems || []).map((item: any) => ({
