@@ -206,28 +206,29 @@ export class InquiryController {
   }
 
   private async getNextInquiryNo(): Promise<string> {
-    const currentYear = new Date().getFullYear();
-    const yearSuffix = currentYear.toString().slice(-2);
-    const prefix = `AF${yearSuffix}-`;
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const prefix = `AF${yyyy}${mm}-`;
 
-    const lastInquiry = await this.inquiryRepository
+    const allInquiries = await this.inquiryRepository
       .createQueryBuilder("inquiry")
-      .where("inquiry.inquiryNo LIKE :prefix", { prefix: `${prefix}%` })
-      .orderBy("inquiry.inquiryNo", "DESC")
-      .getOne();
+      .select(["inquiry.inquiryNo"])
+      .where("inquiry.inquiryNo LIKE :prefix", { prefix: `AF%` })
+      .getMany();
 
-    let nextCounter = 1;
-    if (lastInquiry && lastInquiry.inquiryNo) {
-      const parts = lastInquiry.inquiryNo.split("-");
-      if (parts.length === 2) {
-        const lastCounter = parseInt(parts[1], 10);
-        if (!isNaN(lastCounter)) {
-          nextCounter = lastCounter + 1;
+    let maxSeq = 0;
+    for (const inq of allInquiries) {
+      if (inq.inquiryNo) {
+        const parts = inq.inquiryNo.split("-");
+        const num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
         }
       }
     }
 
-    return `${prefix}${String(nextCounter).padStart(3, "0")}`;
+    return `${prefix}${maxSeq + 1}`;
   }
 
   async getAllInquiries(request: Request, response: Response) {
