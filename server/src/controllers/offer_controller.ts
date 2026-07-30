@@ -458,6 +458,9 @@ export class UpdateLineItemDto {
   specification?: string;
 
   @IsOptional()
+  taxRate?: number | string;
+
+  @IsOptional()
   @IsString()
   description?: string;
 
@@ -696,6 +699,9 @@ export class CreateLineItemDto {
   description?: string;
 
   @IsOptional()
+  taxRate?: number | string;
+
+  @IsOptional()
   @IsString()
   baseQuantity?: string;
 
@@ -723,6 +729,31 @@ export class OfferController {
   private shippingAddressRepository = AppDataSource.getRepository(
     CompanyShippingAddress,
   );
+
+  private mapTaxProfile(tp: any): any {
+    if (!tp) return null;
+    return {
+      id: tp.id,
+      name: tp.name,
+      taxCase: tp.tax_case || undefined,
+      taxRate: Number(tp.tax_rate) || 0,
+      taxCode: tp.tax_code || undefined,
+      requiresVatId: !!tp.requires_vat_id,
+      requiresConfirmedVatId: !!tp.requires_confirmed_vat_id,
+      description: tp.description || undefined,
+    };
+  }
+
+  private async getCustomerTaxProfile(
+    customerId?: string | null,
+  ): Promise<any> {
+    if (!customerId) return null;
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+      relations: ["defaultTaxProfile"],
+    });
+    return this.mapTaxProfile(customer?.defaultTaxProfile);
+  }
 
   private async generateOfferNumber(): Promise<string> {
     try {
@@ -1437,6 +1468,7 @@ export class OfferController {
       });
     }
   }
+
   async createLineItem(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -1469,6 +1501,13 @@ export class OfferController {
       const basePrice = parseFlexibleNumber(body.basePrice) ?? 0;
       const baseQuantity = body.baseQuantity?.trim() || "1";
       const weight = parseFlexibleNumber(body.weight);
+      // Falls back to the offer's own tax rate whenever the caller doesn't
+      // specify one (e.g. "Add existing item"), and to 19% only if neither
+      // is available.
+      const taxRate =
+        body.taxRate !== undefined
+          ? (parseFlexibleNumber(body.taxRate) ?? offer.taxRate ?? 19)
+          : (offer.taxRate ?? 19);
 
       const lineItem = this.lineItemRepository.create({
         offer,
@@ -1484,6 +1523,7 @@ export class OfferController {
         priceMatrix: offer.pricingMode === "matrix" ? [] : undefined,
         weight: weight ?? undefined,
         sourceItemId: body.sourceItemId || undefined,
+        taxRate,
         lineTotal:
           basePrice !== null
             ? basePrice * (parseFlexibleNumber(body.baseQuantity) || 1)
@@ -1507,7 +1547,6 @@ export class OfferController {
       });
     }
   }
-
   async deleteLineItem(request: Request, response: Response) {
     try {
       const { offerId, lineItemId } = request.params;
@@ -1787,6 +1826,7 @@ export class OfferController {
       if (!offer) return;
 
       let subtotal = 0;
+      let taxAmount = 0;
       const customerItems =
         offer.lineItems?.filter((item: OfferLineItem) => !item.isComponent) ||
         [];
@@ -1800,6 +1840,13 @@ export class OfferController {
         }
 
         subtotal += lineTotal;
+
+        // Each line item is taxed at its own rate (falling back to the
+        // offer's rate for items that predate per-line rates), and each
+        // line's VAT is summed independently rather than applying one flat
+        // rate to the whole subtotal.
+        const lineTaxRate = (item as any).taxRate ?? offer.taxRate ?? 19;
+        taxAmount += lineTotal * (lineTaxRate / 100);
       }
 
       let total = subtotal;
@@ -1808,16 +1855,18 @@ export class OfferController {
         const discount = subtotal * (offer.discountPercentage / 100);
         total = subtotal - discount;
         offer.discountAmount = discount;
+        // Discount proportionally reduces the tax base too.
+        taxAmount *= 1 - offer.discountPercentage / 100;
       } else if (offer.discountAmount && offer.discountAmount > 0) {
         total = subtotal - offer.discountAmount;
       }
 
       if (offer.shippingCost && offer.shippingCost > 0) {
         total += offer.shippingCost;
+        // Shipping taxed at the offer's own rate.
+        taxAmount += offer.shippingCost * ((offer.taxRate ?? 19) / 100);
       }
 
-      const taxRate = (offer.taxRate ?? 19) / 100;
-      const taxAmount = total * taxRate;
       const totalWithTax = total + taxAmount;
 
       const formatNumber = (num: number): number => {
@@ -1834,6 +1883,7 @@ export class OfferController {
       console.error("Error calculating offer totals:", error);
     }
   }
+
   async getOfferById(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -1992,9 +2042,15 @@ export class OfferController {
         }));
       }
 
+      // Live-resolved tax profile — always loaded fresh from the customer's
+      // currently-assigned `defaultTaxProfile` relation, never stored on the
+      // offer itself, so it reflects whatever the customer's profile is
+      // right now, not what it was when the offer was created.
+      const taxProfile = await this.getCustomerTaxProfile(offer.customerId);
+
       return response.status(200).json({
         success: true,
-        data: offer,
+        data: { ...offer, taxProfile },
       });
     } catch (error) {
       console.error("Error fetching offer:", error);
@@ -2091,11 +2147,39 @@ export class OfferController {
         );
       }
 
+      // Live-resolved tax profiles for this page's customers — one batched
+      // query instead of one lookup per offer, resolved fresh on every list
+      // load and never stored on the offer itself.
+      const customerIds = Array.from(
+        new Set(
+          offers
+            .map((o: any) => o.customerId)
+            .filter((id: any): id is string => !!id),
+        ),
+      );
+
+      let taxProfileByCustomerId = new Map<string, any>();
+      if (customerIds.length > 0) {
+        const customersWithTax = await this.customerRepository.find({
+          where: { id: In(customerIds) },
+          relations: ["defaultTaxProfile"],
+        });
+        taxProfileByCustomerId = new Map(
+          customersWithTax.map((c: any) => [
+            c.id,
+            this.mapTaxProfile(c.defaultTaxProfile),
+          ]),
+        );
+      }
+
       // Same alias as getOfferById — the "Art.-Nr." cell reads
       // `item.itemNo` in edit mode and `item.material` in view mode, so
       // expose both to the same stored value here too.
       const offersWithItemNo = offers.map((offer: any) => ({
         ...offer,
+        taxProfile: offer.customerId
+          ? taxProfileByCustomerId.get(offer.customerId) || null
+          : null,
         lineItems: (offer.lineItems || []).map((item: any) => ({
           ...item,
           itemNo: item.material,
@@ -2417,6 +2501,13 @@ export class OfferController {
       ) {
         (updateLineItemDto as any).baseQuantity = "1";
       }
+      // Coerce the per-line VAT rate the same way basePrice/samplePrice are
+      // coerced above — accepts "19", "19,00", 19, etc., and falls back to
+      // the offer's own rate (then 19%) if it can't be parsed.
+      if (updateLineItemDto.taxRate !== undefined) {
+        (updateLineItemDto as any).taxRate =
+          parseFlexibleNumber(updateLineItemDto.taxRate) ?? offer.taxRate ?? 19;
+      }
 
       Object.assign(lineItem, updateLineItemDto);
 
@@ -2437,6 +2528,9 @@ export class OfferController {
       }
 
       const updatedLineItem = await this.lineItemRepository.save(lineItem);
+      // A tax-rate change doesn't touch lineTotal but does change which VAT
+      // group this line falls into and how much tax the offer owes overall,
+      // so recalculation must always run — not just on price/qty changes.
       await this.calculateOfferTotals(offerId);
 
       return response.status(200).json({

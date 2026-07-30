@@ -84,105 +84,6 @@ const SHIPPING_METHODS = [
   "Pickup",
 ];
 
-// ---------------------------------------------------------------------------
-// Tax profile logic
-//
-//  - Shipping country DE                         -> DE-VAT
-//  - Shipping country in EU (IGL) + no VAT ID     -> EU_no_valid_VAT_ID
-//  - Shipping country in EU (IGL) + has VAT ID    -> EU_IGL
-//  - Shipping country outside EU / DE             -> third_country
-//
-// "Valid VAT ID" is approximated here as "a VAT ID is present on the
-// customer snapshot" — wire this up to a real VIES validation flag on the
-// customer record once one exists.
-// ---------------------------------------------------------------------------
-type TaxProfile = "DE-VAT" | "EU_no_valid_VAT_ID" | "EU_IGL" | "third_country";
-
-const DE_NAMES = new Set(["DE", "GERMANY", "DEUTSCHLAND"]);
-
-const EU_IGL_COUNTRIES = new Set([
-  "AT",
-  "AUSTRIA",
-  "ÖSTERREICH",
-  "BE",
-  "BELGIUM",
-  "BELGIEN",
-  "BG",
-  "BULGARIA",
-  "HR",
-  "CROATIA",
-  "CY",
-  "CYPRUS",
-  "CZ",
-  "CZECH REPUBLIC",
-  "CZECHIA",
-  "DK",
-  "DENMARK",
-  "EE",
-  "ESTONIA",
-  "FI",
-  "FINLAND",
-  "FR",
-  "FRANCE",
-  "GR",
-  "GREECE",
-  "HU",
-  "HUNGARY",
-  "IE",
-  "IRELAND",
-  "IT",
-  "ITALY",
-  "LV",
-  "LATVIA",
-  "LT",
-  "LITHUANIA",
-  "LU",
-  "LUXEMBOURG",
-  "MT",
-  "MALTA",
-  "NL",
-  "NETHERLANDS",
-  "PL",
-  "POLAND",
-  "PT",
-  "PORTUGAL",
-  "RO",
-  "ROMANIA",
-  "SK",
-  "SLOVAKIA",
-  "SI",
-  "SLOVENIA",
-  "ES",
-  "SPAIN",
-  "SE",
-  "SWEDEN",
-]);
-
-const TAX_PROFILE_LABELS: Record<TaxProfile, string> = {
-  "DE-VAT": "DE-VAT — German VAT applies",
-  EU_no_valid_VAT_ID:
-    "EU_no_valid_VAT_ID — local VAT applies (no VAT ID on file)",
-  EU_IGL: "EU_IGL — intra-community supply, reverse charge",
-  third_country: "third_country — export, no VAT",
-};
-
-const getTaxProfile = (offer: any): TaxProfile | null => {
-  const country = (
-    offer?.deliveryAddress?.country ||
-    offer?.customerSnapshot?.country ||
-    ""
-  )
-    .trim()
-    .toUpperCase();
-  if (!country) return null;
-  if (DE_NAMES.has(country)) return "DE-VAT";
-  if (EU_IGL_COUNTRIES.has(country)) {
-    const vatId = (offer?.customerSnapshot?.vatId || "").trim();
-    return vatId ? "EU_IGL" : "EU_no_valid_VAT_ID";
-  }
-  return "third_country";
-};
-
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
     minimumFractionDigits: 3,
@@ -236,6 +137,14 @@ const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
   const qty = parseFlexibleNumber(item?.baseQuantity) ?? 1;
   const price = parseFlexibleNumber(item?.basePrice) ?? 0;
   return qty * price;
+};
+
+/** Effective VAT rate for a line item: its own rate if set, otherwise the
+ * offer's rate. */
+const getLineTaxRate = (item: any, offer: any): number => {
+  const own = parseFlexibleNumber(item?.taxRate);
+  if (own !== null && own !== undefined) return own;
+  return parseFlexibleNumber(offer?.taxRate) ?? 19;
 };
 
 /** An item counts as "Artikel" if it traces back to a catalog item (either
@@ -565,9 +474,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   // Saved shipping addresses for the offer's customer, used by the
   // delivery-address dropdown below (only fetched once editing starts).
-  const [shippingAddresses, setShippingAddresses] = useState<
-    CustomerShippingAddress[]
-  >([]);
+  const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
   // "__same__" = use billing address; otherwise a CompanyShippingAddress id.
   const [selectedShippingAddressId, setSelectedShippingAddressId] =
     useState("__same__");
@@ -605,9 +512,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [newLine, setNewLine] = useState<{
     itemName: string;
     baseQuantity: string;
+    taxRate: string;
   }>({
     itemName: "",
     baseQuantity: "1",
+    taxRate: "19",
   });
 
   const [creating, setCreating] = useState(false);
@@ -676,7 +585,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           getItems({ limit: 1000 }).catch(() => ({ data: [] })),
         ]);
 
-        console.log("Fetched sources:", custRes);
         setInquiries(
           Array.isArray(inqRes?.data)
             ? inqRes.data
@@ -1065,10 +973,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const persistLine = async (lineItemId: string, payload: any) => {
     try {
       const res: any = await updateLineItem(offer.id, lineItemId, payload);
-      // updateLineItem() already unwraps the response to the line item
-      // itself (see api/offers.ts: `return response.data ?? response`), so
-      // `res` normally IS the updated line item. Handle both shapes
-      // defensively in case that unwrapping ever changes.
       const updatedItem = res?.data ?? res;
       if (updatedItem?.id) {
         setOffer((prev: any) => ({
@@ -1077,6 +981,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             li.id === lineItemId ? updatedItem : li,
           ),
         }));
+        // Totals (subtotal/tax/total) change server-side whenever a line's
+        // price, quantity, or tax rate changes — refresh so the summary
+        // panel and per-rate VAT breakdown reflect the saved state.
+        await refreshLocal();
       }
     } catch (e) {
       console.error("Couldn't save line item change:", e);
@@ -1139,8 +1047,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         itemName: newLine.itemName.trim(),
         baseQuantity: newLine.baseQuantity?.trim() || "1",
         basePrice: 0,
-      });
-      setNewLine({ itemName: "", baseQuantity: "1" });
+        taxRate: parseFlexibleNumber(newLine.taxRate) ?? offer.taxRate ?? 19,
+      } as any);
+      setNewLine({ itemName: "", baseQuantity: "1", taxRate: "19" });
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -1269,8 +1178,36 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
 
-  // --- Tax profile -------------------------------------------------------
-  const taxProfile = offer ? getTaxProfile(offer) : null;
+  const taxProfile = offer?.taxProfile || null;
+
+  const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
+    const byRate = new Map<number, number>();
+    visibleLineItems.forEach((li: any) => {
+      const rate = getLineTaxRate(li, offer);
+      const lineTotal = getLineItemTotal(li, pricingMode);
+      byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
+    });
+
+    if (offer?.shippingCost > 0) {
+      const shipRate = parseFlexibleNumber(offer.taxRate) ?? 19;
+      byRate.set(shipRate, (byRate.get(shipRate) || 0) + offer.shippingCost);
+    }
+
+    // Discount reduces each group's base proportionally.
+    const discountFactor =
+      offer?.discountPercentage > 0 ? 1 - offer.discountPercentage / 100 : 1;
+
+    return Array.from(byRate.entries())
+      .map(([rate, base]) => {
+        const adjustedBase = base * discountFactor;
+        return {
+          rate,
+          base: adjustedBase,
+          tax: adjustedBase * (rate / 100),
+        };
+      })
+      .sort((a, b) => b.rate - a.rate);
+  })();
 
   // --- Linked documents ---------------------------------------------------
   const linkedDocsCount = linkedDocs
@@ -1731,7 +1668,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         <option value="__same__">
                           Same as billing address
                         </option>
-                        {shippingAddresses.map((a) => (
+                        {shippingAddresses.map((a: any) => (
                           <option key={a.id} value={a.id}>
                             {a.name} — {a.street}, {a.city}
                             {a.isDefault ? " (Default)" : ""}
@@ -1742,7 +1679,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
                     {showAsSame ? (
                       <div className="text-sm text-gray-500">
-                        Delivery Address is Same
+                        Same Delivery Address
                       </div>
                     ) : (
                       <AddressBlock
@@ -1846,7 +1783,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <Field
                     label="Tax profile"
                     edit={false}
-                    value={taxProfile ? taxProfile : "No shipping country set"}
+                    value={
+                      taxProfile
+                        ? `${taxProfile.name}`
+                        : "No tax profile assigned to this customer"
+                    }
                   />
                 </div>
               </div>
@@ -1969,7 +1910,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
                             Hinweis
                           </th>
-                          <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
+                          <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
                             MwSt.
                           </th>
                           <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
@@ -2005,6 +1946,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             item.highlightColor ||
                             (freetext ? "#D8964A" : null);
                           const thumb = item.photo;
+                          const lineTaxRate = getLineTaxRate(item, offer);
                           return (
                             <tr
                               key={item.id}
@@ -2080,7 +2022,24 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 )}
                               </td>
                               <td className="px-2 py-2 text-center text-gray-600">
-                                {offer.taxRate ?? 19}%
+                                {edit ? (
+                                  <div className="flex items-center justify-center gap-0.5">
+                                    <DecimalInput
+                                      className="w-14 px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                      value={lineTaxRate}
+                                      onCommit={(raw) => {
+                                        const parsed = parseFlexibleNumber(raw);
+                                        persistLine(item.id, {
+                                          taxRate:
+                                            parsed === null ? 19 : parsed,
+                                        });
+                                      }}
+                                    />
+                                    <span>%</span>
+                                  </div>
+                                ) : (
+                                  `${lineTaxRate}%`
+                                )}
                               </td>
                               <td className="px-2 py-2">
                                 {edit ? (
@@ -2225,7 +2184,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             }
                           />
                         </div>
-                        <div className="w-28">
+                        <div className="w-24">
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Quantity
                           </label>
@@ -2236,6 +2195,21 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               setNewLine((n) => ({
                                 ...n,
                                 baseQuantity: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="w-20">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            MwSt. %
+                          </label>
+                          <input
+                            className={inputCls}
+                            value={newLine.taxRate}
+                            onChange={(e) =>
+                              setNewLine((n) => ({
+                                ...n,
+                                taxRate: e.target.value,
                               }))
                             }
                           />
@@ -2568,14 +2542,19 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      VAT ({offer.taxRate ?? 19}%)
-                    </span>
-                    <span className="font-medium">
-                      {formatCurrency(offer.taxAmount || 0, offer.currency)}
-                    </span>
-                  </div>
+                  {/* One VAT row per distinct rate present among the line
+                      items (plus shipping's rate) — skips 0% groups since
+                      there's nothing to show there. */}
+                  {vatGroups
+                    .filter((g) => g.rate !== 0)
+                    .map((g) => (
+                      <div key={g.rate} className="flex justify-between">
+                        <span className="text-gray-600">VAT ({g.rate}%)</span>
+                        <span className="font-medium">
+                          {formatCurrency(g.tax, offer.currency)}
+                        </span>
+                      </div>
+                    ))}
                   <div className="border-t pt-2 flex justify-between font-bold text-lg">
                     <span>Total</span>
                     <span>

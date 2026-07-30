@@ -154,7 +154,7 @@ export const createOrder = async (
       order.status = status ?? order.status ?? 1;
       order.updated_at = new Date();
 
-      if (!order.order_no || !order.order_no.startsWith("DE")) {
+      if (!order.order_no || !order.order_no.startsWith("B")) {
         try {
           order.order_no = await NumberSequenceService.getNextNumber(seqKey);
         } catch (_) {
