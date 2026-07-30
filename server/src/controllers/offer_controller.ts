@@ -389,6 +389,10 @@ export class UpdateOfferDto {
   highlightColor?: string;
 
   @IsOptional()
+  @IsNumber()
+  conversionCount?: number;
+
+  @IsOptional()
   @IsObject()
   deliveryAddress?: {
     street?: string;
@@ -2106,6 +2110,7 @@ export class OfferController {
         "notes",
         "internalNotes",
         "highlightColor",
+        "conversionCount",
         "currency",
         "deliveryAddress",
         "pricingMode",

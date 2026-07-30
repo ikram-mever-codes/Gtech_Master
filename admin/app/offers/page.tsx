@@ -310,10 +310,23 @@ const OffersPage: React.FC<any> = ({
         `Offer ${offer.offerNumber} converted to Auftrag successfully!`,
         { id: "convert-offer-toast" },
       );
+      const nextCount =
+        (offer.conversionCount ||
+          (offer.highlightColor === "#ECEAE6" ? 1 : 0)) + 1;
+
+      setOffers((prevOffers) =>
+        prevOffers.map((o) =>
+          o.id === offer.id
+            ? {
+                ...o,
+                highlightColor: "#ECEAE6",
+                conversionCount: nextCount,
+              }
+            : o,
+        ),
+      );
+
       try {
-        const nextCount =
-          (offer.conversionCount ||
-            (offer.highlightColor === "#ECEAE6" ? 1 : 0)) + 1;
         await updateOffer(offer.id, {
           highlightColor: "#ECEAE6",
           conversionCount: nextCount,
