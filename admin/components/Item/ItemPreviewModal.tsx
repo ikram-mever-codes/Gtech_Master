@@ -68,6 +68,28 @@ interface ItemPreviewModalProps {
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed";
 
+// IMPORTANT: `Field` used to be declared inside the modal component body.
+// A component defined inside another component's render function gets a new
+// function identity on every render, so React treats it as a *different*
+// component type each time and unmounts/remounts its subtree — which is why
+// any <input> rendered through it lost focus after a single keystroke.
+// Moving it to module scope keeps its identity stable across re-renders, so
+// the underlying DOM nodes (and focus) persist normally.
+const Field = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div>
+    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+      {label}
+    </p>
+    <div className="text-sm text-gray-900 break-words">{children}</div>
+  </div>
+);
+
 export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   isOpen,
   onClose,
@@ -127,10 +149,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
+        item?.pix_path_eBay ||
+        item?.pictures?.shopPicture ||
+        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+        null,
     );
 
   const getCompany = (item: any) =>
@@ -186,10 +208,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           parent_id: raw.parent_id || null,
           parent: raw.parent
             ? {
-              ...raw.parent,
-              de_no: raw.parent.de_no,
-              name_de: raw.parent.name_de,
-            }
+                ...raw.parent,
+                de_no: raw.parent.de_no,
+                name_de: raw.parent.name_de,
+              }
             : null,
           item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
@@ -267,23 +289,23 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             raw.supplierItem ||
             (def
               ? {
-                priceRMB: def.priceRMB || "0",
-                isPO: def.isPO || "No",
-                moq: def.moq || "0",
-                interval: def.interval || "0",
-                leadTime: def.leadTime || "",
-                noteCN: def.noteCN || "",
-                url: def.url || "",
-              }
+                  priceRMB: def.priceRMB || "0",
+                  isPO: def.isPO || "No",
+                  moq: def.moq || "0",
+                  interval: def.interval || "0",
+                  leadTime: def.leadTime || "",
+                  noteCN: def.noteCN || "",
+                  url: def.url || "",
+                }
               : {
-                priceRMB: "0",
-                isPO: "No",
-                moq: "0",
-                interval: "0",
-                leadTime: "",
-                noteCN: "",
-                url: "",
-              }),
+                  priceRMB: "0",
+                  isPO: "No",
+                  moq: "0",
+                  interval: "0",
+                  leadTime: "",
+                  noteCN: "",
+                  url: "",
+                }),
           parent: raw.parent
             ? { ...raw.parent, isActive: toBool(raw.parent?.isActive) }
             : null,
@@ -662,21 +684,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
     }
   };
 
-  const Field = ({
-    label,
-    children,
-  }: {
-    label: string;
-    children: React.ReactNode;
-  }) => (
-    <div>
-      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-        {label}
-      </p>
-      <div className="text-sm text-gray-900 break-words">{children}</div>
-    </div>
-  );
-
   const previewCompanyOrCat =
     getCompany(previewItem) || previewItem?.category || "—";
   const previewItemNo = previewItem?.de_no || "—";
@@ -701,7 +708,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       src={getThumb(previewItem)!}
                       alt="thumb"
                       className="w-full h-full object-contain bg-white p-1"
-
                       onError={(e) =>
                         ((e.target as HTMLImageElement).style.display = "none")
                       }
@@ -750,10 +756,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     setPreviewItem((p: any) =>
                       p
                         ? {
-                          ...p,
-                          tags: newTags,
-                          tagOrder: newTags.map((t) => t.id).join(","),
-                        }
+                            ...p,
+                            tags: newTags,
+                            tagOrder: newTags.map((t) => t.id).join(","),
+                          }
                         : p,
                     )
                   }
@@ -1166,7 +1172,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   />
                 </div>
                 {!previewItem?.attachments ||
-                  previewItem.attachments.length === 0 ? (
+                previewItem.attachments.length === 0 ? (
                   <p className="text-xs text-gray-400">
                     No attachments for this item.
                   </p>
@@ -1249,8 +1255,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                               window.open(resolveUrl(url)!, "_blank")
                             }
                             onError={(e) =>
-                            ((e.target as HTMLImageElement).src =
-                              "https://placehold.co/200x200?text=—")
+                              ((e.target as HTMLImageElement).src =
+                                "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>

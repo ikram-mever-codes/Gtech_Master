@@ -256,7 +256,10 @@ export const getItems = async (
 
     if (company) {
       const companyStr = (company as string).trim();
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyStr);
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          companyStr,
+        );
       if (isUuid) {
         idQb.andWhere("item.customer_id = :company", { company: companyStr });
       } else {
@@ -663,6 +666,14 @@ export const getItemById = async (
       tagOrder: item.tagOrder,
       is_updated: item.is_updated,
       isLabelPrint: item.isLabelPrint || false,
+      // FIX: `price` and `transfer_price_EUR` were previously missing from
+      // this response entirely — only the differently-shaped `transfer_price`
+      // string below existed. The frontend's ItemPreviewModal reads
+      // `raw.price` directly into its editable "Price" field
+      // (`previewItem.price`), so without this the field was always blank on
+      // load regardless of what was actually stored in the database.
+      price: item.price ?? null,
+      transfer_price_EUR: item.transfer_price_EUR ?? null,
       transfer_price: item.transfer_price_EUR
         ? Number(item.transfer_price_EUR).toFixed(2)
         : "null",
@@ -792,29 +803,29 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-            id: defaultSi.id,
-            supplierId: defaultSi.supplier_id,
-            supplierName:
-              defaultSi.supplier?.company_name ||
-              defaultSi.supplier?.name ||
-              "Unknown",
-            priceRMB: defaultSi.price_rmb?.toString() || "0",
-            isPO: defaultSi.is_po || "No",
-            moq: defaultSi.moq?.toString() || "0",
-            interval: defaultSi.oi?.toString() || "0",
-            leadTime: defaultSi.lead_time || "",
-            noteCN: defaultSi.note_cn || "",
-            url: defaultSi.url || "",
-          }
+              id: defaultSi.id,
+              supplierId: defaultSi.supplier_id,
+              supplierName:
+                defaultSi.supplier?.company_name ||
+                defaultSi.supplier?.name ||
+                "Unknown",
+              priceRMB: defaultSi.price_rmb?.toString() || "0",
+              isPO: defaultSi.is_po || "No",
+              moq: defaultSi.moq?.toString() || "0",
+              interval: defaultSi.oi?.toString() || "0",
+              leadTime: defaultSi.lead_time || "",
+              noteCN: defaultSi.note_cn || "",
+              url: defaultSi.url || "",
+            }
           : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          };
+              priceRMB: "0",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -835,7 +846,6 @@ export const getItemById = async (
     return next(error);
   }
 };
-
 export const createItem = async (
   req: Request,
   res: Response,
@@ -1013,7 +1023,6 @@ export const createItem = async (
     return next(error);
   }
 };
-
 export const updateItem = async (
   req: Request,
   res: Response,
@@ -1265,6 +1274,15 @@ export const updateItem = async (
       where: { id: item.cat_id },
     });
 
+    // `currentRMBPrice` stays null unless the RMB price on the active
+    // supplier item is actually different from what's already stored (see
+    // the `sChanges` / `supplierItem.price_rmb !== newRMB` check below, and
+    // the "new supplier item" branch further down). This is the correct
+    // signal for "did the RMB price really change" — NOT "was
+    // supplierItem.price_rmb present in the request body", because the
+    // frontend always includes `supplierItem.price_rmb` on every save
+    // (computed via `parseFloat(...) || 0`), so it is never `undefined`
+    // even when the user only edited an unrelated field like `price`.
     let currentRMBPrice: any = null;
 
     if (supplierItemData) {
@@ -1277,7 +1295,17 @@ export const updateItem = async (
         let sChanges = false;
         if (supplierItemData.price_rmb !== undefined) {
           const newRMB = parseFloat(supplierItemData.price_rmb);
-          if (supplierItem.price_rmb !== newRMB) {
+          // FIX: `supplierItem.price_rmb` comes back from TypeORM as a
+          // STRING for decimal columns (e.g. "0.00"), while `newRMB` is a
+          // parsed number (0). A raw `!==` comparison between a string and
+          // a number is *always* true regardless of the actual value, so
+          // this was flagging "the RMB price changed" on every single save
+          // — even when it didn't — which incorrectly set `currentRMBPrice`
+          // to a non-null value and triggered the price recalculation
+          // below, silently overwriting a manually-edited `price`.
+          // Parsing both sides to numbers before comparing fixes this.
+          const existingRMB = parseFloat(supplierItem.price_rmb as any);
+          if (isNaN(existingRMB) || existingRMB !== newRMB) {
             supplierItem.price_rmb = newRMB;
             currentRMBPrice = newRMB;
             sChanges = true;
@@ -1333,26 +1361,23 @@ export const updateItem = async (
 
     const categoryName = category?.name || item.supp_cat || "STD";
 
-    let rmbPriceToUse: number | null = null;
-    if (supplierItemData && supplierItemData.price_rmb !== undefined) {
-      rmbPriceToUse = parseFloat(supplierItemData.price_rmb);
-    } else {
-      const existingSI =
-        (await supplierItemRepository.findOne({
-          where: { item_id: item.id, is_default: "Y" },
-        })) ||
-        (await supplierItemRepository.findOne({
-          where: { item_id: item.id },
-        }));
-      rmbPriceToUse =
-        existingSI?.price_rmb !== undefined && existingSI?.price_rmb !== null
-          ? parseFloat(existingSI.price_rmb)
-          : null;
-    }
-
-    if (rmbPriceToUse !== null && !isNaN(rmbPriceToUse)) {
+    // ---------------------------------------------------------------------
+    // FIX: only recalculate `price` / `transfer_price_EUR` from the RMB
+    // price when the RMB price actually changed this request
+    // (`currentRMBPrice !== null`), not merely when `supplierItem.price_rmb`
+    // was present in the payload (it always is, from the frontend).
+    //
+    // This means:
+    //  - Editing the RMB purchase price still recalculates `price` as before.
+    //  - Editing `price` directly (without touching RMB) now sticks, instead
+    //    of being silently recomputed back from the unchanged RMB value on
+    //    every save (which is what was blanking/zeroing it out).
+    //  - If neither changed, `item.price` / `item.transfer_price_EUR` keep
+    //    whatever was already applied by the updatableFields loop above.
+    // ---------------------------------------------------------------------
+    if (currentRMBPrice !== null && !isNaN(currentRMBPrice)) {
       const calculatedPrice = calculateTransferPrice(
-        rmbPriceToUse,
+        currentRMBPrice,
         categoryName,
       );
       if (
@@ -1361,12 +1386,6 @@ export const updateItem = async (
       ) {
         item.price = calculatedPrice;
         item.transfer_price_EUR = calculatedPrice;
-        hasChanges = true;
-      }
-    } else {
-      if (item.price !== null || item.transfer_price_EUR !== null) {
-        item.price = null as any;
-        item.transfer_price_EUR = null as any;
         hasChanges = true;
       }
     }
@@ -1399,12 +1418,13 @@ export const updateItem = async (
           item_name_en:
             warehouseItemData.item_name_en ?? warehouseItem.item_name_en,
           is_no_auto_order:
-            warehouseItemData.is_no_auto_order ?? warehouseItem.is_no_auto_order,
-          is_SnSI:
-            warehouseItemData.is_SnSI ?? warehouseItem.is_SnSI,
+            warehouseItemData.is_no_auto_order ??
+            warehouseItem.is_no_auto_order,
+          is_SnSI: warehouseItemData.is_SnSI ?? warehouseItem.is_SnSI,
         });
       }
-      const newEnglishName = req.body.item_name || warehouseItemData?.item_name_en;
+      const newEnglishName =
+        req.body.item_name || warehouseItemData?.item_name_en;
       if (newEnglishName) {
         item.item_name = newEnglishName;
         item.is_updated = true;
@@ -1968,9 +1988,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2046,17 +2066,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3614,23 +3634,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-            where: { id: item.parent_id },
-            select: ["id", "de_no", "name_de", "name_en"],
-          })
+              where: { id: item.parent_id },
+              select: ["id", "de_no", "name_de", "name_en"],
+            })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-            where: { id: item.cat_id },
-            select: ["id", "name"],
-          })
+              where: { id: item.cat_id },
+              select: ["id", "name"],
+            })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-            where: { id: item.supplier_id },
-            select: ["id", "name", "company_name"],
-          })
+              where: { id: item.supplier_id },
+              select: ["id", "name", "company_name"],
+            })
           : null;
 
         let warehouseData: any = null;
@@ -3857,8 +3877,8 @@ export const exportNewItemsToCSV = async (
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
           warehouseData?.item_no_de ||
-          item.ItemID_DE?.toString() ||
-          item.id.toString(),
+            item.ItemID_DE?.toString() ||
+            item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",

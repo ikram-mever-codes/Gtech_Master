@@ -104,12 +104,13 @@ const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 const ItemsManagementPage: React.FC = () => {
@@ -245,10 +246,10 @@ const ItemsManagementPage: React.FC = () => {
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
+        item?.pix_path_eBay ||
+        item?.pictures?.shopPicture ||
+        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+        null,
     );
 
   const getStatusBadgeColor = (status: string) => {
@@ -314,7 +315,7 @@ const ItemsManagementPage: React.FC = () => {
     for (let i = 0; i < 12; i++) ean12 += Math.floor(Math.random() * 10);
     return `${ean12}${calculateEAN13Checksum(ean12)}`;
   };
-  const refreshCountsRef = useRef<() => Promise<void>>(async () => { });
+  const refreshCountsRef = useRef<() => Promise<void>>(async () => {});
 
   const normalizeItem = (raw: any, fallbackRow: any) => {
     const r = raw || {};
@@ -686,7 +687,6 @@ const ItemsManagementPage: React.FC = () => {
     setShowCustomerDropdown(false);
   };
 
-
   useEffect(() => {
     const itemIdParam = searchParams.get("itemId");
     if (itemIdParam !== lastItemIdRef.current) {
@@ -694,7 +694,9 @@ const ItemsManagementPage: React.FC = () => {
       lastItemIdRef.current = itemIdParam;
     }
     if (itemIdParam && !showItemPreview && !isExplicitlyClosedRef.current) {
-      const foundRow = tabData.items.find((item) => String(item.id) === String(itemIdParam));
+      const foundRow = tabData.items.find(
+        (item) => String(item.id) === String(itemIdParam),
+      );
       if (foundRow) {
         openItemPreview(foundRow);
       } else {
@@ -808,7 +810,6 @@ const ItemsManagementPage: React.FC = () => {
             : previewForm.transfer_price_EUR,
       };
       await updateItem(previewForm.id, payload);
-      toast.success("Item updated successfully", successStyles);
       setPreviewEdit(false);
       closePreview();
       reloadItems();
@@ -945,7 +946,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(id);
       fetchTab("parents", true);
-    } catch { }
+    } catch {}
   };
 
   const handleBulk = async (action: "activate" | "deactivate" | "delete") => {
@@ -978,7 +979,7 @@ const ItemsManagementPage: React.FC = () => {
         await deleteTaric(id);
       setSelectedTarics(new Set());
       fetchTab("tarics", true);
-    } catch { }
+    } catch {}
   };
 
   const isTaricTab = activeTab === "tarics";
@@ -1146,10 +1147,11 @@ const ItemsManagementPage: React.FC = () => {
             <tr
               key={item.id}
               onClick={() => openItemPreview(item)}
-              className={`cursor-pointer transition-colors ${isNew
-                ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                : "hover:bg-gray-50"
-                }`}
+              className={`cursor-pointer transition-colors ${
+                isNew
+                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                  : "hover:bg-gray-50"
+              }`}
             >
               <td className="px-2 py-2">
                 <div className="w-15 h-15 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
@@ -1158,7 +1160,6 @@ const ItemsManagementPage: React.FC = () => {
                       src={thumb}
                       alt="thumb"
                       className="w-full h-full object-contain bg-white p-1"
-
                       onError={(e) =>
                         ((e.target as HTMLImageElement).style.display = "none")
                       }
@@ -1179,15 +1180,15 @@ const ItemsManagementPage: React.FC = () => {
                   {(item.customer_name ||
                     item.company_name ||
                     item.company) && (
-                      <>
-                        <span>-</span>
-                        <span className="text-blue-600 font-medium">
-                          {item.customer_name ||
-                            item.company_name ||
-                            item.company}
-                        </span>
-                      </>
-                    )}
+                    <>
+                      <span>-</span>
+                      <span className="text-blue-600 font-medium">
+                        {item.customer_name ||
+                          item.company_name ||
+                          item.company}
+                      </span>
+                    </>
+                  )}
                   {item.isLabelPrint && (
                     <>
                       <span>-</span>
@@ -1262,10 +1263,11 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${parent.is_active === "Y"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                  : "bg-gray-50 text-gray-600 border-gray-200"
-                  }`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                  parent.is_active === "Y"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                    : "bg-gray-50 text-gray-600 border-gray-200"
+                }`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
               </span>
@@ -1331,10 +1333,11 @@ const ItemsManagementPage: React.FC = () => {
                       is_stock_item: w.is_stock_item === "Y" ? "N" : "Y",
                     })
                   }
-                  className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${w.is_stock_item === "Y"
-                    ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
-                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
-                    }`}
+                  className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${
+                    w.is_stock_item === "Y"
+                      ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
+                      : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
+                  }`}
                 >
                   {w.is_stock_item === "Y" ? "Remove Stock" : "Add Stock"}
                 </button>
@@ -1685,10 +1688,11 @@ const ItemsManagementPage: React.FC = () => {
                           onChange={(e) =>
                             setFilters({ ...filters, search: e.target.value })
                           }
-                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-900 border-gray-300 bg-white"
-                            }`}
+                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.search
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
                         />
                         {filters.search && (
                           <button
@@ -1714,10 +1718,11 @@ const ItemsManagementPage: React.FC = () => {
                               eanSearch: e.target.value,
                             })
                           }
-                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-900 border-gray-300 bg-white"
-                            }`}
+                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.eanSearch
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
                         />
                         {filters.eanSearch && (
                           <button
@@ -1761,10 +1766,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, isLabel: e.target.value })
                         }
-                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.isLabel
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">isLabel...</option>
                         <option value="Y">Yes</option>
@@ -1781,9 +1787,13 @@ const ItemsManagementPage: React.FC = () => {
                         placeholder="Supplier..."
                         initialLabel={
                           filters.supplier
-                            ? refSuppliers.find((s) => s.id.toString() === filters.supplier)?.company_name ||
-                            refSuppliers.find((s) => s.id.toString() === filters.supplier)?.name ||
-                            ""
+                            ? refSuppliers.find(
+                                (s) => s.id.toString() === filters.supplier,
+                              )?.company_name ||
+                              refSuppliers.find(
+                                (s) => s.id.toString() === filters.supplier,
+                              )?.name ||
+                              ""
                             : ""
                         }
                       />
@@ -1794,10 +1804,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, category: e.target.value })
                         }
-                        className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.category
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">Category</option>
                         {Array.from(

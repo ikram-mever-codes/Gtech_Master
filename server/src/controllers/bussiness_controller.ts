@@ -232,8 +232,8 @@ export const bulkImportBusinesses = async (
         customer.email = businessData.email
           ? businessData.email.trim().toLowerCase()
           : `${companyNameFirstWord
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, ".")}@imported.business`;
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, ".")}@imported.business`;
         customer.stage = "business";
         customer.contactEmail = businessData.contactEmail
           ? businessData.contactEmail.trim().toLowerCase()
@@ -356,7 +356,8 @@ export const bulkImportBusinesses = async (
         for (let i = 0; i < customersToSave.length; i += CHUNK_SIZE) {
           const chunk = customersToSave.slice(i, i + CHUNK_SIZE);
           console.log(
-            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${chunk.length
+            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${
+              chunk.length
             } businesses`,
           );
 
@@ -528,8 +529,6 @@ export const createBusiness = async (
       defaultPaymentDueDays,
     } = req.body;
 
-
-
     const user = (req as any).user;
 
     const dbCompanyName = displayName || name || companyName;
@@ -677,9 +676,13 @@ export const createBusiness = async (
     let finalCustomerNumber = trimmedCustomerNumber;
     if (!finalCustomerNumber) {
       try {
-        finalCustomerNumber = await NumberSequenceService.getNextNumber("customer");
+        finalCustomerNumber =
+          await NumberSequenceService.getNextNumber("customer");
       } catch (err) {
-        console.warn("Could not generate customer number using sequence service:", err);
+        console.warn(
+          "Could not generate customer number using sequence service:",
+          err,
+        );
       }
     }
 
@@ -701,10 +704,19 @@ export const createBusiness = async (
         customer.default_tax_profile_id = default_tax_profile_id || undefined;
         customer.vat_id_status = vat_id_status || "unchecked";
         customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
-        customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
-        customer.defaultPaymentMethod = defaultPaymentMethod ? defaultPaymentMethod.trim() : undefined;
-        customer.defaultShippingMethod = defaultShippingMethod ? defaultShippingMethod.trim() : undefined;
-        customer.defaultPaymentDueDays = defaultPaymentDueDays !== undefined && defaultPaymentDueDays !== null ? parseInt(defaultPaymentDueDays) : 7;
+        customer.addressLine2 = addressAdditional
+          ? addressAdditional.trim()
+          : undefined;
+        customer.defaultPaymentMethod = defaultPaymentMethod
+          ? defaultPaymentMethod.trim()
+          : undefined;
+        customer.defaultShippingMethod = defaultShippingMethod
+          ? defaultShippingMethod.trim()
+          : undefined;
+        customer.defaultPaymentDueDays =
+          defaultPaymentDueDays !== undefined && defaultPaymentDueDays !== null
+            ? parseInt(defaultPaymentDueDays)
+            : 7;
 
         if (isStarCustomer) {
           customer.stage = "star_customer";
@@ -784,8 +796,8 @@ export const createBusiness = async (
           const matched = await countryRepo.findOne({
             where: [
               { iso2: country.trim().toUpperCase() },
-              { name: country.trim() }
-            ]
+              { name: country.trim() },
+            ],
           });
           if (matched) {
             customer.country_id = matched.id;
@@ -904,9 +916,10 @@ export const createBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features.</p>
-        ${defaultList
-          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-          : ""
+        ${
+          defaultList
+            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+            : ""
         }
       `;
 
@@ -954,26 +967,26 @@ export const createBusiness = async (
       note: finalCustomer.businessDetails?.description,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-          inSeries: finalCustomer.starBusinessDetails.inSeries,
-          madeIn: finalCustomer.starBusinessDetails.madeIn,
-          device: finalCustomer.starBusinessDetails.device,
-          industry: finalCustomer.starBusinessDetails.industry,
-          converted_timestamp:
-            finalCustomer.starBusinessDetails.converted_timestamp,
-          convertedBy: finalCustomer.starBusinessDetails.convertedBy
-            ? {
-              id: finalCustomer.starBusinessDetails.convertedBy.id,
-              name: finalCustomer.starBusinessDetails.convertedBy.name,
-              email: finalCustomer.starBusinessDetails.convertedBy.email,
-            }
-            : undefined,
-        }
+            inSeries: finalCustomer.starBusinessDetails.inSeries,
+            madeIn: finalCustomer.starBusinessDetails.madeIn,
+            device: finalCustomer.starBusinessDetails.device,
+            industry: finalCustomer.starBusinessDetails.industry,
+            converted_timestamp:
+              finalCustomer.starBusinessDetails.converted_timestamp,
+            convertedBy: finalCustomer.starBusinessDetails.convertedBy
+              ? {
+                  id: finalCustomer.starBusinessDetails.convertedBy.id,
+                  name: finalCustomer.starBusinessDetails.convertedBy.name,
+                  email: finalCustomer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
+          }
         : undefined,
       defaultList: defaultList
         ? {
-          id: defaultList.id,
-          name: defaultList.name,
-        }
+            id: defaultList.id,
+            name: defaultList.name,
+          }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -1055,8 +1068,6 @@ export const updateBusiness = async (
       defaultShippingMethod,
       defaultPaymentDueDays,
     } = updateData;
-
-
 
     const user = (req as any).user;
 
@@ -1256,20 +1267,29 @@ export const updateBusiness = async (
           customer.vat_id_status = vat_id_status || "unchecked";
         }
         if (defaultPaymentMethod !== undefined) {
-          customer.defaultPaymentMethod = defaultPaymentMethod ? defaultPaymentMethod.trim() : undefined;
+          customer.defaultPaymentMethod = defaultPaymentMethod
+            ? defaultPaymentMethod.trim()
+            : undefined;
         }
         if (defaultShippingMethod !== undefined) {
-          customer.defaultShippingMethod = defaultShippingMethod ? defaultShippingMethod.trim() : undefined;
+          customer.defaultShippingMethod = defaultShippingMethod
+            ? defaultShippingMethod.trim()
+            : undefined;
         }
         if (defaultPaymentDueDays !== undefined) {
-          customer.defaultPaymentDueDays = defaultPaymentDueDays !== null && defaultPaymentDueDays !== "" ? parseInt(defaultPaymentDueDays) : 7;
+          customer.defaultPaymentDueDays =
+            defaultPaymentDueDays !== null && defaultPaymentDueDays !== ""
+              ? parseInt(defaultPaymentDueDays)
+              : 7;
         }
 
         if (asanaLink !== undefined) {
           customer.asanaLink = asanaLink ? asanaLink.trim() : null;
         }
         if (addressAdditional !== undefined) {
-          customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
+          customer.addressLine2 = addressAdditional
+            ? addressAdditional.trim()
+            : undefined;
         }
 
         if (customer.businessDetails) {
@@ -1301,10 +1321,7 @@ export const updateBusiness = async (
 
             const countryRepo = AppDataSource.getRepository(Country);
             const matched = await countryRepo.findOne({
-              where: [
-                { iso2: countryStr.toUpperCase() },
-                { name: countryStr }
-              ]
+              where: [{ iso2: countryStr.toUpperCase() }, { name: countryStr }],
             });
             if (matched) {
               customer.country_id = matched.id;
@@ -1480,9 +1497,10 @@ export const updateBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features and change your password.</p>
-        ${defaultList
-          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-          : ""
+        ${
+          defaultList
+            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+            : ""
         }
       `;
 
@@ -1539,35 +1557,35 @@ export const updateBusiness = async (
       vat_id_check_response_json: finalCustomer.vat_id_check_response_json,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
-          id: finalCustomer.businessDetails.check_by.id,
-          name: finalCustomer.businessDetails.check_by.name,
-          email: finalCustomer.businessDetails.check_by.email,
-        }
+            id: finalCustomer.businessDetails.check_by.id,
+            name: finalCustomer.businessDetails.check_by.name,
+            email: finalCustomer.businessDetails.check_by.email,
+          }
         : undefined,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-          inSeries: finalCustomer.starBusinessDetails.inSeries,
-          madeIn: finalCustomer.starBusinessDetails.madeIn,
-          lastChecked: finalCustomer.starBusinessDetails.lastChecked,
-          checkedBy: finalCustomer.starBusinessDetails.checkedBy,
-          device: finalCustomer.starBusinessDetails.device,
-          industry: finalCustomer.starBusinessDetails.industry,
-          converted_timestamp:
-            finalCustomer.starBusinessDetails.converted_timestamp,
-          convertedBy: finalCustomer.starBusinessDetails.convertedBy
-            ? {
-              id: finalCustomer.starBusinessDetails.convertedBy.id,
-              name: finalCustomer.starBusinessDetails.convertedBy.name,
-              email: finalCustomer.starBusinessDetails.convertedBy.email,
-            }
-            : undefined,
-        }
+            inSeries: finalCustomer.starBusinessDetails.inSeries,
+            madeIn: finalCustomer.starBusinessDetails.madeIn,
+            lastChecked: finalCustomer.starBusinessDetails.lastChecked,
+            checkedBy: finalCustomer.starBusinessDetails.checkedBy,
+            device: finalCustomer.starBusinessDetails.device,
+            industry: finalCustomer.starBusinessDetails.industry,
+            converted_timestamp:
+              finalCustomer.starBusinessDetails.converted_timestamp,
+            convertedBy: finalCustomer.starBusinessDetails.convertedBy
+              ? {
+                  id: finalCustomer.starBusinessDetails.convertedBy.id,
+                  name: finalCustomer.starBusinessDetails.convertedBy.name,
+                  email: finalCustomer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
+          }
         : undefined,
       defaultList: defaultList
         ? {
-          id: defaultList.id,
-          name: defaultList.name,
-        }
+            id: defaultList.id,
+            name: defaultList.name,
+          }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -1661,54 +1679,54 @@ export const getBusinessById = async (
       vat_id_check_response_json: customer.vat_id_check_response_json,
       businessDetails: customer.businessDetails
         ? {
-          ...customer.businessDetails,
-          check_by: customer.businessDetails.check_by
-            ? {
-              id: customer.businessDetails.check_by.id,
-              name: customer.businessDetails.check_by.name,
-              email: customer.businessDetails.check_by.email,
-            }
-            : undefined,
-        }
+            ...customer.businessDetails,
+            check_by: customer.businessDetails.check_by
+              ? {
+                  id: customer.businessDetails.check_by.id,
+                  name: customer.businessDetails.check_by.name,
+                  email: customer.businessDetails.check_by.email,
+                }
+              : undefined,
+          }
         : undefined,
       starBusinessDetails: customer.starBusinessDetails
         ? {
-          id: customer.starBusinessDetails.id,
-          inSeries: customer.starBusinessDetails.inSeries,
-          madeIn: customer.starBusinessDetails.madeIn,
-          lastChecked: customer.starBusinessDetails.lastChecked,
-          checkedBy: customer.starBusinessDetails.checkedBy,
-          device: customer.starBusinessDetails.device,
-          industry: customer.starBusinessDetails.industry,
-          converted_timestamp:
-            customer.starBusinessDetails.converted_timestamp,
-          convertedBy: customer.starBusinessDetails.convertedBy
-            ? {
-              id: customer.starBusinessDetails.convertedBy.id,
-              name: customer.starBusinessDetails.convertedBy.name,
-              email: customer.starBusinessDetails.convertedBy.email,
-            }
-            : undefined,
-          comment: customer.starBusinessDetails.comment,
-          createdAt: customer.starBusinessDetails.createdAt,
-          updatedAt: customer.starBusinessDetails.updatedAt,
-        }
+            id: customer.starBusinessDetails.id,
+            inSeries: customer.starBusinessDetails.inSeries,
+            madeIn: customer.starBusinessDetails.madeIn,
+            lastChecked: customer.starBusinessDetails.lastChecked,
+            checkedBy: customer.starBusinessDetails.checkedBy,
+            device: customer.starBusinessDetails.device,
+            industry: customer.starBusinessDetails.industry,
+            converted_timestamp:
+              customer.starBusinessDetails.converted_timestamp,
+            convertedBy: customer.starBusinessDetails.convertedBy
+              ? {
+                  id: customer.starBusinessDetails.convertedBy.id,
+                  name: customer.starBusinessDetails.convertedBy.name,
+                  email: customer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
+            comment: customer.starBusinessDetails.comment,
+            createdAt: customer.starBusinessDetails.createdAt,
+            updatedAt: customer.starBusinessDetails.updatedAt,
+          }
         : undefined,
       starCustomerDetails: customer.starCustomerDetails
         ? {
-          id: customer.starCustomerDetails.id,
-          taxNumber: customer.starCustomerDetails.taxNumber,
-          accountVerificationStatus:
-            customer.starCustomerDetails.accountVerificationStatus,
-          isEmailVerified: customer.starCustomerDetails.isEmailVerified,
-          deliveryAddressLine1:
-            customer.starCustomerDetails.deliveryAddressLine1,
-          deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
-          deliveryCity: customer.starCustomerDetails.deliveryCity,
-          deliveryCountry: customer.starCustomerDetails.deliveryCountry,
-          createdAt: customer.starCustomerDetails.createdAt,
-          updatedAt: customer.starCustomerDetails.updatedAt,
-        }
+            id: customer.starCustomerDetails.id,
+            taxNumber: customer.starCustomerDetails.taxNumber,
+            accountVerificationStatus:
+              customer.starCustomerDetails.accountVerificationStatus,
+            isEmailVerified: customer.starCustomerDetails.isEmailVerified,
+            deliveryAddressLine1:
+              customer.starCustomerDetails.deliveryAddressLine1,
+            deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
+            deliveryCity: customer.starCustomerDetails.deliveryCity,
+            deliveryCountry: customer.starCustomerDetails.deliveryCountry,
+            createdAt: customer.starCustomerDetails.createdAt,
+            updatedAt: customer.starCustomerDetails.updatedAt,
+          }
         : undefined,
       website: customer.businessDetails?.website,
       hasWebsite: !!customer.businessDetails?.website,
@@ -1956,7 +1974,8 @@ export const getAllBusinesses = async (
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
         vatTaxId: customer.vatTaxId,
-        deliveryAddressLine1: customer.starCustomerDetails?.deliveryAddressLine1,
+        deliveryAddressLine1:
+          customer.starCustomerDetails?.deliveryAddressLine1,
         deliveryPostalCode: customer.starCustomerDetails?.deliveryPostalCode,
         deliveryCity: customer.starCustomerDetails?.deliveryCity,
         deliveryCountry: customer.starCustomerDetails?.deliveryCountry,
@@ -1966,6 +1985,9 @@ export const getAllBusinesses = async (
         vat_id_checked_at: customer.vat_id_checked_at,
         vat_id_check_source: customer.vat_id_check_source,
         vat_id_check_response_json: customer.vat_id_check_response_json,
+        defaultPaymentMethod: customer.defaultPaymentMethod,
+        defaultShippingMethod: customer.defaultShippingMethod,
+        defaultPaymentDueDays: customer.defaultPaymentDueDays,
         tags: customer.tags,
         tagOrder: customer.tagOrder,
         createdAt: customer.createdAt,
