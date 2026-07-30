@@ -1687,6 +1687,7 @@ const InvoiceListPage: React.FC = () => {
     } else if (activeInvTab === "auftrag") {
       list = orders.filter(
         (o: any) =>
+          !o.bestellung_status &&
           (String(o.order_no).startsWith("MA") ||
             String(o.order_no).startsWith("B")) &&
           o.status !== 2 &&
@@ -1696,6 +1697,7 @@ const InvoiceListPage: React.FC = () => {
     } else if (activeInvTab === "bestellung") {
       list = orders.filter(
         (o: any) =>
+          !!o.bestellung_status ||
           String(o.order_no).startsWith("DE") ||
           o.status === 2 ||
           o.is_fulfilled ||
