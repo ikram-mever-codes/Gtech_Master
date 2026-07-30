@@ -95,6 +95,8 @@ import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
 import { resolveGtechFonts } from "../utils/gtech_fonts";
+// @ts-ignore
+import SVGtoPDF from "svg-to-pdfkit";
 import {
   registerGtechFonts,
   fontRegular,
@@ -104,6 +106,37 @@ import {
 } from "../services/gtechDocumentTemplate";
 
 import { In } from "typeorm";
+
+let cachedCustomerSvg: string | null = null;
+
+function drawCustomerSvgBackground(doc: any): void {
+  if (cachedCustomerSvg === null) {
+    const svgPath = path.join(process.cwd(), "public/Customer_Document.svg");
+    if (fs.existsSync(svgPath)) {
+      try {
+        const rawSvg = fs.readFileSync(svgPath, "utf8");
+        cachedCustomerSvg = rawSvg.replace(/<path[^>]*id="path25"[^>]*\/>/gi, "");
+      } catch (err) {
+        console.error("Failed to load Customer_Document.svg:", err);
+        cachedCustomerSvg = "";
+      }
+    } else {
+      cachedCustomerSvg = "";
+    }
+  }
+
+  if (cachedCustomerSvg) {
+    try {
+      SVGtoPDF(doc, cachedCustomerSvg, 0, 0, {
+        width: 595.28,
+        height: 841.89,
+        preserveAspectRatio: "none",
+      });
+    } catch (e) {
+      console.error("Error rendering Customer_Document.svg background:", e);
+    }
+  }
+}
 
 const formatCountry = (country?: string | null): string => {
   if (!country) return "";
@@ -2940,7 +2973,7 @@ export class OfferController {
       const M = fontMedium(gtechFonts);
       const SB = fontSemiBold(gtechFonts);
 
-      drawGtechBrandLayer(doc, gtechFonts);
+      drawCustomerSvgBackground(doc);
 
       let customer: any = {};
       if (offer.customerSnapshot) {
@@ -3031,43 +3064,15 @@ export class OfferController {
         addrY += 12;
       }
 
-      const titleBoxX = MM(125);
-      const titleBoxY = MM(48);
-      const titleBoxW = MM(67);
-
-      doc.font(SB).fontSize(14);
-      const angebotLabelW = doc.widthOfString("Angebot") + 8;
-      const titleTextX = titleBoxX + angebotLabelW;
-      const titleTextW = titleBoxW - angebotLabelW - 4;
-
-      const fontTitleSize = offer.title && offer.title.length > 35 ? 8.5 : 9.5;
-      doc.font(R).fontSize(fontTitleSize);
-      const titleHeight = offer.title
-        ? doc.heightOfString(offer.title, { width: titleTextW - 6 })
-        : 0;
-      const titleBoxH = Math.max(22, titleHeight + 10);
-
-      doc.rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH).fill("#D1D5DB");
-
-      doc
-        .font(SB)
-        .fontSize(14)
-        .fillColor("#3F4446")
-        .text("Angebot", titleBoxX + 6, titleBoxY + 5, {
-          lineBreak: false,
-        });
-
-      if (offer.title) {
-        doc
-          .font(R)
-          .fontSize(fontTitleSize)
-          .fillColor("#3F4446")
-          .text(offer.title, titleBoxX + 70, titleBoxY + 6, {
-            width: titleBoxW - 75,
-            align: "right",
-            lineBreak: false,
-          });
-      }
+      // Render dynamic Document Title at x_Document_Title SVG location
+      const docTitleText = offer.title
+        ? `Angebot ${offer.offerNumber || ""}: ${offer.title}`
+        : `Angebot ${offer.offerNumber || ""}`;
+      doc.font(SB).fontSize(14).fillColor("#2F6B46").text(docTitleText, MM(100), MM(65), {
+        align: "right",
+        width: MM(92),
+        lineBreak: false,
+      });
 
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
@@ -3086,6 +3091,11 @@ export class OfferController {
             "—",
         ],
       ];
+
+      const titleBoxX = MM(125);
+      const titleBoxY = MM(48);
+      const titleBoxW = MM(67);
+      const titleBoxH = 22;
 
       let infoY = titleBoxY + titleBoxH + 8;
       const LABEL_W = MM(32);
@@ -3250,7 +3260,7 @@ export class OfferController {
               .stroke();
 
             doc.addPage();
-            drawGtechBrandLayer(doc, gtechFonts);
+            drawCustomerSvgBackground(doc);
 
             const newTableY = MM(30);
             doc.font(SB).fontSize(8).fillColor("#3F4446");
@@ -3326,7 +3336,7 @@ export class OfferController {
 
       if (yPos + 120 > MM(265)) {
         doc.addPage();
-        drawGtechBrandLayer(doc, gtechFonts);
+        drawCustomerSvgBackground(doc);
         yPos = MM(30);
       }
 
@@ -3423,7 +3433,7 @@ export class OfferController {
 
       if (yPos + notesHeight > MM(265)) {
         doc.addPage();
-        drawGtechBrandLayer(doc, gtechFonts);
+        drawCustomerSvgBackground(doc);
         yPos = MM(30);
       }
 
