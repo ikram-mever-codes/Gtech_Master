@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const shipping_address_controller_1 = require("../controllers/shipping_address_controller");
+const authorized_1 = require("../middlewares/authorized");
+const router = (0, express_1.Router)({ mergeParams: true });
+router.get("/", authorized_1.authenticateUser, shipping_address_controller_1.getShippingAddresses);
+router.post("/", authorized_1.authenticateUser, shipping_address_controller_1.createShippingAddress);
+router.put("/:addressId", authorized_1.authenticateUser, shipping_address_controller_1.updateShippingAddress);
+router.delete("/:addressId", authorized_1.authenticateUser, shipping_address_controller_1.deleteShippingAddress);
+router.patch("/:addressId/default", authorized_1.authenticateUser, shipping_address_controller_1.setDefaultShippingAddress);
+exports.default = router;

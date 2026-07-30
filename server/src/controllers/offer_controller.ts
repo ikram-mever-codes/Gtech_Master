@@ -675,30 +675,31 @@ export class OfferController {
   private customerRepository = AppDataSource.getRepository(Customer);
 
   private async generateOfferNumber(): Promise<string> {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    try {
+      const { NumberSequenceService } = await import("../services/number_sequence_service");
+      return await NumberSequenceService.getNextNumber("offer");
+    } catch (e) {
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
 
-    const pattern = `OFF-${year}${month}-%`;
-    const offers = await this.offerRepository
-      .createQueryBuilder("offer")
-      .select(["offer.offerNumber"])
-      .where("offer.offerNumber LIKE :pattern", { pattern })
-      .getMany();
+      const offers = await this.offerRepository
+        .createQueryBuilder("offer")
+        .select(["offer.offerNumber"])
+        .getMany();
 
-    let maxSeq = 0;
-    for (const off of offers) {
-      if (off.offerNumber) {
-        const parts = off.offerNumber.split("-");
-        const num = parseInt(parts[parts.length - 1], 10);
-        if (!isNaN(num) && num > maxSeq) {
-          maxSeq = num;
+      let maxSeq = 0;
+      for (const off of offers) {
+        if (off.offerNumber) {
+          const parts = off.offerNumber.split("-");
+          const num = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(num) && num > maxSeq) {
+            maxSeq = num;
+          }
         }
       }
+      return `A${year}${month}-${maxSeq + 1}`;
     }
-
-    const sequence = maxSeq + 1;
-    return `OFF-${year}${month}-${sequence}`;
   }
 
   private buildCustomerSnapshot(customer: Customer | any): CustomerSnapshot {
