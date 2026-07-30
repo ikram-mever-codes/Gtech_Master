@@ -3070,12 +3070,24 @@ export class OfferController {
         addrY += 12;
       }
 
-      const docTitleText = offer.title
-        ? `Angebot ${offer.offerNumber || ""}: ${offer.title}`
-        : `Angebot ${offer.offerNumber || ""}`;
-      doc.font(SB).fontSize(13).fillColor("#2F6B46").text(docTitleText, MM(100), MM(36), {
+      const titleBoxX = MM(125);
+      const titleBoxY = MM(48);
+      const titleBoxW = MM(67);
+      const titleBoxH = 22;
+
+      // Grey title box background matching Image 2 design
+      doc.rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH).fill("#D1D5DB");
+
+      // "Angebot" label on left inside grey box
+      doc.font(SB).fontSize(12).fillColor("#3F4446").text("Angebot", titleBoxX + 6, titleBoxY + 5, {
+        lineBreak: false,
+      });
+
+      // Dynamic Title / Offer Number on right inside grey box
+      const titleText = offer.title || offer.offerNumber || "";
+      doc.font(R).fontSize(9.5).fillColor("#3F4446").text(titleText, titleBoxX + 65, titleBoxY + 6, {
+        width: titleBoxW - 70,
         align: "right",
-        width: MM(92),
         lineBreak: false,
       });
 
@@ -3097,11 +3109,10 @@ export class OfferController {
         ],
       ];
 
-      const titleBoxX = MM(125);
-      let infoY = MM(48);
+      let infoY = titleBoxY + titleBoxH + 8;
       const LABEL_W = MM(32);
       const VALUE_X = titleBoxX + LABEL_W + 4;
-      const VALUE_W = MM(67) - LABEL_W - 4;
+      const VALUE_W = titleBoxW - LABEL_W - 4;
 
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
