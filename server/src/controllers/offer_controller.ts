@@ -32,16 +32,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -52,7 +52,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -95,6 +95,8 @@ import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
 import { resolveGtechFonts } from "../utils/gtech_fonts";
+// @ts-ignore
+import SVGtoPDF from "svg-to-pdfkit";
 import {
   registerGtechFonts,
   fontRegular,
@@ -105,6 +107,37 @@ import {
 
 import { In } from "typeorm";
 import { WarehouseItem } from "../models/warehouse_items";
+
+let cachedCustomerSvg: string | null = null;
+
+function drawCustomerSvgBackground(doc: any): void {
+  if (cachedCustomerSvg === null) {
+    const svgPath = path.join(process.cwd(), "public/Customer_Document.svg");
+    if (fs.existsSync(svgPath)) {
+      try {
+        const rawSvg = fs.readFileSync(svgPath, "utf8");
+        cachedCustomerSvg = rawSvg.replace(/<path[^>]*id="path25"[^>]*\/>/gi, "");
+      } catch (err) {
+        console.error("Failed to load Customer_Document.svg:", err);
+        cachedCustomerSvg = "";
+      }
+    } else {
+      cachedCustomerSvg = "";
+    }
+  }
+
+  if (cachedCustomerSvg) {
+    try {
+      SVGtoPDF(doc, cachedCustomerSvg, 0, 0, {
+        width: 595.28,
+        height: 841.89,
+        preserveAspectRatio: "none",
+      });
+    } catch (e) {
+      console.error("Error rendering Customer_Document.svg background:", e);
+    }
+  }
+}
 
 const formatCountry = (country?: string | null): string => {
   if (!country) return "";
@@ -643,19 +676,25 @@ export class OfferController {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
 
-    const result = await this.offerRepository
+    const pattern = `OFF-${year}${month}-%`;
+    const offers = await this.offerRepository
       .createQueryBuilder("offer")
-      .select(
-        "MAX(CAST(SUBSTRING_INDEX(offer.offerNumber, '-', -1) AS UNSIGNED))",
-        "maxSeq",
-      )
-      .where("offer.offerNumber LIKE :pattern", {
-        pattern: `OFF-${year}${month}-%`,
-      })
-      .getRawOne();
+      .select(["offer.offerNumber"])
+      .where("offer.offerNumber LIKE :pattern", { pattern })
+      .getMany();
 
-    const sequence = result?.maxSeq ? parseInt(result.maxSeq) + 1 : 1;
+    let maxSeq = 0;
+    for (const off of offers) {
+      if (off.offerNumber) {
+        const parts = off.offerNumber.split("-");
+        const num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    }
 
+    const sequence = maxSeq + 1;
     return `OFF-${year}${month}-${sequence}`;
   }
 
@@ -880,9 +919,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-                createOfferDto.defaultPriceMatrix,
-                createOfferDto.totalPriceDecimalPlaces || 2,
-              )
+              createOfferDto.defaultPriceMatrix,
+              createOfferDto.totalPriceDecimalPlaces || 2,
+            )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -2510,10 +2549,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                    totalPriceDecimalPlaces,
-                  ),
-                );
+                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                  totalPriceDecimalPlaces,
+                ),
+              );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -2723,11 +2762,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-                ...tpl,
-                price: match.price,
-                total: match.total,
-                isActive: match.isActive,
-              }
+              ...tpl,
+              price: match.price,
+              total: match.total,
+              isActive: match.isActive,
+            }
             : { ...tpl };
         });
 
@@ -3012,7 +3051,7 @@ export class OfferController {
       const M = fontMedium(gtechFonts);
       const SB = fontSemiBold(gtechFonts);
 
-      drawGtechBrandLayer(doc, gtechFonts);
+      drawCustomerSvgBackground(doc);
 
       let customer: any = {};
       if (offer.customerSnapshot) {
@@ -3103,43 +3142,14 @@ export class OfferController {
         addrY += 12;
       }
 
-      const titleBoxX = MM(125);
-      const titleBoxY = MM(48);
-      const titleBoxW = MM(67);
-
-      doc.font(SB).fontSize(14);
-      const angebotLabelW = doc.widthOfString("Angebot") + 8;
-      const titleTextX = titleBoxX + angebotLabelW;
-      const titleTextW = titleBoxW - angebotLabelW - 4;
-
-      const fontTitleSize = offer.title && offer.title.length > 35 ? 8.5 : 9.5;
-      doc.font(R).fontSize(fontTitleSize);
-      const titleHeight = offer.title
-        ? doc.heightOfString(offer.title, { width: titleTextW - 6 })
-        : 0;
-      const titleBoxH = Math.max(22, titleHeight + 10);
-
-      doc.rect(titleBoxX, titleBoxY, titleBoxW, titleBoxH).fill("#D1D5DB");
-
-      doc
-        .font(SB)
-        .fontSize(14)
-        .fillColor("#3F4446")
-        .text("Angebot", titleBoxX + 6, titleBoxY + 5, {
-          lineBreak: false,
-        });
-
-      if (offer.title) {
-        doc
-          .font(R)
-          .fontSize(fontTitleSize)
-          .fillColor("#3F4446")
-          .text(offer.title, titleBoxX + 70, titleBoxY + 6, {
-            width: titleBoxW - 75,
-            align: "right",
-            lineBreak: false,
-          });
-      }
+      const docTitleText = offer.title
+        ? `Angebot ${offer.offerNumber || ""}: ${offer.title}`
+        : `Angebot ${offer.offerNumber || ""}`;
+      doc.font(SB).fontSize(13).fillColor("#2F6B46").text(docTitleText, MM(100), MM(36), {
+        align: "right",
+        width: MM(92),
+        lineBreak: false,
+      });
 
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
@@ -3154,15 +3164,16 @@ export class OfferController {
         [
           "Kundennr.",
           offer.inquiry?.customer?.customerNumber ||
-            customer.customerNumber ||
-            "—",
+          customer.customerNumber ||
+          "—",
         ],
       ];
 
-      let infoY = titleBoxY + titleBoxH + 8;
+      const titleBoxX = MM(125);
+      let infoY = MM(48);
       const LABEL_W = MM(32);
       const VALUE_X = titleBoxX + LABEL_W + 4;
-      const VALUE_W = titleBoxW - LABEL_W - 4;
+      const VALUE_W = MM(67) - LABEL_W - 4;
 
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
@@ -3322,7 +3333,7 @@ export class OfferController {
               .stroke();
 
             doc.addPage();
-            drawGtechBrandLayer(doc, gtechFonts);
+            drawCustomerSvgBackground(doc);
 
             const newTableY = MM(30);
             doc.font(SB).fontSize(8).fillColor("#3F4446");
@@ -3398,7 +3409,7 @@ export class OfferController {
 
       if (yPos + 120 > MM(265)) {
         doc.addPage();
-        drawGtechBrandLayer(doc, gtechFonts);
+        drawCustomerSvgBackground(doc);
         yPos = MM(30);
       }
 
@@ -3495,7 +3506,7 @@ export class OfferController {
 
       if (yPos + notesHeight > MM(265)) {
         doc.addPage();
-        drawGtechBrandLayer(doc, gtechFonts);
+        drawCustomerSvgBackground(doc);
         yPos = MM(30);
       }
 

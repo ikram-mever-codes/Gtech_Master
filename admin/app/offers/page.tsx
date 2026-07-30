@@ -271,9 +271,6 @@ const OffersPage: React.FC<any> = ({
     }
 
     try {
-      toast.loading(`Converting Offer ${offer.offerNumber} to Auftrag...`, {
-        id: "convert-offer-toast",
-      });
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
       const validItems = lineItems

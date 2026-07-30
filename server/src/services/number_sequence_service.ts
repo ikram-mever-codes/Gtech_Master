@@ -45,17 +45,25 @@ export class NumberSequenceService {
         const defaultStart = sequenceKey === "customer" ? 83777 : 1;
 
         if (sequenceKey === "customer") {
-          const rawMax = await manager
+          const customers = await manager
             .getRepository(Customer)
             .createQueryBuilder("c")
-            .select(
-              "MAX(CAST(SUBSTRING(c.customerNumber, 2) AS UNSIGNED))",
-              "maxNum",
-            )
+            .select(["c.customerNumber"])
             .where("c.customerNumber LIKE 'K%'")
-            .getRawOne();
+            .getMany();
 
-          const maxNum = rawMax?.maxNum ? parseInt(rawMax.maxNum, 10) : 0;
+          let maxNum = 0;
+          for (const cust of customers) {
+            if (cust.customerNumber) {
+              const match = cust.customerNumber.match(/\d+/);
+              if (match) {
+                const n = parseInt(match[0], 10);
+                if (!isNaN(n) && n > maxNum) {
+                  maxNum = n;
+                }
+              }
+            }
+          }
           runningNo = Math.max(defaultStart, maxNum + 1);
         } else {
           const maxRecord = await manager
