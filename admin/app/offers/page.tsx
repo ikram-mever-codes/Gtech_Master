@@ -143,7 +143,7 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                     <img
                       src={thumb}
                       alt="thumb"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       onError={(e) =>
                         ((e.target as HTMLImageElement).style.display = "none")
                       }

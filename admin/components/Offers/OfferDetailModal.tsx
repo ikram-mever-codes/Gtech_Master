@@ -2030,7 +2030,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                       <img
                                         src={thumb}
                                         alt="thumb"
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-contain"
                                         onError={(e) =>
                                           ((
                                             e.target as HTMLImageElement
