@@ -2033,7 +2033,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 <td className="px-2 py-2">
                                   {edit ? (
                                     <TextCellInput
-                                      value={item.material}
+                                      value={item.itemNo}
                                       placeholder="Art.-Nr."
                                       onCommit={(raw) =>
                                         persistLine(item.id, { material: raw })
@@ -2046,7 +2046,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 <td className="px-2 py-2">
                                   {edit ? (
                                     <TextCellInput
-                                      value={item.itemName}
+                                      value={item.itemNo}
                                       onCommit={(raw) =>
                                         persistLine(item.id, {
                                           itemName: raw || item.itemName,
@@ -2054,7 +2054,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                       }
                                     />
                                   ) : (
-                                    <span>{item.itemName}</span>
+                                    <span>{item.itemNo}</span>
                                   )}
                                 </td>
                                 <td className="px-2 py-2">

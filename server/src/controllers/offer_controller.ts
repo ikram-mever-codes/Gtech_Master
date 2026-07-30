@@ -1158,6 +1158,25 @@ export class OfferController {
       const savedOffer = await this.offerRepository.save(offer);
       const lineItems = orderedItems.map((item, idx) => {
         const snap = this.buildItemSnapshot(item);
+
+        // ---------------------------------------------------------------
+        // NEW: pull the price and item number straight from the source
+        // Item entity, so the offer line item starts pre-filled with the
+        // item's own values instead of only whatever buildItemSnapshot()
+        // already derives.
+        //
+        // - basePrice  <- item.price (the Item entity's own `price` column)
+        // - material   <- item's item number. Item doesn't have a plain
+        //   "itemNo" column itself; ItemID_DE is the closest direct
+        //   identifier on the entity, with parent_no_de as a fallback for
+        //   items that only carry the number via their parent link.
+        //   Adjust this fallback chain if your "item no" should come from
+        //   a different column.
+        // ---------------------------------------------------------------
+        const itemNo = item.ItemID_DE
+          ? String(item.ItemID_DE)
+          : item.parent_no_de || "";
+
         return this.lineItemRepository.create({
           offer: savedOffer,
           offerId: savedOffer.id,
@@ -1172,6 +1191,8 @@ export class OfferController {
           purchasePrice: snap.purchasePrice,
           purchaseCurrency: snap.purchaseCurrency,
           baseQuantity: body.baseQuantity || "1",
+          basePrice: item.price ?? 0,
+          material: itemNo,
           position: idx + 1,
           priceMatrix:
             pricingMode === "matrix"
@@ -1206,7 +1227,6 @@ export class OfferController {
       });
     }
   }
-
   async createLineItem(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -1605,6 +1625,125 @@ export class OfferController {
     }
   }
 
+  async getOfferById(request: Request, response: Response) {
+    try {
+      const { id } = request.params;
+
+      const offer = await this.offerRepository.findOne({
+        where: { id },
+        relations: [
+          "lineItems",
+          "inquiry",
+          "inquiry.customer",
+          "inquiry.requests",
+        ],
+      });
+
+      if (!offer) {
+        return response.status(404).json({
+          success: false,
+          message: "Offer not found",
+        });
+      }
+
+      if (offer.subtotal === 0 && offer.totalAmount === 0) {
+        await this.calculateOfferTotals(offer.id);
+        const updatedOffer = await this.offerRepository.findOne({
+          where: { id },
+          relations: ["lineItems"],
+        });
+        if (updatedOffer) {
+          offer.subtotal = updatedOffer.subtotal;
+          offer.taxAmount = updatedOffer.taxAmount;
+          offer.totalAmount = updatedOffer.totalAmount;
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // NEW: backfill `material` (Art.-Nr.) / `basePrice` (Price) from the
+      // originating Item whenever a line item is missing them — e.g. for
+      // line items created before this snapshot logic existed, or ones
+      // whose sourceItemId points to an item that never had these set on
+      // creation. Only touches line items that actually have a
+      // sourceItemId and are missing the value; never overwrites a value
+      // that's already there (so manual edits in the offer itself are
+      // preserved).
+      // ---------------------------------------------------------------
+      if (offer.lineItems && offer.lineItems.length > 0) {
+        const missingIds = offer.lineItems
+          .filter(
+            (li: any) =>
+              li.sourceItemId &&
+              (li.material === null ||
+                li.material === undefined ||
+                li.material === "" ||
+                li.basePrice === null ||
+                li.basePrice === undefined),
+          )
+          .map((li: any) => Number(li.sourceItemId))
+          .filter((id: number) => !isNaN(id));
+
+        if (missingIds.length > 0) {
+          const itemRepository = AppDataSource.getRepository(Item);
+          const sourceItems = await itemRepository.find({
+            where: { id: In(Array.from(new Set(missingIds))) },
+          });
+          const itemById = new Map(
+            sourceItems.map((it: any) => [String(it.id), it]),
+          );
+
+          let needsSave = false;
+          for (const li of offer.lineItems as any[]) {
+            if (!li.sourceItemId) continue;
+            const src = itemById.get(String(li.sourceItemId));
+            if (!src) continue;
+
+            if (
+              li.material === null ||
+              li.material === undefined ||
+              li.material === ""
+            ) {
+              li.material = src.ItemID_DE
+                ? String(src.ItemID_DE)
+                : src.parent_no_de || "";
+              needsSave = true;
+            }
+            if (li.basePrice === null || li.basePrice === undefined) {
+              li.basePrice = src.price ?? 0;
+              needsSave = true;
+            }
+          }
+
+          if (needsSave) {
+            await this.lineItemRepository.save(offer.lineItems as any[]);
+          }
+        }
+      }
+
+      if (offer.lineItems) {
+        offer.lineItems = offer.lineItems.map((item: any) => ({
+          ...item,
+          // Alias so the "Art.-Nr." cell shows the same value whether the
+          // frontend reads `item.itemNo` (edit mode) or `item.material`
+          // (view mode) — both now resolve to the same stored field.
+          itemNo: item.material,
+          activePrice: this.getActiveMatrixEntry(item),
+        }));
+      }
+
+      return response.status(200).json({
+        success: true,
+        data: offer,
+      });
+    } catch (error) {
+      console.error("Error fetching offer:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
   async getAllOffers(request: Request, response: Response) {
     try {
       const {
@@ -1652,9 +1791,17 @@ export class OfferController {
         }
       }
 
+      const offersWithItemNo = offers.map((offer: any) => ({
+        ...offer,
+        lineItems: (offer.lineItems || []).map((item: any) => ({
+          ...item,
+          itemNo: item.material,
+        })),
+      }));
+
       return response.status(200).json({
         success: true,
-        data: offers,
+        data: offersWithItemNo,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -1670,61 +1817,6 @@ export class OfferController {
       });
     }
   }
-
-  async getOfferById(request: Request, response: Response) {
-    try {
-      const { id } = request.params;
-
-      const offer = await this.offerRepository.findOne({
-        where: { id },
-        relations: [
-          "lineItems",
-          "inquiry",
-          "inquiry.customer",
-          "inquiry.requests",
-        ],
-      });
-
-      if (!offer) {
-        return response.status(404).json({
-          success: false,
-          message: "Offer not found",
-        });
-      }
-
-      if (offer.subtotal === 0 && offer.totalAmount === 0) {
-        await this.calculateOfferTotals(offer.id);
-        const updatedOffer = await this.offerRepository.findOne({
-          where: { id },
-          relations: ["lineItems"],
-        });
-        if (updatedOffer) {
-          offer.subtotal = updatedOffer.subtotal;
-          offer.taxAmount = updatedOffer.taxAmount;
-          offer.totalAmount = updatedOffer.totalAmount;
-        }
-      }
-
-      if (offer.lineItems) {
-        offer.lineItems = offer.lineItems.map((item: any) => ({
-          ...item,
-          activePrice: this.getActiveMatrixEntry(item),
-        }));
-      }
-
-      return response.status(200).json({
-        success: true,
-        data: offer,
-      });
-    } catch (error) {
-      console.error("Error fetching offer:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
-    }
-  }
-
   async updateOffer(request: Request, response: Response) {
     try {
       const { id } = request.params;

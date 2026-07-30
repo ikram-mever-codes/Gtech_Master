@@ -293,9 +293,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status &amp; expiry
-                  </th>
+
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -422,31 +420,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
                             {lineItems.length} items
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1 items-center">
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
-                                offer.status,
-                              )}`}
-                            >
-                              {offer.status}
-                            </span>
-                            {offer.validUntil && (
-                              <div
-                                className={`flex items-center gap-1 text-xs ${
-                                  rowColor ? "opacity-80" : "text-gray-600"
-                                }`}
-                              >
-                                <CalendarIcon
-                                  className={`h-3 w-3 ${
-                                    rowColor ? "" : "text-gray-500"
-                                  }`}
-                                />
-                                {formatDate(offer.validUntil)}
-                              </div>
-                            )}
-                          </div>
-                        </td>
+
                         <td
                           className="px-4 py-3 text-center"
                           onClick={(e) => e.stopPropagation()}
