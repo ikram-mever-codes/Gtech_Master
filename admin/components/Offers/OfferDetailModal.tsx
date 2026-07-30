@@ -242,6 +242,32 @@ const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
 const isFreetextLine = (item: any): boolean =>
   !item?.sourceItemId && !item?.requestedItemId;
 
+// --- Delivery-address-vs-billing comparison ---------------------------------
+const normalizeAddrValue = (v: any): string =>
+  (v || "").toString().trim().toLowerCase();
+
+/** True when the delivery address has nothing set of its own, or when it
+ * matches the billing (customer snapshot) address on street/postal/city/
+ * country — i.e. there's nothing distinct to show the user. */
+const isDeliverySameAsBilling = (deliveryAddr: any, snapshot: any): boolean => {
+  const deliveryStreet = normalizeAddrValue(deliveryAddr?.street);
+  if (!deliveryStreet) return true;
+
+  const billingStreet = normalizeAddrValue(
+    snapshot?.address || snapshot?.street,
+  );
+  const billingPostal = normalizeAddrValue(snapshot?.postalCode);
+  const billingCity = normalizeAddrValue(snapshot?.city);
+  const billingCountry = normalizeAddrValue(snapshot?.country);
+
+  return (
+    deliveryStreet === billingStreet &&
+    normalizeAddrValue(deliveryAddr?.postalCode) === billingPostal &&
+    normalizeAddrValue(deliveryAddr?.city) === billingCity &&
+    normalizeAddrValue(deliveryAddr?.country) === billingCountry
+  );
+};
+
 const Section: React.FC<{
   title: string;
   icon?: React.ReactNode;
@@ -881,6 +907,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
+  /** Persists the highlight color immediately — available from the header
+   * regardless of edit/view mode, so the offer's list-row color can be
+   * changed without entering edit mode. */
+  const setHighlightColor = async (color: string) => {
+    try {
+      await updateOffer(offer.id, { highlightColor: color });
+      patch({ highlightColor: color });
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't update highlight color:", e);
+    }
+  };
+
   const setActive = async (lineItemId: string, idx: number) => {
     try {
       await setActivePrice(lineItemId, idx);
@@ -1124,6 +1164,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     },
   ];
 
+  // --- Delivery-address-vs-billing state (used below in the address block) --
+  const currentDeliveryAddress = offer
+    ? edit
+      ? form.deliveryAddress
+      : offer.deliveryAddress
+    : null;
+  const deliverySameAsBilling = offer
+    ? isDeliverySameAsBilling(currentDeliveryAddress, offer.customerSnapshot)
+    : true;
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -1270,9 +1320,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     />
                   </div>
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                      Delivery:
-                    </p>
+                    {!deliverySameAsBilling && (
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                        Delivery:
+                      </p>
+                    )}{" "}
                     <AddressBlock
                       addr={
                         selectedCustomer.deliveryAddressLine1
@@ -1500,8 +1552,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   Offer {offer.offerNumber}
                 </p>
               </div>
-
               <div className="flex items-center gap-4 flex-shrink-0">
+                <input
+                  type="color"
+                  value={offer.highlightColor || "#ffffff"}
+                  onChange={(e) => setHighlightColor(e.target.value)}
+                  title="Offer highlight color (shown on the offers list row)"
+                  className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+                />
                 <ViewEditToggle
                   isEditEnabled={edit}
                   onToggle={() => (edit ? handleCancelEdit() : setEdit(true))}
@@ -1518,7 +1576,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             </div>
 
             <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
-             
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
                 <div className="md:col-span-1 flex flex-col gap-3">
                   <div className="block mb-1">
@@ -1538,21 +1595,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
 
                   <div className="block mb-1">
-                    <span className="text-sm font-bold text-gray-900">
-                      Delivery:
-                    </span>
+                    {!deliverySameAsBilling && (
+                      <span className="text-sm font-bold text-gray-900">
+                        Delivery:
+                      </span>
+                    )}
                     {edit && (
                       <label className="flex items-center gap-2 mb-3 mt-2 cursor-pointer text-xs font-semibold text-gray-600 select-none">
                         <input
                           type="checkbox"
                           className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                          checked={
-                            !form.deliveryAddress?.street ||
-                            form.deliveryAddress?.street ===
-                              (offer.customerSnapshot?.address ||
-                                offer.customerSnapshot?.street ||
-                                "")
-                          }
+                          checked={deliverySameAsBilling}
                           onChange={(e) => {
                             if (e.target.checked) {
                               patch({
@@ -1592,10 +1645,27 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         Delivery address same as billing address
                       </label>
                     )}
-                    <AddressBlock
-                      addr={edit ? form.deliveryAddress : offer.deliveryAddress}
-                      emptyText="No delivery address set."
-                    />
+                    {deliverySameAsBilling ? (
+                      <div className="text-sm text-gray-500">
+                        Delivery Address is Same
+                      </div>
+                    ) : (
+                      <AddressBlock
+                        addr={{
+                          companyName:
+                            currentDeliveryAddress?.companyName ||
+                            currentDeliveryAddress?.contactName,
+                          legalName: currentDeliveryAddress?.contactName,
+                          address: currentDeliveryAddress?.street,
+                          street: currentDeliveryAddress?.street,
+                          postalCode: currentDeliveryAddress?.postalCode,
+                          city: currentDeliveryAddress?.city,
+                          country: currentDeliveryAddress?.country,
+                          contactPhone: currentDeliveryAddress?.contactPhone,
+                        }}
+                        emptyText="No delivery address set."
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1689,15 +1759,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       }
                     />
                   </Field> */}
-
                   <Field
                     label="Tax profile"
                     edit={false}
-                    value={
-                      taxProfile
-                        ? TAX_PROFILE_LABELS[taxProfile]
-                        : "No shipping country set"
-                    }
+                    value={taxProfile ? taxProfile : "No shipping country set"}
                   />
                 </div>
               </div>
@@ -1826,14 +1891,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
                             Menge
                           </th>
-
                           <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                             Netto-Preis
                           </th>
                           <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                             Netto gesamt
                           </th>
-
                           {edit && <th className="w-10" />}
                         </tr>
                       </thead>
@@ -1950,7 +2013,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   <div className="text-right">{qtyDisplay}</div>
                                 )}
                               </td>
-
                               <td className="px-2 py-2">
                                 {edit ? (
                                   <DecimalInput
@@ -1975,7 +2037,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               <td className="px-2 py-2 text-right font-medium">
                                 {formatCurrency(total || 0, offer.currency)}
                               </td>
-
                               {edit && (
                                 <td className="px-2 py-2 text-center">
                                   <button
@@ -1990,19 +2051,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             </tr>
                           );
                         })}
-
                         {/* Shipping method — always the last row */}
                         <tr className="bg-gray-100/80">
                           <td className="px-2 py-2 text-gray-400">
                             {visibleLineItems.length + 1}
                           </td>
                           <td className="px-2 py-2 text-gray-400"></td>
-
                           <td className="px-2 py-2 text-gray-400">—</td>
                           <td className="px-2 py-2 text-gray-700">
                             {offer.shippingMethod || "No shipping method set"}
                           </td>
-
                           <td className="px-0 py-2 text-center text-gray-400"></td>
                           <td className="px-2 py-2 text-center text-gray-600">
                             {offer.taxRate ?? 19}%
@@ -2010,7 +2068,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           <td className="px-2 py-2 text-right text-gray-600">
                             1
                           </td>
-
                           <td className="px-2 py-2 text-right text-gray-600">
                             {formatCurrency(
                               offer.shippingCost || 0,
@@ -2039,7 +2096,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           Add existing item
                         </button>
                       </div>
-
                       {showItemPicker && (
                         <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
                           <input
@@ -2068,7 +2124,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </div>
                         </div>
                       )}
-
                       <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
                         <div className="flex-1">
                           <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2119,11 +2174,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       No line items yet.
                     </div>
                   )}
-
                   {visibleLineItems.map((item: any) => {
                     const total = getLineItemTotal(item, pricingMode);
                     const thumb = item.photo;
-
                     return (
                       <div
                         key={item.id}
@@ -2173,7 +2226,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             )}
                           </div>
                         </div>
-
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium text-gray-900">
@@ -2325,7 +2377,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       </div>
                     );
                   })}
-
                   {edit && (
                     <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
                       <div className="flex-1">
@@ -2410,7 +2461,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     value={formatWeight(totalWeightKg)}
                   />
                 </div>
-
                 {/* <Field
                       label="Discount %"
                       edit={edit}
@@ -2534,7 +2584,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </p>
                   )}
                 </Section>
-
                 <Section
                   title="Comment intern"
                   icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
