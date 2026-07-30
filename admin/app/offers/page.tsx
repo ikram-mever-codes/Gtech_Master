@@ -598,15 +598,16 @@ const OffersPage: React.FC<any> = ({
                               {offer.customerSnapshot?.companyName}
                             </div>
                           </div>
-                          {offer.customerSnapshot?.vatId && (
-                            <div
-                              className={`text-xs mt-0.5 ${
-                                rowColor ? "opacity-80" : "text-gray-500"
-                              }`}
-                            >
-                              VAT: {offer.customerSnapshot.vatId}
-                            </div>
-                          )}
+                          {offer.customerSnapshot.country === "Germany" &&
+                            offer.customerSnapshot?.vatId && (
+                              <div
+                                className={`text-xs mt-0.5 ${
+                                  rowColor ? "opacity-80" : "text-gray-500"
+                                }`}
+                              >
+                                VAT: {offer.customerSnapshot.vatId}
+                              </div>
+                            )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="text-sm font-bold">
