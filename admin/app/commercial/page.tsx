@@ -555,9 +555,6 @@ const InvoiceListPage: React.FC = () => {
 
   const handleMoveToFulfillment = async (order: any) => {
     try {
-      toast.loading(`Moving order ${order.order_no} to Fulfillment...`, {
-        id: "fulfill-order-toast",
-      });
       await updateOrder(order.id, {
         status: 2,
         comment: `${order.comment || ""} [Moved to Fulfillment]`.trim(),
@@ -1128,7 +1125,6 @@ const InvoiceListPage: React.FC = () => {
       else if (response?.data) setOrders(response.data);
     } catch (error) {
       console.error("Error fetching Orders:", error);
-      toast.error("Failed to fetch orders");
     } finally {
       setLoadingOrders(false);
     }
@@ -1142,7 +1138,6 @@ const InvoiceListPage: React.FC = () => {
       else if (response?.data) setOffers(response.data);
     } catch (error) {
       console.error("Error fetching Offers:", error);
-      toast.error("Failed to fetch offers");
     } finally {
       setLoadingOffers(false);
     }
