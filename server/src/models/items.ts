@@ -75,7 +75,7 @@ export class Item {
   @Column({ type: "decimal", precision: 10, scale: 0, nullable: true })
   FSQ?: number;
 
-  @Column({ type: "char", length: 1, default: "Y" })
+  @Column({ type: "char", length: 1, default: "N" })
   is_qty_dividable!: string;
 
   @Column({ default: 0 })
