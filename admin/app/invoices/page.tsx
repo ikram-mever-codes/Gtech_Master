@@ -1105,11 +1105,15 @@ const InvoiceListPage: React.FC = () => {
   }, [orders, orderNoFilter, searchParams]);
 
   const filteredOrders = useMemo(() => {
-    // Only show orders with bestellung_status = 'to_be_processed' OR 'partially_delivered' in Fulfillment
     let list = orders.filter(
       (o: any) =>
         o.bestellung_status === "to_be_processed" ||
-        o.bestellung_status === "partially_delivered",
+        o.bestellung_status === "partially_delivered" ||
+        ((!o.bestellung_status || o.bestellung_status === "draft") &&
+          (String(o.order_no).startsWith("DE") ||
+            o.status === 2 ||
+            o.is_fulfilled ||
+            (o.comment || "").includes("[Moved to Fulfillment]"))),
     );
     const filterParam = searchParams.get("filter");
     if (filterParam === "unassigned_cargo") {
