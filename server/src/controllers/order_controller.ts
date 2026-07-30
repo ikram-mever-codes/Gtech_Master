@@ -17,6 +17,7 @@ import { Taric } from "../models/tarics";
 import { Customer } from "../models/customers";
 import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
+import { NumberSequenceService } from "../services/number_sequence_service";
 
 const _cjkFontCandidates: string[] = [
   path.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
@@ -91,10 +92,15 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
   }
 })();
 
-const padorder_no = (n: number) => `MA${n}`;
+const padorder_no = (n: number) => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  return `MA${yyyy}${mm}-${n}`;
+};
 
 const parseorder_noNumber = (order_no: string) => {
-  const m = /^MA(\d+)$/i.exec((order_no || "").trim());
+  const m = /(\d+)$/.exec((order_no || "").trim());
   if (!m) return null;
   const num = parseInt(m[1], 10);
   return Number.isFinite(num) ? num : null;
@@ -133,20 +139,24 @@ export const createOrder = async (
       }
     }
 
-    const lastOrder = await orderRepo
-      .createQueryBuilder("o")
-      .setLock("pessimistic_write")
-      .where("o.order_no LIKE :prefix", { prefix: "MA%" })
-      .orderBy("o.id", "DESC")
-      .getOne();
+    let generatedorder_no = "";
+    try {
+      generatedorder_no = await NumberSequenceService.getNextNumber("order");
+    } catch (e) {
+      const allOrders = await orderRepo
+        .createQueryBuilder("o")
+        .select(["o.order_no"])
+        .getMany();
 
-    let nextNumber = 1;
-    if (lastOrder?.order_no) {
-      const lastNum = parseorder_noNumber(lastOrder.order_no);
-      if (lastNum !== null) nextNumber = lastNum + 1;
+      let maxNum = 0;
+      for (const ord of allOrders) {
+        const parsed = parseorder_noNumber(ord.order_no);
+        if (parsed !== null && parsed > maxNum) {
+          maxNum = parsed;
+        }
+      }
+      generatedorder_no = padorder_no(maxNum + 1);
     }
-
-    const generatedorder_no = padorder_no(nextNumber);
 
     const order = orderRepo.create({
       order_no: generatedorder_no,
