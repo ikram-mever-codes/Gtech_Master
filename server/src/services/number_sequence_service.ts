@@ -48,11 +48,6 @@ export class NumberSequenceService {
         sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
         sequence.minDigits = 1;
       }
-      if (sequenceKey === "cargo") {
-        sequence.prefix = "C";
-        sequence.formatPattern = "{prefix}{yyyy}{mm}-{number}";
-        sequence.minDigits = 1;
-      }
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
@@ -80,26 +75,6 @@ export class NumberSequenceService {
             }
           }
           runningNo = Math.max(defaultStart, maxNum + 1);
-        } else if (sequenceKey === "cargo") {
-          const cargos = await manager
-            .getRepository(Cargo)
-            .createQueryBuilder("c")
-            .select(["c.cargo_no"])
-            .where("c.cargo_no LIKE 'C%'")
-            .getMany();
-
-          let maxNum = 0;
-          for (const crg of cargos) {
-            if (crg.cargo_no) {
-              const parts = String(crg.cargo_no).split("-");
-              const lastPart = parts[parts.length - 1];
-              const parsed = parseInt(lastPart, 10);
-              if (!isNaN(parsed) && parsed < 50000 && parsed > maxNum) {
-                maxNum = parsed;
-              }
-            }
-          }
-          runningNo = Math.max(1, maxNum + 1);
         } else if (sequenceKey === "order" || sequenceKey === "transfer_order") {
           const prefixToMatch = sequenceKey === "transfer_order" ? "DE" : "B";
           const orders = await manager
@@ -261,9 +236,6 @@ export class NumberSequenceService {
         exists.minDigits = 1;
         if (def.sequenceKey === "customer" && exists.nextRunningNo < 83777) {
           exists.nextRunningNo = 83777;
-        }
-        if (def.sequenceKey === "cargo" && exists.nextRunningNo >= 50000) {
-          exists.nextRunningNo = 1;
         }
         await repo.save(exists);
       }
