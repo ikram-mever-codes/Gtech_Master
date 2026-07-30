@@ -5,6 +5,9 @@ import path from "path";
 import { AppDataSource } from "../config/database";
 import { Customer } from "../models/customers";
 import { Invoice, InvoiceItem } from "../models/invoice";
+import { CCICustomer } from "../models/cci_customer";
+import { CCIInvoice } from "../models/cci_invoice";
+import { CCIItem } from "../models/cci_items";
 import { Cargo } from "../models/cargos";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
@@ -958,6 +961,52 @@ export class InvoiceController {
         finalDataMap.set(inv.id, inv);
       });
 
+      const cciInvoiceRepo = AppDataSource.getRepository(CCIInvoice);
+      const cciInvoices = await cciInvoiceRepo.find({
+        relations: ["customer", "items"],
+        order: { invoice_date: "DESC" },
+      });
+
+      cciInvoices.forEach((cci) => {
+        const customItemCount = cci.items?.length || 0;
+        const customTotalQty =
+          cci.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0;
+        const cargoNo = cci.cargo_no || cci.order_number || "";
+
+        finalDataMap.set(cci.id, {
+          id: cci.id,
+          invoiceNumber: cci.invoice_number,
+          orderNumber: cci.order_number,
+          invoiceDate: cci.invoice_date,
+          deliveryDate: cci.delivery_date,
+          dueDate: cci.due_date,
+          netTotal: Number(cci.net_total || 0),
+          taxAmount: Number(cci.tax_amount || 0),
+          grossTotal: Number(cci.gross_total || 0),
+          freightCost: Number(cci.freight_cost || 0),
+          description: cci.description || "",
+          remark: cci.remark || "",
+          status: cci.status || "closed",
+          bill_to: "GTech Industries GmbH",
+          ship_to:
+            cci.customer?.ship_to_address || cci.customer?.company_name || "-",
+          customItemCount,
+          customTotalQty,
+          cargoNo: cargoNo,
+          cargoId: cargoNo || null,
+          cargo_id: cargoNo || null,
+          cargo: cargoNo ? { id: cargoNo, cargo_no: cargoNo } : null,
+          customer: cci.customer
+            ? {
+              id: cci.customer.original_customer_id || cci.customer.id,
+              companyName: cci.customer.company_name,
+              email: cci.customer.email,
+            }
+            : null,
+          items: cci.items,
+        });
+      });
+
       return res
         .status(200)
         .json({ success: true, data: Array.from(finalDataMap.values()) });
@@ -1026,6 +1075,101 @@ export class InvoiceController {
 
     try {
       const { id } = req.params;
+
+      const cciInvoiceRepo = AppDataSource.getRepository(CCIInvoice);
+      const cciInvoice = await cciInvoiceRepo.findOne({
+        where: [{ id }, { invoice_number: id }],
+        relations: ["customer", "items"],
+      });
+
+      if (cciInvoice) {
+        const detailedItems = (cciInvoice.items || []).map((ci) => ({
+          id: ci.id,
+          qty: ci.quantity,
+          quantity: ci.quantity,
+          eur_special_price: Number(ci.unit_price || 0),
+          price: Number(ci.unit_price || 0),
+          _fallbackEan: ci.ean || "-",
+          _fallbackEk: Number(ci.unit_price || 0),
+          set_taric_code: ci.taric_code || null,
+          remark_de: ci.remark || "",
+          item: {
+            id: ci.item_id,
+            item_name: ci.item_name,
+            ean: ci.ean,
+            taric: ci.taric_code
+              ? { code: ci.taric_code, name_en: ci.taric_name_en, duty_rate: ci.duty_rate }
+              : null,
+          },
+          order: { order_no: ci.order_no || cciInvoice.order_number },
+        }));
+
+        const taricGroupsMap = new Map();
+        detailedItems.forEach((oi: any) => {
+          const code = oi.set_taric_code || oi.item?.taric?.code || "-";
+          const groupKey = `hs_${code}`;
+          if (!taricGroupsMap.has(groupKey)) {
+            taricGroupsMap.set(groupKey, {
+              taricId: groupKey,
+              taricNameEn: oi.item?.taric?.name_en || "Project Item",
+              taricCode: code,
+              dutyRate: oi.item?.taric?.duty_rate || 0,
+              totalQty: 0,
+              totalPrice: 0,
+              unitPrice: 0,
+              isProjectItem: !code || code === "-" || code === "0",
+            });
+          }
+          const group = taricGroupsMap.get(groupKey);
+          group.totalQty += Number(oi.qty || 0);
+          group.totalPrice += Number(oi.qty || 0) * Number(oi.eur_special_price || 0);
+        });
+
+        const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
+          g.unitPrice = g.totalQty > 0 ? g.totalPrice / g.totalQty : 0;
+          return g;
+        });
+
+        return res.json({
+          success: true,
+          data: {
+            invoice: {
+              id: cciInvoice.id,
+              invoiceNumber: cciInvoice.invoice_number,
+              orderNumber: cciInvoice.order_number,
+              invoiceDate: cciInvoice.invoice_date,
+              deliveryDate: cciInvoice.delivery_date,
+              dueDate: cciInvoice.due_date,
+              netTotal: cciInvoice.net_total,
+              taxAmount: cciInvoice.tax_amount,
+              grossTotal: cciInvoice.gross_total,
+              freightCost: cciInvoice.freight_cost,
+              description: cciInvoice.description,
+              remark: cciInvoice.remark,
+              status: cciInvoice.status,
+              customer: cciInvoice.customer
+                ? {
+                  id: cciInvoice.customer.original_customer_id || cciInvoice.customer.id,
+                  companyName: cciInvoice.customer.company_name,
+                  email: cciInvoice.customer.email,
+                }
+                : null,
+            },
+            cargo: cciInvoice.cargo_no
+              ? {
+                id: cciInvoice.cargo_no,
+                cargo_no: cciInvoice.cargo_no,
+                ship_to: cciInvoice.customer?.ship_to_address || null,
+                bill_to: "GTech Industries GmbH",
+              }
+              : null,
+            orderNosInCargo: [cciInvoice.order_number].filter(Boolean),
+            detailedItems,
+            taricGroups,
+          },
+        });
+      }
+
       const invoice = await invoiceRepository.findOne({
         where: { id },
         relations: ["customer", "items", "items.item", "items.item.taric"],
@@ -1038,12 +1182,10 @@ export class InvoiceController {
       }
 
       const orderNumber = invoice.orderNumber || "";
-      console.log(`🔍 [EXPANDED_INVOICE_LOG] Fetching details for Invoice ID: ${id}, OrderNumber: "${orderNumber}"`);
 
       let orderItems: any[] = [];
       let cargo: any = null;
 
-      // 1. Try finding Cargo directly or with tokens
       if (orderNumber) {
         cargo = await cargoRepository.findOne({
           where: { cargo_no: orderNumber },
@@ -1056,7 +1198,6 @@ export class InvoiceController {
         }
 
         if (!cargo) {
-          // Try sub-tokens (e.g. "C2026-FE36 - K083753" -> "C2026-FE36")
           const tokens = orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2);
           for (const token of tokens) {
             cargo = await cargoRepository.findOne({
@@ -1067,13 +1208,6 @@ export class InvoiceController {
         }
       }
 
-      if (cargo) {
-        console.log(`✅ [EXPANDED_INVOICE_LOG] Cargo Matched -> ID: ${cargo.id}, cargo_no: "${cargo.cargo_no}"`);
-      } else {
-        console.log(`⚠️ [EXPANDED_INVOICE_LOG] No Cargo Matched for OrderNumber: "${orderNumber}"`);
-      }
-
-      // 2. Collect orderItems from Cargo (via cargo_orders, direct cargo_id, or linked orders)
       if (cargo) {
         const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
           where: { cargo_id: cargo.id },
@@ -1096,10 +1230,8 @@ export class InvoiceController {
           where: whereConditions,
           relations: ["item", "item.taric", "item.purchasePrices", "order"],
         });
-        console.log(`📦 [EXPANDED_INVOICE_LOG] Found ${orderItems.length} items via Cargo ID ${cargo.id}`);
       }
 
-      // 3. Fallback: Search Order by orderNumber or sub-tokens if no orderItems found yet
       if (orderItems.length === 0 && orderNumber) {
         const tokens = [orderNumber, ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2)];
         const uniqueTokens = [...new Set(tokens)];
@@ -1122,27 +1254,23 @@ export class InvoiceController {
             where: { order_id: In(matchingOrderIds) },
             relations: ["item", "item.taric", "item.purchasePrices", "order"],
           });
-          console.log(`📦 [EXPANDED_INVOICE_LOG] Found ${orderItems.length} items via Order Numbers matching tokens`);
         }
       }
 
-      // 4. Deduplicate orderItems by ID
       if (orderItems.length > 0) {
         const itemMap = new Map();
         orderItems.forEach((oi) => itemMap.set(oi.id, oi));
         orderItems = Array.from(itemMap.values());
       }
 
-      // 5. Ultimate Fallback: Convert invoice.items (InvoiceItem table) if orderItems is still empty
       if (orderItems.length === 0 && invoice.items && invoice.items.length > 0) {
-        console.log(`🚨 [EXPANDED_INVOICE_LOG] Triggering Ultimate Fallback! Converting ${invoice.items.length} direct invoice.items`);
         orderItems = invoice.items.map((invItem: any) => ({
           id: invItem.id,
           qty: Number(invItem.quantity || 0),
           price: Number(invItem.unitPrice || 0),
           eur_special_price: Number(invItem.unitPrice || 0),
           item: invItem.item || {
-            id: invItem.item_id || Math.random(),
+            id: invItem.item_id && !isNaN(Number(invItem.item_id)) ? Number(invItem.item_id) : null,
             item_name: invItem.description || "Invoice Item",
             ean: invItem.articleNumber || "-",
             taric: null,
@@ -1150,8 +1278,6 @@ export class InvoiceController {
           set_taric_code: null,
         }));
       }
-
-      console.log(`🎉 [EXPANDED_INVOICE_LOG] Total items ready to map: ${orderItems.length}`);
 
       const getEffectiveTaricCode = (oi: any): string => {
         const itemTaricCode = oi.item?.taric?.code || "";
@@ -2067,6 +2193,81 @@ export class InvoiceController {
       invoice.closedAt = new Date();
 
       await invoiceRepository.save(invoice);
+
+      try {
+        const cciInvoiceRepo = AppDataSource.getRepository(CCIInvoice);
+        const cciCustomerRepo = AppDataSource.getRepository(CCICustomer);
+        const cciItemRepo = AppDataSource.getRepository(CCIItem);
+
+        const customer = invoice.customer;
+        let cciCustomer: CCICustomer | null = null;
+        if (customer) {
+          cciCustomer = cciCustomerRepo.create({
+            original_customer_id: customer.id,
+            company_name: customer.companyName || "N/A",
+            email: customer.email || customer.contactEmail || "",
+            tax_number: customer.taxNumber || "",
+            bill_to_address: customer.addressLine1 || "",
+            ship_to_address: customer.companyName || "",
+            city: customer.city || "",
+            country: customer.country || "",
+            phone: customer.contactPhoneNumber || "",
+          });
+          await cciCustomerRepo.save(cciCustomer);
+        }
+
+        const cargoNo = (invoice as any).cargoNo || invoice.orderNumber || "";
+        const cciInvoice = cciInvoiceRepo.create({
+          id: invoice.id,
+          invoice_number: invoice.invoiceNumber,
+          order_number: invoice.orderNumber,
+          cargo_no: cargoNo,
+          invoice_date: invoice.invoiceDate || new Date(),
+          delivery_date: invoice.deliveryDate || new Date(),
+          due_date: invoice.dueDate,
+          net_total: Number(invoice.netTotal || 0),
+          tax_amount: Number(invoice.taxAmount || 0),
+          gross_total: Number(invoice.grossTotal || 0),
+          freight_cost: Number(invoice.freightCost || 0),
+          description: invoice.description || "",
+          remark: invoice.remark || "",
+          status: "paid",
+          closed_at: new Date(),
+          customer: cciCustomer,
+        });
+
+        await cciInvoiceRepo.save(cciInvoice);
+
+        const itemsToSave: any[] = [];
+        if (invoice.items && invoice.items.length > 0) {
+          invoice.items.forEach((invItem: any) => {
+            const validItemId =
+              invItem.item_id &&
+                !isNaN(Number(invItem.item_id)) &&
+                Number.isInteger(Number(invItem.item_id))
+                ? Number(invItem.item_id)
+                : null;
+            itemsToSave.push(
+              cciItemRepo.create({
+                cci_invoice: cciInvoice,
+                item_id: validItemId,
+                ean: invItem.articleNumber || "-",
+                item_name: invItem.description || "Invoice Item",
+                quantity: Number(invItem.quantity || 1),
+                unit_price: Number(invItem.unitPrice || 0),
+                total_price: Number(invItem.grossPrice || 0),
+                order_no: invoice.orderNumber || "",
+              }),
+            );
+          });
+          if (itemsToSave.length > 0) {
+            await cciItemRepo.save(itemsToSave);
+          }
+        }
+        console.log(`🔒 [CCI_VERIFY_LOG] Invoice "${invoice.invoiceNumber}" frozen into CCI snapshot tables!`);
+      } catch (cciErr) {
+        console.error("⚠️ Failed to freeze CCI snapshot:", cciErr);
+      }
       return res.json({
         success: true,
         message: "Invoice marked as paid",
