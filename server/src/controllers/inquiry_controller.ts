@@ -109,7 +109,6 @@ export class ItemGenerator {
       .createQueryBuilder("taric")
       .select(["taric.code"])
       .getMany();
-
     let maxCode = 0;
     for (const t of taricList) {
       if (t.code && /^\d+$/.test(t.code)) {
@@ -119,7 +118,6 @@ export class ItemGenerator {
         }
       }
     }
-
     const nextCode = maxCode + 1;
 
     return nextCode.toString().padStart(11, "0");
