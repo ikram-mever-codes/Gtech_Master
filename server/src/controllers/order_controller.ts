@@ -127,18 +127,6 @@ export const createOrder = async (
     const orderRepo = queryRunner.manager.getRepository(Order);
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
-    if (source_offer_id) {
-      const existingOrder = await orderRepo.findOne({
-        where: { source_offer_id },
-      });
-      if (existingOrder) {
-        throw new ErrorHandler(
-          `Auftrag ${existingOrder.order_no} already exists for this Angebot. Duplicate conversion is not allowed.`,
-          409,
-        );
-      }
-    }
-
     let generatedorder_no = "";
     try {
       generatedorder_no = await NumberSequenceService.getNextNumber("order");
@@ -175,44 +163,48 @@ export const createOrder = async (
     const itemRepo = queryRunner.manager.getRepository(Item);
     const supplierItemRepo = queryRunner.manager.getRepository(SupplierItem);
 
-    const itemIds = items.map((it: any) => Number(it.item_id));
-    const dbItems = await itemRepo
-      .createQueryBuilder("i")
-      .where("i.id IN (:...itemIds)", { itemIds })
-      .getMany();
+    const itemIds = items
+      .map((it: any) => Number(it.item_id))
+      .filter((id: number) => Number.isFinite(id) && id > 0);
+
+    const dbItems =
+      itemIds.length > 0
+        ? await itemRepo
+            .createQueryBuilder("i")
+            .where("i.id IN (:...itemIds)", { itemIds })
+            .getMany()
+        : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
-    const supplierItems = await supplierItemRepo
-      .createQueryBuilder("si")
-      .where("si.item_id IN (:...itemIds)", { itemIds })
-      .getMany();
+    const supplierItems =
+      itemIds.length > 0
+        ? await supplierItemRepo
+            .createQueryBuilder("si")
+            .where("si.item_id IN (:...itemIds)", { itemIds })
+            .getMany()
+        : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
     );
 
     const lines = items.map((it: any) => {
-      const item_id = Number(it.item_id);
-      const qty = Number(it.qty);
+      const rawItemId = Number(it.item_id);
+      const validItemId =
+        Number.isFinite(rawItemId) && rawItemId > 0 ? rawItemId : null;
+      const qty = Number(it.qty) || 1;
 
-      if (!Number.isFinite(item_id) || item_id <= 0) {
-        throw new ErrorHandler("Invalid item_id in items[]", 400);
-      }
-      if (!Number.isFinite(qty) || qty <= 0) {
-        throw new ErrorHandler("Invalid qty in items[]", 400);
-      }
-
-      const dbItem = itemMap.get(item_id);
-      const rmbPrice = rmbPriceMap.get(item_id);
+      const dbItem = validItemId ? itemMap.get(validItemId) : null;
+      const rmbPrice = validItemId ? rmbPriceMap.get(validItemId) : null;
 
       return orderItemsRepo.create({
         order_id: order.id,
-        item_id,
+        item_id: validItemId,
         ItemID_DE: dbItem?.ItemID_DE,
         qty,
-        remark_de: it.remark_de,
+        remark_de: it.remark_de || it.itemName || null,
         rmb_special_price: rmbPrice,
-        price: dbItem?.price,
-        currency: dbItem?.currency,
+        price: Number(it.price) || dbItem?.price || 0,
+        currency: dbItem?.currency || "EUR",
         taric_id: dbItem?.taric_id,
         category_id: dbItem?.cat_id ?? order.category_id,
         cargo_id: order.cargo_id,
