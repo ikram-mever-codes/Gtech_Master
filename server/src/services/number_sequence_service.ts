@@ -35,11 +35,9 @@ export class NumberSequenceService {
       if (!sequence.isActive) {
         throw new Error(`Number sequence "${sequenceKey}" is not active`);
       }
-
       if (sequenceKey === "customer") {
         sequence.minDigits = 1;
       }
-
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
