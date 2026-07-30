@@ -242,21 +242,47 @@ const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
 const isFreetextLine = (item: any): boolean =>
   !item?.sourceItemId && !item?.requestedItemId;
 
+// --- Delivery-address-vs-billing comparison ---------------------------------
+const normalizeAddrValue = (v: any): string =>
+  (v || "").toString().trim().toLowerCase();
+
+/** True when the delivery address has nothing set of its own, or when it
+ * matches the billing (customer snapshot) address on street/postal/city/
+ * country — i.e. there's nothing distinct to show the user. */
+const isDeliverySameAsBilling = (deliveryAddr: any, snapshot: any): boolean => {
+  const deliveryStreet = normalizeAddrValue(deliveryAddr?.street);
+  if (!deliveryStreet) return true;
+
+  const billingStreet = normalizeAddrValue(
+    snapshot?.address || snapshot?.street,
+  );
+  const billingPostal = normalizeAddrValue(snapshot?.postalCode);
+  const billingCity = normalizeAddrValue(snapshot?.city);
+  const billingCountry = normalizeAddrValue(snapshot?.country);
+
+  return (
+    deliveryStreet === billingStreet &&
+    normalizeAddrValue(deliveryAddr?.postalCode) === billingPostal &&
+    normalizeAddrValue(deliveryAddr?.city) === billingCity &&
+    normalizeAddrValue(deliveryAddr?.country) === billingCountry
+  );
+};
+
 const Section: React.FC<{
   title: string;
   icon?: React.ReactNode;
   right?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, icon, right, children }) => (
-  <section className="border border-gray-200 rounded-xl bg-white">
-    <header className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+  <section className=" bg-white">
+    <header className="flex items-center justify-between  border-b border-gray-100">
       <div className="flex items-center gap-2">
         {icon}
         <h3 className="text-sm font-bold text-gray-900">{title}</h3>
       </div>
       {right}
     </header>
-    <div className="p-4">{children}</div>
+    <div className="p-0 py-3">{children}</div>
   </section>
 );
 
@@ -375,11 +401,6 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const line2 = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
   return (
     <div className="space-y-1 text-sm text-gray-700">
-      {(addr.companyName || addr.contactName) && (
-        <div className="font-medium text-gray-900">
-          {addr.companyName || addr.contactName}
-        </div>
-      )}
       {addr.legalName && addr.legalName !== addr.companyName && (
         <div>{addr.legalName}</div>
       )}
@@ -886,26 +907,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-  const handlePdf = async () => {
+  /** Persists the highlight color immediately — available from the header
+   * regardless of edit/view mode, so the offer's list-row color can be
+   * changed without entering edit mode. */
+  const setHighlightColor = async (color: string) => {
     try {
-      const res = await generateOfferPdf(offer.id);
-      if (res || res?.success) {
-        await downloadOfferPdf(offer.id, offer.offerNumber);
-        await refreshLocal();
-      }
-    } catch (e) {
-      console.error("PDF error:", e);
-    }
-  };
-
-  const togglePricingMode = async (mode: PricingMode) => {
-    try {
-      await updateOffer(offer.id, { pricingMode: mode });
-      patch({ pricingMode: mode });
+      await updateOffer(offer.id, { highlightColor: color });
+      patch({ highlightColor: color });
       await refreshLocal();
       onChanged?.();
     } catch (e) {
-      console.error("Couldn't switch pricing mode:", e);
+      console.error("Couldn't update highlight color:", e);
     }
   };
 
@@ -1152,6 +1164,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     },
   ];
 
+  // --- Delivery-address-vs-billing state (used below in the address block) --
+  const currentDeliveryAddress = offer
+    ? edit
+      ? form.deliveryAddress
+      : offer.deliveryAddress
+    : null;
+  const deliverySameAsBilling = offer
+    ? isDeliverySameAsBilling(currentDeliveryAddress, offer.customerSnapshot)
+    : true;
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -1298,9 +1320,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     />
                   </div>
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                      Delivery address
-                    </p>
+                    {!deliverySameAsBilling && (
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                        Delivery:
+                      </p>
+                    )}{" "}
                     <AddressBlock
                       addr={
                         selectedCustomer.deliveryAddressLine1
@@ -1528,16 +1552,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   Offer {offer.offerNumber}
                 </p>
               </div>
-
               <div className="flex items-center gap-4 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={handlePdf}
-                  title="Generate / download PDF"
-                  className="text-gray-500 hover:text-gray-700 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-                >
-                  <PrinterIcon className="h-5 w-5" />
-                </button>
+                <input
+                  type="color"
+                  value={offer.highlightColor || "#ffffff"}
+                  onChange={(e) => setHighlightColor(e.target.value)}
+                  title="Offer highlight color (shown on the offers list row)"
+                  className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+                />
                 <ViewEditToggle
                   isEditEnabled={edit}
                   onToggle={() => (edit ? handleCancelEdit() : setEdit(true))}
@@ -1553,94 +1575,101 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Section
-                  title="Customer"
-                  icon={
-                    <BuildingOfficeIcon className="h-4 w-4 text-gray-500" />
-                  }
-                >
-                  <AddressBlock
-                    addr={{
-                      companyName: offer.customerSnapshot?.companyName,
-                      legalName: offer.customerSnapshot?.legalName,
-                      address: offer.customerSnapshot?.address,
-                      street: offer.customerSnapshot?.street,
-                      postalCode: offer.customerSnapshot?.postalCode,
-                      city: offer.customerSnapshot?.city,
-                      country: offer.customerSnapshot?.country,
-                      vatId: offer.customerSnapshot?.vatId,
-                    }}
-                    emptyText="No customer snapshot."
-                  />
-                </Section>
+            <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
+                <div className="md:col-span-1 flex flex-col gap-3">
+                  <div className="block mb-1">
+                    <AddressBlock
+                      addr={{
+                        companyName: offer.customerSnapshot?.companyName,
+                        legalName: offer.customerSnapshot?.legalName,
+                        address: offer.customerSnapshot?.address,
+                        street: offer.customerSnapshot?.street,
+                        postalCode: offer.customerSnapshot?.postalCode,
+                        city: offer.customerSnapshot?.city,
+                        country: offer.customerSnapshot?.country,
+                        vatId: offer.customerSnapshot?.vatId,
+                      }}
+                      emptyText="No customer snapshot."
+                    />
+                  </div>
 
-                <Section
-                  title="Delivery address"
-                  icon={
-                    <BuildingOfficeIcon className="h-4 w-4 text-gray-500" />
-                  }
-                >
-                  {edit && (
-                    <label className="flex items-center gap-2 mb-3 cursor-pointer text-xs font-semibold text-gray-600 select-none">
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                        checked={
-                          !form.deliveryAddress?.street ||
-                          form.deliveryAddress?.street ===
-                            (offer.customerSnapshot?.address ||
-                              offer.customerSnapshot?.street ||
-                              "")
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            patch({
-                              deliveryAddress: {
-                                contactName:
-                                  offer.customerSnapshot?.legalName ||
-                                  offer.customerSnapshot?.companyName ||
-                                  "",
-                                street:
-                                  offer.customerSnapshot?.address ||
-                                  offer.customerSnapshot?.street ||
-                                  "",
-                                postalCode:
-                                  offer.customerSnapshot?.postalCode || "",
-                                city: offer.customerSnapshot?.city || "",
-                                country: offer.customerSnapshot?.country || "",
-                                contactPhone:
-                                  offer.customerSnapshot?.contactPhoneNumber ||
-                                  "",
-                              },
-                            });
-                          } else {
-                            patch({
-                              deliveryAddress: {
-                                contactName: "",
-                                street: "",
-                                postalCode: "",
-                                city: "",
-                                country: "",
-                                contactPhone: "",
-                              },
-                            });
-                          }
+                  <div className="block mb-1">
+                    {!deliverySameAsBilling && (
+                      <span className="text-sm font-bold text-gray-900">
+                        Delivery:
+                      </span>
+                    )}
+                    {edit && (
+                      <label className="flex items-center gap-2 mb-3 mt-2 cursor-pointer text-xs font-semibold text-gray-600 select-none">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                          checked={deliverySameAsBilling}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              patch({
+                                deliveryAddress: {
+                                  contactName:
+                                    offer.customerSnapshot?.legalName ||
+                                    offer.customerSnapshot?.companyName ||
+                                    "",
+                                  street:
+                                    offer.customerSnapshot?.address ||
+                                    offer.customerSnapshot?.street ||
+                                    "",
+                                  postalCode:
+                                    offer.customerSnapshot?.postalCode || "",
+                                  city: offer.customerSnapshot?.city || "",
+                                  country:
+                                    offer.customerSnapshot?.country || "",
+                                  contactPhone:
+                                    offer.customerSnapshot
+                                      ?.contactPhoneNumber || "",
+                                },
+                              });
+                            } else {
+                              patch({
+                                deliveryAddress: {
+                                  contactName: "",
+                                  street: "",
+                                  postalCode: "",
+                                  city: "",
+                                  country: "",
+                                  contactPhone: "",
+                                },
+                              });
+                            }
+                          }}
+                        />
+                        Delivery address same as billing address
+                      </label>
+                    )}
+                    {deliverySameAsBilling ? (
+                      <div className="text-sm text-gray-500">
+                        Delivery Address is Same
+                      </div>
+                    ) : (
+                      <AddressBlock
+                        addr={{
+                          companyName:
+                            currentDeliveryAddress?.companyName ||
+                            currentDeliveryAddress?.contactName,
+                          legalName: currentDeliveryAddress?.contactName,
+                          address: currentDeliveryAddress?.street,
+                          street: currentDeliveryAddress?.street,
+                          postalCode: currentDeliveryAddress?.postalCode,
+                          city: currentDeliveryAddress?.city,
+                          country: currentDeliveryAddress?.country,
+                          contactPhone: currentDeliveryAddress?.contactPhone,
                         }}
+                        emptyText="No delivery address set."
                       />
-                      Delivery address same as billing address
-                    </label>
-                  )}
-                  <AddressBlock
-                    addr={edit ? form.deliveryAddress : offer.deliveryAddress}
-                    emptyText="No delivery address set."
-                  />
-                </Section>
-              </div>
+                    )}
+                  </div>
+                </div>
 
-              <div className="border border-gray-200 rounded-xl bg-white p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                   <Field label="Title" edit={edit} value={offer.title}>
                     <input
                       className={inputCls}
@@ -1709,7 +1738,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <Field
                     label="Payment Due Days"
                     edit={edit}
-                    value={offer.paymentTerms}
+                    value={offer.paymentDueDays}
                   >
                     <input
                       className={inputCls}
@@ -1731,54 +1760,669 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     />
                   </Field> */}
                   <Field
-                    label="Offer color"
-                    edit={edit}
-                    value=""
-                    render={() =>
-                      offer.highlightColor ? (
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-block w-4 h-4 rounded border border-gray-300"
-                            style={{ backgroundColor: offer.highlightColor }}
-                          />
-                          <span className="text-gray-600">
-                            {offer.highlightColor}
-                          </span>
-                        </div>
-                      ) : (
-                        "—"
-                      )
-                    }
-                  >
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        className="w-9 h-9 p-0 border border-gray-300 rounded cursor-pointer"
-                        value={form.highlightColor || "#ffffff"}
-                        onChange={(e) =>
-                          patch({ highlightColor: e.target.value })
-                        }
-                        title="Highlight color for this offer's row in the offers list"
-                      />
-                      {form.highlightColor && (
-                        <button
-                          type="button"
-                          onClick={() => patch({ highlightColor: "" })}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </Field>
+                    label="Tax profile"
+                    edit={false}
+                    value={taxProfile ? taxProfile : "No shipping country set"}
+                  />
                 </div>
               </div>
 
-              {/* WEIGHT & TAX PROFILE */}
-              <Section
-                title="Weight & tax profile"
-                icon={<CalculatorIcon className="h-4 w-4 text-gray-500" />}
-              >
+              {/* PRICING MODE */}
+              {pricingMode === "matrix" && (
+                <button
+                  disabled={!edit}
+                  onClick={() => setShowCopyPaste((s) => !s)}
+                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50 ml-2"
+                >
+                  <ClipboardIcon className="h-4 w-4" />
+                  Paste matrix
+                </button>
+              )}
+
+              {pricingMode === "matrix" && edit && priceTiers.length > 0 && (
+                <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Delete a tier (applies to every item)
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {priceTiers.map((q) => (
+                      <button
+                        key={q}
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              `Delete the ${q} tier from all items?`,
+                            )
+                          )
+                            return;
+                          try {
+                            await deletePriceColumn(offer.id, q);
+                            await refreshLocal();
+                            onChanged?.();
+                          } catch (e) {
+                            console.error("Couldn't delete the tier:", e);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-colors"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {showCopyPaste && pricingMode === "matrix" && (
+                <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <p className="text-xs text-blue-900 mb-2">
+                    One value per line: optional label, then the quantity tiers,
+                    then each item's prices in the same tier order (a "." line
+                    between items is optional; a "." within a block means "not
+                    calculated"). Applied to the line items below, in order —
+                    add them first.
+                  </p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-xs font-medium text-gray-700">
+                      Quantity tiers
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
+                      value={tierCount}
+                      onChange={(e) => setTierCount(e.target.value)}
+                    />
+                  </div>
+                  <textarea
+                    rows={8}
+                    value={copyPasteData}
+                    onChange={(e) => setCopyPasteData(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono"
+                    placeholder={
+                      "Muster\n50\n100\n200\n20,00\n17,32\n16,57\n.\n34,00\n21,21\n20,3"
+                    }
+                  />
+                  <div className="flex justify-end gap-2 mt-2">
+                    <button
+                      onClick={() => {
+                        setShowCopyPaste(false);
+                        setCopyPasteData("");
+                      }}
+                      className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handlePasteMatrix}
+                      disabled={!copyPasteData.trim()}
+                      className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Import prices
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {pricingMode === "classic" ? (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
+                            Pos
+                          </th>
+                          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
+                            Pic
+                          </th>
+                          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                            Art.-Nr.
+                          </th>
+                          <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                            Bezeichnung
+                          </th>
+                          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                            Hinweis
+                          </th>
+                          <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
+                            MwSt.
+                          </th>
+                          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                            Menge
+                          </th>
+                          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                            Netto-Preis
+                          </th>
+                          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                            Netto gesamt
+                          </th>
+                          {edit && <th className="w-10" />}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {visibleLineItems.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={edit ? 10 : 9}
+                              className="text-center py-6 text-sm text-gray-500"
+                            >
+                              No line items yet.
+                            </td>
+                          </tr>
+                        )}
+                        {visibleLineItems.map((item: any) => {
+                          const freetext = isFreetextLine(item);
+                          const total = getLineItemTotal(item, "classic");
+                          const qtyDisplay = Math.round(
+                            parseFlexibleNumber(item.baseQuantity) ?? 1,
+                          );
+                          const rowColor =
+                            item.highlightColor ||
+                            (freetext ? "#D8964A" : null);
+                          const thumb = item.photo;
+                          return (
+                            <tr
+                              key={item.id}
+                              style={
+                                rowColor
+                                  ? { backgroundColor: rowColor }
+                                  : undefined
+                              }
+                            >
+                              <td className="px-2 py-2 text-gray-500">
+                                {item.position}
+                              </td>
+                              <td className="px-2 py-2">
+                                <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                                  {thumb ? (
+                                    <img
+                                      src={thumb}
+                                      alt="thumb"
+                                      className="w-full h-full object-contain"
+                                      onError={(e) =>
+                                        ((
+                                          e.target as HTMLImageElement
+                                        ).style.display = "none")
+                                      }
+                                    />
+                                  ) : (
+                                    <span className="text-gray-300 text-[10px]">
+                                      —
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-2 py-2">
+                                {edit ? (
+                                  <TextCellInput
+                                    value={item.itemNo}
+                                    placeholder="Art.-Nr."
+                                    onCommit={(raw) =>
+                                      persistLine(item.id, { material: raw })
+                                    }
+                                  />
+                                ) : (
+                                  <span>{item.itemNo || "—"}</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-2">
+                                {edit ? (
+                                  <TextCellInput
+                                    value={item.itemName}
+                                    onCommit={(raw) =>
+                                      persistLine(item.id, {
+                                        itemName: raw || item.itemName,
+                                      })
+                                    }
+                                  />
+                                ) : (
+                                  <span>{item.itemName || "—"}</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-2">
+                                {edit ? (
+                                  <TextCellInput
+                                    value={item.notes}
+                                    placeholder="Remark"
+                                    onCommit={(raw) =>
+                                      persistLine(item.id, { notes: raw })
+                                    }
+                                  />
+                                ) : (
+                                  <span className="text-gray-600">
+                                    {item.notes || "—"}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-2 text-center text-gray-600">
+                                {offer.taxRate ?? 19}%
+                              </td>
+                              <td className="px-2 py-2">
+                                {edit ? (
+                                  <DecimalInput
+                                    className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                    value={item.baseQuantity}
+                                    onCommit={(raw) =>
+                                      persistLine(item.id, {
+                                        baseQuantity: raw.trim() || "1",
+                                      })
+                                    }
+                                  />
+                                ) : (
+                                  <div className="text-right">{qtyDisplay}</div>
+                                )}
+                              </td>
+                              <td className="px-2 py-2">
+                                {edit ? (
+                                  <DecimalInput
+                                    className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                    value={item.basePrice}
+                                    onCommit={(raw) => {
+                                      const parsed = parseFlexibleNumber(raw);
+                                      persistLine(item.id, {
+                                        basePrice: parsed === null ? "0" : raw,
+                                      });
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="text-right">
+                                    {formatCurrency(
+                                      item.basePrice || 0,
+                                      offer.currency,
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-2 py-2 text-right font-medium">
+                                {formatCurrency(total || 0, offer.currency)}
+                              </td>
+                              {edit && (
+                                <td className="px-2 py-2 text-center">
+                                  <button
+                                    onClick={() => removeLineItem(item.id)}
+                                    className="text-rose-500 hover:text-rose-700"
+                                    title="Remove line"
+                                  >
+                                    <TrashIcon className="h-4 w-4" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                        {/* Shipping method — always the last row */}
+                        <tr className="bg-gray-100/80">
+                          <td className="px-2 py-2 text-gray-400">
+                            {visibleLineItems.length + 1}
+                          </td>
+                          <td className="px-2 py-2 text-gray-400"></td>
+                          <td className="px-2 py-2 text-gray-400">—</td>
+                          <td className="px-2 py-2 text-gray-700">
+                            {offer.shippingMethod || "No shipping method set"}
+                          </td>
+                          <td className="px-0 py-2 text-center text-gray-400"></td>
+                          <td className="px-2 py-2 text-center text-gray-600">
+                            {offer.taxRate ?? 19}%
+                          </td>
+                          <td className="px-2 py-2 text-right text-gray-600">
+                            1
+                          </td>
+                          <td className="px-2 py-2 text-right text-gray-600">
+                            {formatCurrency(
+                              offer.shippingCost || 0,
+                              offer.currency,
+                            )}
+                          </td>
+                          <td className="px-2 py-2 text-right font-medium text-gray-700">
+                            {formatCurrency(
+                              offer.shippingCost || 0,
+                              offer.currency,
+                            )}
+                          </td>
+                          {edit && <td />}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {edit && (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setShowItemPicker((s) => !s)}
+                          className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1"
+                        >
+                          <PlusIcon className="h-3.5 w-3.5" />
+                          Add existing item
+                        </button>
+                      </div>
+                      {showItemPicker && (
+                        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+                          <input
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                            placeholder="Search items…"
+                            value={itemPickerSearch}
+                            onChange={(e) =>
+                              setItemPickerSearch(e.target.value)
+                            }
+                          />
+                          <div className="max-h-48 overflow-y-auto space-y-1.5">
+                            {itemPickerList.length === 0 ? (
+                              <div className="text-center text-sm text-gray-500 py-3">
+                                No items match.
+                              </div>
+                            ) : (
+                              itemPickerList.map((it) => (
+                                <ItemRow
+                                  key={it.id}
+                                  item={it}
+                                  selected={false}
+                                  onClick={() => addExistingItem(it)}
+                                />
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Freizeile — text
+                          </label>
+                          <input
+                            className={inputCls}
+                            value={newLine.itemName}
+                            placeholder="e.g., Custom bracket"
+                            onChange={(e) =>
+                              setNewLine((n) => ({
+                                ...n,
+                                itemName: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="w-28">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Quantity
+                          </label>
+                          <input
+                            className={inputCls}
+                            value={newLine.baseQuantity}
+                            onChange={(e) =>
+                              setNewLine((n) => ({
+                                ...n,
+                                baseQuantity: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <button
+                          onClick={addLineItem}
+                          className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
+                        >
+                          <PlusIcon className="h-4 w-4" />
+                          Add Freizeile
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {visibleLineItems.length === 0 && (
+                    <div className="text-center py-6 text-sm text-gray-500">
+                      No line items yet.
+                    </div>
+                  )}
+                  {visibleLineItems.map((item: any) => {
+                    const total = getLineItemTotal(item, pricingMode);
+                    const thumb = item.photo;
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-4 border border-gray-200 rounded-lg bg-white"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                              {thumb ? (
+                                <img
+                                  src={thumb}
+                                  alt="thumb"
+                                  className="w-full h-full object-cover"
+                                  onError={(e) =>
+                                    ((
+                                      e.target as HTMLImageElement
+                                    ).style.display = "none")
+                                  }
+                                />
+                              ) : (
+                                <span className="text-gray-300 text-xs">—</span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900">
+                                {item.position}. {item.itemName}
+                              </div>
+                              {item.description && (
+                                <div className="text-sm text-gray-600 mt-0.5">
+                                  {item.description}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex flex-col items-end gap-1">
+                            <div className="text-lg font-bold text-gray-900">
+                              {formatCurrency(total || 0, offer.currency)}
+                            </div>
+                            {edit && (
+                              <button
+                                onClick={() => removeLineItem(item.id)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors"
+                              >
+                                <TrashIcon className="h-3.5 w-3.5" />
+                                Remove item
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-medium text-gray-900">
+                              Price matrix ({offer.unitPriceDecimalPlaces || 3}{" "}
+                              dp)
+                            </h4>
+                            {edit && (
+                              <button
+                                onClick={() => addMatrixEntry(item.id)}
+                                className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center gap-1"
+                              >
+                                <PlusIcon className="h-3.5 w-3.5" />
+                                Add tier
+                              </button>
+                            )}
+                          </div>
+                          {item.priceMatrix?.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                      Quantity
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                      Price
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                      Total
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                      Active
+                                    </th>
+                                    {edit && <th className="px-3 py-2" />}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                  {item.priceMatrix.map(
+                                    (p: any, idx: number) => (
+                                      <tr
+                                        key={p.id}
+                                        className="hover:bg-gray-50"
+                                      >
+                                        <td className="px-3 py-2">
+                                          {edit ? (
+                                            <input
+                                              className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+                                              defaultValue={p.quantity}
+                                              onBlur={(e) =>
+                                                updateMatrixEntry(
+                                                  item.id,
+                                                  p.id,
+                                                  {
+                                                    quantity: e.target.value,
+                                                  },
+                                                )
+                                              }
+                                            />
+                                          ) : (
+                                            <span>{p.quantity} pcs</span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          {edit ? (
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-gray-500">
+                                                {offer.currency}
+                                              </span>
+                                              <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                className="w-28 px-2 py-1 text-sm border border-gray-300 rounded"
+                                                defaultValue={
+                                                  p.price === null
+                                                    ? "."
+                                                    : String(p.price)
+                                                }
+                                                placeholder="."
+                                                onBlur={(e) =>
+                                                  updateMatrixEntry(
+                                                    item.id,
+                                                    p.id,
+                                                    { price: e.target.value },
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                          ) : (
+                                            <span>
+                                              {formatMatrixPrice(
+                                                p.price,
+                                                offer.unitPriceDecimalPlaces ||
+                                                  3,
+                                              )}
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2 font-medium">
+                                          {p.total === null
+                                            ? "."
+                                            : formatCurrency(
+                                                p.total,
+                                                offer.currency,
+                                              )}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          {p.isActive ? (
+                                            <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                                          ) : edit && p.price !== null ? (
+                                            <input
+                                              type="radio"
+                                              name={`active-${item.id}`}
+                                              checked={p.isActive}
+                                              onChange={() =>
+                                                setActive(item.id, idx)
+                                              }
+                                              className="h-4 w-4 text-gray-600"
+                                            />
+                                          ) : (
+                                            <span className="text-gray-300">
+                                              —
+                                            </span>
+                                          )}
+                                        </td>
+                                        {edit && (
+                                          <td className="px-3 py-2 text-right">
+                                            <button
+                                              onClick={() =>
+                                                deleteMatrixEntry(item.id, p.id)
+                                              }
+                                              className="text-rose-600 hover:text-rose-800 text-xs"
+                                            >
+                                              Delete
+                                            </button>
+                                          </td>
+                                        )}
+                                      </tr>
+                                    ),
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="text-center py-3 text-sm text-gray-500">
+                              No tiers yet — add one, or paste a matrix above.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {edit && (
+                    <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          New item name
+                        </label>
+                        <input
+                          className={inputCls}
+                          value={newLine.itemName}
+                          placeholder="e.g., Custom bracket"
+                          onChange={(e) =>
+                            setNewLine((n) => ({
+                              ...n,
+                              itemName: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="w-28">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Quantity
+                        </label>
+                        <input
+                          className={inputCls}
+                          value={newLine.baseQuantity}
+                          onChange={(e) =>
+                            setNewLine((n) => ({
+                              ...n,
+                              baseQuantity: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <button
+                        onClick={addLineItem}
+                        className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        Add item
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Field
                     label="Net weight (items)"
@@ -1817,729 +2461,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     value={formatWeight(totalWeightKg)}
                   />
                 </div>
-                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field
-                    label="Tax profile"
-                    edit={false}
-                    value={
-                      taxProfile
-                        ? TAX_PROFILE_LABELS[taxProfile]
-                        : "No shipping country set"
-                    }
-                  />
-                  {/* <Field
-                    label="Subsequent tax (VAT amount)"
-                    edit={false}
-                    value={formatCurrency(offer.taxAmount || 0, offer.currency)}
-                  /> */}
-                </div>
-              </Section>
-
-              {/* PRICING MODE */}
-              <Section
-                title="Pricing"
-                icon={<CalculatorIcon className="h-4 w-4 text-gray-500" />}
-                right={
-                  <div className="flex items-center gap-2">
-                    {(["classic", "matrix"] as PricingMode[]).map((m) => (
-                      <button
-                        key={m}
-                        disabled={!edit}
-                        onClick={() => togglePricingMode(m)}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-colors disabled:opacity-50 ${
-                          pricingMode === m
-                            ? "border-primary bg-primary/5 text-primary font-semibold"
-                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        {m === "classic" ? "Classic" : "Matrix"}
-                      </button>
-                    ))}
-                    {pricingMode === "matrix" && (
-                      <button
-                        disabled={!edit}
-                        onClick={() => setShowCopyPaste((s) => !s)}
-                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50 ml-2"
-                      >
-                        <ClipboardIcon className="h-4 w-4" />
-                        Paste matrix
-                      </button>
-                    )}
-                  </div>
-                }
-              >
-                {pricingMode === "matrix" && edit && priceTiers.length > 0 && (
-                  <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Delete a tier (applies to every item)
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {priceTiers.map((q) => (
-                        <button
-                          key={q}
-                          onClick={async () => {
-                            if (
-                              !window.confirm(
-                                `Delete the ${q} tier from all items?`,
-                              )
-                            )
-                              return;
-                            try {
-                              await deletePriceColumn(offer.id, q);
-                              await refreshLocal();
-                              onChanged?.();
-                            } catch (e) {
-                              console.error("Couldn't delete the tier:", e);
-                            }
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-colors"
-                        >
-                          <TrashIcon className="h-3.5 w-3.5" />
-                          {q}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {showCopyPaste && pricingMode === "matrix" && (
-                  <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
-                    <p className="text-xs text-blue-900 mb-2">
-                      One value per line: optional label, then the quantity
-                      tiers, then each item's prices in the same tier order (a
-                      "." line between items is optional; a "." within a block
-                      means "not calculated"). Applied to the line items below,
-                      in order — add them first.
-                    </p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <label className="text-xs font-medium text-gray-700">
-                        Quantity tiers
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
-                        value={tierCount}
-                        onChange={(e) => setTierCount(e.target.value)}
-                      />
-                    </div>
-                    <textarea
-                      rows={8}
-                      value={copyPasteData}
-                      onChange={(e) => setCopyPasteData(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono"
-                      placeholder={
-                        "Muster\n50\n100\n200\n20,00\n17,32\n16,57\n.\n34,00\n21,21\n20,3"
-                      }
-                    />
-                    <div className="flex justify-end gap-2 mt-2">
-                      <button
-                        onClick={() => {
-                          setShowCopyPaste(false);
-                          setCopyPasteData("");
-                        }}
-                        className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handlePasteMatrix}
-                        disabled={!copyPasteData.trim()}
-                        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        Import prices
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {pricingMode === "classic" ? (
-                  <div className="space-y-3">
-                    <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-100 border-b border-gray-200">
-                          <tr>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
-                              Pic
-                            </th>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
-                              Pos
-                            </th>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
-                              Art.-Nr.
-                            </th>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600">
-                              Bezeichnung
-                            </th>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
-                              Hinweis
-                            </th>
-                            <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
-                              MwSt.
-                            </th>
-                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
-                              Menge
-                            </th>
-
-                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-                              Netto-Preis
-                            </th>
-                            <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-                              Netto gesamt
-                            </th>
-
-                            {edit && <th className="w-10" />}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {visibleLineItems.length === 0 && (
-                            <tr>
-                              <td
-                                colSpan={edit ? 10 : 9}
-                                className="text-center py-6 text-sm text-gray-500"
-                              >
-                                No line items yet.
-                              </td>
-                            </tr>
-                          )}
-                          {visibleLineItems.map((item: any) => {
-                            const freetext = isFreetextLine(item);
-                            const total = getLineItemTotal(item, "classic");
-                            const qtyDisplay = Math.round(
-                              parseFlexibleNumber(item.baseQuantity) ?? 1,
-                            );
-                            const rowColor =
-                              item.highlightColor ||
-                              (freetext ? "#D8964A" : null);
-                            const thumb = item.photo;
-                            return (
-                              <tr
-                                key={item.id}
-                                style={
-                                  rowColor
-                                    ? { backgroundColor: rowColor }
-                                    : undefined
-                                }
-                              >
-                                <td className="px-2 py-2">
-                                  <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
-                                    {thumb ? (
-                                      <img
-                                        src={thumb}
-                                        alt="thumb"
-                                        className="w-full h-full object-cover"
-                                        onError={(e) =>
-                                          ((
-                                            e.target as HTMLImageElement
-                                          ).style.display = "none")
-                                        }
-                                      />
-                                    ) : (
-                                      <span className="text-gray-300 text-[10px]">
-                                        —
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-2 py-2 text-gray-500">
-                                  {item.position}
-                                </td>
-                                <td className="px-2 py-2">
-                                  {edit ? (
-                                    <TextCellInput
-                                      value={item.itemNo}
-                                      placeholder="Art.-Nr."
-                                      onCommit={(raw) =>
-                                        persistLine(item.id, { material: raw })
-                                      }
-                                    />
-                                  ) : (
-                                    <span>{item.itemNo || "—"}</span>
-                                  )}
-                                </td>
-                                <td className="px-2 py-2">
-                                  {edit ? (
-                                    <TextCellInput
-                                      value={item.itemName}
-                                      onCommit={(raw) =>
-                                        persistLine(item.id, {
-                                          itemName: raw || item.itemName,
-                                        })
-                                      }
-                                    />
-                                  ) : (
-                                    <span>{item.itemName || "—"}</span>
-                                  )}
-                                </td>
-                                <td className="px-2 py-2">
-                                  {edit ? (
-                                    <TextCellInput
-                                      value={item.notes}
-                                      placeholder="Remark"
-                                      onCommit={(raw) =>
-                                        persistLine(item.id, { notes: raw })
-                                      }
-                                    />
-                                  ) : (
-                                    <span className="text-gray-600">
-                                      {item.notes || "—"}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-2 py-2 text-center text-gray-600">
-                                  {offer.taxRate ?? 19}%
-                                </td>
-                                <td className="px-2 py-2">
-                                  {edit ? (
-                                    <DecimalInput
-                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
-                                      value={item.baseQuantity}
-                                      onCommit={(raw) =>
-                                        persistLine(item.id, {
-                                          baseQuantity: raw.trim() || "1",
-                                        })
-                                      }
-                                    />
-                                  ) : (
-                                    <div className="text-right">
-                                      {qtyDisplay}
-                                    </div>
-                                  )}
-                                </td>
-
-                                <td className="px-2 py-2">
-                                  {edit ? (
-                                    <DecimalInput
-                                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
-                                      value={item.basePrice}
-                                      onCommit={(raw) => {
-                                        const parsed = parseFlexibleNumber(raw);
-                                        persistLine(item.id, {
-                                          basePrice:
-                                            parsed === null ? "0" : raw,
-                                        });
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="text-right">
-                                      {formatCurrency(
-                                        item.basePrice || 0,
-                                        offer.currency,
-                                      )}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-2 py-2 text-right font-medium">
-                                  {formatCurrency(total || 0, offer.currency)}
-                                </td>
-
-                                {edit && (
-                                  <td className="px-2 py-2 text-center">
-                                    <button
-                                      onClick={() => removeLineItem(item.id)}
-                                      className="text-rose-500 hover:text-rose-700"
-                                      title="Remove line"
-                                    >
-                                      <TrashIcon className="h-4 w-4" />
-                                    </button>
-                                  </td>
-                                )}
-                              </tr>
-                            );
-                          })}
-
-                          {/* Shipping method — always the last row */}
-                          <tr className="bg-gray-100/80">
-                            <td className="px-2 py-2 text-gray-400"></td>
-                            <td className="px-2 py-2 text-gray-400">
-                              {visibleLineItems.length + 1}
-                            </td>
-                            <td className="px-2 py-2 text-gray-400">—</td>
-                            <td className="px-2 py-2 text-gray-700">
-                              {offer.shippingMethod || "No shipping method set"}
-                            </td>
-
-                            <td className="px-0 py-2 text-center text-gray-400"></td>
-                            <td className="px-2 py-2 text-center text-gray-600">
-                              {offer.taxRate ?? 19}%
-                            </td>
-                            <td className="px-2 py-2 text-right text-gray-600">
-                              1
-                            </td>
-
-                            <td className="px-2 py-2 text-right text-gray-600">
-                              {formatCurrency(
-                                offer.shippingCost || 0,
-                                offer.currency,
-                              )}
-                            </td>
-                            <td className="px-2 py-2 text-right font-medium text-gray-700">
-                              {formatCurrency(
-                                offer.shippingCost || 0,
-                                offer.currency,
-                              )}
-                            </td>
-                            {edit && <td />}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    {edit && (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => setShowItemPicker((s) => !s)}
-                            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1"
-                          >
-                            <PlusIcon className="h-3.5 w-3.5" />
-                            Add existing item
-                          </button>
-                        </div>
-
-                        {showItemPicker && (
-                          <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
-                            <input
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                              placeholder="Search items…"
-                              value={itemPickerSearch}
-                              onChange={(e) =>
-                                setItemPickerSearch(e.target.value)
-                              }
-                            />
-                            <div className="max-h-48 overflow-y-auto space-y-1.5">
-                              {itemPickerList.length === 0 ? (
-                                <div className="text-center text-sm text-gray-500 py-3">
-                                  No items match.
-                                </div>
-                              ) : (
-                                itemPickerList.map((it) => (
-                                  <ItemRow
-                                    key={it.id}
-                                    item={it}
-                                    selected={false}
-                                    onClick={() => addExistingItem(it)}
-                                  />
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Freizeile — text
-                            </label>
-                            <input
-                              className={inputCls}
-                              value={newLine.itemName}
-                              placeholder="e.g., Custom bracket"
-                              onChange={(e) =>
-                                setNewLine((n) => ({
-                                  ...n,
-                                  itemName: e.target.value,
-                                }))
-                              }
-                            />
-                          </div>
-                          <div className="w-28">
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Quantity
-                            </label>
-                            <input
-                              className={inputCls}
-                              value={newLine.baseQuantity}
-                              onChange={(e) =>
-                                setNewLine((n) => ({
-                                  ...n,
-                                  baseQuantity: e.target.value,
-                                }))
-                              }
-                            />
-                          </div>
-                          <button
-                            onClick={addLineItem}
-                            className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
-                          >
-                            <PlusIcon className="h-4 w-4" />
-                            Add Freizeile
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {visibleLineItems.length === 0 && (
-                      <div className="text-center py-6 text-sm text-gray-500">
-                        No line items yet.
-                      </div>
-                    )}
-
-                    {visibleLineItems.map((item: any) => {
-                      const total = getLineItemTotal(item, pricingMode);
-                      const thumb = item.photo;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="p-4 border border-gray-200 rounded-lg bg-white"
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-start gap-3 min-w-0">
-                              <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
-                                {thumb ? (
-                                  <img
-                                    src={thumb}
-                                    alt="thumb"
-                                    className="w-full h-full object-cover"
-                                    onError={(e) =>
-                                      ((
-                                        e.target as HTMLImageElement
-                                      ).style.display = "none")
-                                    }
-                                  />
-                                ) : (
-                                  <span className="text-gray-300 text-xs">
-                                    —
-                                  </span>
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-medium text-gray-900">
-                                  {item.position}. {item.itemName}
-                                </div>
-                                {item.description && (
-                                  <div className="text-sm text-gray-600 mt-0.5">
-                                    {item.description}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right flex flex-col items-end gap-1">
-                              <div className="text-lg font-bold text-gray-900">
-                                {formatCurrency(total || 0, offer.currency)}
-                              </div>
-                              {edit && (
-                                <button
-                                  onClick={() => removeLineItem(item.id)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors"
-                                >
-                                  <TrashIcon className="h-3.5 w-3.5" />
-                                  Remove item
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-sm font-medium text-gray-900">
-                                Price matrix (
-                                {offer.unitPriceDecimalPlaces || 3} dp)
-                              </h4>
-                              {edit && (
-                                <button
-                                  onClick={() => addMatrixEntry(item.id)}
-                                  className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center gap-1"
-                                >
-                                  <PlusIcon className="h-3.5 w-3.5" />
-                                  Add tier
-                                </button>
-                              )}
-                            </div>
-                            {item.priceMatrix?.length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Quantity
-                                      </th>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Price
-                                      </th>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Total
-                                      </th>
-                                      <th className="px-3 py-2 text-left font-medium text-gray-700">
-                                        Active
-                                      </th>
-                                      {edit && <th className="px-3 py-2" />}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-200">
-                                    {item.priceMatrix.map(
-                                      (p: any, idx: number) => (
-                                        <tr
-                                          key={p.id}
-                                          className="hover:bg-gray-50"
-                                        >
-                                          <td className="px-3 py-2">
-                                            {edit ? (
-                                              <input
-                                                className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
-                                                defaultValue={p.quantity}
-                                                onBlur={(e) =>
-                                                  updateMatrixEntry(
-                                                    item.id,
-                                                    p.id,
-                                                    {
-                                                      quantity: e.target.value,
-                                                    },
-                                                  )
-                                                }
-                                              />
-                                            ) : (
-                                              <span>{p.quantity} pcs</span>
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            {edit ? (
-                                              <div className="flex items-center gap-1">
-                                                <span className="text-gray-500">
-                                                  {offer.currency}
-                                                </span>
-                                                <input
-                                                  type="text"
-                                                  inputMode="decimal"
-                                                  className="w-28 px-2 py-1 text-sm border border-gray-300 rounded"
-                                                  defaultValue={
-                                                    p.price === null
-                                                      ? "."
-                                                      : String(p.price)
-                                                  }
-                                                  placeholder="."
-                                                  onBlur={(e) =>
-                                                    updateMatrixEntry(
-                                                      item.id,
-                                                      p.id,
-                                                      { price: e.target.value },
-                                                    )
-                                                  }
-                                                />
-                                              </div>
-                                            ) : (
-                                              <span>
-                                                {formatMatrixPrice(
-                                                  p.price,
-                                                  offer.unitPriceDecimalPlaces ||
-                                                    3,
-                                                )}
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-2 font-medium">
-                                            {p.total === null
-                                              ? "."
-                                              : formatCurrency(
-                                                  p.total,
-                                                  offer.currency,
-                                                )}
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            {p.isActive ? (
-                                              <CheckCircleIcon className="h-4 w-4 text-green-600" />
-                                            ) : edit && p.price !== null ? (
-                                              <input
-                                                type="radio"
-                                                name={`active-${item.id}`}
-                                                checked={p.isActive}
-                                                onChange={() =>
-                                                  setActive(item.id, idx)
-                                                }
-                                                className="h-4 w-4 text-gray-600"
-                                              />
-                                            ) : (
-                                              <span className="text-gray-300">
-                                                —
-                                              </span>
-                                            )}
-                                          </td>
-                                          {edit && (
-                                            <td className="px-3 py-2 text-right">
-                                              <button
-                                                onClick={() =>
-                                                  deleteMatrixEntry(
-                                                    item.id,
-                                                    p.id,
-                                                  )
-                                                }
-                                                className="text-rose-600 hover:text-rose-800 text-xs"
-                                              >
-                                                Delete
-                                              </button>
-                                            </td>
-                                          )}
-                                        </tr>
-                                      ),
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="text-center py-3 text-sm text-gray-500">
-                                No tiers yet — add one, or paste a matrix above.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {edit && (
-                      <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            New item name
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.itemName}
-                            placeholder="e.g., Custom bracket"
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                itemName: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="w-28">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Quantity
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.baseQuantity}
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                baseQuantity: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <button
-                          onClick={addLineItem}
-                          className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
-                        >
-                          <PlusIcon className="h-4 w-4" />
-                          Add item
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Section>
-
-              <Section
-                title="Totals"
-                icon={<CalculatorIcon className="h-4 w-4 text-gray-500" />}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    {/* <Field
+                {/* <Field
                       label="Discount %"
                       edit={edit}
                       value={`${offer.discountPercentage || 0}%`}
@@ -2549,61 +2471,45 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         onCommit={(raw) => patch({ discountPercentage: raw })}
                       />
                     </Field> */}
-                    <Field
-                      label="Shipping cost"
-                      edit={edit}
-                      value={formatCurrency(
-                        offer.shippingCost || 0,
-                        offer.currency,
-                      )}
-                    >
-                      <DecimalInput
-                        value={form.shippingCost}
-                        onCommit={(raw) => patch({ shippingCost: raw })}
-                      />
-                    </Field>
+                <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-medium">
+                      {formatCurrency(offer.subtotal || 0, offer.currency)}
+                    </span>
                   </div>
-                  <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Subtotal</span>
-                      <span className="font-medium">
-                        {formatCurrency(offer.subtotal || 0, offer.currency)}
-                      </span>
-                    </div>
-                    {offer.discountAmount > 0 && (
-                      <div className="flex justify-between text-rose-600">
-                        <span>Discount</span>
-                        <span>
-                          −
-                          {formatCurrency(offer.discountAmount, offer.currency)}
-                        </span>
-                      </div>
-                    )}
-                    {offer.shippingCost > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Shipping</span>
-                        <span className="font-medium">
-                          {formatCurrency(offer.shippingCost, offer.currency)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        VAT ({offer.taxRate ?? 19}%)
-                      </span>
-                      <span className="font-medium">
-                        {formatCurrency(offer.taxAmount || 0, offer.currency)}
-                      </span>
-                    </div>
-                    <div className="border-t pt-2 flex justify-between font-bold text-lg">
-                      <span>Total</span>
+                  {offer.discountAmount > 0 && (
+                    <div className="flex justify-between text-rose-600">
+                      <span>Discount</span>
                       <span>
-                        {formatCurrency(offer.totalAmount || 0, offer.currency)}
+                        −{formatCurrency(offer.discountAmount, offer.currency)}
                       </span>
                     </div>
+                  )}
+                  {offer.shippingCost > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Shipping</span>
+                      <span className="font-medium">
+                        {formatCurrency(offer.shippingCost, offer.currency)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">
+                      VAT ({offer.taxRate ?? 19}%)
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(offer.taxAmount || 0, offer.currency)}
+                    </span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span>
+                      {formatCurrency(offer.totalAmount || 0, offer.currency)}
+                    </span>
                   </div>
                 </div>
-              </Section>
+              </div>
 
               {/* LINKED DOCUMENTS */}
               <Section
@@ -2678,7 +2584,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </p>
                   )}
                 </Section>
-
                 <Section
                   title="Comment intern"
                   icon={<PencilIcon className="h-4 w-4 text-gray-500" />}

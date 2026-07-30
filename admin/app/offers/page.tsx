@@ -86,11 +86,11 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
     <table className="w-full text-sm">
       <thead className="bg-gray-100 border-b border-gray-200">
         <tr>
-          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
-            Pic
-          </th>
           <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
             Pos
+          </th>
+          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
+            Pic
           </th>
           <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
             Art.-Nr.
@@ -136,13 +136,14 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
               key={item.id}
               style={rowColor ? { backgroundColor: rowColor } : undefined}
             >
+              <td className="px-2 py-2 text-gray-500">{item.position}</td>
               <td className="px-2 py-2">
                 <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
                   {thumb ? (
                     <img
                       src={thumb}
                       alt="thumb"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       onError={(e) =>
                         ((e.target as HTMLImageElement).style.display = "none")
                       }
@@ -152,7 +153,6 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                   )}
                 </div>
               </td>
-              <td className="px-2 py-2 text-gray-500">{item.position}</td>
               <td className="px-2 py-2">
                 <span>{item.itemNo || item.material || "—"}</span>
               </td>
@@ -182,8 +182,8 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
 
         {/* Shipping method — always the last row, same as OfferDetailModal */}
         <tr className="bg-gray-100/80">
-          <td className="px-2 py-2 text-gray-400"></td>
           <td className="px-2 py-2 text-gray-400">{lineItems.length + 1}</td>
+          <td className="px-2 py-2 text-gray-400"></td>
           <td className="px-2 py-2 text-gray-400">—</td>
           <td className="px-2 py-2 text-gray-700">
             {offer.shippingMethod || "No shipping method set"}

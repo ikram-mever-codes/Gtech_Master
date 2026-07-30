@@ -87,7 +87,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) { }
+      } catch (e: any) {}
     }
   }
 })();
@@ -117,8 +117,15 @@ export const createOrder = async (
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    const { category_id, customer_id, supplier_id, status, comment, items, source_offer_id } =
-      req.body;
+    const {
+      category_id,
+      customer_id,
+      supplier_id,
+      status,
+      comment,
+      items,
+      source_offer_id,
+    } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       throw new ErrorHandler("items[] is required and cannot be empty", 400);
@@ -147,7 +154,10 @@ export const createOrder = async (
       order.status = status ?? order.status ?? 1;
       order.updated_at = new Date();
 
-      if (!order.order_no || !order.order_no.startsWith("DE")) {
+      if (
+        !order.order_no ||
+        (!order.order_no.startsWith("B") && !order.order_no.startsWith("MA"))
+      ) {
         try {
           order.order_no = await NumberSequenceService.getNextNumber(seqKey);
         } catch (_) {
@@ -198,18 +208,18 @@ export const createOrder = async (
     const dbItems =
       itemIds.length > 0
         ? await itemRepo
-          .createQueryBuilder("i")
-          .where("i.id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("i")
+            .where("i.id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
     const supplierItems =
       itemIds.length > 0
         ? await supplierItemRepo
-          .createQueryBuilder("si")
-          .where("si.item_id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("si")
+            .where("si.item_id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
@@ -288,12 +298,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -354,9 +364,13 @@ export const updateOrder = async (
       (typeof order.comment === "string" &&
         order.comment.includes("[Moved to Fulfillment]"));
 
-    if (isFulfillmentMove && (!order.order_no || !order.order_no.startsWith("DE"))) {
+    if (
+      isFulfillmentMove &&
+      (!order.order_no || !order.order_no.startsWith("DE"))
+    ) {
       try {
-        order.order_no = await NumberSequenceService.getNextNumber("transfer_order");
+        order.order_no =
+          await NumberSequenceService.getNextNumber("transfer_order");
       } catch (_) {
         const now = new Date();
         const yy = String(now.getFullYear()).slice(-2);
@@ -478,12 +492,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -673,20 +687,20 @@ export const getAllOrders = async (
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-              id: warehouseItem.id,
-              item_no_de: warehouseItem.item_no_de,
-              item_name_de: warehouseItem.item_name_de,
-              item_name_en: warehouseItem.item_name_en,
-              stock_qty: warehouseItem.stock_qty,
-              msq: warehouseItem.msq,
-              buffer: warehouseItem.buffer,
-              is_stock_item: warehouseItem.is_stock_item,
-              is_SnSI: warehouseItem.is_SnSI,
-              ship_class: warehouseItem.ship_class,
-              is_active: warehouseItem.is_active,
-              is_no_auto_order: warehouseItem.is_no_auto_order,
-              category_id: warehouseItem.category_id,
-            }
+                id: warehouseItem.id,
+                item_no_de: warehouseItem.item_no_de,
+                item_name_de: warehouseItem.item_name_de,
+                item_name_en: warehouseItem.item_name_en,
+                stock_qty: warehouseItem.stock_qty,
+                msq: warehouseItem.msq,
+                buffer: warehouseItem.buffer,
+                is_stock_item: warehouseItem.is_stock_item,
+                is_SnSI: warehouseItem.is_SnSI,
+                ship_class: warehouseItem.ship_class,
+                is_active: warehouseItem.is_active,
+                is_no_auto_order: warehouseItem.is_no_auto_order,
+                category_id: warehouseItem.category_id,
+              }
             : null,
         };
       }),
@@ -893,12 +907,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -1533,9 +1547,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-    starCustomerDetails?.deliveryAddressLine1 ||
-    businessDetails?.address ||
-    "",
+      starCustomerDetails?.deliveryAddressLine1 ||
+      businessDetails?.address ||
+      "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -1553,9 +1567,9 @@ const resolveCustomerAddress = (
       "",
     country: formatCountry(
       customer.country ||
-      starCustomerDetails?.deliveryCountry ||
-      businessDetails?.country ||
-      ""
+        starCustomerDetails?.deliveryCountry ||
+        businessDetails?.country ||
+        "",
     ),
     phone:
       customer.contactPhoneNumber ||
@@ -1659,8 +1673,8 @@ export const generateCommercialInvoicePDF = async (
     const manualTarics =
       uniqueCodes.length > 0
         ? await AppDataSource.getRepository(Taric).find({
-          where: { code: In(uniqueCodes) },
-        })
+            where: { code: In(uniqueCodes) },
+          })
         : [];
     const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -1782,12 +1796,13 @@ export const generateCommercialInvoicePDF = async (
       ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
       : formatPostalCity(customerAddress.postalCode, customerAddress.city);
     const shipToCountry = formatCountry(
-      cargo?.ship_to_country || customerAddress.country || ""
+      cargo?.ship_to_country || customerAddress.country || "",
     );
     const isContactSameAsLegalName = !!(
       customerAddress.contact &&
       customer?.legalName &&
-      customerAddress.contact.trim().toLowerCase() === customer.legalName.trim().toLowerCase()
+      customerAddress.contact.trim().toLowerCase() ===
+        customer.legalName.trim().toLowerCase()
     );
     const shipToContact =
       cargo?.ship_to_contact_person ||
@@ -1829,9 +1844,13 @@ export const generateCommercialInvoicePDF = async (
     const cargoNoVal = (cargo?.cargo_no || invoice.orderNumber || "").trim();
 
     const data = {
-      invoiceNo: isClosedInvoice ? (invoiceNoVal || "Draft") : (invoiceNoVal || "Draft"),
-      date: isClosedInvoice ? (formattedDateVal || "Draft") : (formattedDateVal || "Draft"),
-      cargoNo: isClosedInvoice ? (cargoNoVal || "Draft") : (cargoNoVal || "Draft"),
+      invoiceNo: isClosedInvoice
+        ? invoiceNoVal || "Draft"
+        : invoiceNoVal || "Draft",
+      date: isClosedInvoice
+        ? formattedDateVal || "Draft"
+        : formattedDateVal || "Draft",
+      cargoNo: isClosedInvoice ? cargoNoVal || "Draft" : cargoNoVal || "Draft",
       customerNo,
       billTo: {
         name: billToName,
@@ -1853,15 +1872,14 @@ export const generateCommercialInvoicePDF = async (
 
     const safeInvoiceNo = (data.invoiceNo || "").trim() || "CI";
     const safeCargoNo = (data.cargoNo || "").trim() || "NoCargo";
-    const filename = `${safeInvoiceNo}_${safeCargoNo}.pdf`
-      .replace(/[/\\?%*:|"<>\s]/g, "_");
+    const filename = `${safeInvoiceNo}_${safeCargoNo}.pdf`.replace(
+      /[/\\?%*:|"<>\s]/g,
+      "_",
+    );
 
     const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=${filename}`,
-    );
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
     doc.pipe(res);
 
     doc
@@ -1945,7 +1963,7 @@ export const generateCommercialInvoicePDF = async (
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
               .text("中国安徽...", 152, 101);
-          } catch (e) { }
+          } catch (e) {}
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -1969,17 +1987,40 @@ export const generateCommercialInvoicePDF = async (
     const bEori = GTECH_GMBH.eori;
 
     let billY = addrY + 12;
-    doc.font("Helvetica-Bold").fontSize(10.5).text(bName, 40, billY, { width: 155 });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(10.5)
+      .text(bName, 40, billY, { width: 155 });
     billY = doc.y + 1;
     doc.font("Helvetica").fontSize(9.5);
-    if (bStreet) { doc.text(bStreet, 40, billY, { width: 155 }); billY = doc.y + 1; }
-    if (bCity) { doc.text(bCity, 40, billY, { width: 155 }); billY = doc.y + 1; }
-    if (bCountry) { doc.text(bCountry, 40, billY, { width: 155 }); billY = doc.y + 1; }
-    if (bPhone) { doc.text(bPhone, 40, billY, { width: 155 }); billY = doc.y + 1; }
-    if (bEori) { doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, billY, { width: 155 }); }
+    if (bStreet) {
+      doc.text(bStreet, 40, billY, { width: 155 });
+      billY = doc.y + 1;
+    }
+    if (bCity) {
+      doc.text(bCity, 40, billY, { width: 155 });
+      billY = doc.y + 1;
+    }
+    if (bCountry) {
+      doc.text(bCountry, 40, billY, { width: 155 });
+      billY = doc.y + 1;
+    }
+    if (bPhone) {
+      doc.text(bPhone, 40, billY, { width: 155 });
+      billY = doc.y + 1;
+    }
+    if (bEori) {
+      doc
+        .font("Helvetica-Bold")
+        .text(`EORI: ${bEori}`, 40, billY, { width: 155 });
+    }
 
     const shipNameY = addrY + 12;
-    const primaryShipName = (data.shipTo.contact || data.shipTo.company || "").trim();
+    const primaryShipName = (
+      data.shipTo.contact ||
+      data.shipTo.company ||
+      ""
+    ).trim();
     doc
       .fillColor("black")
       .font("Helvetica-Bold")
@@ -1997,7 +2038,10 @@ export const generateCommercialInvoicePDF = async (
     doc
       .font("Helvetica")
       .fontSize(10)
-      .text("Cargo No.: ", rightX, metaY + 14, { continued: true, width: rightW })
+      .text("Cargo No.: ", rightX, metaY + 14, {
+        continued: true,
+        width: rightW,
+      })
       .font("Helvetica-Bold")
       .text(data.cargoNo);
 
@@ -2007,10 +2051,21 @@ export const generateCommercialInvoicePDF = async (
       doc.text(data.shipTo.contact, 205, shipY, { width: 195 });
       shipY = doc.y + 1;
     }
-    if (data.shipTo.street) { doc.text(data.shipTo.street, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-    if (data.shipTo.city) { doc.text(data.shipTo.city, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-    if (data.shipTo.country) { doc.text(data.shipTo.country, 205, shipY, { width: 195 }); shipY = doc.y + 1; }
-    if (data.shipTo.phone) { doc.text(data.shipTo.phone, 205, shipY, { width: 195 }); }
+    if (data.shipTo.street) {
+      doc.text(data.shipTo.street, 205, shipY, { width: 195 });
+      shipY = doc.y + 1;
+    }
+    if (data.shipTo.city) {
+      doc.text(data.shipTo.city, 205, shipY, { width: 195 });
+      shipY = doc.y + 1;
+    }
+    if (data.shipTo.country) {
+      doc.text(data.shipTo.country, 205, shipY, { width: 195 });
+      shipY = doc.y + 1;
+    }
+    if (data.shipTo.phone) {
+      doc.text(data.shipTo.phone, 205, shipY, { width: 195 });
+    }
 
     doc
       .font("Helvetica-Bold")
@@ -2022,7 +2077,9 @@ export const generateCommercialInvoicePDF = async (
       .fontSize(15)
       .font("Helvetica-Bold")
       .fillColor("black")
-      .text(`Commercial Invoice  ${data.invoiceNo}`, 0, 240, { align: "center" });
+      .text(`Commercial Invoice  ${data.invoiceNo}`, 0, 240, {
+        align: "center",
+      });
 
     const tableTop = 272;
     doc
@@ -2196,7 +2253,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) { }
+    } catch (e) {}
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;

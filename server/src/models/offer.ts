@@ -172,7 +172,7 @@ export class Offer {
   deliveryTerms?: string;
 
   @Column({ type: "text", nullable: true })
-  paymentTerms?: string;
+  paymentDueDays?: string;
 
   @Column({ type: "varchar", length: 100, nullable: true })
   paymentMethod?: string;
