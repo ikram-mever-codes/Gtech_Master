@@ -32,6 +32,7 @@ export type OrdersTableProps = {
   suppliers: any[];
   onAssignSupplier: (itemId: number | string, supplierId: number, baseItemId?: number | string) => Promise<void>;
   router: any;
+  onBestellungStatusChange?: (orderId: number, newStatus: string) => void;
 };
 
 export default function OrdersTable({
@@ -54,6 +55,7 @@ export default function OrdersTable({
   suppliers,
   onAssignSupplier,
   router,
+  onBestellungStatusChange,
 }: OrdersTableProps) {
   const [editingSupplierId, setEditingSupplierId] = useState<number | string | null>(null);
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string | number>>(new Set());
@@ -429,6 +431,37 @@ export default function OrdersTable({
         </button>
       ),
       align: "center",
+    },
+    {
+      header: "Status",
+      width: "140px",
+      align: "center",
+      render: (row) => {
+        if (activeTab !== "orders") return null;
+        const s = (row.bestellung_status || "draft") as string;
+        const colorMap: Record<string, string> = {
+          draft: "bg-gray-100 text-gray-700 border-gray-300",
+          to_be_processed: "bg-blue-100 text-blue-700 border-blue-300",
+          partially_delivered: "bg-orange-100 text-orange-700 border-orange-300",
+          delivered: "bg-green-100 text-green-700 border-green-300",
+        };
+        return (
+          <select
+            value={s}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              e.stopPropagation();
+              if (onBestellungStatusChange) {
+                onBestellungStatusChange(row.id, e.target.value);
+              }
+            }}
+            className={`text-[11px] font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 ${colorMap[s] || colorMap.draft}`}
+          >
+            <option value="to_be_processed">To Be Processed</option>
+            <option value="partially_delivered">Partially Delivered</option>
+          </select>
+        );
+      },
     },
     {
       header: "Catgy",

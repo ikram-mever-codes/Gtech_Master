@@ -314,6 +314,7 @@ export const updateOrder = async (
       status,
       comment,
       items,
+      bestellung_status,
     } = req.body;
 
     if (!orderId) return next(new ErrorHandler("Order ID is required", 400));
@@ -346,6 +347,7 @@ export const updateOrder = async (
     if (supplier_id !== undefined) order.supplier_id = supplier_id || null;
     if (status !== undefined) order.status = status ?? order.status;
     if (comment !== undefined) order.comment = comment ?? order.comment;
+    if (bestellung_status !== undefined) (order as any).bestellung_status = bestellung_status;
     order.updated_at = new Date();
 
     const isFulfillmentMove =
@@ -362,6 +364,9 @@ export const updateOrder = async (
         const yy = String(now.getFullYear()).slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, "0");
         order.order_no = `DE${yy}${mm}-1`;
+      }
+      if (!(order as any).bestellung_status) {
+        (order as any).bestellung_status = "draft";
       }
     }
 
@@ -460,6 +465,7 @@ export const updateOrder = async (
           finalOrder!.supplier?.name ||
           "Unassigned",
         status: finalOrder!.status,
+        bestellung_status: (finalOrder as any)!.bestellung_status || null,
         comment: finalOrder!.comment,
         source_offer_id: finalOrder!.source_offer_id || null,
         created_at: finalOrder!.created_at,
@@ -540,7 +546,7 @@ export const getAllOrders = async (
           ord.order_no = newDeNo;
           try {
             await orderRepo.update(ord.id, { order_no: newDeNo });
-          } catch (_) {}
+          } catch (_) { }
         }
       } else {
         if (ord.order_no.startsWith("DE")) {
@@ -548,7 +554,7 @@ export const getAllOrders = async (
           ord.order_no = newBNo;
           try {
             await orderRepo.update(ord.id, { order_no: newBNo });
-          } catch (_) {}
+          } catch (_) { }
         }
       }
     }
@@ -628,6 +634,7 @@ export const getAllOrders = async (
         order.cargo?.bill_to_display_name ||
         order.customer?.companyName ||
         "No Customer",
+      bestellung_status: (order as any).bestellung_status || null,
       items: (order.orderItems || []).map((oi) => {
         const itemDetails =
           oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
