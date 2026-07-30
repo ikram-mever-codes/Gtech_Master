@@ -91,7 +91,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
   }
 })();
 
-const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
+const padorder_no = (n: number) => `MA${n}`;
 
 const parseorder_noNumber = (order_no: string) => {
   const m = /^MA(\d+)$/i.exec((order_no || "").trim());

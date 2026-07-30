@@ -1645,7 +1645,6 @@ const InvoiceListPage: React.FC = () => {
     } = docFilters;
 
     return list.filter((item: any) => {
-      // 1. DocumentNo
       if (documentNo.trim()) {
         const s = documentNo.toLowerCase().trim();
         const docNo = String(
@@ -1658,7 +1657,6 @@ const InvoiceListPage: React.FC = () => {
         if (!docNo.includes(s)) return false;
       }
 
-      // 2. CustomerNo
       if (customerNo.trim()) {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
@@ -1672,7 +1670,6 @@ const InvoiceListPage: React.FC = () => {
         if (!cNo.includes(s)) return false;
       }
 
-      // 3. CustomerName
       if (customerName.trim()) {
         const s = customerName.toLowerCase().trim();
         const cName = String(
@@ -1687,7 +1684,6 @@ const InvoiceListPage: React.FC = () => {
         if (!cName.includes(s)) return false;
       }
 
-      // 4. Value
       if (valueAmount.trim()) {
         let val = 0;
         if (activeInvTab === "angebot") {
@@ -1703,13 +1699,11 @@ const InvoiceListPage: React.FC = () => {
         if (!isValueMatching(val, valueOperator, valueAmount)) return false;
       }
 
-      // 5. Status
       if (status) {
         const itemStatus = String(item.status || "").toLowerCase();
         if (itemStatus !== status.toLowerCase()) return false;
       }
 
-      // 6. Date Created
       if (datePreset && datePreset !== "all") {
         const docDate =
           item.createdAt ||

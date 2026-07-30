@@ -669,21 +669,20 @@ export class OfferController {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
 
-    const lastOffer = await this.offerRepository
+    const result = await this.offerRepository
       .createQueryBuilder("offer")
+      .select(
+        "MAX(CAST(SUBSTRING_INDEX(offer.offerNumber, '-', -1) AS UNSIGNED))",
+        "maxSeq",
+      )
       .where("offer.offerNumber LIKE :pattern", {
         pattern: `OFF-${year}${month}-%`,
       })
-      .orderBy("offer.offerNumber", "DESC")
-      .getOne();
+      .getRawOne();
 
-    let sequence = 1;
-    if (lastOffer) {
-      const lastNumber = parseInt(lastOffer.offerNumber.split("-")[2]) || 0;
-      sequence = lastNumber + 1;
-    }
+    const sequence = result?.maxSeq ? parseInt(result.maxSeq) + 1 : 1;
 
-    return `OFF-${year}${month}-${sequence.toString().padStart(4, "0")}`;
+    return `OFF-${year}${month}-${sequence}`;
   }
 
   private buildCustomerSnapshot(customer: Customer | any): CustomerSnapshot {
