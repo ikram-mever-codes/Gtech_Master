@@ -192,6 +192,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           height: itemFormData.height || undefined,
           remark: itemFormData.remark,
           model: itemFormData.model,
+          RMB_Price: Number(itemFormData.price) || 0,
           price: Number(itemFormData.price) || 0,
           currency: itemFormData.currency || "CNY",
           isActive: itemFormData.isActive ? "Y" : "N",
