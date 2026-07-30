@@ -64,6 +64,7 @@ const tarics_1 = require("../models/tarics");
 const customers_1 = require("../models/customers");
 const supplier_items_1 = require("../models/supplier_items");
 const cargo_controller_1 = require("./cargo_controller");
+const number_sequence_service_1 = require("../services/number_sequence_service");
 const _cjkFontCandidates = [
     path_1.default.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
     path_1.default.resolve(__dirname, "..", "..", "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
@@ -118,9 +119,14 @@ exports._cachedCjkFontBuffer = null;
         }
     }
 })();
-const padorder_no = (n) => `MA${n}`;
+const padorder_no = (n) => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    return `MA${yyyy}${mm}-${n}`;
+};
 const parseorder_noNumber = (order_no) => {
-    const m = /^MA(\d+)$/i.exec((order_no || "").trim());
+    const m = /(\d+)$/.exec((order_no || "").trim());
     if (!m)
         return null;
     const num = parseInt(m[1], 10);
@@ -146,19 +152,24 @@ const createOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 throw new errorHandler_1.default(`Auftrag ${existingOrder.order_no} already exists for this Angebot. Duplicate conversion is not allowed.`, 409);
             }
         }
-        const lastOrder = yield orderRepo
-            .createQueryBuilder("o")
-            .setLock("pessimistic_write")
-            .where("o.order_no LIKE :prefix", { prefix: "MA%" })
-            .orderBy("o.id", "DESC")
-            .getOne();
-        let nextNumber = 1;
-        if (lastOrder === null || lastOrder === void 0 ? void 0 : lastOrder.order_no) {
-            const lastNum = parseorder_noNumber(lastOrder.order_no);
-            if (lastNum !== null)
-                nextNumber = lastNum + 1;
+        let generatedorder_no = "";
+        try {
+            generatedorder_no = yield number_sequence_service_1.NumberSequenceService.getNextNumber("order");
         }
-        const generatedorder_no = padorder_no(nextNumber);
+        catch (e) {
+            const allOrders = yield orderRepo
+                .createQueryBuilder("o")
+                .select(["o.order_no"])
+                .getMany();
+            let maxNum = 0;
+            for (const ord of allOrders) {
+                const parsed = parseorder_noNumber(ord.order_no);
+                if (parsed !== null && parsed > maxNum) {
+                    maxNum = parsed;
+                }
+            }
+            generatedorder_no = padorder_no(maxNum + 1);
+        }
         const order = orderRepo.create({
             order_no: generatedorder_no,
             category_id: category_id || null,

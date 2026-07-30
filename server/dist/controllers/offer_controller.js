@@ -83,6 +83,7 @@ const gtech_fonts_1 = require("../utils/gtech_fonts");
 // @ts-ignore
 const svg_to_pdfkit_1 = __importDefault(require("svg-to-pdfkit"));
 const gtechDocumentTemplate_1 = require("../services/gtechDocumentTemplate");
+const number_sequence_service_1 = require("../services/number_sequence_service");
 const typeorm_1 = require("typeorm");
 let cachedCustomerSvg = null;
 function drawCustomerSvgBackground(doc) {
@@ -739,27 +740,29 @@ class OfferController {
     }
     generateOfferNumber() {
         return __awaiter(this, void 0, void 0, function* () {
-            const date = new Date();
-            const year = date.getFullYear();
-            const month = (date.getMonth() + 1).toString().padStart(2, "0");
-            const pattern = `OFF-${year}${month}-%`;
-            const offers = yield this.offerRepository
-                .createQueryBuilder("offer")
-                .select(["offer.offerNumber"])
-                .where("offer.offerNumber LIKE :pattern", { pattern })
-                .getMany();
-            let maxSeq = 0;
-            for (const off of offers) {
-                if (off.offerNumber) {
-                    const parts = off.offerNumber.split("-");
-                    const num = parseInt(parts[parts.length - 1], 10);
-                    if (!isNaN(num) && num > maxSeq) {
-                        maxSeq = num;
+            try {
+                return yield number_sequence_service_1.NumberSequenceService.getNextNumber("offer");
+            }
+            catch (e) {
+                const date = new Date();
+                const year = date.getFullYear();
+                const month = (date.getMonth() + 1).toString().padStart(2, "0");
+                const offers = yield this.offerRepository
+                    .createQueryBuilder("offer")
+                    .select(["offer.offerNumber"])
+                    .getMany();
+                let maxSeq = 0;
+                for (const off of offers) {
+                    if (off.offerNumber) {
+                        const parts = off.offerNumber.split("-");
+                        const num = parseInt(parts[parts.length - 1], 10);
+                        if (!isNaN(num) && num > maxSeq) {
+                            maxSeq = num;
+                        }
                     }
                 }
+                return `A${year}${month}-${maxSeq + 1}`;
             }
-            const sequence = maxSeq + 1;
-            return `OFF-${year}${month}-${sequence}`;
         });
     }
     buildCustomerSnapshot(customer) {

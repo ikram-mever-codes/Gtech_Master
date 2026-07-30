@@ -141,17 +141,18 @@ class NumberSequenceService {
         return __awaiter(this, void 0, void 0, function* () {
             const repo = database_1.AppDataSource.getRepository(number_sequence_1.NumberSequence);
             const defaults = [
-                { sequenceKey: "offer", name: "Angebot", prefix: "A", minDigits: 2 },
-                { sequenceKey: "order", name: "Auftrag", prefix: "B", minDigits: 2 },
-                { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", minDigits: 2 },
-                { sequenceKey: "invoice", name: "Rechnung", prefix: "R", minDigits: 2 },
+                { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+                { sequenceKey: "order", name: "Auftrag", prefix: "MA", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+                { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+                { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
                 {
                     sequenceKey: "invoice_correction",
                     name: "Rechnungskorrektur",
                     prefix: "RK",
-                    minDigits: 2,
+                    formatPattern: "{prefix}{yyyy}{mm}-{number}",
+                    minDigits: 1,
                 },
-                { sequenceKey: "delivery_note", name: "Lieferschein", prefix: "L", minDigits: 2 },
+                { sequenceKey: "delivery_note", name: "Lieferschein", prefix: "L", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
                 {
                     sequenceKey: "customer",
                     name: "Kunde",
@@ -163,15 +164,15 @@ class NumberSequenceService {
                     sequenceKey: "cargo",
                     name: "Cargo",
                     prefix: "C",
-                    formatPattern: "{prefix}{yyyy}-{number}",
-                    minDigits: 4,
+                    formatPattern: "{prefix}{yyyy}{mm}-{number}",
+                    minDigits: 1,
                 },
                 {
                     sequenceKey: "closed_ci",
                     name: "Commercial Invoice",
                     prefix: "CI",
-                    formatPattern: "{prefix}{yy}{mm}{number}",
-                    minDigits: 3,
+                    formatPattern: "{prefix}{yyyy}{mm}-{number}",
+                    minDigits: 1,
                 },
             ];
             for (const def of defaults) {
@@ -180,11 +181,13 @@ class NumberSequenceService {
                 });
                 if (!exists) {
                     const startNo = def.sequenceKey === "customer" ? 83777 : 1;
-                    yield repo.save(repo.create(Object.assign(Object.assign({}, def), { minDigits: def.minDigits, nextRunningNo: startNo })));
+                    yield repo.save(repo.create(Object.assign(Object.assign({}, def), { nextRunningNo: startNo })));
                 }
-                else if (def.sequenceKey === "customer") {
+                else {
+                    exists.prefix = def.prefix;
+                    exists.formatPattern = def.formatPattern;
                     exists.minDigits = 1;
-                    if (exists.nextRunningNo < 83777) {
+                    if (def.sequenceKey === "customer" && exists.nextRunningNo < 83777) {
                         exists.nextRunningNo = 83777;
                     }
                     yield repo.save(exists);
