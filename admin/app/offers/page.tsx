@@ -670,19 +670,22 @@ const OffersPage: React.FC<any> = ({
                               onClick={(e) =>
                                 handleConvertOfferToAuftrag(offer, e)
                               }
-                              className={`relative inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap cursor-pointer ${
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap cursor-pointer ${
                                 isConverted
                                   ? "bg-gray-500 hover:bg-gray-600 text-white"
                                   : "bg-[#2F6B46] hover:bg-[#255638] text-white"
                               }`}
                             >
                               <MoveRight className="h-3.5 w-3.5" />
-                              {conversionCount > 0 && (
-                                <span className="ml-0.5 px-1.5 py-0.2 text-[9px] font-black bg-white text-gray-900 rounded-full shadow-sm border border-gray-300">
-                                  {conversionCount}
-                                </span>
-                              )}
                             </button>
+                            {conversionCount > 0 && (
+                              <span
+                                title={`Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""}`}
+                                className="px-1.5 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
+                              >
+                                {conversionCount}
+                              </span>
+                            )}
                             <button
                               title="Download Angebot PDF"
                               onClick={async (e) => {

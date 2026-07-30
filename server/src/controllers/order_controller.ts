@@ -127,38 +127,70 @@ export const createOrder = async (
     const orderRepo = queryRunner.manager.getRepository(Order);
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
-    let generatedorder_no = "";
-    try {
-      generatedorder_no = await NumberSequenceService.getNextNumber("order");
-    } catch (e) {
-      const allOrders = await orderRepo
-        .createQueryBuilder("o")
-        .select(["o.order_no"])
-        .getMany();
+    let order: Order;
+    let existingOrder: Order | null = null;
 
-      let maxNum = 0;
-      for (const ord of allOrders) {
-        const parsed = parseorder_noNumber(ord.order_no);
-        if (parsed !== null && parsed > maxNum) {
-          maxNum = parsed;
-        }
-      }
-      generatedorder_no = padorder_no(maxNum + 1);
+    if (source_offer_id) {
+      existingOrder = await orderRepo.findOne({
+        where: { source_offer_id },
+      });
     }
 
-    const order = orderRepo.create({
-      order_no: generatedorder_no,
-      category_id: category_id || null,
-      customer_id: customer_id || null,
-      supplier_id: supplier_id || null,
-      status: status ?? 1,
-      comment: comment || null,
-      source_offer_id: source_offer_id || null,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
+    if (existingOrder) {
+      order = existingOrder;
+      order.customer_id = customer_id || order.customer_id || null;
+      order.category_id = category_id || order.category_id || null;
+      order.supplier_id = supplier_id || order.supplier_id || null;
+      order.comment = comment || order.comment || null;
+      order.status = status ?? order.status ?? 1;
+      order.updated_at = new Date();
 
-    await orderRepo.save(order);
+      if (!order.order_no || order.order_no.startsWith("MA")) {
+        try {
+          order.order_no = await NumberSequenceService.getNextNumber("order");
+        } catch (_) {
+          order.order_no = padorder_no(1);
+        }
+      }
+
+      await orderRepo.save(order);
+      await orderItemsRepo.delete({ order_id: order.id });
+    } else {
+      let generatedorder_no = "";
+      try {
+        generatedorder_no = await NumberSequenceService.getNextNumber("order");
+      } catch (e) {
+        const allOrders = await orderRepo
+          .createQueryBuilder("o")
+          .select(["o.order_no"])
+          .getMany();
+
+        let maxNum = 0;
+        for (const ord of allOrders) {
+          const parsed = parseorder_noNumber(ord.order_no);
+          if (parsed !== null && parsed > maxNum) {
+            maxNum = parsed;
+          }
+        }
+        generatedorder_no = padorder_no(maxNum + 1);
+      }
+
+      const now = new Date();
+      order = orderRepo.create({
+        order_no: generatedorder_no,
+        category_id: category_id || null,
+        customer_id: customer_id || null,
+        supplier_id: supplier_id || null,
+        status: status ?? 1,
+        comment: comment || null,
+        source_offer_id: source_offer_id || null,
+        date_created: now.toISOString(),
+        created_at: now,
+        updated_at: now,
+      });
+
+      await orderRepo.save(order);
+    }
 
     const itemRepo = queryRunner.manager.getRepository(Item);
     const supplierItemRepo = queryRunner.manager.getRepository(SupplierItem);
@@ -462,8 +494,7 @@ export const getAllOrders = async (
       .leftJoinAndSelect("o.cargo", "cargo")
       .leftJoinAndSelect("cargo.customer", "cust")
       .leftJoinAndSelect("o.customer", "orderCust")
-      .orderBy("o.date_created", "DESC")
-      .addOrderBy("o.id", "DESC")
+      .orderBy("o.id", "DESC")
       .addOrderBy("oi.id", "ASC");
 
     if (search) {
