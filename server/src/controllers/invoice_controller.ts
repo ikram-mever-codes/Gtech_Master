@@ -1142,8 +1142,48 @@ export class InvoiceController {
           : [];
       const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
+      const itemsWithFallbacks = await Promise.all(
+        [...orderItems].map(async (oi: any) => {
+          const item = oi.item;
+
+          let ean = item?.ean || "-";
+          if (ean === "-" && item?.id) {
+            const wi = await AppDataSource.getRepository(WarehouseItem).findOne(
+              {
+                where: { item_id: item.id },
+              },
+            );
+            if (wi?.ean) ean = wi.ean;
+          }
+
+          let rmbPrice = oi.rmb_special_price || 0;
+          if (!rmbPrice && item?.id) {
+            rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
+          }
+          let eurPrice =
+            oi.eur_special_price ||
+            oi.price ||
+            item?.transfer_price_EUR ||
+            item?.price ||
+            0;
+          if (!eurPrice && rmbPrice) {
+            eurPrice = Number(rmbPrice) * 0.13;
+          }
+
+          return {
+            ...oi,
+            v: (item?.length * item?.width * item?.height) / 1000 || 0,
+            w: item?.weight || 0,
+            _effectiveTaricCode: getEffectiveTaricCode(oi),
+            _fallbackEan: ean,
+            _fallbackRmb: rmbPrice,
+            _fallbackEk: eurPrice,
+          };
+        }),
+      );
+
       const taricGroupsMap = new Map<string, any>();
-      orderItems.forEach((oi: any) => {
+      itemsWithFallbacks.forEach((oi: any) => {
         const item = oi.item;
         const taric = item?.taric;
         const itemTaricCode = taric?.code || "";
@@ -1173,16 +1213,6 @@ export class InvoiceController {
             }
           }
 
-          let unitPrice =
-            oi?.eur_special_price ||
-            oi?.price ||
-            item?.transfer_price_EUR ||
-            item?.price ||
-            0;
-          if (!unitPrice && (oi?.rmb_special_price || 0) > 0) {
-            unitPrice = oi.rmb_special_price * 0.13;
-          }
-
           taricGroupsMap.set(groupKey, {
             taricId: groupKey,
             taricNameEn: displayName,
@@ -1190,23 +1220,15 @@ export class InvoiceController {
             dutyRate: displayRate,
             totalQty: 0,
             totalPrice: 0,
-            unitPrice: unitPrice,
+            unitPrice: 0,
             isProjectItem,
           });
         }
 
         const group = taricGroupsMap.get(groupKey)!;
-        group.totalQty += oi.qty || 0;
-        let currentPrice =
-          oi?.eur_special_price ||
-          oi?.price ||
-          item?.transfer_price_EUR ||
-          item?.price ||
-          0;
-        if (!currentPrice && (oi?.rmb_special_price || 0) > 0) {
-          currentPrice = oi.rmb_special_price * 0.13;
-        }
-        group.totalPrice += (oi.qty || 0) * (Number(currentPrice) || 0);
+        group.totalQty += Number(oi.qty) || 0;
+        const currentPrice = Number(oi._fallbackEk) || 0;
+        group.totalPrice += (Number(oi.qty) || 0) * currentPrice;
       });
 
       const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
@@ -1217,46 +1239,6 @@ export class InvoiceController {
         }
         return g;
       });
-
-      const itemsWithFallbacks = await Promise.all(
-        [...orderItems].map(async (oi: any) => {
-          const item = oi.item;
-
-          let ean = item?.ean || "-";
-          if (ean === "-" && item?.id) {
-            const wi = await AppDataSource.getRepository(WarehouseItem).findOne(
-              {
-                where: { item_id: item.id },
-              },
-            );
-            if (wi?.ean) ean = wi.ean;
-          }
-
-          let rmbPrice = oi.rmb_special_price || 0;
-          if (!rmbPrice && item?.id) {
-            rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
-          }
-          let eurPrice =
-            oi.eur_special_price ||
-            oi.price ||
-            item?.transfer_price_EUR ||
-            item?.price ||
-            0;
-          if (!eurPrice && rmbPrice) {
-            eurPrice = rmbPrice * 0.13;
-          }
-
-          return {
-            ...oi,
-            v: (item?.length * item?.width * item?.height) / 1000 || 0,
-            w: item?.weight || 0,
-            _effectiveTaricCode: getEffectiveTaricCode(oi),
-            _fallbackEan: ean,
-            _fallbackRmb: rmbPrice,
-            _fallbackEk: eurPrice,
-          };
-        }),
-      );
 
       const sortedItems = itemsWithFallbacks.sort((a: any, b: any) => {
         const codeCompare = (a._effectiveTaricCode || "").localeCompare(
