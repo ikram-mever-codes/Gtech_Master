@@ -1,4 +1,3 @@
-// orderApi.ts
 import { toast } from "react-hot-toast";
 import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";

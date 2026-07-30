@@ -121,7 +121,6 @@ export const createOrder = async (
     const orderRepo = queryRunner.manager.getRepository(Order);
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
-    // Duplicate guard: if this offer was already converted, reject with 409
     if (source_offer_id) {
       const existingOrder = await orderRepo.findOne({
         where: { source_offer_id },

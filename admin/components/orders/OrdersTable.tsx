@@ -636,6 +636,12 @@ export default function OrdersTable({
         />
       ),
     },
+    {
+      header: "Actions",
+      width: "50px",
+      align: "center",
+      render: (row) => <ActionCell row={row} />,
+    },
   ];
 
   return (
