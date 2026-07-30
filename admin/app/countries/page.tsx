@@ -157,7 +157,12 @@ export default function CountriesPage() {
 
   const handleEditDelete = async () => {
     if (!selectedCountry) return;
-    if (!confirm(`Are you sure you want to delete ${selectedCountry.name}? This action cannot be undone.`)) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedCountry.name}? This action cannot be undone.`,
+      )
+    )
+      return;
     setSubmitting(true);
     try {
       const res: any = await deleteCountry(selectedCountry.id);
@@ -249,7 +254,9 @@ export default function CountriesPage() {
       ) : filteredCountries.length === 0 ? (
         <div className="p-12 text-center">
           <Globe2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium font-poppins">No countries found.</p>
+          <p className="text-gray-500 font-medium font-poppins">
+            No countries found.
+          </p>
           <p className="text-xs text-gray-400 mt-1">
             Try a different search or create a new country.
           </p>
@@ -272,8 +279,9 @@ export default function CountriesPage() {
                 <tr
                   key={country.id}
                   onClick={() => handleRowClick(country)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!country.is_active ? "opacity-60" : ""
-                    }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
+                    !country.is_active ? "opacity-60" : ""
+                  }`}
                 >
                   <td className="px-6 py-4 font-mono font-bold text-gray-700">
                     {country.iso2}
@@ -467,7 +475,9 @@ export default function CountriesPage() {
                       type="text"
                       maxLength={2}
                       value={editIso2}
-                      onChange={(e) => setEditIso2(e.target.value.toUpperCase())}
+                      onChange={(e) =>
+                        setEditIso2(e.target.value.toUpperCase())
+                      }
                       className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all uppercase font-mono font-bold"
                     />
                   ) : (
@@ -524,16 +534,22 @@ export default function CountriesPage() {
                           onChange={(e) => setEditIsEu(e.target.checked)}
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-sm font-semibold text-gray-700">EU Member Country</span>
+                        <span className="text-sm font-semibold text-gray-700">
+                          EU Member Country
+                        </span>
                       </label>
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={editIsIglCountry}
-                          onChange={(e) => setEditIsIglCountry(e.target.checked)}
+                          onChange={(e) =>
+                            setEditIsIglCountry(e.target.checked)
+                          }
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-sm font-semibold text-gray-700">IGL Country</span>
+                        <span className="text-sm font-semibold text-gray-700">
+                          IGL Country
+                        </span>
                       </label>
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
@@ -542,21 +558,41 @@ export default function CountriesPage() {
                           onChange={(e) => setEditIsActive(e.target.checked)}
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-sm font-semibold text-gray-700">Active (shows in dropdowns)</span>
+                        <span className="text-sm font-semibold text-gray-700">
+                          Active (shows in dropdowns)
+                        </span>
                       </label>
                     </>
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedCountry.is_eu ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}>
-                        {selectedCountry.is_eu ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedCountry.is_eu ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+                      >
+                        {selectedCountry.is_eu ? (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
                         EU Member
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedCountry.is_igl_country ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}>
-                        {selectedCountry.is_igl_country ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedCountry.is_igl_country ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+                      >
+                        {selectedCountry.is_igl_country ? (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
                         IGL Country
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedCountry.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}>
-                        {selectedCountry.is_active ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedCountry.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+                      >
+                        {selectedCountry.is_active ? (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
                         Active
                       </span>
                     </div>
@@ -582,7 +618,7 @@ export default function CountriesPage() {
 
   return (
     <MasterPageLayout
-      title="Country Settings"
+      title="Country"
       icon={Globe2}
       actionButtons={actionButtons}
       filterBar={filterBar}

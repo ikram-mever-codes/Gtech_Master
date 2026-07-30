@@ -38,7 +38,8 @@ export default function TaxProfilesPage() {
   const [requiresConfirmedVatId, setRequiresConfirmedVatId] = useState(false);
   const [description, setDescription] = useState("");
 
-  const [selectedTaxProfile, setSelectedTaxProfile] = useState<TaxProfile | null>(null);
+  const [selectedTaxProfile, setSelectedTaxProfile] =
+    useState<TaxProfile | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isEditEnabled, setIsEditEnabled] = useState(false);
   const [editName, setEditName] = useState("");
@@ -47,7 +48,8 @@ export default function TaxProfilesPage() {
   const [editTaxCode, setEditTaxCode] = useState("");
   const [editRevenueAccountNo, setEditRevenueAccountNo] = useState("");
   const [editRequiresVatId, setEditRequiresVatId] = useState(false);
-  const [editRequiresConfirmedVatId, setEditRequiresConfirmedVatId] = useState(false);
+  const [editRequiresConfirmedVatId, setEditRequiresConfirmedVatId] =
+    useState(false);
   const [editIsActive, setEditIsActive] = useState(true);
   const [editDescription, setEditDescription] = useState("");
 
@@ -168,7 +170,9 @@ export default function TaxProfilesPage() {
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to update tax profile");
+      toast.error(
+        err?.response?.data?.message || "Failed to update tax profile",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +180,12 @@ export default function TaxProfilesPage() {
 
   const handleEditDelete = async () => {
     if (!selectedTaxProfile) return;
-    if (!confirm(`Are you sure you want to delete the profile "${selectedTaxProfile.name}"? This action cannot be undone.`)) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete the profile "${selectedTaxProfile.name}"? This action cannot be undone.`,
+      )
+    )
+      return;
     setSubmitting(true);
     try {
       const res: any = await deleteTaxProfile(selectedTaxProfile.id);
@@ -188,7 +197,9 @@ export default function TaxProfilesPage() {
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to delete tax profile");
+      toast.error(
+        err?.response?.data?.message || "Failed to delete tax profile",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -207,7 +218,9 @@ export default function TaxProfilesPage() {
         setEditTaxCode(selectedTaxProfile.tax_code || "");
         setEditRevenueAccountNo(selectedTaxProfile.revenue_account_no || "");
         setEditRequiresVatId(selectedTaxProfile.requires_vat_id);
-        setEditRequiresConfirmedVatId(selectedTaxProfile.requires_confirmed_vat_id);
+        setEditRequiresConfirmedVatId(
+          selectedTaxProfile.requires_confirmed_vat_id,
+        );
         setEditIsActive(selectedTaxProfile.is_active);
         setEditDescription(selectedTaxProfile.description || "");
       }
@@ -269,7 +282,9 @@ export default function TaxProfilesPage() {
       ) : filteredProfiles.length === 0 ? (
         <div className="p-12 text-center">
           <Percent className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium font-poppins">No tax profiles found.</p>
+          <p className="text-gray-500 font-medium font-poppins">
+            No tax profiles found.
+          </p>
           <p className="text-xs text-gray-400 mt-1">
             Try a different search or create a new profile.
           </p>
@@ -291,8 +306,9 @@ export default function TaxProfilesPage() {
                 <tr
                   key={p.id}
                   onClick={() => handleRowClick(p)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!p.is_active ? "opacity-60" : ""
-                    }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
+                    !p.is_active ? "opacity-60" : ""
+                  }`}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">
                     <div>
@@ -557,7 +573,9 @@ export default function TaxProfilesPage() {
                     >
                       <option value="DE-VAT">DE-VAT</option>
                       <option value="EU_IGL">EU_IGL</option>
-                      <option value="EU_no_valid_VAT_ID">EU_no_valid_VAT_ID</option>
+                      <option value="EU_no_valid_VAT_ID">
+                        EU_no_valid_VAT_ID
+                      </option>
                       <option value="third_country">third_country</option>
                     </select>
                   ) : (
@@ -577,7 +595,9 @@ export default function TaxProfilesPage() {
                       step="0.01"
                       min="0"
                       value={editTaxRate}
-                      onChange={(e) => setEditTaxRate(parseFloat(e.target.value) || 0)}
+                      onChange={(e) =>
+                        setEditTaxRate(parseFloat(e.target.value) || 0)
+                      }
                       className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all"
                     />
                   ) : (
@@ -648,19 +668,27 @@ export default function TaxProfilesPage() {
                         <input
                           type="checkbox"
                           checked={editRequiresVatId}
-                          onChange={(e) => setEditRequiresVatId(e.target.checked)}
+                          onChange={(e) =>
+                            setEditRequiresVatId(e.target.checked)
+                          }
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-xs font-semibold text-gray-700">Requires VAT ID</span>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Requires VAT ID
+                        </span>
                       </label>
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={editRequiresConfirmedVatId}
-                          onChange={(e) => setEditRequiresConfirmedVatId(e.target.checked)}
+                          onChange={(e) =>
+                            setEditRequiresConfirmedVatId(e.target.checked)
+                          }
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-xs font-semibold text-gray-700">Requires Confirmed VAT ID</span>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Requires Confirmed VAT ID
+                        </span>
                       </label>
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
@@ -669,21 +697,41 @@ export default function TaxProfilesPage() {
                           onChange={(e) => setEditIsActive(e.target.checked)}
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-xs font-semibold text-gray-700">Active</span>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Active
+                        </span>
                       </label>
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedTaxProfile.requires_vat_id ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}>
-                        {selectedTaxProfile.requires_vat_id ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedTaxProfile.requires_vat_id ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+                      >
+                        {selectedTaxProfile.requires_vat_id ? (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
                         Requires VAT ID
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedTaxProfile.requires_confirmed_vat_id ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}>
-                        {selectedTaxProfile.requires_confirmed_vat_id ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedTaxProfile.requires_confirmed_vat_id ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+                      >
+                        {selectedTaxProfile.requires_confirmed_vat_id ? (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
                         Requires Confirmed VAT ID
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedTaxProfile.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}>
-                        {selectedTaxProfile.is_active ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedTaxProfile.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+                      >
+                        {selectedTaxProfile.is_active ? (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
                         Active
                       </span>
                     </div>
@@ -709,7 +757,7 @@ export default function TaxProfilesPage() {
 
   return (
     <MasterPageLayout
-      title="Tax Profile Settings"
+      title="Tax Profile"
       icon={Percent}
       actionButtons={actionButtons}
       filterBar={filterBar}

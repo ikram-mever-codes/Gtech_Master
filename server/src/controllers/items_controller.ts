@@ -875,7 +875,7 @@ export const createItem = async (
       price,
       currency,
       isActive = "Y",
-      is_qty_dividable = "Y",
+      is_qty_dividable = "N",
       is_npr = "N",
       is_eur_special = "N",
       is_rmb_special = "N",

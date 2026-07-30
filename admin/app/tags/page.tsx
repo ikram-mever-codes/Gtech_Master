@@ -49,7 +49,7 @@ export default function TagsPage() {
   const [activeTab, setActiveTab] = useState("company");
   const [tags, setTags] = useState<TagType[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Modal & Form States
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -144,7 +144,8 @@ export default function TagsPage() {
         fetchTags();
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Failed to delete tag";
+      const msg =
+        err?.response?.data?.message || err?.message || "Failed to delete tag";
       toast.error(msg);
       console.error(err);
     }
@@ -188,13 +189,19 @@ export default function TagsPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center gap-3 py-12">
           <div className="w-8 h-8 border-2 border-[#8CC21B] border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-sm font-semibold text-gray-500">Loading tags...</span>
+          <span className="text-sm font-semibold text-gray-500">
+            Loading tags...
+          </span>
         </div>
       ) : tags.length === 0 ? (
         <div className="text-center py-12">
           <Tag className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No tags found for this category.</p>
-          <p className="text-xs text-gray-400 mt-1">Use the button above to add a tag.</p>
+          <p className="text-gray-500 font-medium">
+            No tags found for this category.
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Use the button above to add a tag.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -288,11 +295,10 @@ export default function TagsPage() {
           <div className="grid grid-cols-8 gap-2">
             {COLORS.map((col) => {
               const isSelected = tagColor === col.id;
-              const activeColorClass =
-                colorClasses[col.id] || {
-                  button: "bg-white border-gray-300 text-gray-700",
-                  dot: "bg-white",
-                };
+              const activeColorClass = colorClasses[col.id] || {
+                button: "bg-white border-gray-300 text-gray-700",
+                dot: "bg-white",
+              };
               return (
                 <button
                   key={col.id}
@@ -362,7 +368,7 @@ export default function TagsPage() {
 
   return (
     <MasterPageLayout
-      title="Tag Management"
+      title="Tag"
       icon={Tag}
       actionButtons={actionButtons}
       filterBar={filterBar}

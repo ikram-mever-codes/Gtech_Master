@@ -395,9 +395,11 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
       {(addr.address || addr.street) && (
         <div>{addr.address || addr.street}</div>
       )}
-      {line2 && <div>{line2}</div>}
-      {addr.country && <div>{addr.country}</div>}
-      {addr.vatId && <div className="text-gray-500">VAT ID: {addr.vatId}</div>}
+      {/* {line2 && <div>{line2}</div>} */}
+      {/* {addr.country && <div>{addr.country}</div>} */}
+      {addr.vatId && addr.country !== "Germany" && addr.country !== "DE" && (
+        <div className="text-gray-500">VAT ID: {addr.vatId}</div>
+      )}
       {addr.contactPhone && (
         <div className="text-gray-500">Phone: {addr.contactPhone}</div>
       )}
@@ -1581,9 +1583,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     }}
                     emptyText="No customer snapshot."
                   />
-                  <p className="text-[11px] text-gray-400 pt-2">
-                    Snapshot taken when the offer was created.
-                  </p>
                 </Section>
 
                 <Section
@@ -1728,7 +1727,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ paymentTerms: e.target.value })}
                     />
                   </Field>
-                  <Field
+                  {/* <Field
                     label="Tax rate"
                     edit={edit}
                     value={`${offer.taxRate ?? 19}%`}
@@ -1739,7 +1738,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         patch({ taxRate: parseFlexibleNumber(raw) ?? 19 })
                       }
                     />
-                  </Field>
+                  </Field> */}
                   <Field
                     label="Offer color"
                     edit={edit}
@@ -1837,11 +1836,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         : "No shipping country set"
                     }
                   />
-                  <Field
+                  {/* <Field
                     label="Subsequent tax (VAT amount)"
                     edit={false}
                     value={formatCurrency(offer.taxAmount || 0, offer.currency)}
-                  />
+                  /> */}
                 </div>
               </Section>
 

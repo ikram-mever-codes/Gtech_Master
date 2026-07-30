@@ -676,7 +676,8 @@ export class OfferController {
 
   private async generateOfferNumber(): Promise<string> {
     try {
-      const { NumberSequenceService } = await import("../services/number_sequence_service");
+      const { NumberSequenceService } =
+        await import("../services/number_sequence_service");
       return await NumberSequenceService.getNextNumber("offer");
     } catch (e) {
       const date = new Date();
@@ -1017,6 +1018,13 @@ export class OfferController {
               requestedItemId: request.id,
               itemName: request.itemName || "Component",
               material: request.material,
+              // NEW: thumbnail for requested-item-based lines. RequestedItem
+              // doesn't have a confirmed photo/picture field in what's been
+              // shown so far — using `(request as any).photo` defensively so
+              // this picks it up automatically if/when that field exists,
+              // without breaking compilation if it doesn't.
+              photo:
+                (request as any).photo || (request as any).picture || undefined,
               specification: request.specification,
               description: request.comment || request.extraNote,
               weight: request.weight,
@@ -1045,6 +1053,9 @@ export class OfferController {
               requestedItemId: request.id,
               itemName: request.itemName || "Item",
               material: request.material,
+              // NEW: same defensive photo lookup as above.
+              photo:
+                (request as any).photo || (request as any).picture || undefined,
               specification: request.specification,
               description: request.comment || request.extraNote,
               weight: request.weight,
@@ -1110,7 +1121,7 @@ export class OfferController {
       }
 
       const itemRepository = AppDataSource.getRepository(Item);
-      // NEW: also load "parent" — de_no lives on the Item's parent record,
+      // also load "parent" — de_no lives on the Item's parent record,
       // not on Item itself (see getItemById, which resolves de_no the same
       // way: warehouse item_no_de first, falling back to parent.de_no).
       const fetchedItems: any[] = await itemRepository.find({
@@ -1135,7 +1146,7 @@ export class OfferController {
           .json({ success: false, message: "No matching items found." });
       }
 
-      // NEW: batch-load warehouse records for all requested items, matched
+      // batch-load warehouse records for all requested items, matched
       // the same way getItemById matches a single item — by ItemID_DE first,
       // falling back to item_id — so `de_no` here resolves identically to
       // what the item detail view shows.
@@ -1244,6 +1255,8 @@ export class OfferController {
         // material  <- item's de_no, resolved the same way getItemById
         //   resolves it: warehouse item_no_de first, falling back to
         //   parent.de_no.
+        // photo     <- item.photo (the Item entity's own thumbnail column,
+        //   same field getItemById/getItems already expose to the frontend).
         // ---------------------------------------------------------------
         return this.lineItemRepository.create({
           offer: savedOffer,
@@ -1261,6 +1274,7 @@ export class OfferController {
           baseQuantity: body.baseQuantity || "1",
           basePrice: item.price ?? 0,
           material: getDeNo(item),
+          photo: item.photo || undefined,
           position: idx + 1,
           priceMatrix:
             pricingMode === "matrix"
@@ -3611,12 +3625,6 @@ export class OfferController {
     }
   }
 
-  // ==========================================================================
-  // Linked documents (orders / invoices / invoice corrections / delivery
-  // notes) tied to this offer. Returns an empty-but-valid shape until the
-  // Order/Invoice/DeliveryNote entities are wired in here — the frontend
-  // already handles an empty result gracefully.
-  // ==========================================================================
   async getLinkedDocuments(request: Request, response: Response) {
     try {
       const { id } = request.params;

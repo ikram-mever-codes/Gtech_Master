@@ -31,7 +31,9 @@ export default function ShippingMethodsPage() {
   const [showModal, setShowModal] = useState(false);
   const [name, setName] = useState("");
 
-  const [selectedMethod, setSelectedMethod] = useState<ShippingMethod | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<ShippingMethod | null>(
+    null,
+  );
   const [showEditModal, setShowEditModal] = useState(false);
   const [isEditEnabled, setIsEditEnabled] = useState(false);
   const [editName, setEditName] = useState("");
@@ -118,7 +120,9 @@ export default function ShippingMethodsPage() {
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to update shipping method");
+      toast.error(
+        err?.response?.data?.message || "Failed to update shipping method",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -128,7 +132,7 @@ export default function ShippingMethodsPage() {
     if (!selectedMethod) return;
     if (
       !confirm(
-        `Are you sure you want to delete the shipping method "${selectedMethod.name}"? This action cannot be undone.`
+        `Are you sure you want to delete the shipping method "${selectedMethod.name}"? This action cannot be undone.`,
       )
     )
       return;
@@ -143,7 +147,9 @@ export default function ShippingMethodsPage() {
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to delete shipping method");
+      toast.error(
+        err?.response?.data?.message || "Failed to delete shipping method",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -208,7 +214,9 @@ export default function ShippingMethodsPage() {
       ) : filteredMethods.length === 0 ? (
         <div className="p-12 text-center">
           <Truck className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium font-poppins">No shipping methods found.</p>
+          <p className="text-gray-500 font-medium font-poppins">
+            No shipping methods found.
+          </p>
           <p className="text-xs text-gray-400 mt-1">
             Try a different search or create a new shipping method.
           </p>
@@ -227,8 +235,9 @@ export default function ShippingMethodsPage() {
                 <tr
                   key={sm.id}
                   onClick={() => handleRowClick(sm)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!sm.is_active ? "opacity-60" : ""
-                    }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
+                    !sm.is_active ? "opacity-60" : ""
+                  }`}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">
                     {sm.name}
@@ -355,16 +364,19 @@ export default function ShippingMethodsPage() {
                           onChange={(e) => setEditIsActive(e.target.checked)}
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-xs font-semibold text-gray-700">Active</span>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Active
+                        </span>
                       </label>
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_active
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-gray-100 text-gray-400 border border-gray-200"
-                          }`}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                          selectedMethod.is_active
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-gray-100 text-gray-400 border border-gray-200"
+                        }`}
                       >
                         {selectedMethod.is_active ? (
                           <CheckCircle className="w-3.5 h-3.5" />
@@ -396,7 +408,7 @@ export default function ShippingMethodsPage() {
 
   return (
     <MasterPageLayout
-      title="Shipping Method Settings"
+      title="Shipping Method"
       icon={Truck}
       actionButtons={actionButtons}
       filterBar={filterBar}
@@ -404,4 +416,4 @@ export default function ShippingMethodsPage() {
       modalContent={modalContent}
     />
   );
-};
+}
