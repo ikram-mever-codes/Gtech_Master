@@ -332,7 +332,7 @@ export class UpdateOfferDto {
 
   @IsOptional()
   @IsString()
-  paymentTerms?: string;
+  paymentDueDays?: string;
 
   @IsOptional()
   @IsString()
@@ -957,6 +957,16 @@ export class OfferController {
         termsConditions: createOfferDto.termsConditions,
         deliveryTerms: createOfferDto.deliveryTerms,
         paymentTerms: createOfferDto.paymentTerms,
+        // NEW: default payment due days from the customer record, so the
+        // offer starts pre-filled with the customer's own standing terms
+        // (e.g. "7", "30") instead of only whatever the request body sent
+        // for `paymentTerms`. Coerced to string since paymentDueDays is a
+        // text column; left undefined if the customer has no value set.
+        paymentDueDays:
+          customer.defaultPaymentDueDays !== undefined &&
+          customer.defaultPaymentDueDays !== null
+            ? String(customer.defaultPaymentDueDays)
+            : undefined,
         paymentMethod: createOfferDto.paymentMethod,
         shippingMethod: createOfferDto.shippingMethod,
         deliveryTime: createOfferDto.deliveryTime,
@@ -1018,11 +1028,6 @@ export class OfferController {
               requestedItemId: request.id,
               itemName: request.itemName || "Component",
               material: request.material,
-              // NEW: thumbnail for requested-item-based lines. RequestedItem
-              // doesn't have a confirmed photo/picture field in what's been
-              // shown so far — using `(request as any).photo` defensively so
-              // this picks it up automatically if/when that field exists,
-              // without breaking compilation if it doesn't.
               photo:
                 (request as any).photo || (request as any).picture || undefined,
               specification: request.specification,
@@ -1053,7 +1058,6 @@ export class OfferController {
               requestedItemId: request.id,
               itemName: request.itemName || "Item",
               material: request.material,
-              // NEW: same defensive photo lookup as above.
               photo:
                 (request as any).photo || (request as any).picture || undefined,
               specification: request.specification,
@@ -1232,6 +1236,13 @@ export class OfferController {
         notes: body.notes,
         internalNotes: body.internalNotes,
         paymentMethod: body.paymentMethod,
+        // NEW: same default payment due days fill as createOfferFromInquiry,
+        // sourced from the recipient customer's own standing terms.
+        paymentDueDays:
+          customer.defaultPaymentDueDays !== undefined &&
+          customer.defaultPaymentDueDays !== null
+            ? String(customer.defaultPaymentDueDays)
+            : undefined,
         shippingMethod: body.shippingMethod,
         isAssembly: false,
         pricingMode,
