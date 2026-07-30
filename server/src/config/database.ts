@@ -57,7 +57,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || "postgres",
   password: process.env.DB_PASSWORD || "Mujtaba@911",
   database: process.env.DB_NAME || "master",
-  synchronize: true,
+  synchronize: false,
   logging: false,
 
   entities: [
@@ -112,8 +112,8 @@ export const AppDataSource = new DataSource({
     ssl:
       process.env.DB_SSL === "true"
         ? {
-          rejectUnauthorized: false,
-        }
+            rejectUnauthorized: false,
+          }
         : false,
   },
   poolSize: 10,
@@ -176,7 +176,8 @@ export const initializeDatabase = async (): Promise<DataSource> => {
 
     await bootstrapAdminUser();
 
-    const { NumberSequenceService } = await import("../services/number_sequence_service");
+    const { NumberSequenceService } =
+      await import("../services/number_sequence_service");
     await NumberSequenceService.seedDefaultSequences();
 
     const { seedDatabase } = await import("../services/seedDatabase");
