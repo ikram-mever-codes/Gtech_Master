@@ -87,7 +87,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) {}
+      } catch (e: any) { }
     }
   }
 })();
@@ -154,10 +154,7 @@ export const createOrder = async (
       order.status = status ?? order.status ?? 1;
       order.updated_at = new Date();
 
-      if (
-        !order.order_no ||
-        (!order.order_no.startsWith("B") && !order.order_no.startsWith("MA"))
-      ) {
+      if (!order.order_no || !order.order_no.startsWith("B")) {
         try {
           order.order_no = await NumberSequenceService.getNextNumber(seqKey);
         } catch (_) {
@@ -208,18 +205,18 @@ export const createOrder = async (
     const dbItems =
       itemIds.length > 0
         ? await itemRepo
-            .createQueryBuilder("i")
-            .where("i.id IN (:...itemIds)", { itemIds })
-            .getMany()
+          .createQueryBuilder("i")
+          .where("i.id IN (:...itemIds)", { itemIds })
+          .getMany()
         : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
     const supplierItems =
       itemIds.length > 0
         ? await supplierItemRepo
-            .createQueryBuilder("si")
-            .where("si.item_id IN (:...itemIds)", { itemIds })
-            .getMany()
+          .createQueryBuilder("si")
+          .where("si.item_id IN (:...itemIds)", { itemIds })
+          .getMany()
         : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
@@ -298,12 +295,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -492,12 +489,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -549,7 +546,7 @@ export const getAllOrders = async (
         ord.order_no = newDeNo;
         try {
           await orderRepo.update(ord.id, { order_no: newDeNo });
-        } catch (_) {}
+        } catch (_) { }
       }
     }
 
@@ -687,20 +684,20 @@ export const getAllOrders = async (
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-                id: warehouseItem.id,
-                item_no_de: warehouseItem.item_no_de,
-                item_name_de: warehouseItem.item_name_de,
-                item_name_en: warehouseItem.item_name_en,
-                stock_qty: warehouseItem.stock_qty,
-                msq: warehouseItem.msq,
-                buffer: warehouseItem.buffer,
-                is_stock_item: warehouseItem.is_stock_item,
-                is_SnSI: warehouseItem.is_SnSI,
-                ship_class: warehouseItem.ship_class,
-                is_active: warehouseItem.is_active,
-                is_no_auto_order: warehouseItem.is_no_auto_order,
-                category_id: warehouseItem.category_id,
-              }
+              id: warehouseItem.id,
+              item_no_de: warehouseItem.item_no_de,
+              item_name_de: warehouseItem.item_name_de,
+              item_name_en: warehouseItem.item_name_en,
+              stock_qty: warehouseItem.stock_qty,
+              msq: warehouseItem.msq,
+              buffer: warehouseItem.buffer,
+              is_stock_item: warehouseItem.is_stock_item,
+              is_SnSI: warehouseItem.is_SnSI,
+              ship_class: warehouseItem.ship_class,
+              is_active: warehouseItem.is_active,
+              is_no_auto_order: warehouseItem.is_no_auto_order,
+              category_id: warehouseItem.category_id,
+            }
             : null,
         };
       }),
@@ -907,12 +904,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -1547,9 +1544,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-      starCustomerDetails?.deliveryAddressLine1 ||
-      businessDetails?.address ||
-      "",
+    starCustomerDetails?.deliveryAddressLine1 ||
+    businessDetails?.address ||
+    "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -1567,9 +1564,9 @@ const resolveCustomerAddress = (
       "",
     country: formatCountry(
       customer.country ||
-        starCustomerDetails?.deliveryCountry ||
-        businessDetails?.country ||
-        "",
+      starCustomerDetails?.deliveryCountry ||
+      businessDetails?.country ||
+      "",
     ),
     phone:
       customer.contactPhoneNumber ||
@@ -1673,8 +1670,8 @@ export const generateCommercialInvoicePDF = async (
     const manualTarics =
       uniqueCodes.length > 0
         ? await AppDataSource.getRepository(Taric).find({
-            where: { code: In(uniqueCodes) },
-          })
+          where: { code: In(uniqueCodes) },
+        })
         : [];
     const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -1802,7 +1799,7 @@ export const generateCommercialInvoicePDF = async (
       customerAddress.contact &&
       customer?.legalName &&
       customerAddress.contact.trim().toLowerCase() ===
-        customer.legalName.trim().toLowerCase()
+      customer.legalName.trim().toLowerCase()
     );
     const shipToContact =
       cargo?.ship_to_contact_person ||
@@ -1963,7 +1960,7 @@ export const generateCommercialInvoicePDF = async (
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
               .text("中国安徽...", 152, 101);
-          } catch (e) {}
+          } catch (e) { }
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -2253,7 +2250,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;
