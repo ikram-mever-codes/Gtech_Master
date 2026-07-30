@@ -1392,9 +1392,9 @@ export class OfferController {
 
     return {
       street: "Street Address",
-      city: customer.city,
-      postalCode: customer.postalCode,
-      country: customer.country,
+      city: customer.businessDetails?.city,
+      postalCode: customer.businessDetails?.postalCode,
+      country: customer.businessDetails?.country,
       contactName: customer.legalName || customer.companyName,
       contactPhone: customer.contactPhoneNumber,
     };
