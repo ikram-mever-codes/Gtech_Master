@@ -5,16 +5,17 @@ import app, { initializeCronJobs } from "./app";
 import { initializeDatabase } from "./config/database";
 import { getConnection } from "./config/misDb";
 import ErrorHandler from "./utils/errorHandler";
+import { addBestellungStatusMigration } from "./migrations/add_bestellung_status";
 
 const PORT = process.env.PORT || 1000;
 
 const startServer = async () => {
   try {
     await initializeDatabase();
+    await addBestellungStatusMigration();
 
     const server = app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
-      // initializeCronJobs();
       console.log(`WebSocket server is running`);
     });
 

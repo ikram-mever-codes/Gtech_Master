@@ -32,6 +32,7 @@ export type OrdersTableProps = {
   suppliers: any[];
   onAssignSupplier: (itemId: number | string, supplierId: number, baseItemId?: number | string) => Promise<void>;
   router: any;
+  onBestellungStatusChange?: (orderId: number, newStatus: string) => void;
 };
 
 export default function OrdersTable({
@@ -54,6 +55,7 @@ export default function OrdersTable({
   suppliers,
   onAssignSupplier,
   router,
+  onBestellungStatusChange,
 }: OrdersTableProps) {
   const [editingSupplierId, setEditingSupplierId] = useState<number | string | null>(null);
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string | number>>(new Set());
@@ -431,6 +433,45 @@ export default function OrdersTable({
       align: "center",
     },
     {
+      header: "Status",
+      width: "140px",
+      align: "center",
+      render: (row) => {
+        if (activeTab !== "orders") return null;
+        const s = (row.bestellung_status || "draft") as string;
+        const getStatusStyle = (status: string) => {
+          switch (status) {
+            case "to_be_processed":
+              return { backgroundColor: "#C3CCCF", color: "#1F2937", borderColor: "#A8B4B8" };
+            case "partially_delivered":
+              return { backgroundColor: "#E5B080", color: "#4A2600", borderColor: "#D49D6C" };
+            case "delivered":
+              return { backgroundColor: "#C8E3D4", color: "#164E2F", borderColor: "#ADCDBA" };
+            case "draft":
+            default:
+              return { backgroundColor: "#F3F4F6", color: "#374151", borderColor: "#D1D5DB" };
+          }
+        };
+        return (
+          <select
+            value={s}
+            style={getStatusStyle(s)}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              e.stopPropagation();
+              if (onBestellungStatusChange) {
+                onBestellungStatusChange(row.id, e.target.value);
+              }
+            }}
+            className="text-[11px] font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1"
+          >
+            <option value="to_be_processed">To Be Processed</option>
+            <option value="partially_delivered">Partially Delivered</option>
+          </select>
+        );
+      },
+    },
+    {
       header: "Catgy",
       width: "65px",
       render: (row) => getCategoryName(row.category_id),
@@ -635,12 +676,6 @@ export default function OrdersTable({
           )}
         />
       ),
-    },
-    {
-      header: "Actions",
-      width: "50px",
-      align: "center",
-      render: (row) => <ActionCell row={row} />,
     },
   ];
 

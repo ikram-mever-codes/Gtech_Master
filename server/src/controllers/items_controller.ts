@@ -937,8 +937,15 @@ export const createItem = async (
         return next(new ErrorHandler("Item with this EAN already exists", 400));
     }
 
-    const finalRMB = RMB_Price ? parseFloat(RMB_Price) : null;
-    let finalPrice = null;
+    const parsedRMB =
+      RMB_Price !== undefined && RMB_Price !== null && RMB_Price !== ""
+        ? parseFloat(RMB_Price)
+        : price !== undefined && price !== null && (currency === "CNY" || currency === "RMB" || !currency)
+        ? parseFloat(price)
+        : null;
+
+    const finalRMB = parsedRMB !== null && !isNaN(parsedRMB) ? parsedRMB : null;
+    let finalPrice = price ? parseFloat(price) : null;
 
     if (finalRMB !== null && !isNaN(finalRMB)) {
       finalPrice = calculateTransferPrice(finalRMB, category?.name || "STD");

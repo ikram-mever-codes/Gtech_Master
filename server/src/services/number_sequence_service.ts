@@ -43,6 +43,11 @@ export class NumberSequenceService {
         sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
         sequence.minDigits = 1;
       }
+      if (sequenceKey === "transfer_order") {
+        sequence.prefix = "DE";
+        sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
+        sequence.minDigits = 1;
+      }
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
@@ -70,12 +75,13 @@ export class NumberSequenceService {
             }
           }
           runningNo = Math.max(defaultStart, maxNum + 1);
-        } else if (sequenceKey === "order") {
+        } else if (sequenceKey === "order" || sequenceKey === "transfer_order") {
+          const prefixToMatch = sequenceKey === "transfer_order" ? "DE" : "B";
           const orders = await manager
             .getRepository(Order)
             .createQueryBuilder("o")
             .select(["o.order_no"])
-            .where("o.order_no LIKE 'B%'")
+            .where("o.order_no LIKE :pfx", { pfx: `${prefixToMatch}%` })
             .getMany();
 
           let maxNum = 0;
