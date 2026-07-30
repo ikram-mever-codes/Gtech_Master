@@ -781,7 +781,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         if (f.title?.trim()) return f;
         const first = next[0];
         return first
-          ? { ...f, title: `Offer for ${first.item_name || first.itemName}` }
+          ? { ...f, title: `${first.item_name || first.itemName}` }
           : f;
       });
       return next;

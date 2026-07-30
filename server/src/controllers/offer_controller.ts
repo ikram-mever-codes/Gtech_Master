@@ -32,16 +32,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => { },
-      IsEnum: () => () => { },
-      IsNumber: () => () => { },
-      IsObject: () => () => { },
-      IsOptional: () => () => { },
-      IsString: () => () => { },
-      Max: () => () => { },
-      Min: () => () => { },
-      IsBoolean: () => () => { },
-      IsArray: () => () => { },
+      IsDate: () => () => {},
+      IsEnum: () => () => {},
+      IsNumber: () => () => {},
+      IsObject: () => () => {},
+      IsOptional: () => () => {},
+      IsString: () => () => {},
+      Max: () => () => {},
+      Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -52,7 +52,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => { },
+      Type: () => () => {},
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -116,7 +116,10 @@ function drawCustomerSvgBackground(doc: any): void {
     if (fs.existsSync(svgPath)) {
       try {
         const rawSvg = fs.readFileSync(svgPath, "utf8");
-        cachedCustomerSvg = rawSvg.replace(/<path[^>]*id="path25"[^>]*\/>/gi, "");
+        cachedCustomerSvg = rawSvg.replace(
+          /<path[^>]*id="path25"[^>]*\/>/gi,
+          "",
+        );
       } catch (err) {
         console.error("Failed to load Customer_Document.svg:", err);
         cachedCustomerSvg = "";
@@ -919,9 +922,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-              createOfferDto.defaultPriceMatrix,
-              createOfferDto.totalPriceDecimalPlaces || 2,
-            )
+                createOfferDto.defaultPriceMatrix,
+                createOfferDto.totalPriceDecimalPlaces || 2,
+              )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -931,7 +934,7 @@ export class OfferController {
         itemId: null,
         itemSnapshot: null,
         customerId: customer.id,
-        title: createOfferDto.title || `Offer for ${inquiry.name}`,
+        title: createOfferDto.title || `${inquiry.name}`,
         inquiry: inquiry,
         inquiryId: inquiry.id,
         inquirySnapshot,
@@ -1199,8 +1202,8 @@ export class OfferController {
         title:
           body.title ||
           (orderedItems.length > 1
-            ? `Offer for ${primarySnapshot.itemName} +${orderedItems.length - 1} more`
-            : `Offer for ${primarySnapshot.itemName}`),
+            ? `${primarySnapshot.itemName} +${orderedItems.length - 1} more`
+            : `${primarySnapshot.itemName}`),
         inquiry: null,
         inquiryId: null,
         inquirySnapshot: null,
@@ -2549,10 +2552,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                  totalPriceDecimalPlaces,
-                ),
-              );
+                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                    totalPriceDecimalPlaces,
+                  ),
+                );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -2762,11 +2765,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-              ...tpl,
-              price: match.price,
-              total: match.total,
-              isActive: match.isActive,
-            }
+                ...tpl,
+                price: match.price,
+                total: match.total,
+                isActive: match.isActive,
+              }
             : { ...tpl };
         });
 
@@ -3145,11 +3148,15 @@ export class OfferController {
       const docTitleText = offer.title
         ? `Angebot ${offer.offerNumber || ""}: ${offer.title}`
         : `Angebot ${offer.offerNumber || ""}`;
-      doc.font(SB).fontSize(13).fillColor("#2F6B46").text(docTitleText, MM(100), MM(36), {
-        align: "right",
-        width: MM(92),
-        lineBreak: false,
-      });
+      doc
+        .font(SB)
+        .fontSize(13)
+        .fillColor("#2F6B46")
+        .text(docTitleText, MM(100), MM(36), {
+          align: "right",
+          width: MM(92),
+          lineBreak: false,
+        });
 
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
@@ -3164,8 +3171,8 @@ export class OfferController {
         [
           "Kundennr.",
           offer.inquiry?.customer?.customerNumber ||
-          customer.customerNumber ||
-          "—",
+            customer.customerNumber ||
+            "—",
         ],
       ];
 

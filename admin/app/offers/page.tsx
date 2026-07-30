@@ -585,11 +585,6 @@ const OffersPage: React.FC<any> = ({
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <BuildingOfficeIcon
-                              className={`h-4 w-4 ${
-                                rowColor ? "opacity-70" : "text-gray-400"
-                              }`}
-                            />
                             <div
                               className={`text-sm font-medium truncate max-w-[12rem] ${
                                 rowColor ? "" : "text-gray-900"
