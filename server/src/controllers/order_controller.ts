@@ -170,18 +170,18 @@ export const createOrder = async (
     const dbItems =
       itemIds.length > 0
         ? await itemRepo
-            .createQueryBuilder("i")
-            .where("i.id IN (:...itemIds)", { itemIds })
-            .getMany()
+          .createQueryBuilder("i")
+          .where("i.id IN (:...itemIds)", { itemIds })
+          .getMany()
         : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
     const supplierItems =
       itemIds.length > 0
         ? await supplierItemRepo
-            .createQueryBuilder("si")
-            .where("si.item_id IN (:...itemIds)", { itemIds })
-            .getMany()
+          .createQueryBuilder("si")
+          .where("si.item_id IN (:...itemIds)", { itemIds })
+          .getMany()
         : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
@@ -198,20 +198,20 @@ export const createOrder = async (
 
       return orderItemsRepo.create({
         order_id: order.id,
-        item_id: validItemId,
-        ItemID_DE: dbItem?.ItemID_DE,
+        item_id: validItemId || undefined,
+        ItemID_DE: dbItem?.ItemID_DE || undefined,
         qty,
-        remark_de: it.remark_de || it.itemName || null,
-        rmb_special_price: rmbPrice,
+        remark_de: it.remark_de || it.itemName || undefined,
+        rmb_special_price: rmbPrice || undefined,
         price: Number(it.price) || dbItem?.price || 0,
         currency: dbItem?.currency || "EUR",
-        taric_id: dbItem?.taric_id,
-        category_id: dbItem?.cat_id ?? order.category_id,
-        cargo_id: order.cargo_id,
+        taric_id: dbItem?.taric_id || undefined,
+        category_id: dbItem?.cat_id ?? order.category_id ?? undefined,
+        cargo_id: order.cargo_id || undefined,
         status: "NSO",
         created_at: new Date(),
         updated_at: new Date(),
-      });
+      } as any) as unknown as OrderItem;
     });
 
     await orderItemsRepo.save(lines);

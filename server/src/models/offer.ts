@@ -272,6 +272,9 @@ export class Offer {
   @Column({ type: "varchar", length: 20, nullable: true })
   highlightColor?: string;
 
+  @Column({ type: "integer", default: 0 })
+  conversionCount!: number;
+
   @Column({ type: "boolean", default: false })
   isAssembly!: boolean;
 

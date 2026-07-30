@@ -170,6 +170,7 @@ export interface Offer {
   notes?: string;
   internalNotes?: string;
   highlightColor?: string;
+  conversionCount?: number;
   isAssembly: boolean;
   assemblyName?: string;
   assemblyDescription?: string;
