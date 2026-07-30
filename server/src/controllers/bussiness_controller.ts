@@ -501,6 +501,8 @@ export const createBusiness = async (
       city,
       state,
       country = "Germany",
+      country_id,
+      countryId,
       postalCode,
       latitude,
       longitude,
@@ -791,17 +793,28 @@ export const createBusiness = async (
         businessDetails.city = city ? city.trim() : undefined;
         businessDetails.state = state ? state.trim() : undefined;
         businessDetails.country = country ? country.trim() : undefined;
-        if (country) {
-          const countryRepo = AppDataSource.getRepository(Country);
+        const targetCountryId = country_id || countryId;
+        const countryRepo = AppDataSource.getRepository(Country);
+        if (targetCountryId) {
+          const matchedById = await countryRepo.findOne({ where: { id: targetCountryId } });
+          if (matchedById) {
+            customer.country_id = matchedById.id;
+            businessDetails.country_id = matchedById.id;
+            businessDetails.country = matchedById.name || matchedById.iso2;
+            customer.country = matchedById.name || matchedById.iso2;
+          }
+        } else if (country) {
           const matched = await countryRepo.findOne({
             where: [
               { iso2: country.trim().toUpperCase() },
               { name: country.trim() },
+              { name_de: country.trim() },
             ],
           });
           if (matched) {
             customer.country_id = matched.id;
             businessDetails.country_id = matched.id;
+            customer.country = matched.name;
           }
         }
         businessDetails.postalCode = postalCode ? postalCode.trim() : undefined;
@@ -1315,13 +1328,31 @@ export const updateBusiness = async (
             businessDetails.city = updateData.city.trim();
           if (updateData.state !== undefined)
             businessDetails.state = updateData.state.trim();
-          if (updateData.country !== undefined) {
+          const targetCountryId = updateData.country_id || updateData.countryId;
+          if (targetCountryId !== undefined) {
+            const countryRepo = AppDataSource.getRepository(Country);
+            const matchedById = await countryRepo.findOne({ where: { id: targetCountryId } });
+            if (matchedById) {
+              customer.country_id = matchedById.id;
+              businessDetails.country_id = matchedById.id;
+              businessDetails.country = matchedById.name;
+              customer.country = matchedById.name;
+            } else {
+              customer.country_id = null;
+              businessDetails.country_id = null;
+            }
+          } else if (updateData.country !== undefined) {
             const countryStr = updateData.country.trim();
             businessDetails.country = countryStr;
+            customer.country = countryStr;
 
             const countryRepo = AppDataSource.getRepository(Country);
             const matched = await countryRepo.findOne({
-              where: [{ iso2: countryStr.toUpperCase() }, { name: countryStr }],
+              where: [
+                { iso2: countryStr.toUpperCase() },
+                { name: countryStr },
+                { name_de: countryStr },
+              ],
             });
             if (matched) {
               customer.country_id = matched.id;
@@ -1826,7 +1857,9 @@ export const getAllBusinesses = async (
     const customerRepository = AppDataSource.getRepository(Customer);
     const queryBuilder = customerRepository
       .createQueryBuilder("customer")
+      .leftJoinAndSelect("customer.countryEntity", "customerCountry")
       .leftJoinAndSelect("customer.businessDetails", "businessDetails")
+      .leftJoinAndSelect("businessDetails.countryEntity", "businessCountry")
       .leftJoinAndSelect("customer.starCustomerDetails", "starCustomerDetails")
       .leftJoinAndSelect("customer.tags", "tags");
 
@@ -1963,7 +1996,9 @@ export const getAllBusinesses = async (
         addressAdditional: customer.addressLine2,
         city: customer.businessDetails?.city,
         state: customer.businessDetails?.state,
-        country: customer.businessDetails?.country,
+        country: customer.businessDetails?.country || customer.country,
+        country_id: customer.country_id || customer.businessDetails?.country_id || null,
+        countryEntity: customer.countryEntity || customer.businessDetails?.countryEntity || null,
         postalCode: customer.businessDetails?.postalCode,
         website: customer.businessDetails?.website,
         hasWebsite: !!customer.businessDetails?.website,
