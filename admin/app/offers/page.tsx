@@ -488,10 +488,13 @@ const OffersPage: React.FC<any> = ({
                 <tr>
                   <th className="w-9 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Offer
+                    Created
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Customer
+                    No
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Company
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount
@@ -544,6 +547,18 @@ const OffersPage: React.FC<any> = ({
                         </td>
                         <td className="px-4 py-3">
                           <div
+                            className={`text-sm ${
+                              rowColor ? "" : "text-gray-700"
+                            }`}
+                            style={
+                              rowColor ? { color: rowTextColor } : undefined
+                            }
+                          >
+                            {formatDate(offer.createdAt)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div
                             className="text-sm font-medium"
                             style={{ color: rowTextColor }}
                           >
@@ -570,18 +585,13 @@ const OffersPage: React.FC<any> = ({
                           >
                             {offer.title}
                           </div>
-                          <div
-                            className={`text-xs mt-1 flex items-center gap-2 ${
-                              rowColor ? "opacity-80" : "text-gray-400"
-                            }`}
-                          >
-                            Created {formatDate(offer.createdAt)}
-                            {offer.useUnitPrices && (
-                              <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
+                          {offer.useUnitPrices && (
+                            <div className="mt-1">
+                              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
                                 Unit pricing
                               </span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -664,7 +674,7 @@ const OffersPage: React.FC<any> = ({
 
                       {isExpanded && (
                         <tr className="bg-emerald-50/20 border-b border-gray-200">
-                          <td colSpan={5} className="px-6 py-4">
+                          <td colSpan={6} className="px-6 py-4">
                             <OfferLineItemsTable
                               offer={offer}
                               lineItems={lineItems}
