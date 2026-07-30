@@ -763,12 +763,13 @@ export class OfferController {
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       vatId: customer.vatTaxId || customer.taxNumber || "",
-      address: customer.address || "",
-      city: customer.city || "",
-      postalCode: customer.postalCode || "",
-      country: customer.country || "",
-      street: customer.street || "Street Address",
-      additionalInfo: customer.addressLine2 || "Additional Info",
+      address: customer.businessDetails?.address || "",
+      city: customer.businessDetails?.city || "",
+      postalCode: customer.businessDetails?.postalCode || "",
+      country: customer.businessDetails?.country || customer.country || "",
+      street: customer.businessDetails?.street,
+      additionalInfo:
+        customer.businessDetails?.additionalInfo || "Additional Info",
     };
   }
 
@@ -928,6 +929,7 @@ export class OfferController {
         where: { id: inquiryId },
         relations: [
           "customer",
+          "customer.businessDetails",
           "customer.shippingAddresses",
           "requests",
           "contactPerson",

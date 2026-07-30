@@ -1437,16 +1437,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         legalName: selectedCustomer.legalName,
                         address:
                           selectedCustomer.addressLine1 ||
-                          selectedCustomer.businessDetails?.address,
+                          selectedCustomer?.address,
                         postalCode:
                           selectedCustomer.postalCode ||
-                          selectedCustomer.businessDetails?.postalCode,
-                        city:
-                          selectedCustomer.city ||
-                          selectedCustomer.businessDetails?.city,
+                          selectedCustomer?.postalCode,
+                        city: selectedCustomer.city || selectedCustomer?.city,
                         country:
-                          selectedCustomer.country ||
-                          selectedCustomer.businessDetails?.country,
+                          selectedCustomer.country || selectedCustomer?.country,
                         vatId:
                           selectedCustomer.vatTaxId ||
                           selectedCustomer.taxNumber,

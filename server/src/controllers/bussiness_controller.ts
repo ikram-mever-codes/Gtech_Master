@@ -796,7 +796,9 @@ export const createBusiness = async (
         const targetCountryId = country_id || countryId;
         const countryRepo = AppDataSource.getRepository(Country);
         if (targetCountryId) {
-          const matchedById = await countryRepo.findOne({ where: { id: targetCountryId } });
+          const matchedById = await countryRepo.findOne({
+            where: { id: targetCountryId },
+          });
           if (matchedById) {
             customer.country_id = matchedById.id;
             businessDetails.country_id = matchedById.id;
@@ -1331,7 +1333,9 @@ export const updateBusiness = async (
           const targetCountryId = updateData.country_id || updateData.countryId;
           if (targetCountryId !== undefined) {
             const countryRepo = AppDataSource.getRepository(Country);
-            const matchedById = await countryRepo.findOne({ where: { id: targetCountryId } });
+            const matchedById = await countryRepo.findOne({
+              where: { id: targetCountryId },
+            });
             if (matchedById) {
               customer.country_id = matchedById.id;
               businessDetails.country_id = matchedById.id;
@@ -1997,8 +2001,12 @@ export const getAllBusinesses = async (
         city: customer.businessDetails?.city,
         state: customer.businessDetails?.state,
         country: customer.businessDetails?.country || customer.country,
-        country_id: customer.country_id || customer.businessDetails?.country_id || null,
-        countryEntity: customer.countryEntity || customer.businessDetails?.countryEntity || null,
+        country_id:
+          customer.country_id || customer.businessDetails?.country_id || null,
+        countryEntity:
+          customer.countryEntity ||
+          customer.businessDetails?.countryEntity ||
+          null,
         postalCode: customer.businessDetails?.postalCode,
         website: customer.businessDetails?.website,
         hasWebsite: !!customer.businessDetails?.website,
