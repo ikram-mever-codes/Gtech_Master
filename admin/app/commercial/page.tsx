@@ -554,12 +554,16 @@ const InvoiceListPage: React.FC = () => {
 
   const handleMoveToFulfillment = async (order: any) => {
     try {
-      await updateOrder(order.id, {
-        status: 2,
-        comment: `${order.comment || ""} [Moved to Fulfillment]`.trim(),
-        is_fulfilled: true,
-        bestellung_status: "draft",
-      } as any);
+      await updateOrder(
+        order.id,
+        {
+          status: 2,
+          comment: `${order.comment || ""} [Moved to Fulfillment]`.trim(),
+          is_fulfilled: true,
+          bestellung_status: "draft",
+        } as any,
+        false,
+      );
       toast.success(`Order ${order.order_no} transferred to Bestellung!`, {
         id: "fulfill-order-toast",
       });
@@ -575,7 +579,6 @@ const InvoiceListPage: React.FC = () => {
   const handleBestellungStatusChange = async (orderId: number, newStatus: string) => {
     try {
       await updateOrder(orderId, { bestellung_status: newStatus } as any);
-      toast.success("Status updated successfully");
       fetchOrders();
     } catch (err) {
       console.error(err);
@@ -2115,27 +2118,29 @@ const InvoiceListPage: React.FC = () => {
         render: (row) => {
           if (activeInvTab !== "bestellung") return null;
           const s = (row.bestellung_status || "draft") as string;
-          const labelMap: Record<string, string> = {
-            draft: "Draft",
-            to_be_processed: "To Be Processed",
-            partially_delivered: "Partially Delivered",
-            delivered: "Delivered",
-          };
-          const colorMap: Record<string, string> = {
-            draft: "bg-gray-100 text-gray-700 border-gray-300",
-            to_be_processed: "bg-blue-100 text-blue-700 border-blue-300",
-            partially_delivered: "bg-orange-100 text-orange-700 border-orange-300",
-            delivered: "bg-green-100 text-green-700 border-green-300",
+          const getStatusStyle = (status: string) => {
+            switch (status) {
+              case "to_be_processed":
+                return { backgroundColor: "#C3CCCF", color: "#1F2937", borderColor: "#A8B4B8" };
+              case "partially_delivered":
+                return { backgroundColor: "#E5B080", color: "#4A2600", borderColor: "#D49D6C" };
+              case "delivered":
+                return { backgroundColor: "#C8E3D4", color: "#164E2F", borderColor: "#ADCDBA" };
+              case "draft":
+              default:
+                return { backgroundColor: "#F3F4F6", color: "#374151", borderColor: "#D1D5DB" };
+            }
           };
           return (
             <select
               value={s}
+              style={getStatusStyle(s)}
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => {
                 e.stopPropagation();
                 handleBestellungStatusChange(row.id, e.target.value);
               }}
-              className={`text-[11px] font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-offset-0 ${colorMap[s] || colorMap.draft}`}
+              className="text-[11px] font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1"
             >
               <option value="draft">Draft</option>
               <option value="to_be_processed">To Be Processed</option>

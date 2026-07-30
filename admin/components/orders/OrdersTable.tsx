@@ -439,15 +439,23 @@ export default function OrdersTable({
       render: (row) => {
         if (activeTab !== "orders") return null;
         const s = (row.bestellung_status || "draft") as string;
-        const colorMap: Record<string, string> = {
-          draft: "bg-gray-100 text-gray-700 border-gray-300",
-          to_be_processed: "bg-blue-100 text-blue-700 border-blue-300",
-          partially_delivered: "bg-orange-100 text-orange-700 border-orange-300",
-          delivered: "bg-green-100 text-green-700 border-green-300",
+        const getStatusStyle = (status: string) => {
+          switch (status) {
+            case "to_be_processed":
+              return { backgroundColor: "#C3CCCF", color: "#1F2937", borderColor: "#A8B4B8" };
+            case "partially_delivered":
+              return { backgroundColor: "#E5B080", color: "#4A2600", borderColor: "#D49D6C" };
+            case "delivered":
+              return { backgroundColor: "#C8E3D4", color: "#164E2F", borderColor: "#ADCDBA" };
+            case "draft":
+            default:
+              return { backgroundColor: "#F3F4F6", color: "#374151", borderColor: "#D1D5DB" };
+          }
         };
         return (
           <select
             value={s}
+            style={getStatusStyle(s)}
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               e.stopPropagation();
@@ -455,7 +463,7 @@ export default function OrdersTable({
                 onBestellungStatusChange(row.id, e.target.value);
               }
             }}
-            className={`text-[11px] font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 ${colorMap[s] || colorMap.draft}`}
+            className="text-[11px] font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1"
           >
             <option value="to_be_processed">To Be Processed</option>
             <option value="partially_delivered">Partially Delivered</option>
@@ -668,12 +676,6 @@ export default function OrdersTable({
           )}
         />
       ),
-    },
-    {
-      header: "Actions",
-      width: "50px",
-      align: "center",
-      render: (row) => <ActionCell row={row} />,
     },
   ];
 

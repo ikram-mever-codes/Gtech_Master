@@ -118,15 +118,18 @@ export const getAllOrders = async (filters?: OrderSearchFilters) => {
 export const updateOrder = async (
   orderId: string | number,
   orderData: UpdateOrderPayload,
+  showToast: boolean = true,
 ) => {
   try {
-    toast.loading("Updating order...", loadingStyles);
+    if (showToast) toast.loading("Updating order...", loadingStyles);
     const response = await api.put(`/orders/${orderId}`, orderData);
-    toast.dismiss();
-    toast.success("Order updated successfully", successStyles);
+    if (showToast) {
+      toast.dismiss();
+      toast.success("Order updated successfully", successStyles);
+    }
     return response.data;
   } catch (error) {
-    toast.dismiss();
+    if (showToast) toast.dismiss();
     handleApiError(error, "Order update failed");
     throw error;
   }

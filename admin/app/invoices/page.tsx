@@ -1130,7 +1130,6 @@ const InvoiceListPage: React.FC = () => {
   const handleFulfillmentStatusChange = async (orderId: number, newStatus: string) => {
     try {
       await updateOrder(orderId, { bestellung_status: newStatus } as any);
-      toast.success("Status updated");
       fetchOrders();
     } catch (err) {
       console.error(err);
