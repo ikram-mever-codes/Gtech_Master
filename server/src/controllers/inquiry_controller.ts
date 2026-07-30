@@ -838,21 +838,6 @@ export class InquiryController {
           where: { id },
           relations: ["requests"],
         });
-
-        // if (
-        //   updatedInquiry &&
-        //   !updatedInquiry.isAssembly &&
-        //   updatedInquiry.requests &&
-        //   updatedInquiry.requests.length > 0
-        // ) {
-        //   await Promise.all(
-        //     updatedInquiry.requests.map(async (requestItem: any) => {
-        //       await this.requestRepository.update(requestItem.id, {
-        //         status: status,
-        //       });
-        //     })
-        //   );
-        // }
       }
 
       const updatedInquiry = await this.inquiryRepository.findOne({
