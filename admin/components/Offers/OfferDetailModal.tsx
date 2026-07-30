@@ -211,22 +211,6 @@ const resolveThumbUrl = (url: string | null | undefined): string | null => {
   return url;
 };
 
-const getItemThumb = (item: any): string | null =>
-  resolveThumbUrl(
-    item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
-  );
-
-/** Thumbnail for an OFFER LINE ITEM specifically — the line item's own
- * `photo` column (populated from the source Item at offer-creation time,
- * see createOfferFromItem / the getOfferById backfill), not the catalog
- * item lookups used elsewhere in this file for the item picker. */
-const getLineItemThumb = (item: any): string | null =>
-  resolveThumbUrl(item?.photo || null);
-
 const getItemCompany = (item: any): string =>
   item?.customer_name ||
   item?.company_display_name ||
@@ -298,7 +282,7 @@ const ItemRow: React.FC<{
   selected: boolean;
   onClick: () => void;
 }> = ({ item, selected, onClick }) => {
-  const thumb = getItemThumb(item);
+  const thumb = item.photo;
   const name = item.item_name || item.itemName || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   const company = getItemCompany(item);
@@ -2027,7 +2011,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             const rowColor =
                               item.highlightColor ||
                               (freetext ? "#D8964A" : null);
-                            const thumb = getLineItemThumb(item);
+                            const thumb = item.photo;
                             return (
                               <tr
                                 key={item.id}
@@ -2294,7 +2278,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
                     {visibleLineItems.map((item: any) => {
                       const total = getLineItemTotal(item, pricingMode);
-                      const thumb = getLineItemThumb(item);
+                      const thumb = item.photo;
 
                       return (
                         <div

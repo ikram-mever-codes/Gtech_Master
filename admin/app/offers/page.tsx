@@ -65,27 +65,6 @@ const getContrastTextColor = (hex: string): string => {
   return luminance > 0.6 ? "#111827" : "#ffffff";
 };
 
-const resolveThumbUrl = (url: string | null | undefined): string | null => {
-  if (!url) return null;
-  if (url.includes("cloudinary.com")) return url;
-  if (url.includes("/uploads/")) {
-    const fileName = url.split("/uploads/").pop();
-    try {
-      const apiOrigin = new URL(BASE_URL).origin;
-      return `${apiOrigin}/uploads/${fileName}`;
-    } catch {
-      return url;
-    }
-  }
-  return url;
-};
-
-/** Thumbnail for an offer line item — the line item's own `photo` column
- * (populated from the source Item at offer-creation time; see
- * createOfferFromItem / the getOfferById backfill). */
-const getLineItemThumb = (item: any): string | null =>
-  resolveThumbUrl(item?.photo || null);
-
 // --- Mirrors the classic-mode line items table in OfferDetailModal --------
 // Kept here (read-only) so the expanded row on the Offers list looks
 // identical to what you see inside the offer detail modal, instead of the
@@ -151,7 +130,7 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
             parseFlexibleNumber(item.baseQuantity) ?? 1,
           );
           const rowColor = item.highlightColor || (freetext ? "#D8964A" : null);
-          const thumb = getLineItemThumb(item);
+          const thumb = item.photo;
           return (
             <tr
               key={item.id}
