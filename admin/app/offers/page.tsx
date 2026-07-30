@@ -182,9 +182,9 @@ const OffersPage: React.FC<any> = ({
       try {
         await updateOffer(offer.id, { highlightColor: "#ECEAE6" });
       } catch (_) {}
-      toast.success(`Offer ${offer.offerNumber} converted to Auftrag!`, {
-        id: "convert-offer-toast",
-      });
+      // toast.success(`Offer ${offer.offerNumber} converted to Auftrag!`, {
+      //   id: "convert-offer-toast",
+      // });
       fetchOffers();
       onOrderConverted?.();
     } catch (err) {
@@ -505,13 +505,20 @@ const OffersPage: React.FC<any> = ({
                         >
                           <div className="flex items-center justify-center gap-1.5 font-poppins">
                             <button
-                              title={offer.highlightColor === "#ECEAE6" ? "Already converted to Auftrag" : "Convert Offer to Auftrag Order"}
-                              onClick={(e) => handleConvertOfferToAuftrag(offer, e)}
+                              title={
+                                offer.highlightColor === "#ECEAE6"
+                                  ? "Already converted to Auftrag"
+                                  : "Convert Offer to Auftrag Order"
+                              }
+                              onClick={(e) =>
+                                handleConvertOfferToAuftrag(offer, e)
+                              }
                               disabled={offer.highlightColor === "#ECEAE6"}
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap ${offer.highlightColor === "#ECEAE6"
-                                ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
-                                : "text-white bg-[#2F6B46] hover:bg-[#255638] cursor-pointer"
-                                }`}
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap ${
+                                offer.highlightColor === "#ECEAE6"
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                                  : "text-white bg-[#2F6B46] hover:bg-[#255638] cursor-pointer"
+                              }`}
                             >
                               <MoveRight className="h-3.5 w-3.5" />
                             </button>
@@ -524,7 +531,7 @@ const OffersPage: React.FC<any> = ({
                                     offer.id,
                                     offer.offerNumber,
                                   );
-                                } catch (_) { }
+                                } catch (_) {}
                               }}
                               className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap"
                             >
