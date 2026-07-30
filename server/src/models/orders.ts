@@ -75,9 +75,6 @@ export class Order {
   @JoinColumn({ name: "cargo_id" })
   cargo?: Cargo;
 
-  @Column({ type: "varchar", length: 50, nullable: true })
-  bestellung_status?: string | null;
-
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order)
   orderItems!: OrderItem[];
 

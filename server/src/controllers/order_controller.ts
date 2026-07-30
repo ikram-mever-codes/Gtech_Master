@@ -127,32 +127,66 @@ export const createOrder = async (
     const orderRepo = queryRunner.manager.getRepository(Order);
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
-    const seqKey = "order";
-    let generatedorder_no = "";
-    try {
-      generatedorder_no = await NumberSequenceService.getNextNumber(seqKey);
-    } catch (e) {
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(-2);
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      generatedorder_no = `B${yy}${mm}-1`;
+    let order: Order;
+    let existingOrder: Order | null = null;
+
+    if (source_offer_id) {
+      existingOrder = await orderRepo.findOne({
+        where: { source_offer_id },
+      });
     }
 
-    const now = new Date();
-    const order = orderRepo.create({
-      order_no: generatedorder_no,
-      category_id: category_id || null,
-      customer_id: customer_id || null,
-      supplier_id: supplier_id || null,
-      status: status ?? 1,
-      comment: comment || null,
-      source_offer_id: source_offer_id || null,
-      date_created: now.toISOString(),
-      created_at: now,
-      updated_at: now,
-    });
+    const seqKey = "order";
 
-    await orderRepo.save(order);
+    if (existingOrder) {
+      order = existingOrder;
+      order.customer_id = customer_id || order.customer_id || null;
+      order.category_id = category_id || order.category_id || null;
+      order.supplier_id = supplier_id || order.supplier_id || null;
+      order.comment = comment || order.comment || null;
+      order.status = status ?? order.status ?? 1;
+      order.updated_at = new Date();
+
+      if (!order.order_no || (!order.order_no.startsWith("B") && !order.order_no.startsWith("MA"))) {
+        try {
+          order.order_no = await NumberSequenceService.getNextNumber(seqKey);
+        } catch (_) {
+          const now = new Date();
+          const yy = String(now.getFullYear()).slice(-2);
+          const mm = String(now.getMonth() + 1).padStart(2, "0");
+          order.order_no = `B${yy}${mm}-1`;
+        }
+      }
+
+      await orderRepo.save(order);
+      await orderItemsRepo.delete({ order_id: order.id });
+    } else {
+      let generatedorder_no = "";
+      try {
+        generatedorder_no = await NumberSequenceService.getNextNumber(seqKey);
+      } catch (e) {
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        generatedorder_no = `B${yy}${mm}-1`;
+      }
+
+      const now = new Date();
+      order = orderRepo.create({
+        order_no: generatedorder_no,
+        category_id: category_id || null,
+        customer_id: customer_id || null,
+        supplier_id: supplier_id || null,
+        status: status ?? 1,
+        comment: comment || null,
+        source_offer_id: source_offer_id || null,
+        date_created: now.toISOString(),
+        created_at: now,
+        updated_at: now,
+      });
+
+      await orderRepo.save(order);
+    }
 
     const itemRepo = queryRunner.manager.getRepository(Item);
     const supplierItemRepo = queryRunner.manager.getRepository(SupplierItem);
@@ -280,7 +314,6 @@ export const updateOrder = async (
       status,
       comment,
       items,
-      bestellung_status,
     } = req.body;
 
     if (!orderId) return next(new ErrorHandler("Order ID is required", 400));
@@ -313,7 +346,6 @@ export const updateOrder = async (
     if (supplier_id !== undefined) order.supplier_id = supplier_id || null;
     if (status !== undefined) order.status = status ?? order.status;
     if (comment !== undefined) order.comment = comment ?? order.comment;
-    if (bestellung_status !== undefined) (order as any).bestellung_status = bestellung_status;
     order.updated_at = new Date();
 
     const isFulfillmentMove =
@@ -330,9 +362,6 @@ export const updateOrder = async (
         const yy = String(now.getFullYear()).slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, "0");
         order.order_no = `DE${yy}${mm}-1`;
-      }
-      if (!(order as any).bestellung_status) {
-        (order as any).bestellung_status = "draft";
       }
     }
 
@@ -431,7 +460,6 @@ export const updateOrder = async (
           finalOrder!.supplier?.name ||
           "Unassigned",
         status: finalOrder!.status,
-        bestellung_status: (finalOrder as any)!.bestellung_status || null,
         comment: finalOrder!.comment,
         source_offer_id: finalOrder!.source_offer_id || null,
         created_at: finalOrder!.created_at,
@@ -512,7 +540,7 @@ export const getAllOrders = async (
           ord.order_no = newDeNo;
           try {
             await orderRepo.update(ord.id, { order_no: newDeNo });
-          } catch (_) { }
+          } catch (_) {}
         }
       } else {
         if (ord.order_no.startsWith("DE")) {
@@ -520,7 +548,7 @@ export const getAllOrders = async (
           ord.order_no = newBNo;
           try {
             await orderRepo.update(ord.id, { order_no: newBNo });
-          } catch (_) { }
+          } catch (_) {}
         }
       }
     }
@@ -600,7 +628,6 @@ export const getAllOrders = async (
         order.cargo?.bill_to_display_name ||
         order.customer?.companyName ||
         "No Customer",
-      bestellung_status: (order as any).bestellung_status || null,
       items: (order.orderItems || []).map((oi) => {
         const itemDetails =
           oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
