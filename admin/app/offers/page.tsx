@@ -281,52 +281,53 @@ const OffersPage: React.FC<any> = ({
     );
     if (!prompt) return;
 
+    if (offer.highlightColor === "#ECEAE6") {
+      toast.error(
+        `Offer ${offer.offerNumber} has already been converted to Auftrag.`,
+        {
+          id: "convert-offer-toast",
+          duration: 4000,
+        },
+      );
+      return;
+    }
+
     try {
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
-      const validItems = lineItems.map((x: any) => {
-        const rawId = x.sourceItemId || x.itemId || x.item_id;
-        const numericId =
-          rawId !== null && rawId !== undefined ? Number(rawId) : NaN;
-        const validItemId =
-          Number.isFinite(numericId) && numericId > 0 ? numericId : null;
-        return {
-          item_id: validItemId,
-          qty: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
-          price: Number(x.basePrice || x.unitPrice || x.price || 0),
-          remark_de: x.itemName || x.notes || x.description || "Line Item",
-        };
-      });
+      const validItems = lineItems
+        .map((x: any) => {
+          const rawId = x.sourceItemId || x.itemId || x.item_id || x.id;
+          const numericId =
+            rawId !== null && rawId !== undefined ? Number(rawId) : NaN;
+          if (!Number.isFinite(numericId) || numericId <= 0) return null;
+          return {
+            item_id: numericId,
+            qty: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
+            price: Number(x.basePrice || x.unitPrice || x.price || 0),
+            remark_de: x.notes || x.description || x.itemName || null,
+          };
+        })
+        .filter(Boolean);
+
+      if (validItems.length === 0) {
+        toast.error(
+          `Cannot convert "${offer.offerNumber}": none of the line items are linked to a catalog item. Please ensure items have a valid sourceItemId.`,
+          { id: "convert-offer-toast", duration: 6000 },
+        );
+        return;
+      }
 
       const payload = {
         customer_id: offer.customer_id || offer.customerSnapshot?.id || null,
         comment: `Converted from Offer ${offer.offerNumber}${offer.discountAmount ? ` [Discount: €${offer.discountAmount}]` : offer.discountPercentage ? ` [Discount: ${offer.discountPercentage}%]` : ""}`,
         status: 1,
-        items: validItems.length > 0 ? validItems : [{ item_id: null, qty: 1, price: 0, remark_de: offer.title || "Offer Conversion" }],
+        items: validItems,
         source_offer_id: offer.id,
       };
       await createOrder(payload as any);
-      const nextCount =
-        (offer.conversionCount ||
-          (offer.highlightColor === "#ECEAE6" ? 1 : 0)) + 1;
-
-      setOffers((prevOffers) =>
-        prevOffers.map((o) =>
-          o.id === offer.id
-            ? {
-                ...o,
-                highlightColor: "#ECEAE6",
-                conversionCount: nextCount,
-              }
-            : o,
-        ),
-      );
-
       try {
-        await updateOffer(offer.id, {
-          highlightColor: "#ECEAE6",
-          conversionCount: nextCount,
-        } as any);
+        await updateOffer(offer.id, { highlightColor: "#ECEAE6" });
       } catch (_) {}
       fetchOffers();
       onOrderConverted?.();
@@ -528,17 +529,10 @@ const OffersPage: React.FC<any> = ({
                   const isExpanded = expandedOfferIds.has(offer.id);
                   const lineItems =
                     offer.lineItems?.filter((li: any) => !li.isComponent) || [];
-                  const rowColor =
-                    offer.highlightColor && offer.highlightColor !== "#ECEAE6"
-                      ? offer.highlightColor
-                      : null;
+                  const rowColor = offer.highlightColor || null;
                   const rowTextColor = rowColor
                     ? getContrastTextColor(rowColor)
                     : undefined;
-                  const conversionCount =
-                    Number(offer.conversionCount) ||
-                    (offer.highlightColor === "#ECEAE6" ? 1 : 0);
-                  const isConverted = conversionCount > 0;
 
                   return (
                     <React.Fragment key={offer.id}>
@@ -663,29 +657,22 @@ const OffersPage: React.FC<any> = ({
                           <div className="flex items-center justify-center gap-1.5 font-poppins">
                             <button
                               title={
-                                isConverted
-                                  ? `Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""} to Auftrag (Click to convert again)`
+                                offer.highlightColor === "#ECEAE6"
+                                  ? "Already converted to Auftrag"
                                   : "Convert Offer to Auftrag Order"
                               }
                               onClick={(e) =>
                                 handleConvertOfferToAuftrag(offer, e)
                               }
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap cursor-pointer ${
-                                isConverted
-                                  ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                  : "bg-[#2F6B46] hover:bg-[#255638] text-white"
+                              disabled={offer.highlightColor === "#ECEAE6"}
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap ${
+                                offer.highlightColor === "#ECEAE6"
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                                  : "text-white bg-[#2F6B46] hover:bg-[#255638] cursor-pointer"
                               }`}
                             >
                               <MoveRight className="h-3.5 w-3.5" />
                             </button>
-                            {conversionCount > 0 && (
-                              <span
-                                title={`Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""}`}
-                                className="px-1.5 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
-                              >
-                                {conversionCount}
-                              </span>
-                            )}
                             <button
                               title="Download Angebot PDF"
                               onClick={async (e) => {

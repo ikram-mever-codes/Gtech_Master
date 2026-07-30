@@ -35,7 +35,9 @@ import {
   getOfferStatusColor,
   deletePriceColumn,
   getOfferLinkedDocuments,
+  getCustomerShippingAddresses,
   type LinkedDocumentsResult,
+  type CustomerShippingAddress,
 } from "@/api/offers";
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
@@ -391,6 +393,39 @@ const PickerRow: React.FC<{
   </div>
 );
 
+const COUNTRY_CODES: Record<string, string> = {
+  germany: "DE",
+  deutschland: "DE",
+  austria: "AT",
+  österreich: "AT",
+  switzerland: "CH",
+  schweiz: "CH",
+  france: "FR",
+  frankreich: "FR",
+  italy: "IT",
+  italien: "IT",
+  spain: "ES",
+  spanien: "ES",
+  netherlands: "NL",
+  niederlande: "NL",
+  belgium: "BE",
+  belgien: "BE",
+  poland: "PL",
+  polen: "PL",
+  "united kingdom": "GB",
+  uk: "GB",
+  "united states": "US",
+  usa: "US",
+  china: "CN",
+};
+
+const getCountryCode = (country?: string): string => {
+  if (!country) return "";
+  const trimmed = country.trim();
+  if (trimmed.length === 2) return trimmed.toUpperCase();
+  return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
+};
+
 const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   addr,
   emptyText,
@@ -398,18 +433,30 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   if (!addr) {
     return <div className="text-sm text-gray-400">{emptyText}</div>;
   }
-  const line2 = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
+
+  const countryCode = getCountryCode(addr.country);
+  const isGermany = countryCode === "DE";
+
+  const cityLine = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
+
+  const addressLine = [
+    addr.address || addr.street,
+    cityLine,
+    !isGermany ? countryCode : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <div className="space-y-1 text-sm text-gray-700">
       {addr.legalName && addr.legalName !== addr.companyName && (
         <div>{addr.legalName}</div>
       )}
-      {(addr.address || addr.street) && (
-        <div>{addr.address || addr.street}</div>
+      {addr.contactName && <div>{addr.contactName}</div>}
+      {addressLine && (
+        <div className="whitespace-normal break-words">{addressLine}</div>
       )}
-      {/* {line2 && <div>{line2}</div>} */}
-      {/* {addr.country && <div>{addr.country}</div>} */}
-      {addr.vatId && addr.country !== "Germany" && addr.country !== "DE" && (
+      {addr.vatId && !isGermany && (
         <div className="text-gray-500">VAT ID: {addr.vatId}</div>
       )}
       {addr.contactPhone && (
@@ -418,7 +465,6 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
     </div>
   );
 };
-
 /** Text input accepting both "," and "." as decimal separator. */
 const DecimalInput: React.FC<{
   value: string | number | null | undefined;
@@ -511,6 +557,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [itemPickerSearch, setItemPickerSearch] = useState("");
+
+  // Saved shipping addresses for the offer's customer, used by the
+  // delivery-address dropdown below (only fetched once editing starts).
+  const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
+  const [selectedShippingAddressId, setSelectedShippingAddressId] =
+    useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -666,6 +718,19 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       .finally(() => setLinkedDocsLoading(false));
   }, [offer?.id]);
 
+  // Saved shipping addresses for this offer's customer — only fetched while
+  // editing, since that's the only place the picker is shown.
+  useEffect(() => {
+    if (!edit || !offer?.customerId) {
+      setShippingAddresses([]);
+      setSelectedShippingAddressId("");
+      return;
+    }
+    getCustomerShippingAddresses(offer.customerId)
+      .then((res) => setShippingAddresses(res.success ? res.data : []))
+      .catch((e) => console.error("Couldn't load shipping addresses:", e));
+  }, [edit, offer?.customerId]);
+
   if (!isOpen) return null;
 
   function resetCreatePicker() {
@@ -725,6 +790,28 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   };
 
   const cPatch = (p: any) => setCreateForm((f: any) => ({ ...f, ...p }));
+
+  // Applies a saved shipping address (picked from the dropdown) onto the
+  // in-progress delivery address form.
+  const applyShippingAddress = (addressId: string) => {
+    setSelectedShippingAddressId(addressId);
+    const addr = shippingAddresses.find((a: any) => a.id === addressId);
+    if (!addr) return;
+    patch({
+      deliveryAddress: {
+        contactName:
+          offer.customerSnapshot?.legalName ||
+          offer.customerSnapshot?.companyName ||
+          "",
+        street: addr.street,
+        postalCode: addr.postalCode,
+        city: addr.city,
+        country: addr.country,
+        additionalInfo: addr.additionalInfo,
+        contactPhone: offer.customerSnapshot?.contactPhoneNumber || "",
+      },
+    });
+  };
 
   const visibleInquiries = inquiries.filter((i) => {
     const matchCust = filterCustomerId
@@ -1095,6 +1182,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         icon: <BuildingOfficeIcon className="h-3 w-3" />,
       },
     };
+
     const s = map[offer?.sourceType] || map.inquiry;
     return (
       <span
@@ -1522,24 +1610,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-bold text-gray-900 truncate">
-                    Offer {offer.title}
-                  </h2>
+                  <p className="text-lg font-bold text-gray-900 truncate">
+                    Angebot {offer.offerNumber}
+                  </p>
                   {offer.revision > 1 && (
                     <span className="text-xs text-gray-500">
                       Rev. {offer.revision}
                     </span>
                   )}
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${getOfferStatusColor(offer.status)}`}
-                  >
-                    {offer.status}
-                  </span>
-                  {sourceBadge()}
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-700">
-                    {pricingMode === "matrix"
-                      ? "Matrix pricing"
-                      : "Classic pricing"}
+                    {pricingMode === "matrix" ? "Matrix" : "Classic"}
                   </span>
                   {displayInquiryNo && (
                     <span className="text-sm font-bold text-gray-900 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
@@ -1548,9 +1628,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </span>
                   )}
                 </div>
-                <p className="text-sm font-medium text-gray-500 truncate mt-0.5">
-                  Offer {offer.offerNumber}
-                </p>
+                <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
+                  {offer.title}
+                </h2>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
                 <input
@@ -1600,50 +1680,25 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         Delivery:
                       </span>
                     )}
-                    {edit && (
-                      <label className="flex items-center gap-2 mb-3 mt-2 cursor-pointer text-xs font-semibold text-gray-600 select-none">
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                          checked={deliverySameAsBilling}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              patch({
-                                deliveryAddress: {
-                                  contactName:
-                                    offer.customerSnapshot?.legalName ||
-                                    offer.customerSnapshot?.companyName ||
-                                    "",
-                                  street:
-                                    offer.customerSnapshot?.address ||
-                                    offer.customerSnapshot?.street ||
-                                    "",
-                                  postalCode:
-                                    offer.customerSnapshot?.postalCode || "",
-                                  city: offer.customerSnapshot?.city || "",
-                                  country:
-                                    offer.customerSnapshot?.country || "",
-                                  contactPhone:
-                                    offer.customerSnapshot
-                                      ?.contactPhoneNumber || "",
-                                },
-                              });
-                            } else {
-                              patch({
-                                deliveryAddress: {
-                                  contactName: "",
-                                  street: "",
-                                  postalCode: "",
-                                  city: "",
-                                  country: "",
-                                  contactPhone: "",
-                                },
-                              });
-                            }
-                          }}
-                        />
-                        Delivery address same as billing address
-                      </label>
+
+                    {edit && !deliverySameAsBilling && (
+                      <select
+                        className={`${inputCls} mb-2`}
+                        value={selectedShippingAddressId}
+                        onChange={(e) => applyShippingAddress(e.target.value)}
+                      >
+                        <option value="">
+                          {shippingAddresses.length > 0
+                            ? "Select a saved shipping address…"
+                            : "No saved shipping addresses"}
+                        </option>
+                        {shippingAddresses.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name} — {a.street}, {a.city}
+                            {a.isDefault ? " (Default)" : ""}
+                          </option>
+                        ))}
+                      </select>
                     )}
                     {deliverySameAsBilling ? (
                       <div className="text-sm text-gray-500">
@@ -1747,18 +1802,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       onChange={(e) => patch({ paymentTerms: e.target.value })}
                     />
                   </Field>
-                  {/* <Field
-                    label="Tax rate"
-                    edit={edit}
-                    value={`${offer.taxRate ?? 19}%`}
-                  >
-                    <DecimalInput
-                      value={form.taxRate}
-                      onCommit={(raw) =>
-                        patch({ taxRate: parseFlexibleNumber(raw) ?? 19 })
-                      }
-                    />
-                  </Field> */}
                   <Field
                     label="Tax profile"
                     edit={false}
@@ -2461,16 +2504,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     value={formatWeight(totalWeightKg)}
                   />
                 </div>
-                {/* <Field
-                      label="Discount %"
-                      edit={edit}
-                      value={`${offer.discountPercentage || 0}%`}
-                    >
-                      <DecimalInput
-                        value={form.discountPercentage}
-                        onCommit={(raw) => patch({ discountPercentage: raw })}
-                      />
-                    </Field> */}
                 <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>

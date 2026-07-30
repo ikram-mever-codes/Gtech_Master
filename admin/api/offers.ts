@@ -676,3 +676,28 @@ export async function setActivePrice(lineItemId: string, priceIndex: number) {
     throw error;
   }
 }
+
+export interface CustomerShippingAddress {
+  id: string;
+  name: string;
+  street: string;
+  postalCode: string;
+  city: string;
+  country: string;
+  additionalInfo?: string;
+  isDefault: boolean;
+}
+
+export const getCustomerShippingAddresses = async (
+  customerId: string,
+): Promise<{ success: boolean; data: CustomerShippingAddress[] }> => {
+  try {
+    const response: any = await api.get(
+      `/offers/customers/${customerId}/shipping-addresses`,
+    );
+    return response?.success ? response : { success: false, data: [] };
+  } catch (error) {
+    handleApiError(error, "Failed to fetch shipping addresses");
+    return { success: false, data: [] };
+  }
+};

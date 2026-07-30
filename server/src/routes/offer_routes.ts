@@ -24,6 +24,15 @@ router.post(
 );
 
 // ---------------------------------------------------------------------------
+// Customer shipping addresses (for the delivery-address picker)
+// ---------------------------------------------------------------------------
+router.get(
+  "/customers/:customerId/shipping-addresses",
+  authorize(UserRole.SALES),
+  offerController.getCustomerShippingAddresses.bind(offerController),
+);
+
+// ---------------------------------------------------------------------------
 // Offer CRUD operations - Restricted to Admin and Sales
 // ---------------------------------------------------------------------------
 router.get(

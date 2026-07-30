@@ -107,6 +107,7 @@ import {
 
 import { In } from "typeorm";
 import { WarehouseItem } from "../models/warehouse_items";
+import { CompanyShippingAddress } from "../models/company_shipping_address";
 
 let cachedCustomerSvg: string | null = null;
 
@@ -512,6 +513,40 @@ export class PasteMatrixDto {
   tierCount!: number;
 }
 
+export class DeliveryAddressDto {
+  @IsOptional()
+  @IsString()
+  street?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  additionalInfo?: string;
+
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+}
+
 export class CreateOfferFromItemDto {
   @IsOptional()
   @IsString()
@@ -543,6 +578,10 @@ export class CreateOfferFromItemDto {
   @IsOptional()
   @IsString()
   shippingMethod?: string;
+
+  @IsOptional()
+  @Type(() => DeliveryAddressDto)
+  deliveryAddress?: DeliveryAddressDto;
 
   @IsOptional()
   @IsString()
@@ -677,6 +716,9 @@ export class OfferController {
   private inquiryRepository = AppDataSource.getRepository(Inquiry);
   private requestedItemRepository = AppDataSource.getRepository(RequestedItem);
   private customerRepository = AppDataSource.getRepository(Customer);
+  private shippingAddressRepository = AppDataSource.getRepository(
+    CompanyShippingAddress,
+  );
 
   private async generateOfferNumber(): Promise<string> {
     try {
@@ -717,54 +759,45 @@ export class OfferController {
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       vatId: customer.vatTaxId || customer.taxNumber || "",
-      address: customer.addressLine1 || customer.businessDetails?.address || "",
-      city: customer.city || customer.businessDetails?.city || "",
-      postalCode:
-        customer.postalCode || customer.businessDetails?.postalCode || "",
-      country: customer.country || customer.businessDetails?.country || "",
-      state: customer.businessDetails?.state || "",
-      street: customer.addressLine1 || "Street Address",
+      address: customer.address || "",
+      city: customer.city || "",
+      postalCode: customer.postalCode || "",
+      country: customer.country || "",
+      street: customer.street || "Street Address",
       additionalInfo: customer.addressLine2 || "Additional Info",
     };
   }
 
-  private buildDeliveryAddress(customer: Customer | any) {
-    const sc = customer.starCustomerDetails;
-    if (sc && sc.deliveryAddressLine1) {
-      return {
-        street: sc.deliveryAddressLine1,
-        city:
-          sc.deliveryCity ||
-          customer.city ||
-          customer.businessDetails?.city ||
-          "",
-        state: sc.deliveryState || customer.businessDetails?.state || "",
-        postalCode:
-          sc.deliveryPostalCode ||
-          customer.postalCode ||
-          customer.businessDetails?.postalCode ||
-          "",
-        country:
-          sc.deliveryCountry ||
-          customer.country ||
-          customer.businessDetails?.country ||
-          "",
-        contactName: customer.legalName || customer.companyName || "",
-        contactPhone: customer.contactPhoneNumber || "",
-      };
-    }
-    return {
-      street: customer.addressLine1 || "Street Address",
-      city: customer.city || customer.businessDetails?.city || "",
-      state: customer.businessDetails?.state || "",
-      postalCode:
-        customer.postalCode || customer.businessDetails?.postalCode || "",
-      country: customer.country || customer.businessDetails?.country || "",
-      contactName: customer.legalName || customer.companyName || "",
-      contactPhone: customer.contactPhoneNumber || "",
-    };
-  }
+  async getShippingAddresses(request: Request, response: Response) {
+    try {
+      const { customerId } = request.params;
 
+      const addresses = await this.shippingAddressRepository.find({
+        where: { company: { id: customerId } },
+        relations: ["country"],
+        order: { is_default: "DESC", name: "ASC" },
+      });
+
+      const data = addresses.map((addr) => ({
+        id: addr.id,
+        name: addr.name,
+        street: addr.street,
+        postalCode: addr.postal_code,
+        city: addr.city,
+        country: addr.country?.name || "",
+        additionalInfo: addr.address_additional_line || undefined,
+        isDefault: addr.is_default,
+      }));
+
+      return response.status(200).json({ success: true, data });
+    } catch (error) {
+      console.error("Error fetching shipping addresses:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
   // ---------------------------------------------------------------------
   // Pricing helpers
   // ---------------------------------------------------------------------
@@ -889,7 +922,12 @@ export class OfferController {
 
       const inquiry = await this.inquiryRepository.findOne({
         where: { id: inquiryId },
-        relations: ["customer", "requests", "contactPerson"],
+        relations: [
+          "customer",
+          "customer.shippingAddresses",
+          "requests",
+          "contactPerson",
+        ],
       });
 
       if (!inquiry) {
@@ -945,15 +983,8 @@ export class OfferController {
         inquiryId: inquiry.id,
         inquirySnapshot,
         customerSnapshot,
-        deliveryAddress: createOfferDto.deliveryAddress || {
-          street: "Street Address",
-          city: customer.businessDetails?.city,
-          state: customer.businessDetails?.state,
-          postalCode: customer.businessDetails?.postalCode,
-          country: customer.businessDetails?.country,
-          contactName: customer.legalName || customer.companyName,
-          contactPhone: customer.contactPhoneNumber,
-        },
+        deliveryAddress:
+          createOfferDto.deliveryAddress || this.buildDeliveryAddress(customer),
         status: "Draft",
         validUntil:
           coerceDate(createOfferDto.validUntil) ||
@@ -961,11 +992,11 @@ export class OfferController {
         termsConditions: createOfferDto.termsConditions,
         deliveryTerms: createOfferDto.deliveryTerms,
         paymentTerms: createOfferDto.paymentTerms,
-        // NEW: default payment due days from the customer record, so the
-        // offer starts pre-filled with the customer's own standing terms
-        // (e.g. "7", "30") instead of only whatever the request body sent
-        // for `paymentTerms`. Coerced to string since paymentDueDays is a
-        // text column; left undefined if the customer has no value set.
+        // Default payment due days from the customer record, so the offer
+        // starts pre-filled with the customer's own standing terms (e.g.
+        // "7", "30") instead of only whatever the request body sent for
+        // `paymentTerms`. Coerced to string since paymentDueDays is a text
+        // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
           customer.defaultPaymentDueDays !== null
@@ -1129,12 +1160,20 @@ export class OfferController {
       }
 
       const itemRepository = AppDataSource.getRepository(Item);
-      // also load "parent" — de_no lives on the Item's parent record,
-      // not on Item itself (see getItemById, which resolves de_no the same
-      // way: warehouse item_no_de first, falling back to parent.de_no).
+      // "parent" — de_no lives on the Item's parent record, not on Item
+      // itself (see getItemById, which resolves de_no the same way:
+      // warehouse item_no_de first, falling back to parent.de_no).
+      // "customer.shippingAddresses" — needed so the fallback customer
+      // (orderedItems[0].customer, used when body.customerId is absent)
+      // carries its default shipping address for buildDeliveryAddress.
       const fetchedItems: any[] = await itemRepository.find({
         where: { id: In(requestedIds) },
-        relations: ["customer", "taric", "parent"],
+        relations: [
+          "customer",
+          "customer.shippingAddresses",
+          "taric",
+          "parent",
+        ],
       });
 
       if (fetchedItems.length === 0) {
@@ -1192,7 +1231,11 @@ export class OfferController {
       if (body.customerId) {
         customer = await this.customerRepository.findOne({
           where: { id: body.customerId },
-          relations: ["businessDetails", "starCustomerDetails"],
+          relations: [
+            "businessDetails",
+            "starCustomerDetails",
+            "shippingAddresses",
+          ],
         });
       }
       if (!customer) {
@@ -1231,7 +1274,8 @@ export class OfferController {
         itemSnapshot: primarySnapshot,
         customerId: customer.id,
         customerSnapshot,
-        deliveryAddress: this.buildDeliveryAddress(customer),
+        deliveryAddress:
+          body.deliveryAddress || this.buildDeliveryAddress(customer),
         status: "Draft",
         validUntil:
           coerceDate(body.validUntil) ||
@@ -1240,7 +1284,7 @@ export class OfferController {
         notes: body.notes,
         internalNotes: body.internalNotes,
         paymentMethod: body.paymentMethod,
-        // NEW: same default payment due days fill as createOfferFromInquiry,
+        // Same default payment due days fill as createOfferFromInquiry,
         // sourced from the recipient customer's own standing terms.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
@@ -1265,14 +1309,12 @@ export class OfferController {
       const lineItems = orderedItems.map((item, idx) => {
         const snap = this.buildItemSnapshot(item);
 
-        // ---------------------------------------------------------------
         // basePrice <- item.price (the Item entity's own `price` column)
         // material  <- item's de_no, resolved the same way getItemById
         //   resolves it: warehouse item_no_de first, falling back to
         //   parent.de_no.
         // photo     <- item.photo (the Item entity's own thumbnail column,
         //   same field getItemById/getItems already expose to the frontend).
-        // ---------------------------------------------------------------
         return this.lineItemRepository.create({
           offer: savedOffer,
           offerId: savedOffer.id,
@@ -1324,7 +1366,71 @@ export class OfferController {
       });
     }
   }
+  private buildDeliveryAddress(customer: any): Offer["deliveryAddress"] {
+    const defaultAddress = (customer.shippingAddresses || []).find(
+      (addr: any) => addr.is_default,
+    );
 
+    if (defaultAddress) {
+      return {
+        street: defaultAddress.street,
+        city: defaultAddress.city,
+        postalCode: defaultAddress.postal_code,
+        country: defaultAddress.country?.name || "",
+        additionalInfo: defaultAddress.address_additional_line || undefined,
+        contactName: customer.legalName || customer.companyName,
+        contactPhone: customer.contactPhoneNumber,
+      };
+    }
+
+    // Fallback when the customer has no default shipping address
+    return {
+      street: "Street Address",
+      city: customer.city,
+      postalCode: customer.postalCode,
+      country: customer.country,
+      contactName: customer.legalName || customer.companyName,
+      contactPhone: customer.contactPhoneNumber,
+    };
+  }
+  async getCustomerShippingAddresses(request: Request, response: Response) {
+    try {
+      const { customerId } = request.params;
+
+      const customer = await this.customerRepository.findOne({
+        where: { id: customerId },
+        relations: ["shippingAddresses", "shippingAddresses.country"],
+      });
+
+      if (!customer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Customer not found" });
+      }
+
+      const data = (customer.shippingAddresses || [])
+        .slice()
+        .sort((a: any, b: any) => Number(b.is_default) - Number(a.is_default))
+        .map((addr: any) => ({
+          id: addr.id,
+          name: addr.name,
+          street: addr.street,
+          postalCode: addr.postal_code,
+          city: addr.city,
+          country: addr.country?.name || "",
+          additionalInfo: addr.address_additional_line || undefined,
+          isDefault: addr.is_default,
+        }));
+
+      return response.status(200).json({ success: true, data });
+    } catch (error) {
+      console.error("Error fetching shipping addresses:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
   async createLineItem(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
