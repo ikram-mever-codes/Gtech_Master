@@ -39,6 +39,10 @@ export const generateInvoicesForOrders = async (
       });
       for (const order of orders) {
         orderNumbers.add(order.order_no);
+        if (order.cargo_id) {
+          const c = await cargoRepo.findOne({ where: { id: order.cargo_id } });
+          if (c?.cargo_no) cargoNumbers.add(c.cargo_no);
+        }
         if (order.orderItems) {
           for (const oi of order.orderItems) {
             if (oi.cargo_id && oi.cargo?.cargo_no) {
@@ -47,6 +51,14 @@ export const generateInvoicesForOrders = async (
           }
         }
       }
+
+      const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
+        where: { order_id: In(orderIds) },
+        relations: ["cargo"],
+      });
+      cargoOrders.forEach((co) => {
+        if (co.cargo?.cargo_no) cargoNumbers.add(co.cargo.cargo_no);
+      });
     }
 
     for (const cargoNo of Array.from(cargoNumbers)) {
@@ -67,10 +79,24 @@ export const generateInvoicesForOrders = async (
         }
       }
 
-      const items = await orderItemRepo.find({
+      const linkedCargoOrders = await AppDataSource.getRepository(CargoOrder).find({
         where: { cargo_id: cargo.id },
+      });
+      const orderIdsFromCargo = linkedCargoOrders.map((co) => co.order_id).filter(Boolean);
+
+      const whereConditions: any[] = [{ cargo_id: cargo.id }];
+      if (orderIdsFromCargo.length > 0) {
+        whereConditions.push({ order_id: In(orderIdsFromCargo) });
+      }
+
+      const rawItems = await orderItemRepo.find({
+        where: whereConditions,
         relations: ["item", "item.taric", "order"],
       });
+
+      const itemMap = new Map();
+      rawItems.forEach((oi) => itemMap.set(oi.id, oi));
+      const items = Array.from(itemMap.values());
 
       await syncInvoiceRecord(
         cargoNo,
@@ -407,7 +433,7 @@ export const createCargo = async (
         }),
       );
       await cargoOrderRepo.save(cargoOrderEntries);
-      await generateInvoicesForOrders(orders);
+      await generateInvoicesForOrders(orders, [savedCargo.id]);
     }
 
     res.status(201).json({
@@ -479,7 +505,7 @@ export const updateCargo = async (
           }),
         );
         await cargoOrderRepo.save(cargoOrderEntries);
-        await generateInvoicesForOrders(orders);
+        await generateInvoicesForOrders(orders, [cargo.id]);
       }
     }
 
@@ -614,7 +640,7 @@ export const assignOrdersToCargo = async (
       }
     }
 
-    await generateInvoicesForOrders(validOrderIds, oldCargoIds);
+    await generateInvoicesForOrders(validOrderIds, [...oldCargoIds, cargo.id]);
 
     res.status(200).json({
       success: true,
