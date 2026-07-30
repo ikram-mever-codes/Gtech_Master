@@ -91,10 +91,10 @@ const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
   return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
     }`;
 };
 
@@ -1630,8 +1630,8 @@ const InvoiceListPage: React.FC = () => {
                 setCurrentPage(1);
               }}
               className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
                 }`}
             >
               {tab.label}
@@ -2161,8 +2161,8 @@ const InvoiceListPage: React.FC = () => {
                               key={i + 1}
                               onClick={() => setCurrentPage(i + 1)}
                               className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                                  ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                  : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
                                 }`}
                             >
                               {i + 1}
@@ -2459,8 +2459,8 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       onClick={() => setModalActiveTab("taric")}
                       className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "taric"
-                          ? "border-[#8CC21B] text-gray-900"
-                          : "border-transparent text-gray-500 hover:text-gray-700"
+                        ? "border-[#8CC21B] text-gray-900"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                     >
                       Taric Summary
@@ -2468,8 +2468,8 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       onClick={() => setModalActiveTab("items")}
                       className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "items"
-                          ? "border-[#8CC21B] text-gray-900"
-                          : "border-transparent text-gray-500 hover:text-gray-700"
+                        ? "border-[#8CC21B] text-gray-900"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                     >
                       Items List

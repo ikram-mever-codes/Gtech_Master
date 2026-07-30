@@ -1028,7 +1028,7 @@ export class InvoiceController {
       const { id } = req.params;
       const invoice = await invoiceRepository.findOne({
         where: { id },
-        relations: ["customer", "items"],
+        relations: ["customer", "items", "items.item", "items.item.taric"],
       });
 
       if (!invoice) {
@@ -1037,57 +1037,107 @@ export class InvoiceController {
           .json({ success: false, message: "Invoice not found" });
       }
 
-      const orderNumber = invoice.orderNumber;
+      const orderNumber = invoice.orderNumber || "";
       let orderItems: any[] = [];
       let cargo: any = null;
 
-      cargo = await cargoRepository.findOne({
-        where: { cargo_no: orderNumber },
-      });
-
-      if (!cargo && orderNumber) {
+      // 1. Try finding Cargo directly or with tokens
+      if (orderNumber) {
         cargo = await cargoRepository.findOne({
-          where: { cargo_no: Like(`%${orderNumber}%`) },
+          where: { cargo_no: orderNumber },
         });
+
+        if (!cargo) {
+          cargo = await cargoRepository.findOne({
+            where: { cargo_no: Like(`%${orderNumber}%`) },
+          });
+        }
+
+        if (!cargo) {
+          // Try sub-tokens (e.g. "C2026-FE36 - K083753" -> "C2026-FE36")
+          const tokens = orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2);
+          for (const token of tokens) {
+            cargo = await cargoRepository.findOne({
+              where: [{ cargo_no: token }, { cargo_no: Like(`%${token}%`) }],
+            });
+            if (cargo) break;
+          }
+        }
       }
 
+      // 2. Collect orderItems from Cargo (via cargo_orders, direct cargo_id, or linked orders)
       if (cargo) {
         const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
           where: { cargo_id: cargo.id },
         });
-        const orderIdsFromCargo = cargoOrders.map((co) => co.order_id).filter(Boolean);
+        const orderIdsFromCargoOrders = cargoOrders.map((co) => co.order_id).filter(Boolean);
+
+        const ordersInCargo = await orderRepository.find({
+          where: [{ cargo_id: cargo.id }],
+        });
+        const orderIdsFromOrders = ordersInCargo.map((o) => o.id).filter(Boolean);
+
+        const allOrderIds = [...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders])];
 
         const whereConditions: any[] = [{ cargo_id: cargo.id }];
-        if (orderIdsFromCargo.length > 0) {
-          whereConditions.push({ order_id: In(orderIdsFromCargo) });
+        if (allOrderIds.length > 0) {
+          whereConditions.push({ order_id: In(allOrderIds) });
         }
 
         orderItems = await orderItemRepository.find({
           where: whereConditions,
           relations: ["item", "item.taric", "item.purchasePrices", "order"],
         });
+      }
 
-        const itemMap = new Map();
-        orderItems.forEach((oi) => itemMap.set(oi.id, oi));
-        orderItems = Array.from(itemMap.values());
-      } else {
-        const order = await orderRepository.findOne({
-          where: { order_no: orderNumber },
+      // 3. Fallback: Search Order by orderNumber or sub-tokens if no orderItems found yet
+      if (orderItems.length === 0 && orderNumber) {
+        const tokens = [orderNumber, ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2)];
+        const uniqueTokens = [...new Set(tokens)];
+
+        const matchingOrders = await orderRepository.find({
+          where: uniqueTokens.map((t) => ({ order_no: Like(`%${t}%`) })),
         });
-        if (order) {
-          const cargoOrder = await AppDataSource.getRepository(CargoOrder).findOne({
-            where: { order_id: order.id },
+
+        if (matchingOrders.length > 0) {
+          const matchingOrderIds = matchingOrders.map((o) => o.id);
+          const foundCargoOrder = await AppDataSource.getRepository(CargoOrder).findOne({
+            where: { order_id: In(matchingOrderIds) },
             relations: ["cargo"],
           });
-          if (cargoOrder?.cargo) {
-            cargo = cargoOrder.cargo;
+          if (foundCargoOrder?.cargo) {
+            cargo = foundCargoOrder.cargo;
           }
 
           orderItems = await orderItemRepository.find({
-            where: { order_id: order.id },
+            where: { order_id: In(matchingOrderIds) },
             relations: ["item", "item.taric", "item.purchasePrices", "order"],
           });
         }
+      }
+
+      // 4. Deduplicate orderItems by ID
+      if (orderItems.length > 0) {
+        const itemMap = new Map();
+        orderItems.forEach((oi) => itemMap.set(oi.id, oi));
+        orderItems = Array.from(itemMap.values());
+      }
+
+      // 5. Ultimate Fallback: Convert invoice.items (InvoiceItem table) if orderItems is still empty
+      if (orderItems.length === 0 && invoice.items && invoice.items.length > 0) {
+        orderItems = invoice.items.map((invItem: any) => ({
+          id: invItem.id,
+          qty: Number(invItem.quantity || 0),
+          price: Number(invItem.unitPrice || 0),
+          eur_special_price: Number(invItem.unitPrice || 0),
+          item: invItem.item || {
+            id: invItem.item_id || Math.random(),
+            item_name: invItem.description || "Invoice Item",
+            ean: invItem.articleNumber || "-",
+            taric: null,
+          },
+          set_taric_code: null,
+        }));
       }
 
       const getEffectiveTaricCode = (oi: any): string => {
