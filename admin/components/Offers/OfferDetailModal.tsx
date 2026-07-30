@@ -1424,7 +1424,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   />
                 </div>
               </div>
-
               {sourceType === "item" && selectedCustomer && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
@@ -1435,15 +1434,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       addr={{
                         companyName: selectedCustomer.companyName,
                         legalName: selectedCustomer.legalName,
-                        address:
-                          selectedCustomer.addressLine1 ||
-                          selectedCustomer?.address,
-                        postalCode:
-                          selectedCustomer.postalCode ||
-                          selectedCustomer?.postalCode,
-                        city: selectedCustomer.city || selectedCustomer?.city,
-                        country:
-                          selectedCustomer.country || selectedCustomer?.country,
+                        address: selectedCustomer.addressLine1,
+                        postalCode: selectedCustomer.postalCode,
+                        city: selectedCustomer.city,
+                        country: selectedCustomer.country,
                         vatId:
                           selectedCustomer.vatTaxId ||
                           selectedCustomer.taxNumber,
@@ -1452,11 +1446,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     />
                   </div>
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    {!deliverySameAsBilling && (
+                    {selectedCustomer.deliveryAddressLine1 && (
                       <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                         Delivery:
                       </p>
-                    )}{" "}
+                    )}
                     <AddressBlock
                       addr={
                         selectedCustomer.deliveryAddressLine1
@@ -1477,7 +1471,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 </div>
               )}
-
               <div className="space-y-2 max-h-56 overflow-y-auto">
                 {sourceType === "inquiry" &&
                   (visibleInquiries.length === 0 ? (
@@ -1721,9 +1714,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
 
                   <div className="block mb-1">
-                    <span className="text-sm font-bold text-gray-900">
-                      Delivery:
-                    </span>
+                    {(edit || !showAsSame) && (
+                      <span className="text-sm font-bold text-gray-900">
+                        Delivery:
+                      </span>
+                    )}
 
                     {edit && (
                       <select
