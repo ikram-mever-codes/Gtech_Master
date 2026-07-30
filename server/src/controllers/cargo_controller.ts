@@ -16,6 +16,7 @@ export const generateInvoicesForOrders = async (
   cargoIds: number[] = [],
 ) => {
   try {
+    console.log(`📝 [GENERATE_INVOICE_LOG] Started for orderIds: ${JSON.stringify(orderIds)}, cargoIds: ${JSON.stringify(cargoIds)}`);
     const orderRepo = AppDataSource.getRepository(Order);
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
     const invoiceRepo = AppDataSource.getRepository(Invoice);
@@ -61,15 +62,21 @@ export const generateInvoicesForOrders = async (
       });
     }
 
+    console.log(`📝 [GENERATE_INVOICE_LOG] Target Cargo Numbers to sync: ${JSON.stringify(Array.from(cargoNumbers))}`);
+
     for (const cargoNo of Array.from(cargoNumbers)) {
       const cargo = await cargoRepo.findOne({
         where: { cargo_no: cargoNo },
         relations: ["customer"],
       });
-      if (!cargo) continue;
+      if (!cargo) {
+        console.log(`⚠️ [GENERATE_INVOICE_LOG] Cargo not found for cargoNo: "${cargoNo}"`);
+        continue;
+      }
       if (cargo.cargo_type_id) {
         const cargoType = await cargoTypeRepo.findOne({ where: { id: cargo.cargo_type_id } });
         if (cargoType && cargoType.has_pl === false) {
+          console.log(`⛔ [GENERATE_INVOICE_LOG] Cargo ${cargoNo} type HAS_PL is FALSE -> Skipping invoice creation`);
           const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: cargoNo } });
           if (existingInvoice) {
             await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
@@ -98,6 +105,7 @@ export const generateInvoicesForOrders = async (
       rawItems.forEach((oi) => itemMap.set(oi.id, oi));
       const items = Array.from(itemMap.values());
 
+      console.log(`🧾 [GENERATE_INVOICE_LOG] Syncing invoice for Cargo "${cargoNo}" with ${items.length} items`);
       await syncInvoiceRecord(
         cargoNo,
         items,
@@ -113,6 +121,7 @@ export const generateInvoicesForOrders = async (
         where: { orderNumber: orderNo },
       });
       if (existingInvoice) {
+        console.log(`🧹 [GENERATE_INVOICE_LOG] Cleaned up individual order invoice for "${orderNo}" now assigned to cargo`);
         await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
         await invoiceRepo.delete(existingInvoice.id);
       }
@@ -564,6 +573,7 @@ export const assignOrdersToCargo = async (
   try {
     const { id } = req.params;
     const { orderIds } = req.body;
+    console.log(`🚚 [ASSIGN_CARGO_LOG] Assigning orderIds: ${JSON.stringify(orderIds)} to Target Cargo ID: ${id}`);
 
     const validOrderIds = (orderIds as any[])
       .filter((id) => Boolean(id) && !isNaN(Number(id)))
@@ -578,9 +588,12 @@ export const assignOrdersToCargo = async (
     const cargoRepo = AppDataSource.getRepository(Cargo);
     const cargo = await cargoRepo.findOne({ where: { id: Number(id) } });
     if (!cargo) {
+      console.log(`❌ [ASSIGN_CARGO_LOG] Cargo ID ${id} not found in database`);
       res.status(404).json({ success: false, message: "Cargo not found" });
       return;
     }
+
+    console.log(`🚚 [ASSIGN_CARGO_LOG] Target Cargo Found -> ID: ${cargo.id}, cargo_no: "${cargo.cargo_no}", cargo_status: "${cargo.cargo_status}", cargo_type_id: ${cargo.cargo_type_id}`);
 
     const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
     const { isSplitMove } = req.body;
