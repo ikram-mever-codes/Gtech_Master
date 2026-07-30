@@ -425,6 +425,12 @@ export class OfferLineItem {
   @Column({ type: "varchar", length: 255, nullable: true })
   material?: string;
 
+  // NEW: item thumbnail, sourced from Item.photo (or, for requested items,
+  // whatever picture field the source ends up carrying). Nullable since
+  // older line items and any without a resolvable image won't have one.
+  @Column({ type: "varchar", length: 500, nullable: true })
+  photo?: string;
+
   @Column({ type: "text", nullable: true })
   specification?: string;
 

@@ -1836,11 +1836,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         : "No shipping country set"
                     }
                   />
-                  <Field
+                  {/* <Field
                     label="Subsequent tax (VAT amount)"
                     edit={false}
                     value={formatCurrency(offer.taxAmount || 0, offer.currency)}
-                  />
+                  /> */}
                 </div>
               </Section>
 
