@@ -32,7 +32,9 @@ export default function PaymentMethodsPage() {
   const [name, setName] = useState("");
   const [isPrepayment, setIsPrepayment] = useState(false);
 
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(
+    null,
+  );
   const [showEditModal, setShowEditModal] = useState(false);
   const [isEditEnabled, setIsEditEnabled] = useState(false);
   const [editName, setEditName] = useState("");
@@ -124,7 +126,9 @@ export default function PaymentMethodsPage() {
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to update payment method");
+      toast.error(
+        err?.response?.data?.message || "Failed to update payment method",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -134,7 +138,7 @@ export default function PaymentMethodsPage() {
     if (!selectedMethod) return;
     if (
       !confirm(
-        `Are you sure you want to delete the payment method "${selectedMethod.name}"? This action cannot be undone.`
+        `Are you sure you want to delete the payment method "${selectedMethod.name}"? This action cannot be undone.`,
       )
     )
       return;
@@ -149,7 +153,9 @@ export default function PaymentMethodsPage() {
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to delete payment method");
+      toast.error(
+        err?.response?.data?.message || "Failed to delete payment method",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -215,7 +221,9 @@ export default function PaymentMethodsPage() {
       ) : filteredMethods.length === 0 ? (
         <div className="p-12 text-center">
           <CreditCard className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium font-poppins">No payment methods found.</p>
+          <p className="text-gray-500 font-medium font-poppins">
+            No payment methods found.
+          </p>
           <p className="text-xs text-gray-400 mt-1">
             Try a different search or create a new payment method.
           </p>
@@ -386,7 +394,9 @@ export default function PaymentMethodsPage() {
                         <input
                           type="checkbox"
                           checked={editIsPrepayment}
-                          onChange={(e) => setEditIsPrepayment(e.target.checked)}
+                          onChange={(e) =>
+                            setEditIsPrepayment(e.target.checked)
+                          }
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
                         <span className="text-xs font-semibold text-gray-700">
@@ -400,7 +410,9 @@ export default function PaymentMethodsPage() {
                           onChange={(e) => setEditIsActive(e.target.checked)}
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
-                        <span className="text-xs font-semibold text-gray-700">Active</span>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Active
+                        </span>
                       </label>
                     </div>
                   ) : (
@@ -456,7 +468,7 @@ export default function PaymentMethodsPage() {
 
   return (
     <MasterPageLayout
-      title="Payment Method Settings"
+      title="Payment Method"
       icon={CreditCard}
       actionButtons={actionButtons}
       filterBar={filterBar}

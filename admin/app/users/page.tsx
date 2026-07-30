@@ -15,12 +15,7 @@ import {
   MenuItem,
   Button,
 } from "@mui/material";
-import {
-  PlusIcon,
-  RefreshCw,
-  Users,
-  Search,
-} from "lucide-react";
+import { PlusIcon, RefreshCw, Users, Search } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { UserRole, UserStatus } from "@/utils/interfaces";
 import theme from "@/styles/theme";
@@ -90,8 +85,12 @@ export default function UsersPage() {
             {row.name?.charAt(0).toUpperCase()}
           </Avatar>
           <div>
-            <div className="text-gray-800 font-medium font-poppins">{row.name}</div>
-            <div className="text-sm text-gray-500 font-poppins">{row.email}</div>
+            <div className="text-gray-800 font-medium font-poppins">
+              {row.name}
+            </div>
+            <div className="text-sm text-gray-500 font-poppins">
+              {row.email}
+            </div>
           </div>
         </div>
       ),
@@ -100,7 +99,9 @@ export default function UsersPage() {
       key: "phoneNumber",
       label: "Phone",
       render: (value: string) => (
-        <span className="text-gray-700 font-poppins">{value || "Not provided"}</span>
+        <span className="text-gray-700 font-poppins">
+          {value || "Not provided"}
+        </span>
       ),
     },
     {
@@ -172,7 +173,7 @@ export default function UsersPage() {
       !searchText ||
       [user.name, user.email, user.phoneNumber].some(
         (field) =>
-          field && field.toLowerCase().includes(searchText.toLowerCase())
+          field && field.toLowerCase().includes(searchText.toLowerCase()),
       );
 
     const matchesStatus =
@@ -185,7 +186,7 @@ export default function UsersPage() {
 
   const handleResendVerification = async (
     userId: string,
-    userEmail: string
+    userEmail: string,
   ) => {
     try {
       await resendVerificationEmail(userEmail);
@@ -289,8 +290,6 @@ export default function UsersPage() {
         </Select>
       </FormControl>
 
-
-
       <Typography
         variant="body2"
         color="text.secondary"
@@ -347,7 +346,7 @@ export default function UsersPage() {
 
   return (
     <MasterPageLayout
-      title="Users Management"
+      title="Users"
       icon={Users}
       actionButtons={actionButtons}
       filterBar={filterBar}
