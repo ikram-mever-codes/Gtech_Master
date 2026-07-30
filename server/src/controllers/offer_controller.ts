@@ -966,7 +966,7 @@ export class OfferController {
           customer.defaultPaymentDueDays !== undefined &&
           customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
-            : undefined,
+            : "7",
         paymentMethod: createOfferDto.paymentMethod,
         shippingMethod: createOfferDto.shippingMethod,
         deliveryTime: createOfferDto.deliveryTime,
@@ -1242,7 +1242,7 @@ export class OfferController {
           customer.defaultPaymentDueDays !== undefined &&
           customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
-            : undefined,
+            : "7",
         shippingMethod: body.shippingMethod,
         isAssembly: false,
         pricingMode,

@@ -2150,10 +2150,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
                           {/* Shipping method — always the last row */}
                           <tr className="bg-gray-100/80">
-                            <td className="px-2 py-2 text-gray-400"></td>
                             <td className="px-2 py-2 text-gray-400">
                               {visibleLineItems.length + 1}
                             </td>
+                            <td className="px-2 py-2 text-gray-400"></td>
+
                             <td className="px-2 py-2 text-gray-400">—</td>
                             <td className="px-2 py-2 text-gray-700">
                               {offer.shippingMethod || "No shipping method set"}
@@ -2549,19 +2550,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         onCommit={(raw) => patch({ discountPercentage: raw })}
                       />
                     </Field> */}
-                    <Field
-                      label="Shipping cost"
-                      edit={edit}
-                      value={formatCurrency(
-                        offer.shippingCost || 0,
-                        offer.currency,
-                      )}
-                    >
-                      <DecimalInput
-                        value={form.shippingCost}
-                        onCommit={(raw) => patch({ shippingCost: raw })}
-                      />
-                    </Field>
                   </div>
                   <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
                     <div className="flex justify-between">

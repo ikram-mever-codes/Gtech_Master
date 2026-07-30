@@ -182,8 +182,8 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
 
         {/* Shipping method — always the last row, same as OfferDetailModal */}
         <tr className="bg-gray-100/80">
-          <td className="px-2 py-2 text-gray-400"></td>
           <td className="px-2 py-2 text-gray-400">{lineItems.length + 1}</td>
+          <td className="px-2 py-2 text-gray-400"></td>
           <td className="px-2 py-2 text-gray-400">—</td>
           <td className="px-2 py-2 text-gray-700">
             {offer.shippingMethod || "No shipping method set"}
