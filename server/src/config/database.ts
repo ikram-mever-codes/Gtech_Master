@@ -48,6 +48,10 @@ import { PaymentMethod } from "../models/payment_methods";
 import { ShippingMethod } from "../models/shipping_methods";
 import { NumberSequence } from "../models/number_sequence";
 
+import { CCICustomer } from "../models/cci_customer";
+import { CCIInvoice } from "../models/cci_invoice";
+import { CCIItem } from "../models/cci_items";
+
 dotenv.config();
 
 export const AppDataSource = new DataSource({
@@ -82,6 +86,9 @@ export const AppDataSource = new DataSource({
     Permission,
     Invoice,
     InvoiceItem,
+    CCICustomer,
+    CCIInvoice,
+    CCIItem,
     DeliveryAddress,
     Parent,
     Item,
