@@ -5,6 +5,7 @@ import { Cargo } from "../models/cargos";
 import { Invoice } from "../models/invoice";
 import { Offer } from "../models/offer";
 import { Order } from "../models/orders";
+import { Inquiry } from "../models/inquiry";
 
 const entityMapping: Record<string, { entity: any; column: string }> = {
   customer: { entity: Customer, column: "customerNumber" },
@@ -16,6 +17,7 @@ const entityMapping: Record<string, { entity: any; column: string }> = {
   invoice: { entity: Invoice, column: "invoiceNumber" },
   invoice_correction: { entity: Invoice, column: "invoiceNumber" },
   delivery_note: { entity: Invoice, column: "invoiceNumber" },
+  inquiry: { entity: Inquiry, column: "inquiryNo" },
 };
 
 export class NumberSequenceService {
@@ -179,6 +181,13 @@ export class NumberSequenceService {
         name: "Commercial Invoice",
         prefix: "CI",
         formatPattern: "{prefix}{yyyy}{mm}-{number}",
+        minDigits: 1,
+      },
+      {
+        sequenceKey: "inquiry",
+        name: "Anfrage",
+        prefix: "AF",
+        formatPattern: "{prefix}{yy}-{number}",
         minDigits: 1,
       },
     ];
