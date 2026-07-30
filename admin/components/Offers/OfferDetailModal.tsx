@@ -1518,12 +1518,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             </div>
 
             <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
-              {/*
-                Fixed layout: the company/delivery address column stays a
-                single column on the left, and the rest of the fields form
-                their own proper grid to the right — instead of a 3-col
-                grid squeezing a whole 3-col sub-grid into a single cell.
-              */}
+             
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
                 <div className="md:col-span-1 flex flex-col gap-3">
                   <div className="block mb-1">
