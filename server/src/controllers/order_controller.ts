@@ -136,6 +136,8 @@ export const createOrder = async (
       });
     }
 
+    const seqKey = "transfer_order";
+
     if (existingOrder) {
       order = existingOrder;
       order.customer_id = customer_id || order.customer_id || null;
@@ -145,11 +147,14 @@ export const createOrder = async (
       order.status = status ?? order.status ?? 1;
       order.updated_at = new Date();
 
-      if (!order.order_no || order.order_no.startsWith("MA")) {
+      if (!order.order_no || !order.order_no.startsWith("DE")) {
         try {
-          order.order_no = await NumberSequenceService.getNextNumber("order");
+          order.order_no = await NumberSequenceService.getNextNumber(seqKey);
         } catch (_) {
-          order.order_no = padorder_no(1);
+          const now = new Date();
+          const yy = String(now.getFullYear()).slice(-2);
+          const mm = String(now.getMonth() + 1).padStart(2, "0");
+          order.order_no = `DE${yy}${mm}-1`;
         }
       }
 
@@ -158,21 +163,12 @@ export const createOrder = async (
     } else {
       let generatedorder_no = "";
       try {
-        generatedorder_no = await NumberSequenceService.getNextNumber("order");
+        generatedorder_no = await NumberSequenceService.getNextNumber(seqKey);
       } catch (e) {
-        const allOrders = await orderRepo
-          .createQueryBuilder("o")
-          .select(["o.order_no"])
-          .getMany();
-
-        let maxNum = 0;
-        for (const ord of allOrders) {
-          const parsed = parseorder_noNumber(ord.order_no);
-          if (parsed !== null && parsed > maxNum) {
-            maxNum = parsed;
-          }
-        }
-        generatedorder_no = padorder_no(maxNum + 1);
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        generatedorder_no = `DE${yy}${mm}-1`;
       }
 
       const now = new Date();
@@ -352,6 +348,23 @@ export const updateOrder = async (
     if (comment !== undefined) order.comment = comment ?? order.comment;
     order.updated_at = new Date();
 
+    const isFulfillmentMove =
+      order.status === 2 ||
+      req.body.is_fulfilled ||
+      (typeof order.comment === "string" &&
+        order.comment.includes("[Moved to Fulfillment]"));
+
+    if (isFulfillmentMove && (!order.order_no || !order.order_no.startsWith("DE"))) {
+      try {
+        order.order_no = await NumberSequenceService.getNextNumber("transfer_order");
+      } catch (_) {
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        order.order_no = `DE${yy}${mm}-1`;
+      }
+    }
+
     await orderRepo.save(order);
 
     if (Array.isArray(items)) {
@@ -507,6 +520,24 @@ export const getAllOrders = async (
     }
 
     const orders = await qb.getMany();
+
+    for (const ord of orders) {
+      if (
+        ord.order_no &&
+        (ord.order_no.startsWith("B") || ord.order_no.startsWith("MA"))
+      ) {
+        const parts = ord.order_no.split("-");
+        const suffix = parts[parts.length - 1];
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const newDeNo = `DE${yy}${mm}-${suffix}`;
+        ord.order_no = newDeNo;
+        try {
+          await orderRepo.update(ord.id, { order_no: newDeNo });
+        } catch (_) {}
+      }
+    }
 
     const itemIds: number[] = [];
     const itemIdDEs: (number | undefined)[] = [];

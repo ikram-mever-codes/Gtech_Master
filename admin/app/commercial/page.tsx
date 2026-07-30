@@ -1682,10 +1682,10 @@ const InvoiceListPage: React.FC = () => {
     } else if (activeInvTab === "bestellung") {
       list = orders.filter(
         (o: any) =>
-          String(o.order_no).startsWith("DE") &&
-          o.status !== 2 &&
-          !o.is_fulfilled &&
-          !(o.comment || "").includes("[Moved to Fulfillment]"),
+          String(o.order_no).startsWith("DE") ||
+          o.status === 2 ||
+          o.is_fulfilled ||
+          (o.comment || "").includes("[Moved to Fulfillment]"),
       );
     } else if (activeInvTab === "rechnung") {
       list = invoices.filter(
