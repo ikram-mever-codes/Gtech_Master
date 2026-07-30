@@ -450,6 +450,106 @@ const CombinedBusinessContactsContent: React.FC = () => {
     loadPaymentAndShippingMethods();
   }, []);
 
+  useEffect(() => {
+    if (!taxProfiles || taxProfiles.length === 0) return;
+
+    const countryCode = (businessForm.country || "").trim().toUpperCase();
+    const vatTaxId = (businessForm.vatTaxId || "").trim();
+    const vatIdStatus = (businessForm.vat_id_status || "").trim();
+
+    let targetCase = "third_country";
+
+    if (countryCode === "DE") {
+      targetCase = "DE-VAT";
+    } else {
+      const matchedCountry = dbCountries.find(
+        (c: any) => (c.iso2 || "").trim().toUpperCase() === countryCode,
+      );
+      const isIgl = Boolean(
+        matchedCountry?.is_igl_country || matchedCountry?.is_eu,
+      );
+
+      if (isIgl) {
+        const isValidStatus =
+          vatIdStatus === "vies_valid" || vatIdStatus === "bzst_qualified_valid";
+        if (vatTaxId && isValidStatus) {
+          targetCase = "EU_IGL";
+        } else {
+          targetCase = "EU_no_valid_VAT_ID";
+        }
+      } else {
+        targetCase = "third_country";
+      }
+    }
+
+    const matchedProfile =
+      taxProfiles.find((tp: any) => {
+        const caseStr = (tp.tax_case || "").toLowerCase();
+        const nameStr = (tp.name || "").toLowerCase();
+        const codeStr = (tp.tax_code || "").toLowerCase();
+        const rateNum = Number(tp.tax_rate ?? tp.rate ?? 0);
+
+        if (targetCase === "DE-VAT") {
+          return (
+            caseStr.includes("de-vat") ||
+            caseStr.includes("de_vat") ||
+            nameStr.includes("de-vat") ||
+            nameStr.includes("standard vat") ||
+            nameStr.includes("de 19") ||
+            codeStr.includes("de") ||
+            rateNum === 19
+          );
+        }
+
+        if (targetCase === "EU_IGL") {
+          return (
+            caseStr.includes("eu_igl") ||
+            caseStr.includes("eu-igl") ||
+            caseStr.includes("igl") ||
+            nameStr.includes("eu_igl") ||
+            nameStr.includes("eu-igl") ||
+            nameStr.includes("igl")
+          );
+        }
+
+        if (targetCase === "EU_no_valid_VAT_ID") {
+          return (
+            caseStr.includes("no_valid") ||
+            caseStr.includes("no valid") ||
+            nameStr.includes("no_valid") ||
+            nameStr.includes("no valid") ||
+            (nameStr.includes("eu") && !nameStr.includes("igl"))
+          );
+        }
+
+        if (targetCase === "third_country") {
+          return (
+            caseStr.includes("third") ||
+            caseStr.includes("drittland") ||
+            caseStr.includes("export") ||
+            nameStr.includes("third") ||
+            nameStr.includes("drittland") ||
+            nameStr.includes("export")
+          );
+        }
+
+        return false;
+      }) || taxProfiles[0];
+
+    if (matchedProfile && matchedProfile.id !== businessForm.default_tax_profile_id) {
+      setBusinessForm((prev: any) => ({
+        ...prev,
+        default_tax_profile_id: matchedProfile.id,
+      }));
+    }
+  }, [
+    businessForm.country,
+    businessForm.vatTaxId,
+    businessForm.vat_id_status,
+    dbCountries,
+    taxProfiles,
+  ]);
+
 
   const filteredBusinesses = useMemo(() => {
     const cn = clientFilters.companyName.trim().toLowerCase();
@@ -2063,6 +2163,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     <div className="col-span-6 md:col-span-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Default Tax Profile
+                        <span className="text-[10px] font-semibold text-emerald-600 ml-1.5">(Auto-assigned by tax rules)</span>
                       </label>
                       <select
                         value={businessForm.default_tax_profile_id || ""}
@@ -2072,13 +2173,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             default_tax_profile_id: e.target.value || "",
                           })
                         }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                        disabled={true}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-gray-100 backdrop-blur-sm rounded-lg cursor-not-allowed text-gray-700 font-medium"
                       >
                         <option value="">None / Not Assigned</option>
                         {taxProfiles.map((tp) => (
                           <option key={tp.id} value={tp.id}>
-                            {tp.name} ({tp.rate}%)
+                            {tp.name} ({tp.tax_rate ?? tp.rate ?? 0}%)
                           </option>
                         ))}
                       </select>
