@@ -1047,16 +1047,44 @@ export class InvoiceController {
         where: { cargo_no: orderNumber },
       });
 
+      if (!cargo && orderNumber) {
+        cargo = await cargoRepository.findOne({
+          where: { cargo_no: Like(`%${orderNumber}%`) },
+        });
+      }
+
       if (cargo) {
-        orderItems = await orderItemRepository.find({
+        const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
           where: { cargo_id: cargo.id },
+        });
+        const orderIdsFromCargo = cargoOrders.map((co) => co.order_id).filter(Boolean);
+
+        const whereConditions: any[] = [{ cargo_id: cargo.id }];
+        if (orderIdsFromCargo.length > 0) {
+          whereConditions.push({ order_id: In(orderIdsFromCargo) });
+        }
+
+        orderItems = await orderItemRepository.find({
+          where: whereConditions,
           relations: ["item", "item.taric", "item.purchasePrices", "order"],
         });
+
+        const itemMap = new Map();
+        orderItems.forEach((oi) => itemMap.set(oi.id, oi));
+        orderItems = Array.from(itemMap.values());
       } else {
         const order = await orderRepository.findOne({
           where: { order_no: orderNumber },
         });
         if (order) {
+          const cargoOrder = await AppDataSource.getRepository(CargoOrder).findOne({
+            where: { order_id: order.id },
+            relations: ["cargo"],
+          });
+          if (cargoOrder?.cargo) {
+            cargo = cargoOrder.cargo;
+          }
+
           orderItems = await orderItemRepository.find({
             where: { order_id: order.id },
             relations: ["item", "item.taric", "item.purchasePrices", "order"],
@@ -1343,14 +1371,34 @@ export class InvoiceController {
         const orderNumber = invoice.orderNumber;
         let orderItems: any[] = [];
 
-        const cargo = await cargoRepository.findOne({
+        let cargo = await cargoRepository.findOne({
           where: { cargo_no: orderNumber },
         });
+        if (!cargo && orderNumber) {
+          cargo = await cargoRepository.findOne({
+            where: { cargo_no: Like(`%${orderNumber}%`) },
+          });
+        }
+
         if (cargo) {
-          orderItems = await orderItemRepository.find({
+          const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
             where: { cargo_id: cargo.id },
+          });
+          const orderIdsFromCargo = cargoOrders.map((co) => co.order_id).filter(Boolean);
+
+          const whereConditions: any[] = [{ cargo_id: cargo.id }];
+          if (orderIdsFromCargo.length > 0) {
+            whereConditions.push({ order_id: In(orderIdsFromCargo) });
+          }
+
+          orderItems = await orderItemRepository.find({
+            where: whereConditions,
             relations: ["item", "item.taric", "order"],
           });
+
+          const itemMap = new Map();
+          orderItems.forEach((oi) => itemMap.set(oi.id, oi));
+          orderItems = Array.from(itemMap.values());
         } else {
           const order = await orderRepository.findOne({
             where: { order_no: orderNumber },

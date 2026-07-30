@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { In } from "typeorm";
+import { In, Like } from "typeorm";
 import PDFDocument from "pdfkit";
 import bwipjs from "bwip-js";
 import path from "path";
@@ -143,7 +143,7 @@ export const createOrder = async (
       });
     }
 
-    const seqKey = "order";
+    const seqKey = "transfer_order";
 
     if (existingOrder) {
       order = existingOrder;
@@ -154,17 +154,14 @@ export const createOrder = async (
       order.status = status ?? order.status ?? 1;
       order.updated_at = new Date();
 
-      if (
-        !order.order_no ||
-        (!order.order_no.startsWith("B") && !order.order_no.startsWith("MA"))
-      ) {
+      if (!order.order_no || !order.order_no.startsWith("DE")) {
         try {
           order.order_no = await NumberSequenceService.getNextNumber(seqKey);
         } catch (_) {
           const now = new Date();
           const yy = String(now.getFullYear()).slice(-2);
           const mm = String(now.getMonth() + 1).padStart(2, "0");
-          order.order_no = `B${yy}${mm}-1`;
+          order.order_no = `DE${yy}${mm}-1`;
         }
       }
 
@@ -178,7 +175,7 @@ export const createOrder = async (
         const now = new Date();
         const yy = String(now.getFullYear()).slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, "0");
-        generatedorder_no = `B${yy}${mm}-1`;
+        generatedorder_no = `DE${yy}${mm}-1`;
       }
 
       const now = new Date();
@@ -536,34 +533,20 @@ export const getAllOrders = async (
     const orders = await qb.getMany();
 
     for (const ord of orders) {
-      if (!ord.order_no) continue;
-      const isFulfilledOrder =
-        ord.status === 2 ||
-        (ord as any).is_fulfilled ||
-        (ord.comment && ord.comment.includes("[Moved to Fulfillment]"));
-
-      const parts = ord.order_no.split("-");
-      const suffix = parts[parts.length - 1];
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(-2);
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-
-      if (isFulfilledOrder) {
-        if (ord.order_no.startsWith("B") || ord.order_no.startsWith("MA")) {
-          const newDeNo = `DE${yy}${mm}-${suffix}`;
-          ord.order_no = newDeNo;
-          try {
-            await orderRepo.update(ord.id, { order_no: newDeNo });
-          } catch (_) {}
-        }
-      } else {
-        if (ord.order_no.startsWith("DE")) {
-          const newBNo = `B${yy}${mm}-${suffix}`;
-          ord.order_no = newBNo;
-          try {
-            await orderRepo.update(ord.id, { order_no: newBNo });
-          } catch (_) {}
-        }
+      if (
+        ord.order_no &&
+        (ord.order_no.startsWith("B") || ord.order_no.startsWith("MA"))
+      ) {
+        const parts = ord.order_no.split("-");
+        const suffix = parts[parts.length - 1];
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const newDeNo = `DE${yy}${mm}-${suffix}`;
+        ord.order_no = newDeNo;
+        try {
+          await orderRepo.update(ord.id, { order_no: newDeNo });
+        } catch (_) {}
       }
     }
 
@@ -1624,7 +1607,7 @@ export const generateCommercialInvoicePDF = async (
         .json({ success: false, message: "Invoice not found" });
     }
 
-    const cargo = await AppDataSource.getRepository(Cargo).findOne({
+    let cargo = await AppDataSource.getRepository(Cargo).findOne({
       where: { cargo_no: invoice.orderNumber },
       relations: [
         "customer",
@@ -1633,13 +1616,40 @@ export const generateCommercialInvoicePDF = async (
       ],
     });
 
+    if (!cargo && invoice.orderNumber) {
+      cargo = await AppDataSource.getRepository(Cargo).findOne({
+        where: { cargo_no: Like(`%${invoice.orderNumber}%`) },
+        relations: [
+          "customer",
+          "customer.businessDetails",
+          "customer.starCustomerDetails",
+        ],
+      });
+    }
+
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
     let rawOrderItems: any[] = [];
     if (cargo) {
-      rawOrderItems = await orderItemRepo.find({
+      const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
         where: { cargo_id: cargo.id },
+      });
+      const orderIdsFromCargo = cargoOrders
+        .map((co) => co.order_id)
+        .filter(Boolean);
+
+      const whereConditions: any[] = [{ cargo_id: cargo.id }];
+      if (orderIdsFromCargo.length > 0) {
+        whereConditions.push({ order_id: In(orderIdsFromCargo) });
+      }
+
+      rawOrderItems = await orderItemRepo.find({
+        where: whereConditions,
         relations: ["item", "item.taric"],
       });
+
+      const itemMap = new Map();
+      rawOrderItems.forEach((oi) => itemMap.set(oi.id, oi));
+      rawOrderItems = Array.from(itemMap.values());
     } else {
       const order = await AppDataSource.getRepository(Order).findOne({
         where: { order_no: invoice.orderNumber },
