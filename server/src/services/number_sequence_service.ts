@@ -149,7 +149,7 @@ export class NumberSequenceService {
     const repo = AppDataSource.getRepository(NumberSequence);
     const defaults = [
       { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
-      { sequenceKey: "order", name: "Auftrag", prefix: "MA", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "order", name: "Auftrag", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
       {

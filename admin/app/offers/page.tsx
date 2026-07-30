@@ -306,10 +306,6 @@ const OffersPage: React.FC<any> = ({
         source_offer_id: offer.id,
       };
       await createOrder(payload as any);
-      toast.success(
-        `Offer ${offer.offerNumber} converted to Auftrag successfully!`,
-        { id: "convert-offer-toast" },
-      );
       const nextCount =
         (offer.conversionCount ||
           (offer.highlightColor === "#ECEAE6" ? 1 : 0)) + 1;
