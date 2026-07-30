@@ -51,13 +51,24 @@ class NumberSequenceService {
                 if (mapping) {
                     const defaultStart = sequenceKey === "customer" ? 83777 : 1;
                     if (sequenceKey === "customer") {
-                        const rawMax = yield manager
+                        const customers = yield manager
                             .getRepository(customers_1.Customer)
                             .createQueryBuilder("c")
-                            .select("MAX(CAST(SUBSTRING(c.customerNumber, 2) AS UNSIGNED))", "maxNum")
+                            .select(["c.customerNumber"])
                             .where("c.customerNumber LIKE 'K%'")
-                            .getRawOne();
-                        const maxNum = (rawMax === null || rawMax === void 0 ? void 0 : rawMax.maxNum) ? parseInt(rawMax.maxNum, 10) : 0;
+                            .getMany();
+                        let maxNum = 0;
+                        for (const cust of customers) {
+                            if (cust.customerNumber) {
+                                const match = cust.customerNumber.match(/\d+/);
+                                if (match) {
+                                    const n = parseInt(match[0], 10);
+                                    if (!isNaN(n) && n > maxNum) {
+                                        maxNum = n;
+                                    }
+                                }
+                            }
+                        }
                         runningNo = Math.max(defaultStart, maxNum + 1);
                     }
                     else {

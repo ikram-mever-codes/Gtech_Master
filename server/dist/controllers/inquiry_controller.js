@@ -152,15 +152,20 @@ class ItemGenerator {
     static generateTaricCode() {
         return __awaiter(this, void 0, void 0, function* () {
             const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
-            const highestTaric = yield taricRepository
+            const taricList = yield taricRepository
                 .createQueryBuilder("taric")
-                .select("MAX(CAST(taric.code AS UNSIGNED))", "maxCode")
-                .where("taric.code REGEXP :regex", { regex: "^[0-9]+$" })
-                .getRawOne();
-            let nextCode = 1;
-            if (highestTaric === null || highestTaric === void 0 ? void 0 : highestTaric.maxCode) {
-                nextCode = parseInt(highestTaric.maxCode) + 1;
+                .select(["taric.code"])
+                .getMany();
+            let maxCode = 0;
+            for (const t of taricList) {
+                if (t.code && /^\d+$/.test(t.code)) {
+                    const num = parseInt(t.code, 10);
+                    if (!isNaN(num) && num > maxCode) {
+                        maxCode = num;
+                    }
+                }
             }
+            const nextCode = maxCode + 1;
             return nextCode.toString().padStart(11, "0");
         });
     }

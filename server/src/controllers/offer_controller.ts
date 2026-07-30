@@ -32,16 +32,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -52,7 +52,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -675,19 +675,25 @@ export class OfferController {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
 
-    const result = await this.offerRepository
+    const pattern = `OFF-${year}${month}-%`;
+    const offers = await this.offerRepository
       .createQueryBuilder("offer")
-      .select(
-        "MAX(CAST(SUBSTRING_INDEX(offer.offerNumber, '-', -1) AS UNSIGNED))",
-        "maxSeq",
-      )
-      .where("offer.offerNumber LIKE :pattern", {
-        pattern: `OFF-${year}${month}-%`,
-      })
-      .getRawOne();
+      .select(["offer.offerNumber"])
+      .where("offer.offerNumber LIKE :pattern", { pattern })
+      .getMany();
 
-    const sequence = result?.maxSeq ? parseInt(result.maxSeq) + 1 : 1;
+    let maxSeq = 0;
+    for (const off of offers) {
+      if (off.offerNumber) {
+        const parts = off.offerNumber.split("-");
+        const num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    }
 
+    const sequence = maxSeq + 1;
     return `OFF-${year}${month}-${sequence}`;
   }
 
@@ -912,9 +918,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-                createOfferDto.defaultPriceMatrix,
-                createOfferDto.totalPriceDecimalPlaces || 2,
-              )
+              createOfferDto.defaultPriceMatrix,
+              createOfferDto.totalPriceDecimalPlaces || 2,
+            )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -2471,10 +2477,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                    totalPriceDecimalPlaces,
-                  ),
-                );
+                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                  totalPriceDecimalPlaces,
+                ),
+              );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -2684,11 +2690,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-                ...tpl,
-                price: match.price,
-                total: match.total,
-                isActive: match.isActive,
-              }
+              ...tpl,
+              price: match.price,
+              total: match.total,
+              isActive: match.isActive,
+            }
             : { ...tpl };
         });
 
@@ -3064,11 +3070,10 @@ export class OfferController {
         addrY += 12;
       }
 
-      // Render dynamic Document Title at x_Document_Title SVG location
       const docTitleText = offer.title
         ? `Angebot ${offer.offerNumber || ""}: ${offer.title}`
         : `Angebot ${offer.offerNumber || ""}`;
-      doc.font(SB).fontSize(14).fillColor("#2F6B46").text(docTitleText, MM(100), MM(65), {
+      doc.font(SB).fontSize(13).fillColor("#2F6B46").text(docTitleText, MM(100), MM(36), {
         align: "right",
         width: MM(92),
         lineBreak: false,
@@ -3087,20 +3092,16 @@ export class OfferController {
         [
           "Kundennr.",
           offer.inquiry?.customer?.customerNumber ||
-            customer.customerNumber ||
-            "—",
+          customer.customerNumber ||
+          "—",
         ],
       ];
 
       const titleBoxX = MM(125);
-      const titleBoxY = MM(48);
-      const titleBoxW = MM(67);
-      const titleBoxH = 22;
-
-      let infoY = titleBoxY + titleBoxH + 8;
+      let infoY = MM(48);
       const LABEL_W = MM(32);
       const VALUE_X = titleBoxX + LABEL_W + 4;
-      const VALUE_W = titleBoxW - LABEL_W - 4;
+      const VALUE_W = MM(67) - LABEL_W - 4;
 
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {

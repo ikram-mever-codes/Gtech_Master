@@ -742,14 +742,23 @@ class OfferController {
             const date = new Date();
             const year = date.getFullYear();
             const month = (date.getMonth() + 1).toString().padStart(2, "0");
-            const result = yield this.offerRepository
+            const pattern = `OFF-${year}${month}-%`;
+            const offers = yield this.offerRepository
                 .createQueryBuilder("offer")
-                .select("MAX(CAST(SUBSTRING_INDEX(offer.offerNumber, '-', -1) AS UNSIGNED))", "maxSeq")
-                .where("offer.offerNumber LIKE :pattern", {
-                pattern: `OFF-${year}${month}-%`,
-            })
-                .getRawOne();
-            const sequence = (result === null || result === void 0 ? void 0 : result.maxSeq) ? parseInt(result.maxSeq) + 1 : 1;
+                .select(["offer.offerNumber"])
+                .where("offer.offerNumber LIKE :pattern", { pattern })
+                .getMany();
+            let maxSeq = 0;
+            for (const off of offers) {
+                if (off.offerNumber) {
+                    const parts = off.offerNumber.split("-");
+                    const num = parseInt(parts[parts.length - 1], 10);
+                    if (!isNaN(num) && num > maxSeq) {
+                        maxSeq = num;
+                    }
+                }
+            }
+            const sequence = maxSeq + 1;
             return `OFF-${year}${month}-${sequence}`;
         });
     }
@@ -2776,11 +2785,10 @@ class OfferController {
                     });
                     addrY += 12;
                 }
-                // Render dynamic Document Title at x_Document_Title SVG location
                 const docTitleText = offer.title
                     ? `Angebot ${offer.offerNumber || ""}: ${offer.title}`
                     : `Angebot ${offer.offerNumber || ""}`;
-                doc.font(SB).fontSize(14).fillColor("#2F6B46").text(docTitleText, MM(100), MM(65), {
+                doc.font(SB).fontSize(13).fillColor("#2F6B46").text(docTitleText, MM(100), MM(36), {
                     align: "right",
                     width: MM(92),
                     lineBreak: false,
@@ -2802,13 +2810,10 @@ class OfferController {
                     ],
                 ];
                 const titleBoxX = MM(125);
-                const titleBoxY = MM(48);
-                const titleBoxW = MM(67);
-                const titleBoxH = 22;
-                let infoY = titleBoxY + titleBoxH + 8;
+                let infoY = MM(48);
                 const LABEL_W = MM(32);
                 const VALUE_X = titleBoxX + LABEL_W + 4;
-                const VALUE_W = titleBoxW - LABEL_W - 4;
+                const VALUE_W = MM(67) - LABEL_W - 4;
                 doc.fontSize(8.5).fillColor("#3F4446");
                 infoItems.forEach(([label, value]) => {
                     if (!label && !value) {

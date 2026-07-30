@@ -105,16 +105,22 @@ export class ItemGenerator {
   static async generateTaricCode(): Promise<string> {
     const taricRepository = AppDataSource.getRepository(Taric);
 
-    const highestTaric = await taricRepository
+    const taricList = await taricRepository
       .createQueryBuilder("taric")
-      .select("MAX(CAST(taric.code AS UNSIGNED))", "maxCode")
-      .where("taric.code REGEXP :regex", { regex: "^[0-9]+$" })
-      .getRawOne();
+      .select(["taric.code"])
+      .getMany();
 
-    let nextCode = 1;
-    if (highestTaric?.maxCode) {
-      nextCode = parseInt(highestTaric.maxCode) + 1;
+    let maxCode = 0;
+    for (const t of taricList) {
+      if (t.code && /^\d+$/.test(t.code)) {
+        const num = parseInt(t.code, 10);
+        if (!isNaN(num) && num > maxCode) {
+          maxCode = num;
+        }
+      }
     }
+
+    const nextCode = maxCode + 1;
 
     return nextCode.toString().padStart(11, "0");
   }
