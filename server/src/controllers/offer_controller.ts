@@ -516,6 +516,10 @@ export class PasteMatrixDto {
 export class DeliveryAddressDto {
   @IsOptional()
   @IsString()
+  addressName?: string;
+
+  @IsOptional()
+  @IsString()
   street?: string;
 
   @IsOptional()
@@ -1373,6 +1377,7 @@ export class OfferController {
 
     if (defaultAddress) {
       return {
+        addressName: defaultAddress.name,
         street: defaultAddress.street,
         city: defaultAddress.city,
         postalCode: defaultAddress.postal_code,
@@ -1383,7 +1388,6 @@ export class OfferController {
       };
     }
 
-    // Fallback when the customer has no default shipping address
     return {
       street: "Street Address",
       city: customer.city,

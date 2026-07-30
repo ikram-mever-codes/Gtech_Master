@@ -137,6 +137,7 @@ export class Offer {
 
   @Column({ type: "json", nullable: true })
   deliveryAddress?: {
+    addressName?: string;
     street?: string;
     city?: string;
     state?: string;

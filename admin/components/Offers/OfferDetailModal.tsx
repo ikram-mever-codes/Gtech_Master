@@ -449,6 +449,11 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
 
   return (
     <div className="space-y-1 text-sm text-gray-700">
+      {addr.addressName && (
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          {addr.addressName}
+        </div>
+      )}
       {addr.legalName && addr.legalName !== addr.companyName && (
         <div>{addr.legalName}</div>
       )}
@@ -560,9 +565,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   // Saved shipping addresses for the offer's customer, used by the
   // delivery-address dropdown below (only fetched once editing starts).
-  const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
+  const [shippingAddresses, setShippingAddresses] = useState<
+    CustomerShippingAddress[]
+  >([]);
+  // "__same__" = use billing address; otherwise a CompanyShippingAddress id.
   const [selectedShippingAddressId, setSelectedShippingAddressId] =
-    useState("");
+    useState("__same__");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -723,7 +731,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   useEffect(() => {
     if (!edit || !offer?.customerId) {
       setShippingAddresses([]);
-      setSelectedShippingAddressId("");
       return;
     }
     getCustomerShippingAddresses(offer.customerId)
@@ -791,14 +798,50 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   const cPatch = (p: any) => setCreateForm((f: any) => ({ ...f, ...p }));
 
-  // Applies a saved shipping address (picked from the dropdown) onto the
-  // in-progress delivery address form.
-  const applyShippingAddress = (addressId: string) => {
-    setSelectedShippingAddressId(addressId);
-    const addr = shippingAddresses.find((a: any) => a.id === addressId);
+  // Called from the header's edit toggle. Seeds the dropdown selection from
+  // the offer's current state so it starts on the right option.
+  const handleStartEdit = () => {
+    setSelectedShippingAddressId(
+      isDeliverySameAsBilling(offer?.deliveryAddress, offer?.customerSnapshot)
+        ? "__same__"
+        : "__custom__",
+    );
+    setEdit(true);
+  };
+
+  // Single handler for the delivery-address dropdown. "__same__" reverts to
+  // the billing address; any other value is a saved shipping address id.
+  // Only updates local form state — nothing is persisted until "Save
+  // changes" (handleSave -> updateOffer) is clicked.
+  const handleDeliveryAddressSelect = (value: string) => {
+    setSelectedShippingAddressId(value);
+
+    if (value === "__same__") {
+      patch({
+        deliveryAddress: {
+          addressName: "",
+          contactName:
+            offer.customerSnapshot?.legalName ||
+            offer.customerSnapshot?.companyName ||
+            "",
+          street:
+            offer.customerSnapshot?.address ||
+            offer.customerSnapshot?.street ||
+            "",
+          postalCode: offer.customerSnapshot?.postalCode || "",
+          city: offer.customerSnapshot?.city || "",
+          country: offer.customerSnapshot?.country || "",
+          contactPhone: offer.customerSnapshot?.contactPhoneNumber || "",
+        },
+      });
+      return;
+    }
+
+    const addr = shippingAddresses.find((a: any) => a.id === value);
     if (!addr) return;
     patch({
       deliveryAddress: {
+        addressName: addr.name,
         contactName:
           offer.customerSnapshot?.legalName ||
           offer.customerSnapshot?.companyName ||
@@ -980,6 +1023,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setEdit(false);
     setShowCopyPaste(false);
     setShowItemPicker(false);
+    setSelectedShippingAddressId("__same__");
   };
 
   const handleDelete = async () => {
@@ -1261,6 +1305,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const deliverySameAsBilling = offer
     ? isDeliverySameAsBilling(currentDeliveryAddress, offer.customerSnapshot)
     : true;
+  const showAsSame = edit
+    ? selectedShippingAddressId === "__same__"
+    : deliverySameAsBilling;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -1642,7 +1689,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 />
                 <ViewEditToggle
                   isEditEnabled={edit}
-                  onToggle={() => (edit ? handleCancelEdit() : setEdit(true))}
+                  onToggle={() =>
+                    edit ? handleCancelEdit() : handleStartEdit()
+                  }
                   disabled={saving}
                 />
                 <button
@@ -1675,22 +1724,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
 
                   <div className="block mb-1">
-                    {!deliverySameAsBilling && (
-                      <span className="text-sm font-bold text-gray-900">
-                        Delivery:
-                      </span>
-                    )}
+                    <span className="text-sm font-bold text-gray-900">
+                      Delivery:
+                    </span>
 
-                    {edit && !deliverySameAsBilling && (
+                    {edit && (
                       <select
-                        className={`${inputCls} mb-2`}
+                        className={`${inputCls} mt-1 mb-2`}
                         value={selectedShippingAddressId}
-                        onChange={(e) => applyShippingAddress(e.target.value)}
+                        onChange={(e) =>
+                          handleDeliveryAddressSelect(e.target.value)
+                        }
                       >
-                        <option value="">
-                          {shippingAddresses.length > 0
-                            ? "Select a saved shipping address…"
-                            : "No saved shipping addresses"}
+                        <option value="__same__">
+                          Same as billing address
                         </option>
                         {shippingAddresses.map((a) => (
                           <option key={a.id} value={a.id}>
@@ -1700,13 +1747,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         ))}
                       </select>
                     )}
-                    {deliverySameAsBilling ? (
+
+                    {showAsSame ? (
                       <div className="text-sm text-gray-500">
                         Delivery Address is Same
                       </div>
                     ) : (
                       <AddressBlock
                         addr={{
+                          addressName: currentDeliveryAddress?.addressName,
                           companyName:
                             currentDeliveryAddress?.companyName ||
                             currentDeliveryAddress?.contactName,
