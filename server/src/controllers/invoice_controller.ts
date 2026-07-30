@@ -1038,6 +1038,8 @@ export class InvoiceController {
       }
 
       const orderNumber = invoice.orderNumber || "";
+      console.log(`🔍 [EXPANDED_INVOICE_LOG] Fetching details for Invoice ID: ${id}, OrderNumber: "${orderNumber}"`);
+
       let orderItems: any[] = [];
       let cargo: any = null;
 
@@ -1065,6 +1067,12 @@ export class InvoiceController {
         }
       }
 
+      if (cargo) {
+        console.log(`✅ [EXPANDED_INVOICE_LOG] Cargo Matched -> ID: ${cargo.id}, cargo_no: "${cargo.cargo_no}"`);
+      } else {
+        console.log(`⚠️ [EXPANDED_INVOICE_LOG] No Cargo Matched for OrderNumber: "${orderNumber}"`);
+      }
+
       // 2. Collect orderItems from Cargo (via cargo_orders, direct cargo_id, or linked orders)
       if (cargo) {
         const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
@@ -1088,6 +1096,7 @@ export class InvoiceController {
           where: whereConditions,
           relations: ["item", "item.taric", "item.purchasePrices", "order"],
         });
+        console.log(`📦 [EXPANDED_INVOICE_LOG] Found ${orderItems.length} items via Cargo ID ${cargo.id}`);
       }
 
       // 3. Fallback: Search Order by orderNumber or sub-tokens if no orderItems found yet
@@ -1113,6 +1122,7 @@ export class InvoiceController {
             where: { order_id: In(matchingOrderIds) },
             relations: ["item", "item.taric", "item.purchasePrices", "order"],
           });
+          console.log(`📦 [EXPANDED_INVOICE_LOG] Found ${orderItems.length} items via Order Numbers matching tokens`);
         }
       }
 
@@ -1125,6 +1135,7 @@ export class InvoiceController {
 
       // 5. Ultimate Fallback: Convert invoice.items (InvoiceItem table) if orderItems is still empty
       if (orderItems.length === 0 && invoice.items && invoice.items.length > 0) {
+        console.log(`🚨 [EXPANDED_INVOICE_LOG] Triggering Ultimate Fallback! Converting ${invoice.items.length} direct invoice.items`);
         orderItems = invoice.items.map((invItem: any) => ({
           id: invItem.id,
           qty: Number(invItem.quantity || 0),
@@ -1139,6 +1150,8 @@ export class InvoiceController {
           set_taric_code: null,
         }));
       }
+
+      console.log(`🎉 [EXPANDED_INVOICE_LOG] Total items ready to map: ${orderItems.length}`);
 
       const getEffectiveTaricCode = (oi: any): string => {
         const itemTaricCode = oi.item?.taric?.code || "";
