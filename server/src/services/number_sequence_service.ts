@@ -34,33 +34,56 @@ export class NumberSequenceService {
         throw new Error(`Number sequence "${sequenceKey}" is not active`);
       }
 
+      if (sequenceKey === "customer") {
+        sequence.minDigits = 1;
+      }
+
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
       if (mapping) {
-        const maxRecord = await manager.getRepository(mapping.entity)
-          .createQueryBuilder("entity")
-          .orderBy(`entity.${mapping.column}`, "DESC")
-          .getOne();
-
         const defaultStart = sequenceKey === "customer" ? 83777 : 1;
 
-        if (!maxRecord) {
-          runningNo = defaultStart;
+        if (sequenceKey === "customer") {
+          const rawMax = await manager
+            .getRepository(Customer)
+            .createQueryBuilder("c")
+            .select(
+              "MAX(CAST(SUBSTRING(c.customerNumber, 2) AS UNSIGNED))",
+              "maxNum",
+            )
+            .where("c.customerNumber LIKE 'K%'")
+            .getRawOne();
+
+          const maxNum = rawMax?.maxNum ? parseInt(rawMax.maxNum, 10) : 0;
+          runningNo = Math.max(defaultStart, maxNum + 1);
         } else {
-          const maxVal = maxRecord[mapping.column];
-          const match = String(maxVal).match(/\d+$/);
-          if (match) {
-            let maxNum = parseInt(match[0], 10);
+          const maxRecord = await manager
+            .getRepository(mapping.entity)
+            .createQueryBuilder("entity")
+            .orderBy(`entity.${mapping.column}`, "DESC")
+            .getOne();
 
-            if (sequenceKey === "closed_ci" && match[0].length > sequence.minDigits) {
-              const suffix = match[0].slice(-sequence.minDigits);
-              maxNum = parseInt(suffix, 10);
-            }
+          if (!maxRecord) {
+            runningNo = defaultStart;
+          } else {
+            const maxVal = maxRecord[mapping.column];
+            const match = String(maxVal).match(/\d+$/);
+            if (match) {
+              let maxNum = parseInt(match[0], 10);
 
-            const nextAligned = maxNum + 1;
-            if (runningNo > nextAligned) {
-              runningNo = Math.max(defaultStart, nextAligned);
+              if (
+                sequenceKey === "closed_ci" &&
+                match[0].length > sequence.minDigits
+              ) {
+                const suffix = match[0].slice(-sequence.minDigits);
+                maxNum = parseInt(suffix, 10);
+              }
+
+              const nextAligned = maxNum + 1;
+              if (runningNo > nextAligned) {
+                runningNo = Math.max(defaultStart, nextAligned);
+              }
             }
           }
         }
@@ -133,7 +156,7 @@ export class NumberSequenceService {
         name: "Kunde",
         prefix: "K",
         formatPattern: "{prefix}{number}",
-        minDigits: 6,
+        minDigits: 1,
       },
       {
         sequenceKey: "cargo",
@@ -160,8 +183,11 @@ export class NumberSequenceService {
         await repo.save(
           repo.create({ ...def, minDigits: def.minDigits, nextRunningNo: startNo }),
         );
-      } else if (def.sequenceKey === "customer" && exists.nextRunningNo < 83777) {
-        exists.nextRunningNo = 83777;
+      } else if (def.sequenceKey === "customer") {
+        exists.minDigits = 1;
+        if (exists.nextRunningNo < 83777) {
+          exists.nextRunningNo = 83777;
+        }
         await repo.save(exists);
       }
     }
