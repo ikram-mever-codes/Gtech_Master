@@ -1959,11 +1959,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       <table className="w-full text-sm">
                         <thead className="bg-gray-100 border-b border-gray-200">
                           <tr>
-                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
-                              Pic
-                            </th>
                             <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
                               Pos
+                            </th>
+                            <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
+                              Pic
                             </th>
                             <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
                               Art.-Nr.
@@ -2021,6 +2021,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     : undefined
                                 }
                               >
+                                <td className="px-2 py-2 text-gray-500">
+                                  {item.position}
+                                </td>
                                 <td className="px-2 py-2">
                                   <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
                                     {thumb ? (
@@ -2040,9 +2043,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                       </span>
                                     )}
                                   </div>
-                                </td>
-                                <td className="px-2 py-2 text-gray-500">
-                                  {item.position}
                                 </td>
                                 <td className="px-2 py-2">
                                   {edit ? (
