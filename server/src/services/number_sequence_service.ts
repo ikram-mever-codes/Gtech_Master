@@ -38,6 +38,11 @@ export class NumberSequenceService {
       if (sequenceKey === "customer") {
         sequence.minDigits = 1;
       }
+      if (sequenceKey === "order") {
+        sequence.prefix = "B";
+        sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
+        sequence.minDigits = 1;
+      }
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
@@ -65,6 +70,26 @@ export class NumberSequenceService {
             }
           }
           runningNo = Math.max(defaultStart, maxNum + 1);
+        } else if (sequenceKey === "order") {
+          const orders = await manager
+            .getRepository(Order)
+            .createQueryBuilder("o")
+            .select(["o.order_no"])
+            .where("o.order_no LIKE 'B%'")
+            .getMany();
+
+          let maxNum = 0;
+          for (const ord of orders) {
+            if (ord.order_no) {
+              const parts = String(ord.order_no).split("-");
+              const lastPart = parts[parts.length - 1];
+              const parsed = parseInt(lastPart, 10);
+              if (!isNaN(parsed) && parsed > maxNum) {
+                maxNum = parsed;
+              }
+            }
+          }
+          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
         } else {
           const allRecords = await manager
             .getRepository(mapping.entity)
