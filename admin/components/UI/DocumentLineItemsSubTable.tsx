@@ -15,10 +15,12 @@ export interface DocumentLineItem {
   baseQuantity?: number | string;
   price?: number | string;
   unitPrice?: number | string;
+  basePrice?: number | string;
   rmb_price?: number | string;
   rmb_special_price?: number | string;
   total?: number | string;
   totalPrice?: number | string;
+  lineTotal?: number | string;
   supplier_name?: string;
   supplier_id?: number | string;
   status?: string;
@@ -95,12 +97,17 @@ export const DocumentLineItemsSubTable: React.FC<
                   it.unitPrices?.find((up: any) => up.isActive) ||
                   it.quantityPrices?.find((qp: any) => qp.isActive);
 
+                // FIX: offer line items store their per-unit price under
+                // `basePrice` (see the offer create/update controllers),
+                // which wasn't being read here at all — falling straight
+                // through to 0. Added it into the fallback chain.
                 const uPrice = Number(
                   activePrice?.unitPrice ??
                     activePrice?.price ??
                     it.rmb_special_price ??
                     it.rmb_price ??
                     it.unitPrice ??
+                    it.basePrice ??
                     it.price ??
                     0,
                 );
@@ -113,11 +120,17 @@ export const DocumentLineItemsSubTable: React.FC<
                     1,
                 );
 
+                // FIX: this previously read `item.totalPrice` — `item` was
+                // never defined in this scope (the map variable is `it`),
+                // so this threw a ReferenceError on every render whenever
+                // a document had line items, crashing the whole table
+                // (which is why nothing, including price, was rendering).
+                // Now reads the line item's own total if present
+                // (`lineTotal` for offers, `totalPrice`/`total` for
+                // orders/invoices), falling back to a computed
+                // price × quantity if no stored total exists.
                 const tPrice = Number(
-                  activePrice?.totalPrice ??
-                    it.total ??
-                    it.totalPrice ??
-                    uPrice * qtyVal,
+                  it.lineTotal ?? it.totalPrice ?? it.total ?? uPrice * qtyVal,
                 );
 
                 const sname =

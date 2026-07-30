@@ -15,13 +15,17 @@ import {
   ChevronRight,
   ChevronDown,
   Filter,
+  MoveRight,
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
+import { toast } from "react-hot-toast";
+import { createOrder } from "@/api/orders";
 import {
   getAllOffers,
+  updateOffer,
   formatCurrency,
   getOfferStatuses,
   getOfferStatusColor,
@@ -55,7 +59,12 @@ const getContrastTextColor = (hex: string): string => {
   return luminance > 0.6 ? "#111827" : "#ffffff";
 };
 
-const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
+const OffersPage: React.FC<any> = ({
+  embedded = false,
+  docFilters,
+  onOrderConverted,
+  refreshTrigger,
+}) => {
   const { user } = useSelector((state: RootState) => state.user);
 
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -106,7 +115,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
 
   useEffect(() => {
     fetchOffers();
-  }, [fetchOffers]);
+  }, [fetchOffers, refreshTrigger]);
 
   const openCreate = () => {
     setDetailOfferId(null);
@@ -115,6 +124,75 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
   const openDetail = (offer: Offer) => {
     setDetailOfferId(offer.id);
     setShowDetail(true);
+  };
+  const handleConvertOfferToAuftrag = async (
+    offer: any,
+    e?: React.MouseEvent,
+  ) => {
+    if (e) e.stopPropagation();
+
+    if (offer.highlightColor === "#ECEAE6") {
+      toast.error(
+        `Offer ${offer.offerNumber} has already been converted to Auftrag.`,
+        {
+          id: "convert-offer-toast",
+          duration: 4000,
+        },
+      );
+      return;
+    }
+
+    try {
+      toast.loading(`Converting Offer ${offer.offerNumber} to Auftrag...`, {
+        id: "convert-offer-toast",
+      });
+      const lineItems =
+        offer.lineItems?.filter((li: any) => !li.isComponent) || [];
+      const validItems = lineItems
+        .map((x: any) => {
+          const rawId = x.sourceItemId || x.itemId || x.item_id || x.id;
+          const numericId =
+            rawId !== null && rawId !== undefined ? Number(rawId) : NaN;
+          if (!Number.isFinite(numericId) || numericId <= 0) return null;
+          return {
+            item_id: numericId,
+            qty: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
+            price: Number(x.basePrice || x.unitPrice || x.price || 0),
+            remark_de: x.notes || x.description || x.itemName || null,
+          };
+        })
+        .filter(Boolean);
+
+      if (validItems.length === 0) {
+        toast.error(
+          `Cannot convert "${offer.offerNumber}": none of the line items are linked to a catalog item. Please ensure items have a valid sourceItemId.`,
+          { id: "convert-offer-toast", duration: 6000 },
+        );
+        return;
+      }
+
+      const payload = {
+        customer_id: offer.customer_id || offer.customerSnapshot?.id || null,
+        comment: `Converted from Offer ${offer.offerNumber}${offer.discountAmount ? ` [Discount: €${offer.discountAmount}]` : offer.discountPercentage ? ` [Discount: ${offer.discountPercentage}%]` : ""}`,
+        status: 1,
+        items: validItems,
+        source_offer_id: offer.id,
+      };
+      await createOrder(payload as any);
+      try {
+        await updateOffer(offer.id, { highlightColor: "#ECEAE6" });
+      } catch (_) {}
+      toast.success(`Offer ${offer.offerNumber} converted to Auftrag!`, {
+        id: "convert-offer-toast",
+      });
+      fetchOffers();
+      onOrderConverted?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to convert offer to Auftrag", {
+        id: "convert-offer-toast",
+      });
+    }
   };
 
   const displayOffers = React.useMemo(() => {
@@ -538,6 +616,7 @@ const OffersPage: React.FC<any> = ({ embedded = false, docFilters }) => {
           onClose={() => {
             setShowDetail(false);
             setDetailOfferId(null);
+            fetchOffers();
           }}
           onChanged={fetchOffers}
           userRole={user?.role}

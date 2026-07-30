@@ -70,17 +70,19 @@ const CustomButton = ({
         : "50px",
 
     ...(ownerState.variant === "contained" && {
+      backgroundColor: ownerState.color === "primary" ? "#2F6B46" : undefined,
       ...(ownerState.gradient && {
         background: `linear-gradient(135deg, ${
-          theme.palette[ownerState.color].main
-        } 0%, ${theme.palette[ownerState.color].dark} 100%)`,
+          theme.palette[ownerState.color]?.main || "#2F6B46"
+        } 0%, ${theme.palette[ownerState.color]?.dark || "#255638"} 100%)`,
         "&:hover": {
           background: `linear-gradient(135deg, ${
-            theme.palette[ownerState.color].dark
-          } 0%, ${theme.palette[ownerState.color].main} 100%)`,
+            theme.palette[ownerState.color]?.dark || "#255638"
+          } 0%, ${theme.palette[ownerState.color]?.main || "#2F6B46"} 100%)`,
         },
       }),
       "&:hover": {
+        backgroundColor: ownerState.color === "primary" ? "#255638" : undefined,
         ...(ownerState.hoverEffect === "scale" && {
           transform: "scale(1.03)",
         }),

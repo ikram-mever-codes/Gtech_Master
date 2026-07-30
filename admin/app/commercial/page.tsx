@@ -94,6 +94,7 @@ import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
+import { UserRole } from "@/utils/interfaces";
 import {
   CommercialFilters,
   initialCommercialFilters,
@@ -220,6 +221,7 @@ const InvoiceListPage: React.FC = () => {
   );
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const [offerRefreshKey, setOfferRefreshKey] = useState(0);
 
   const handleOpenOfferModal = (id: string | null = null) => {
     setSelectedOfferId(id);
@@ -549,6 +551,22 @@ const InvoiceListPage: React.FC = () => {
     setOrderItems((prev) =>
       prev.map((x) => (x.item_id === item_id ? { ...x, remark_de } : x)),
     );
+  };
+
+  const handleMoveToFulfillment = async (order: any) => {
+    try {
+      toast.loading(`Moving order ${order.order_no} to Fulfillment...`, { id: "fulfill-order-toast" });
+      await updateOrder(order.id, {
+        status: 2,
+        comment: `${order.comment || ""} [Moved to Fulfillment]`.trim(),
+        is_fulfilled: true,
+      } as any);
+      toast.success(`Order ${order.order_no} moved to Fulfillment!`, { id: "fulfill-order-toast" });
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to move order to Fulfillment", { id: "fulfill-order-toast" });
+    }
   };
 
   const handleEditOrder = async (order: any) => {
@@ -1318,6 +1336,7 @@ const InvoiceListPage: React.FC = () => {
       loadInvoices();
     } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
       fetchAllItems();
+      fetchOrders();
     }
   }, [activeInvTab]);
 
@@ -1651,9 +1670,21 @@ const InvoiceListPage: React.FC = () => {
     if (activeInvTab === "angebot") {
       list = offers || [];
     } else if (activeInvTab === "auftrag") {
-      list = orders.filter((o: any) => String(o.order_no).startsWith("MA"));
+      list = orders.filter(
+        (o: any) =>
+          String(o.order_no).startsWith("MA") &&
+          o.status !== 2 &&
+          !o.is_fulfilled &&
+          !(o.comment || "").includes("[Moved to Fulfillment]")
+      );
     } else if (activeInvTab === "bestellung") {
-      list = orders.filter((o: any) => !String(o.order_no).startsWith("MA"));
+      list = orders.filter(
+        (o: any) =>
+          !String(o.order_no).startsWith("MA") &&
+          o.status !== 2 &&
+          !o.is_fulfilled &&
+          !(o.comment || "").includes("[Moved to Fulfillment]")
+      );
     } else if (activeInvTab === "rechnung") {
       list = invoices.filter(
         (inv: any) => inv.status !== "paid" && inv.status !== "cancelled",
@@ -1716,7 +1747,6 @@ const InvoiceListPage: React.FC = () => {
     } = docFilters;
 
     return list.filter((item: any) => {
-      // 1. DocumentNo
       if (documentNo.trim()) {
         const s = documentNo.toLowerCase().trim();
         const docNo = String(
@@ -1729,7 +1759,6 @@ const InvoiceListPage: React.FC = () => {
         if (!docNo.includes(s)) return false;
       }
 
-      // 2. CustomerNo
       if (customerNo.trim()) {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
@@ -1743,7 +1772,6 @@ const InvoiceListPage: React.FC = () => {
         if (!cNo.includes(s)) return false;
       }
 
-      // 3. CustomerName
       if (customerName.trim()) {
         const s = customerName.toLowerCase().trim();
         const cName = String(
@@ -1758,7 +1786,6 @@ const InvoiceListPage: React.FC = () => {
         if (!cName.includes(s)) return false;
       }
 
-      // 4. Value
       if (valueAmount.trim()) {
         let val = 0;
         if (activeInvTab === "angebot") {
@@ -1778,13 +1805,11 @@ const InvoiceListPage: React.FC = () => {
         if (!isValueMatching(val, valueOperator, valueAmount)) return false;
       }
 
-      // 5. Status
       if (status) {
         const itemStatus = String(item.status || "").toLowerCase();
         if (itemStatus !== status.toLowerCase()) return false;
       }
 
-      // 6. Date Created
       if (datePreset && datePreset !== "all") {
         const docDate =
           item.createdAt ||
@@ -2076,37 +2101,32 @@ const InvoiceListPage: React.FC = () => {
                     e.stopPropagation();
                     handleOpenOfferModal(row.id);
                   }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
                 >
                   Edit
                 </button>
               </div>
             );
+<<<<<<< HEAD
           } else if (
             activeInvTab === "auftrag" ||
             activeInvTab === "bestellung"
           ) {
             const hasCargo = !!row.cargo_id;
+=======
+          } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
+>>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
             return (
-              <div className="flex items-center justify-center gap-1.5 font-poppins">
+              <div className="flex items-center justify-center font-poppins">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenReassignModal(row);
+                    handleMoveToFulfillment(row);
                   }}
-                  title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
-                  className="px-1.5 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-0.5"
+                  title="Send / Move to Fulfillment"
+                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md flex items-center gap-1"
                 >
-                  <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditOrder(row);
-                  }}
-                  className="px-1.5 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
-                >
-                  Edit
+                  <MoveRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             );
@@ -2118,7 +2138,7 @@ const InvoiceListPage: React.FC = () => {
                     e.stopPropagation();
                     handleOpenInvoiceDetails(row);
                   }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
                 >
                   View
                 </button>
@@ -2475,15 +2495,49 @@ const InvoiceListPage: React.FC = () => {
         </div>
 
         {activeInvTab === "angebot" && (
-          <OffersPage embedded={true} docFilters={docFilters} />
+          <OffersPage embedded={true} docFilters={docFilters} onOrderConverted={fetchOrders} refreshTrigger={offerRefreshKey} />
         )}
 
+<<<<<<< HEAD
         {activeInvTab !== "angebot" && (
+=======
+        {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
+            <OrdersTable
+              orders={currentItems}
+              loading={loadingOrders}
+              getCategoryName={getCategoryName}
+              getSupplierName={getSupplierName}
+              getOrderStatusColor={getOrderStatusColor}
+              onView={(o) => {
+                setViewOrder(o);
+                setViewItems(o.items || []);
+                setShowViewModal(true);
+              }}
+              onFulfill={handleMoveToFulfillment}
+              onEdit={handleEditOrder}
+              onDelete={handleDeleteOrder}
+              canDelete={user?.role === UserRole.ADMIN}
+              onGoToItems={handleGoToItems}
+              onReassign={handleOpenReassignModal}
+              activeTab={activeInvTab}
+              itemById={itemById}
+              onSplit={handleOpenSplitModal}
+              suppliers={suppliers}
+              onAssignSupplier={handleAssignSupplier}
+              router={router}
+            />
+          </div>
+        )}
+
+        {activeInvTab !== "angebot" && activeInvTab !== "auftrag" && activeInvTab !== "bestellung" && (
+>>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
           <>
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
               <DataTable
                 data={currentItems}
                 columns={commercialColumns}
+<<<<<<< HEAD
                 loading={
                   activeInvTab === "auftrag" || activeInvTab === "bestellung"
                     ? loadingOrders
@@ -2514,11 +2568,21 @@ const InvoiceListPage: React.FC = () => {
                   const docNumber = isOrder
                     ? row.order_no
                     : row.invoiceNumber || row.id;
+=======
+                loading={loading}
+                emptyMessage="No Invoices Found"
+                getRowClassName={() => ""}
+                expandedRowIds={expandedDocIds}
+                renderRowDetails={(row) => {
+                  const items = row.items || row.lineItems || [];
+                  const docNumber = row.invoiceNumber || row.id;
+>>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
 
                   return (
                     <DocumentLineItemsSubTable
                       items={items}
                       currency={row.currency || "EUR"}
+<<<<<<< HEAD
                       title={`Line Items (${items.length}) — ${isOrder ? `Order No: ${docNumber}` : `Invoice: ${docNumber}`}`}
                       totalAmount={Number(
                         row.subtotal ||
@@ -2528,12 +2592,18 @@ const InvoiceListPage: React.FC = () => {
                           0,
                       )}
                       type={isOrder ? "order" : "invoice"}
+=======
+                      title={`Line Items (${items.length}) — Invoice: ${docNumber}`}
+                      totalAmount={Number(row.subtotal || row.netTotal || row.grossTotal || row.totalAmount || 0)}
+                      type="invoice"
+>>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
                       getSupplierName={getSupplierName}
                       getOrderStatusColor={getOrderStatusColor}
                     />
                   );
                 }}
                 onRowClick={(row) => {
+<<<<<<< HEAD
                   if (
                     activeInvTab === "auftrag" ||
                     activeInvTab === "bestellung"
@@ -2542,6 +2612,9 @@ const InvoiceListPage: React.FC = () => {
                   } else {
                     handleOpenInvoiceDetails(row);
                   }
+=======
+                  handleOpenInvoiceDetails(row);
+>>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
                 }}
               />
 
@@ -4012,8 +4085,12 @@ const InvoiceListPage: React.FC = () => {
             onClose={() => {
               setShowOfferModal(false);
               setSelectedOfferId(null);
+              setOfferRefreshKey((prev) => prev + 1);
             }}
-            onChanged={fetchOffers}
+            onChanged={() => {
+              fetchOffers();
+              setOfferRefreshKey((prev) => prev + 1);
+            }}
             userRole={user?.role}
           />
         )}
@@ -4028,4 +4105,9 @@ const InvoiceListPageWrapper: React.FC = () => (
     <InvoiceListPage />
   </Suspense>
 );
+<<<<<<< HEAD
 export default InvoiceListPageWrapper;
+=======
+
+export default InvoiceListPageWrapper;
+>>>>>>> c9aa8cbdbf87c51087047b06add3ea92aaf64b8c
