@@ -603,7 +603,8 @@ const OffersPage: React.FC<any> = ({
                               {offer.customerSnapshot?.companyName}
                             </div>
                           </div>
-                          {offer.customerSnapshot.country !== "Germany" &&
+                          {offer.customerSnapshot.country !== "DE" &&
+                            offer.customerSnapshot?.country !== "Germany" &&
                             offer.customerSnapshot?.vatId && (
                               <div
                                 className={`text-xs mt-0.5 ${
