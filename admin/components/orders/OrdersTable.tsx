@@ -279,7 +279,7 @@ export default function OrdersTable({
       width: "115px",
       align: "center",
       render: (row) => {
-        const hasCargo = !!row.cargo_id;
+        const hasCargo = !!row.cargo_id || !!row.cargoId || !!row.cargo?.id;
         return (
           <div className="flex items-center justify-center gap-1">
             <button
@@ -340,7 +340,7 @@ export default function OrdersTable({
         </div>
       );
     }
-    const hasCargo = !!row.cargo_id;
+    const hasCargo = !!row.cargo_id || !!row.cargoId || !!row.cargo?.id;
     return (
       <div className="flex items-center justify-center gap-1.5">
         <button

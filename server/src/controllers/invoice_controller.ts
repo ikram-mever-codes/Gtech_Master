@@ -81,7 +81,7 @@ export class InvoiceController {
 
       const dueDays =
         customer.defaultPaymentDueDays !== undefined &&
-        customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
           ? customer.defaultPaymentDueDays
           : 7;
 
@@ -197,7 +197,7 @@ export class InvoiceController {
                   .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
                   .fontSize(8)
                   .text("中国安徽...", leftAlignX + 220, yPos);
-              } catch (e) {}
+              } catch (e) { }
             }
             doc.font("Helvetica");
           }
@@ -266,9 +266,8 @@ export class InvoiceController {
         doc.text(invoice.customer?.addressLine1 || "", leftAlignX, yPos);
         yPos += 12;
         doc.text(
-          `${invoice.customer?.postalCode || ""} ${
-            invoice.customer?.city || ""
-          }`.trim(),
+          `${invoice.customer?.postalCode || ""} ${invoice.customer?.city || ""
+            }`.trim(),
           leftAlignX,
           yPos,
         );
@@ -502,16 +501,14 @@ export class InvoiceController {
         }
 
         doc.text(
-          `Zahlungsart: ${
-            invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
+          `Zahlungsart: ${invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
           }`,
           leftAlignX,
           yPos,
         );
         yPos += 15;
         doc.text(
-          `Versandart: ${
-            invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
+          `Versandart: ${invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
           }`,
           leftAlignX,
           yPos,
@@ -519,7 +516,7 @@ export class InvoiceController {
         yPos += 15;
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-          invoice.customer?.defaultPaymentDueDays !== null
+            invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         const dueDateLabel = invoice.dueDate
@@ -679,7 +676,7 @@ export class InvoiceController {
       if (invoiceData.deliveryDate) {
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-          invoice.customer?.defaultPaymentDueDays !== null
+            invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         invoiceData.dueDate = calculateDueDate(
@@ -930,13 +927,13 @@ export class InvoiceController {
 
           const rawShipTo =
             typeof cargo?.ship_to_company_name === "string" &&
-            cargo.ship_to_company_name.trim().length > 1
+              cargo.ship_to_company_name.trim().length > 1
               ? cargo.ship_to_company_name.trim()
               : typeof cargo?.ship_to_display_name === "string" &&
-                  cargo.ship_to_display_name.trim().length > 1
+                cargo.ship_to_display_name.trim().length > 1
                 ? cargo.ship_to_display_name.trim()
                 : typeof inv.customer?.companyName === "string" &&
-                    inv.customer.companyName.trim()
+                  inv.customer.companyName.trim()
                   ? inv.customer.companyName.trim()
                   : "-";
 
@@ -949,6 +946,7 @@ export class InvoiceController {
             customTotalQty,
             cargoNo: cargoNo || inv.orderNumber,
             cargoId: cargo?.id || null,
+            cargo_id: cargo?.id || null,
             cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null,
             orderComment,
           };
@@ -1137,8 +1135,8 @@ export class InvoiceController {
       const manualTarics =
         uniqueManualCodes.length > 0
           ? await AppDataSource.getRepository(Taric).find({
-              where: { code: In(uniqueManualCodes) },
-            })
+            where: { code: In(uniqueManualCodes) },
+          })
           : [];
       const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -1260,19 +1258,19 @@ export class InvoiceController {
           invoice,
           cargo: cargo
             ? {
-                id: cargo.id,
-                cargo_no: cargo.cargo_no,
-                ship_to: (() => {
-                  const v =
-                    cargo.ship_to_company_name ??
-                    cargo.ship_to_display_name ??
-                    null;
-                  if (!v || typeof v !== "string") return null;
-                  const s = v.trim();
-                  return s.length > 1 ? s : null;
-                })(),
-                bill_to: "GTech Industries GmbH",
-              }
+              id: cargo.id,
+              cargo_no: cargo.cargo_no,
+              ship_to: (() => {
+                const v =
+                  cargo.ship_to_company_name ??
+                  cargo.ship_to_display_name ??
+                  null;
+                if (!v || typeof v !== "string") return null;
+                const s = v.trim();
+                return s.length > 1 ? s : null;
+              })(),
+              bill_to: "GTech Industries GmbH",
+            }
             : null,
           orderNosInCargo,
           detailedItems: sortedItems,
