@@ -1709,7 +1709,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <Field
                     label="Payment Due Days"
                     edit={edit}
-                    value={offer.paymentTerms}
+                    value={offer.paymentDueDays}
                   >
                     <input
                       className={inputCls}
