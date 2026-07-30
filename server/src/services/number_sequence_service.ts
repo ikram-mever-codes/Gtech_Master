@@ -66,34 +66,34 @@ export class NumberSequenceService {
           }
           runningNo = Math.max(defaultStart, maxNum + 1);
         } else {
-          const maxRecord = await manager
+          const allRecords = await manager
             .getRepository(mapping.entity)
             .createQueryBuilder("entity")
-            .orderBy(`entity.${mapping.column}`, "DESC")
-            .getOne();
+            .select([`entity.${mapping.column}`])
+            .getMany();
 
-          if (!maxRecord) {
-            runningNo = defaultStart;
-          } else {
-            const maxVal = maxRecord[mapping.column];
-            const match = String(maxVal).match(/\d+$/);
-            if (match) {
-              let maxNum = parseInt(match[0], 10);
-
-              if (
-                sequenceKey === "closed_ci" &&
-                match[0].length > sequence.minDigits
-              ) {
-                const suffix = match[0].slice(-sequence.minDigits);
-                maxNum = parseInt(suffix, 10);
-              }
-
-              const nextAligned = maxNum + 1;
-              if (runningNo > nextAligned) {
-                runningNo = Math.max(defaultStart, nextAligned);
+          let maxNum = 0;
+          for (const rec of allRecords) {
+            const val = (rec as any)[mapping.column];
+            if (val) {
+              const parts = String(val).split("-");
+              const lastPart = parts[parts.length - 1];
+              const parsed = parseInt(lastPart, 10);
+              if (!isNaN(parsed) && parsed > maxNum) {
+                maxNum = parsed;
+              } else {
+                const numMatch = String(val).match(/\d+$/);
+                if (numMatch) {
+                  const parsedMatch = parseInt(numMatch[0], 10);
+                  if (!isNaN(parsedMatch) && parsedMatch > maxNum) {
+                    maxNum = parsedMatch;
+                  }
+                }
               }
             }
           }
+          const nextAligned = maxNum + 1;
+          runningNo = Math.max(sequence.nextRunningNo || 1, nextAligned);
         }
       }
 

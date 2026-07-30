@@ -574,9 +574,22 @@ export class InquiryController {
           const annualPotentialKEur = annualPotential / 1000;
           total_potential_k_eur += annualPotentialKEur;
 
+          const letterSuffix = this.getLetterSuffix(index);
+          let assignedItemNo = `${savedInquiry.inquiryNo || "AF"}-${letterSuffix}`;
+          if (reqData.itemNo && typeof reqData.itemNo === "string" && reqData.itemNo.trim()) {
+            const rawNo = reqData.itemNo.trim();
+            if (savedInquiry.inquiryNo && rawNo.startsWith(savedInquiry.inquiryNo)) {
+              assignedItemNo = rawNo;
+            } else if (/^[a-z]$/i.test(rawNo)) {
+              assignedItemNo = `${savedInquiry.inquiryNo || "AF"}-${rawNo.toLowerCase()}`;
+            } else if (rawNo !== String(index + 1).padStart(3, "0")) {
+              assignedItemNo = rawNo;
+            }
+          }
+
           const requestItem = this.requestRepository.create({
             ...reqDataWithoutId,
-            itemNo: reqData.itemNo || String(index + 1).padStart(3, "0"),
+            itemNo: assignedItemNo,
             cat_id: reqData.cat_id || defaultProCatId,
             businessId: starBusinessDetails.id,
             business: starBusinessDetails,
