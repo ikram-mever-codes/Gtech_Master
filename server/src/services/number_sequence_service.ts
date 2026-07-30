@@ -38,6 +38,11 @@ export class NumberSequenceService {
       if (sequenceKey === "customer") {
         sequence.minDigits = 1;
       }
+      if (sequenceKey === "order") {
+        sequence.prefix = "B";
+        sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
+        sequence.minDigits = 1;
+      }
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
@@ -65,35 +70,55 @@ export class NumberSequenceService {
             }
           }
           runningNo = Math.max(defaultStart, maxNum + 1);
-        } else {
-          const maxRecord = await manager
-            .getRepository(mapping.entity)
-            .createQueryBuilder("entity")
-            .orderBy(`entity.${mapping.column}`, "DESC")
-            .getOne();
+        } else if (sequenceKey === "order") {
+          const orders = await manager
+            .getRepository(Order)
+            .createQueryBuilder("o")
+            .select(["o.order_no"])
+            .where("o.order_no LIKE 'B%'")
+            .getMany();
 
-          if (!maxRecord) {
-            runningNo = defaultStart;
-          } else {
-            const maxVal = maxRecord[mapping.column];
-            const match = String(maxVal).match(/\d+$/);
-            if (match) {
-              let maxNum = parseInt(match[0], 10);
-
-              if (
-                sequenceKey === "closed_ci" &&
-                match[0].length > sequence.minDigits
-              ) {
-                const suffix = match[0].slice(-sequence.minDigits);
-                maxNum = parseInt(suffix, 10);
-              }
-
-              const nextAligned = maxNum + 1;
-              if (runningNo > nextAligned) {
-                runningNo = Math.max(defaultStart, nextAligned);
+          let maxNum = 0;
+          for (const ord of orders) {
+            if (ord.order_no) {
+              const parts = String(ord.order_no).split("-");
+              const lastPart = parts[parts.length - 1];
+              const parsed = parseInt(lastPart, 10);
+              if (!isNaN(parsed) && parsed > maxNum) {
+                maxNum = parsed;
               }
             }
           }
+          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
+        } else {
+          const allRecords = await manager
+            .getRepository(mapping.entity)
+            .createQueryBuilder("entity")
+            .select([`entity.${mapping.column}`])
+            .getMany();
+
+          let maxNum = 0;
+          for (const rec of allRecords) {
+            const val = (rec as any)[mapping.column];
+            if (val) {
+              const parts = String(val).split("-");
+              const lastPart = parts[parts.length - 1];
+              const parsed = parseInt(lastPart, 10);
+              if (!isNaN(parsed) && parsed > maxNum) {
+                maxNum = parsed;
+              } else {
+                const numMatch = String(val).match(/\d+$/);
+                if (numMatch) {
+                  const parsedMatch = parseInt(numMatch[0], 10);
+                  if (!isNaN(parsedMatch) && parsedMatch > maxNum) {
+                    maxNum = parsedMatch;
+                  }
+                }
+              }
+            }
+          }
+          const nextAligned = maxNum + 1;
+          runningNo = Math.max(sequence.nextRunningNo || 1, nextAligned);
         }
       }
 
@@ -149,7 +174,7 @@ export class NumberSequenceService {
     const repo = AppDataSource.getRepository(NumberSequence);
     const defaults = [
       { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
-      { sequenceKey: "order", name: "Auftrag", prefix: "MA", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "order", name: "Auftrag", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
       {
