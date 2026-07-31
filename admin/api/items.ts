@@ -12,6 +12,7 @@ export interface Item {
   name_cn: string | null;
   item_name: string;
   item_name_cn: string | null;
+  item_name_de: string | null; // NEW
   ean: string | null;
   is_active: string;
   is_updated: boolean;
@@ -43,7 +44,12 @@ export interface Item {
   isLabelPrint?: boolean;
   customer_id?: string | null;
   customer_name?: string | null;
-  item_name_de?: string | null;
+  // NEW fields
+  is_stock_item?: string;
+  stockEU?: number;
+  MSQ_EU?: number;
+  stockCN?: number;
+  MSQ_CN?: number;
 }
 
 export interface Parent {
@@ -309,6 +315,7 @@ export const getItemByCategory = async (categoryId: number) => {
 export const createItem = async (itemData: {
   item_name: string;
   item_name_cn?: string;
+  item_name_de?: string; // NEW
   ean?: string;
   parent_id: number;
   taric_id?: number;
@@ -329,9 +336,14 @@ export const createItem = async (itemData: {
   currency?: string;
   isActive?: string;
   item_no_de?: string;
-  item_name_de?: string;
   is_eur_special?: string;
   is_rmb_special?: string;
+  // NEW fields
+  is_stock_item?: string;
+  stockEU?: number;
+  MSQ_EU?: number;
+  stockCN?: number;
+  MSQ_CN?: number;
 }) => {
   try {
     toast.loading("Creating item...", loadingStyles);

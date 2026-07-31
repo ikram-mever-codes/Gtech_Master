@@ -51,6 +51,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
   const [itemFormData, setItemFormData] = useState<any>({
     item_name: "",
     item_name_cn: "",
+    item_name_de: "", // NEW: Item Name DE
     ean: "",
     price_rmb: 0,
     parent_id: 0,
@@ -72,11 +73,16 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
     is_eur_special: false,
     is_rmb_special: false,
     item_no_de: "",
-    item_name_de: "",
     qty: "",
     interval: "Monatlich",
     priority: "Normal",
     requestStatus: "Open",
+    // NEW: Stock and MSQ fields
+    is_stock_item: "N",
+    stockEU: 0,
+    MSQ_EU: 0,
+    stockCN: 0,
+    MSQ_CN: 0,
   });
 
   useEffect(() => {
@@ -164,6 +170,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           inquiryId,
           itemName: itemFormData.item_name,
           item_name_cn: itemFormData.item_name_cn,
+          item_name_de: itemFormData.item_name_de, // NEW
           ean: itemFormData.ean,
           parent_id: itemFormData.parent_id,
           taric_id: itemFormData.taric_id || undefined,
@@ -180,18 +187,24 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           currency: itemFormData.currency || "EUR",
           isActive: itemFormData.isActive ? "Y" : "N",
           itemNo: itemFormData.item_no_de || undefined,
-          item_name_de: itemFormData.item_name_de || undefined,
           is_eur_special: itemFormData.is_eur_special ? "Y" : "N",
           is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
           qty: itemFormData.qty,
           interval: itemFormData.interval,
           priority: itemFormData.priority,
           requestStatus: itemFormData.requestStatus,
+          // NEW: Stock and MSQ fields
+          is_stock_item: itemFormData.is_stock_item || "N",
+          stockEU: parseInt(itemFormData.stockEU) || 0,
+          MSQ_EU: parseInt(itemFormData.MSQ_EU) || 0,
+          stockCN: parseInt(itemFormData.stockCN) || 0,
+          MSQ_CN: parseInt(itemFormData.MSQ_CN) || 0,
         });
       } else {
         result = await createItem({
           item_name: itemFormData.item_name,
           item_name_cn: itemFormData.item_name_cn,
+          item_name_de: itemFormData.item_name_de, // NEW
           ean: itemFormData.ean,
           parent_id: itemFormData.parent_id,
           taric_id: itemFormData.taric_id || undefined,
@@ -218,9 +231,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           currency: itemFormData.currency || "CNY",
           isActive: itemFormData.isActive ? "Y" : "N",
           item_no_de: itemFormData.item_no_de || undefined,
-          item_name_de: itemFormData.item_name_de || undefined,
           is_eur_special: itemFormData.is_eur_special ? "Y" : "N",
           is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
+          // NEW: Stock and MSQ fields
+          is_stock_item: itemFormData.is_stock_item || "N",
+          stockEU: parseInt(itemFormData.stockEU) || 0,
+          MSQ_EU: parseInt(itemFormData.MSQ_EU) || 0,
+          stockCN: parseInt(itemFormData.stockCN) || 0,
+          MSQ_CN: parseInt(itemFormData.MSQ_CN) || 0,
         });
       }
       const createdId =
@@ -302,6 +320,22 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  German Name (DE)
+                </label>
+                <input
+                  value={itemFormData.item_name_de}
+                  onChange={(e) =>
+                    setItemFormData({
+                      ...itemFormData,
+                      item_name_de: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Enter German name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   EAN
                 </label>
                 <div className="flex gap-2">
@@ -343,21 +377,6 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   placeholder="e.g. DE1024"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  DE Item Name
-                </label>
-                <input
-                  value={itemFormData.item_name_de}
-                  onChange={(e) =>
-                    setItemFormData({
-                      ...itemFormData,
-                      item_name_de: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 />
               </div>
               <div>
@@ -599,6 +618,98 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   }
                   className="text-sm"
                 />
+              </div>
+
+              {/* NEW: Stock and MSQ Fields */}
+              <div className="md:col-span-2">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Is Stock Item
+                    </label>
+                    <select
+                      value={itemFormData.is_stock_item || "N"}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          is_stock_item: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                    >
+                      <option value="N">No</option>
+                      <option value="Y">Yes</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Stock EU
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={itemFormData.stockEU || 0}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          stockEU: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      MSQ EU
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={itemFormData.MSQ_EU || 0}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          MSQ_EU: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Stock CN
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={itemFormData.stockCN || 0}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          stockCN: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      MSQ CN
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={itemFormData.MSQ_CN || 0}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          MSQ_CN: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
               </div>
 
               {isRequest && (

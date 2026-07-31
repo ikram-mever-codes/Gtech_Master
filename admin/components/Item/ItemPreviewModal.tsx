@@ -324,6 +324,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             pixPath: raw.pix_path || "",
           },
           attachments: raw.attachments || [],
+          // NEW: Stock and MSQ fields
+          is_stock_item: raw.is_stock_item || "N",
+          stockEU: raw.stockEU || 0,
+          MSQ_EU: raw.MSQ_EU || 0,
+          stockCN: raw.stockCN || 0,
+          MSQ_CN: raw.MSQ_CN || 0,
         };
         setPreviewItem(mapped);
         setPreviewQuality(qualityRes?.data || []);
@@ -433,6 +439,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
         const payload = {
           item_name: previewItem.name ?? previewItem.item_name,
           item_name_cn: previewItem.nameCN ?? previewItem.item_name_cn,
+          item_name_de: previewItem.item_name_de || "", // NEW
           ean: (previewItem.ean || "").toString(),
           model: previewItem.model,
           remark: previewItem.remark,
@@ -478,6 +485,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           photo: previewItem.pictures?.shopPicture,
           pix_path: previewItem.pictures?.pixPath,
           pix_path_eBay: previewItem.pictures?.ebayPictures,
+          // NEW: Stock and MSQ fields
+          is_stock_item: previewItem.is_stock_item || "N",
+          stockEU: parseInt(previewItem.stockEU) || 0,
+          MSQ_EU: parseInt(previewItem.MSQ_EU) || 0,
+          stockCN: parseInt(previewItem.stockCN) || 0,
+          MSQ_CN: parseInt(previewItem.MSQ_CN) || 0,
         };
         await updateItem(Number(itemId), payload);
       }
@@ -1036,6 +1049,82 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     >
                       {previewItem.isActive ? "Active" : "Inactive"}
                     </span>
+                  )}
+                </Field>
+              </div>
+
+              {/* NEW: Stock and MSQ Fields */}
+              <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4">
+                <Field label="Is Stock Item">
+                  {previewEdit ? (
+                    <select
+                      className={inputCls}
+                      value={previewItem.is_stock_item || "N"}
+                      onChange={(e) =>
+                        patchPreview({ is_stock_item: e.target.value })
+                      }
+                    >
+                      <option value="N">No</option>
+                      <option value="Y">Yes</option>
+                    </select>
+                  ) : (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${previewItem.is_stock_item === "Y" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                    >
+                      {previewItem.is_stock_item === "Y" ? "Yes" : "No"}
+                    </span>
+                  )}
+                </Field>
+                <Field label="Stock EU">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={previewItem.stockEU ?? 0}
+                      onChange={(e) =>
+                        patchPreview({ stockEU: e.target.value })
+                      }
+                    />
+                  ) : (
+                    (previewItem.stockEU ?? 0)
+                  )}
+                </Field>
+                <Field label="MSQ EU">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={previewItem.MSQ_EU ?? 0}
+                      onChange={(e) => patchPreview({ MSQ_EU: e.target.value })}
+                    />
+                  ) : (
+                    (previewItem.MSQ_EU ?? 0)
+                  )}
+                </Field>
+                <Field label="Stock CN">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={previewItem.stockCN ?? 0}
+                      onChange={(e) =>
+                        patchPreview({ stockCN: e.target.value })
+                      }
+                    />
+                  ) : (
+                    (previewItem.stockCN ?? 0)
+                  )}
+                </Field>
+                <Field label="MSQ CN">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={previewItem.MSQ_CN ?? 0}
+                      onChange={(e) => patchPreview({ MSQ_CN: e.target.value })}
+                    />
+                  ) : (
+                    (previewItem.MSQ_CN ?? 0)
                   )}
                 </Field>
               </div>

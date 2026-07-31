@@ -1292,8 +1292,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     );
   };
 
-  const visibleLineItems =
-    offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
+  const visibleLineItems = (
+    offer?.lineItems?.filter((li: any) => !li.isComponent) || []
+  ).sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
   const pricingMode: PricingMode = offer?.pricingMode || "classic";
 
   const priceTiers: string[] = (() => {
@@ -1309,7 +1310,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     );
   })();
 
-  // --- Weight totals ---------------------------------------------------
   const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
     const qty =
       pricingMode === "matrix"
@@ -2377,15 +2377,41 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                   {edit && (
                     <div className="space-y-3">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => setShowItemPicker((s) => !s)}
-                          className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1"
+                          className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1 whitespace-nowrap"
                         >
                           <PlusIcon className="h-3.5 w-3.5" />
                           Add existing item
                         </button>
+
+                        <div className="flex-1 min-w-[200px]">
+                          <div className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <input
+                                className={inputCls}
+                                value={newLine.itemName}
+                                placeholder="Freizeile — text"
+                                onChange={(e) =>
+                                  setNewLine((n) => ({
+                                    ...n,
+                                    itemName: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <button
+                              onClick={addLineItem}
+                              className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
+                            >
+                              <PlusIcon className="h-4 w-4" />
+                              Add Freizeile
+                            </button>
+                          </div>
+                        </div>
                       </div>
+
                       {showItemPicker && (
                         <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
                           <input
@@ -2414,65 +2440,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </div>
                         </div>
                       )}
-                      <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Freizeile — text
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.itemName}
-                            placeholder="e.g., Custom bracket"
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                itemName: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="w-24">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Quantity
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.baseQuantity}
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                baseQuantity: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="w-20">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            MwSt. %
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.taxRate}
-                            placeholder={String(
-                              parseFlexibleNumber(offer?.taxProfile?.taxRate) ??
-                                19,
-                            )}
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                taxRate: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <button
-                          onClick={addLineItem}
-                          className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
-                        >
-                          <PlusIcon className="h-4 w-4" />
-                          Add Freizeile
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>
