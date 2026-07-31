@@ -422,8 +422,18 @@ export const createCargo = async (
 
     const { id, created_at, updated_at, orders, orderItems, ...cargoData } =
       req.body;
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const defaultPrefix = `C${yy}${mm}-`;
 
-    if (!cargoData.cargo_no || !cargoData.cargo_no.trim()) {
+    const rawCargoNo = (cargoData.cargo_no || "").trim();
+    const isCustomText =
+      rawCargoNo &&
+      rawCargoNo !== defaultPrefix &&
+      !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
+
+    if (!rawCargoNo || rawCargoNo === defaultPrefix) {
       try {
         cargoData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
       } catch (err) {
@@ -432,6 +442,16 @@ export const createCargo = async (
           err,
         );
       }
+    } else if (isCustomText) {
+      const existingRemark = (cargoData.remark || cargoData.note || "").trim();
+      if (existingRemark) {
+        if (!existingRemark.includes(rawCargoNo)) {
+          cargoData.remark = `${existingRemark} - ${rawCargoNo}`;
+        }
+      } else {
+        cargoData.remark = rawCargoNo;
+      }
+      cargoData.note = cargoData.remark;
     }
 
     const cargo = cargoRepo.create(cargoData as Partial<Cargo>);
@@ -483,6 +503,25 @@ export const updateCargo = async (
       orderItems,
       ...updateData
     } = req.body;
+
+    const rawCargoNo = (updateData.cargo_no || "").trim();
+    const isCustomText =
+      rawCargoNo &&
+      !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
+
+    if (isCustomText) {
+      const existingRemark = (
+        updateData.remark !== undefined ? updateData.remark : (cargo.remark || cargo.note || "")
+      ).trim();
+      if (existingRemark) {
+        if (!existingRemark.includes(rawCargoNo)) {
+          updateData.remark = `${existingRemark} - ${rawCargoNo}`;
+        }
+      } else {
+        updateData.remark = rawCargoNo;
+      }
+      updateData.note = updateData.remark;
+    }
 
     const oldCargoNo = cargo.cargo_no;
     cargoRepo.merge(cargo, updateData);

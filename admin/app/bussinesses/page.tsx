@@ -453,7 +453,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
   useEffect(() => {
     if (!taxProfiles || taxProfiles.length === 0) return;
 
-    const countryCode = (businessForm.country || "").trim().toUpperCase();
+    const countryCode = (businessForm.country || "DE").trim().toUpperCase();
     const vatTaxId = (businessForm.vatTaxId || "").trim();
     const vatIdStatus = (businessForm.vat_id_status || "").trim();
 
@@ -1031,7 +1031,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
       tags: business.tags || [],
       tagOrder: business.tagOrder || "",
       debtor_no: business.debtor_no || "",
-      default_tax_profile_id: business.default_tax_profile_id || "",
+      default_tax_profile_id:
+        business.default_tax_profile_id ||
+        taxProfiles.find(
+          (tp: any) => (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
+        )?.id ||
+        taxProfiles[0]?.id ||
+        "",
       vat_id_status: business.vat_id_status || "unchecked",
       defaultPaymentMethod: business.defaultPaymentMethod || "",
       defaultShippingMethod: business.defaultShippingMethod || "",
@@ -2155,7 +2161,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         <span className="text-[10px] font-semibold text-emerald-600 ml-1.5">(Auto-assigned by tax rules)</span>
                       </label>
                       <select
-                        value={businessForm.default_tax_profile_id || ""}
+                        value={
+                          businessForm.default_tax_profile_id ||
+                          taxProfiles.find(
+                            (tp: any) =>
+                              (tp.tax_case || "").trim().toUpperCase() ===
+                              "DE-VAT",
+                          )?.id ||
+                          taxProfiles[0]?.id ||
+                          ""
+                        }
                         onChange={(e) =>
                           setBusinessForm({
                             ...businessForm,
@@ -2163,9 +2178,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           })
                         }
                         disabled={true}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-gray-100 backdrop-blur-sm rounded-lg cursor-not-allowed text-gray-700 font-medium"
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-gray-100 backdrop-blur-sm rounded-lg cursor-not-allowed text-gray-700 font-semibold"
                       >
-                        <option value="">None / Not Assigned</option>
                         {taxProfiles.map((tp) => (
                           <option key={tp.id} value={tp.id}>
                             {tp.tax_case || tp.name}

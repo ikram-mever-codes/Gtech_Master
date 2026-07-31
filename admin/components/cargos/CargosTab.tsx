@@ -318,10 +318,15 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
     );
 
     const resetForm = () => {
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const defaultPrefix = `C${yy}${mm}-`;
+
         setFormData({
             customer_id: undefined,
             cargo_type_id: undefined,
-            cargo_no: "",
+            cargo_no: defaultPrefix,
             pickup_date: "",
             dep_date: "",
             eta: "",
@@ -429,6 +434,29 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                     cleanFormData[field] = null as any;
                 }
             });
+
+            const rawCargoNo = (cleanFormData.cargo_no || "").trim();
+            const now = new Date();
+            const yy = String(now.getFullYear()).slice(-2);
+            const mm = String(now.getMonth() + 1).padStart(2, "0");
+            const defaultPrefix = `C${yy}${mm}-`;
+
+            const isCustomText =
+                rawCargoNo &&
+                rawCargoNo !== defaultPrefix &&
+                !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
+
+            if (isCustomText) {
+                const existingRemark = (cleanFormData.remark || cleanFormData.note || "").trim();
+                if (existingRemark) {
+                    if (!existingRemark.includes(rawCargoNo)) {
+                        cleanFormData.remark = `${existingRemark} - ${rawCargoNo}`;
+                    }
+                } else {
+                    cleanFormData.remark = rawCargoNo;
+                }
+                cleanFormData.note = cleanFormData.remark;
+            }
 
             const payload: any = {
                 ...cleanFormData,
@@ -556,7 +584,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
             ship_to_full_address: "",
             ship_to_remarks: "",
         };
-
         try {
             const res: any = await getShippingAddresses(String(customer.id));
             const dbAddresses = res && res.success ? (res.data || []) : [];
@@ -781,7 +808,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                 ) : "-"}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-800 max-w-[150px] truncate">
-                                                {cargo.remark || cargo.note || "-"}
+                                                {cargo.remark || cargo.note || cargo.cargo_no || "-"}
                                             </td>
                                         </tr>
                                         {expandedCargoIds.has(cargo.id) && (
@@ -934,10 +961,10 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                 </span>
                                 <span className="text-gray-300 font-normal">|</span>
                                 <span className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-bold select-none ${formData.cargo_status === "Delivered"
-                                        ? "bg-emerald-100 text-emerald-800"
-                                        : formData.cargo_status === "Shipped"
-                                            ? "bg-green-100 text-green-800"
-                                            : "bg-blue-100 text-blue-800"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : formData.cargo_status === "Shipped"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-blue-100 text-blue-800"
                                     }`}>
                                     {formData.cargo_status || "Open"}
                                 </span>
