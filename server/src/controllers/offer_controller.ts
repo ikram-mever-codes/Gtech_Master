@@ -1832,74 +1832,6 @@ export class OfferController {
     }
   }
 
-  private async calculateOfferTotals(offerId: string): Promise<void> {
-    try {
-      const offer = await this.offerRepository.findOne({
-        where: { id: offerId },
-        relations: ["lineItems"],
-      });
-
-      if (!offer) return;
-
-      let subtotal = 0;
-      let taxAmount = 0;
-      const customerItems =
-        offer.lineItems?.filter((item: OfferLineItem) => !item.isComponent) ||
-        [];
-
-      for (const item of customerItems) {
-        const lineTotal = this.getLineItemTotal(item, offer.pricingMode);
-
-        if (lineTotal > 0 && item.lineTotal !== lineTotal) {
-          item.lineTotal = lineTotal;
-          await this.lineItemRepository.save(item);
-        }
-
-        subtotal += lineTotal;
-
-        // Each line item is taxed at its own rate (falling back to the
-        // offer's rate for items that predate per-line rates), and each
-        // line's VAT is summed independently rather than applying one flat
-        // rate to the whole subtotal.
-        const lineTaxRate = (item as any).taxRate ?? offer.taxRate ?? 19;
-        taxAmount += lineTotal * (lineTaxRate / 100);
-      }
-
-      let total = subtotal;
-
-      if (offer.discountPercentage && offer.discountPercentage > 0) {
-        const discount = subtotal * (offer.discountPercentage / 100);
-        total = subtotal - discount;
-        offer.discountAmount = discount;
-        // Discount proportionally reduces the tax base too.
-        taxAmount *= 1 - offer.discountPercentage / 100;
-      } else if (offer.discountAmount && offer.discountAmount > 0) {
-        total = subtotal - offer.discountAmount;
-      }
-
-      if (offer.shippingCost && offer.shippingCost > 0) {
-        total += offer.shippingCost;
-        // Shipping taxed at the offer's own rate.
-        taxAmount += offer.shippingCost * ((offer.taxRate ?? 19) / 100);
-      }
-
-      const totalWithTax = total + taxAmount;
-
-      const formatNumber = (num: number): number => {
-        if (isNaN(num) || !isFinite(num)) return 0;
-        return Math.round(num * 100) / 100;
-      };
-
-      offer.subtotal = formatNumber(subtotal);
-      offer.taxAmount = formatNumber(taxAmount);
-      offer.totalAmount = formatNumber(totalWithTax);
-
-      await this.offerRepository.save(offer);
-    } catch (error) {
-      console.error("Error calculating offer totals:", error);
-    }
-  }
-
   async getOfferById(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -2249,6 +2181,10 @@ export class OfferController {
           rawBody.shippingCost !== undefined
             ? parseFlexibleNumberOrZero(rawBody.shippingCost)
             : undefined,
+        shippingQuantity:
+          rawBody.shippingQuantity !== undefined
+            ? parseFlexibleNumberOrZero(rawBody.shippingQuantity)
+            : undefined,
         subtotal:
           rawBody.subtotal !== undefined
             ? parseFlexibleNumberOrZero(rawBody.subtotal)
@@ -2358,6 +2294,9 @@ export class OfferController {
       if (updateOfferDto.shippingCost !== undefined) {
         offer.shippingCost = updateOfferDto.shippingCost;
       }
+      if (updateOfferDto.shippingQuantity !== undefined) {
+        offer.shippingQuantity = updateOfferDto.shippingQuantity;
+      }
       if (updateOfferDto.subtotal !== undefined) {
         offer.subtotal = updateOfferDto.subtotal;
       }
@@ -2385,18 +2324,8 @@ export class OfferController {
         );
       }
 
-      if (
-        updateOfferDto.shippingCost !== undefined ||
-        updateOfferDto.discountPercentage !== undefined ||
-        updateOfferDto.discountAmount !== undefined ||
-        updateOfferDto.subtotal !== undefined ||
-        updateOfferDto.taxAmount !== undefined ||
-        updateOfferDto.totalAmount !== undefined ||
-        updateOfferDto.taxRate !== undefined ||
-        pricingModeChanged
-      ) {
-        await this.calculateOfferTotals(id);
-      }
+      // Always recalculate totals after any update
+      await this.calculateOfferTotals(id);
 
       const completeOffer = await this.offerRepository.findOne({
         where: { id: updatedOffer.id },
@@ -2425,6 +2354,67 @@ export class OfferController {
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  }
+
+  private async calculateOfferTotals(offerId: string): Promise<void> {
+    try {
+      const offer = await this.offerRepository.findOne({
+        where: { id: offerId },
+        relations: ["lineItems"],
+      });
+
+      if (!offer) return;
+
+      let subtotal = 0;
+      let taxAmount = 0;
+      const customerItems =
+        offer.lineItems?.filter((item: OfferLineItem) => !item.isComponent) ||
+        [];
+
+      for (const item of customerItems) {
+        const lineTotal = this.getLineItemTotal(item, offer.pricingMode);
+        if (lineTotal > 0 && item.lineTotal !== lineTotal) {
+          item.lineTotal = lineTotal;
+          await this.lineItemRepository.save(item);
+        }
+        subtotal += lineTotal;
+        const lineTaxRate = (item as any).taxRate ?? offer.taxRate ?? 19;
+        taxAmount += lineTotal * (lineTaxRate / 100);
+      }
+
+      let total = subtotal;
+
+      if (offer.discountPercentage && offer.discountPercentage > 0) {
+        const discount = subtotal * (offer.discountPercentage / 100);
+        total = subtotal - discount;
+        offer.discountAmount = discount;
+        taxAmount *= 1 - offer.discountPercentage / 100;
+      } else if (offer.discountAmount && offer.discountAmount > 0) {
+        total = subtotal - offer.discountAmount;
+      }
+
+      // Use shipping quantity in the calculation
+      const shippingQuantity = offer.shippingQuantity || 1;
+      const shippingCostTotal = (offer.shippingCost || 0) * shippingQuantity;
+
+      if (shippingCostTotal > 0) {
+        total += shippingCostTotal;
+        taxAmount += shippingCostTotal * ((offer.taxRate ?? 19) / 100);
+      }
+
+      const formatNumber = (num: number): number => {
+        if (isNaN(num) || !isFinite(num)) return 0;
+        return Math.round(num * 100) / 100;
+      };
+
+      offer.subtotal = formatNumber(subtotal);
+      offer.taxAmount = formatNumber(taxAmount);
+      offer.totalAmount = formatNumber(total + taxAmount);
+
+      await this.offerRepository.save(offer);
+    } catch (error) {
+      console.error("Error calculating offer totals:", error);
     }
   }
 

@@ -180,6 +180,26 @@ export class Offer {
 
   @Column({
     type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  shippingCost!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 1,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  shippingQuantity!: number;
+
+  @Column({
+    type: "decimal",
     precision: 5,
     scale: 2,
     nullable: true,
@@ -242,16 +262,6 @@ export class Offer {
     transformer: numericTransformer,
   })
   subtotal!: number;
-
-  @Column({
-    type: "decimal",
-    precision: 12,
-    scale: 2,
-    default: 0,
-    nullable: true,
-    transformer: numericTransformer,
-  })
-  shippingCost!: number;
 
   @Column({
     type: "decimal",
