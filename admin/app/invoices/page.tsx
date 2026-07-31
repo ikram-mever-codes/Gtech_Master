@@ -1595,7 +1595,7 @@ const InvoiceListPage: React.FC = () => {
                 className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
               >
                 <Plus className="h-4 w-4" />
-                New Cargo
+                Cargo
               </button>
             ) : activeInvTab === "cargo_type" ? (
               <button
@@ -1603,19 +1603,7 @@ const InvoiceListPage: React.FC = () => {
                 className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
               >
                 <Plus className="h-4 w-4" />
-                New Cargo Type
-              </button>
-            ) : activeInvTab === "orders" || activeInvTab === "order_items" ? (
-              <button
-                onClick={() => {
-                  resetForm();
-                  setMode("create");
-                  setShowModal(true);
-                }}
-                className="px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl flex items-center gap-2 font-semibold shadow-sm transition-all text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                New Order
+                Cargo Type
               </button>
             ) : null}
           </div>

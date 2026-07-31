@@ -231,14 +231,6 @@ export default function CountriesPage() {
           className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white"
         />
       </div>
-      <button
-        onClick={fetchCountries}
-        className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
-        title="Refresh"
-      >
-        <RefreshCw className="h-4.5 w-4.5 animate-duration-1000" />
-        Refresh
-      </button>
     </div>
   );
 
@@ -279,9 +271,8 @@ export default function CountriesPage() {
                 <tr
                   key={country.id}
                   onClick={() => handleRowClick(country)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
-                    !country.is_active ? "opacity-60" : ""
-                  }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!country.is_active ? "opacity-60" : ""
+                    }`}
                 >
                   <td className="px-6 py-4 font-mono font-bold text-gray-700">
                     {country.iso2}

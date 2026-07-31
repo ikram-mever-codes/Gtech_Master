@@ -96,28 +96,16 @@ const allMenuItems: MenuEntry[] = [
   {
     icon: Truck,
     text: "Fulfillment",
-    resource: "Delivery",
-    children: [
-      {
-        icon: Receipt,
-        text: "Orders",
-        path: "/invoices",
-        resource: "Invoices",
-      },
-      {
-        icon: ShoppingCart,
-        text: "Order Processing",
-        path: "/orders",
-        resource: "Orders",
-      },
-      {
-        icon: Timer,
-        text: "Scheduled Items",
-        path: "/scheduled",
-        resource: "Scheduled Items",
-      },
-    ],
+    path: "/invoices",
+    resource: "Invoices",
   },
+  {
+    icon: ShoppingCart,
+    text: "Order Processing",
+    path: "/orders",
+    resource: "Orders",
+  },
+
   {
     icon: AlertTriangle,
     text: "Attention",

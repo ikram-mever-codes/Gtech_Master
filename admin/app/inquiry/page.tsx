@@ -1484,7 +1484,7 @@ const CombinedInquiriesPageContent = () => {
               className="px-3 py-2 text-sm bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all flex items-center gap-2"
             >
               <PlusIcon className="h-4 w-4" />
-              New Inquiry
+              Inquiry
             </CustomButton>
           </div>
         </div>

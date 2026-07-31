@@ -1510,15 +1510,6 @@ const OrderPage: React.FC = () => {
         />
         Refresh
       </button>
-
-      <CustomButton
-        gradient={true}
-        onClick={openCreate}
-        className="px-4 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold flex items-center gap-2 h-[38px]"
-      >
-        <PlusIcon className="h-4 w-4" />
-        New Order
-      </CustomButton>
     </div>
   );
 
@@ -1543,17 +1534,6 @@ const OrderPage: React.FC = () => {
                   title={activeTabObj?.label || "Orders"}
                   icon={ShoppingCart}
                 />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <CustomButton
-                  gradient={true}
-                  onClick={openCreate}
-                  size="small"
-                  startIcon={<PlusIcon className="h-4 w-4" />}
-                >
-                  New Order
-                </CustomButton>
               </div>
             </div>
           </div>
