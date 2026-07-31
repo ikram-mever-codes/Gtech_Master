@@ -484,55 +484,44 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
     const matchedProfile =
       taxProfiles.find((tp: any) => {
-        const caseStr = (tp.tax_case || "").toLowerCase();
-        const nameStr = (tp.name || "").toLowerCase();
-        const codeStr = (tp.tax_code || "").toLowerCase();
-        const rateNum = Number(tp.tax_rate ?? tp.rate ?? 0);
+        const caseStr = (tp.tax_case || "").trim();
+        if (caseStr === targetCase) return true;
+
+        const lowerCaseStr = caseStr.toLowerCase();
+        const lowerName = (tp.name || "").toLowerCase();
 
         if (targetCase === "DE-VAT") {
           return (
-            caseStr.includes("de-vat") ||
-            caseStr.includes("de_vat") ||
-            nameStr.includes("de-vat") ||
-            nameStr.includes("standard vat") ||
-            nameStr.includes("de 19") ||
-            codeStr.includes("de") ||
-            rateNum === 19
+            lowerCaseStr === "de-vat" ||
+            lowerCaseStr === "de_vat" ||
+            lowerName.includes("standard vat") ||
+            Number(tp.tax_rate ?? tp.rate ?? 0) === 19
           );
         }
-
         if (targetCase === "EU_IGL") {
           return (
-            caseStr.includes("eu_igl") ||
-            caseStr.includes("eu-igl") ||
-            caseStr.includes("igl") ||
-            nameStr.includes("eu_igl") ||
-            nameStr.includes("eu-igl") ||
-            nameStr.includes("igl")
+            lowerCaseStr === "eu_igl" ||
+            lowerCaseStr === "eu-igl" ||
+            lowerName.includes("eu_igl") ||
+            lowerName.includes("reverse charge")
           );
         }
-
         if (targetCase === "EU_no_valid_VAT_ID") {
           return (
-            caseStr.includes("no_valid") ||
-            caseStr.includes("no valid") ||
-            nameStr.includes("no_valid") ||
-            nameStr.includes("no valid") ||
-            (nameStr.includes("eu") && !nameStr.includes("igl"))
+            lowerCaseStr === "eu_no_valid_vat_id" ||
+            lowerCaseStr === "eu_no_valid" ||
+            lowerName.includes("no_valid") ||
+            lowerName.includes("no valid")
           );
         }
-
         if (targetCase === "third_country") {
           return (
-            caseStr.includes("third") ||
-            caseStr.includes("drittland") ||
-            caseStr.includes("export") ||
-            nameStr.includes("third") ||
-            nameStr.includes("drittland") ||
-            nameStr.includes("export")
+            lowerCaseStr === "third_country" ||
+            lowerCaseStr === "third country" ||
+            lowerName.includes("third") ||
+            lowerName.includes("export")
           );
         }
-
         return false;
       }) || taxProfiles[0];
 
@@ -2179,7 +2168,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         <option value="">None / Not Assigned</option>
                         {taxProfiles.map((tp) => (
                           <option key={tp.id} value={tp.id}>
-                            {tp.name} ({tp.tax_rate ?? tp.rate ?? 0}%)
+                            {tp.tax_case || tp.name}
                           </option>
                         ))}
                       </select>
