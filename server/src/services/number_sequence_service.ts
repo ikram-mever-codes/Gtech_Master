@@ -48,6 +48,11 @@ export class NumberSequenceService {
         sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
         sequence.minDigits = 1;
       }
+      if (sequenceKey === "cargo") {
+        sequence.prefix = "C";
+        sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
+        sequence.minDigits = 1;
+      }
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
@@ -92,6 +97,28 @@ export class NumberSequenceService {
               const parsed = parseInt(lastPart, 10);
               if (!isNaN(parsed) && parsed > maxNum) {
                 maxNum = parsed;
+              }
+            }
+          }
+          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
+        } else if (sequenceKey === "cargo") {
+          const cargos = await manager
+            .getRepository(Cargo)
+            .createQueryBuilder("c")
+            .select(["c.cargo_no"])
+            .where("c.cargo_no LIKE 'C%'")
+            .getMany();
+
+          let maxNum = 0;
+          for (const car of cargos) {
+            if (car.cargo_no) {
+              const val = String(car.cargo_no).trim();
+              const match = val.match(/^C\d{4,6}-(\d+)$/i);
+              if (match) {
+                const parsed = parseInt(match[1], 10);
+                if (!isNaN(parsed) && parsed < 1000 && parsed > maxNum) {
+                  maxNum = parsed;
+                }
               }
             }
           }
@@ -202,7 +229,7 @@ export class NumberSequenceService {
         sequenceKey: "cargo",
         name: "Cargo",
         prefix: "C",
-        formatPattern: "{prefix}{yyyy}{mm}-{number}",
+        formatPattern: "{prefix}{yy}{mm}-{number}",
         minDigits: 1,
       },
       {
@@ -236,6 +263,9 @@ export class NumberSequenceService {
         exists.minDigits = 1;
         if (def.sequenceKey === "customer" && exists.nextRunningNo < 83777) {
           exists.nextRunningNo = 83777;
+        }
+        if (def.sequenceKey === "cargo" && exists.nextRunningNo > 10000) {
+          exists.nextRunningNo = 11;
         }
         await repo.save(exists);
       }
