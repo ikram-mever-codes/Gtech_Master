@@ -362,9 +362,6 @@ export class UpdateOfferDto {
   taxRate?: number;
 
   @IsOptional()
-  shippingTaxRate?: number | string | null;
-
-  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(100)
@@ -379,6 +376,11 @@ export class UpdateOfferDto {
   @IsNumber()
   @Min(0)
   shippingCost?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  shippingQuantity?: number;
 
   @IsOptional()
   @IsString()
@@ -766,22 +768,6 @@ export class OfferController {
     return this.mapTaxProfile(customer?.defaultTaxProfile);
   }
 
-  // Shipping's effective VAT rate: the offer's own override
-  // (shippingTaxRate) if set, otherwise the customer's live tax profile
-  // rate, falling back to the offer's flat taxRate, then 19%.
-  private getEffectiveShippingTaxRate(
-    offer: any,
-    taxProfile?: any | null,
-  ): number {
-    if (offer.shippingTaxRate !== null && offer.shippingTaxRate !== undefined) {
-      return parseFlexibleNumber(offer.shippingTaxRate) ?? 19;
-    }
-    if (taxProfile?.taxRate !== undefined && taxProfile?.taxRate !== null) {
-      return parseFlexibleNumber(taxProfile.taxRate) ?? 19;
-    }
-    return parseFlexibleNumber(offer.taxRate) ?? 19;
-  }
-
   private async generateOfferNumber(): Promise<string> {
     try {
       const { NumberSequenceService } =
@@ -1072,9 +1058,6 @@ export class OfferController {
         currency: createOfferDto.currency || "EUR",
         pricingMode,
         taxRate: createOfferDto.taxRate ?? 19,
-        // shippingTaxRate always starts unset on creation — falls back to
-        // the customer's live tax profile until explicitly overridden.
-        shippingTaxRate: null,
         discountPercentage: createOfferDto.discountPercentage || 0,
         discountAmount: createOfferDto.discountAmount || 0,
         shippingCost: createOfferDto.shippingCost || 0,
@@ -1362,9 +1345,6 @@ export class OfferController {
         isAssembly: false,
         pricingMode,
         taxRate: body.taxRate ?? 19,
-        // Always unset on creation — falls back to the customer's live tax
-        // profile until explicitly overridden.
-        shippingTaxRate: null,
         unitPriceDecimalPlaces: body.unitPriceDecimalPlaces || 3,
         totalPriceDecimalPlaces: body.totalPriceDecimalPlaces || 2,
         maxUnitPriceColumns: body.maxUnitPriceColumns || 3,
@@ -1857,83 +1837,6 @@ export class OfferController {
     }
   }
 
-  private async calculateOfferTotals(offerId: string): Promise<void> {
-    try {
-      const offer = await this.offerRepository.findOne({
-        where: { id: offerId },
-        relations: ["lineItems"],
-      });
-
-      if (!offer) return;
-
-      let subtotal = 0;
-      let taxAmount = 0;
-      const customerItems =
-        offer.lineItems?.filter((item: OfferLineItem) => !item.isComponent) ||
-        [];
-
-      for (const item of customerItems) {
-        const lineTotal = this.getLineItemTotal(item, offer.pricingMode);
-
-        if (lineTotal > 0 && item.lineTotal !== lineTotal) {
-          item.lineTotal = lineTotal;
-          await this.lineItemRepository.save(item);
-        }
-
-        subtotal += lineTotal;
-
-        // Each line item is taxed at its own rate (falling back to the
-        // offer's rate for items that predate per-line rates), and each
-        // line's VAT is summed independently rather than applying one flat
-        // rate to the whole subtotal.
-        const lineTaxRate = (item as any).taxRate ?? offer.taxRate ?? 19;
-        taxAmount += lineTotal * (lineTaxRate / 100);
-      }
-
-      let total = subtotal;
-
-      if (offer.discountPercentage && offer.discountPercentage > 0) {
-        const discount = subtotal * (offer.discountPercentage / 100);
-        total = subtotal - discount;
-        offer.discountAmount = discount;
-        // Discount proportionally reduces the tax base too.
-        taxAmount *= 1 - offer.discountPercentage / 100;
-      } else if (offer.discountAmount && offer.discountAmount > 0) {
-        total = subtotal - offer.discountAmount;
-      }
-
-      if (offer.shippingCost && offer.shippingCost > 0) {
-        total += offer.shippingCost;
-        // Shipping is taxed at its own override rate when set
-        // (offer.shippingTaxRate), otherwise falls back to the offer's
-        // flat taxRate — same precedence used on the frontend's
-        // getShippingTaxRate, minus the live tax-profile fallback (which
-        // isn't available inside this offer-only query; the frontend
-        // layers that in on top when shippingTaxRate is null).
-        const shippingRate =
-          offer.shippingTaxRate !== null && offer.shippingTaxRate !== undefined
-            ? offer.shippingTaxRate
-            : (offer.taxRate ?? 19);
-        taxAmount += offer.shippingCost * (shippingRate / 100);
-      }
-
-      const totalWithTax = total + taxAmount;
-
-      const formatNumber = (num: number): number => {
-        if (isNaN(num) || !isFinite(num)) return 0;
-        return Math.round(num * 100) / 100;
-      };
-
-      offer.subtotal = formatNumber(subtotal);
-      offer.taxAmount = formatNumber(taxAmount);
-      offer.totalAmount = formatNumber(totalWithTax);
-
-      await this.offerRepository.save(offer);
-    } catch (error) {
-      console.error("Error calculating offer totals:", error);
-    }
-  }
-
   async getOfferById(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -2283,6 +2186,10 @@ export class OfferController {
           rawBody.shippingCost !== undefined
             ? parseFlexibleNumberOrZero(rawBody.shippingCost)
             : undefined,
+        shippingQuantity:
+          rawBody.shippingQuantity !== undefined
+            ? parseFlexibleNumberOrZero(rawBody.shippingQuantity)
+            : undefined,
         subtotal:
           rawBody.subtotal !== undefined
             ? parseFlexibleNumberOrZero(rawBody.subtotal)
@@ -2298,16 +2205,6 @@ export class OfferController {
         taxRate:
           rawBody.taxRate !== undefined
             ? parseFlexibleNumberOrZero(rawBody.taxRate)
-            : undefined,
-        // shippingTaxRate is nullable — an explicit null clears the
-        // override (falls back to the live tax profile), so it must be
-        // distinguished from "field not sent at all" (undefined). Only
-        // coerce when the field is actually present in the body.
-        shippingTaxRate:
-          rawBody.shippingTaxRate !== undefined
-            ? rawBody.shippingTaxRate === null || rawBody.shippingTaxRate === ""
-              ? null
-              : parseFlexibleNumber(rawBody.shippingTaxRate)
             : undefined,
       };
 
@@ -2385,6 +2282,7 @@ export class OfferController {
         "unitPriceDecimalPlaces",
         "totalPriceDecimalPlaces",
         "maxUnitPriceColumns",
+        "shippingQuantity", // ADD THIS
       ];
 
       fieldsToUpdate.forEach((field) => {
@@ -2392,14 +2290,6 @@ export class OfferController {
           offer[field] = updateOfferDto[field];
         }
       });
-
-      // shippingTaxRate handled separately from fieldsToUpdate since null
-      // is a meaningful, intentional value here (clears the override) and
-      // must not be skipped by a blanket `!== undefined` check applied to
-      // a field that's expected to sometimes legitimately be null.
-      if (updateOfferDto.shippingTaxRate !== undefined) {
-        offer.shippingTaxRate = updateOfferDto.shippingTaxRate;
-      }
 
       if (updateOfferDto.discountPercentage !== undefined) {
         offer.discountPercentage = updateOfferDto.discountPercentage;
@@ -2409,6 +2299,9 @@ export class OfferController {
       }
       if (updateOfferDto.shippingCost !== undefined) {
         offer.shippingCost = updateOfferDto.shippingCost;
+      }
+      if (updateOfferDto.shippingQuantity !== undefined) {
+        offer.shippingQuantity = updateOfferDto.shippingQuantity;
       }
       if (updateOfferDto.subtotal !== undefined) {
         offer.subtotal = updateOfferDto.subtotal;
@@ -2437,19 +2330,8 @@ export class OfferController {
         );
       }
 
-      if (
-        updateOfferDto.shippingCost !== undefined ||
-        updateOfferDto.discountPercentage !== undefined ||
-        updateOfferDto.discountAmount !== undefined ||
-        updateOfferDto.subtotal !== undefined ||
-        updateOfferDto.taxAmount !== undefined ||
-        updateOfferDto.totalAmount !== undefined ||
-        updateOfferDto.taxRate !== undefined ||
-        updateOfferDto.shippingTaxRate !== undefined ||
-        pricingModeChanged
-      ) {
-        await this.calculateOfferTotals(id);
-      }
+      // Always recalculate totals after any update
+      await this.calculateOfferTotals(id);
 
       const completeOffer = await this.offerRepository.findOne({
         where: { id: updatedOffer.id },
@@ -2478,6 +2360,67 @@ export class OfferController {
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  }
+
+  private async calculateOfferTotals(offerId: string): Promise<void> {
+    try {
+      const offer = await this.offerRepository.findOne({
+        where: { id: offerId },
+        relations: ["lineItems"],
+      });
+
+      if (!offer) return;
+
+      let subtotal = 0;
+      let taxAmount = 0;
+      const customerItems =
+        offer.lineItems?.filter((item: OfferLineItem) => !item.isComponent) ||
+        [];
+
+      for (const item of customerItems) {
+        const lineTotal = this.getLineItemTotal(item, offer.pricingMode);
+        if (lineTotal > 0 && item.lineTotal !== lineTotal) {
+          item.lineTotal = lineTotal;
+          await this.lineItemRepository.save(item);
+        }
+        subtotal += lineTotal;
+        const lineTaxRate = (item as any).taxRate ?? offer.taxRate ?? 19;
+        taxAmount += lineTotal * (lineTaxRate / 100);
+      }
+
+      let total = subtotal;
+
+      if (offer.discountPercentage && offer.discountPercentage > 0) {
+        const discount = subtotal * (offer.discountPercentage / 100);
+        total = subtotal - discount;
+        offer.discountAmount = discount;
+        taxAmount *= 1 - offer.discountPercentage / 100;
+      } else if (offer.discountAmount && offer.discountAmount > 0) {
+        total = subtotal - offer.discountAmount;
+      }
+
+      // Use shipping quantity in the calculation
+      const shippingQuantity = offer.shippingQuantity || 1;
+      const shippingCostTotal = (offer.shippingCost || 0) * shippingQuantity;
+
+      if (shippingCostTotal > 0) {
+        total += shippingCostTotal;
+        taxAmount += shippingCostTotal * ((offer.taxRate ?? 19) / 100);
+      }
+
+      const formatNumber = (num: number): number => {
+        if (isNaN(num) || !isFinite(num)) return 0;
+        return Math.round(num * 100) / 100;
+      };
+
+      offer.subtotal = formatNumber(subtotal);
+      offer.taxAmount = formatNumber(taxAmount);
+      offer.totalAmount = formatNumber(total + taxAmount);
+
+      await this.offerRepository.save(offer);
+    } catch (error) {
+      console.error("Error calculating offer totals:", error);
     }
   }
 
@@ -3665,14 +3608,7 @@ export class OfferController {
               (getSafeNumber(item.baseQuantity) || 1) * unitPriceNum;
           }
 
-          // Each line's own effective VAT rate (falling back to the
-          // offer's flat rate), same precedence used everywhere else this
-          // is calculated, so the PDF's per-row MwSt column and gross
-          // total match what the offer detail view shows.
-          const lineTaxRatePercent = getSafeNumber(
-            item.taxRate ?? offer.taxRate ?? 19,
-          );
-          const grossTotalNum = netTotalNum * (1 + lineTaxRatePercent / 100);
+          const grossTotalNum = netTotalNum * (1 + vatRatePercent / 100);
 
           let nameText = item.itemName || "Item";
           if (item.description) {
@@ -3743,7 +3679,7 @@ export class OfferController {
             qtyStr,
             nameText,
             `${formatNumber(netTotalNum, 2)} ${offer.currency || "EUR"}`,
-            `${lineTaxRatePercent}%`,
+            `${vatRatePercent}%`,
             `${formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3)} ${offer.currency || "EUR"}`,
             `${formatNumber(grossTotalNum, 2)} ${offer.currency || "EUR"}`,
           ];
