@@ -34,6 +34,7 @@ import numberSequenceRoutes from "./routes/number_sequence_routes";
 import paymentMethodRoutes from "./routes/payment_method_routes";
 import shippingMethodRoutes from "./routes/shipping_method_routes";
 import salesPriceRoutes from "./routes/sales_price_routes";
+import customerOrderRoutes from "./routes/customer_orders";
 
 const app: any = express();
 
