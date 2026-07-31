@@ -139,19 +139,75 @@ const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
   return qty * price;
 };
 
-/** Effective VAT rate for a line item: its own rate if set, otherwise the
- * offer's rate. */
-const getLineTaxRate = (item: any, offer: any): number => {
-  const own = parseFlexibleNumber(item?.taxRate);
-  if (own !== null && own !== undefined) return own;
-  return parseFlexibleNumber(offer?.taxRate) ?? 19;
-};
-
 /** An item counts as "Artikel" if it traces back to a catalog item (either
  * picked directly or inherited from an inquiry request); anything added by
- * hand with just a name is a "Freitext" line. */
+ * hand with just a name is a "Freitext" line (a "Freizeile"). This is also
+ * the line type that's allowed a custom, editable VAT rate — everything
+ * else always follows the customer's live tax profile. */
 const isFreetextLine = (item: any): boolean =>
   !item?.sourceItemId && !item?.requestedItemId;
+
+/** Effective VAT rate for a line item.
+ * - Freizeile (freetext) lines: their own stored `taxRate` — editable,
+ *   persisted on the line item — falling back to the tax profile's rate
+ *   only if the line has never had one set.
+ * - Every other line (from a catalog item or an inquiry request): always
+ *   the customer's currently-assigned tax profile rate, resolved fresh on
+ *   every load. Never the line's own `taxRate` field — tax rates change
+ *   often, and these line types must never show a stale, cached one. */
+const getLineTaxRate = (item: any, offer: any): number => {
+  const taxProfileRate = parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
+  if (isFreetextLine(item)) {
+    const own = parseFlexibleNumber(item?.taxRate);
+    return own !== null && own !== undefined ? own : taxProfileRate;
+  }
+  return taxProfileRate;
+};
+
+/** Shipping is always taxed at the customer's live tax profile rate —
+ * never editable, never stored separately on the offer. */
+const getShippingTaxRate = (offer: any): number =>
+  parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
+
+/** All distinct VAT rates currently active on the offer: the tax profile's
+ * rate (counted once, if any non-Freizeile line or shipping cost exists)
+ * plus each Freizeile's own rate. Pass `excludeItemId` when checking
+ * whether a NEW rate for that specific item would be allowed, so its own
+ * current rate doesn't count against itself. */
+const getActiveTaxRates = (offer: any, excludeItemId?: string): Set<number> => {
+  const rates = new Set<number>();
+  const lineItems =
+    offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
+
+  const hasNonFreetext = lineItems.some(
+    (li: any) => !isFreetextLine(li) && li.id !== excludeItemId,
+  );
+  const hasShipping = (offer?.shippingCost || 0) > 0;
+  if (hasNonFreetext || hasShipping) {
+    rates.add(parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19);
+  }
+
+  lineItems.forEach((li: any) => {
+    if (isFreetextLine(li) && li.id !== excludeItemId) {
+      rates.add(getLineTaxRate(li, offer));
+    }
+  });
+
+  return rates;
+};
+
+/** True if `rate` is already one of the offer's active rates (no new slot
+ * needed), or if there's still room for a new one — max 3 distinct VAT
+ * rates per offer, total. */
+const canUseTaxRate = (
+  offer: any,
+  rate: number,
+  excludeItemId?: string,
+): boolean => {
+  const rates = getActiveTaxRates(offer, excludeItemId);
+  if (rates.has(rate)) return true;
+  return rates.size < 3;
+};
 
 // --- Delivery-address-vs-billing comparison ---------------------------------
 const normalizeAddrValue = (v: any): string =>
@@ -516,7 +572,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   }>({
     itemName: "",
     baseQuantity: "1",
-    taxRate: "19",
+    // Empty by default — falls back to the tax profile's rate at submit
+    // time (shown as the input's placeholder) unless the user overrides it.
+    taxRate: "",
   });
 
   const [creating, setCreating] = useState(false);
@@ -1042,14 +1100,32 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       toast.error("Enter a name for the Freizeile first.", errorStyles);
       return;
     }
+
+    // Empty input -> fall back to the tax profile's rate; anything typed
+    // is the user's explicit override for this Freizeile only.
+    const taxProfileRate =
+      parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
+    const requestedRate =
+      newLine.taxRate.trim() === ""
+        ? taxProfileRate
+        : (parseFlexibleNumber(newLine.taxRate) ?? taxProfileRate);
+
+    if (!canUseTaxRate(offer, requestedRate)) {
+      toast.error(
+        "Only 3 different VAT rates are allowed on one offer.",
+        errorStyles,
+      );
+      return;
+    }
+
     try {
       await createOfferLineItem(offer.id, {
         itemName: newLine.itemName.trim(),
         baseQuantity: newLine.baseQuantity?.trim() || "1",
         basePrice: 0,
-        taxRate: parseFlexibleNumber(newLine.taxRate) ?? offer.taxRate ?? 19,
+        taxRate: requestedRate,
       } as any);
-      setNewLine({ itemName: "", baseQuantity: "1", taxRate: "19" });
+      setNewLine({ itemName: "", baseQuantity: "1", taxRate: "" });
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -1114,7 +1190,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-  const sourceBadge = () => {
+  const sourceBadge = (source: string) => {
     const map: Record<
       string,
       { label: string; cls: string; icon: React.ReactNode }
@@ -1178,8 +1254,16 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
 
+  // --- Tax profile (live, resolved fresh from the customer's relation) ---
   const taxProfile = offer?.taxProfile || null;
 
+  // --- Per-rate VAT breakdown ---------------------------------------------
+  // Each visible line item's effective rate (getLineTaxRate) determines
+  // which group its net total falls into; shipping is grouped under the
+  // tax profile's rate. Each group's VAT is computed independently, so a
+  // mixed offer (e.g. two catalog lines at the profile's 19% and one
+  // Freizeile at 7%) shows two separate VAT rows rather than one flat
+  // rate applied to everything.
   const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
     const byRate = new Map<number, number>();
     visibleLineItems.forEach((li: any) => {
@@ -1189,7 +1273,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     });
 
     if (offer?.shippingCost > 0) {
-      const shipRate = parseFlexibleNumber(offer.taxRate) ?? 19;
+      const shipRate = getShippingTaxRate(offer);
       byRate.set(shipRate, (byRate.get(shipRate) || 0) + offer.shippingCost);
     }
 
@@ -1785,7 +1869,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     edit={false}
                     value={
                       taxProfile
-                        ? `${taxProfile.name}`
+                        ? `${taxProfile.name} (${taxProfile.taxRate}%)`
                         : "No tax profile assigned to this customer"
                     }
                   />
@@ -1947,6 +2031,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             (freetext ? "#D8964A" : null);
                           const thumb = item.photo;
                           const lineTaxRate = getLineTaxRate(item, offer);
+                          // Only Freizeile (freetext) lines get an editable
+                          // VAT rate — catalog/inquiry-sourced lines always
+                          // follow the live tax profile and can't be
+                          // overridden here.
+                          const taxRateEditable = freetext;
                           return (
                             <tr
                               key={item.id}
@@ -2022,16 +2111,36 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 )}
                               </td>
                               <td className="px-2 py-2 text-center text-gray-600">
-                                {edit ? (
+                                {edit && taxRateEditable ? (
                                   <div className="flex items-center justify-center gap-0.5">
                                     <DecimalInput
                                       className="w-14 px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                                       value={lineTaxRate}
                                       onCommit={(raw) => {
                                         const parsed = parseFlexibleNumber(raw);
+                                        const taxProfileRate =
+                                          parseFlexibleNumber(
+                                            offer?.taxProfile?.taxRate,
+                                          ) ?? 19;
+                                        const newRate =
+                                          parsed === null
+                                            ? taxProfileRate
+                                            : parsed;
+                                        if (
+                                          !canUseTaxRate(
+                                            offer,
+                                            newRate,
+                                            item.id,
+                                          )
+                                        ) {
+                                          toast.error(
+                                            "Only 3 different VAT rates are allowed on one offer.",
+                                            errorStyles,
+                                          );
+                                          return;
+                                        }
                                         persistLine(item.id, {
-                                          taxRate:
-                                            parsed === null ? 19 : parsed,
+                                          taxRate: newRate,
                                         });
                                       }}
                                     />
@@ -2094,7 +2203,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             </tr>
                           );
                         })}
-                        {/* Shipping method — always the last row */}
+                        {/* Shipping method — always the last row. Its VAT
+                            rate always follows the live tax profile and is
+                            never editable. */}
                         <tr className="bg-gray-100/80">
                           <td className="px-2 py-2 text-gray-400">
                             {visibleLineItems.length + 1}
@@ -2106,7 +2217,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </td>
                           <td className="px-0 py-2 text-center text-gray-400"></td>
                           <td className="px-2 py-2 text-center text-gray-600">
-                            {offer.taxRate ?? 19}%
+                            {getShippingTaxRate(offer)}%
                           </td>
                           <td className="px-2 py-2 text-right text-gray-600">
                             1
@@ -2206,6 +2317,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           <input
                             className={inputCls}
                             value={newLine.taxRate}
+                            placeholder={String(
+                              parseFlexibleNumber(offer?.taxProfile?.taxRate) ??
+                                19,
+                            )}
                             onChange={(e) =>
                               setNewLine((n) => ({
                                 ...n,
@@ -2543,8 +2658,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </div>
                   )}
                   {/* One VAT row per distinct rate present among the line
-                      items (plus shipping's rate) — skips 0% groups since
-                      there's nothing to show there. */}
+                      items (plus shipping) — up to 3 rates total by design,
+                      each shown and summed independently. Skips a 0% group
+                      since there's nothing to display there. */}
                   {vatGroups
                     .filter((g) => g.rate !== 0)
                     .map((g) => (
