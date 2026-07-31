@@ -68,21 +68,31 @@ export const generateInvoicesForOrders = async (
       });
       if (!cargo) continue;
       if (cargo.cargo_type_id) {
-        const cargoType = await cargoTypeRepo.findOne({ where: { id: cargo.cargo_type_id } });
+        const cargoType = await cargoTypeRepo.findOne({
+          where: { id: cargo.cargo_type_id },
+        });
         if (cargoType && cargoType.has_pl === false) {
-          const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: cargoNo } });
+          const existingInvoice = await invoiceRepo.findOne({
+            where: { orderNumber: cargoNo },
+          });
           if (existingInvoice) {
-            await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+            await invoiceItemRepo.delete({
+              invoice: { id: existingInvoice.id },
+            });
             await invoiceRepo.delete(existingInvoice.id);
           }
           continue;
         }
       }
 
-      const linkedCargoOrders = await AppDataSource.getRepository(CargoOrder).find({
+      const linkedCargoOrders = await AppDataSource.getRepository(
+        CargoOrder,
+      ).find({
         where: { cargo_id: cargo.id },
       });
-      const orderIdsFromCargo = linkedCargoOrders.map((co) => co.order_id).filter(Boolean);
+      const orderIdsFromCargo = linkedCargoOrders
+        .map((co) => co.order_id)
+        .filter(Boolean);
 
       const whereConditions: any[] = [{ cargo_id: cargo.id }];
       if (orderIdsFromCargo.length > 0) {
@@ -174,8 +184,8 @@ const syncInvoiceRecord = async (
   const manualTaricsList =
     uniqueCodes.length > 0
       ? await AppDataSource.getRepository(Taric).find({
-        where: { code: In(uniqueCodes) },
-      })
+          where: { code: In(uniqueCodes) },
+        })
       : [];
   const manualTaricMap = new Map(manualTaricsList.map((t) => [t.code, t]));
 
@@ -258,7 +268,6 @@ export const getAllCargos = async (
       limit = 50,
       search = "",
       unassignedOnly = "false",
-      status = "",
       availableOnly = "false",
     } = req.query as any;
 
@@ -267,18 +276,6 @@ export const getAllCargos = async (
     const skip = (pageNum - 1) * limitNum;
 
     const qb = cargoRepo.createQueryBuilder("cargo");
-
-    if (status) {
-      const statuses = status.split(",").map((s: string) => s.trim());
-      qb.andWhere("cargo.cargo_status IN (:...statuses)", { statuses });
-    }
-
-    if (availableOnly === "true") {
-      qb.leftJoin(Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
-      qb.andWhere(
-        "(cargo.cargo_status = 'Open' OR (cargo.cargo_status != 'Shipped' AND cargo.cargo_status != 'Delivered' AND (invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))))",
-      );
-    }
 
     if (search) {
       qb.andWhere(
@@ -310,7 +307,7 @@ export const getAllCargos = async (
     }
 
     const [cargos, total] = await qb
-      .orderBy("cargo.id", "DESC")
+      .orderBy("cargo.createdAt", "DESC") // Changed sorting field to createdAt
       .groupBy("cargo.id")
       .skip(skip)
       .take(limitNum)
@@ -353,6 +350,114 @@ export const getAllCargos = async (
     return next(error);
   }
 };
+
+// export const getAllCargos = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction,
+// ) => {
+//   try {
+//     const cargoRepo = AppDataSource.getRepository(Cargo);
+//     const {
+//       page = 1,
+//       limit = 50,
+//       search = "",
+//       unassignedOnly = "false",
+//       status = "",
+//       availableOnly = "false",
+//     } = req.query as any;
+
+//     const pageNum = Math.max(1, Number(page));
+//     const limitNum = Math.max(1, Math.min(1000, Number(limit)));
+//     const skip = (pageNum - 1) * limitNum;
+
+//     const qb = cargoRepo.createQueryBuilder("cargo");
+
+//     if (status) {
+//       const statuses = status.split(",").map((s: string) => s.trim());
+//       qb.andWhere("cargo.cargo_status IN (:...statuses)", { statuses });
+//     }
+
+//     if (availableOnly === "true") {
+//       qb.leftJoin(Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
+//       qb.andWhere(
+//         "(cargo.cargo_status = 'Open' OR (cargo.cargo_status != 'Shipped' AND cargo.cargo_status != 'Delivered' AND (invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))))",
+//       );
+//     }
+
+//     if (search) {
+//       qb.andWhere(
+//         "(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)",
+//         { search: `%${search}%` },
+//       );
+//     }
+
+//     if (unassignedOnly === "true") {
+//       qb.andWhere((qb) => {
+//         const subQuery = qb
+//           .subQuery()
+//           .select("o.cargo_id")
+//           .from(Order, "o")
+//           .where("o.cargo_id IS NOT NULL")
+//           .getQuery();
+//         return "cargo.id NOT IN " + subQuery;
+//       });
+
+//       qb.andWhere((qb) => {
+//         const subQuery = qb
+//           .subQuery()
+//           .select("co.cargo_id")
+//           .from(CargoOrder, "co")
+//           .where("co.cargo_id IS NOT NULL")
+//           .getQuery();
+//         return "cargo.id NOT IN " + subQuery;
+//       });
+//     }
+
+//     const [cargos, total] = await qb
+//       .orderBy("cargo.id", "DESC")
+//       .groupBy("cargo.id")
+//       .skip(skip)
+//       .take(limitNum)
+//       .getManyAndCount();
+
+//     const cargoIds = cargos.map((c) => c.id);
+//     const itemCountsMap: { [key: number]: number } = {};
+//     if (cargoIds.length > 0) {
+//       const orderItemRepo = AppDataSource.getRepository(OrderItem);
+//       const counts = await orderItemRepo
+//         .createQueryBuilder("oi")
+//         .select("oi.cargo_id", "cargoId")
+//         .addSelect("COUNT(oi.id)", "count")
+//         .where("oi.cargo_id IN (:...cargoIds)", { cargoIds })
+//         .groupBy("oi.cargo_id")
+//         .getRawMany();
+
+//       counts.forEach((c) => {
+//         itemCountsMap[Number(c.cargoId)] = Number(c.count);
+//       });
+//     }
+
+//     const dataWithCounts = cargos.map((c) => ({
+//       ...c,
+//       assignedItemsCount: itemCountsMap[c.id] || 0,
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: dataWithCounts,
+//       pagination: {
+//         page: pageNum,
+//         limit: limitNum,
+//         totalRecords: total,
+//         totalPages: Math.ceil(total / limitNum),
+//       },
+//     });
+//     return;
+//   } catch (error) {
+//     return next(error);
+//   }
+// };
 
 export const getCargoById = async (
   req: Request,
@@ -417,7 +522,10 @@ export const createCargo = async (
       try {
         cargoData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
       } catch (err) {
-        console.warn("Could not generate cargo number using sequence service:", err);
+        console.warn(
+          "Could not generate cargo number using sequence service:",
+          err,
+        );
       }
     }
 
@@ -484,7 +592,9 @@ export const updateCargo = async (
         .set({ orderNumber: newCargoNo })
         .where("orderNumber = :oldNo", { oldNo: oldCargoNo })
         .execute();
-      console.log(`[Cargo] cargo_no changed from "${oldCargoNo}" → "${newCargoNo}": updated linked invoices.`);
+      console.log(
+        `[Cargo] cargo_no changed from "${oldCargoNo}" → "${newCargoNo}": updated linked invoices.`,
+      );
     }
 
     if (Array.isArray(orders)) {
@@ -519,7 +629,6 @@ export const updateCargo = async (
     return next(error);
   }
 };
-
 
 export const deleteCargo = async (
   req: Request,
@@ -589,7 +698,9 @@ export const assignOrdersToCargo = async (
     const orderRepo = AppDataSource.getRepository(Order);
 
     if (validOrderIds.length > 0 && !isSplitMove) {
-      const ordersForOldCargos = await orderRepo.find({ where: { id: In(validOrderIds) } });
+      const ordersForOldCargos = await orderRepo.find({
+        where: { id: In(validOrderIds) },
+      });
       for (const o of ordersForOldCargos) {
         if (o.cargo_id && !oldCargoIds.includes(o.cargo_id)) {
           oldCargoIds.push(o.cargo_id);
@@ -602,7 +713,7 @@ export const assignOrdersToCargo = async (
         }
       }
       await cargoOrderRepo.delete({
-        order_id: In(validOrderIds)
+        order_id: In(validOrderIds),
       });
     }
 
