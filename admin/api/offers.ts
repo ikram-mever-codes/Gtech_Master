@@ -229,7 +229,6 @@ export interface CreateOfferPayload {
 export interface UpdateOfferPayload extends Partial<CreateOfferPayload> {
   status?: Offer["status"];
   subtotal?: number;
-  shippingTaxRate?: number;
   taxAmount?: number;
   totalAmount?: number;
 }
