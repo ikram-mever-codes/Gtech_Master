@@ -90,12 +90,13 @@ import { formatCountryCode } from "@/utils/address";
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 interface Invoice {
@@ -1424,11 +1425,11 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev) =>
         prev
           ? {
-            ...prev,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1629,10 +1630,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </button>
@@ -1646,7 +1648,7 @@ const InvoiceListPage: React.FC = () => {
               type="text"
               placeholder={
                 activeInvTab === "open_invoices" ||
-                  activeInvTab === "closed_invoices"
+                activeInvTab === "closed_invoices"
                   ? "Search invoices, customers, or order numbers..."
                   : activeInvTab === "cargos"
                     ? "Search cargos..."
@@ -1658,7 +1660,7 @@ const InvoiceListPage: React.FC = () => {
               }
               value={
                 activeInvTab === "open_invoices" ||
-                  activeInvTab === "closed_invoices"
+                activeInvTab === "closed_invoices"
                   ? searchTerm
                   : orderNoFilter
               }
@@ -1675,25 +1677,25 @@ const InvoiceListPage: React.FC = () => {
               className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
             />
             {(activeInvTab === "open_invoices" ||
-              activeInvTab === "closed_invoices"
+            activeInvTab === "closed_invoices"
               ? searchTerm
               : orderNoFilter) && (
-                <button
-                  onClick={() => {
-                    if (
-                      activeInvTab === "open_invoices" ||
-                      activeInvTab === "closed_invoices"
-                    ) {
-                      setSearchTerm("");
-                    } else {
-                      setOrderNoFilter("");
-                    }
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (
+                    activeInvTab === "open_invoices" ||
+                    activeInvTab === "closed_invoices"
+                  ) {
+                    setSearchTerm("");
+                  } else {
+                    setOrderNoFilter("");
+                  }
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {activeInvTab === "cargos" && (
@@ -1781,285 +1783,286 @@ const InvoiceListPage: React.FC = () => {
 
         {(activeInvTab === "open_invoices" ||
           activeInvTab === "closed_invoices") && (
-            <>
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                      <p className="text-xs text-[#6C757D]">
-                        Loading invoices...
-                      </p>
-                    </div>
+          <>
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
+                    <p className="text-xs text-[#6C757D]">
+                      Loading invoices...
+                    </p>
                   </div>
-                ) : filteredInvoices.length === 0 ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
-                      <h3 className="text-lg font-medium mb-1 text-[#212529]">
-                        No invoices found
-                      </h3>
-                      <p className="text-xs text-[#6C757D]">
-                        Try adjusting your search or filters
-                      </p>
-                    </div>
+                </div>
+              ) : filteredInvoices.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
+                    <h3 className="text-lg font-medium mb-1 text-[#212529]">
+                      No invoices found
+                    </h3>
+                    <p className="text-xs text-[#6C757D]">
+                      Try adjusting your search or filters
+                    </p>
                   </div>
-                ) : (
-                  <>
-                    <div className="hidden lg:block overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
-                          <tr>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                #
-                              </th>
-                            )}
+                </div>
+              ) : (
+                <>
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
+                        <tr>
+                          {activeInvTab === "closed_invoices" && (
                             <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              <div className="flex items-center gap-1.5">ID</div>
+                              #
                             </th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Invoice No
-                              </th>
-                            )}
+                          )}
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            <div className="flex items-center gap-1.5">ID</div>
+                          </th>
+                          {activeInvTab === "closed_invoices" && (
                             <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Bill To
+                              Invoice No
                             </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Ship To
+                          )}
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Bill To
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Ship To
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Cargo No.
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            {activeInvTab === "open_invoices"
+                              ? "Date created"
+                              : "Closed Date"}
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            {activeInvTab === "open_invoices"
+                              ? "Count Item"
+                              : "Item Count"}
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            {activeInvTab === "open_invoices"
+                              ? "QTY"
+                              : "Total Qty"}
+                          </th>
+                          {activeInvTab === "closed_invoices" && (
+                            <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Total Price
                             </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Cargo No.
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Date created"
-                                : "Closed Date"}
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Count Item"
-                                : "Item Count"}
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "QTY"
-                                : "Total Qty"}
-                            </th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Total Price
-                              </th>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#F1F3F5]">
-                          {currentInvoices.map((invoice, index) => {
-                            return (
-                              <React.Fragment key={invoice.id}>
-                                <tr
-                                  onClick={() =>
-                                    handleOpenInvoiceDetails(invoice)
-                                  }
-                                  className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium"
-                                >
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-[#212529]">
-                                      {startIndex + index + 1}
-                                    </td>
-                                  )}
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-bold">
-                                    {invoice.id.slice(-5).toUpperCase()}
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                                      {invoice.invoiceNumber || "N/A"}
-                                    </td>
-                                  )}
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#F1F3F5]">
+                        {currentInvoices.map((invoice, index) => {
+                          return (
+                            <React.Fragment key={invoice.id}>
+                              <tr
+                                onClick={() =>
+                                  handleOpenInvoiceDetails(invoice)
+                                }
+                                className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium"
+                              >
+                                {activeInvTab === "closed_invoices" && (
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {(() => {
-                                      const v = invoice.bill_to;
-                                      if (!v || typeof v === "object")
-                                        return "N/A";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "N/A";
-                                    })()}
+                                    {startIndex + index + 1}
                                   </td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {(() => {
-                                      const v = invoice.ship_to;
-                                      if (!v || typeof v === "object") return "-";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "-";
-                                    })()}
+                                )}
+                                <td className="py-4 px-4 text-xs text-[#212529] font-bold">
+                                  {invoice.id.slice(-5).toUpperCase()}
+                                </td>
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
+                                    {invoice.invoiceNumber || "N/A"}
                                   </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.cargo?.cargo_no ||
-                                      invoice.cargoNo ||
-                                      invoice.orderNumber ||
-                                      "No Cargo"}
+                                )}
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {(() => {
+                                    const v = invoice.bill_to;
+                                    if (!v || typeof v === "object")
+                                      return "N/A";
+                                    const s = String(v).trim();
+                                    return s.length > 1 ? s : "N/A";
+                                  })()}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#6C757D]">
+                                  {(() => {
+                                    const v = invoice.ship_to;
+                                    if (!v || typeof v === "object") return "-";
+                                    const s = String(v).trim();
+                                    return s.length > 1 ? s : "-";
+                                  })()}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {invoice.cargo?.cargo_no ||
+                                    invoice.cargoNo ||
+                                    invoice.orderNumber ||
+                                    "No Cargo"}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#495057]">
+                                  {formatDate(invoice.invoiceDate)}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {invoice.customItemCount ??
+                                    invoice.items?.length ??
+                                    0}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529] font-medium">
+                                  {invoice.customTotalQty ??
+                                    invoice.items?.reduce(
+                                      (sum: any, item: any) =>
+                                        sum + item.quantity,
+                                      0,
+                                    ) ??
+                                    0}
+                                </td>
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                    {Number(invoice.grossTotal).toLocaleString(
+                                      undefined,
+                                      {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      },
+                                    )}
                                   </td>
-                                  <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {formatDate(invoice.invoiceDate)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.customItemCount ??
-                                      invoice.items?.length ??
-                                      0}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                    {invoice.customTotalQty ??
-                                      invoice.items?.reduce(
-                                        (sum: any, item: any) =>
-                                          sum + item.quantity,
-                                        0,
-                                      ) ??
-                                      0}
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                      {Number(invoice.grossTotal).toLocaleString(
-                                        undefined,
-                                        {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        },
-                                      )}
-                                    </td>
-                                  )}
-                                </tr>
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                )}
+                              </tr>
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
 
-                    <div className="lg:hidden divide-y divide-[#F1F3F5]">
-                      {currentInvoices.map((invoice) => (
-                        <div
-                          key={invoice.id}
-                          onClick={() => handleOpenInvoiceDetails(invoice)}
-                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
-                                {invoice.id.slice(-5).toUpperCase()}
-                              </div>
-                              <div className="font-bold text-sm text-[#212529]">
-                                {activeInvTab === "closed_invoices"
-                                  ? invoice.invoiceNumber
-                                  : `ID: ${invoice.id.slice(-5)}`}
-                              </div>
+                  <div className="lg:hidden divide-y divide-[#F1F3F5]">
+                    {currentInvoices.map((invoice) => (
+                      <div
+                        key={invoice.id}
+                        onClick={() => handleOpenInvoiceDetails(invoice)}
+                        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
+                              {invoice.id.slice(-5).toUpperCase()}
                             </div>
-                            <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
-                              style={getStatusColor(invoice.status)}
-                            >
-                              {invoice.status}
+                            <div className="font-bold text-sm text-[#212529]">
+                              {activeInvTab === "closed_invoices"
+                                ? invoice.invoiceNumber
+                                : `ID: ${invoice.id.slice(-5)}`}
+                            </div>
+                          </div>
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
+                            style={getStatusColor(invoice.status)}
+                          >
+                            {invoice.status}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">Customer</span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.customer?.companyName}
                             </span>
                           </div>
-
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Customer</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customer?.companyName}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">
-                                {activeInvTab === "open_invoices"
-                                  ? "Cargo"
-                                  : "Cargo No."}
-                              </span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.cargo?.cargo_no ||
-                                  invoice.cargoNo ||
-                                  invoice.orderNumber ||
-                                  "-"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Items / Qty</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customItemCount ??
-                                  invoice.items?.length ??
-                                  0}{" "}
-                                /{" "}
-                                {invoice.customTotalQty ??
-                                  invoice.items?.reduce(
-                                    (sum, item) => sum + item.quantity,
-                                    0,
-                                  ) ??
-                                  0}
-                              </span>
-                            </div>
-                            {activeInvTab === "closed_invoices" && (
-                              <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
-                                <span className="text-[#6C757D]">
-                                  Total Price
-                                </span>
-                                <span className="text-[#212529]">
-                                  ${Number(invoice.grossTotal).toFixed(2)}
-                                </span>
-                              </div>
-                            )}
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">
+                              {activeInvTab === "open_invoices"
+                                ? "Cargo"
+                                : "Cargo No."}
+                            </span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.cargo?.cargo_no ||
+                                invoice.cargoNo ||
+                                invoice.orderNumber ||
+                                "-"}
+                            </span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
-                        <div className="text-[11px] font-medium text-[#6C757D]">
-                          Showing {startIndex + 1} to{" "}
-                          {Math.min(endIndex, filteredInvoices.length)} of{" "}
-                          {filteredInvoices.length} invoices
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() =>
-                              setCurrentPage(Math.max(1, currentPage - 1))
-                            }
-                            disabled={currentPage === 1}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
-                          {[...Array(totalPages)].map((_, i) => (
-                            <button
-                              key={i + 1}
-                              onClick={() => setCurrentPage(i + 1)}
-                              className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                                }`}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() =>
-                              setCurrentPage(
-                                Math.min(totalPages, currentPage + 1),
-                              )
-                            }
-                            disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">Items / Qty</span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.customItemCount ??
+                                invoice.items?.length ??
+                                0}{" "}
+                              /{" "}
+                              {invoice.customTotalQty ??
+                                invoice.items?.reduce(
+                                  (sum, item) => sum + item.quantity,
+                                  0,
+                                ) ??
+                                0}
+                            </span>
+                          </div>
+                          {activeInvTab === "closed_invoices" && (
+                            <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
+                              <span className="text-[#6C757D]">
+                                Total Price
+                              </span>
+                              <span className="text-[#212529]">
+                                ${Number(invoice.grossTotal).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </>
-          )}
+                    ))}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
+                      <div className="text-[11px] font-medium text-[#6C757D]">
+                        Showing {startIndex + 1} to{" "}
+                        {Math.min(endIndex, filteredInvoices.length)} of{" "}
+                        {filteredInvoices.length} invoices
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
+                        </button>
+                        {[...Array(totalPages)].map((_, i) => (
+                          <button
+                            key={i + 1}
+                            onClick={() => setCurrentPage(i + 1)}
+                            className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                              currentPage === i + 1
+                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1),
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
 
         {activeInvTab === "cargos" && (
           <div
@@ -2142,7 +2145,7 @@ const InvoiceListPage: React.FC = () => {
                               selectedInvoice.id,
                               selectedInvoice.invoiceNumber,
                               selectedInvoice.cargo?.cargo_no ||
-                              selectedInvoice.cargoNo,
+                                selectedInvoice.cargoNo,
                             );
                           } catch (error) {
                             console.error("PDF Generation failed", error);
@@ -2331,19 +2334,21 @@ const InvoiceListPage: React.FC = () => {
                   <div className="flex border-b border-gray-200">
                     <button
                       onClick={() => setModalActiveTab("taric")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "taric"
-                        ? "border-[#8CC21B] text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "taric"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                     >
                       Taric Summary
                     </button>
                     <button
                       onClick={() => setModalActiveTab("items")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "items"
-                        ? "border-[#8CC21B] text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "items"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                     >
                       Items List
                     </button>
@@ -2374,227 +2379,227 @@ const InvoiceListPage: React.FC = () => {
                           columns={
                             activeInvTab === "closed_invoices"
                               ? [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => it.taricNameEn,
-                                  width: "250px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 600,
-                                          }
-                                          : undefined
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate
-                                      ? `${Number(it.dutyRate).toFixed(2)}`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => it.totalQty,
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => it.unitPrice || "0.00",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    (
-                                      Number(it.totalPrice) || 0
-                                    ).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    }),
-                                  width: "100px",
-                                },
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "250px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 600,
+                                              }
+                                            : undefined
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate
+                                        ? `${Number(it.dutyRate).toFixed(2)}`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                      }),
+                                    width: "100px",
+                                  },
+                                ]
                               : [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => it.taricNameEn,
-                                  width: "250px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 600,
-                                          }
-                                          : undefined
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate
-                                      ? `${Number(it.dutyRate).toFixed(2)}`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => it.totalQty,
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => it.unitPrice || "0.00",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    (
-                                      Number(it.totalPrice) || 0
-                                    ).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    }),
-                                  width: "100px",
-                                },
-                                {
-                                  header: "Operation",
-                                  render: (group: any) => (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTaricGroup(group);
-                                        setSelectedTaricCode("");
-                                        setShowTaricModal(true);
-                                      }}
-                                      className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
-                                    >
-                                      <RefreshCw className="w-3 h-3" /> Set
-                                      taric
-                                    </button>
-                                  ),
-                                  width: "110px",
-                                },
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "250px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 600,
+                                              }
+                                            : undefined
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate
+                                        ? `${Number(it.dutyRate).toFixed(2)}`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                      }),
+                                    width: "100px",
+                                  },
+                                  {
+                                    header: "Operation",
+                                    render: (group: any) => (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedTaricGroup(group);
+                                          setSelectedTaricCode("");
+                                          setShowTaricModal(true);
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
+                                      >
+                                        <RefreshCw className="w-3 h-3" /> Set
+                                        taric
+                                      </button>
+                                    ),
+                                    width: "110px",
+                                  },
+                                ]
                           }
                           expandedRowId={null}
                           totalCols={
                             activeInvTab === "closed_invoices"
                               ? [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "80px",
-                                },
-                                {
-                                  value: (
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                  }),
-                                  width: "100px",
-                                  align: "left",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "80px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    }),
+                                    width: "100px",
+                                    align: "left",
+                                  },
+                                ]
                               : [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "80px",
-                                },
-                                {
-                                  value: (
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                  }),
-                                  width: "100px",
-                                  align: "left",
-                                },
-                                {
-                                  value: "",
-                                  width: "110px",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "80px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    }),
+                                    width: "100px",
+                                    align: "left",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "110px",
+                                  },
+                                ]
                           }
                         />
                       </div>
@@ -2608,257 +2613,257 @@ const InvoiceListPage: React.FC = () => {
                         columns={
                           activeInvTab === "closed_invoices"
                             ? [
-                              {
-                                header: "#",
-                                render: (_: any, idx: number) => idx + 1,
-                                width: "40px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-2 leading-tight py-1"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "350px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) =>
-                                  it.set_taric_code ||
-                                  it.item?.taric?.code ||
-                                  "-",
-                                width: "100px",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <span className="font-bold">{it.qty}</span>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  it.eur_special_price ||
-                                  it._fallbackEk ||
-                                  "0",
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      {totalPrice.toFixed(2)}
-                                    </span>
-                                  );
+                                {
+                                  header: "#",
+                                  render: (_: any, idx: number) => idx + 1,
+                                  width: "40px",
                                 },
-                                width: "80px",
-                                align: "center",
-                              },
-                            ]
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-2 leading-tight py-1"
+                                      title={it.item?.item_name}
+                                    >
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "350px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) =>
+                                    it.set_taric_code ||
+                                    it.item?.taric?.code ||
+                                    "-",
+                                  width: "100px",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <span className="font-bold">{it.qty}</span>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    it.eur_special_price ||
+                                    it._fallbackEk ||
+                                    "0",
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        {totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "80px",
+                                  align: "center",
+                                },
+                              ]
                             : [
-                              {
-                                header: "ID",
-                                render: (it: any) => (
-                                  <div className="flex flex-col gap-1.5 p-1">
-                                    <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
-                                      <FileText className="w-3 h-3" /> {it.id}
+                                {
+                                  header: "ID",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col gap-1.5 p-1">
+                                      <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
+                                        <FileText className="w-3 h-3" /> {it.id}
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setNewQty(it.qty_label || it.qty);
+                                            setQtyRemarks(it.remarks_cn || "");
+                                            setShowQTYModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
+                                        >
+                                          <Package className="w-2.5 h-2.5" />{" "}
+                                          QtyLabel
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setSplitQty(
+                                              Math.floor(it.qty * 0.5),
+                                            );
+                                            setTargetCargoId("");
+                                            setSplitRemarks(
+                                              it.remarks_cn || "",
+                                            );
+                                            setShowSPModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
+                                        >
+                                          <Scissors className="w-2.5 h-2.5" />{" "}
+                                          Split
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setTargetCargoId(it.cargo_id || "");
+                                            setShowREModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
+                                        >
+                                          <RefreshCw className="w-2.5 h-2.5" />{" "}
+                                          ReAssign
+                                        </button>
+                                      </div>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setNewQty(it.qty_label || it.qty);
-                                          setQtyRemarks(it.remarks_cn || "");
-                                          setShowQTYModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
-                                      >
-                                        <Package className="w-2.5 h-2.5" />{" "}
-                                        QtyLabel
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setSplitQty(
-                                            Math.floor(it.qty * 0.5),
-                                          );
-                                          setTargetCargoId("");
-                                          setSplitRemarks(
-                                            it.remarks_cn || "",
-                                          );
-                                          setShowSPModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
-                                      >
-                                        <Scissors className="w-2.5 h-2.5" />{" "}
-                                        Split
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setTargetCargoId(it.cargo_id || "");
-                                          setShowREModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
-                                      >
-                                        <RefreshCw className="w-2.5 h-2.5" />{" "}
-                                        ReAssign
-                                      </button>
-                                    </div>
-                                  </div>
-                                ),
-                                width: "100px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-3 leading-tight break-words"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "250px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) =>
-                                  it.set_taric_code || it.item?.taric?.code,
-                                width: "90px",
-                              },
-                              {
-                                header: "Remark",
-                                render: (it: any) =>
-                                  `// ${it.remark_de || ""}`,
-                                width: "80px",
-                              },
-                              {
-                                header: "Order_no",
-                                render: (it: any) =>
-                                  it.order?.order_no || "-",
-                                width: "80px",
-                              },
-                              {
-                                header: "SOID",
-                                render: (it: any) =>
-                                  it.supplier_order_id || "-",
-                                width: "50px",
-                              },
-                              {
-                                header: "Status",
-                                render: (it: any) => it.status,
-                                width: "60px",
-                              },
-                              {
-                                header: "V(dm³)",
-                                render: (it: any) => it.v?.toFixed(2),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "W(kg)",
-                                render: (it: any) => it.w?.toFixed(2),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <div className="flex flex-col items-center">
-                                    <span className="font-bold">
-                                      {it.qty_label
-                                        ? `${it.qty_label}/${it.qty}`
-                                        : it.qty}
-                                    </span>
-                                  </div>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  it.eur_special_price ||
-                                  it._fallbackEk ||
-                                  "0",
-                                width: "45px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      {totalPrice.toFixed(2)}
-                                    </span>
-                                  );
+                                  ),
+                                  width: "100px",
                                 },
-                                width: "65px",
-                                align: "center",
-                              },
-                              {
-                                header: "Action",
-                                render: (it: any) =>
-                                  it.item?.is_eur_special === "Y" &&
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-3 leading-tight break-words"
+                                      title={it.item?.item_name}
+                                    >
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "250px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) =>
+                                    it.set_taric_code || it.item?.taric?.code,
+                                  width: "90px",
+                                },
+                                {
+                                  header: "Remark",
+                                  render: (it: any) =>
+                                    `// ${it.remark_de || ""}`,
+                                  width: "80px",
+                                },
+                                {
+                                  header: "Order_no",
+                                  render: (it: any) =>
+                                    it.order?.order_no || "-",
+                                  width: "80px",
+                                },
+                                {
+                                  header: "SOID",
+                                  render: (it: any) =>
+                                    it.supplier_order_id || "-",
+                                  width: "50px",
+                                },
+                                {
+                                  header: "Status",
+                                  render: (it: any) => it.status,
+                                  width: "60px",
+                                },
+                                {
+                                  header: "V(dm³)",
+                                  render: (it: any) => it.v?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "W(kg)",
+                                  render: (it: any) => it.w?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col items-center">
+                                      <span className="font-bold">
+                                        {it.qty_label
+                                          ? `${it.qty_label}/${it.qty}`
+                                          : it.qty}
+                                      </span>
+                                    </div>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    it.eur_special_price ||
+                                    it._fallbackEk ||
+                                    "0",
+                                  width: "45px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        {totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "65px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "Action",
+                                  render: (it: any) =>
+                                    it.item?.is_eur_special === "Y" &&
                                     (!it.eur_special_price ||
                                       Number(it.eur_special_price) === 0) ? (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setExpandedPriceItemId(
-                                          expandedPriceItemId === it.id
-                                            ? null
-                                            : it.id,
-                                        );
-                                        setEditingPrice(
-                                          it.eur_special_price || 0,
-                                        );
-                                      }}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
-                                    >
-                                      <DollarSign className="w-3.5 h-3.5" />{" "}
-                                      SET EUR PRICE
-                                    </button>
-                                  ) : null,
-                                width: "120px",
-                              },
-                            ]
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedPriceItemId(
+                                            expandedPriceItemId === it.id
+                                              ? null
+                                              : it.id,
+                                          );
+                                          setEditingPrice(
+                                            it.eur_special_price || 0,
+                                          );
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
+                                      >
+                                        <DollarSign className="w-3.5 h-3.5" />{" "}
+                                        SET EUR PRICE
+                                      </button>
+                                    ) : null,
+                                  width: "120px",
+                                },
+                              ]
                         }
                         expandedRowId={expandedPriceItemId}
                         renderRowDetails={(it: any) => (
@@ -2943,17 +2948,10 @@ const InvoiceListPage: React.FC = () => {
                     typeof window !== "undefined" ? document.body : undefined
                   }
                   styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                  options={cargos
-                    .filter((c) => {
-                      const status = (c.cargo_status || "")
-                        .trim()
-                        .toLowerCase();
-                      return status !== "shipped" && status !== "delivered";
-                    })
-                    .map((c) => ({
-                      value: String(c.id),
-                      label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                    }))}
+                  options={cargos.map((c) => ({
+                    value: String(c.id),
+                    label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
+                  }))}
                   value={
                     cargos
                       .map((c) => ({
