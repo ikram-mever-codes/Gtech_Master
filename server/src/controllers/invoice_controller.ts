@@ -1140,19 +1140,19 @@ export class InvoiceController {
           status: cciInvoice.status,
           customer: cciInvoice.customer
             ? {
-                id: cciInvoice.customer.original_customer_id || cciInvoice.customer.id,
-                companyName: cciInvoice.customer.company_name,
-                email: cciInvoice.customer.email,
-              }
+              id: cciInvoice.customer.original_customer_id || cciInvoice.customer.id,
+              companyName: cciInvoice.customer.company_name,
+              email: cciInvoice.customer.email,
+            }
             : null,
         },
         cargo: cciInvoice.cargo_no
           ? {
-              id: cciInvoice.cargo_no,
-              cargo_no: cciInvoice.cargo_no,
-              ship_to: cciInvoice.customer?.ship_to_address || null,
-              bill_to: "GTech Industries GmbH",
-            }
+            id: cciInvoice.cargo_no,
+            cargo_no: cciInvoice.cargo_no,
+            ship_to: cciInvoice.customer?.ship_to_address || null,
+            bill_to: "GTech Industries GmbH",
+          }
           : null,
         orderNosInCargo: [cciInvoice.order_number].filter(Boolean),
         detailedItems,
@@ -1309,8 +1309,8 @@ export class InvoiceController {
     const manualTarics =
       uniqueManualCodes.length > 0
         ? await AppDataSource.getRepository(Taric).find({
-            where: { code: In(uniqueManualCodes) },
-          })
+          where: { code: In(uniqueManualCodes) },
+        })
         : [];
     const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -2184,12 +2184,63 @@ export class InvoiceController {
           await cciCustomerRepo.save(cciCustomer);
         }
 
-        const cargoNo = (invoice as any).cargoNo || invoice.orderNumber || "";
+        const orderRepo = AppDataSource.getRepository(Order);
+        const cargoRepo = AppDataSource.getRepository(Cargo);
+        const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+
+        let finalCargoNo = (invoice as any).cargoNo || invoice.orderNumber || "";
+
+        try {
+          const matchingOrder = await orderRepo.findOne({
+            where: [
+              { order_no: invoice.orderNumber },
+              { id: isNaN(Number(invoice.orderNumber)) ? -1 : Number(invoice.orderNumber) },
+            ],
+          });
+
+          if (matchingOrder) {
+            const cargoOrders = await cargoOrderRepo.find({
+              where: { order_id: matchingOrder.id },
+              relations: ["cargo"],
+            });
+            const linkedCargos = cargoOrders.map((co) => co.cargo).filter(Boolean);
+
+            for (const cargo of linkedCargos) {
+              const isOfficialSeq = /^C\d{4,6}-\d+$/i.test(cargo.cargo_no || "");
+              if (!isOfficialSeq && cargo.cargo_no && cargo.cargo_no.trim()) {
+                const customCargoNo = cargo.cargo_no.trim();
+
+                if (cargo.remark && cargo.remark.trim()) {
+                  if (!cargo.remark.includes(customCargoNo)) {
+                    cargo.remark = `${cargo.remark} | ${customCargoNo}`;
+                  }
+                } else {
+                  cargo.remark = customCargoNo;
+                }
+
+                try {
+                  const officialCargoNo = await NumberSequenceService.getNextNumber("cargo");
+                  cargo.cargo_no = officialCargoNo;
+                  finalCargoNo = officialCargoNo;
+                } catch (err) {
+                  console.warn("Could not generate sequence cargo_no on invoice close:", err);
+                }
+
+                await cargoRepo.save(cargo);
+              } else if (cargo.cargo_no) {
+                finalCargoNo = cargo.cargo_no;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("Error processing cargo transition on invoice closure:", err);
+        }
+
         const cciInvoice = cciInvoiceRepo.create({
           id: invoice.id,
           invoice_number: invoice.invoiceNumber,
           order_number: invoice.orderNumber,
-          cargo_no: cargoNo,
+          cargo_no: finalCargoNo,
           invoice_date: invoice.invoiceDate || new Date(),
           delivery_date: invoice.deliveryDate || new Date(),
           due_date: invoice.dueDate,

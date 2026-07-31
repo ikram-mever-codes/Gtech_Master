@@ -412,8 +412,13 @@ export const createCargo = async (
 
     const { id, created_at, updated_at, orders, orderItems, ...cargoData } =
       req.body;
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const defaultPrefix = `C${yy}${mm}-`;
 
-    if (!cargoData.cargo_no || !cargoData.cargo_no.trim()) {
+    const rawCargoNo = (cargoData.cargo_no || "").trim();
+    if (!rawCargoNo || rawCargoNo === defaultPrefix) {
       try {
         cargoData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
       } catch (err) {
@@ -470,6 +475,8 @@ export const updateCargo = async (
       orderItems,
       ...updateData
     } = req.body;
+
+
 
     const oldCargoNo = cargo.cargo_no;
     cargoRepo.merge(cargo, updateData);
