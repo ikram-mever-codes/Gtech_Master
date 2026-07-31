@@ -16,6 +16,39 @@ export const createAuftragFromOffer = async (
   }
 };
 
+export const createAuftragFromInquiry = async (
+  inquiryId: string,
+  payload?: { title?: string; paymentMethod?: string; shippingMethod?: string; notes?: string },
+) => {
+  try {
+    const response: any = await api.post(
+      `/customer-orders/from-inquiry/${inquiryId}`,
+      payload || {},
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to create Auftrag from Inquiry");
+    throw error;
+  }
+};
+
+export const createAuftragFromItems = async (payload: {
+  customerId: string;
+  selectedItems: Array<{ itemId: string | number; qty: number; price?: number; itemName?: string; notes?: string }>;
+  title?: string;
+  paymentMethod?: string;
+  shippingMethod?: string;
+  notes?: string;
+}) => {
+  try {
+    const response: any = await api.post("/customer-orders/from-items", payload);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to create Auftrag from Items");
+    throw error;
+  }
+};
+
 export const getAllCustomerOrders = async () => {
   try {
     const response: any = await api.get("/customer-orders");

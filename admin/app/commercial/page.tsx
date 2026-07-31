@@ -96,6 +96,7 @@ import {
   updateTransferOrderStatus,
 } from "@/api/transfer_orders";
 import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
+import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
@@ -351,6 +352,7 @@ const InvoiceListPage: React.FC = () => {
   const [loadingBestellungen, setLoadingBestellungen] = useState(false);
   const [selectedAuftragForBestellungModal, setSelectedAuftragForBestellungModal] = useState<any>(null);
   const [showAuftragToBestellungModal, setShowAuftragToBestellungModal] = useState(false);
+  const [showAuftragCreateModal, setShowAuftragCreateModal] = useState(false);
 
   const fetchBestellungen = useCallback(async () => {
     setLoadingBestellungen(true);
@@ -2363,9 +2365,13 @@ const InvoiceListPage: React.FC = () => {
             {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
               <CustomButton
                 onClick={() => {
-                  resetForm();
-                  setMode("create");
-                  setShowModal(true);
+                  if (activeInvTab === "auftrag") {
+                    setShowAuftragCreateModal(true);
+                  } else {
+                    resetForm();
+                    setMode("create");
+                    setShowModal(true);
+                  }
                 }}
                 gradient
                 size="small"
@@ -4191,6 +4197,16 @@ const InvoiceListPage: React.FC = () => {
             onSuccess={() => {
               fetchOrders();
               fetchBestellungen();
+            }}
+          />
+        )}
+
+        {showAuftragCreateModal && (
+          <AuftragCreateModal
+            isOpen={showAuftragCreateModal}
+            onClose={() => setShowAuftragCreateModal(false)}
+            onSuccess={() => {
+              fetchOrders();
             }}
           />
         )}
