@@ -378,6 +378,11 @@ export class UpdateOfferDto {
   shippingCost?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  shippingQuantity?: number;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 
@@ -2277,6 +2282,7 @@ export class OfferController {
         "unitPriceDecimalPlaces",
         "totalPriceDecimalPlaces",
         "maxUnitPriceColumns",
+        "shippingQuantity", // ADD THIS
       ];
 
       fieldsToUpdate.forEach((field) => {

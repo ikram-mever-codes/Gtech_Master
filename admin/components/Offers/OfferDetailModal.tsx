@@ -986,73 +986,73 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   };
 
-const handleSave = async () => {
-  if (!offer) return;
-  if (!form.title?.trim()) {
-    toast.error("Title can't be empty.", errorStyles);
-    return;
-  }
-  
-  setSaving(true);
-  
-  // Add a timeout to prevent infinite loading
-  const saveTimeout = setTimeout(() => {
-    setSaving(false);
-    toast.error("Save operation timed out. Please try again.", errorStyles);
-  }, 30000); // 30 second timeout
-  
-  try {
-    const payload = {
-      title: form.title,
-      status: form.status,
-      currency: form.currency,
-      validUntil: form.validUntil,
-      deliveryTime: form.deliveryTime,
-      paymentTerms: form.paymentTerms,
-      paymentMethod: form.paymentMethod || undefined,
-      shippingMethod: form.shippingMethod || undefined,
-      deliveryTerms: form.deliveryTerms,
-      termsConditions: form.termsConditions,
-      notes: form.notes,
-      internalNotes: form.internalNotes,
-      highlightColor: form.highlightColor ?? "",
-      deliveryAddress: form.deliveryAddress,
-      discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
-      shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
-      shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
-      taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
-      pricingMode: form.pricingMode,
-      unitPriceDecimalPlaces: form.unitPriceDecimalPlaces,
-      totalPriceDecimalPlaces: form.totalPriceDecimalPlaces,
-      maxUnitPriceColumns: form.maxUnitPriceColumns,
-    };
-
-    console.log("Saving offer with payload:", payload);
-
-    const res = await updateOffer(offer.id, payload);
-    
-    clearTimeout(saveTimeout); // Clear the timeout since we got a response
-    
-    if (res.success) {
-      toast.success("Offer updated successfully.", successStyles);
-      await refreshLocal();
-      setEdit(false);
-      onChanged?.();
-    } else {
-      toast.error(res.message || "Failed to update offer.", errorStyles);
+  const handleSave = async () => {
+    if (!offer) return;
+    if (!form.title?.trim()) {
+      toast.error("Title can't be empty.", errorStyles);
+      return;
     }
-  } catch (e: any) {
-    clearTimeout(saveTimeout);
-    console.error("Error saving offer:", e);
-    toast.error(
-      e.message || "An error occurred while saving. Please try again.",
-      errorStyles
-    );
-  } finally {
-    // Ensure saving is set to false even if there's an error
-    setSaving(false);
-  }
-};
+
+    setSaving(true);
+
+    // Add a timeout to prevent infinite loading
+    const saveTimeout = setTimeout(() => {
+      setSaving(false);
+      toast.error("Save operation timed out. Please try again.", errorStyles);
+    }, 30000); // 30 second timeout
+
+    try {
+      const payload = {
+        title: form.title,
+        status: form.status,
+        currency: form.currency,
+        validUntil: form.validUntil,
+        deliveryTime: form.deliveryTime,
+        paymentTerms: form.paymentTerms,
+        paymentMethod: form.paymentMethod || undefined,
+        shippingMethod: form.shippingMethod || undefined,
+        deliveryTerms: form.deliveryTerms,
+        termsConditions: form.termsConditions,
+        notes: form.notes,
+        internalNotes: form.internalNotes,
+        highlightColor: form.highlightColor ?? "",
+        deliveryAddress: form.deliveryAddress,
+        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
+        shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
+        shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
+        taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
+        pricingMode: form.pricingMode,
+        unitPriceDecimalPlaces: form.unitPriceDecimalPlaces,
+        totalPriceDecimalPlaces: form.totalPriceDecimalPlaces,
+        maxUnitPriceColumns: form.maxUnitPriceColumns,
+      };
+
+      console.log("Saving offer with payload:", payload);
+
+      const res = await updateOffer(offer.id, payload);
+
+      clearTimeout(saveTimeout); // Clear the timeout since we got a response
+
+      if (res.success) {
+        toast.success("Offer updated successfully.", successStyles);
+        await refreshLocal();
+        setEdit(false);
+        onChanged?.();
+      } else {
+        toast.error(res.message || "Failed to update offer.", errorStyles);
+      }
+    } catch (e: any) {
+      clearTimeout(saveTimeout);
+      console.error("Error saving offer:", e);
+      toast.error(
+        e.message || "An error occurred while saving. Please try again.",
+        errorStyles,
+      );
+    } finally {
+      // Ensure saving is set to false even if there's an error
+      setSaving(false);
+    }
+  };
   const handleCancelEdit = () => {
     setForm(buildForm(offer));
     setEdit(false);
@@ -1341,9 +1341,11 @@ const handleSave = async () => {
       byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
     });
 
-    // FIX: Only add shipping once, using the total (quantity * cost)
-    const shippingTotal =
-      (offer?.shippingCost || 0) * (offer?.shippingQuantity || 1);
+    // Use real-time shipping total from form state when editing, otherwise from offer
+    const shippingTotal = edit
+      ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
+      : (offer?.shippingCost || 0) * (offer?.shippingQuantity || 1);
+
     if (shippingTotal > 0) {
       const shipRate = getShippingTaxRate(offer);
       byRate.set(shipRate, (byRate.get(shipRate) || 0) + shippingTotal);
@@ -1364,7 +1366,6 @@ const handleSave = async () => {
       })
       .sort((a, b) => b.rate - a.rate);
   })();
-
   // --- Linked documents ---------------------------------------------------
   const linkedDocsCount = linkedDocs
     ? (
@@ -2290,81 +2291,87 @@ const handleSave = async () => {
                         })}
 
                         {/* Shipping method row with editable quantity and price */}
-                        <tr className="bg-gray-50/80 border-t-2 border-gray-200">
-                          <td className="px-2 py-2 text-gray-400">
-                            {visibleLineItems.length + 1}
-                          </td>
-                          <td className="px-2 py-2 text-gray-400"></td>
-                          <td className="px-2 py-2 text-gray-400">—</td>
-                          <td className="px-2 py-2">
-                            {edit ? (
-                              <input
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
-                                value={offer.shippingMethod || ""}
-                                onChange={(e) =>
-                                  patch({ shippingMethod: e.target.value })
-                                }
-                                placeholder="Shipping method"
-                              />
-                            ) : (
-                              <span className="font-medium text-gray-700">
-                                {offer.shippingMethod ||
-                                  "No shipping method set"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-0 py-2 text-center text-gray-400"></td>
-                          <td className="px-2 py-2 text-center text-gray-600">
-                            {getShippingTaxRate(offer)}%
-                          </td>
-                          <td className="px-2 py-2">
-                            {edit ? (
-                              <DecimalInput
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
-                                value={offer.shippingQuantity || 1}
-                                onCommit={(raw) => {
-                                  const val = parseFloat(raw.replace(",", "."));
-                                  if (!isNaN(val) && val > 0) {
-                                    patch({ shippingQuantity: val });
+                        {offer.shippingMethod && (
+                          <tr className="bg-gray-50/80 border-t-2 border-gray-200">
+                            <td className="px-2 py-2 text-gray-400">
+                              {visibleLineItems.length + 1}
+                            </td>
+                            <td className="px-2 py-2 text-gray-400"></td>
+                            <td className="px-2 py-2 text-gray-400">—</td>
+                            <td className="px-2 py-2">
+                              {edit ? (
+                                <input
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
+                                  value={form.shippingMethod || ""}
+                                  onChange={(e) =>
+                                    patch({ shippingMethod: e.target.value })
                                   }
-                                }}
-                              />
-                            ) : (
-                              <div className="text-right font-medium">
-                                {offer.shippingQuantity || 1}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-2 py-2">
-                            {edit ? (
-                              <DecimalInput
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
-                                value={offer.shippingCost || 0}
-                                onCommit={(raw) => {
-                                  const val = parseFloat(raw.replace(",", "."));
-                                  if (!isNaN(val) && val >= 0) {
-                                    patch({ shippingCost: val });
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <div className="text-right font-medium">
-                                {formatCurrency(
-                                  offer.shippingCost || 0,
-                                  offer.currency,
-                                )}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-2 py-2 text-right font-bold text-gray-800">
-                            {formatCurrency(
-                              (offer.shippingCost || 0) *
-                                (offer.shippingQuantity || 1),
-                              offer.currency,
-                            )}
-                          </td>
-                          {edit && <td />}
-                        </tr>
+                                  placeholder="Shipping method"
+                                />
+                              ) : (
+                                <span className="font-medium text-gray-700">
+                                  {offer.shippingMethod ||
+                                    "No shipping method set"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-0 py-2 text-center text-gray-400"></td>
+                            <td className="px-2 py-2 text-center text-gray-600">
+                              {getShippingTaxRate(offer)}%
+                            </td>
+                            <td className="px-2 py-2">
+                              {edit ? (
+                                <DecimalInput
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
+                                  value={form.shippingQuantity ?? 1}
+                                  onCommit={(raw) => {
+                                    const val = parseFloat(
+                                      raw.replace(",", "."),
+                                    );
+                                    if (!isNaN(val) && val > 0) {
+                                      patch({ shippingQuantity: val });
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="text-right font-medium">
+                                  {offer.shippingQuantity || 1}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-2 py-2">
+                              {edit ? (
+                                <DecimalInput
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
+                                  value={form.shippingCost ?? 0}
+                                  onCommit={(raw) => {
+                                    const val = parseFloat(
+                                      raw.replace(",", "."),
+                                    );
+                                    if (!isNaN(val) && val >= 0) {
+                                      patch({ shippingCost: val });
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="text-right font-medium">
+                                  {formatCurrency(
+                                    offer.shippingCost || 0,
+                                    offer.currency,
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-right font-bold text-gray-800">
+                              {formatCurrency(
+                                (form.shippingCost || 0) *
+                                  (form.shippingQuantity || 1),
+                                offer.currency,
+                              )}
+                            </td>
+                            {edit && <td />}
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -2778,27 +2785,7 @@ const handleSave = async () => {
                       </span>
                     </div>
                   )}
-                  {offer.shippingCost > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Shipping{" "}
-                        {offer.shippingQuantity && offer.shippingQuantity > 1
-                          ? `(${offer.shippingQuantity} × ${formatCurrency(offer.shippingCost / (offer.shippingQuantity || 1), offer.currency)})`
-                          : ""}
-                      </span>
-                      <span className="font-medium">
-                        {formatCurrency(
-                          (offer.shippingCost || 0) *
-                            (offer.shippingQuantity || 1),
-                          offer.currency,
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  {/* One VAT row per distinct rate present among the line
-      items (plus shipping) — up to 3 rates total by design,
-      each shown and summed independently. Skips a 0% group
-      since there's nothing to display there. */}
+
                   {vatGroups
                     .filter((g) => g.rate !== 0)
                     .map((g) => (
