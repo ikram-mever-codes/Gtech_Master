@@ -6,9 +6,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Item } from "./items";
-// Assuming you have a Customer entity, if not, use customer_id: number
-// import { Customer } from "./customers";
-
+import { Customer } from "./customers";
 @Entity("sales_prices")
 export class SalesPrice {
   @PrimaryGeneratedColumn()
@@ -17,8 +15,8 @@ export class SalesPrice {
   @Column()
   item_id!: number;
 
-  @Column({ nullable: true })
-  customer_id?: number; // NULL = Standardpreis
+  @Column({ type: "int", nullable: true })
+  customer_id?: number | null; // NULL = Standardpreis
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 1 })
   min_quantity!: number;
@@ -29,4 +27,8 @@ export class SalesPrice {
   @ManyToOne(() => Item)
   @JoinColumn({ name: "item_id" })
   item!: Item;
+
+  @ManyToOne(() => Customer, { onDelete: "CASCADE", nullable: true })
+  @JoinColumn({ name: "customer_id" })
+  customer?: Customer | null;
 }

@@ -268,6 +268,7 @@ export const getAllCargos = async (
       limit = 50,
       search = "",
       unassignedOnly = "false",
+      status = "",
       availableOnly = "false",
     } = req.query as any;
 
@@ -276,6 +277,18 @@ export const getAllCargos = async (
     const skip = (pageNum - 1) * limitNum;
 
     const qb = cargoRepo.createQueryBuilder("cargo");
+
+    if (status) {
+      const statuses = status.split(",").map((s: string) => s.trim());
+      qb.andWhere("cargo.cargo_status IN (:...statuses)", { statuses });
+    }
+
+    if (availableOnly === "true") {
+      qb.leftJoin(Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
+      qb.andWhere(
+        "(cargo.cargo_status = 'Open' OR (cargo.cargo_status != 'Shipped' AND cargo.cargo_status != 'Delivered' AND (invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))))",
+      );
+    }
 
     if (search) {
       qb.andWhere(
@@ -307,7 +320,7 @@ export const getAllCargos = async (
     }
 
     const [cargos, total] = await qb
-      .orderBy("cargo.created_at", "DESC") // Changed sorting field to createdAt
+      .orderBy("cargo.id", "DESC")
       .groupBy("cargo.id")
       .skip(skip)
       .take(limitNum)
@@ -350,114 +363,6 @@ export const getAllCargos = async (
     return next(error);
   }
 };
-
-// export const getAllCargos = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction,
-// ) => {
-//   try {
-//     const cargoRepo = AppDataSource.getRepository(Cargo);
-//     const {
-//       page = 1,
-//       limit = 50,
-//       search = "",
-//       unassignedOnly = "false",
-//       status = "",
-//       availableOnly = "false",
-//     } = req.query as any;
-
-//     const pageNum = Math.max(1, Number(page));
-//     const limitNum = Math.max(1, Math.min(1000, Number(limit)));
-//     const skip = (pageNum - 1) * limitNum;
-
-//     const qb = cargoRepo.createQueryBuilder("cargo");
-
-//     if (status) {
-//       const statuses = status.split(",").map((s: string) => s.trim());
-//       qb.andWhere("cargo.cargo_status IN (:...statuses)", { statuses });
-//     }
-
-//     if (availableOnly === "true") {
-//       qb.leftJoin(Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
-//       qb.andWhere(
-//         "(cargo.cargo_status = 'Open' OR (cargo.cargo_status != 'Shipped' AND cargo.cargo_status != 'Delivered' AND (invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))))",
-//       );
-//     }
-
-//     if (search) {
-//       qb.andWhere(
-//         "(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)",
-//         { search: `%${search}%` },
-//       );
-//     }
-
-//     if (unassignedOnly === "true") {
-//       qb.andWhere((qb) => {
-//         const subQuery = qb
-//           .subQuery()
-//           .select("o.cargo_id")
-//           .from(Order, "o")
-//           .where("o.cargo_id IS NOT NULL")
-//           .getQuery();
-//         return "cargo.id NOT IN " + subQuery;
-//       });
-
-//       qb.andWhere((qb) => {
-//         const subQuery = qb
-//           .subQuery()
-//           .select("co.cargo_id")
-//           .from(CargoOrder, "co")
-//           .where("co.cargo_id IS NOT NULL")
-//           .getQuery();
-//         return "cargo.id NOT IN " + subQuery;
-//       });
-//     }
-
-//     const [cargos, total] = await qb
-//       .orderBy("cargo.id", "DESC")
-//       .groupBy("cargo.id")
-//       .skip(skip)
-//       .take(limitNum)
-//       .getManyAndCount();
-
-//     const cargoIds = cargos.map((c) => c.id);
-//     const itemCountsMap: { [key: number]: number } = {};
-//     if (cargoIds.length > 0) {
-//       const orderItemRepo = AppDataSource.getRepository(OrderItem);
-//       const counts = await orderItemRepo
-//         .createQueryBuilder("oi")
-//         .select("oi.cargo_id", "cargoId")
-//         .addSelect("COUNT(oi.id)", "count")
-//         .where("oi.cargo_id IN (:...cargoIds)", { cargoIds })
-//         .groupBy("oi.cargo_id")
-//         .getRawMany();
-
-//       counts.forEach((c) => {
-//         itemCountsMap[Number(c.cargoId)] = Number(c.count);
-//       });
-//     }
-
-//     const dataWithCounts = cargos.map((c) => ({
-//       ...c,
-//       assignedItemsCount: itemCountsMap[c.id] || 0,
-//     }));
-
-//     res.status(200).json({
-//       success: true,
-//       data: dataWithCounts,
-//       pagination: {
-//         page: pageNum,
-//         limit: limitNum,
-//         totalRecords: total,
-//         totalPages: Math.ceil(total / limitNum),
-//       },
-//     });
-//     return;
-//   } catch (error) {
-//     return next(error);
-//   }
-// };
 
 export const getCargoById = async (
   req: Request,

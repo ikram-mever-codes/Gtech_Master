@@ -2948,10 +2948,17 @@ const InvoiceListPage: React.FC = () => {
                     typeof window !== "undefined" ? document.body : undefined
                   }
                   styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                  options={cargos.map((c) => ({
-                    value: String(c.id),
-                    label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                  }))}
+                  options={cargos
+                    .filter((c) => {
+                      const status = (c.cargo_status || "")
+                        .trim()
+                        .toLowerCase();
+                      return status !== "shipped" && status !== "delivered";
+                    })
+                    .map((c) => ({
+                      value: String(c.id),
+                      label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
+                    }))}
                   value={
                     cargos
                       .map((c) => ({
