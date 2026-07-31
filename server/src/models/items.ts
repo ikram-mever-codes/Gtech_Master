@@ -69,6 +69,9 @@ export class Item {
   @Column({ type: "text", nullable: true })
   item_name_cn?: string;
 
+  @Column({ type: "text", nullable: true })
+  item_name_de?: string; // NEW: ItemNameDE
+
   @Column({ type: "decimal", precision: 10, scale: 0, nullable: true })
   FOQ?: number;
 
@@ -172,6 +175,21 @@ export class Item {
 
   @Column({ type: "char", length: 1, default: "N" })
   is_special_purchase_price_RMB!: string;
+
+  @Column({ type: "char", length: 1, default: "N" })
+  is_stock_item!: string;
+
+  @Column({ type: "int", nullable: true, default: 0 })
+  stockEU?: number;
+
+  @Column({ type: "int", nullable: true, default: 0 })
+  MSQ_EU?: number;
+
+  @Column({ type: "int", nullable: true, default: 0 })
+  stockCN?: number;
+
+  @Column({ type: "int", nullable: true, default: 0 })
+  MSQ_CN?: number;
 
   @OneToMany(() => PurchasePrice, (pp) => pp.item)
   purchasePrices!: PurchasePrice[];

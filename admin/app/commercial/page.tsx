@@ -82,6 +82,7 @@ import BillToShipToForm, {
   WAREHOUSE_BILL_TO,
 } from "@/components/General/BillToShipToForm";
 import { toast } from "react-hot-toast";
+import { successStyles, errorStyles } from "@/utils/constants";
 import CustomModal from "@/components/UI/CustomModal";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
 import { getAllOffers } from "@/api/offers";
@@ -94,9 +95,15 @@ import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import {
   getAllTransferOrders,
   updateTransferOrderStatus,
+  createBestellungFromAuftrag,
 } from "@/api/transfer_orders";
+import {
+  getAllRechnungen,
+  getLieferscheine,
+} from "@/api/rechnungen";
 import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
 import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
+import AuftragToRechnungModal from "@/components/orders/AuftragToRechnungModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
@@ -353,6 +360,61 @@ const InvoiceListPage: React.FC = () => {
   const [selectedAuftragForBestellungModal, setSelectedAuftragForBestellungModal] = useState<any>(null);
   const [showAuftragToBestellungModal, setShowAuftragToBestellungModal] = useState(false);
   const [showAuftragCreateModal, setShowAuftragCreateModal] = useState(false);
+
+  const [rechnungen, setRechnungen] = useState<any[]>([]);
+  const [lieferscheine, setLieferscheine] = useState<any[]>([]);
+  const [loadingRechnungen, setLoadingRechnungen] = useState(false);
+  const [loadingLieferscheine, setLoadingLieferscheine] = useState(false);
+
+  const [selectedAuftragForRechnungModal, setSelectedAuftragForRechnungModal] = useState<any>(null);
+  const [showAuftragToRechnungModal, setShowAuftragToRechnungModal] = useState(false);
+
+  const fetchRechnungen = useCallback(async () => {
+    setLoadingRechnungen(true);
+    try {
+      const res = await getAllRechnungen();
+      if (res?.success) setRechnungen(res.data || []);
+      else if (Array.isArray(res?.data)) setRechnungen(res.data);
+    } catch (err) {
+      console.error("Error fetching Rechnungen:", err);
+    } finally {
+      setLoadingRechnungen(false);
+    }
+  }, []);
+
+  const fetchLieferscheine = useCallback(async () => {
+    setLoadingLieferscheine(true);
+    try {
+      const res = await getLieferscheine();
+      if (res?.success) setLieferscheine(res.data || []);
+      else if (Array.isArray(res?.data)) setLieferscheine(res.data);
+    } catch (err) {
+      console.error("Error fetching Lieferscheine:", err);
+    } finally {
+      setLoadingLieferscheine(false);
+    }
+  }, []);
+
+  const handleDirectConvertAuftragToBestellung = async (auftrag: any) => {
+    if (!window.confirm(`Convert Auftrag ${auftrag.order_no} directly to Bestellung?`)) return;
+    try {
+      const items = (auftrag.orderItems || auftrag.items || []).map((it: any) => ({
+        sourceLineItemId: String(it.id),
+        qty: Number(it.quantity || it.qty) || 1,
+        max_qty: Number(it.quantity || it.qty) || 1,
+        price: Number(it.price || 0),
+        itemName: it.itemName || it.item_name || "Line Item",
+      }));
+      const res = await createBestellungFromAuftrag(auftrag.id, items, auftrag.notes || "");
+      if (res?.success) {
+        toast.success(res.message || `Auftrag ${auftrag.order_no} converted to Bestellung!`, successStyles);
+        fetchOrders();
+        fetchBestellungen();
+      }
+    } catch (err) {
+      console.error("Error converting Auftrag to Bestellung:", err);
+    }
+  };
 
   const fetchBestellungen = useCallback(async () => {
     setLoadingBestellungen(true);
@@ -1381,14 +1443,16 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     if (activeInvTab === "lieferschein") {
       fetchCustomers();
+      fetchLieferscheine();
     } else if (activeInvTab === "rechnung" || activeInvTab === "rk") {
       loadInvoices();
+      fetchRechnungen();
     } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
       fetchAllItems();
       fetchOrders();
       fetchBestellungen();
     }
-  }, [activeInvTab, fetchBestellungen, fetchAllItems, fetchOrders]);
+  }, [activeInvTab, fetchBestellungen, fetchAllItems, fetchOrders, fetchRechnungen, fetchLieferscheine]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -2241,18 +2305,28 @@ const InvoiceListPage: React.FC = () => {
             );
           } else if (activeInvTab === "auftrag") {
             return (
-              <div className="flex items-center justify-center font-poppins">
+              <div className="flex items-center justify-center gap-1.5 font-poppins">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedAuftragForBestellungModal(row);
-                    setShowAuftragToBestellungModal(true);
+                    handleDirectConvertAuftragToBestellung(row);
                   }}
-                  title="Convert Auftrag to Bestellung"
+                  title="Convert Auftrag directly to Bestellung"
                   className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-md flex items-center gap-1"
                 >
                   <MoveRight className="w-3.5 h-3.5" />
                   <span>Convert</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedAuftragForRechnungModal(row);
+                    setShowAuftragToRechnungModal(true);
+                  }}
+                  title="Generate Rechnung & Lieferschein"
+                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md flex items-center gap-1"
+                >
+                  <MoveRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             );
@@ -4207,6 +4281,22 @@ const InvoiceListPage: React.FC = () => {
             onClose={() => setShowAuftragCreateModal(false)}
             onSuccess={() => {
               fetchOrders();
+            }}
+          />
+        )}
+
+        {showAuftragToRechnungModal && (
+          <AuftragToRechnungModal
+            isOpen={showAuftragToRechnungModal}
+            onClose={() => {
+              setShowAuftragToRechnungModal(false);
+              setSelectedAuftragForRechnungModal(null);
+            }}
+            auftrag={selectedAuftragForRechnungModal}
+            onSuccess={() => {
+              fetchOrders();
+              fetchRechnungen();
+              fetchLieferscheine();
             }}
           />
         )}

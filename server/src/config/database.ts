@@ -57,6 +57,10 @@ import { CCICustomer } from "../models/cci_customer";
 import { CCIInvoice } from "../models/cci_invoice";
 import { CCIItem } from "../models/cci_items";
 
+import { Rechnung } from "../models/rechnung";
+import { RechnungCustomer } from "../models/rechnung_customer";
+import { RechnungItem } from "../models/rechnung_items";
+
 dotenv.config();
 
 export const AppDataSource = new DataSource({
@@ -123,6 +127,9 @@ export const AppDataSource = new DataSource({
     PaymentMethod,
     ShippingMethod,
     NumberSequence,
+    Rechnung,
+    RechnungCustomer,
+    RechnungItem,
   ],
   extra: {
     ssl:

@@ -100,7 +100,6 @@ export interface RequestedItem {
   attachments?: any[];
   taric?: string;
 }
-
 export interface RequestedItemCreatePayload {
   businessId: string;
   contactPersonId?: string;
@@ -147,6 +146,12 @@ export interface RequestedItemCreatePayload {
   isActive?: "Y" | "N";
   supplier_id?: number;
   item_name_de?: string;
+  // NEW: Stock and MSQ fields
+  is_stock_item?: "Y" | "N";
+  stockEU?: number;
+  MSQ_EU?: number;
+  stockCN?: number;
+  MSQ_CN?: number;
 }
 
 export interface RequestedItemUpdatePayload extends Partial<RequestedItemCreatePayload> {

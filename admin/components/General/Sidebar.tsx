@@ -19,6 +19,11 @@ import {
   Tooltip,
   Fade,
   Collapse,
+  Avatar,
+  Menu,
+  MenuItem,
+  ListItemText,
+  alpha,
 } from "@mui/material";
 import {
   LucideMenu,
@@ -27,6 +32,12 @@ import {
   LucideShield,
   LucideChevronUp,
   LucideChevronDown,
+  LucideUser,
+  LucideSettings,
+  Bell,
+  Mail,
+  LogOut,
+  Shield,
   Tag as LucideTag,
   Users as LucideUsers,
   Handshake,
@@ -50,7 +61,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -164,12 +175,21 @@ const allMenuItems: MenuEntry[] = [
 ];
 
 const Sidebar = () => {
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [showScrollUp, setShowScrollUp] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const openUserMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const closeUserMenu = () => {
+    setAnchorEl(null);
+  };
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
   const [isMounted, setIsMounted] = useState(false);
@@ -649,31 +669,208 @@ const Sidebar = () => {
           </Box>
         </Fade>
         <Divider sx={{ borderColor: "divider", my: 2, flexShrink: 0 }} />
-        {user?.role && !isCollapsed && (
-          <Box sx={{ px: 3, mb: 2, flexShrink: 0 }}>
-            <Box
+
+        <Box sx={{ px: 2, mb: 1, width: "100%", flexShrink: 0 }}>
+          <Box
+            onClick={openUserMenu}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              padding: isCollapsed ? "8px" : "8px 12px",
+              borderRadius: 1.5,
+              backgroundColor: "rgba(255, 255, 255, 0.06)",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              justifyContent: isCollapsed ? "center" : "flex-start",
+              "&:hover": {
+                backgroundColor: "rgba(255, 255, 255, 0.12)",
+              },
+            }}
+          >
+            <Avatar
+              src={user?.avatar}
+              alt={user?.name}
               sx={{
-                display: "flex",
-                alignItems: "center",
-                padding: "8px 12px",
-                borderRadius: 1,
-                backgroundColor: "rgba(140, 194, 27, 0.15)",
+                width: 34,
+                height: 34,
+                bgcolor: theme.palette.primary.main,
+                color: "white",
+                fontSize: "0.9rem",
+                fontWeight: 600,
               }}
             >
-              <LucideShield
-                size={16}
-                color={theme.palette.primary.main}
-                style={{ marginRight: 8 }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ color: "primary.main", fontWeight: 600 }}
-              >
-                {user.role} ACCESS
-              </Typography>
-            </Box>
+              {!user?.avatar && user?.name?.charAt(0)}
+            </Avatar>
+
+            {!isCollapsed && (
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "white",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    lineHeight: 1.2,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {user?.name || "User"}
+                </Typography>
+                {user?.role && (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "primary.main",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                      display: "block",
+                    }}
+                  >
+                    {user.role} ACCESS
+                  </Typography>
+                )}
+              </Box>
+            )}
           </Box>
-        )}
+
+          {/* User Popover Menu */}
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={closeUserMenu}
+            onClick={closeUserMenu}
+            PaperProps={{
+              elevation: 4,
+              sx: {
+                minWidth: 240,
+                maxWidth: 300,
+                overflow: "visible",
+                filter: "drop-shadow(0px 4px 12px rgba(0,0,0,0.15))",
+                mb: 1,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 2,
+              },
+            }}
+            transformOrigin={{ horizontal: "left", vertical: "bottom" }}
+            anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+          >
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Avatar
+                  src={user?.avatar}
+                  alt={user?.name}
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    bgcolor: theme.palette.primary.main,
+                  }}
+                >
+                  {!user?.avatar && user?.name?.charAt(0)}
+                </Avatar>
+                <Box sx={{ ml: 1.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+                    {user?.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {user?.email || "user@example.com"}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box
+                sx={{
+                  mt: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  py: 0.5,
+                  px: 1,
+                  borderRadius: 1,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                }}
+              >
+                <Shield
+                  size={14}
+                  color={theme.palette.primary.main}
+                  style={{ marginRight: "6px" }}
+                />
+                <Typography
+                  variant="caption"
+                  sx={{ color: theme.palette.primary.main, fontWeight: 600 }}
+                >
+                  {user?.role || "Admin"} ACCESS
+                </Typography>
+              </Box>
+            </Box>
+
+            <Divider />
+
+            <MenuItem sx={{ py: 1 }}>
+              <ListItemIcon>
+                <LucideSettings size={18} color={theme.palette.text.secondary} />
+              </ListItemIcon>
+              <ListItemText primary="Account Settings" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+            </MenuItem>
+
+            <MenuItem
+              sx={{ py: 1 }}
+              onClick={() => {
+                router.push("/profile");
+                closeUserMenu();
+              }}
+            >
+              <ListItemIcon>
+                <LucideUser size={18} color={theme.palette.text.secondary} />
+              </ListItemIcon>
+              <ListItemText primary="Profile" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+            </MenuItem>
+
+            <MenuItem sx={{ py: 1 }}>
+              <ListItemIcon>
+                <Bell size={18} color={theme.palette.text.secondary} />
+              </ListItemIcon>
+              <ListItemText primary="Notifications" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+            </MenuItem>
+
+            <MenuItem sx={{ py: 1 }}>
+              <ListItemIcon>
+                <Mail size={18} color={theme.palette.text.secondary} />
+              </ListItemIcon>
+              <ListItemText primary="Messages" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+            </MenuItem>
+
+            <Divider />
+
+            <Box sx={{ p: 1 }}>
+              <MenuItem
+                onClick={handleLogout}
+                sx={{
+                  py: 1,
+                  borderRadius: 1,
+                  bgcolor: alpha(theme.palette.error.main, 0.08),
+                  color: theme.palette.error.main,
+                  "&:hover": {
+                    bgcolor: alpha(theme.palette.error.main, 0.15),
+                  },
+                }}
+              >
+                <ListItemIcon>
+                  <LogOut size={18} color={theme.palette.error.main} />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Logout"
+                  primaryTypographyProps={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: theme.palette.error.main,
+                  }}
+                />
+              </MenuItem>
+            </Box>
+          </Menu>
+        </Box>
       </List>
 
       <Box
@@ -694,7 +891,7 @@ const Sidebar = () => {
             width: "100%",
             color: "white",
             backgroundColor: "primary.main",
-            fontSize: "17px",
+            fontSize: "15px",
             fontWeight: 600,
           }}
         >

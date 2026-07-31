@@ -35,12 +35,8 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
             </aside>
 
             <div className="flex-1 flex flex-col min-w-0" suppressHydrationWarning>
-              <header className="sticky top-0 z-50">
-                <Header />
-              </header>
-
-              <main className="flex-1 p-6 bg-gray-50">
-                <div className="w-full px-8 py-6 mb-[2rem] mx-auto" suppressHydrationWarning>
+              <main className="flex-1 p-4 md:p-6 bg-gray-50 overflow-y-auto">
+                <div className="w-full px-4 md:px-8 py-4 mb-[2rem] mx-auto" suppressHydrationWarning>
                   {children}
                 </div>
               </main>

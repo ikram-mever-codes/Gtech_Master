@@ -337,8 +337,9 @@ export const getItems = async (
         "item.id",
         "item.item_name",
         "item.item_name_cn",
+        "item.item_name_de", // From items table
         "item.ean",
-        "item.ItemID_DE",
+        "item.ItemID_DE", // From items table
         "item.isActive",
         "item.parent_id",
         "item.taric_id",
@@ -366,6 +367,12 @@ export const getItems = async (
         "item.created_at",
         "item.updated_at",
         "item.tagOrder",
+        // NEW fields
+        "item.is_stock_item",
+        "item.stockEU",
+        "item.MSQ_EU",
+        "item.stockCN",
+        "item.MSQ_CN",
       ])
       .leftJoinAndSelect("item.tags", "tags")
       .leftJoin("item.parent", "parent")
@@ -384,7 +391,7 @@ export const getItems = async (
       .orderBy("item.created_at", "DESC")
       .getMany();
 
-    // STEP 3: Warehouse metrics
+    // STEP 3: Warehouse metrics (only for warehouse-specific data)
     const targetItemIDsDE = items
       .map((i) => i.ItemID_DE)
       .filter(Boolean) as number[];
@@ -396,7 +403,6 @@ export const getItems = async (
         "wi.item_id",
         "wi.ItemID_DE",
         "wi.item_no_de",
-        "wi.item_name_de",
         "wi.ean",
         "wi.is_active",
       ])
@@ -423,13 +429,17 @@ export const getItems = async (
 
       return {
         id: item.id,
+        // de_no comes from warehouse (fallback to parent)
         de_no: warehouseData?.item_no_de || parentData?.de_no || null,
         name_de: parentData?.name_de || null,
         name_en: parentData?.name_en || null,
         name_cn: parentData?.name_cn || null,
         item_name: item.item_name,
         item_name_cn: item.item_name_cn,
+        // FIX: Use item.item_name_de from items table, not warehouse
+        item_name_de: item.item_name_de || null,
         ean: item.ean || warehouseData?.ean || null,
+        // FIX: Use item.ItemID_DE from items table, not warehouse
         ItemID_DE: item.ItemID_DE || null,
         is_active: warehouseData
           ? warehouseData.is_active
@@ -442,8 +452,6 @@ export const getItems = async (
         customer_id: item.customer_id || null,
         customer_name: customerData?.companyName || null,
         isLabelPrint: item.isLabelPrint || false,
-        item_name_de:
-          warehouseData?.item_name_de || parentData?.name_de || null,
         photo: item.photo || null,
         pix_path: item.pix_path || null,
         pix_path_eBay: item.pix_path_eBay || null,
@@ -464,6 +472,12 @@ export const getItems = async (
         updated_at: item.updated_at,
         tags: item.tags || [],
         tagOrder: item.tagOrder,
+        // NEW fields
+        is_stock_item: item.is_stock_item || "N",
+        stockEU: item.stockEU || 0,
+        MSQ_EU: item.MSQ_EU || 0,
+        stockCN: item.stockCN || 0,
+        MSQ_CN: item.MSQ_CN || 0,
       };
     });
 
@@ -533,7 +547,6 @@ export const getItemById = async (
       ],
     });
 
-    console.log(item);
     if (!item) {
       return next(new ErrorHandler("Item not found", 404));
     }
@@ -628,6 +641,7 @@ export const getItemById = async (
       console.warn("library_files table not available:", e.message);
     }
 
+    // de_no comes from warehouse (fallback to parent)
     const de_no = primaryWarehouseItem?.item_no_de || item.parent?.de_no || "";
     const ean = item.ean || primaryWarehouseItem?.ean || "";
 
@@ -642,6 +656,8 @@ export const getItemById = async (
       is_new: item.is_new || "N",
       itemNo: `${item.id} / ${de_no}`,
       item_name: item.item_name || "",
+      // FIX: Use item.item_name_de from items table
+      item_name_de: item.item_name_de || "",
       is_active: primaryWarehouseItem
         ? primaryWarehouseItem.is_active
         : item.isActive || "N",
@@ -672,6 +688,12 @@ export const getItemById = async (
       transfer_price: item.transfer_price_EUR
         ? Number(item.transfer_price_EUR).toFixed(2)
         : "null",
+      // NEW: Stock and MSQ fields
+      is_stock_item: item.is_stock_item || "N",
+      stockEU: item.stockEU || 0,
+      MSQ_EU: item.MSQ_EU || 0,
+      stockCN: item.stockCN || 0,
+      MSQ_CN: item.MSQ_CN || 0,
       parent: {
         noDE: item.parent?.de_no || item.parent_no_de || "",
         nameDE: item.parent?.name_de || "",
@@ -720,6 +742,7 @@ export const getItemById = async (
         isNPR: item.is_npr || "N",
         isNew: item.is_new || "N",
         warehouseItem: primaryWarehouseItem?.id?.toString() || "",
+        // FIX: Use item.ItemID_DE from items table
         idDE: item.ItemID_DE?.toString() || "",
         noDE: primaryWarehouseItem?.item_no_de || item.parent_no_de || "",
         nameDE:
@@ -824,7 +847,6 @@ export const getItemById = async (
       })(),
 
       nprRemarks: item.npr_remark || "",
-      // remark_cn: item. || "",
     };
 
     const user = (req as AuthorizedRequest).user;
@@ -841,6 +863,7 @@ export const getItemById = async (
     return next(error);
   }
 };
+
 export const createItem = async (
   req: Request,
   res: Response,
@@ -855,6 +878,7 @@ export const createItem = async (
     let {
       item_name,
       item_name_cn,
+      item_name_de,
       ean,
       parent_id,
       taric_id,
@@ -877,8 +901,13 @@ export const createItem = async (
       is_rmb_special = "N",
       painPoints = [],
       item_no_de,
-      item_name_de,
       isLabelPrint = false,
+      // NEW fields
+      is_stock_item = "N",
+      stockEU = 0,
+      MSQ_EU = 0,
+      stockCN = 0,
+      MSQ_CN = 0,
     } = req.body;
 
     if (!item_name || !parent_id || !supplier_id) {
@@ -969,6 +998,7 @@ export const createItem = async (
     const newItem = itemRepository.create({
       item_name,
       item_name_cn,
+      item_name_de, // NEW
       ean: ean ? ean.toString() : null,
       parent_id,
       sales_price:
@@ -996,6 +1026,12 @@ export const createItem = async (
       is_new: "Y",
       is_updated: false,
       isLabelPrint,
+      // NEW fields
+      is_stock_item: is_stock_item || "N",
+      stockEU: parseInt(stockEU) || 0,
+      MSQ_EU: parseInt(MSQ_EU) || 0,
+      stockCN: parseInt(stockCN) || 0,
+      MSQ_CN: parseInt(MSQ_CN) || 0,
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -1049,6 +1085,7 @@ export const createItem = async (
     return next(error);
   }
 };
+
 export const updateItem = async (
   req: Request,
   res: Response,
@@ -1151,6 +1188,7 @@ export const updateItem = async (
     const updatableFields = [
       "item_name",
       "item_name_cn",
+      "item_name_de", // NEW
       "ean",
       "parent_id",
       "taric_id",
@@ -1187,9 +1225,15 @@ export const updateItem = async (
       "ItemID_DE",
       "painPoints",
       "price",
-      "sales_price", // NEW
+      "sales_price",
       "transfer_price_EUR",
       "isLabelPrint",
+      // NEW fields
+      "is_stock_item",
+      "stockEU",
+      "MSQ_EU",
+      "stockCN",
+      "MSQ_CN",
     ];
 
     let hasChanges = false;
@@ -1301,15 +1345,6 @@ export const updateItem = async (
       where: { id: item.cat_id },
     });
 
-    // `currentRMBPrice` stays null unless the RMB price on the active
-    // supplier item is actually different from what's already stored (see
-    // the `sChanges` / `supplierItem.price_rmb !== newRMB` check below, and
-    // the "new supplier item" branch further down). This is the correct
-    // signal for "did the RMB price really change" — NOT "was
-    // supplierItem.price_rmb present in the request body", because the
-    // frontend always includes `supplierItem.price_rmb` on every save
-    // (computed via `parseFloat(...) || 0`), so it is never `undefined`
-    // even when the user only edited an unrelated field like `price`.
     let currentRMBPrice: any = null;
 
     if (supplierItemData) {
@@ -1322,15 +1357,6 @@ export const updateItem = async (
         let sChanges = false;
         if (supplierItemData.price_rmb !== undefined) {
           const newRMB = parseFloat(supplierItemData.price_rmb);
-          // FIX: `supplierItem.price_rmb` comes back from TypeORM as a
-          // STRING for decimal columns (e.g. "0.00"), while `newRMB` is a
-          // parsed number (0). A raw `!==` comparison between a string and
-          // a number is *always* true regardless of the actual value, so
-          // this was flagging "the RMB price changed" on every single save
-          // — even when it didn't — which incorrectly set `currentRMBPrice`
-          // to a non-null value and triggered the price recalculation
-          // below, silently overwriting a manually-edited `price`.
-          // Parsing both sides to numbers before comparing fixes this.
           const existingRMB = parseFloat(supplierItem.price_rmb as any);
           if (isNaN(existingRMB) || existingRMB !== newRMB) {
             supplierItem.price_rmb = newRMB;
@@ -1388,20 +1414,6 @@ export const updateItem = async (
 
     const categoryName = category?.name || item.supp_cat || "STD";
 
-    // ---------------------------------------------------------------------
-    // FIX: only recalculate `price` / `transfer_price_EUR` from the RMB
-    // price when the RMB price actually changed this request
-    // (`currentRMBPrice !== null`), not merely when `supplierItem.price_rmb`
-    // was present in the payload (it always is, from the frontend).
-    //
-    // This means:
-    //  - Editing the RMB purchase price still recalculates `price` as before.
-    //  - Editing `price` directly (without touching RMB) now sticks, instead
-    //    of being silently recomputed back from the unchanged RMB value on
-    //    every save (which is what was blanking/zeroing it out).
-    //  - If neither changed, `item.price` / `item.transfer_price_EUR` keep
-    //    whatever was already applied by the updatableFields loop above.
-    // ---------------------------------------------------------------------
     if (currentRMBPrice !== null && !isNaN(currentRMBPrice)) {
       const calculatedPrice = calculateTransferPrice(
         currentRMBPrice,

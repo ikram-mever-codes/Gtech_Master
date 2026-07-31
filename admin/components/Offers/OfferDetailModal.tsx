@@ -284,10 +284,11 @@ const ItemRow: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
           ? "border-primary bg-primary/5"
           : "border-gray-200 hover:bg-gray-50"
-        }`}
+      }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -337,10 +338,11 @@ const PickerRow: React.FC<{
 }> = ({ selected, onClick, title, subtitle, meta }) => (
   <div
     onClick={onClick}
-    className={`p-3 border rounded-lg cursor-pointer transition-all ${selected
+    className={`p-3 border rounded-lg cursor-pointer transition-all ${
+      selected
         ? "border-primary bg-primary/5"
         : "border-gray-200 hover:bg-gray-50"
-      }`}
+    }`}
   >
     <div className="flex justify-between items-start">
       <div className="min-w-0">
@@ -883,7 +885,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         selectedCustomer.defaultShippingMethod || f.shippingMethod,
       paymentTerms:
         selectedCustomer.defaultPaymentDueDays !== undefined &&
-          selectedCustomer.defaultPaymentDueDays !== null
+        selectedCustomer.defaultPaymentDueDays !== null
           ? `${selectedCustomer.defaultPaymentDueDays}`
           : f.paymentTerms,
     }));
@@ -1290,8 +1292,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     );
   };
 
-  const visibleLineItems =
-    offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
+  const visibleLineItems = (
+    offer?.lineItems?.filter((li: any) => !li.isComponent) || []
+  ).sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
   const pricingMode: PricingMode = offer?.pricingMode || "classic";
 
   const priceTiers: string[] = (() => {
@@ -1307,7 +1310,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     );
   })();
 
-  // --- Weight totals ---------------------------------------------------
   const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
     const qty =
       pricingMode === "matrix"
@@ -1367,8 +1369,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   // --- Linked documents ---------------------------------------------------
   const linkedDocsCount = linkedDocs
     ? (
-      Object.keys(LINKED_DOC_LABELS) as (keyof LinkedDocumentsResult)[]
-    ).reduce((sum, key) => sum + (linkedDocs[key]?.length || 0), 0)
+        Object.keys(LINKED_DOC_LABELS) as (keyof LinkedDocumentsResult)[]
+      ).reduce((sum, key) => sum + (linkedDocs[key]?.length || 0), 0)
     : 0;
 
   const sourceTabs: {
@@ -1376,17 +1378,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     label: string;
     icon: React.ReactNode;
   }[] = [
-      {
-        key: "inquiry",
-        label: "From inquiry",
-        icon: <LinkIcon className="h-4 w-4" />,
-      },
-      {
-        key: "item",
-        label: "Customer + item(s)",
-        icon: <CubeIcon className="h-4 w-4" />,
-      },
-    ];
+    {
+      key: "inquiry",
+      label: "From inquiry",
+      icon: <LinkIcon className="h-4 w-4" />,
+    },
+    {
+      key: "item",
+      label: "Customer + item(s)",
+      icon: <CubeIcon className="h-4 w-4" />,
+    },
+  ];
 
   // --- Delivery-address-vs-billing state (used below in the address block) --
   const currentDeliveryAddress = offer
@@ -1408,7 +1410,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           <>
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
               <h2 className="text-lg font-bold text-gray-900">
-                Create new Angebot
+                Create new offer
               </h2>
               <button
                 type="button"
@@ -1431,10 +1433,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSelectedItems([]);
                       setItemQuantities({});
                     }}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${sourceType === t.key
+                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+                      sourceType === t.key
                         ? "border-primary bg-primary/5 text-primary font-semibold"
                         : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
+                    }`}
                   >
                     {t.icon}
                     {t.label}
@@ -1467,10 +1470,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <button
                       key={m}
                       onClick={() => cPatch({ pricingMode: m })}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${createForm.pricingMode === m
+                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${
+                        createForm.pricingMode === m
                           ? "border-primary bg-primary/5 text-primary font-semibold"
                           : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                        }`}
+                      }`}
                     >
                       {m === "classic"
                         ? "Classic (1 qty · 1 price)"
@@ -1546,15 +1550,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       addr={
                         selectedCustomer.deliveryAddressLine1
                           ? {
-                            contactName:
-                              selectedCustomer.legalName ||
-                              selectedCustomer.companyName,
-                            street: selectedCustomer.deliveryAddressLine1,
-                            postalCode: selectedCustomer.deliveryPostalCode,
-                            city: selectedCustomer.deliveryCity,
-                            country: selectedCustomer.deliveryCountry,
-                            contactPhone: selectedCustomer.contactPhoneNumber,
-                          }
+                              contactName:
+                                selectedCustomer.legalName ||
+                                selectedCustomer.companyName,
+                              street: selectedCustomer.deliveryAddressLine1,
+                              postalCode: selectedCustomer.deliveryPostalCode,
+                              city: selectedCustomer.deliveryCity,
+                              country: selectedCustomer.deliveryCountry,
+                              contactPhone: selectedCustomer.contactPhoneNumber,
+                            }
                           : null
                       }
                       emptyText="Same as customer address."
@@ -1589,7 +1593,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             paymentTerms:
                               inq.customer?.defaultPaymentDueDays !==
                                 undefined &&
-                                inq.customer?.defaultPaymentDueDays !== null
+                              inq.customer?.defaultPaymentDueDays !== null
                                 ? `${inq.customer.defaultPaymentDueDays}`
                                 : f.paymentTerms || "",
                           }));
@@ -2138,9 +2142,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                       alt="thumb"
                                       className="w-full h-full object-contain"
                                       onError={(e) =>
-                                      ((
-                                        e.target as HTMLImageElement
-                                      ).style.display = "none")
+                                        ((
+                                          e.target as HTMLImageElement
+                                        ).style.display = "none")
                                       }
                                     />
                                   ) : (
@@ -2361,7 +2365,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <td className="px-2 py-2 text-right font-bold text-gray-800">
                               {formatCurrency(
                                 (form.shippingCost || 0) *
-                                (form.shippingQuantity || 1),
+                                  (form.shippingQuantity || 1),
                                 offer.currency,
                               )}
                             </td>
@@ -2373,15 +2377,41 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                   {edit && (
                     <div className="space-y-3">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => setShowItemPicker((s) => !s)}
-                          className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1"
+                          className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1 whitespace-nowrap"
                         >
                           <PlusIcon className="h-3.5 w-3.5" />
                           Add existing item
                         </button>
+
+                        <div className="flex-1 min-w-[200px]">
+                          <div className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <input
+                                className={inputCls}
+                                value={newLine.itemName}
+                                placeholder="Freizeile — text"
+                                onChange={(e) =>
+                                  setNewLine((n) => ({
+                                    ...n,
+                                    itemName: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <button
+                              onClick={addLineItem}
+                              className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
+                            >
+                              <PlusIcon className="h-4 w-4" />
+                              Add Freizeile
+                            </button>
+                          </div>
+                        </div>
                       </div>
+
                       {showItemPicker && (
                         <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
                           <input
@@ -2410,65 +2440,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </div>
                         </div>
                       )}
-                      <div className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-end gap-2">
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Freizeile — text
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.itemName}
-                            placeholder="e.g., Custom bracket"
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                itemName: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="w-24">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Quantity
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.baseQuantity}
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                baseQuantity: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="w-20">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            MwSt. %
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={newLine.taxRate}
-                            placeholder={String(
-                              parseFlexibleNumber(offer?.taxProfile?.taxRate) ??
-                              19,
-                            )}
-                            onChange={(e) =>
-                              setNewLine((n) => ({
-                                ...n,
-                                taxRate: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <button
-                          onClick={addLineItem}
-                          className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1"
-                        >
-                          <PlusIcon className="h-4 w-4" />
-                          Add Freizeile
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -2496,9 +2467,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   alt="thumb"
                                   className="w-full h-full object-cover"
                                   onError={(e) =>
-                                  ((
-                                    e.target as HTMLImageElement
-                                  ).style.display = "none")
+                                    ((
+                                      e.target as HTMLImageElement
+                                    ).style.display = "none")
                                   }
                                 />
                               ) : (
@@ -2623,7 +2594,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                               {formatMatrixPrice(
                                                 p.price,
                                                 offer.unitPriceDecimalPlaces ||
-                                                3,
+                                                  3,
                                               )}
                                             </span>
                                           )}
@@ -2632,9 +2603,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                           {p.total === null
                                             ? "."
                                             : formatCurrency(
-                                              p.total,
-                                              offer.currency,
-                                            )}
+                                                p.total,
+                                                offer.currency,
+                                              )}
                                         </td>
                                         <td className="px-3 py-2">
                                           {p.isActive ? (
@@ -2745,7 +2716,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className={inputCls}
                       defaultValue={
                         visibleLineItems[0]?.extraWeight === null ||
-                          visibleLineItems[0]?.extraWeight === undefined
+                        visibleLineItems[0]?.extraWeight === undefined
                           ? ""
                           : String(visibleLineItems[0].extraWeight)
                       }

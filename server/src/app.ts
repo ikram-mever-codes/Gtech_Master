@@ -36,6 +36,7 @@ import shippingMethodRoutes from "./routes/shipping_method_routes";
 import salesPriceRoutes from "./routes/sales_price_routes";
 import customerOrderRoutes from "./routes/customer_orders";
 import transferOrderRoutes from "./routes/transfer_orders";
+import rechnungRoutes from "./routes/rechnung_routes";
 
 const app: any = express();
 
@@ -102,6 +103,7 @@ app.use("/api/v1/payment-methods", paymentMethodRoutes);
 app.use("/api/v1/shipping-methods", shippingMethodRoutes);
 app.use("/api/v1/customer-orders", customerOrderRoutes);
 app.use("/api/v1/transfer-orders", transferOrderRoutes);
+app.use("/api/v1/rechnungen", rechnungRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));
