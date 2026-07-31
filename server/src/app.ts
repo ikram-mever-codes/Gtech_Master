@@ -33,11 +33,7 @@ import shippingAddressRoutes from "./routes/shipping_address_routes";
 import numberSequenceRoutes from "./routes/number_sequence_routes";
 import paymentMethodRoutes from "./routes/payment_method_routes";
 import shippingMethodRoutes from "./routes/shipping_method_routes";
-<<<<<<< HEAD
 import salesPriceRoutes from "./routes/sales_price_routes";
-=======
-import customerOrderRoutes from "./routes/customer_orders";
->>>>>>> 6a3281b4f5d67ce31ae8a97ec9ebb24d39641e84
 
 const app: any = express();
 
