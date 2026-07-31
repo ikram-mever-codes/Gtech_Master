@@ -323,6 +323,7 @@ export const createItem = async (itemData: {
   RMB_Price?: number;
   price_rmb?: number;
   priceRMB?: number;
+  sales_price?: number | null;
   rmbPrice?: number;
   price?: number;
   currency?: string;

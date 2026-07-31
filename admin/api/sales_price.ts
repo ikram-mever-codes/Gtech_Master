@@ -6,16 +6,17 @@ export interface SalesPriceTier {
   unitPriceEur: number;
 }
 
-export interface CustomerSalesPrices {
-  customerId: number;
+export interface CustomerSalesPriceRow {
+  customerId: number | null; // null = global
   customerName: string;
   customerNumber?: string;
+  individual: SalesPriceTier | null;
   tiers: SalesPriceTier[];
 }
 
 export interface SalesPricesForItem {
-  global: SalesPriceTier[];
-  customers: CustomerSalesPrices[];
+  itemCustomerId: number | null;
+  rows: CustomerSalesPriceRow[];
 }
 
 export const getSalesPricesForItem = async (itemId: number | string) => {
@@ -31,14 +32,15 @@ export const getSalesPricesForItem = async (itemId: number | string) => {
 export const createSalesPrice = async (payload: {
   itemId: number | string;
   customerId?: number | string | null;
-  minQuantity: number | string;
+  isIndividual: boolean;
+  minQuantity?: number | string;
   unitPriceEur: number | string;
 }) => {
   try {
     const response: any = await api.post("/sales-prices", payload);
     return response;
   } catch (error) {
-    handleApiError(error, "Failed to save the price tier");
+    handleApiError(error, "Failed to save the sales price");
     throw error;
   }
 };
@@ -51,7 +53,7 @@ export const updateSalesPrice = async (
     const response: any = await api.put(`/sales-prices/${id}`, payload);
     return response;
   } catch (error) {
-    handleApiError(error, "Failed to update the price tier");
+    handleApiError(error, "Failed to update the sales price");
     throw error;
   }
 };
@@ -61,7 +63,7 @@ export const deleteSalesPrice = async (id: number) => {
     const response: any = await api.delete(`/sales-prices/${id}`);
     return response;
   } catch (error) {
-    handleApiError(error, "Failed to delete the price tier");
+    handleApiError(error, "Failed to delete the sales price");
     throw error;
   }
 };

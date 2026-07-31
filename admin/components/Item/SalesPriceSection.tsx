@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { PlusIcon, TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
@@ -10,7 +10,7 @@ import {
   updateSalesPrice,
   deleteSalesPrice,
   type SalesPricesForItem,
-  type SalesPriceTier,
+  type CustomerSalesPriceRow,
 } from "@/api/sales_price";
 import { errorStyles, successStyles } from "@/utils/constants";
 
@@ -21,134 +21,47 @@ interface SalesPriceSectionProps {
   itemId: number | string;
 }
 
-interface PriceCardProps {
-  title: string;
-  subtitle?: string;
-  tiers: SalesPriceTier[];
-  onAddTier: () => void;
-  onEditTier: (tier: SalesPriceTier) => void;
-  onDeleteTier: (tier: SalesPriceTier) => void;
-  accent?: "global" | "customer";
-}
-
-/** One customer's (or the item's global) price ladder — a small card in
- * the horizontally-scrolling row. Shown sorted by quantity, with quick
- * edit/delete per tier and an "Add tier" affordance. */
-const PriceCard: React.FC<PriceCardProps> = ({
-  title,
-  subtitle,
-  tiers,
-  onAddTier,
-  onEditTier,
-  onDeleteTier,
-  accent = "customer",
-}) => {
-  const sortedTiers = React.useMemo(
-    () => [...tiers].sort((a, b) => a.minQuantity - b.minQuantity),
-    [tiers],
-  );
-
-  return (
-    <div className="shrink-0 w-64 border border-gray-200 rounded-lg bg-white overflow-hidden flex flex-col">
-      <div
-        className={`px-3 py-2 border-b ${
-          accent === "global"
-            ? "bg-gray-50 border-gray-200"
-            : "bg-blue-50/60 border-blue-100"
-        }`}
-      >
-        <div className="text-sm font-semibold text-gray-900 truncate">
-          {title}
-        </div>
-        {subtitle && (
-          <div className="text-xs text-gray-500 truncate">{subtitle}</div>
-        )}
-      </div>
-      <div className="flex-1 divide-y divide-gray-100">
-        {sortedTiers.length === 0 ? (
-          <div className="px-3 py-3 text-xs text-gray-400">
-            No price tiers yet.
-          </div>
-        ) : (
-          sortedTiers.map((t) => (
-            <div
-              key={t.id}
-              className="px-3 py-1.5 flex items-center justify-between text-sm hover:bg-gray-50 group"
-            >
-              <span className="text-gray-600">From {t.minQuantity}</span>
-              <span className="font-medium text-gray-900">
-                {t.unitPriceEur.toFixed(4)} €
-              </span>
-              <div className="hidden group-hover:flex items-center gap-1 ml-2">
-                <button
-                  type="button"
-                  onClick={() => onEditTier(t)}
-                  className="text-gray-400 hover:text-blue-600 transition-colors"
-                  aria-label="Edit tier"
-                >
-                  <PencilIcon className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteTier(t)}
-                  className="text-gray-400 hover:text-rose-600 transition-colors"
-                  aria-label="Delete tier"
-                >
-                  <TrashIcon className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={onAddTier}
-        className="px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 border-t border-gray-100 flex items-center gap-1 transition-colors"
-      >
-        <PlusIcon className="w-3.5 h-3.5" />
-        Add tier
-      </button>
-    </div>
-  );
-};
+const formatPrice = (v: number) => v.toFixed(4);
 
 export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
   itemId,
 }) => {
   const [data, setData] = useState<SalesPricesForItem | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Popup state — covers "add a tier to an existing scope" and "add a
-  // brand-new customer's first tier" in one modal.
+  // Cell-edit / add-tier popup
   const [showModal, setShowModal] = useState(false);
-  const [modalScope, setModalScope] = useState<{
-    customerId: string; // "" = global
-  }>({ customerId: "" });
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalCustomerId, setModalCustomerId] = useState<string>("");
+  const [modalCustomerName, setModalCustomerName] = useState<string>("");
+  const [modalIsIndividual, setModalIsIndividual] = useState(true);
   const [modalTierId, setModalTierId] = useState<number | null>(null);
-  const [modalQty, setModalQty] = useState("1");
+  const [modalQty, setModalQty] = useState("");
   const [modalPrice, setModalPrice] = useState("");
+
+  // Add-customer popup
   const [showAddCustomer, setShowAddCustomer] = useState(false);
-  const [newCustomerId, setNewCustomerId] = useState("");
+  const [newCustomerId, setNewCustomerId] = useState<string>("");
+  const [newCustomerName, setNewCustomerName] = useState<string>("");
+  const [selectedCustomerData, setSelectedCustomerData] = useState<any>(null);
 
   const load = useCallback(async () => {
     if (!itemId) return;
-
     setLoading(true);
-    setError(null);
-
     try {
-      const res = await getSalesPricesForItem(itemId);
-
-      if (res?.success && res.data) {
-        setData(res.data);
-      } else {
-        setError("Failed to load sales prices");
+      const res: any = await getSalesPricesForItem(itemId);
+      if (res.success) {
+        // Filter out the global row
+        const filteredRows = (res.data?.rows || []).filter(
+          (row: any) => row.customerId !== null,
+        );
+        setData({
+          ...res.data,
+          rows: filteredRows,
+        });
       }
     } catch (e) {
       console.error("Failed to load sales prices:", e);
-      setError("An error occurred while loading sales prices");
       toast.error("Failed to load sales prices", errorStyles);
     } finally {
       setLoading(false);
@@ -159,44 +72,75 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
     load();
   }, [load]);
 
-  const openAddTier = (customerId: string) => {
-    setModalScope({ customerId });
-    setModalTierId(null);
+  // Column headers: the union of every tier quantity across every customer row
+  const tierQuantities = useMemo(() => {
+    const set = new Set<number>();
+    (data?.rows || []).forEach((row) =>
+      row.tiers.forEach((t) => set.add(t.minQuantity)),
+    );
+    return Array.from(set).sort((a, b) => a - b);
+  }, [data]);
+
+  const rowsWithData = data?.rows || [];
+
+  const openIndividualModal = (row: CustomerSalesPriceRow) => {
+    setModalTitle(
+      row.individual
+        ? `Edit individual price — ${row.customerName}`
+        : `Add individual price — ${row.customerName}`,
+    );
+    setModalCustomerId(row.customerId === null ? "" : String(row.customerId));
+    setModalCustomerName(row.customerName);
+    setModalIsIndividual(true);
+    setModalTierId(row.individual?.id ?? null);
     setModalQty("1");
-    setModalPrice("");
+    setModalPrice(row.individual ? String(row.individual.unitPriceEur) : "");
     setShowModal(true);
   };
 
-  const openEditTier = (customerId: string, tier: SalesPriceTier) => {
-    setModalScope({ customerId });
-    setModalTierId(tier.id);
-    setModalQty(String(tier.minQuantity));
-    setModalPrice(String(tier.unitPriceEur));
+  const openTierModal = (
+    row: CustomerSalesPriceRow,
+    existing?: { id: number; minQuantity: number; unitPriceEur: number },
+  ) => {
+    setModalTitle(
+      existing
+        ? `Edit tier — ${row.customerName}`
+        : `Add tier — ${row.customerName}`,
+    );
+    setModalCustomerId(row.customerId === null ? "" : String(row.customerId));
+    setModalCustomerName(row.customerName);
+    setModalIsIndividual(false);
+    setModalTierId(existing?.id ?? null);
+    setModalQty(existing ? String(existing.minQuantity) : "");
+    setModalPrice(existing ? String(existing.unitPriceEur) : "");
     setShowModal(true);
   };
 
   const submitModal = async () => {
-    // Validate inputs
-    const qtyStr = modalQty.trim().replace(",", ".");
     const priceStr = modalPrice.trim().replace(",", ".");
-
-    const qty = Number(qtyStr);
     const price = Number(priceStr);
 
-    if (!qtyStr || isNaN(qty) || qty <= 0 || !Number.isInteger(qty)) {
-      toast.error(
-        "Enter a valid positive integer for minimum quantity.",
-        errorStyles,
-      );
+    if (!priceStr || isNaN(price) || price < 0) {
+      toast.error("Enter a valid unit price.", errorStyles);
       return;
     }
 
-    if (!priceStr || isNaN(price) || price < 0) {
-      toast.error("Enter a valid non-negative unit price.", errorStyles);
-      return;
+    let qty: number | undefined;
+    if (!modalIsIndividual) {
+      const qtyStr = modalQty.trim().replace(",", ".");
+      qty = Number(qtyStr);
+      if (!qtyStr || isNaN(qty) || qty <= 0 || !Number.isInteger(qty)) {
+        toast.error(
+          "Enter a valid positive integer for minimum quantity.",
+          errorStyles,
+        );
+        return;
+      }
     }
 
     try {
+      const customerId = modalCustomerId ? modalCustomerId : null;
+
       if (modalTierId) {
         await updateSalesPrice(modalTierId, {
           minQuantity: qty,
@@ -205,178 +149,113 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
       } else {
         await createSalesPrice({
           itemId: Number(itemId),
-          customerId: modalScope.customerId
-            ? Number(modalScope.customerId)
-            : null,
+          customerId: customerId,
+          isIndividual: modalIsIndividual,
           minQuantity: qty,
           unitPriceEur: price,
         });
       }
 
-      toast.success("Price tier saved successfully.", successStyles);
+      toast.success("Sales price saved successfully.", successStyles);
       setShowModal(false);
       await load();
-    } catch (e) {
-      console.error("Couldn't save price tier:", e);
-      toast.error("Failed to save price tier. Please try again.", errorStyles);
-    }
-  };
-
-  const removeTier = async (tier: SalesPriceTier) => {
-    if (!window.confirm(`Delete the tier at ${tier.minQuantity}+ units?`)) {
-      return;
-    }
-
-    try {
-      await deleteSalesPrice(tier.id);
-      toast.success("Price tier deleted successfully.", successStyles);
-      await load();
-    } catch (e) {
-      console.error("Couldn't delete price tier:", e);
+    } catch (e: any) {
+      console.error("Couldn't save sales price:", e);
       toast.error(
-        "Failed to delete price tier. Please try again.",
+        e.message || "Failed to save sales price. Please try again.",
         errorStyles,
       );
     }
   };
 
-  const addCustomerPrice = async () => {
-    if (!newCustomerId) {
+  const removeEntry = async (id: number, label: string) => {
+    if (!window.confirm(`Delete ${label}?`)) return;
+    try {
+      await deleteSalesPrice(id);
+      toast.success("Deleted successfully.", successStyles);
+      await load();
+    } catch (e) {
+      console.error("Couldn't delete sales price:", e);
+      toast.error("Failed to delete sales price.", errorStyles);
+    }
+  };
+
+  const addTierColumnFor = (row: CustomerSalesPriceRow) => openTierModal(row);
+
+  const startAddCustomer = () => {
+    setNewCustomerId("");
+    setNewCustomerName("");
+    setSelectedCustomerData(null);
+    setShowAddCustomer(true);
+  };
+
+  const confirmAddCustomer = async () => {
+    if (!newCustomerId || newCustomerId === "" || newCustomerId === "0") {
       toast.error("Please select a customer first.", errorStyles);
       return;
     }
 
-    setShowAddCustomer(false);
-    openAddTier(newCustomerId);
-    setNewCustomerId("");
+    let customerIdToSend = newCustomerId;
+
+    if (selectedCustomerData && selectedCustomerData.id) {
+      customerIdToSend = String(selectedCustomerData.id);
+    }
+
+    const uuidRegex =
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    const isValidUUID = uuidRegex.test(customerIdToSend);
+
+    if (!isValidUUID) {
+      toast.error(
+        `Invalid customer ID format. Please select a different customer.`,
+        errorStyles,
+      );
+      return;
+    }
+
+    try {
+      const payload = {
+        itemId: Number(itemId),
+        customerId: customerIdToSend,
+        isIndividual: true,
+        minQuantity: 1,
+        unitPriceEur: 0,
+      };
+
+      await createSalesPrice(payload);
+
+      toast.success(
+        "Customer price entry created. You can now add tiers.",
+        successStyles,
+      );
+      setShowAddCustomer(false);
+      setNewCustomerId("");
+      setNewCustomerName("");
+      setSelectedCustomerData(null);
+      await load();
+    } catch (e: any) {
+      console.error("Couldn't create customer price:", e);
+      toast.error(
+        e.message || "Failed to create customer price. Please try again.",
+        errorStyles,
+      );
+    }
   };
 
-  const sortedCustomers = React.useMemo(() => {
-    if (!data?.customers) return [];
-    return [...data.customers].sort((a, b) =>
-      a.customerName.localeCompare(b.customerName),
-    );
-  }, [data?.customers]);
+  const handleCustomerSelect = (customerId: string, customerData?: any) => {
+    setNewCustomerId(customerId);
 
-  // Modal component for better organization
-  const renderTierModal = () => {
-    if (!showModal) return null;
-
-    return (
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
-        onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
-      >
-        <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
-          <h4 className="text-lg font-bold text-gray-900">
-            {modalTierId ? "Edit price tier" : "Add price tier"}
-          </h4>
-          <p className="text-xs text-gray-500">
-            {modalScope.customerId
-              ? "Customer-specific tier — overrides the global ladder for this customer."
-              : "Global tier — the default suggestion for every customer without their own pricing."}
-          </p>
-          <div>
-            <label
-              className="block text-xs font-medium text-gray-700 mb-1"
-              htmlFor="minQuantity"
-            >
-              Minimum quantity
-            </label>
-            <input
-              id="minQuantity"
-              className={inputCls}
-              value={modalQty}
-              onChange={(e) => setModalQty(e.target.value)}
-              type="text"
-              inputMode="numeric"
-            />
-          </div>
-          <div>
-            <label
-              className="block text-xs font-medium text-gray-700 mb-1"
-              htmlFor="unitPrice"
-            >
-              Net unit price (€)
-            </label>
-            <input
-              id="unitPrice"
-              className={inputCls}
-              value={modalPrice}
-              onChange={(e) => setModalPrice(e.target.value)}
-              type="text"
-              inputMode="decimal"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowModal(false)}
-              className="flex-1 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={submitModal}
-              className="flex-1 px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] transition-colors"
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderAddCustomerModal = () => {
-    if (!showAddCustomer) return null;
-
-    return (
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
-        onClick={(e) =>
-          e.target === e.currentTarget && setShowAddCustomer(false)
-        }
-      >
-        <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
-          <h4 className="text-lg font-bold text-gray-900">
-            Add customer price
-          </h4>
-          <div>
-            <label
-              className="block text-xs font-medium text-gray-700 mb-1"
-              htmlFor="customerSearch"
-            >
-              Customer
-            </label>
-            <CustomerSearchInput
-              value={newCustomerId}
-              onChange={(id: string) => setNewCustomerId(id)}
-              placeholder="Search customer..."
-              mode="customers"
-              className="w-full"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowAddCustomer(false)}
-              className="flex-1 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={addCustomerPrice}
-              className="flex-1 px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] transition-colors"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    if (customerData) {
+      setSelectedCustomerData(customerData);
+      setNewCustomerName(
+        customerData.companyName ||
+          customerData.legalName ||
+          "Selected customer",
+      );
+    } else {
+      setSelectedCustomerData(null);
+      setNewCustomerName("");
+    }
   };
 
   if (loading && !data) {
@@ -390,31 +269,11 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
     );
   }
 
-  if (error && !data) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-900">Sales prices</h3>
-        </div>
-        <div className="text-sm text-red-500 py-4">{error}</div>
-        <button
-          type="button"
-          onClick={load}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-gray-900">Sales prices</h3>
+    <div className="space-y-3  mt-3">
+      <div className="w-full justify-between">
         <button
-          type="button"
-          onClick={() => setShowAddCustomer(true)}
+          onClick={startAddCustomer}
           className="text-xs font-medium text-blue-700 hover:text-blue-900 flex items-center gap-1 transition-colors"
         >
           <PlusIcon className="w-3.5 h-3.5" />
@@ -422,31 +281,209 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
         </button>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        <PriceCard
-          title="Global (default)"
-          tiers={data?.global || []}
-          accent="global"
-          onAddTier={() => openAddTier("")}
-          onEditTier={(t) => openEditTier("", t)}
-          onDeleteTier={removeTier}
-        />
-        {sortedCustomers.map((c) => (
-          <PriceCard
-            key={c.customerId}
-            title={c.customerName}
-            subtitle={c.customerNumber ? `#${c.customerNumber}` : undefined}
-            tiers={c.tiers}
-            accent="customer"
-            onAddTier={() => openAddTier(String(c.customerId))}
-            onEditTier={(t) => openEditTier(String(c.customerId), t)}
-            onDeleteTier={removeTier}
-          />
-        ))}
-      </div>
+      {rowsWithData.length === 0 ? (
+        <div className="text-sm text-gray-400 py-4 text-center border border-gray-200 rounded-lg bg-gray-50">
+          No customer-specific prices. Click "Add customer price" to create one.
+        </div>
+      ) : (
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="w-full text-sm whitespace-nowrap">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 text-xs uppercase tracking-wider">
+                  Customer
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider">
+                  Base Price
+                </th>
+                {tierQuantities.map((q) => (
+                  <th
+                    key={q}
+                    className="px-3 py-2 text-right font-semibold text-gray-600 text-xs uppercase tracking-wider"
+                  >
+                    {q}+
+                  </th>
+                ))}
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 w-8" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rowsWithData.map((row) => (
+                <tr
+                  key={row.customerId ?? "global"}
+                  className="hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-gray-900 text-sm truncate max-w-[150px]">
+                      {row.customerName}
+                    </div>
+                    {row.customerNumber && (
+                      <div className="text-xs text-gray-500">
+                        #{row.customerNumber}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      onClick={() => openIndividualModal(row)}
+                      className={`px-2 py-0.5 rounded transition-colors text-sm ${
+                        row.individual
+                          ? "font-semibold text-gray-900 hover:bg-gray-100"
+                          : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      }`}
+                    >
+                      {row.individual
+                        ? formatPrice(row.individual.unitPriceEur)
+                        : "+ add"}
+                    </button>
+                  </td>
+                  {tierQuantities.map((q) => {
+                    const tier = row.tiers.find((t) => t.minQuantity === q);
+                    return (
+                      <td key={q} className="px-3 py-2 text-right">
+                        {tier ? (
+                          <div className="inline-flex items-center gap-1 group">
+                            <button
+                              onClick={() => openTierModal(row, tier)}
+                              className="font-medium text-gray-900 hover:bg-gray-100 px-2 py-0.5 rounded text-sm"
+                            >
+                              {formatPrice(tier.unitPriceEur)}
+                            </button>
+                            <button
+                              onClick={() =>
+                                removeEntry(tier.id, `the ${q} tier`)
+                              }
+                              className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-rose-600 transition-opacity"
+                            >
+                              <TrashIcon className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => addTierColumnFor(row)}
+                      title="Add a new quantity tier"
+                      className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {renderTierModal()}
-      {renderAddCustomerModal()}
+      {/* Individual price / tier add-edit popup */}
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
+        >
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+            <h4 className="text-lg font-bold text-gray-900">{modalTitle}</h4>
+            {!modalIsIndividual && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Minimum quantity
+                </label>
+                <input
+                  className={inputCls}
+                  value={modalQty}
+                  onChange={(e) => setModalQty(e.target.value)}
+                  placeholder="e.g., 10"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Net unit price (€)
+              </label>
+              <input
+                className={inputCls}
+                value={modalPrice}
+                onChange={(e) => setModalPrice(e.target.value)}
+                placeholder="e.g., 15.50"
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitModal}
+                className="flex-1 px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer picker */}
+      {showAddCustomer && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+          onClick={(e) =>
+            e.target === e.currentTarget && setShowAddCustomer(false)
+          }
+        >
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+            <h4 className="text-lg font-bold text-gray-900">
+              Add customer price
+            </h4>
+            <p className="text-xs text-gray-500">
+              Select a customer to add sales prices for them.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Customer
+              </label>
+              <CustomerSearchInput
+                value={newCustomerId}
+                onChange={handleCustomerSelect}
+                placeholder="Search customer..."
+                mode="customers"
+                className="w-full"
+              />
+            </div>
+            {newCustomerName && (
+              <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+                Selected: <span className="font-medium">{newCustomerName}</span>
+              </div>
+            )}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setShowAddCustomer(false);
+                  setNewCustomerId("");
+                  setNewCustomerName("");
+                  setSelectedCustomerData(null);
+                }}
+                className="flex-1 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAddCustomer}
+                className="flex-1 px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] transition-colors"
+              >
+                Create & Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

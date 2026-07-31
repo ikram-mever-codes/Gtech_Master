@@ -585,6 +585,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [filterCustomerId, setFilterCustomerId] = useState("");
   const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  // Per-item quantity entered directly in the create picker, keyed by
+  // item id (as string). Defaults to "1" as soon as an item is selected,
+  // and is sent along with itemIds when creating the offer so line items
+  // are created with the right baseQuantity right away — no need to edit
+  // the quantity again after the offer is created.
+  const [itemQuantities, setItemQuantities] = useState<Record<string, string>>(
+    {},
+  );
   const [sourceSearch, setSourceSearch] = useState("");
   const [createForm, setCreateForm] = useState<any>({
     title: "",
@@ -712,6 +720,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setSourceSearch("");
     setSelectedInquiry(null);
     setSelectedItems([]);
+    setItemQuantities({});
     setCreateForm({
       title: "",
       currency: "EUR",
@@ -896,7 +905,21 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       });
       return next;
     });
+    // Keep a "1" quantity ready as soon as an item is selected, and drop it
+    // again if the item is deselected.
+    setItemQuantities((prev) => {
+      const key = String(it.id);
+      const alreadySelected = prev[key] !== undefined;
+      if (alreadySelected) {
+        const { [key]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [key]: "1" };
+    });
   };
+
+  const setItemQuantity = (itemId: string | number, qty: string) =>
+    setItemQuantities((prev) => ({ ...prev, [String(itemId)]: qty }));
 
   const canCreate = () => {
     if (!createForm.title?.trim()) return false;
@@ -931,12 +954,33 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           ...common,
           customerId: filterCustomerId,
           itemIds: selectedItems.map((it) => String(it.id)),
+          // Per-item quantities entered directly in the picker above, keyed
+          // by item id — the backend uses these for each line's
+          // baseQuantity instead of a single shared default.
+          itemQuantities: selectedItems.reduce(
+            (acc: Record<string, string>, it) => {
+              acc[String(it.id)] = itemQuantities[String(it.id)]?.trim()
+                ? itemQuantities[String(it.id)]
+                : "1";
+              return acc;
+            },
+            {},
+          ),
         });
       }
+
       toast.success("Offer created successfully.", successStyles);
-      window.location.reload();
+      onChanged?.();
+
+      // Open the newly created offer directly in this modal's preview
+      // instead of reloading the whole page.
+      if (res?.data) {
+        setOffer(res.data);
+        setForm(buildForm(res.data));
+      }
     } catch (e) {
       console.error("Error creating offer:", e);
+    } finally {
       setCreating(false);
     }
   };
@@ -1358,6 +1402,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSourceSearch("");
                       setSelectedInquiry(null);
                       setSelectedItems([]);
+                      setItemQuantities({});
                     }}
                     className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
                       sourceType === t.key
@@ -1565,6 +1610,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             item={it}
                             selected
                             onClick={() => toggleItem(it)}
+                          />
+                        </div>
+                        <div className="w-20 shrink-0">
+                          <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
+                            Qty
+                          </label>
+                          <input
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+                            value={itemQuantities[String(it.id)] ?? "1"}
+                            onChange={(e) =>
+                              setItemQuantity(it.id, e.target.value)
+                            }
                           />
                         </div>
                         <button

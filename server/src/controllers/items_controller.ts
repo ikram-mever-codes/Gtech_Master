@@ -971,6 +971,10 @@ export const createItem = async (
       item_name_cn,
       ean: ean ? ean.toString() : null,
       parent_id,
+      sales_price:
+        sales_price !== undefined && sales_price !== null && sales_price !== ""
+          ? Math.round(parseFloat(sales_price) * 100) / 100
+          : null,
       taric_id,
       cat_id,
       supplier_id,

@@ -422,6 +422,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           currency: previewItem.currency || "EUR",
           itemNo: previewItem.de_no,
           qty: previewItem.qty,
+
           interval: previewItem.interval,
           priority: previewItem.priority,
           requestStatus: previewItem.requestStatus,
@@ -462,7 +463,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             previewItem.sales_price === "" ||
             previewItem.sales_price === undefined
               ? null
-              : parseFloat(previewItem.sales_price),
+              : Math.round(parseFloat(previewItem.sales_price) * 100) / 100,
           supplierItem: {
             price_rmb: parseFloat(previewItem.supplierItem?.priceRMB) || 0,
             is_po: previewItem.supplierItem?.isPO,
@@ -480,7 +481,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
         };
         await updateItem(Number(itemId), payload);
       }
-      toast.success("Item updated", { id: tid, ...successStyles });
       setPreviewEdit(false);
       fetchItemDetails();
       if (onSaved) onSaved();
@@ -987,7 +987,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     "—"
                   )}
                 </Field>
-                <Field label="Price">
+                <Field label="Transfer Price">
                   {previewEdit ? (
                     <input
                       type="number"
@@ -1004,7 +1004,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      step="0.0001"
+                      step="0.01"
                       className={inputCls}
                       value={previewItem.sales_price ?? ""}
                       onChange={(e) =>

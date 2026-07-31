@@ -7,6 +7,7 @@ import {
 } from "typeorm";
 import { Item } from "./items";
 import { Customer } from "./customers";
+
 @Entity("sales_prices")
 export class SalesPrice {
   @PrimaryGeneratedColumn()
@@ -15,8 +16,12 @@ export class SalesPrice {
   @Column()
   item_id!: number;
 
-  @Column({ type: "int", nullable: true })
-  customer_id?: number | null; // NULL = Standardpreis
+  // FIX: Change from number to string (UUID)
+  @Column({ type: "uuid", nullable: true })
+  customer_id?: string | null;
+
+  @Column({ type: "boolean", default: false })
+  is_individual!: boolean;
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 1 })
   min_quantity!: number;

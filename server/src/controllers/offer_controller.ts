@@ -594,6 +594,14 @@ export class CreateOfferFromItemDto {
   @IsString()
   baseQuantity?: string;
 
+  // NEW: per-item base quantity, keyed by item id (as string). Lets the
+  // create-offer picker set each line's quantity directly instead of the
+  // single shared `baseQuantity` fallback above. Falls back to
+  // `baseQuantity` (then "1") for any item id not present here.
+  @IsOptional()
+  @IsObject()
+  itemQuantities?: Record<string, string>;
+
   @IsOptional()
   @IsEnum(["classic", "matrix"])
   pricingMode?: PricingMode;
@@ -1346,12 +1354,20 @@ export class OfferController {
       const lineItems = orderedItems.map((item, idx) => {
         const snap = this.buildItemSnapshot(item);
 
+        // baseQuantity <- body.itemQuantities[item.id] when provided by the
+        //   create-offer picker (per-item quantity entered directly), else
+        //   falls back to the single shared body.baseQuantity, then "1".
         // basePrice <- item.price (the Item entity's own `price` column)
         // material  <- item's de_no, resolved the same way getItemById
         //   resolves it: warehouse item_no_de first, falling back to
         //   parent.de_no.
         // photo     <- item.photo (the Item entity's own thumbnail column,
         //   same field getItemById/getItems already expose to the frontend).
+        const requestedQty =
+          body.itemQuantities?.[String(item.id)]?.trim() ||
+          body.baseQuantity ||
+          "1";
+
         return this.lineItemRepository.create({
           offer: savedOffer,
           offerId: savedOffer.id,
@@ -1365,7 +1381,7 @@ export class OfferController {
           length: snap.length,
           purchasePrice: snap.purchasePrice,
           purchaseCurrency: snap.purchaseCurrency,
-          baseQuantity: body.baseQuantity || "1",
+          baseQuantity: requestedQty,
           basePrice: item.price ?? 0,
           material: getDeNo(item),
           photo: item.photo || undefined,

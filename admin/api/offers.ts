@@ -96,8 +96,10 @@ export interface CreateOfferFromItemPayload {
   title?: string;
   currency?: string;
   validUntil?: string;
+  itemQuanities?: any;
   paymentMethod?: string;
   shippingMethod?: string;
+  itemQuantities?: any;
   pricingMode?: PricingMode;
   taxRate?: number;
   unitPriceDecimalPlaces?: number;

@@ -64,6 +64,9 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
     remark: "",
     model: "",
     price: 0,
+    // NEW — plain, manually-set sales price, independent from the RMB-driven
+    // `price` field above. Never derived/recalculated, just stored as given.
+    sales_price: "",
     currency: isRequest ? "EUR" : "CNY",
     isActive: true,
     is_eur_special: false,
@@ -82,12 +85,13 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
     const loadOptions = async () => {
       setLoadingOptions(true);
       try {
-        const [parentsRes, taricsRes, suppliersRes, categoriesRes] = await Promise.all([
-          getParents({ page: 1, limit: 100000 }),
-          getAllTarics({ page: 1, limit: 100000 }),
-          getAllSuppliers({ page: 1, limit: 100000 }),
-          getCategories(),
-        ]);
+        const [parentsRes, taricsRes, suppliersRes, categoriesRes] =
+          await Promise.all([
+            getParents({ page: 1, limit: 100000 }),
+            getAllTarics({ page: 1, limit: 100000 }),
+            getAllSuppliers({ page: 1, limit: 100000 }),
+            getCategories(),
+          ]);
         setRefParents(parentsRes.data || []);
         setRefTarics(taricsRes.data || []);
         setRefSuppliers(suppliersRes.data || []);
@@ -139,10 +143,16 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
     }
     if (isRequest) {
       if (!businessId) {
-        return toast.error("Business ID is required for requested items", errorStyles);
+        return toast.error(
+          "Business ID is required for requested items",
+          errorStyles,
+        );
       }
       if (!itemFormData.qty?.trim()) {
-        return toast.error("Quantity is required for requested items", errorStyles);
+        return toast.error(
+          "Quantity is required for requested items",
+          errorStyles,
+        );
       }
     }
 
@@ -198,6 +208,13 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           priceRMB: Number(itemFormData.price) || 0,
           rmbPrice: Number(itemFormData.price) || 0,
           price: Number(itemFormData.price) || 0,
+
+          sales_price:
+            itemFormData.sales_price === "" ||
+            itemFormData.sales_price === undefined ||
+            itemFormData.sales_price === null
+              ? null
+              : Math.round(parseFloat(itemFormData.sales_price) * 100) / 100,
           currency: itemFormData.currency || "CNY",
           isActive: itemFormData.isActive ? "Y" : "N",
           item_no_de: itemFormData.item_no_de || undefined,
@@ -206,19 +223,25 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
         });
       }
-      const createdId = result?.data?.id || result?.data?.data?.id || result?.id;
+      const createdId =
+        result?.data?.id || result?.data?.data?.id || result?.id;
       if (createdId && newItemTags.length > 0) {
         await syncEntityTags(
           createdId,
           isRequest ? "request_item" : "item",
-          newItemTags.map((t) => t.id)
+          newItemTags.map((t) => t.id),
         );
       }
-      toast.success(`${isRequest ? "Request item" : "Item"} created successfully`);
+      toast.success(
+        `${isRequest ? "Request item" : "Item"} created successfully`,
+      );
       if (onCreated) onCreated(result?.data || result);
       onClose();
     } catch (e: any) {
-      toast.error(e.message || `Failed to create ${isRequest ? "request item" : "item"}`, errorStyles);
+      toast.error(
+        e.message || `Failed to create ${isRequest ? "request item" : "item"}`,
+        errorStyles,
+      );
     }
   };
 
@@ -240,7 +263,9 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           {loadingOptions ? (
             <div className="py-20 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
-              <p className="mt-2 text-sm text-gray-500">Loading form options...</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Loading form options...
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -349,16 +374,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.parent_id
                       ? {
-                        value: itemFormData.parent_id,
-                        label: (() => {
-                          const p = refParents?.find(
-                            (x) => x.id === itemFormData.parent_id
-                          );
-                          return p
-                            ? `${p.name_de} (${p.de_no})`
-                            : "Unknown";
-                        })(),
-                      }
+                          value: itemFormData.parent_id,
+                          label: (() => {
+                            const p = refParents?.find(
+                              (x) => x.id === itemFormData.parent_id,
+                            );
+                            return p ? `${p.name_de} (${p.de_no})` : "Unknown";
+                          })(),
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -387,14 +410,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.taric_id
                       ? {
-                        value: itemFormData.taric_id,
-                        label: (() => {
-                          const t = refTarics?.find(
-                            (x) => x.id === itemFormData.taric_id
-                          );
-                          return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                        })(),
-                      }
+                          value: itemFormData.taric_id,
+                          label: (() => {
+                            const t = refTarics?.find(
+                              (x) => x.id === itemFormData.taric_id,
+                            );
+                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                          })(),
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -423,12 +446,12 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.cat_id
                       ? {
-                        value: itemFormData.cat_id,
-                        label:
-                          categories?.find(
-                            (x) => x.id === itemFormData.cat_id
-                          )?.name || "Unknown",
-                      }
+                          value: itemFormData.cat_id,
+                          label:
+                            categories?.find(
+                              (x) => x.id === itemFormData.cat_id,
+                            )?.name || "Unknown",
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -457,14 +480,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.supplier_id
                       ? {
-                        value: itemFormData.supplier_id,
-                        label: (() => {
-                          const s = refSuppliers?.find(
-                            (x) => x.id === itemFormData.supplier_id
-                          );
-                          return s ? getSupplierLabel(s) : "Unknown";
-                        })(),
-                      }
+                          value: itemFormData.supplier_id,
+                          label: (() => {
+                            const s = refSuppliers?.find(
+                              (x) => x.id === itemFormData.supplier_id,
+                            );
+                            return s ? getSupplierLabel(s) : "Unknown";
+                          })(),
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -479,28 +502,26 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   className="text-sm"
                 />
               </div>
-              {(["weight", "length", "width", "height"] as const).map(
-                (dim) => (
-                  <div key={dim}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {dim[0].toUpperCase() + dim.slice(1)} (
-                      {dim === "weight" ? "kg" : "cm"})
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={(itemFormData as any)[dim]}
-                      onChange={(e) =>
-                        setItemFormData({
-                          ...itemFormData,
-                          [dim]: Number(e.target.value),
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                )
-              )}
+              {(["weight", "length", "width", "height"] as const).map((dim) => (
+                <div key={dim}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {dim[0].toUpperCase() + dim.slice(1)} (
+                    {dim === "weight" ? "kg" : "cm"})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={(itemFormData as any)[dim]}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        [dim]: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+              ))}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Model
@@ -518,7 +539,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price
+                  Transfer Price
                 </label>
                 <input
                   type="number"
@@ -528,15 +549,33 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                     setItemFormData({
                       ...itemFormData,
                       price:
-                        e.target.value === ""
-                          ? 0
-                          : parseFloat(e.target.value),
+                        e.target.value === "" ? 0 : parseFloat(e.target.value),
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   placeholder="0.00"
                 />
               </div>
+              {!isRequest && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sales Price
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={itemFormData.sales_price}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        sales_price: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Currency
@@ -555,7 +594,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   onChange={(opt: any) =>
                     setItemFormData({
                       ...itemFormData,
-                      currency: opt ? opt.value : (isRequest ? "EUR" : "CNY"),
+                      currency: opt ? opt.value : isRequest ? "EUR" : "CNY",
                     })
                   }
                   className="text-sm"

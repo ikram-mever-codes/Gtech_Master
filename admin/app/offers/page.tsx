@@ -65,10 +65,10 @@ const getContrastTextColor = (hex: string): string => {
   return luminance > 0.6 ? "#111827" : "#ffffff";
 };
 
-// --- Mirrors the classic-mode line items table in OfferDetailModal --------
-// Kept here (read-only) so the expanded row on the Offers list looks
-// identical to what you see inside the offer detail modal, instead of the
-// generic DocumentLineItemsSubTable used for orders/invoices.
+// --- Mirrors the classic-mode line items table + tax logic in
+// OfferDetailModal ------------------------------------------------------
+// Kept here (read-only) so the expanded row on the Offers list looks and
+// calculates identically to what you see inside the offer detail modal.
 const isFreetextLine = (item: any): boolean =>
   !item?.sourceItemId && !item?.requestedItemId;
 
@@ -78,132 +78,240 @@ const getClassicLineTotal = (item: any): number => {
   return qty * price;
 };
 
+/** Effective VAT rate for a line item.
+ * - Freizeile (freetext) lines: their own stored `taxRate`, editable in the
+ *   detail modal — falls back to the tax profile's rate if never set.
+ * - Every other line (catalog item or inquiry request): always the
+ *   customer's live tax profile rate, never the line's own `taxRate`. */
+const getLineTaxRate = (item: any, offer: any): number => {
+  const taxProfileRate = parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
+  if (isFreetextLine(item)) {
+    const own = parseFlexibleNumber(item?.taxRate);
+    return own !== null && own !== undefined ? own : taxProfileRate;
+  }
+  return taxProfileRate;
+};
+
+/** Shipping always follows the live tax profile rate — never editable. */
+const getShippingTaxRate = (offer: any): number =>
+  parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
+
+/** One VAT group per distinct effective rate among the visible line items
+ * (plus shipping, grouped under its own rate), each summed independently —
+ * same logic as OfferDetailModal's `vatGroups`. */
+const getVatGroups = (
+  offer: any,
+  lineItems: any[],
+): { rate: number; base: number; tax: number }[] => {
+  const byRate = new Map<number, number>();
+  lineItems.forEach((li: any) => {
+    const rate = getLineTaxRate(li, offer);
+    const lineTotal = getClassicLineTotal(li);
+    byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
+  });
+
+  if (offer?.shippingCost > 0) {
+    const shipRate = getShippingTaxRate(offer);
+    byRate.set(shipRate, (byRate.get(shipRate) || 0) + offer.shippingCost);
+  }
+
+  const discountFactor =
+    offer?.discountPercentage > 0 ? 1 - offer.discountPercentage / 100 : 1;
+
+  return Array.from(byRate.entries())
+    .map(([rate, base]) => {
+      const adjustedBase = base * discountFactor;
+      return {
+        rate,
+        base: adjustedBase,
+        tax: adjustedBase * (rate / 100),
+      };
+    })
+    .sort((a, b) => b.rate - a.rate);
+};
+
 const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
   offer,
   lineItems,
-}) => (
-  <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
-    <table className="w-full text-sm">
-      <thead className="bg-gray-100 border-b border-gray-200">
-        <tr>
-          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
-            Pos
-          </th>
-          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
-            Pic
-          </th>
-          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
-            Art.-Nr.
-          </th>
-          <th className="px-2 py-2 text-left font-semibold text-gray-600">
-            Bezeichnung
-          </th>
-          <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
-            Hinweis
-          </th>
-          <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
-            MwSt.
-          </th>
-          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
-            Menge
-          </th>
-          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-            Netto-Preis
-          </th>
-          <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-            Netto gesamt
-          </th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-200">
-        {lineItems.length === 0 && (
-          <tr>
-            <td colSpan={9} className="text-center py-6 text-sm text-gray-500">
-              No line items yet.
-            </td>
-          </tr>
-        )}
-        {lineItems.map((item: any) => {
-          const freetext = isFreetextLine(item);
-          const total = getClassicLineTotal(item);
-          const qtyDisplay = Math.round(
-            parseFlexibleNumber(item.baseQuantity) ?? 1,
-          );
-          const rowColor = item.highlightColor || (freetext ? "#D8964A" : null);
-          const thumb = item.photo;
-          return (
-            <tr
-              key={item.id}
-              style={rowColor ? { backgroundColor: rowColor } : undefined}
-            >
-              <td className="px-2 py-2 text-gray-500">{item.position}</td>
-              <td className="px-2 py-2">
-                <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
-                  {thumb ? (
-                    <img
-                      src={thumb}
-                      alt="thumb"
-                      className="w-full h-full object-contain"
-                      onError={(e) =>
-                        ((e.target as HTMLImageElement).style.display = "none")
-                      }
-                    />
-                  ) : (
-                    <span className="text-gray-300 text-[10px]">—</span>
-                  )}
-                </div>
+}) => {
+  const sortedLineItems = [...lineItems].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+  const vatGroups = getVatGroups(offer, lineItems);
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-100 border-b border-gray-200">
+            <tr>
+              <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
+                Pos
+              </th>
+              <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
+                Pic
+              </th>
+              <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                Art.-Nr.
+              </th>
+              <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                Bezeichnung
+              </th>
+              <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                Hinweis
+              </th>
+              <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
+                MwSt.
+              </th>
+              <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                Menge
+              </th>
+              <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                Netto-Preis
+              </th>
+              <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                Netto gesamt
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {sortedLineItems.length === 0 && (
+              <tr>
+                <td
+                  colSpan={9}
+                  className="text-center py-6 text-sm text-gray-500"
+                >
+                  No line items yet.
+                </td>
+              </tr>
+            )}
+            {sortedLineItems.map((item: any) => {
+              const freetext = isFreetextLine(item);
+              const total = getClassicLineTotal(item);
+              const qtyDisplay = Math.round(
+                parseFlexibleNumber(item.baseQuantity) ?? 1,
+              );
+              const rowColor =
+                item.highlightColor || (freetext ? "#D8964A" : null);
+              const thumb = item.photo;
+              const lineTaxRate = getLineTaxRate(item, offer);
+              return (
+                <tr
+                  key={item.id}
+                  style={rowColor ? { backgroundColor: rowColor } : undefined}
+                >
+                  <td className="px-2 py-2 text-gray-500">{item.position}</td>
+                  <td className="px-2 py-2">
+                    <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt="thumb"
+                          className="w-full h-full object-contain"
+                          onError={(e) =>
+                            ((e.target as HTMLImageElement).style.display =
+                              "none")
+                          }
+                        />
+                      ) : (
+                        <span className="text-gray-300 text-[10px]">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2">
+                    <span>{item.itemNo || item.material || "—"}</span>
+                  </td>
+                  <td className="px-2 py-2">
+                    <span>{item.itemName || "—"}</span>
+                  </td>
+                  <td className="px-2 py-2">
+                    <span className="text-gray-600">{item.notes || "—"}</span>
+                  </td>
+                  <td className="px-2 py-2 text-center text-gray-600">
+                    {lineTaxRate}%
+                  </td>
+                  <td className="px-2 py-2">
+                    <div className="text-right">{qtyDisplay}</div>
+                  </td>
+                  <td className="px-2 py-2">
+                    <div className="text-right">
+                      {formatCurrency(item.basePrice || 0, offer.currency)}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 text-right font-medium">
+                    {formatCurrency(total || 0, offer.currency)}
+                  </td>
+                </tr>
+              );
+            })}
+
+            {/* Shipping method — always the last row, same as OfferDetailModal */}
+            <tr className="bg-gray-100/80">
+              <td className="px-2 py-2 text-gray-400">
+                {lineItems.length + 1}
               </td>
-              <td className="px-2 py-2">
-                <span>{item.itemNo || item.material || "—"}</span>
+              <td className="px-2 py-2 text-gray-400"></td>
+              <td className="px-2 py-2 text-gray-400">—</td>
+              <td className="px-2 py-2 text-gray-700">
+                {offer.shippingMethod || "No shipping method set"}
               </td>
-              <td className="px-2 py-2">
-                <span>{item.itemName || "—"}</span>
-              </td>
-              <td className="px-2 py-2">
-                <span className="text-gray-600">{item.notes || "—"}</span>
-              </td>
+              <td className="px-0 py-2 text-center text-gray-400"></td>
               <td className="px-2 py-2 text-center text-gray-600">
-                {offer.taxRate ?? 19}%
+                {getShippingTaxRate(offer)}%
               </td>
-              <td className="px-2 py-2">
-                <div className="text-right">{qtyDisplay}</div>
+              <td className="px-2 py-2 text-right text-gray-600">1</td>
+              <td className="px-2 py-2 text-right text-gray-600">
+                {formatCurrency(offer.shippingCost || 0, offer.currency)}
               </td>
-              <td className="px-2 py-2">
-                <div className="text-right">
-                  {formatCurrency(item.basePrice || 0, offer.currency)}
-                </div>
-              </td>
-              <td className="px-2 py-2 text-right font-medium">
-                {formatCurrency(total || 0, offer.currency)}
+              <td className="px-2 py-2 text-right font-medium text-gray-700">
+                {formatCurrency(offer.shippingCost || 0, offer.currency)}
               </td>
             </tr>
-          );
-        })}
+          </tbody>
+        </table>
+      </div>
 
-        {/* Shipping method — always the last row, same as OfferDetailModal */}
-        <tr className="bg-gray-100/80">
-          <td className="px-2 py-2 text-gray-400">{lineItems.length + 1}</td>
-          <td className="px-2 py-2 text-gray-400"></td>
-          <td className="px-2 py-2 text-gray-400">—</td>
-          <td className="px-2 py-2 text-gray-700">
-            {offer.shippingMethod || "No shipping method set"}
-          </td>
-          <td className="px-0 py-2 text-center text-gray-400"></td>
-          <td className="px-2 py-2 text-center text-gray-600">
-            {offer.taxRate ?? 19}%
-          </td>
-          <td className="px-2 py-2 text-right text-gray-600">1</td>
-          <td className="px-2 py-2 text-right text-gray-600">
-            {formatCurrency(offer.shippingCost || 0, offer.currency)}
-          </td>
-          <td className="px-2 py-2 text-right font-medium text-gray-700">
-            {formatCurrency(offer.shippingCost || 0, offer.currency)}
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-);
+      {/* Totals — one VAT row per distinct active rate, summed
+          independently, same as OfferDetailModal's summary panel. */}
+      <div className="max-w-sm ml-auto w-full space-y-2 text-sm bg-white border border-gray-200 rounded-lg p-3">
+        <div className="flex justify-between">
+          <span className="text-gray-600">Subtotal</span>
+          <span className="font-medium">
+            {formatCurrency(offer.subtotal || 0, offer.currency)}
+          </span>
+        </div>
+        {offer.discountAmount > 0 && (
+          <div className="flex justify-between text-rose-600">
+            <span>Discount</span>
+            <span>−{formatCurrency(offer.discountAmount, offer.currency)}</span>
+          </div>
+        )}
+        {offer.shippingCost > 0 && (
+          <div className="flex justify-between">
+            <span className="text-gray-600">Shipping</span>
+            <span className="font-medium">
+              {formatCurrency(offer.shippingCost, offer.currency)}
+            </span>
+          </div>
+        )}
+        {vatGroups
+          .filter((g) => g.rate !== 0)
+          .map((g) => (
+            <div key={g.rate} className="flex justify-between">
+              <span className="text-gray-600">VAT ({g.rate}%)</span>
+              <span className="font-medium">
+                {formatCurrency(g.tax, offer.currency)}
+              </span>
+            </div>
+          ))}
+        <div className="border-t pt-2 flex justify-between font-bold text-base">
+          <span>Total</span>
+          <span>{formatCurrency(offer.totalAmount || 0, offer.currency)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const OffersPage: React.FC<any> = ({
   embedded = false,
