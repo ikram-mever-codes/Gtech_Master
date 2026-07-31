@@ -435,6 +435,28 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                 }
             });
 
+            const rawCargoNo = (cleanFormData.cargo_no || "").trim();
+            const now = new Date();
+            const yy = String(now.getFullYear()).slice(-2);
+            const mm = String(now.getMonth() + 1).padStart(2, "0");
+            const defaultPrefix = `C${yy}${mm}-`;
+
+            const isCustomText =
+                rawCargoNo &&
+                rawCargoNo !== defaultPrefix &&
+                !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
+
+            if (isCustomText) {
+                const existingRemark = (cleanFormData.remark || "").trim();
+                if (existingRemark) {
+                    if (!existingRemark.includes(rawCargoNo)) {
+                        cleanFormData.remark = `${existingRemark} - ${rawCargoNo}`;
+                    }
+                } else {
+                    cleanFormData.remark = rawCargoNo;
+                }
+            }
+
             const payload: any = {
                 ...cleanFormData,
                 orders: assignedOrderIds,

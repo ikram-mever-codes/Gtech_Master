@@ -418,11 +418,25 @@ export const createCargo = async (
     const defaultPrefix = `C${yy}${mm}-`;
 
     const rawCargoNo = (cargoData.cargo_no || "").trim();
+    const isCustomText =
+      rawCargoNo &&
+      rawCargoNo !== defaultPrefix &&
+      !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
+
     if (!rawCargoNo || rawCargoNo === defaultPrefix) {
       try {
         cargoData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
       } catch (err) {
         console.warn("Could not generate cargo number using sequence service:", err);
+      }
+    } else if (isCustomText) {
+      const existingRemark = (cargoData.remark || "").trim();
+      if (existingRemark) {
+        if (!existingRemark.includes(rawCargoNo)) {
+          cargoData.remark = `${existingRemark} - ${rawCargoNo}`;
+        }
+      } else {
+        cargoData.remark = rawCargoNo;
       }
     }
 
@@ -476,7 +490,23 @@ export const updateCargo = async (
       ...updateData
     } = req.body;
 
+    const rawCargoNo = (updateData.cargo_no || "").trim();
+    const isCustomText =
+      rawCargoNo &&
+      !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
 
+    if (isCustomText) {
+      const existingRemark = (
+        updateData.remark !== undefined ? updateData.remark : cargo.remark || ""
+      ).trim();
+      if (existingRemark) {
+        if (!existingRemark.includes(rawCargoNo)) {
+          updateData.remark = `${existingRemark} - ${rawCargoNo}`;
+        }
+      } else {
+        updateData.remark = rawCargoNo;
+      }
+    }
 
     const oldCargoNo = cargo.cargo_no;
     cargoRepo.merge(cargo, updateData);

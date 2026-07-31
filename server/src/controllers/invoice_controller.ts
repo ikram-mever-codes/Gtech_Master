@@ -2212,7 +2212,7 @@ export class InvoiceController {
 
                 if (cargo.remark && cargo.remark.trim()) {
                   if (!cargo.remark.includes(customCargoNo)) {
-                    cargo.remark = `${cargo.remark} | ${customCargoNo}`;
+                    cargo.remark = `${cargo.remark} - ${customCargoNo}`;
                   }
                 } else {
                   cargo.remark = customCargoNo;
