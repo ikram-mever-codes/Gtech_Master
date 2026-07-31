@@ -307,7 +307,7 @@ export const getAllCargos = async (
     }
 
     const [cargos, total] = await qb
-      .orderBy("cargo.createdAt", "DESC") // Changed sorting field to createdAt
+      .orderBy("cargo.created_at", "DESC") // Changed sorting field to createdAt
       .groupBy("cargo.id")
       .skip(skip)
       .take(limitNum)
