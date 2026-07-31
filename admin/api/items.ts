@@ -320,6 +320,9 @@ export const createItem = async (itemData: {
   model?: string;
   supplier_id?: number;
   RMB_Price?: number;
+  price_rmb?: number;
+  priceRMB?: number;
+  rmbPrice?: number;
   price?: number;
   currency?: string;
   isActive?: string;

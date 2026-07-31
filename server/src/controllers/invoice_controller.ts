@@ -1063,408 +1063,376 @@ export class InvoiceController {
     }
   };
 
+  static fetchExpandedDetailsData = async (invoiceId: string) => {
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
+    const cargoRepository = AppDataSource.getRepository(Cargo);
+    const orderRepository = AppDataSource.getRepository(Order);
+    const orderItemRepository = AppDataSource.getRepository(OrderItem);
+    const cciInvoiceRepo = AppDataSource.getRepository(CCIInvoice);
+
+    const cciInvoice = await cciInvoiceRepo.findOne({
+      where: [{ id: invoiceId }, { invoice_number: invoiceId }],
+      relations: ["customer", "items"],
+    });
+
+    if (cciInvoice) {
+      const detailedItems = (cciInvoice.items || []).map((ci) => ({
+        id: ci.id,
+        qty: ci.quantity,
+        quantity: ci.quantity,
+        eur_special_price: Number(ci.unit_price || 0),
+        price: Number(ci.unit_price || 0),
+        _fallbackEan: ci.ean || "-",
+        _fallbackEk: Number(ci.unit_price || 0),
+        set_taric_code: ci.taric_code || null,
+        remark_de: ci.remark || "",
+        item: {
+          id: ci.item_id,
+          item_name: ci.item_name,
+          ean: ci.ean,
+          taric: ci.taric_code
+            ? { code: ci.taric_code, name_en: ci.taric_name_en, duty_rate: Number(ci.duty_rate || 0) }
+            : null,
+        },
+        order: { order_no: ci.order_no || cciInvoice.order_number },
+      }));
+
+      const taricGroupsMap = new Map();
+      detailedItems.forEach((oi: any) => {
+        const code = oi.set_taric_code || oi.item?.taric?.code || "-";
+        const groupKey = `hs_${code}`;
+        if (!taricGroupsMap.has(groupKey)) {
+          taricGroupsMap.set(groupKey, {
+            taricId: groupKey,
+            taricNameEn: oi.item?.taric?.name_en || oi.item?.item_name || "Project Item",
+            taricCode: code,
+            dutyRate: Number(oi.item?.taric?.duty_rate ?? 0),
+            totalQty: 0,
+            totalPrice: 0,
+            unitPrice: 0,
+            isProjectItem: !code || code === "-" || code === "0",
+          });
+        }
+        const group = taricGroupsMap.get(groupKey);
+        group.totalQty += Number(oi.qty || 0);
+        group.totalPrice += Number(oi.qty || 0) * Number(oi.eur_special_price || 0);
+      });
+
+      const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
+        g.unitPrice = g.totalQty > 0 ? g.totalPrice / g.totalQty : 0;
+        return g;
+      });
+
+      return {
+        invoice: {
+          id: cciInvoice.id,
+          invoiceNumber: cciInvoice.invoice_number,
+          orderNumber: cciInvoice.order_number,
+          invoiceDate: cciInvoice.invoice_date,
+          deliveryDate: cciInvoice.delivery_date,
+          dueDate: cciInvoice.due_date,
+          netTotal: cciInvoice.net_total,
+          taxAmount: cciInvoice.tax_amount,
+          grossTotal: cciInvoice.gross_total,
+          freightCost: cciInvoice.freight_cost,
+          description: cciInvoice.description,
+          remark: cciInvoice.remark,
+          status: cciInvoice.status,
+          customer: cciInvoice.customer
+            ? {
+                id: cciInvoice.customer.original_customer_id || cciInvoice.customer.id,
+                companyName: cciInvoice.customer.company_name,
+                email: cciInvoice.customer.email,
+              }
+            : null,
+        },
+        cargo: cciInvoice.cargo_no
+          ? {
+              id: cciInvoice.cargo_no,
+              cargo_no: cciInvoice.cargo_no,
+              ship_to: cciInvoice.customer?.ship_to_address || null,
+              bill_to: "GTech Industries GmbH",
+            }
+          : null,
+        orderNosInCargo: [cciInvoice.order_number].filter(Boolean),
+        detailedItems,
+        taricGroups,
+      };
+    }
+
+    const invoice = await invoiceRepository.findOne({
+      where: { id: invoiceId },
+      relations: ["customer", "items", "items.item", "items.item.taric"],
+    });
+
+    if (!invoice) return null;
+
+    const orderNumber = invoice.orderNumber || "";
+    let orderItems: any[] = [];
+    let cargo: any = null;
+
+    if (orderNumber) {
+      cargo = await cargoRepository.findOne({
+        where: { cargo_no: orderNumber },
+      });
+
+      if (!cargo) {
+        cargo = await cargoRepository.findOne({
+          where: { cargo_no: Like(`%${orderNumber}%`) },
+        });
+      }
+
+      if (!cargo) {
+        const tokens = orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2);
+        for (const token of tokens) {
+          cargo = await cargoRepository.findOne({
+            where: [{ cargo_no: token }, { cargo_no: Like(`%${token}%`) }],
+          });
+          if (cargo) break;
+        }
+      }
+    }
+
+    if (cargo) {
+      const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
+        where: { cargo_id: cargo.id },
+      });
+      const orderIdsFromCargoOrders = cargoOrders.map((co) => co.order_id).filter(Boolean);
+
+      const ordersInCargo = await orderRepository.find({
+        where: [{ cargo_id: cargo.id }],
+      });
+      const orderIdsFromOrders = ordersInCargo.map((o) => o.id).filter(Boolean);
+
+      const allOrderIds = [...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders])];
+
+      const whereConditions: any[] = [{ cargo_id: cargo.id }];
+      if (allOrderIds.length > 0) {
+        whereConditions.push({ order_id: In(allOrderIds) });
+      }
+
+      orderItems = await orderItemRepository.find({
+        where: whereConditions,
+        relations: ["item", "item.taric", "item.purchasePrices", "order"],
+      });
+    }
+
+    if (orderItems.length === 0 && orderNumber) {
+      const tokens = [orderNumber, ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2)];
+      const uniqueTokens = [...new Set(tokens)];
+
+      const matchingOrders = await orderRepository.find({
+        where: uniqueTokens.map((t) => ({ order_no: Like(`%${t}%`) })),
+      });
+
+      if (matchingOrders.length > 0) {
+        const matchingOrderIds = matchingOrders.map((o) => o.id);
+        const foundCargoOrder = await AppDataSource.getRepository(CargoOrder).findOne({
+          where: { order_id: In(matchingOrderIds) },
+          relations: ["cargo"],
+        });
+        if (foundCargoOrder?.cargo) {
+          cargo = foundCargoOrder.cargo;
+        }
+
+        orderItems = await orderItemRepository.find({
+          where: { order_id: In(matchingOrderIds) },
+          relations: ["item", "item.taric", "item.purchasePrices", "order"],
+        });
+      }
+    }
+
+    if (orderItems.length > 0) {
+      const itemMap = new Map();
+      orderItems.forEach((oi) => itemMap.set(oi.id, oi));
+      orderItems = Array.from(itemMap.values());
+    }
+
+    if (orderItems.length === 0 && invoice.items && invoice.items.length > 0) {
+      orderItems = invoice.items.map((invItem: any) => ({
+        id: invItem.id,
+        qty: Number(invItem.quantity || 0),
+        price: Number(invItem.unitPrice || 0),
+        eur_special_price: Number(invItem.unitPrice || 0),
+        item: invItem.item || {
+          id: invItem.item_id && !isNaN(Number(invItem.item_id)) ? Number(invItem.item_id) : null,
+          item_name: invItem.description || "Invoice Item",
+          ean: invItem.articleNumber || "-",
+          taric: null,
+        },
+        set_taric_code: null,
+      }));
+    }
+
+    const getEffectiveTaricCode = (oi: any): string => {
+      const itemTaricCode = oi.item?.taric?.code || "";
+      const rawCode = oi.set_taric_code
+        ? oi.set_taric_code.toString()
+        : itemTaricCode;
+      if (rawCode) {
+        const codes = rawCode.split("/");
+        return codes.length > 1 ? codes[1].trim() : codes[0].trim();
+      }
+      return "unknown";
+    };
+
+    const getGroupKey = (oi: any): string => {
+      const itemTaricCode = oi.item?.taric?.code || "";
+      const isProjectItem =
+        !itemTaricCode ||
+        itemTaricCode === "0" ||
+        itemTaricCode === "0000000000";
+
+      if (oi.set_taric_code) {
+        const codes = oi.set_taric_code.split("/");
+        const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+        return `hs_${target}`;
+      }
+      const taricId = oi.item?.taric?.id;
+      if (taricId && !isProjectItem) {
+        return `hs_${itemTaricCode}`;
+      }
+      return `item_${oi.item?.id || Math.random()}`;
+    };
+
+    const manualTaricCodes: string[] = [];
+    orderItems.forEach((oi: any) => {
+      if (oi.set_taric_code) {
+        const codes = oi.set_taric_code.split("/");
+        codes.forEach((c: string) => {
+          if (c && c.trim()) manualTaricCodes.push(c.trim());
+        });
+      }
+    });
+
+    const uniqueManualCodes = [...new Set(manualTaricCodes)];
+    const manualTarics =
+      uniqueManualCodes.length > 0
+        ? await AppDataSource.getRepository(Taric).find({
+            where: { code: In(uniqueManualCodes) },
+          })
+        : [];
+    const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
+
+    const itemsWithFallbacks = await Promise.all(
+      [...orderItems].map(async (oi: any) => {
+        const item = oi.item;
+
+        let ean = item?.ean || "-";
+        if (ean === "-" && item?.id) {
+          const wi = await AppDataSource.getRepository(WarehouseItem).findOne(
+            { where: { item_id: item.id } },
+          );
+          if (wi?.ean) ean = wi.ean;
+        }
+
+        let rmbPrice = oi.rmb_special_price || 0;
+        if (!rmbPrice && item?.id) {
+          rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
+        }
+        let eurPrice =
+          oi.eur_special_price ||
+          oi.price ||
+          item?.transfer_price_EUR ||
+          item?.price ||
+          0;
+        if (!eurPrice && rmbPrice) {
+          eurPrice = Number(rmbPrice) * 0.13;
+        }
+
+        return {
+          ...oi,
+          v: (item?.length * item?.width * item?.height) / 1000 || 0,
+          w: item?.weight || 0,
+          _effectiveTaricCode: getEffectiveTaricCode(oi),
+          _fallbackEan: ean,
+          _fallbackRmb: rmbPrice,
+          _fallbackEk: eurPrice,
+        };
+      }),
+    );
+
+    const taricGroupsMap = new Map<string, any>();
+    itemsWithFallbacks.forEach((oi: any) => {
+      const item = oi.item;
+      const taric = item?.taric;
+      const itemTaricCode = taric?.code || "";
+      const isProjectItem =
+        !itemTaricCode ||
+        itemTaricCode === "0" ||
+        itemTaricCode === "0000000000";
+      const groupKey = getGroupKey(oi);
+
+      if (!taricGroupsMap.has(groupKey)) {
+        let displayCode = oi.item?.taric?.code || "-";
+        let displayName =
+          taric?.name_en || (isProjectItem ? "Project Item" : "Unknown");
+        let displayRate = Number(taric?.duty_rate || 0);
+
+        if (oi.set_taric_code) {
+          const codes = oi.set_taric_code.split("/");
+          const targetCode =
+            codes.length > 1 ? codes[1].trim() : codes[0].trim();
+          displayCode = targetCode;
+
+          const mTaric = manualTaricMap.get(targetCode);
+          if (mTaric) {
+            displayName = mTaric.name_en || displayName;
+            displayRate =
+              mTaric.duty_rate !== undefined ? Number(mTaric.duty_rate) : displayRate;
+          }
+        }
+
+        taricGroupsMap.set(groupKey, {
+          taricId: groupKey,
+          taricNameEn: displayName,
+          taricCode: displayCode,
+          dutyRate: displayRate,
+          totalQty: 0,
+          totalPrice: 0,
+          unitPrice: 0,
+          isProjectItem,
+        });
+      }
+
+      const group = taricGroupsMap.get(groupKey)!;
+      group.totalQty += Number(oi.qty) || 0;
+      const currentPrice = Number(oi._fallbackEk) || 0;
+      group.totalPrice += (Number(oi.qty) || 0) * currentPrice;
+    });
+
+    const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
+      g.unitPrice = g.totalQty > 0 ? g.totalPrice / g.totalQty : 0;
+      return g;
+    });
+
+    return {
+      invoice,
+      cargo,
+      orderNosInCargo: [orderNumber].filter(Boolean),
+      detailedItems: itemsWithFallbacks,
+      taricGroups,
+    };
+  };
+
   static getInvoiceExpandedDetails = async (
     req: Request,
     res: Response,
     next: NextFunction,
   ) => {
-    const invoiceRepository = AppDataSource.getRepository(Invoice);
-    const cargoRepository = AppDataSource.getRepository(Cargo);
-    const orderRepository = AppDataSource.getRepository(Order);
-    const orderItemRepository = AppDataSource.getRepository(OrderItem);
-
     try {
       const { id } = req.params;
+      const data = await InvoiceController.fetchExpandedDetailsData(id);
 
-      const cciInvoiceRepo = AppDataSource.getRepository(CCIInvoice);
-      const cciInvoice = await cciInvoiceRepo.findOne({
-        where: [{ id }, { invoice_number: id }],
-        relations: ["customer", "items"],
-      });
-
-      if (cciInvoice) {
-        const detailedItems = (cciInvoice.items || []).map((ci) => ({
-          id: ci.id,
-          qty: ci.quantity,
-          quantity: ci.quantity,
-          eur_special_price: Number(ci.unit_price || 0),
-          price: Number(ci.unit_price || 0),
-          _fallbackEan: ci.ean || "-",
-          _fallbackEk: Number(ci.unit_price || 0),
-          set_taric_code: ci.taric_code || null,
-          remark_de: ci.remark || "",
-          item: {
-            id: ci.item_id,
-            item_name: ci.item_name,
-            ean: ci.ean,
-            taric: ci.taric_code
-              ? { code: ci.taric_code, name_en: ci.taric_name_en, duty_rate: ci.duty_rate }
-              : null,
-          },
-          order: { order_no: ci.order_no || cciInvoice.order_number },
-        }));
-
-        const taricGroupsMap = new Map();
-        detailedItems.forEach((oi: any) => {
-          const code = oi.set_taric_code || oi.item?.taric?.code || "-";
-          const groupKey = `hs_${code}`;
-          if (!taricGroupsMap.has(groupKey)) {
-            taricGroupsMap.set(groupKey, {
-              taricId: groupKey,
-              taricNameEn: oi.item?.taric?.name_en || "Project Item",
-              taricCode: code,
-              dutyRate: oi.item?.taric?.duty_rate || 0,
-              totalQty: 0,
-              totalPrice: 0,
-              unitPrice: 0,
-              isProjectItem: !code || code === "-" || code === "0",
-            });
-          }
-          const group = taricGroupsMap.get(groupKey);
-          group.totalQty += Number(oi.qty || 0);
-          group.totalPrice += Number(oi.qty || 0) * Number(oi.eur_special_price || 0);
-        });
-
-        const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
-          g.unitPrice = g.totalQty > 0 ? g.totalPrice / g.totalQty : 0;
-          return g;
-        });
-
-        return res.json({
-          success: true,
-          data: {
-            invoice: {
-              id: cciInvoice.id,
-              invoiceNumber: cciInvoice.invoice_number,
-              orderNumber: cciInvoice.order_number,
-              invoiceDate: cciInvoice.invoice_date,
-              deliveryDate: cciInvoice.delivery_date,
-              dueDate: cciInvoice.due_date,
-              netTotal: cciInvoice.net_total,
-              taxAmount: cciInvoice.tax_amount,
-              grossTotal: cciInvoice.gross_total,
-              freightCost: cciInvoice.freight_cost,
-              description: cciInvoice.description,
-              remark: cciInvoice.remark,
-              status: cciInvoice.status,
-              customer: cciInvoice.customer
-                ? {
-                  id: cciInvoice.customer.original_customer_id || cciInvoice.customer.id,
-                  companyName: cciInvoice.customer.company_name,
-                  email: cciInvoice.customer.email,
-                }
-                : null,
-            },
-            cargo: cciInvoice.cargo_no
-              ? {
-                id: cciInvoice.cargo_no,
-                cargo_no: cciInvoice.cargo_no,
-                ship_to: cciInvoice.customer?.ship_to_address || null,
-                bill_to: "GTech Industries GmbH",
-              }
-              : null,
-            orderNosInCargo: [cciInvoice.order_number].filter(Boolean),
-            detailedItems,
-            taricGroups,
-          },
-        });
-      }
-
-      const invoice = await invoiceRepository.findOne({
-        where: { id },
-        relations: ["customer", "items", "items.item", "items.item.taric"],
-      });
-
-      if (!invoice) {
+      if (!data) {
         return res
           .status(404)
           .json({ success: false, message: "Invoice not found" });
       }
 
-      const orderNumber = invoice.orderNumber || "";
-
-      let orderItems: any[] = [];
-      let cargo: any = null;
-
-      if (orderNumber) {
-        cargo = await cargoRepository.findOne({
-          where: { cargo_no: orderNumber },
-        });
-
-        if (!cargo) {
-          cargo = await cargoRepository.findOne({
-            where: { cargo_no: Like(`%${orderNumber}%`) },
-          });
-        }
-
-        if (!cargo) {
-          const tokens = orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2);
-          for (const token of tokens) {
-            cargo = await cargoRepository.findOne({
-              where: [{ cargo_no: token }, { cargo_no: Like(`%${token}%`) }],
-            });
-            if (cargo) break;
-          }
-        }
-      }
-
-      if (cargo) {
-        const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
-          where: { cargo_id: cargo.id },
-        });
-        const orderIdsFromCargoOrders = cargoOrders.map((co) => co.order_id).filter(Boolean);
-
-        const ordersInCargo = await orderRepository.find({
-          where: [{ cargo_id: cargo.id }],
-        });
-        const orderIdsFromOrders = ordersInCargo.map((o) => o.id).filter(Boolean);
-
-        const allOrderIds = [...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders])];
-
-        const whereConditions: any[] = [{ cargo_id: cargo.id }];
-        if (allOrderIds.length > 0) {
-          whereConditions.push({ order_id: In(allOrderIds) });
-        }
-
-        orderItems = await orderItemRepository.find({
-          where: whereConditions,
-          relations: ["item", "item.taric", "item.purchasePrices", "order"],
-        });
-      }
-
-      if (orderItems.length === 0 && orderNumber) {
-        const tokens = [orderNumber, ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2)];
-        const uniqueTokens = [...new Set(tokens)];
-
-        const matchingOrders = await orderRepository.find({
-          where: uniqueTokens.map((t) => ({ order_no: Like(`%${t}%`) })),
-        });
-
-        if (matchingOrders.length > 0) {
-          const matchingOrderIds = matchingOrders.map((o) => o.id);
-          const foundCargoOrder = await AppDataSource.getRepository(CargoOrder).findOne({
-            where: { order_id: In(matchingOrderIds) },
-            relations: ["cargo"],
-          });
-          if (foundCargoOrder?.cargo) {
-            cargo = foundCargoOrder.cargo;
-          }
-
-          orderItems = await orderItemRepository.find({
-            where: { order_id: In(matchingOrderIds) },
-            relations: ["item", "item.taric", "item.purchasePrices", "order"],
-          });
-        }
-      }
-
-      if (orderItems.length > 0) {
-        const itemMap = new Map();
-        orderItems.forEach((oi) => itemMap.set(oi.id, oi));
-        orderItems = Array.from(itemMap.values());
-      }
-
-      if (orderItems.length === 0 && invoice.items && invoice.items.length > 0) {
-        orderItems = invoice.items.map((invItem: any) => ({
-          id: invItem.id,
-          qty: Number(invItem.quantity || 0),
-          price: Number(invItem.unitPrice || 0),
-          eur_special_price: Number(invItem.unitPrice || 0),
-          item: invItem.item || {
-            id: invItem.item_id && !isNaN(Number(invItem.item_id)) ? Number(invItem.item_id) : null,
-            item_name: invItem.description || "Invoice Item",
-            ean: invItem.articleNumber || "-",
-            taric: null,
-          },
-          set_taric_code: null,
-        }));
-      }
-
-      const getEffectiveTaricCode = (oi: any): string => {
-        const itemTaricCode = oi.item?.taric?.code || "";
-        const rawCode = oi.set_taric_code
-          ? oi.set_taric_code.toString()
-          : itemTaricCode;
-        if (rawCode) {
-          const codes = rawCode.split("/");
-          return codes.length > 1 ? codes[1].trim() : codes[0].trim();
-        }
-        return "unknown";
-      };
-
-      const getGroupKey = (oi: any): string => {
-        const itemTaricCode = oi.item?.taric?.code || "";
-        const isProjectItem =
-          !itemTaricCode ||
-          itemTaricCode === "0" ||
-          itemTaricCode === "0000000000";
-
-        if (oi.set_taric_code) {
-          const codes = oi.set_taric_code.split("/");
-          const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-          return `hs_${target}`;
-        }
-        const taricId = oi.item?.taric?.id;
-        if (taricId && !isProjectItem) {
-          return `hs_${itemTaricCode}`;
-        }
-        return `item_${oi.item?.id || Math.random()}`;
-      };
-
-      const manualTaricCodes: string[] = [];
-      orderItems.forEach((oi: any) => {
-        if (oi.set_taric_code) {
-          const codes = oi.set_taric_code.split("/");
-          codes.forEach((c: string) => {
-            if (c && c.trim()) manualTaricCodes.push(c.trim());
-          });
-        }
-      });
-
-      const uniqueManualCodes = [...new Set(manualTaricCodes)];
-      const manualTarics =
-        uniqueManualCodes.length > 0
-          ? await AppDataSource.getRepository(Taric).find({
-            where: { code: In(uniqueManualCodes) },
-          })
-          : [];
-      const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
-
-      const itemsWithFallbacks = await Promise.all(
-        [...orderItems].map(async (oi: any) => {
-          const item = oi.item;
-
-          let ean = item?.ean || "-";
-          if (ean === "-" && item?.id) {
-            const wi = await AppDataSource.getRepository(WarehouseItem).findOne(
-              {
-                where: { item_id: item.id },
-              },
-            );
-            if (wi?.ean) ean = wi.ean;
-          }
-
-          let rmbPrice = oi.rmb_special_price || 0;
-          if (!rmbPrice && item?.id) {
-            rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
-          }
-          let eurPrice =
-            oi.eur_special_price ||
-            oi.price ||
-            item?.transfer_price_EUR ||
-            item?.price ||
-            0;
-          if (!eurPrice && rmbPrice) {
-            eurPrice = Number(rmbPrice) * 0.13;
-          }
-
-          return {
-            ...oi,
-            v: (item?.length * item?.width * item?.height) / 1000 || 0,
-            w: item?.weight || 0,
-            _effectiveTaricCode: getEffectiveTaricCode(oi),
-            _fallbackEan: ean,
-            _fallbackRmb: rmbPrice,
-            _fallbackEk: eurPrice,
-          };
-        }),
-      );
-
-      const taricGroupsMap = new Map<string, any>();
-      itemsWithFallbacks.forEach((oi: any) => {
-        const item = oi.item;
-        const taric = item?.taric;
-        const itemTaricCode = taric?.code || "";
-        const isProjectItem =
-          !itemTaricCode ||
-          itemTaricCode === "0" ||
-          itemTaricCode === "0000000000";
-        const groupKey = getGroupKey(oi);
-
-        if (!taricGroupsMap.has(groupKey)) {
-          let displayCode = oi.item?.taric?.code || "-";
-          let displayName =
-            taric?.name_en || (isProjectItem ? "Project Item" : "Unknown");
-          let displayRate = taric?.duty_rate || 0;
-
-          if (oi.set_taric_code) {
-            const codes = oi.set_taric_code.split("/");
-            const targetCode =
-              codes.length > 1 ? codes[1].trim() : codes[0].trim();
-            displayCode = targetCode;
-
-            const mTaric = manualTaricMap.get(targetCode);
-            if (mTaric) {
-              displayName = mTaric.name_en || displayName;
-              displayRate =
-                mTaric.duty_rate !== undefined ? mTaric.duty_rate : displayRate;
-            }
-          }
-
-          taricGroupsMap.set(groupKey, {
-            taricId: groupKey,
-            taricNameEn: displayName,
-            taricCode: displayCode,
-            dutyRate: displayRate,
-            totalQty: 0,
-            totalPrice: 0,
-            unitPrice: 0,
-            isProjectItem,
-          });
-        }
-
-        const group = taricGroupsMap.get(groupKey)!;
-        group.totalQty += Number(oi.qty) || 0;
-        const currentPrice = Number(oi._fallbackEk) || 0;
-        group.totalPrice += (Number(oi.qty) || 0) * currentPrice;
-      });
-
-      const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
-        if (g.totalQty > 0) {
-          g.unitPrice = g.totalPrice / g.totalQty;
-        } else {
-          g.unitPrice = 0;
-        }
-        return g;
-      });
-
-      const sortedItems = itemsWithFallbacks.sort((a: any, b: any) => {
-        const codeCompare = (a._effectiveTaricCode || "").localeCompare(
-          b._effectiveTaricCode || "",
-        );
-        if (codeCompare !== 0) return codeCompare;
-        return (a.item?.item_name || "").localeCompare(b.item?.item_name || "");
-      });
-
-      const orderNosInCargo = [
-        ...new Set(
-          orderItems.map((oi: any) => oi.order?.order_no).filter(Boolean),
-        ),
-      ];
-
       return res.json({
         success: true,
-        data: {
-          invoice,
-          cargo: cargo
-            ? {
-              id: cargo.id,
-              cargo_no: cargo.cargo_no,
-              ship_to: (() => {
-                const v =
-                  cargo.ship_to_company_name ??
-                  cargo.ship_to_display_name ??
-                  null;
-                if (!v || typeof v !== "string") return null;
-                const s = v.trim();
-                return s.length > 1 ? s : null;
-              })(),
-              bill_to: "GTech Industries GmbH",
-            }
-            : null,
-          orderNosInCargo,
-          detailedItems: sortedItems,
-          taricGroups,
-        },
+        data,
       });
     } catch (error) {
       console.error(error);
@@ -2239,7 +2207,46 @@ export class InvoiceController {
         await cciInvoiceRepo.save(cciInvoice);
 
         const itemsToSave: any[] = [];
-        if (invoice.items && invoice.items.length > 0) {
+        let expandedData: any = null;
+        try {
+          expandedData = await InvoiceController.fetchExpandedDetailsData(invoice.id);
+        } catch (e) {
+          console.warn("Could not fetch expanded data for dynamic freeze:", e);
+        }
+
+        const detailedItems = expandedData?.detailedItems || [];
+        if (detailedItems.length > 0) {
+          detailedItems.forEach((it: any) => {
+            const item = it.item;
+            const ean = it._fallbackEan || item?.ean || "-";
+            const itemName = item?.item_name || item?.name || it.description || "Invoice Item";
+            const taricCode = it.set_taric_code || item?.taric?.code || "";
+            const taricName = item?.taric?.name_en || item?.taric?.description_en || "";
+            const dutyRate = Number(item?.taric?.duty_rate ?? 0);
+            const qty = Number(it.qty || it.quantity || 1);
+            const unitPrice = Number(it.eur_special_price || it._fallbackEk || it.unitPrice || 0);
+            const totalPrice = qty * unitPrice;
+            const validItemId = item?.id && !isNaN(Number(item.id)) && Number.isInteger(Number(item.id)) ? Number(item.id) : null;
+
+            itemsToSave.push(
+              cciItemRepo.create({
+                cci_invoice: cciInvoice,
+                item_id: validItemId,
+                ean: String(ean),
+                item_no_de: item?.item_no_de || "",
+                item_name: String(itemName),
+                taric_code: String(taricCode),
+                taric_name_en: String(taricName),
+                duty_rate: dutyRate,
+                quantity: qty,
+                unit_price: unitPrice,
+                total_price: totalPrice,
+                order_no: it.order?.order_no || invoice.orderNumber || "",
+                remark: it.remark_de || it.remarks_cn || "",
+              }),
+            );
+          });
+        } else if (invoice.items && invoice.items.length > 0) {
           invoice.items.forEach((invItem: any) => {
             const validItemId =
               invItem.item_id &&
@@ -2260,11 +2267,12 @@ export class InvoiceController {
               }),
             );
           });
-          if (itemsToSave.length > 0) {
-            await cciItemRepo.save(itemsToSave);
-          }
         }
-        console.log(`🔒 [CCI_VERIFY_LOG] Invoice "${invoice.invoiceNumber}" frozen into CCI snapshot tables!`);
+
+        if (itemsToSave.length > 0) {
+          await cciItemRepo.save(itemsToSave);
+        }
+        console.log(`🔒 [CCI_VERIFY_LOG] Invoice "${invoice.invoiceNumber}" frozen into CCI snapshot tables with ${itemsToSave.length} items!`);
       } catch (cciErr) {
         console.error("⚠️ Failed to freeze CCI snapshot:", cciErr);
       }

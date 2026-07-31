@@ -17,7 +17,7 @@ const migrateClosedInvoices = async () => {
 
     const closedInvoices = await invoiceRepo.find({
       where: [{ status: "paid" }, { status: "closed" }],
-      relations: ["customer"],
+      relations: ["customer", "items"],
     });
 
     console.log(`Found ${closedInvoices.length} closed/paid invoices to migrate...`);
@@ -26,33 +26,29 @@ const migrateClosedInvoices = async () => {
     for (const inv of closedInvoices) {
       const existingCCI = await cciInvoiceRepo.findOne({
         where: [{ id: inv.id }, { invoice_number: inv.invoiceNumber }],
+        relations: ["items"],
       });
-
-      if (existingCCI) {
-        console.log(`CCI Invoice ${inv.invoiceNumber} already exists -> Skipping`);
-        continue;
-      }
 
       let expandedData: any = null;
       try {
-        const reqMock: any = { params: { id: inv.id } };
-        const resMock: any = {
-          json: (data: any) => data,
-          status: () => resMock,
-        };
-        const nextMock: any = (err: any) => {
-          console.error("Expanded details fetch error:", err);
-        };
-        const result: any = await InvoiceController.getInvoiceExpandedDetails(
-          reqMock,
-          resMock,
-          nextMock,
-        );
-        if (result?.success) {
-          expandedData = result.data;
-        }
+        expandedData = await InvoiceController.fetchExpandedDetailsData(inv.id);
       } catch (err) {
         console.warn(`Could not fetch expanded details for invoice ${inv.id}:`, err);
+      }
+
+      if (existingCCI) {
+        const hasMissingTaric = (existingCCI.items || []).some(
+          (ci) => !ci.taric_code || ci.taric_code === "" || ci.taric_code === "-",
+        );
+        if (!hasMissingTaric && existingCCI.items && existingCCI.items.length > 0) {
+          console.log(`CCI Invoice ${inv.invoiceNumber} already exists with Taric codes -> Skipping`);
+          continue;
+        }
+
+        console.log(`🔄 Refreshing CCI Invoice ${inv.invoiceNumber} with full Taric codes...`);
+        if (existingCCI.items && existingCCI.items.length > 0) {
+          await cciItemRepo.remove(existingCCI.items);
+        }
       }
 
       const customer = inv.customer;
