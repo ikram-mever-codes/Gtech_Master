@@ -937,12 +937,31 @@ export const createItem = async (
         return next(new ErrorHandler("Item with this EAN already exists", 400));
     }
 
-    const parsedRMB =
-      RMB_Price !== undefined && RMB_Price !== null && RMB_Price !== ""
-        ? parseFloat(RMB_Price)
-        : price !== undefined && price !== null && (currency === "CNY" || currency === "RMB" || !currency)
-        ? parseFloat(price)
-        : null;
+    const rawRMB =
+      RMB_Price ??
+      req.body.price_rmb ??
+      req.body.priceRMB ??
+      req.body.rmbPrice ??
+      req.body.purchasePrice;
+
+    let parsedRMB: number | null = null;
+    if (
+      rawRMB !== undefined &&
+      rawRMB !== null &&
+      rawRMB !== "" &&
+      !isNaN(Number(rawRMB)) &&
+      Number(rawRMB) > 0
+    ) {
+      parsedRMB = parseFloat(rawRMB);
+    } else if (
+      price !== undefined &&
+      price !== null &&
+      price !== "" &&
+      !isNaN(Number(price)) &&
+      Number(price) > 0
+    ) {
+      parsedRMB = parseFloat(price);
+    }
 
     const finalRMB = parsedRMB !== null && !isNaN(parsedRMB) ? parsedRMB : null;
     let finalPrice = price ? parseFloat(price) : null;
