@@ -447,7 +447,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                 !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
 
             if (isCustomText) {
-                const existingRemark = (cleanFormData.remark || "").trim();
+                const existingRemark = (cleanFormData.remark || cleanFormData.note || "").trim();
                 if (existingRemark) {
                     if (!existingRemark.includes(rawCargoNo)) {
                         cleanFormData.remark = `${existingRemark} - ${rawCargoNo}`;
@@ -455,6 +455,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                 } else {
                     cleanFormData.remark = rawCargoNo;
                 }
+                cleanFormData.note = cleanFormData.remark;
             }
 
             const payload: any = {
