@@ -362,6 +362,9 @@ export class UpdateOfferDto {
   taxRate?: number;
 
   @IsOptional()
+  shippingTaxRate?: number | string | null;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(100)
@@ -763,6 +766,22 @@ export class OfferController {
     return this.mapTaxProfile(customer?.defaultTaxProfile);
   }
 
+  // Shipping's effective VAT rate: the offer's own override
+  // (shippingTaxRate) if set, otherwise the customer's live tax profile
+  // rate, falling back to the offer's flat taxRate, then 19%.
+  private getEffectiveShippingTaxRate(
+    offer: any,
+    taxProfile?: any | null,
+  ): number {
+    if (offer.shippingTaxRate !== null && offer.shippingTaxRate !== undefined) {
+      return parseFlexibleNumber(offer.shippingTaxRate) ?? 19;
+    }
+    if (taxProfile?.taxRate !== undefined && taxProfile?.taxRate !== null) {
+      return parseFlexibleNumber(taxProfile.taxRate) ?? 19;
+    }
+    return parseFlexibleNumber(offer.taxRate) ?? 19;
+  }
+
   private async generateOfferNumber(): Promise<string> {
     try {
       const { NumberSequenceService } =
@@ -1053,6 +1072,9 @@ export class OfferController {
         currency: createOfferDto.currency || "EUR",
         pricingMode,
         taxRate: createOfferDto.taxRate ?? 19,
+        // shippingTaxRate always starts unset on creation — falls back to
+        // the customer's live tax profile until explicitly overridden.
+        shippingTaxRate: null,
         discountPercentage: createOfferDto.discountPercentage || 0,
         discountAmount: createOfferDto.discountAmount || 0,
         shippingCost: createOfferDto.shippingCost || 0,
@@ -1340,6 +1362,9 @@ export class OfferController {
         isAssembly: false,
         pricingMode,
         taxRate: body.taxRate ?? 19,
+        // Always unset on creation — falls back to the customer's live tax
+        // profile until explicitly overridden.
+        shippingTaxRate: null,
         unitPriceDecimalPlaces: body.unitPriceDecimalPlaces || 3,
         totalPriceDecimalPlaces: body.totalPriceDecimalPlaces || 2,
         maxUnitPriceColumns: body.maxUnitPriceColumns || 3,
@@ -1879,8 +1904,17 @@ export class OfferController {
 
       if (offer.shippingCost && offer.shippingCost > 0) {
         total += offer.shippingCost;
-        // Shipping taxed at the offer's own rate.
-        taxAmount += offer.shippingCost * ((offer.taxRate ?? 19) / 100);
+        // Shipping is taxed at its own override rate when set
+        // (offer.shippingTaxRate), otherwise falls back to the offer's
+        // flat taxRate — same precedence used on the frontend's
+        // getShippingTaxRate, minus the live tax-profile fallback (which
+        // isn't available inside this offer-only query; the frontend
+        // layers that in on top when shippingTaxRate is null).
+        const shippingRate =
+          offer.shippingTaxRate !== null && offer.shippingTaxRate !== undefined
+            ? offer.shippingTaxRate
+            : (offer.taxRate ?? 19);
+        taxAmount += offer.shippingCost * (shippingRate / 100);
       }
 
       const totalWithTax = total + taxAmount;
@@ -2265,6 +2299,16 @@ export class OfferController {
           rawBody.taxRate !== undefined
             ? parseFlexibleNumberOrZero(rawBody.taxRate)
             : undefined,
+        // shippingTaxRate is nullable — an explicit null clears the
+        // override (falls back to the live tax profile), so it must be
+        // distinguished from "field not sent at all" (undefined). Only
+        // coerce when the field is actually present in the body.
+        shippingTaxRate:
+          rawBody.shippingTaxRate !== undefined
+            ? rawBody.shippingTaxRate === null || rawBody.shippingTaxRate === ""
+              ? null
+              : parseFlexibleNumber(rawBody.shippingTaxRate)
+            : undefined,
       };
 
       const offer = await this.offerRepository.findOne({
@@ -2349,6 +2393,14 @@ export class OfferController {
         }
       });
 
+      // shippingTaxRate handled separately from fieldsToUpdate since null
+      // is a meaningful, intentional value here (clears the override) and
+      // must not be skipped by a blanket `!== undefined` check applied to
+      // a field that's expected to sometimes legitimately be null.
+      if (updateOfferDto.shippingTaxRate !== undefined) {
+        offer.shippingTaxRate = updateOfferDto.shippingTaxRate;
+      }
+
       if (updateOfferDto.discountPercentage !== undefined) {
         offer.discountPercentage = updateOfferDto.discountPercentage;
       }
@@ -2393,6 +2445,7 @@ export class OfferController {
         updateOfferDto.taxAmount !== undefined ||
         updateOfferDto.totalAmount !== undefined ||
         updateOfferDto.taxRate !== undefined ||
+        updateOfferDto.shippingTaxRate !== undefined ||
         pricingModeChanged
       ) {
         await this.calculateOfferTotals(id);
@@ -3612,7 +3665,14 @@ export class OfferController {
               (getSafeNumber(item.baseQuantity) || 1) * unitPriceNum;
           }
 
-          const grossTotalNum = netTotalNum * (1 + vatRatePercent / 100);
+          // Each line's own effective VAT rate (falling back to the
+          // offer's flat rate), same precedence used everywhere else this
+          // is calculated, so the PDF's per-row MwSt column and gross
+          // total match what the offer detail view shows.
+          const lineTaxRatePercent = getSafeNumber(
+            item.taxRate ?? offer.taxRate ?? 19,
+          );
+          const grossTotalNum = netTotalNum * (1 + lineTaxRatePercent / 100);
 
           let nameText = item.itemName || "Item";
           if (item.description) {
@@ -3683,7 +3743,7 @@ export class OfferController {
             qtyStr,
             nameText,
             `${formatNumber(netTotalNum, 2)} ${offer.currency || "EUR"}`,
-            `${vatRatePercent}%`,
+            `${lineTaxRatePercent}%`,
             `${formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3)} ${offer.currency || "EUR"}`,
             `${formatNumber(grossTotalNum, 2)} ${offer.currency || "EUR"}`,
           ];

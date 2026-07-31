@@ -178,6 +178,14 @@ export class Offer {
   @Column({ type: "varchar", length: 100, nullable: true })
   paymentMethod?: string;
 
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
+  shippingTaxRate?: number | null;
+
   @Column({ type: "varchar", length: 100, nullable: true })
   shippingMethod?: string;
 

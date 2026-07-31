@@ -270,45 +270,6 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
           </tbody>
         </table>
       </div>
-
-      {/* Totals — one VAT row per distinct active rate, summed
-          independently, same as OfferDetailModal's summary panel. */}
-      <div className="max-w-sm ml-auto w-full space-y-2 text-sm bg-white border border-gray-200 rounded-lg p-3">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Subtotal</span>
-          <span className="font-medium">
-            {formatCurrency(offer.subtotal || 0, offer.currency)}
-          </span>
-        </div>
-        {offer.discountAmount > 0 && (
-          <div className="flex justify-between text-rose-600">
-            <span>Discount</span>
-            <span>−{formatCurrency(offer.discountAmount, offer.currency)}</span>
-          </div>
-        )}
-        {offer.shippingCost > 0 && (
-          <div className="flex justify-between">
-            <span className="text-gray-600">Shipping</span>
-            <span className="font-medium">
-              {formatCurrency(offer.shippingCost, offer.currency)}
-            </span>
-          </div>
-        )}
-        {vatGroups
-          .filter((g) => g.rate !== 0)
-          .map((g) => (
-            <div key={g.rate} className="flex justify-between">
-              <span className="text-gray-600">VAT ({g.rate}%)</span>
-              <span className="font-medium">
-                {formatCurrency(g.tax, offer.currency)}
-              </span>
-            </div>
-          ))}
-        <div className="border-t pt-2 flex justify-between font-bold text-base">
-          <span>Total</span>
-          <span>{formatCurrency(offer.totalAmount || 0, offer.currency)}</span>
-        </div>
-      </div>
     </div>
   );
 };

@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
 import {
   XMarkIcon,
@@ -51,9 +50,7 @@ import { BASE_URL } from "@/utils/constants";
 import { parseFlexibleNumber, formatMatrixPrice } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 import { PrinterIcon } from "lucide-react";
-
 type PricingMode = "classic" | "matrix";
-
 interface OfferDetailModalProps {
   isOpen: boolean;
   offerId: string | null;
@@ -62,12 +59,9 @@ interface OfferDetailModalProps {
   userRole?: UserRole;
   fetchOffers?: any;
 }
-
 type SourceType = "inquiry" | "item";
-
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
-
 const PAYMENT_METHODS = [
   "Prepayment",
   "Bank transfer",
@@ -76,7 +70,6 @@ const PAYMENT_METHODS = [
   "Credit card",
   "PayPal",
 ];
-
 const SHIPPING_METHODS = [
   "Standard shipping",
   "Express shipping",
@@ -84,13 +77,11 @@ const SHIPPING_METHODS = [
   "Courier",
   "Pickup",
 ];
-
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
   })} kg`;
-
 /** Converts any date-ish value to the "yyyy-MM-dd" shape a native
  * <input type="date"> expects; returns "" when there's nothing valid. */
 const toDateInputValue = (value: any): string => {
@@ -99,7 +90,6 @@ const toDateInputValue = (value: any): string => {
   if (isNaN(d.getTime())) return "";
   return d.toISOString().split("T")[0];
 };
-
 const resolveThumbUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
   if (url.includes("cloudinary.com")) return url;
@@ -114,7 +104,6 @@ const resolveThumbUrl = (url: string | null | undefined): string | null => {
   }
   return url;
 };
-
 const getItemCompany = (item: any): string =>
   item?.customer_name ||
   item?.company_display_name ||
@@ -125,11 +114,9 @@ const getItemCompany = (item: any): string =>
   item?.company_name ||
   item?.company ||
   "";
-
 // --- Local pricing helpers (mode-aware, no dependency on legacy api helpers) --
 const getActiveMatrixEntry = (item: any) =>
   (item?.priceMatrix || []).find((p: any) => p.isActive) || null;
-
 const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
   if (pricingMode === "matrix") {
     const active = getActiveMatrixEntry(item);
@@ -139,7 +126,6 @@ const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
   const price = parseFlexibleNumber(item?.basePrice) ?? 0;
   return qty * price;
 };
-
 /** An item counts as "Artikel" if it traces back to a catalog item (either
  * picked directly or inherited from an inquiry request); anything added by
  * hand with just a name is a "Freitext" line (a "Freizeile"). This is also
@@ -147,7 +133,6 @@ const getLineItemTotal = (item: any, pricingMode: PricingMode): number => {
  * else always follows the customer's live tax profile. */
 const isFreetextLine = (item: any): boolean =>
   !item?.sourceItemId && !item?.requestedItemId;
-
 /** Effective VAT rate for a line item.
  * - Freizeile (freetext) lines: their own stored `taxRate` — editable,
  *   persisted on the line item — falling back to the tax profile's rate
@@ -164,12 +149,17 @@ const getLineTaxRate = (item: any, offer: any): number => {
   }
   return taxProfileRate;
 };
-
-/** Shipping is always taxed at the customer's live tax profile rate —
- * never editable, never stored separately on the offer. */
-const getShippingTaxRate = (offer: any): number =>
-  parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
-
+/** Shipping's effective VAT rate: the offer's own override
+ * (offer.shippingTaxRate) if set, otherwise the customer's live tax
+ * profile rate. This is the ONLY rate that's editable independently of
+ * any line item, since shipping isn't a line item itself — persisted
+ * directly on the offer via updateOffer. */
+const getShippingTaxRate = (offer: any): number => {
+  if (offer?.shippingTaxRate !== null && offer?.shippingTaxRate !== undefined) {
+    return parseFlexibleNumber(offer.shippingTaxRate) ?? 19;
+  }
+  return parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
+};
 /** All distinct VAT rates currently active on the offer: the tax profile's
  * rate (counted once, if any non-Freizeile line or shipping cost exists)
  * plus each Freizeile's own rate. Pass `excludeItemId` when checking
@@ -179,24 +169,23 @@ const getActiveTaxRates = (offer: any, excludeItemId?: string): Set<number> => {
   const rates = new Set<number>();
   const lineItems =
     offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
-
   const hasNonFreetext = lineItems.some(
     (li: any) => !isFreetextLine(li) && li.id !== excludeItemId,
   );
   const hasShipping = (offer?.shippingCost || 0) > 0;
-  if (hasNonFreetext || hasShipping) {
+  if (hasNonFreetext) {
     rates.add(parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19);
   }
-
+  if (hasShipping) {
+    rates.add(getShippingTaxRate(offer));
+  }
   lineItems.forEach((li: any) => {
     if (isFreetextLine(li) && li.id !== excludeItemId) {
       rates.add(getLineTaxRate(li, offer));
     }
   });
-
   return rates;
 };
-
 /** True if `rate` is already one of the offer's active rates (no new slot
  * needed), or if there's still room for a new one — max 3 distinct VAT
  * rates per offer, total. */
@@ -209,25 +198,21 @@ const canUseTaxRate = (
   if (rates.has(rate)) return true;
   return rates.size < 3;
 };
-
 // --- Delivery-address-vs-billing comparison ---------------------------------
 const normalizeAddrValue = (v: any): string =>
   (v || "").toString().trim().toLowerCase();
-
 /** True when the delivery address has nothing set of its own, or when it
  * matches the billing (customer snapshot) address on street/postal/city/
  * country — i.e. there's nothing distinct to show the user. */
 const isDeliverySameAsBilling = (deliveryAddr: any, snapshot: any): boolean => {
   const deliveryStreet = normalizeAddrValue(deliveryAddr?.street);
   if (!deliveryStreet) return true;
-
   const billingStreet = normalizeAddrValue(
     snapshot?.address || snapshot?.street,
   );
   const billingPostal = normalizeAddrValue(snapshot?.postalCode);
   const billingCity = normalizeAddrValue(snapshot?.city);
   const billingCountry = normalizeAddrValue(snapshot?.country);
-
   return (
     deliveryStreet === billingStreet &&
     normalizeAddrValue(deliveryAddr?.postalCode) === billingPostal &&
@@ -235,7 +220,6 @@ const isDeliverySameAsBilling = (deliveryAddr: any, snapshot: any): boolean => {
     normalizeAddrValue(deliveryAddr?.country) === billingCountry
   );
 };
-
 const Section: React.FC<{
   title: string;
   icon?: React.ReactNode;
@@ -253,7 +237,6 @@ const Section: React.FC<{
     <div className="p-0 py-3">{children}</div>
   </section>
 );
-
 const Field: React.FC<{
   label: string;
   edit: boolean;
@@ -270,7 +253,6 @@ const Field: React.FC<{
     </div>
   </div>
 );
-
 const ItemRow: React.FC<{
   item: any;
   selected: boolean;
@@ -281,14 +263,14 @@ const ItemRow: React.FC<{
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   const company = getItemCompany(item);
   const isLabel = item.isLabelPrint || item.isLabel === "Y";
-
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
           ? "border-primary bg-primary/5"
           : "border-gray-200 hover:bg-gray-50"
-        }`}
+      }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -328,7 +310,6 @@ const ItemRow: React.FC<{
     </div>
   );
 };
-
 const PickerRow: React.FC<{
   selected: boolean;
   onClick: () => void;
@@ -338,10 +319,11 @@ const PickerRow: React.FC<{
 }> = ({ selected, onClick, title, subtitle, meta }) => (
   <div
     onClick={onClick}
-    className={`p-3 border rounded-lg cursor-pointer transition-all ${selected
+    className={`p-3 border rounded-lg cursor-pointer transition-all ${
+      selected
         ? "border-primary bg-primary/5"
         : "border-gray-200 hover:bg-gray-50"
-      }`}
+    }`}
   >
     <div className="flex justify-between items-start">
       <div className="min-w-0">
@@ -356,7 +338,6 @@ const PickerRow: React.FC<{
     </div>
   </div>
 );
-
 const COUNTRY_CODES: Record<string, string> = {
   germany: "DE",
   deutschland: "DE",
@@ -382,14 +363,12 @@ const COUNTRY_CODES: Record<string, string> = {
   usa: "US",
   china: "CN",
 };
-
 const getCountryCode = (country?: string): string => {
   if (!country) return "";
   const trimmed = country.trim();
   if (trimmed.length === 2) return trimmed.toUpperCase();
   return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
 };
-
 const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   addr,
   emptyText,
@@ -397,12 +376,9 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   if (!addr) {
     return <div className="text-sm text-gray-400">{emptyText}</div>;
   }
-
   const countryCode = getCountryCode(addr.country);
   const isGermany = countryCode === "DE";
-
   const cityLine = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
-
   const addressLine = [
     addr.address || addr.street,
     cityLine,
@@ -410,7 +386,6 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   ]
     .filter(Boolean)
     .join(", ");
-
   return (
     <div className="space-y-1 text-sm text-gray-700">
       {addr.addressName && (
@@ -444,11 +419,9 @@ const DecimalInput: React.FC<{
   const [local, setLocal] = useState(
     value === null || value === undefined ? "" : String(value),
   );
-
   useEffect(() => {
     setLocal(value === null || value === undefined ? "" : String(value));
   }, [value]);
-
   return (
     <input
       type="text"
@@ -461,7 +434,6 @@ const DecimalInput: React.FC<{
     />
   );
 };
-
 /** Plain text input that commits on blur — used for the classic spreadsheet
  * cells (item no., name, remark) so every keystroke doesn't trigger a save. */
 const TextCellInput: React.FC<{
@@ -471,11 +443,9 @@ const TextCellInput: React.FC<{
   placeholder?: string;
 }> = ({ value, onCommit, className, placeholder }) => {
   const [local, setLocal] = useState(value || "");
-
   useEffect(() => {
     setLocal(value || "");
   }, [value]);
-
   return (
     <input
       type="text"
@@ -490,14 +460,12 @@ const TextCellInput: React.FC<{
     />
   );
 };
-
 const LINKED_DOC_LABELS: Record<keyof LinkedDocumentsResult, string> = {
   orders: "Orders",
   invoices: "Invoices",
   invoiceCorrections: "Invoice corrections",
   deliveryNotes: "Delivery notes",
 };
-
 export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   isOpen,
   offerId,
@@ -519,22 +487,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [showCreateAuftragModal, setShowCreateAuftragModal] = useState(false);
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
-
   const [linkedDocs, setLinkedDocs] = useState<LinkedDocumentsResult | null>(
     null,
   );
   const [linkedDocsLoading, setLinkedDocsLoading] = useState(false);
-
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [itemPickerSearch, setItemPickerSearch] = useState("");
-
   // Saved shipping addresses for the offer's customer, used by the
   // delivery-address dropdown below (only fetched once editing starts).
   const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
   // "__same__" = use billing address; otherwise a CompanyShippingAddress id.
   const [selectedShippingAddressId, setSelectedShippingAddressId] =
     useState("__same__");
-
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
@@ -558,9 +522,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     })();
   }, [isOpen]);
-
   const isCreate = !offerId && !offer;
-
   const [form, setForm] = useState<any>({});
   const [showCopyPaste, setShowCopyPaste] = useState(false);
   const [copyPasteData, setCopyPasteData] = useState("");
@@ -576,7 +538,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     // time (shown as the input's placeholder) unless the user overrides it.
     taxRate: "",
   });
-
   const [creating, setCreating] = useState(false);
   const [sourceType, setSourceType] = useState<SourceType>("inquiry");
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -609,7 +570,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     totalPriceDecimalPlaces: 2,
     maxUnitPriceColumns: 3,
   });
-
   const fetchOffer = useCallback(async () => {
     if (!offerId) return;
     setLoading(true);
@@ -625,7 +585,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       setLoading(false);
     }
   }, [offerId]);
-
   useEffect(() => {
     if (!isOpen) return;
     setEdit(false);
@@ -640,7 +599,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       resetCreatePicker();
     }
   }, [isOpen, offerId, fetchOffer]);
-
   useEffect(() => {
     if (!isOpen || offerId) return;
     (async () => {
@@ -650,7 +608,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           getAllCustomers({ limit: 1000 }),
           getItems({ limit: 1000 }).catch(() => ({ data: [] })),
         ]);
-
         setInquiries(
           Array.isArray(inqRes?.data)
             ? inqRes.data
@@ -671,7 +628,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     })();
   }, [isOpen, offerId]);
-
   // Load the item catalog lazily for the "add existing item" picker when
   // editing an existing offer (the effect above only runs during creation).
   useEffect(() => {
@@ -685,7 +641,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     })();
   }, [showItemPicker, items.length]);
-
   // Linked documents (orders / invoices / invoice corrections / delivery
   // notes) tied to this specific offer.
   useEffect(() => {
@@ -699,7 +654,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       .catch(() => setLinkedDocs(null))
       .finally(() => setLinkedDocsLoading(false));
   }, [offer?.id]);
-
   // Saved shipping addresses for this offer's customer — only fetched while
   // editing, since that's the only place the picker is shown.
   useEffect(() => {
@@ -711,9 +665,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       .then((res) => setShippingAddresses(res.success ? res.data : []))
       .catch((e) => console.error("Couldn't load shipping addresses:", e));
   }, [edit, offer?.customerId]);
-
   if (!isOpen) return null;
-
   function resetCreatePicker() {
     setSourceType("inquiry");
     setFilterCustomerId("");
@@ -737,7 +689,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       maxUnitPriceColumns: 3,
     });
   }
-
   function buildForm(o: any) {
     return {
       title: o.title || "",
@@ -763,16 +714,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       maxUnitPriceColumns: o.maxUnitPriceColumns || 3,
     };
   }
-
   const patch = (p: any) => setForm((f: any) => ({ ...f, ...p }));
-
   const refreshLocal = async () => {
     const updated = await getOfferById(offer.id);
     if (updated.success) setOffer(updated.data);
   };
-
   const cPatch = (p: any) => setCreateForm((f: any) => ({ ...f, ...p }));
-
   // Called from the header's edit toggle. Seeds the dropdown selection from
   // the offer's current state so it starts on the right option.
   const handleStartEdit = () => {
@@ -783,14 +730,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     );
     setEdit(true);
   };
-
   // Single handler for the delivery-address dropdown. "__same__" reverts to
   // the billing address; any other value is a saved shipping address id.
   // Only updates local form state — nothing is persisted until "Save
   // changes" (handleSave -> updateOffer) is clicked.
   const handleDeliveryAddressSelect = (value: string) => {
     setSelectedShippingAddressId(value);
-
     if (value === "__same__") {
       patch({
         deliveryAddress: {
@@ -811,7 +756,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       });
       return;
     }
-
     const addr = shippingAddresses.find((a: any) => a.id === value);
     if (!addr) return;
     patch({
@@ -831,6 +775,29 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     });
   };
 
+  const saveShippingTaxRate = async (raw: string) => {
+    const parsed = raw.trim() === "" ? null : parseFlexibleNumber(raw);
+    const taxProfileRate =
+      parseFlexibleNumber(offer?.taxProfile?.taxRate) ?? 19;
+    const newRate = parsed === null ? taxProfileRate : parsed;
+
+    const offerWithoutShipping = { ...offer, shippingCost: 0 };
+    if (!canUseTaxRate(offerWithoutShipping, newRate)) {
+      toast.error(
+        "Only 3 different VAT rates are allowed on one offer.",
+        errorStyles,
+      );
+      return;
+    }
+
+    try {
+      await updateOffer(offer.id, { shippingTaxRate: parsed || undefined });
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't save the shipping VAT rate:", e);
+    }
+  };
   const visibleInquiries = inquiries.filter((i) => {
     const matchCust = filterCustomerId
       ? i.customer?.id === filterCustomerId
@@ -840,7 +807,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       : true;
     return matchCust && matchSearch;
   });
-
   const visibleItems = items.filter((it) => {
     const name = it.item_name || it.itemName || "";
     if (!sourceSearch) return true;
@@ -856,7 +822,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         .includes(q)
     );
   });
-
   const itemPickerList = items.filter((it) => {
     if (!itemPickerSearch) return true;
     const q = itemPickerSearch.toLowerCase();
@@ -869,11 +834,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         .includes(q)
     );
   });
-
   const selectedCustomer = customers.find(
     (c: any) => String(c.id) === String(filterCustomerId),
   );
-
   useEffect(() => {
     if (sourceType !== "item") return;
     if (!selectedCustomer) return;
@@ -884,12 +847,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         selectedCustomer.defaultShippingMethod || f.shippingMethod,
       paymentTerms:
         selectedCustomer.defaultPaymentDueDays !== undefined &&
-          selectedCustomer.defaultPaymentDueDays !== null
+        selectedCustomer.defaultPaymentDueDays !== null
           ? `${selectedCustomer.defaultPaymentDueDays}`
           : f.paymentTerms,
     }));
   }, [selectedCustomer, sourceType]);
-
   const toggleItem = (it: any) => {
     setSelectedItems((prev) => {
       const exists = prev.some((p) => String(p.id) === String(it.id));
@@ -917,10 +879,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       return { ...prev, [key]: "1" };
     });
   };
-
   const setItemQuantity = (itemId: string | number, qty: string) =>
     setItemQuantities((prev) => ({ ...prev, [String(itemId)]: qty }));
-
   const canCreate = () => {
     if (!createForm.title?.trim()) return false;
     if (sourceType === "inquiry") return !!selectedInquiry;
@@ -945,7 +905,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         totalPriceDecimalPlaces: createForm.totalPriceDecimalPlaces,
         maxUnitPriceColumns: createForm.maxUnitPriceColumns,
       };
-
       let res: any;
       if (sourceType === "inquiry") {
         res = await createOfferFromInquiry(selectedInquiry.id, common);
@@ -968,10 +927,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           ),
         });
       }
-
       toast.success("Offer created successfully.", successStyles);
       onChanged?.();
-
       // Open the newly created offer directly in this modal's preview
       // instead of reloading the whole page.
       if (res?.data) {
@@ -984,7 +941,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       setCreating(false);
     }
   };
-
   const handleSave = async () => {
     if (!offer) return;
     if (!form.title?.trim()) {
@@ -1027,7 +983,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       setSaving(false);
     }
   };
-
   const handleCancelEdit = () => {
     setForm(buildForm(offer));
     setEdit(false);
@@ -1035,7 +990,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setShowItemPicker(false);
     setSelectedShippingAddressId("__same__");
   };
-
   const handleDelete = async () => {
     if (!offer) return;
     if (!window.confirm("Delete this offer? This can't be undone.")) return;
@@ -1047,7 +1001,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       console.error("Error deleting offer:", e);
     }
   };
-
   /** Persists the highlight color immediately — available from the header
    * regardless of edit/view mode, so the offer's list-row color can be
    * changed without entering edit mode. */
@@ -1061,7 +1014,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       console.error("Couldn't update highlight color:", e);
     }
   };
-
   const setActive = async (lineItemId: string, idx: number) => {
     try {
       await setActivePrice(lineItemId, idx);
@@ -1071,7 +1023,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       console.error("Couldn't set the active price:", e);
     }
   };
-
   const persistLine = async (lineItemId: string, payload: any) => {
     try {
       const res: any = await updateLineItem(offer.id, lineItemId, payload);
@@ -1093,7 +1044,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       toast.error("Couldn't save that change.", errorStyles);
     }
   };
-
   const updateMatrixEntry = async (
     lineItemId: string,
     entryId: string,
@@ -1120,7 +1070,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     });
     await persistLine(lineItemId, { priceMatrix: updated });
   };
-
   const deleteMatrixEntry = async (lineItemId: string, entryId: string) => {
     if (!window.confirm("Delete this price tier?")) return;
     const li = offer.lineItems.find((l: any) => l.id === lineItemId);
@@ -1128,7 +1077,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     const updated = (li.priceMatrix || []).filter((p: any) => p.id !== entryId);
     await persistLine(lineItemId, { priceMatrix: updated });
   };
-
   const addMatrixEntry = async (lineItemId: string) => {
     try {
       await addPriceMatrixEntry(lineItemId, { quantity: "1000", price: null });
@@ -1138,13 +1086,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       console.error("Couldn't add a price tier:", e);
     }
   };
-
   const addLineItem = async () => {
     if (!newLine.itemName.trim()) {
       toast.error("Enter a name for the Freizeile first.", errorStyles);
       return;
     }
-
     // Empty input -> fall back to the tax profile's rate; anything typed
     // is the user's explicit override for this Freizeile only.
     const taxProfileRate =
@@ -1153,7 +1099,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       newLine.taxRate.trim() === ""
         ? taxProfileRate
         : (parseFlexibleNumber(newLine.taxRate) ?? taxProfileRate);
-
     if (!canUseTaxRate(offer, requestedRate)) {
       toast.error(
         "Only 3 different VAT rates are allowed on one offer.",
@@ -1161,7 +1106,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       );
       return;
     }
-
     try {
       await createOfferLineItem(offer.id, {
         itemName: newLine.itemName.trim(),
@@ -1176,7 +1120,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       console.error("Couldn't add the Freizeile:", e);
     }
   };
-
   const addExistingItem = async (it: any) => {
     try {
       await createOfferLineItem(offer.id, {
@@ -1194,7 +1137,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       console.error("Couldn't add the item:", e);
     }
   };
-
   const removeLineItem = async (lineItemId: string) => {
     if (!window.confirm("Remove this line item?")) return;
     try {
@@ -1205,7 +1147,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       console.error("Couldn't remove the item:", e);
     }
   };
-
   const handlePasteMatrix = async () => {
     if (!copyPasteData.trim()) {
       toast.error("Paste the qty/price data first.", errorStyles);
@@ -1233,7 +1174,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       toast.error("Couldn't parse that paste — check the format.", errorStyles);
     }
   };
-
   const sourceBadge = (source: string) => {
     const map: Record<
       string,
@@ -1256,6 +1196,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       },
     };
 
+    return map[source] ?? null;
+
     const s = map[offer?.sourceType] || map.inquiry;
     return (
       <span
@@ -1266,11 +1208,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       </span>
     );
   };
-
   const visibleLineItems =
     offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
   const pricingMode: PricingMode = offer?.pricingMode || "classic";
-
   const priceTiers: string[] = (() => {
     if (pricingMode !== "matrix") return [];
     const set = new Set<string>();
@@ -1283,7 +1223,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       (a, b) => (parseFlexibleNumber(a) || 0) - (parseFlexibleNumber(b) || 0),
     );
   })();
-
   // --- Weight totals ---------------------------------------------------
   const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
     const qty =
@@ -1297,17 +1236,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     0,
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
-
   // --- Tax profile (live, resolved fresh from the customer's relation) ---
   const taxProfile = offer?.taxProfile || null;
-
   // --- Per-rate VAT breakdown ---------------------------------------------
   // Each visible line item's effective rate (getLineTaxRate) determines
-  // which group its net total falls into; shipping is grouped under the
-  // tax profile's rate. Each group's VAT is computed independently, so a
-  // mixed offer (e.g. two catalog lines at the profile's 19% and one
-  // Freizeile at 7%) shows two separate VAT rows rather than one flat
-  // rate applied to everything.
+  // which group its net total falls into; shipping is grouped under its
+  // own effective rate (override or tax profile). Each group's VAT is
+  // computed independently, so a mixed offer (e.g. two catalog lines at
+  // the profile's 19% and one Freizeile at 7%) shows two separate VAT rows
+  // rather than one flat rate applied to everything.
   const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
     const byRate = new Map<number, number>();
     visibleLineItems.forEach((li: any) => {
@@ -1315,16 +1252,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       const lineTotal = getLineItemTotal(li, pricingMode);
       byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
     });
-
     if (offer?.shippingCost > 0) {
       const shipRate = getShippingTaxRate(offer);
       byRate.set(shipRate, (byRate.get(shipRate) || 0) + offer.shippingCost);
     }
-
     // Discount reduces each group's base proportionally.
     const discountFactor =
       offer?.discountPercentage > 0 ? 1 - offer.discountPercentage / 100 : 1;
-
     return Array.from(byRate.entries())
       .map(([rate, base]) => {
         const adjustedBase = base * discountFactor;
@@ -1336,31 +1270,28 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       })
       .sort((a, b) => b.rate - a.rate);
   })();
-
   // --- Linked documents ---------------------------------------------------
   const linkedDocsCount = linkedDocs
     ? (
-      Object.keys(LINKED_DOC_LABELS) as (keyof LinkedDocumentsResult)[]
-    ).reduce((sum, key) => sum + (linkedDocs[key]?.length || 0), 0)
+        Object.keys(LINKED_DOC_LABELS) as (keyof LinkedDocumentsResult)[]
+      ).reduce((sum, key) => sum + (linkedDocs[key]?.length || 0), 0)
     : 0;
-
   const sourceTabs: {
     key: SourceType;
     label: string;
     icon: React.ReactNode;
   }[] = [
-      {
-        key: "inquiry",
-        label: "From inquiry",
-        icon: <LinkIcon className="h-4 w-4" />,
-      },
-      {
-        key: "item",
-        label: "Customer + item(s)",
-        icon: <CubeIcon className="h-4 w-4" />,
-      },
-    ];
-
+    {
+      key: "inquiry",
+      label: "From inquiry",
+      icon: <LinkIcon className="h-4 w-4" />,
+    },
+    {
+      key: "item",
+      label: "Customer + item(s)",
+      icon: <CubeIcon className="h-4 w-4" />,
+    },
+  ];
   // --- Delivery-address-vs-billing state (used below in the address block) --
   const currentDeliveryAddress = offer
     ? edit
@@ -1373,7 +1304,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const showAsSame = edit
     ? selectedShippingAddressId === "__same__"
     : deliverySameAsBilling;
-
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -1391,7 +1321,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 {sourceTabs.map((t) => (
@@ -1404,17 +1333,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSelectedItems([]);
                       setItemQuantities({});
                     }}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${sourceType === t.key
+                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+                      sourceType === t.key
                         ? "border-primary bg-primary/5 text-primary font-semibold"
                         : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
+                    }`}
                   >
                     {t.icon}
                     {t.label}
                   </button>
                 ))}
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Offer title *
@@ -1430,7 +1359,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   }
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Pricing mode
@@ -1440,10 +1368,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <button
                       key={m}
                       onClick={() => cPatch({ pricingMode: m })}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${createForm.pricingMode === m
+                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${
+                        createForm.pricingMode === m
                           ? "border-primary bg-primary/5 text-primary font-semibold"
                           : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                        }`}
+                      }`}
                     >
                       {m === "classic"
                         ? "Classic (1 qty · 1 price)"
@@ -1452,7 +1381,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   ))}
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1519,15 +1447,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       addr={
                         selectedCustomer.deliveryAddressLine1
                           ? {
-                            contactName:
-                              selectedCustomer.legalName ||
-                              selectedCustomer.companyName,
-                            street: selectedCustomer.deliveryAddressLine1,
-                            postalCode: selectedCustomer.deliveryPostalCode,
-                            city: selectedCustomer.deliveryCity,
-                            country: selectedCustomer.deliveryCountry,
-                            contactPhone: selectedCustomer.contactPhoneNumber,
-                          }
+                              contactName:
+                                selectedCustomer.legalName ||
+                                selectedCustomer.companyName,
+                              street: selectedCustomer.deliveryAddressLine1,
+                              postalCode: selectedCustomer.deliveryPostalCode,
+                              city: selectedCustomer.deliveryCity,
+                              country: selectedCustomer.deliveryCountry,
+                              contactPhone: selectedCustomer.contactPhoneNumber,
+                            }
                           : null
                       }
                       emptyText="Same as customer address."
@@ -1562,7 +1490,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             paymentTerms:
                               inq.customer?.defaultPaymentDueDays !==
                                 undefined &&
-                                inq.customer?.defaultPaymentDueDays !== null
+                              inq.customer?.defaultPaymentDueDays !== null
                                 ? `${inq.customer.defaultPaymentDueDays}`
                                 : f.paymentTerms || "",
                           }));
@@ -1573,7 +1501,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       />
                     ))
                   ))}
-
                 {sourceType === "item" &&
                   (visibleItems.length === 0 ? (
                     <div className="text-center py-4 text-gray-500 text-sm">
@@ -1594,7 +1521,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     ))
                   ))}
               </div>
-
               {sourceType === "item" && selectedItems.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
@@ -1634,7 +1560,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 </div>
               )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Payment method
@@ -1696,7 +1621,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </select>
               </div>
             </div>
-
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
               <button
                 onClick={onClose}
@@ -1769,7 +1693,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </button>
               </div>
             </div>
-
             <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
                 <div className="md:col-span-1 flex flex-col gap-3">
@@ -1788,14 +1711,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       emptyText="No customer snapshot."
                     />
                   </div>
-
                   <div className="block mb-1">
                     {(edit || !showAsSame) && (
                       <span className="text-sm font-bold text-gray-900">
                         Delivery:
                       </span>
                     )}
-
                     {edit && (
                       <select
                         className={`${inputCls} mt-1 mb-2`}
@@ -1815,7 +1736,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         ))}
                       </select>
                     )}
-
                     {showAsSame ? (
                       <div className="text-sm text-gray-500">
                         Same Delivery Address
@@ -1840,7 +1760,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     )}
                   </div>
                 </div>
-
                 <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                   <Field label="Title" edit={edit} value={offer.title}>
                     <input
@@ -1930,7 +1849,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   />
                 </div>
               </div>
-
               {/* PRICING MODE */}
               {pricingMode === "matrix" && (
                 <button
@@ -1942,7 +1860,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   Paste matrix
                 </button>
               )}
-
               {pricingMode === "matrix" && edit && priceTiers.length > 0 && (
                 <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
                   <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
@@ -1976,7 +1893,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 </div>
               )}
-
               {showCopyPaste && pricingMode === "matrix" && (
                 <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
                   <p className="text-xs text-blue-900 mb-2">
@@ -2027,7 +1943,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 </div>
               )}
-
               {pricingMode === "classic" ? (
                 <div className="space-y-3">
                   <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -2111,9 +2026,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                       alt="thumb"
                                       className="w-full h-full object-contain"
                                       onError={(e) =>
-                                      ((
-                                        e.target as HTMLImageElement
-                                      ).style.display = "none")
+                                        ((
+                                          e.target as HTMLImageElement
+                                        ).style.display = "none")
                                       }
                                     />
                                   ) : (
@@ -2259,8 +2174,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           );
                         })}
                         {/* Shipping method — always the last row. Its VAT
-                            rate always follows the live tax profile and is
-                            never editable. */}
+                            rate defaults to the live tax profile but can be
+                            overridden here, same as a Freizeile's rate. */}
                         <tr className="bg-gray-100/80">
                           <td className="px-2 py-2 text-gray-400">
                             {visibleLineItems.length + 1}
@@ -2272,7 +2187,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </td>
                           <td className="px-0 py-2 text-center text-gray-400"></td>
                           <td className="px-2 py-2 text-center text-gray-600">
-                            {getShippingTaxRate(offer)}%
+                            {edit ? (
+                              <div className="flex items-center justify-center gap-0.5">
+                                <DecimalInput
+                                  className="w-14 px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                  value={getShippingTaxRate(offer)}
+                                  onCommit={saveShippingTaxRate}
+                                />
+                                <span>%</span>
+                              </div>
+                            ) : (
+                              `${getShippingTaxRate(offer)}%`
+                            )}
                           </td>
                           <td className="px-2 py-2 text-right text-gray-600">
                             1
@@ -2419,9 +2345,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   alt="thumb"
                                   className="w-full h-full object-cover"
                                   onError={(e) =>
-                                  ((
-                                    e.target as HTMLImageElement
-                                  ).style.display = "none")
+                                    ((
+                                      e.target as HTMLImageElement
+                                    ).style.display = "none")
                                   }
                                 />
                               ) : (
@@ -2546,7 +2472,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                               {formatMatrixPrice(
                                                 p.price,
                                                 offer.unitPriceDecimalPlaces ||
-                                                3,
+                                                  3,
                                               )}
                                             </span>
                                           )}
@@ -2555,9 +2481,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                           {p.total === null
                                             ? "."
                                             : formatCurrency(
-                                              p.total,
-                                              offer.currency,
-                                            )}
+                                                p.total,
+                                                offer.currency,
+                                              )}
                                         </td>
                                         <td className="px-3 py-2">
                                           {p.isActive ? (
@@ -2649,7 +2575,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   )}
                 </div>
               )}
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Field
@@ -2668,7 +2593,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className={inputCls}
                       defaultValue={
                         visibleLineItems[0]?.extraWeight === null ||
-                          visibleLineItems[0]?.extraWeight === undefined
+                        visibleLineItems[0]?.extraWeight === undefined
                           ? ""
                           : String(visibleLineItems[0].extraWeight)
                       }
@@ -2734,7 +2659,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </div>
                 </div>
               </div>
-
               {/* LINKED DOCUMENTS */}
               <Section
                 title="Linked documents"
@@ -2783,7 +2707,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   </p>
                 )}
               </Section>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <Section
                   title="Comment field"
@@ -2835,7 +2758,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </Section>
               </div>
             </div>
-
             <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
               <div>
                 {edit && userRole === UserRole.ADMIN && (
@@ -2878,7 +2800,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
           </>
         )}
       </div>
-
       <CreateAuftragModal
         isOpen={showCreateAuftragModal}
         onClose={() => setShowCreateAuftragModal(false)}
@@ -2890,5 +2811,4 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     </div>
   );
 };
-
 export default OfferDetailModal;
