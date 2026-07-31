@@ -48,6 +48,9 @@ import { PaymentMethod } from "../models/payment_methods";
 import { ShippingMethod } from "../models/shipping_methods";
 import { NumberSequence } from "../models/number_sequence";
 
+import { CustomerOrder } from "../models/customer_orders";
+import { CustomerOrderItem } from "../models/customer_order_items";
+
 import { CCICustomer } from "../models/cci_customer";
 import { CCIInvoice } from "../models/cci_invoice";
 import { CCIItem } from "../models/cci_items";
@@ -93,6 +96,8 @@ export const AppDataSource = new DataSource({
     Parent,
     Item,
     Order,
+    CustomerOrder,
+    CustomerOrderItem,
     Offer,
     OfferLineItem,
     OrderItem,

@@ -1241,22 +1241,21 @@ const CombinedBusinessContactsContent: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-3">
             <CustomButton
-              startIcon={<PlusIcon className="w-5 h-5" />}
-              gradient={true}
-              onClick={openCreateBusinessModal}
-            >
-              Add Business
-            </CustomButton>
-            <CustomButton
               startIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
               gradient={true}
               onClick={() => router.push("/bussinesses/import")}
             >
               Import CSV
             </CustomButton>
+            <CustomButton
+              startIcon={<PlusIcon className="w-5 h-5" />}
+              gradient={true}
+              onClick={openCreateBusinessModal}
+            >
+              Business
+            </CustomButton>
           </div>
         </div>
-
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
