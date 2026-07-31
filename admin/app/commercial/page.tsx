@@ -91,6 +91,11 @@ import { OfferDetailModal } from "@/components/Offers/OfferDetailModal";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
+import {
+  getAllTransferOrders,
+  updateTransferOrderStatus,
+} from "@/api/transfer_orders";
+import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
@@ -342,6 +347,40 @@ const InvoiceListPage: React.FC = () => {
 
   const [orders, setOrders] = useState<any[]>([]);
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [bestellungen, setBestellungen] = useState<any[]>([]);
+  const [loadingBestellungen, setLoadingBestellungen] = useState(false);
+  const [selectedAuftragForBestellungModal, setSelectedAuftragForBestellungModal] = useState<any>(null);
+  const [showAuftragToBestellungModal, setShowAuftragToBestellungModal] = useState(false);
+
+  const fetchBestellungen = useCallback(async () => {
+    setLoadingBestellungen(true);
+    try {
+      const res = await getAllTransferOrders();
+      if (res?.success) setBestellungen(res.data || []);
+      else if (res?.data) setBestellungen(res.data);
+      else if (Array.isArray(res)) setBestellungen(res);
+    } catch (error) {
+      console.error("Error fetching transfer orders (Bestellung):", error);
+    } finally {
+      setLoadingBestellungen(false);
+    }
+  }, []);
+
+  const handleUpdateBestellungStatus = async (
+    id: number | string,
+    newStatus: "draft" | "to be processed" | "partially delivered" | "delivered",
+  ) => {
+    try {
+      const res = await updateTransferOrderStatus(id, newStatus);
+      if (res?.success) {
+        toast.success(`Bestellung status updated to ${newStatus}`);
+        fetchBestellungen();
+        fetchOrders();
+      }
+    } catch (error) {
+      console.error("Failed to update bestellung status:", error);
+    }
+  };
   const [offers, setOffers] = useState<any[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -1334,7 +1373,8 @@ const InvoiceListPage: React.FC = () => {
     fetchOffers();
     fetchSuppliers();
     fetchCategories();
-  }, [fetchOrders, fetchOffers, fetchSuppliers, fetchCategories]);
+    fetchBestellungen();
+  }, [fetchOrders, fetchOffers, fetchSuppliers, fetchCategories, fetchBestellungen]);
 
   useEffect(() => {
     if (activeInvTab === "lieferschein") {
@@ -1344,8 +1384,9 @@ const InvoiceListPage: React.FC = () => {
     } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
       fetchAllItems();
       fetchOrders();
+      fetchBestellungen();
     }
-  }, [activeInvTab]);
+  }, [activeInvTab, fetchBestellungen, fetchAllItems, fetchOrders]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -1692,13 +1733,10 @@ const InvoiceListPage: React.FC = () => {
       }));
       list = [...mappedCustOrders, ...wawiOrders];
     } else if (activeInvTab === "bestellung") {
-      list = orders.filter(
-        (o: any) =>
-          String(o.order_no).startsWith("DE") ||
-          o.status === 2 ||
-          o.is_fulfilled ||
-          (o.comment || "").includes("[Moved to Fulfillment]"),
-      );
+      list = (bestellungen || []).map((b: any) => ({
+        ...b,
+        items: b.orderItems || b.items || [],
+      }));
     } else if (activeInvTab === "rechnung") {
       list = invoices.filter(
         (inv: any) => inv.status !== "paid" && inv.status !== "cancelled",
@@ -2131,6 +2169,55 @@ const InvoiceListPage: React.FC = () => {
           }
         },
       },
+      ...(activeInvTab === "bestellung"
+        ? [
+            {
+              header: "Status",
+              width: "150px",
+              align: "center" as const,
+              render: (row: any) => {
+                const currentStatus = row.status || "draft";
+                const getStatusStyle = (st: string) => {
+                  switch (st) {
+                    case "draft":
+                      return "bg-gray-100 text-gray-800 border-gray-300";
+                    case "to be processed":
+                      return "bg-blue-50 text-blue-700 border-blue-300 font-bold";
+                    case "partially delivered":
+                      return "bg-amber-50 text-amber-700 border-amber-300 font-bold";
+                    case "delivered":
+                      return "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold";
+                    default:
+                      return "bg-gray-100 text-gray-700 border-gray-200";
+                  }
+                };
+
+                return (
+                  <select
+                    value={currentStatus}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) =>
+                      handleUpdateBestellungStatus(
+                        row.id,
+                        e.target.value as any,
+                      )
+                    }
+                    className={`text-[11px] px-2 py-1 rounded border shadow-sm cursor-pointer focus:ring-2 focus:ring-emerald-500 font-medium ${getStatusStyle(
+                      currentStatus,
+                    )}`}
+                  >
+                    <option value="draft">draft</option>
+                    <option value="to be processed">to be processed</option>
+                    <option value="partially delivered">
+                      partially delivered
+                    </option>
+                    <option value="delivered">delivered</option>
+                  </select>
+                );
+              },
+            },
+          ]
+        : []),
       {
         header: "Actions",
         width: "110px",
@@ -2150,22 +2237,34 @@ const InvoiceListPage: React.FC = () => {
                 </button>
               </div>
             );
-          } else if (
-            activeInvTab === "auftrag" ||
-            activeInvTab === "bestellung"
-          ) {
-            const hasCargo = !!row.cargo_id;
+          } else if (activeInvTab === "auftrag") {
             return (
               <div className="flex items-center justify-center font-poppins">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleMoveToFulfillment(row);
+                    setSelectedAuftragForBestellungModal(row);
+                    setShowAuftragToBestellungModal(true);
                   }}
-                  title="Send / Move to Fulfillment"
-                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md flex items-center gap-1"
+                  title="Convert Auftrag to Bestellung"
+                  className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-md flex items-center gap-1"
                 >
                   <MoveRight className="w-3.5 h-3.5" />
+                  <span>Convert</span>
+                </button>
+              </div>
+            );
+          } else if (activeInvTab === "bestellung") {
+            return (
+              <div className="flex items-center justify-center gap-1.5 font-poppins">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewOrder(row);
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
+                >
+                  View
                 </button>
               </div>
             );
@@ -4078,6 +4177,21 @@ const InvoiceListPage: React.FC = () => {
               setOfferRefreshKey((prev) => prev + 1);
             }}
             userRole={user?.role}
+          />
+        )}
+
+        {showAuftragToBestellungModal && (
+          <AuftragToBestellungModal
+            isOpen={showAuftragToBestellungModal}
+            onClose={() => {
+              setShowAuftragToBestellungModal(false);
+              setSelectedAuftragForBestellungModal(null);
+            }}
+            auftrag={selectedAuftragForBestellungModal}
+            onSuccess={() => {
+              fetchOrders();
+              fetchBestellungen();
+            }}
           />
         )}
       </div>

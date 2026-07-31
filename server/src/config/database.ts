@@ -50,6 +50,8 @@ import { NumberSequence } from "../models/number_sequence";
 
 import { CustomerOrder } from "../models/customer_orders";
 import { CustomerOrderItem } from "../models/customer_order_items";
+import { TransferOrder } from "../models/transfer_order";
+import { TransferOrderItem } from "../models/transfer_order_items";
 
 import { CCICustomer } from "../models/cci_customer";
 import { CCIInvoice } from "../models/cci_invoice";
@@ -98,6 +100,8 @@ export const AppDataSource = new DataSource({
     Order,
     CustomerOrder,
     CustomerOrderItem,
+    TransferOrder,
+    TransferOrderItem,
     Offer,
     OfferLineItem,
     OrderItem,
