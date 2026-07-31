@@ -345,59 +345,65 @@ const OffersPage: React.FC<any> = ({
     e?: React.MouseEvent,
   ) => {
     if (e) e.stopPropagation();
+    const companyName =
+      offer.customerSnapshot?.companyName ||
+      offer.customerSnapshot?.legalName ||
+      offer.customerSnapshot?.name ||
+      offer.customer?.companyName ||
+      "";
+
     const prompt = window.confirm(
-      "Do you want to convert this offer to an Auftrag?",
+      `Auftrag erstellen für ${companyName} aus Angebot ${offer.offerNumber} ?`,
     );
     if (!prompt) return;
-
-    if (offer.highlightColor === "#ECEAE6") {
-      toast.error(
-        `Offer ${offer.offerNumber} has already been converted to Auftrag.`,
-        {
-          id: "convert-offer-toast",
-          duration: 4000,
-        },
-      );
-      return;
-    }
 
     try {
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
-      const validItems = lineItems
-        .map((x: any) => {
-          const rawId = x.sourceItemId || x.itemId || x.item_id || x.id;
-          const numericId =
-            rawId !== null && rawId !== undefined ? Number(rawId) : NaN;
-          if (!Number.isFinite(numericId) || numericId <= 0) return null;
-          return {
-            item_id: numericId,
-            qty: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
-            price: Number(x.basePrice || x.unitPrice || x.price || 0),
-            remark_de: x.notes || x.description || x.itemName || null,
-          };
-        })
-        .filter(Boolean);
-
-      if (validItems.length === 0) {
-        toast.error(
-          `Cannot convert "${offer.offerNumber}": none of the line items are linked to a catalog item. Please ensure items have a valid sourceItemId.`,
-          { id: "convert-offer-toast", duration: 6000 },
-        );
-        return;
-      }
+      const validItems = lineItems.map((x: any) => {
+        const rawId = x.sourceItemId || x.itemId || x.item_id;
+        const numericId =
+          rawId !== null && rawId !== undefined ? Number(rawId) : NaN;
+        const validItemId =
+          Number.isFinite(numericId) && numericId > 0 ? numericId : null;
+        return {
+          item_id: validItemId,
+          qty: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
+          price: Number(x.basePrice || x.unitPrice || x.price || 0),
+          remark_de: x.itemName || x.notes || x.description || "Line Item",
+        };
+      });
 
       const payload = {
         customer_id: offer.customer_id || offer.customerSnapshot?.id || null,
         comment: `Converted from Offer ${offer.offerNumber}${offer.discountAmount ? ` [Discount: €${offer.discountAmount}]` : offer.discountPercentage ? ` [Discount: ${offer.discountPercentage}%]` : ""}`,
         status: 1,
-        items: validItems,
+        items: validItems.length > 0 ? validItems : [{ item_id: null, qty: 1, price: 0, remark_de: offer.title || "Offer Conversion" }],
         source_offer_id: offer.id,
       };
       await createOrder(payload as any);
+      const nextCount =
+        (offer.conversionCount ||
+          (offer.highlightColor === "#ECEAE6" ? 1 : 0)) + 1;
+
+      setOffers((prevOffers) =>
+        prevOffers.map((o) =>
+          o.id === offer.id
+            ? {
+              ...o,
+              highlightColor: "#ECEAE6",
+              conversionCount: nextCount,
+            }
+            : o,
+        ),
+      );
+
       try {
-        await updateOffer(offer.id, { highlightColor: "#ECEAE6" });
-      } catch (_) {}
+        await updateOffer(offer.id, {
+          highlightColor: "#ECEAE6",
+          conversionCount: nextCount,
+        } as any);
+      } catch (_) { }
       fetchOffers();
       onOrderConverted?.();
     } catch (err) {
