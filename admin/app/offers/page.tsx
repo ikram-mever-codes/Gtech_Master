@@ -602,10 +602,17 @@ const OffersPage: React.FC<any> = ({
                   const isExpanded = expandedOfferIds.has(offer.id);
                   const lineItems =
                     offer.lineItems?.filter((li: any) => !li.isComponent) || [];
-                  const rowColor = offer.highlightColor || null;
+                  const rowColor =
+                    offer.highlightColor && offer.highlightColor !== "#ECEAE6"
+                      ? offer.highlightColor
+                      : null;
                   const rowTextColor = rowColor
                     ? getContrastTextColor(rowColor)
                     : undefined;
+                  const conversionCount =
+                    Number(offer.conversionCount) ||
+                    (offer.highlightColor === "#ECEAE6" ? 1 : 0);
+                  const isConverted = conversionCount > 0;
 
                   return (
                     <React.Fragment key={offer.id}>
@@ -730,22 +737,29 @@ const OffersPage: React.FC<any> = ({
                           <div className="flex items-center justify-center gap-1.5 font-poppins">
                             <button
                               title={
-                                offer.highlightColor === "#ECEAE6"
-                                  ? "Already converted to Auftrag"
+                                isConverted
+                                  ? `Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""} to Auftrag (Click to convert again)`
                                   : "Convert Offer to Auftrag Order"
                               }
                               onClick={(e) =>
                                 handleConvertOfferToAuftrag(offer, e)
                               }
-                              disabled={offer.highlightColor === "#ECEAE6"}
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap ${
-                                offer.highlightColor === "#ECEAE6"
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
-                                  : "text-white bg-[#2F6B46] hover:bg-[#255638] cursor-pointer"
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap cursor-pointer ${
+                                isConverted
+                                  ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                  : "bg-[#2F6B46] hover:bg-[#255638] text-white"
                               }`}
                             >
                               <MoveRight className="h-3.5 w-3.5" />
                             </button>
+                            {conversionCount > 0 && (
+                              <span
+                                title={`Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""}`}
+                                className="px-1.5 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
+                              >
+                                {conversionCount}
+                              </span>
+                            )}
                             <button
                               title="Download Angebot PDF"
                               onClick={async (e) => {
