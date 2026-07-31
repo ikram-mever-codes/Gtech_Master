@@ -23,6 +23,7 @@ export interface Item {
   weight: number | null;
   length: number | null;
   width: number | null;
+  sales_price?: number | null;
   height: number | null;
   remark: string | null;
   model: string | null;

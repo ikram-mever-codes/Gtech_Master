@@ -18,6 +18,8 @@ import ReactSelect from "react-select";
 import CustomModal from "@/components/UI/CustomModal";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import SalesPriceSection from "@/components/Item/SalesPriceSection";
+
 import { EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import {
   getItemById,
@@ -445,6 +447,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           is_dimension_special: previewItem.others?.isDimensionSpecial
             ? "Y"
             : "N",
+
           is_eur_special: previewItem.parent?.isEURSpecial ? "Y" : "N",
           is_rmb_special: previewItem.parent?.isRMBSpecial ? "Y" : "N",
           is_new: previewItem.others?.isNew ? "Y" : "N",
@@ -455,6 +458,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             : null,
           customer_id: previewItem.customer_id ?? null,
           supplierItems: previewItem.supplierItems,
+          sales_price:
+            previewItem.sales_price === "" ||
+            previewItem.sales_price === undefined
+              ? null
+              : parseFloat(previewItem.sales_price),
           supplierItem: {
             price_rmb: parseFloat(previewItem.supplierItem?.priceRMB) || 0,
             is_po: previewItem.supplierItem?.isPO,
@@ -955,7 +963,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 )}
               </div>
 
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
                 <Field label="Default Supplier">
                   {previewEdit ? (
                     <select
@@ -974,7 +982,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       ))}
                     </select>
                   ) : previewItem.supplier_name ? (
-                    `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name}`
+                    `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name.slice(10)}`
                   ) : (
                     "—"
                   )}
@@ -990,6 +998,24 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     />
                   ) : (
                     `${previewItem.price || "0.00"} ${previewItem.currency || "EUR"}`
+                  )}
+                </Field>
+                <Field label="Sales Price">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      step="0.0001"
+                      className={inputCls}
+                      value={previewItem.sales_price ?? ""}
+                      onChange={(e) =>
+                        patchPreview({ sales_price: e.target.value })
+                      }
+                    />
+                  ) : previewItem.sales_price !== null &&
+                    previewItem.sales_price !== undefined ? (
+                    `${Number(previewItem.sales_price).toFixed(2)} ${previewItem.currency || "EUR"}`
+                  ) : (
+                    "—"
                   )}
                 </Field>
                 <Field label="Status">
@@ -1085,6 +1111,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   </Field>
                 </div>
               )}
+
+              {previewItem?.id && <SalesPriceSection itemId={previewItem.id} />}
+
               <div className="mt-6 pt-5 border-t border-gray-200">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold text-gray-900">

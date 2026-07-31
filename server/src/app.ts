@@ -33,6 +33,7 @@ import shippingAddressRoutes from "./routes/shipping_address_routes";
 import numberSequenceRoutes from "./routes/number_sequence_routes";
 import paymentMethodRoutes from "./routes/payment_method_routes";
 import shippingMethodRoutes from "./routes/shipping_method_routes";
+import salesPriceRoutes from "./routes/sales_price_routes";
 
 const app: any = express();
 
@@ -86,6 +87,7 @@ app.use("/api/v1/tags", tagRoutes);
 app.use("/api/v1/tax-profiles", taxProfileRoutes);
 app.use("/api/v1/countries", countryRoutes);
 app.use("/api/v1/number-sequences", numberSequenceRoutes);
+app.use("/api/v1/sales-prices", salesPriceRoutes);
 app.use(
   "/api/v1/customers/:companyId/shipping-addresses",
   shippingAddressRoutes,

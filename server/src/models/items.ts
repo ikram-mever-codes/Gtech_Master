@@ -120,6 +120,14 @@ export class Item {
   @Column({ type: "char", length: 1, default: "N" })
   is_eur_special!: string;
 
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  sales_price?: number | null;
+
   @Column({ default: 0 })
   is_pu_item!: number;
 

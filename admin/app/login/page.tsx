@@ -52,7 +52,7 @@ const Login = () => {
       if (response.data.data.role === "PURCHASING") {
         router.push("/orders?tab=label_print");
       } else {
-        router.push("/scheduled");
+        router.push("/bussinesses");
       }
 
       return response.data;
@@ -66,7 +66,7 @@ const Login = () => {
       if (user.role === "PURCHASING") {
         router.push("/orders?tab=label_print");
       } else {
-        router.push("/scheduled");
+        router.push("/bussinesses");
       }
     }
   }, [user, loading, router]);

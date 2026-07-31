@@ -666,12 +666,7 @@ export const getItemById = async (
       tagOrder: item.tagOrder,
       is_updated: item.is_updated,
       isLabelPrint: item.isLabelPrint || false,
-      // FIX: `price` and `transfer_price_EUR` were previously missing from
-      // this response entirely — only the differently-shaped `transfer_price`
-      // string below existed. The frontend's ItemPreviewModal reads
-      // `raw.price` directly into its editable "Price" field
-      // (`previewItem.price`), so without this the field was always blank on
-      // load regardless of what was actually stored in the database.
+      sales_price: item.sales_price ?? null,
       price: item.price ?? null,
       transfer_price_EUR: item.transfer_price_EUR ?? null,
       transfer_price: item.transfer_price_EUR
@@ -873,6 +868,7 @@ export const createItem = async (
       model,
       RMB_Price,
       price,
+      sales_price,
       currency,
       isActive = "Y",
       is_qty_dividable = "N",
@@ -1187,6 +1183,7 @@ export const updateItem = async (
       "ItemID_DE",
       "painPoints",
       "price",
+      "sales_price", // NEW
       "transfer_price_EUR",
       "isLabelPrint",
     ];
