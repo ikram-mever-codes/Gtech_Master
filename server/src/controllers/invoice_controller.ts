@@ -2188,48 +2188,68 @@ export class InvoiceController {
         const cargoRepo = AppDataSource.getRepository(Cargo);
         const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
 
-        let finalCargoNo = (invoice as any).cargoNo || invoice.orderNumber || "";
+        const targetCargoNo = (invoice as any).cargoNo || invoice.orderNumber || "";
+        let finalCargoNo = targetCargoNo;
+        let linkedCargos: Cargo[] = [];
 
         try {
-          const matchingOrder = await orderRepo.findOne({
-            where: [
-              { order_no: invoice.orderNumber },
-              { id: isNaN(Number(invoice.orderNumber)) ? -1 : Number(invoice.orderNumber) },
-            ],
-          });
-
-          if (matchingOrder) {
-            const cargoOrders = await cargoOrderRepo.find({
-              where: { order_id: matchingOrder.id },
-              relations: ["cargo"],
+          if (targetCargoNo) {
+            const directCargos = await cargoRepo.find({
+              where: [
+                { cargo_no: targetCargoNo },
+                { cargo_no: targetCargoNo.trim() },
+              ],
             });
-            const linkedCargos = cargoOrders.map((co) => co.cargo).filter(Boolean);
+            linkedCargos.push(...directCargos);
+          }
 
-            for (const cargo of linkedCargos) {
-              const isOfficialSeq = /^C\d{4,6}-\d+$/i.test(cargo.cargo_no || "");
-              if (!isOfficialSeq && cargo.cargo_no && cargo.cargo_no.trim()) {
-                const customCargoNo = cargo.cargo_no.trim();
+          if (linkedCargos.length === 0 && targetCargoNo) {
+            const matchingOrder = await orderRepo.findOne({
+              where: [
+                { order_no: targetCargoNo },
+                { id: isNaN(Number(targetCargoNo)) ? -1 : Number(targetCargoNo) },
+              ],
+            });
 
-                if (cargo.remark && cargo.remark.trim()) {
-                  if (!cargo.remark.includes(customCargoNo)) {
-                    cargo.remark = `${cargo.remark} - ${customCargoNo}`;
-                  }
-                } else {
-                  cargo.remark = customCargoNo;
+            if (matchingOrder) {
+              const cargoOrders = await cargoOrderRepo.find({
+                where: { order_id: matchingOrder.id },
+                relations: ["cargo"],
+              });
+              linkedCargos.push(...cargoOrders.map((co) => co.cargo).filter(Boolean));
+            }
+          }
+
+          const cargoMap = new Map<number, Cargo>();
+          linkedCargos.forEach((c) => cargoMap.set(c.id, c));
+          linkedCargos = Array.from(cargoMap.values());
+
+          for (const cargo of linkedCargos) {
+            const isOfficialSeq = /^C\d{4,6}-\d+$/i.test(cargo.cargo_no || "");
+            if (!isOfficialSeq && cargo.cargo_no && cargo.cargo_no.trim()) {
+              const customCargoNo = cargo.cargo_no.trim();
+
+              const existingRemark = (cargo.remark || cargo.note || "").trim();
+              if (existingRemark) {
+                if (!existingRemark.includes(customCargoNo)) {
+                  cargo.remark = `${existingRemark} - ${customCargoNo}`;
                 }
-
-                try {
-                  const officialCargoNo = await NumberSequenceService.getNextNumber("cargo");
-                  cargo.cargo_no = officialCargoNo;
-                  finalCargoNo = officialCargoNo;
-                } catch (err) {
-                  console.warn("Could not generate sequence cargo_no on invoice close:", err);
-                }
-
-                await cargoRepo.save(cargo);
-              } else if (cargo.cargo_no) {
-                finalCargoNo = cargo.cargo_no;
+              } else {
+                cargo.remark = customCargoNo;
               }
+              cargo.note = cargo.remark;
+
+              try {
+                const officialCargoNo = await NumberSequenceService.getNextNumber("cargo");
+                cargo.cargo_no = officialCargoNo;
+                finalCargoNo = officialCargoNo;
+              } catch (err) {
+                console.warn("Could not generate sequence cargo_no on invoice close:", err);
+              }
+
+              await cargoRepo.save(cargo);
+            } else if (cargo.cargo_no) {
+              finalCargoNo = cargo.cargo_no;
             }
           }
         } catch (err) {

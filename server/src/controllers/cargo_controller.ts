@@ -430,7 +430,7 @@ export const createCargo = async (
         console.warn("Could not generate cargo number using sequence service:", err);
       }
     } else if (isCustomText) {
-      const existingRemark = (cargoData.remark || "").trim();
+      const existingRemark = (cargoData.remark || cargoData.note || "").trim();
       if (existingRemark) {
         if (!existingRemark.includes(rawCargoNo)) {
           cargoData.remark = `${existingRemark} - ${rawCargoNo}`;
@@ -438,6 +438,7 @@ export const createCargo = async (
       } else {
         cargoData.remark = rawCargoNo;
       }
+      cargoData.note = cargoData.remark;
     }
 
     const cargo = cargoRepo.create(cargoData as Partial<Cargo>);
@@ -497,7 +498,7 @@ export const updateCargo = async (
 
     if (isCustomText) {
       const existingRemark = (
-        updateData.remark !== undefined ? updateData.remark : cargo.remark || ""
+        updateData.remark !== undefined ? updateData.remark : (cargo.remark || cargo.note || "")
       ).trim();
       if (existingRemark) {
         if (!existingRemark.includes(rawCargoNo)) {
@@ -506,6 +507,7 @@ export const updateCargo = async (
       } else {
         updateData.remark = rawCargoNo;
       }
+      updateData.note = updateData.remark;
     }
 
     const oldCargoNo = cargo.cargo_no;
