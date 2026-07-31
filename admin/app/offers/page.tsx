@@ -22,7 +22,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { toast } from "react-hot-toast";
-import { createOrder } from "@/api/orders";
+import { createAuftragFromOffer } from "@/api/customer_orders";
 import {
   getAllOffers,
   updateOffer,
@@ -47,12 +47,11 @@ import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 // Item Number
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
-  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
   }`;
 
 const getContrastTextColor = (hex: string): string => {
@@ -209,8 +208,8 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                           alt="thumb"
                           className="w-full h-full object-contain"
                           onError={(e) =>
-                            ((e.target as HTMLImageElement).style.display =
-                              "none")
+                          ((e.target as HTMLImageElement).style.display =
+                            "none")
                           }
                         />
                       ) : (
@@ -360,28 +359,22 @@ const OffersPage: React.FC<any> = ({
     try {
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
-      const validItems = lineItems.map((x: any) => {
-        const rawId = x.sourceItemId || x.itemId || x.item_id;
-        const numericId =
-          rawId !== null && rawId !== undefined ? Number(rawId) : NaN;
-        const validItemId =
-          Number.isFinite(numericId) && numericId > 0 ? numericId : null;
-        return {
-          item_id: validItemId,
-          qty: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
-          price: Number(x.basePrice || x.unitPrice || x.price || 0),
-          remark_de: x.itemName || x.notes || x.description || "Line Item",
-        };
-      });
 
-      const payload = {
-        customer_id: offer.customer_id || offer.customerSnapshot?.id || null,
-        comment: `Converted from Offer ${offer.offerNumber}${offer.discountAmount ? ` [Discount: €${offer.discountAmount}]` : offer.discountPercentage ? ` [Discount: ${offer.discountPercentage}%]` : ""}`,
-        status: 1,
-        items: validItems.length > 0 ? validItems : [{ item_id: null, qty: 1, price: 0, remark_de: offer.title || "Offer Conversion" }],
-        source_offer_id: offer.id,
-      };
-      await createOrder(payload as any);
+      const selectedItems = lineItems.map((x: any) => ({
+        lineItemId: x.id,
+        quantity: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
+        price: Number(x.basePrice || x.unitPrice || x.price || 0),
+        itemName: x.itemName || x.notes || x.description || "Line Item",
+      }));
+
+      if (selectedItems.length === 0) {
+        toast.error(`Offer ${offer.offerNumber} has no line items to convert.`, {
+          id: "convert-offer-toast",
+        });
+        return;
+      }
+
+      await createAuftragFromOffer(offer.id, selectedItems);
       const nextCount =
         (offer.conversionCount ||
           (offer.highlightColor === "#ECEAE6" ? 1 : 0)) + 1;
@@ -443,8 +436,8 @@ const OffersPage: React.FC<any> = ({
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           offer.customerSnapshot?.customerNumber ||
-            offer.customerSnapshot?.id ||
-            "",
+          offer.customerSnapshot?.id ||
+          "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -452,8 +445,8 @@ const OffersPage: React.FC<any> = ({
         const s = customerName.toLowerCase().trim();
         const cName = String(
           offer.customerSnapshot?.companyName ||
-            offer.customerSnapshot?.name ||
-            "",
+          offer.customerSnapshot?.name ||
+          "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -624,9 +617,8 @@ const OffersPage: React.FC<any> = ({
                     <React.Fragment key={offer.id}>
                       <tr
                         onClick={() => openDetail(offer)}
-                        className={`transition-colors cursor-pointer ${
-                          rowColor ? "" : "hover:bg-gray-50"
-                        }`}
+                        className={`transition-colors cursor-pointer ${rowColor ? "" : "hover:bg-gray-50"
+                          }`}
                         style={
                           rowColor
                             ? { backgroundColor: rowColor, color: rowTextColor }
@@ -652,9 +644,8 @@ const OffersPage: React.FC<any> = ({
                         </td>
                         <td className="px-4 py-3">
                           <div
-                            className={`text-sm ${
-                              rowColor ? "" : "text-gray-700"
-                            }`}
+                            className={`text-sm ${rowColor ? "" : "text-gray-700"
+                              }`}
                             style={
                               rowColor ? { color: rowTextColor } : undefined
                             }
@@ -675,18 +666,16 @@ const OffersPage: React.FC<any> = ({
                             {rowColor && offer.offerNumber}
                             {offer.revision > 1 && (
                               <span
-                                className={`ml-2 text-xs ${
-                                  rowColor ? "" : "text-gray-500"
-                                }`}
+                                className={`ml-2 text-xs ${rowColor ? "" : "text-gray-500"
+                                  }`}
                               >
                                 Rev. {offer.revision}
                               </span>
                             )}
                           </div>
                           <div
-                            className={`text-sm truncate max-w-[16rem] ${
-                              rowColor ? "" : "text-gray-600"
-                            }`}
+                            className={`text-sm truncate max-w-[16rem] ${rowColor ? "" : "text-gray-600"
+                              }`}
                           >
                             {offer.title}
                           </div>
@@ -701,9 +690,8 @@ const OffersPage: React.FC<any> = ({
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <div
-                              className={`text-sm font-medium truncate max-w-[12rem] ${
-                                rowColor ? "" : "text-gray-900"
-                              }`}
+                              className={`text-sm font-medium truncate max-w-[12rem] ${rowColor ? "" : "text-gray-900"
+                                }`}
                             >
                               {offer.customerSnapshot?.companyName}
                             </div>
@@ -712,9 +700,8 @@ const OffersPage: React.FC<any> = ({
                             offer.customerSnapshot?.country !== "Germany" &&
                             offer.customerSnapshot?.vatId && (
                               <div
-                                className={`text-xs mt-0.5 ${
-                                  rowColor ? "opacity-80" : "text-gray-500"
-                                }`}
+                                className={`text-xs mt-0.5 ${rowColor ? "opacity-80" : "text-gray-500"
+                                  }`}
                               >
                                 VAT: {offer.customerSnapshot.vatId}
                               </div>
@@ -728,9 +715,8 @@ const OffersPage: React.FC<any> = ({
                             )}
                           </div>
                           <div
-                            className={`text-xs ${
-                              rowColor ? "opacity-80" : "text-gray-500"
-                            }`}
+                            className={`text-xs ${rowColor ? "opacity-80" : "text-gray-500"
+                              }`}
                           >
                             {lineItems.length} items
                           </div>
@@ -750,11 +736,10 @@ const OffersPage: React.FC<any> = ({
                               onClick={(e) =>
                                 handleConvertOfferToAuftrag(offer, e)
                               }
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap cursor-pointer ${
-                                isConverted
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap cursor-pointer ${isConverted
                                   ? "bg-gray-500 hover:bg-gray-600 text-white"
                                   : "bg-[#2F6B46] hover:bg-[#255638] text-white"
-                              }`}
+                                }`}
                             >
                               <MoveRight className="h-3.5 w-3.5" />
                             </button>
@@ -775,7 +760,7 @@ const OffersPage: React.FC<any> = ({
                                     offer.id,
                                     offer.offerNumber,
                                   );
-                                } catch (_) {}
+                                } catch (_) { }
                               }}
                               className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap"
                             >
@@ -831,11 +816,10 @@ const OffersPage: React.FC<any> = ({
                       setCurrentPage(p);
                       setFilters({ ...filters, page: p });
                     }}
-                    className={`px-2 py-1 text-sm rounded-lg ${
-                      currentPage === p
+                    className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
                         ? "bg-gray-600 text-white"
                         : "bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {p}
                   </button>
