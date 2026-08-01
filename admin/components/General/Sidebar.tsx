@@ -126,51 +126,8 @@ const allMenuItems: MenuEntry[] = [
   {
     icon: Settings,
     text: "Settings",
+    path: "/tags",
     resource: "Settings",
-    children: [
-      {
-        icon: LucideUsers,
-        text: "Users",
-        path: "/users",
-        resource: "Users",
-      },
-      {
-        icon: LucideTag,
-        text: "Tags",
-        path: "/tags",
-        resource: "Tags",
-      },
-      {
-        icon: CreditCard,
-        text: "Payment Methods",
-        path: "/payment-methods",
-        resource: "Settings",
-      },
-      {
-        icon: Truck,
-        text: "Shipping Methods",
-        path: "/shipping-methods",
-        resource: "Settings",
-      },
-      {
-        icon: LucideGlobe,
-        text: "Countries",
-        path: "/countries",
-        resource: "Settings",
-      },
-      {
-        icon: LucidePercent,
-        text: "Tax Profiles",
-        path: "/tax-profiles",
-        resource: "Settings",
-      },
-      {
-        icon: Hash,
-        text: "Numbers",
-        path: "/numbers",
-        resource: "Settings",
-      },
-    ],
   },
 ];
 
@@ -201,16 +158,13 @@ const Sidebar = () => {
   const menuContainerRef = useRef<HTMLDivElement>(null);
   const menuContentRef = useRef<HTMLDivElement>(null);
 
-  // Access-aware menu (ADMIN sees everything).
   const menuItems = useMemo<MenuEntry[]>(() => {
     if (!user || user.role === "ADMIN") return allMenuItems;
     const userResources = user.assignedResources || [];
 
     const allowed = (resource: string) => {
-      // 1. "Tags" should be visible to users of any type
       if (resource === "Tags") return true;
 
-      // 2. Purchasing Team must see everything under Fulfillment AND Items
       if (
         user.role === "PURCHASING" &&
         (resource === "Items" ||
@@ -222,7 +176,6 @@ const Sidebar = () => {
         return true;
       }
 
-      // 3. Fallback to admin-assigned access lists
       return userResources.includes(resource);
     };
 
@@ -230,7 +183,6 @@ const Sidebar = () => {
       .map((item) => {
         if (item.children) {
           const kids = item.children.filter((c) => allowed(c.resource));
-          // If the group parent text is allowed OR has valid child items, render it
           return kids.length || allowed(item.resource)
             ? { ...item, children: kids }
             : null;
@@ -241,8 +193,22 @@ const Sidebar = () => {
   }, [user]);
 
   const isPathActive = useCallback(
-    (path?: string) =>
-      !!path && (activePath === path || activePath.startsWith(path)),
+    (path?: string) => {
+      if (!path) return false;
+      const settingsPaths = [
+        "/tags",
+        "/payment-methods",
+        "/shipping-methods",
+        "/tax-profiles",
+        "/users",
+        "/numbers",
+        "/countries",
+      ];
+      if (path === "/tags" && settingsPaths.some((sp) => activePath === sp || activePath.startsWith(sp))) {
+        return true;
+      }
+      return activePath === path || activePath.startsWith(path);
+    },
     [activePath],
   );
 
@@ -253,7 +219,6 @@ const Sidebar = () => {
     [isPathActive],
   );
 
-  // Auto-open the group that contains the active route
   useEffect(() => {
     const next: Record<string, boolean> = {};
     menuItems.forEach((item) => {
@@ -310,7 +275,6 @@ const Sidebar = () => {
     setIsMounted(true);
   }, []);
 
-  // Recalculate on resize
   useEffect(() => {
     if (!isMounted) return;
     updateScrollButtons();
@@ -319,7 +283,6 @@ const Sidebar = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, [updateScrollButtons, menuItems, isCollapsed, isMounted]);
 
-  // Reliable recalculation whenever the menu's height changes
   useEffect(() => {
     if (!isMounted) return;
     const container = menuContainerRef.current;
@@ -732,7 +695,6 @@ const Sidebar = () => {
             )}
           </Box>
 
-          {/* User Popover Menu */}
           <Menu
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}

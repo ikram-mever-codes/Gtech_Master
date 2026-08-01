@@ -12,6 +12,7 @@ export const successStyles = {
     fontSize: "1rem",
     fontWeight: 500,
     boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
+    zIndex: 99999,
   },
   iconTheme: {
     primary: "#FFFFFF",
@@ -30,6 +31,7 @@ export const errorStyles = {
     fontSize: "1rem",
     fontWeight: 500,
     boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
+    zIndex: 99999,
   },
   iconTheme: {
     primary: "#FFFFFF",
@@ -49,6 +51,7 @@ export const loadingStyles = {
     fontSize: "1rem",
     fontWeight: 700,
     boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
+    zIndex: 99999,
   },
   iconTheme: {
     primary: "#FFFFFF",

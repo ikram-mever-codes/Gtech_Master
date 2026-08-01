@@ -101,6 +101,7 @@ interface FilterState {
   tags?: string;
   company?: string;
   isLabel?: string;
+  isStock?: string;
 }
 
 const PAGE_LIMIT = 30;
@@ -195,6 +196,7 @@ const ItemsManagementPage: React.FC = () => {
     tags: "",
     company: "",
     isLabel: "",
+    isStock: "",
   });
   const [taricSearch, setTaricSearch] = useState("");
   const [itemsTotalRecords, setItemsTotalRecords] = useState(0);
@@ -410,6 +412,7 @@ const ItemsManagementPage: React.FC = () => {
                 supplier: filters.supplier || undefined,
                 tags: filters.tags || undefined,
                 isLabel: filters.isLabel || undefined,
+                isStock: filters.isStock || undefined,
                 company: filters.company || undefined,
                 filter: auditFilter || undefined,
               },
@@ -481,6 +484,7 @@ const ItemsManagementPage: React.FC = () => {
       filters.supplier,
       filters.tags,
       filters.isLabel,
+      filters.isStock,
       filters.company,
     ],
   );
@@ -499,6 +503,7 @@ const ItemsManagementPage: React.FC = () => {
     filters.supplier,
     filters.tags,
     filters.isLabel,
+    filters.isStock,
     filters.company,
   ]);
 
@@ -1028,6 +1033,7 @@ const ItemsManagementPage: React.FC = () => {
       tags: "",
       company: "",
       isLabel: "",
+      isStock: "",
     });
 
   const renderTableHeaders = () => {
@@ -1703,11 +1709,11 @@ const ItemsManagementPage: React.FC = () => {
             {activeTab !== "warehouse" && (
               <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
                 {activeTab === "items" ? (
-                  <div className="flex flex-wrap items-center gap-2 w-full">
-                    <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                      <FunnelIcon className="w-5 h-5 text-primary" />
+                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full overflow-x-auto py-0.5">
+                    <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+                      <FunnelIcon className="w-4 h-4 text-primary" />
                     </div>
-                    <div className="relative flex-grow flex-shrink flex-1 min-w-[140px]">
+                    <div className="relative w-[115px] flex-shrink-0">
                       <div className="relative">
                         <input
                           type="text"
@@ -1716,7 +1722,7 @@ const ItemsManagementPage: React.FC = () => {
                           onChange={(e) =>
                             setFilters({ ...filters, search: e.target.value })
                           }
-                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
+                          className={`w-full px-2.5 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
                             ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                             : "text-gray-900 border-gray-300 bg-white"
                             }`}
@@ -1726,14 +1732,14 @@ const ItemsManagementPage: React.FC = () => {
                             onClick={() =>
                               setFilters({ ...filters, search: "" })
                             }
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
                           >
                             <XMarkIcon className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
                     </div>
-                    <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
+                    <div className="relative w-[110px] flex-shrink-0">
                       <div className="relative">
                         <input
                           type="text"
@@ -1745,7 +1751,7 @@ const ItemsManagementPage: React.FC = () => {
                               eanSearch: e.target.value,
                             })
                           }
-                          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
+                          className={`w-full px-2.5 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
                             ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                             : "text-gray-900 border-gray-300 bg-white"
                             }`}
@@ -1755,14 +1761,14 @@ const ItemsManagementPage: React.FC = () => {
                             onClick={() =>
                               setFilters({ ...filters, eanSearch: "" })
                             }
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
                           >
                             <XMarkIcon className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
                     </div>
-                    <div className="flex-grow flex-shrink flex-1 min-w-[180px]">
+                    <div className="w-[120px] flex-shrink-0">
                       <TagFilterSelector
                         category="item"
                         compact={true}
@@ -1774,7 +1780,7 @@ const ItemsManagementPage: React.FC = () => {
                         }
                       />
                     </div>
-                    <div className="relative flex-grow flex-shrink flex-1 min-w-[180px]">
+                    <div className="relative w-[120px] flex-shrink-0">
                       <CustomerSearchInput
                         value={filters.company || ""}
                         onChange={(id, name) =>
@@ -1786,13 +1792,13 @@ const ItemsManagementPage: React.FC = () => {
                       />
                     </div>
 
-                    <div className="w-[90px] flex-shrink-0">
+                    <div className="w-[95px] flex-shrink-0">
                       <select
                         value={filters.isLabel || ""}
                         onChange={(e) =>
                           setFilters({ ...filters, isLabel: e.target.value })
                         }
-                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
+                        className={`w-full px-2 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
                           ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                           : "text-gray-400 border-gray-300 bg-white"
                           }`}
@@ -1803,7 +1809,24 @@ const ItemsManagementPage: React.FC = () => {
                       </select>
                     </div>
 
-                    <div className="flex-grow flex-shrink flex-1 min-w-[200px]">
+                    <div className="w-[125px] flex-shrink-0">
+                      <select
+                        value={filters.isStock || ""}
+                        onChange={(e) =>
+                          setFilters({ ...filters, isStock: e.target.value })
+                        }
+                        className={`w-full px-2 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isStock
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-400 border-gray-300 bg-white"
+                          }`}
+                      >
+                        <option value="">IsStock QTY...</option>
+                        <option value="Y">Yes</option>
+                        <option value="N">No</option>
+                      </select>
+                    </div>
+
+                    <div className="w-[125px] flex-shrink-0">
                       <SupplierSearchInput
                         value={filters.supplier}
                         onChange={(id) =>
@@ -1823,13 +1846,13 @@ const ItemsManagementPage: React.FC = () => {
                         }
                       />
                     </div>
-                    <div className="w-[105px] flex-shrink-0">
+                    <div className="w-[95px] flex-shrink-0">
                       <select
                         value={filters.category}
                         onChange={(e) =>
                           setFilters({ ...filters, category: e.target.value })
                         }
-                        className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
+                        className={`w-full px-2 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
                           ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                           : "text-gray-400 border-gray-300 bg-white"
                           }`}
@@ -1852,7 +1875,7 @@ const ItemsManagementPage: React.FC = () => {
                     <div className="shrink-0">
                       <button
                         onClick={resetFilters}
-                        className="w-full lg:w-auto px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        className="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1 whitespace-nowrap"
                       >
                         <ArrowPathIcon className="w-3.5 h-3.5" />
                         Reset
@@ -2112,7 +2135,6 @@ const ItemsManagementPage: React.FC = () => {
           onSuccess={() => {
             setShowAuftragCreateModal(false);
             setSelectedGreenItem(null);
-            toast.success("Auftrag created successfully!", successStyles);
           }}
         />
       )}

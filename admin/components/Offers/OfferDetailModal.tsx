@@ -1269,6 +1269,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         material: it.model || (it.ean ? String(it.ean) : undefined),
         basePrice: 0,
         weight: it.weight,
+        notes: it.remark_ex || it.remark || undefined,
         sourceItemId: String(it.id),
       });
       setShowItemPicker(false);
@@ -2341,7 +2342,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             Bezeichnung
                           </th>
                           <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
-                            Hinweis
+                            RemarkEx
                           </th>
                           <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
                             MwSt.

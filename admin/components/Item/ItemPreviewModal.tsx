@@ -126,7 +126,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   });
 
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [uploadingPictures, setUploadingPictures] = useState(false);
 
   const toBool = (v: any) =>
     v === "Y" || v === "Yes" || v === true || v === 1 || v === "1";
@@ -324,6 +326,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             pixPath: raw.pix_path || "",
           },
           attachments: raw.attachments || [],
+          remark_ex: raw.remark_ex || "",
           // NEW: Stock and MSQ fields
           is_stock_item: raw.is_stock_item || "N",
           stockEU: raw.stockEU || 0,
@@ -439,10 +442,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
         const payload = {
           item_name: previewItem.name ?? previewItem.item_name,
           item_name_cn: previewItem.nameCN ?? previewItem.item_name_cn,
-          item_name_de: previewItem.item_name_de || "", // NEW
+          item_name_de: previewItem.item_name_de || "",
           ean: (previewItem.ean || "").toString(),
           model: previewItem.model,
           remark: previewItem.remark,
+          remark_ex: previewItem.remark_ex,
           cat_id: previewItem.category_id
             ? parseInt(previewItem.category_id)
             : null,
@@ -748,6 +752,28 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
+                {/* Tags in header - right side */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Tags</span>
+                  <EntityTagSelector
+                    entityId={previewItem.id}
+                    entityType={isRequest ? "request_item" : "item"}
+                    initialTags={previewItem.tags || []}
+                    tagOrder={previewItem.tagOrder}
+                    disabled={!previewEdit}
+                    onTagsUpdated={(newTags: any[]) =>
+                      setPreviewItem((p: any) =>
+                        p
+                          ? {
+                            ...p,
+                            tags: newTags,
+                            tagOrder: newTags.map((t) => t.id).join(","),
+                          }
+                          : p,
+                      )
+                    }
+                  />
+                </div>
                 <ViewEditToggle
                   isEditEnabled={previewEdit}
                   onToggle={() => setPreviewEdit(!previewEdit)}
@@ -763,29 +789,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="mb-5">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Tags
-                </p>
-                <EntityTagSelector
-                  entityId={previewItem.id}
-                  entityType={isRequest ? "request_item" : "item"}
-                  initialTags={previewItem.tags || []}
-                  tagOrder={previewItem.tagOrder}
-                  disabled={!previewEdit}
-                  onTagsUpdated={(newTags: any[]) =>
-                    setPreviewItem((p: any) =>
-                      p
-                        ? {
-                          ...p,
-                          tags: newTags,
-                          tagOrder: newTags.map((t) => t.id).join(","),
-                        }
-                        : p,
-                    )
-                  }
-                />
-              </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
                 <Field label="Item No">
@@ -924,8 +927,20 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
               </div>
 
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <Field label="Remark (EN/DE)">
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                <Field label="RemarkEx">
+                  {previewEdit ? (
+                    <textarea
+                      rows={2}
+                      className={inputCls}
+                      value={previewItem.remark_ex ?? ""}
+                      onChange={(e) => patchPreview({ remark_ex: e.target.value })}
+                    />
+                  ) : (
+                    previewItem.remark_ex || "—"
+                  )}
+                </Field>
+                <Field label="Remark EN/DE">
                   {previewEdit ? (
                     <textarea
                       rows={2}
@@ -1060,9 +1075,20 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <select
                       className={inputCls}
                       value={previewItem.is_stock_item || "N"}
-                      onChange={(e) =>
-                        patchPreview({ is_stock_item: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const newVal = e.target.value;
+                        if (newVal === "N") {
+                          const sEU = Number(previewItem.stockEU) || 0;
+                          const mEU = Number(previewItem.MSQ_EU) || 0;
+                          const sCN = Number(previewItem.stockCN) || 0;
+                          const mCN = Number(previewItem.MSQ_CN) || 0;
+                          if (sEU > 0 || mEU > 0 || sCN > 0 || mCN > 0) {
+                            toast.error("Cannot set 'Is Stock Item' to No while stock quantity exists in EU/CN warehouse.", errorStyles);
+                            return;
+                          }
+                        }
+                        patchPreview({ is_stock_item: newVal });
+                      }}
                     >
                       <option value="N">No</option>
                       <option value="Y">Yes</option>
@@ -1079,7 +1105,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.stockEU ?? 0}
                       onChange={(e) =>
                         patchPreview({ stockEU: e.target.value })
@@ -1093,7 +1120,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.MSQ_EU ?? 0}
                       onChange={(e) => patchPreview({ MSQ_EU: e.target.value })}
                     />
@@ -1105,7 +1133,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.stockCN ?? 0}
                       onChange={(e) =>
                         patchPreview({ stockCN: e.target.value })
@@ -1119,7 +1148,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.MSQ_CN ?? 0}
                       onChange={(e) => patchPreview({ MSQ_CN: e.target.value })}
                     />
@@ -1216,11 +1246,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     Add
                   </button>
                 </div>
-                {previewQuality.length === 0 ? (
-                  <p className="text-xs text-gray-400">
-                    No quality criteria for this item.
-                  </p>
-                ) : (
+                {previewQuality.length > 0 && (
                   <div className="space-y-2">
                     {previewQuality.map((q: any) => (
                       <div
@@ -1289,12 +1315,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     onChange={uploadPreviewAttachments}
                   />
                 </div>
-                {!previewItem?.attachments ||
-                  previewItem.attachments.length === 0 ? (
-                  <p className="text-xs text-gray-400">
-                    No attachments for this item.
-                  </p>
-                ) : (
+                {previewItem?.attachments && previewItem.attachments.length > 0 && (
                   <div className="space-y-2">
                     {previewItem.attachments.map((att: any, i: number) => {
                       const url = resolveUrl(att.url) || "";
@@ -1342,39 +1363,91 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 )}
               </div>
               <div className="mt-6 pt-5 border-t border-gray-200">
-                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <PhotoIcon className="w-4 h-4 text-blue-500" />
-                  Pictures
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <PhotoIcon className="w-4 h-4 text-blue-500" />
+                    Pictures
+                  </h3>
+                  <button
+                    onClick={() => pictureInputRef.current?.click()}
+                    disabled={uploadingPictures}
+                    className="px-2.5 py-1 text-xs bg-[#8CC21B] text-white rounded-md hover:bg-[#7ab318] flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <PhotoIcon className="w-3.5 h-3.5" />
+                    {uploadingPictures ? "Uploading..." : "Upload"}
+                  </button>
+                  <input
+                    ref={pictureInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (!files || files.length === 0 || !previewItem) return;
+                      const tid = toast.loading("Uploading pictures...", loadingStyles);
+                      setUploadingPictures(true);
+                      try {
+                        const newUrls: string[] = [];
+                        for (let i = 0; i < files.length; i++) {
+                          const fd = new FormData();
+                          fd.append("file", files[i]);
+                          const up = await uploadFile(fd, false);
+                          if (up.data?.url) newUrls.push(up.data.url);
+                        }
+                        if (newUrls.length > 0) {
+                          let shopPic = previewItem.pictures?.shopPicture || "";
+                          let ebayPic = previewItem.pictures?.ebayPictures || "";
+                          let gallery = (previewItem.pictures?.pixPath || "").split(",").filter(Boolean);
+                          newUrls.forEach((url) => {
+                            if (!shopPic) shopPic = url;
+                            else if (!ebayPic) ebayPic = url;
+                            else gallery.push(url);
+                          });
+                          const updatedPictures = { shopPicture: shopPic, ebayPictures: ebayPic, pixPath: gallery.join(",") };
+                          setPreviewItem((p: any) => ({ ...p, pictures: updatedPictures }));
+                          await updateItem(Number(itemId), {
+                            photo: shopPic,
+                            pix_path_eBay: ebayPic,
+                            pix_path: gallery.join(","),
+                          });
+                          toast.success("Pictures uploaded", { id: tid, ...successStyles });
+                        } else {
+                          toast.dismiss(tid);
+                        }
+                      } catch (err) {
+                        toast.error("Failed to upload pictures", { id: tid, ...errorStyles });
+                      } finally {
+                        setUploadingPictures(false);
+                        if (pictureInputRef.current) pictureInputRef.current.value = "";
+                      }
+                    }}
+                  />
+                </div>
                 {(() => {
-                  const pics = [
-                    previewItem.pictures?.shopPicture,
-                    previewItem.pictures?.ebayPictures,
-                    ...(previewItem.pictures?.pixPath || "")
-                      .split(",")
-                      .filter(Boolean),
-                  ].filter(Boolean);
-                  if (pics.length === 0)
+                  const picEntries: { url: string; label: string }[] = [];
+                  if (previewItem.pictures?.shopPicture)
+                    picEntries.push({ url: previewItem.pictures.shopPicture, label: "Shop Picture" });
+                  if (previewItem.pictures?.ebayPictures)
+                    picEntries.push({ url: previewItem.pictures.ebayPictures, label: "eBay Picture" });
+                  (previewItem.pictures?.pixPath || "").split(",").filter(Boolean).forEach((u: string, i: number) =>
+                    picEntries.push({ url: u, label: `Gallery ${i + 1}` })
+                  );
+                  if (picEntries.length === 0)
                     return (
                       <p className="text-xs text-gray-400">No pictures.</p>
                     );
                   return (
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                      {pics.map((url: any, i: number) => (
-                        <div
-                          key={i}
-                          className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
-                        >
+                      {picEntries.map(({ url, label }, i) => (
+                        <div key={i} className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                           <img
                             src={resolveUrl(url)!}
-                            alt={`pic-${i}`}
+                            alt={label}
                             className="w-full h-full object-contain bg-white cursor-pointer"
-                            onClick={() =>
-                              window.open(resolveUrl(url)!, "_blank")
-                            }
+                            onClick={() => window.open(resolveUrl(url)!, "_blank")}
                             onError={(e) =>
-                            ((e.target as HTMLImageElement).src =
-                              "https://placehold.co/200x200?text=—")
+                              ((e.target as HTMLImageElement).src = "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>

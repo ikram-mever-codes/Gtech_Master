@@ -734,7 +734,7 @@ export default function AuftragToRechnungModal({
                       Bezeichnung
                     </th>
                     <th className="px-2 py-2 text-left font-semibold w-36">
-                      Hinweis
+                      RemarkEx
                     </th>
                     <th className="px-2 py-2 text-center font-semibold w-16">
                       MwSt.

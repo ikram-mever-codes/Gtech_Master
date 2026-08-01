@@ -27,6 +27,7 @@ export interface Item {
   sales_price?: number | null;
   height: number | null;
   remark: string | null;
+  remark_ex?: string | null;
   model: string | null;
   supplier_id: number | null;
   supplier_name: string | null;
@@ -262,6 +263,7 @@ export const getItems = async (
     tags?: string;
     filter?: string;
     isLabel?: string;
+    isStock?: string;
     company?: string;
   },
   options?: { refresh?: boolean },
