@@ -185,19 +185,42 @@ export default function AuftragToRechnungModal({
     setNotes(auftrag.notes || auftrag.comment || "");
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
 
-    setEditTitle(auftrag.title || auftrag.comment || auftrag.offer_id || "");
-    setEditShippingMethod(auftrag.shippingMethod || auftrag.shipping_method || "angeliefert durch GTech");
-    setEditPaymentMethod(auftrag.paymentMethod || auftrag.payment_method || "Kauf auf Rechnung");
-    setEditPaymentTerms(auftrag.paymentTerms || auftrag.payment_terms || "30 days net");
-
-    // Populate Customer Address State
+    // Populate Customer Address & Defaults State
     const cust = auftrag.customerSnapshot || auftrag.customer || {};
     setEditCompanyName(cust.companyName || cust.name || auftrag.customer_name || "");
-    setEditStreet(cust.address || cust.street || cust.addressLine1 || "");
-    setEditPostalCode(cust.postalCode || "37079");
+    setEditStreet(cust.address || cust.street || cust.addressLine1 || cust.bill_to_address || "");
+    setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
     setEditCity(cust.city || "Göttingen");
     setEditCountry(cust.country || "DE");
-    setEditVatId(cust.vatId || cust.vatTaxId || cust.taxNumber || "");
+    setEditVatId(cust.vatId || cust.vatTaxId || cust.taxNumber || cust.tax_number || "");
+
+    const sMethod =
+      auftrag.shippingMethod ||
+      auftrag.shipping_method ||
+      cust.defaultShippingMethod ||
+      cust.shippingMethod ||
+      cust.shipping_method ||
+      "angeliefert durch GTech";
+
+    const pMethod =
+      auftrag.paymentMethod ||
+      auftrag.payment_method ||
+      cust.defaultPaymentMethod ||
+      cust.paymentMethod ||
+      cust.payment_method ||
+      "Kauf auf Rechnung";
+
+    const pTerms =
+      auftrag.paymentTerms ||
+      auftrag.payment_terms ||
+      (cust.defaultPaymentDueDays ? `${cust.defaultPaymentDueDays} days net` : undefined) ||
+      cust.defaultPaymentTerms ||
+      cust.paymentTerms ||
+      "30 days net";
+
+    setEditShippingMethod(sMethod);
+    setEditPaymentMethod(pMethod);
+    setEditPaymentTerms(pTerms);
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
@@ -263,15 +286,23 @@ export default function AuftragToRechnungModal({
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
 
-  // Display Customer snapshot
   const cust = auftrag.customerSnapshot || auftrag.customer || {};
   const companyName = editCompanyName || cust.companyName || cust.name || auftrag.customer_name || "Potis GmbH & Co. KG";
   const legalName = cust.legalName || cust.name || "";
   const addressStr = editStreet || cust.address || cust.street || cust.addressLine1 || "August-Spindler-Straße 4";
   const postalCity = `${editPostalCode || cust.postalCode || "37079"} ${editCity || cust.city || "Göttingen"}`.trim();
 
-  // Delivery address
-  const deliveryName = cust.deliveryAddressLine1 || cust.ship_to_full_address ? "Same as billing address" : "Same Delivery Address";
+  const deliveryName =
+    auftrag.ship_to ||
+    auftrag.shipTo ||
+    cust.ship_to ||
+    cust.ship_to_address ||
+    cust.ship_to_full_address ||
+    cust.deliveryAddressLine1 ||
+    cust.shippingAddress ||
+    (cust.deliveryStreet
+      ? `${cust.deliveryCompanyName || companyName}, ${cust.deliveryStreet} ${cust.deliveryPostalCode || ""} ${cust.deliveryCity || ""}`.trim()
+      : "Same as billing address");
 
   const handleSaveAuftragEdits = async () => {
     try {
@@ -370,16 +401,13 @@ export default function AuftragToRechnungModal({
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-lg font-bold text-gray-900 truncate">
-                Auftrag {auftrag.order_no}
+                Ausliefern {auftrag.order_no}
               </span>
               {auftrag.offerNumber && (
                 <span className="text-sm font-bold text-gray-600">
                   Angebot {auftrag.offerNumber}
                 </span>
               )}
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-700">
-                Classic
-              </span>
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
               {editTitle || auftrag.title || auftrag.comment || "Direction switch including motor supply cable"}
