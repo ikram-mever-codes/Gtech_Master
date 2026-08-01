@@ -467,6 +467,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                 await createCargo(payload);
             } else if (modalMode === "edit" && editingId) {
                 await updateCargo(editingId, payload);
+                toast.success("Cargo updated successfully", successStyles);
             }
             setShowModal(false);
             fetchCargos();

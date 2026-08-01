@@ -101,7 +101,6 @@ export const updateCargo = async (id: number, cargoData: Partial<CargoType> & { 
         toast.loading("Updating cargo...", loadingStyles);
         const res = await api.put(`/cargos/${id}`, cargoData);
         toast.dismiss();
-        toast.success("Cargo updated successfully", successStyles);
         const payload = res as any;
         if (payload && typeof payload === "object" && "success" in payload) return payload;
         return { success: true, data: payload };
