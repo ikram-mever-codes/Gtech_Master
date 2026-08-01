@@ -126,51 +126,8 @@ const allMenuItems: MenuEntry[] = [
   {
     icon: Settings,
     text: "Settings",
+    path: "/tags",
     resource: "Settings",
-    children: [
-      {
-        icon: LucideUsers,
-        text: "Users",
-        path: "/users",
-        resource: "Users",
-      },
-      {
-        icon: LucideTag,
-        text: "Tags",
-        path: "/tags",
-        resource: "Tags",
-      },
-      {
-        icon: CreditCard,
-        text: "Payment Methods",
-        path: "/payment-methods",
-        resource: "Settings",
-      },
-      {
-        icon: Truck,
-        text: "Shipping Methods",
-        path: "/shipping-methods",
-        resource: "Settings",
-      },
-      {
-        icon: LucideGlobe,
-        text: "Countries",
-        path: "/countries",
-        resource: "Settings",
-      },
-      {
-        icon: LucidePercent,
-        text: "Tax Profiles",
-        path: "/tax-profiles",
-        resource: "Settings",
-      },
-      {
-        icon: Hash,
-        text: "Numbers",
-        path: "/numbers",
-        resource: "Settings",
-      },
-    ],
   },
 ];
 
@@ -241,8 +198,22 @@ const Sidebar = () => {
   }, [user]);
 
   const isPathActive = useCallback(
-    (path?: string) =>
-      !!path && (activePath === path || activePath.startsWith(path)),
+    (path?: string) => {
+      if (!path) return false;
+      const settingsPaths = [
+        "/tags",
+        "/payment-methods",
+        "/shipping-methods",
+        "/tax-profiles",
+        "/users",
+        "/numbers",
+        "/countries",
+      ];
+      if (path === "/tags" && settingsPaths.some((sp) => activePath === sp || activePath.startsWith(sp))) {
+        return true;
+      }
+      return activePath === path || activePath.startsWith(path);
+    },
     [activePath],
   );
 

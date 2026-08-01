@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Tag, Plus, RefreshCw, Pencil, Trash, Check } from "lucide-react";
+import { FunnelIcon } from "@heroicons/react/24/outline";
 import { getTags, createTag, updateTag, deleteTag } from "@/api/tags";
 import { toast } from "react-hot-toast";
 import { colorClasses, TagBadge } from "@/components/Tags/TagManager";
@@ -165,21 +166,26 @@ export default function TagsPage() {
   );
 
   const filterBar = (
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex items-center gap-2 overflow-x-auto pb-px">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveTab(cat.id)}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 whitespace-nowrap transition-all -mb-px ${
-              activeTab === cat.id
-                ? "border-[#8CC21B] text-[#8CC21B]"
-                : "border-transparent text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+        <FunnelIcon className="w-4 h-4 text-gray-400" />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {CATEGORIES.map((cat) => {
+          const isActive = activeTab === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setActiveTab(cat.id)}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${isActive
+                ? "bg-[#8CC21B] text-white shadow-xs"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -304,21 +310,19 @@ export default function TagsPage() {
                   key={col.id}
                   type="button"
                   onClick={() => setTagColor(col.id)}
-                  className={`h-9 rounded-xl flex items-center justify-center border transition-all ${
-                    isSelected
-                      ? `${activeColorClass.button} ring-2 ring-[#8CC21B]/20`
-                      : "border-gray-200 bg-white hover:bg-gray-50 text-gray-400"
-                  }`}
+                  className={`h-9 rounded-xl flex items-center justify-center border transition-all ${isSelected
+                    ? `${activeColorClass.button} ring-2 ring-[#8CC21B]/20`
+                    : "border-gray-200 bg-white hover:bg-gray-50 text-gray-400"
+                    }`}
                   title={col.label}
                 >
                   <span
-                    className={`w-3.5 h-3.5 rounded-full ${
-                      col.id === "none"
-                        ? "bg-white border border-gray-400"
-                        : isSelected
-                          ? activeColorClass.dot
-                          : col.bg
-                    } flex items-center justify-center`}
+                    className={`w-3.5 h-3.5 rounded-full ${col.id === "none"
+                      ? "bg-white border border-gray-400"
+                      : isSelected
+                        ? activeColorClass.dot
+                        : col.bg
+                      } flex items-center justify-center`}
                   >
                     {isSelected && col.id !== "none" && (
                       <Check className="h-2 w-2 stroke-[3] text-white" />
