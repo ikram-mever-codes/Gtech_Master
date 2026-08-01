@@ -106,6 +106,7 @@ import LieferscheinDetailModal from "@/components/orders/LieferscheinDetailModal
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
+
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
 import { UserRole } from "@/utils/interfaces";
 import {
@@ -116,7 +117,7 @@ import {
   isDateInPreset,
 } from "@/utils/commercialFilters";
 import AuftragPreviewModal from "@/components/orders/AuftragPreviewModal";
-import { set } from "date-fns";
+import BestellungPreviewModal from "@/components/orders/BestellungPreviewModal";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -234,6 +235,13 @@ const InvoiceListPage: React.FC = () => {
   const [activeInvTab, setActiveInvTab] = useState<InvoiceTab>(
     () => (searchParams.get("tab") as InvoiceTab) || "angebot",
   );
+  const [showBestellungPreviewModal, setShowBestellungPreviewModal] =
+    useState(false);
+  const [selectedBestellungId, setSelectedBestellungId] = useState<
+    string | number | null
+  >(null);
+  const [bestellungPreviewInitialEdit, setBestellungPreviewInitialEdit] =
+    useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [offerRefreshKey, setOfferRefreshKey] = useState(0);
@@ -251,6 +259,19 @@ const InvoiceListPage: React.FC = () => {
     setSelectedAuftragId(id);
     setAuftragPreviewInitialEdit(initialEdit);
     setShowAuftragPreviewModal(true);
+  };
+
+  // Was previously declared as state but never wired to anything —
+  // no function opened it, nothing imported/rendered BestellungPreviewModal,
+  // and every click on a Bestellung row fell through to the Auftrag
+  // handlers instead. This is the counterpart to handleOpenAuftragPreview.
+  const handleOpenBestellungPreview = (
+    id: string | number,
+    initialEdit: boolean = false,
+  ) => {
+    setSelectedBestellungId(id);
+    setBestellungPreviewInitialEdit(initialEdit);
+    setShowBestellungPreviewModal(true);
   };
 
   const handleOpenOfferModal = (id: string | null = null) => {
@@ -305,14 +326,14 @@ const InvoiceListPage: React.FC = () => {
 
     const currentState = expandedStates[invoice.id] || {};
     if (!currentState.data) {
-      setExpandedStates((prev) => ({
+      setExpandedStates((prev: any) => ({
         ...prev,
         [invoice.id]: { ...currentState, loading: true },
       }));
       try {
         const response = await getExpandedInvoiceDetails(invoice.id);
         if (response.success) {
-          setExpandedStates((prev) => ({
+          setExpandedStates((prev: any) => ({
             ...prev,
             [invoice.id]: {
               taric: true,
@@ -324,7 +345,7 @@ const InvoiceListPage: React.FC = () => {
         }
       } catch (error) {
         console.error(error);
-        setExpandedStates((prev) => ({
+        setExpandedStates((prev: any) => ({
           ...prev,
           [invoice.id]: { ...currentState, loading: false },
         }));
@@ -427,6 +448,23 @@ const InvoiceListPage: React.FC = () => {
     }
   }, []);
 
+  const fetchBestellungen = useCallback(async () => {
+    setLoadingBestellungen(true);
+    try {
+      const res = await getAllTransferOrders();
+      if (res?.success) setBestellungen(res.data || []);
+      else if (res?.data) setBestellungen(res.data);
+      else if (Array.isArray(res)) setBestellungen(res);
+    } catch (error) {
+      console.error("Error fetching transfer orders (Bestellung):", error);
+    } finally {
+      setLoadingBestellungen(false);
+    }
+  }, []);
+
+  // Was calling fetchOrders/fetchBestellungen with no follow-up — the user
+  // asked that a successful conversion switch to the Bestellung tab and
+  // open the new Bestellung directly, same as the Angebot→Auftrag flow.
   const handleDirectConvertAuftragToBestellung = async (auftrag: any) => {
     if (
       !window.confirm(
@@ -444,7 +482,7 @@ const InvoiceListPage: React.FC = () => {
           itemName: it.itemName || it.item_name || "Line Item",
         }),
       );
-      const res = await createBestellungFromAuftrag(
+      const res: any = await createBestellungFromAuftrag(
         auftrag.id,
         items,
         auftrag.notes || "",
@@ -456,45 +494,35 @@ const InvoiceListPage: React.FC = () => {
         );
         fetchOrders();
         fetchBestellungen();
+
+        const createdBestellungId = res?.data?.id;
+        if (createdBestellungId) {
+          setActiveInvTab("bestellung");
+          handleOpenBestellungPreview(createdBestellungId);
+        }
       }
     } catch (err) {
       console.error("Error converting Auftrag to Bestellung:", err);
     }
   };
 
-  const fetchBestellungen = useCallback(async () => {
-    setLoadingBestellungen(true);
-    try {
-      const res = await getAllTransferOrders();
-      if (res?.success) setBestellungen(res.data || []);
-      else if (res?.data) setBestellungen(res.data);
-      else if (Array.isArray(res)) setBestellungen(res);
-    } catch (error) {
-      console.error("Error fetching transfer orders (Bestellung):", error);
-    } finally {
-      setLoadingBestellungen(false);
-    }
-  }, []);
-
+  // Was referenced by the Bestellung Status column but never defined —
+  // that's a guaranteed runtime ReferenceError the moment the Bestellung
+  // tab renders.
   const handleUpdateBestellungStatus = async (
-    id: number | string,
-    newStatus:
-      | "draft"
-      | "to be processed"
-      | "partially delivered"
-      | "delivered",
+    id: string | number,
+    status: string,
   ) => {
     try {
-      const res = await updateTransferOrderStatus(id, newStatus);
-      if (res?.success) {
-        toast.success(`Bestellung status updated to ${newStatus}`);
-        fetchBestellungen();
-        fetchOrders();
-      }
-    } catch (error) {
-      console.error("Failed to update bestellung status:", error);
+      await updateTransferOrderStatus(id, status);
+      toast.success("Bestellung status updated.", successStyles);
+      fetchBestellungen();
+    } catch (err) {
+      console.error("Error updating Bestellung status:", err);
+      toast.error("Failed to update Bestellung status.", errorStyles);
     }
   };
+
   const [offers, setOffers] = useState<any[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -617,13 +645,13 @@ const InvoiceListPage: React.FC = () => {
   }, []);
 
   const handleCustomerChange = (customer_id: string) =>
-    setForm((prev) => ({ ...prev, customer_id }));
+    setForm((prev: any) => ({ ...prev, customer_id }));
 
   const handleCategoryChange = async (
     category_id: string,
     resetOrderItemsFlag: boolean = true,
   ) => {
-    setForm((prev) => ({ ...prev, category_id }));
+    setForm((prev: any) => ({ ...prev, category_id }));
     setSelectedItemId("");
     if (resetOrderItemsFlag) setOrderItems([]);
 
@@ -638,7 +666,7 @@ const InvoiceListPage: React.FC = () => {
     supplier_id: string,
     resetOrderItemsFlag: boolean = true,
   ) => {
-    setForm((prev) => ({ ...prev, supplier_id }));
+    setForm((prev: any) => ({ ...prev, supplier_id }));
     setSelectedItemId("");
     if (resetOrderItemsFlag) setOrderItems([]);
 
@@ -665,8 +693,8 @@ const InvoiceListPage: React.FC = () => {
     const item = itemById.get(String(item_id));
     const itemName = item?.item_name || item?.name || "Unnamed Item";
 
-    setOrderItems((prev) => {
-      const idx = prev.findIndex((x) => x.item_id === String(item_id));
+    setOrderItems((prev: any) => {
+      const idx = prev.findIndex((x: any) => x.item_id === String(item_id));
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = { ...next[idx], qty: next[idx].qty + qty };
@@ -692,18 +720,20 @@ const InvoiceListPage: React.FC = () => {
   };
 
   const handleRemoveOrderItem = (item_id: string) =>
-    setOrderItems((prev) => prev.filter((x) => x.item_id !== item_id));
+    setOrderItems((prev: any) =>
+      prev.filter((x: any) => x.item_id !== item_id),
+    );
 
   const handleUpdateOrderItemQty = (item_id: string, qty: number) => {
     if (!qty || qty <= 0) return;
-    setOrderItems((prev) =>
-      prev.map((x) => (x.item_id === item_id ? { ...x, qty } : x)),
+    setOrderItems((prev: any) =>
+      prev.map((x: any) => (x.item_id === item_id ? { ...x, qty } : x)),
     );
   };
 
   const handleUpdateOrderItemRemark = (item_id: string, remark_de: string) => {
-    setOrderItems((prev) =>
-      prev.map((x) => (x.item_id === item_id ? { ...x, remark_de } : x)),
+    setOrderItems((prev: any) =>
+      prev.map((x: any) => (x.item_id === item_id ? { ...x, remark_de } : x)),
     );
   };
 
@@ -843,7 +873,7 @@ const InvoiceListPage: React.FC = () => {
           if (expandedStates[invId].items) {
             const response = await getExpandedInvoiceDetails(invId);
             if (response.success) {
-              setExpandedStates((prev) => ({
+              setExpandedStates((prev: any) => ({
                 ...prev,
                 [invId]: { ...prev[invId], data: response.data },
               }));
@@ -871,27 +901,27 @@ const InvoiceListPage: React.FC = () => {
     }
 
     if (!isCurrentlyOpen && !currentState.data) {
-      setExpandedStates((prev) => ({
+      setExpandedStates((prev: any) => ({
         ...prev,
         [id]: { ...newState, loading: true },
       }));
       try {
         const response = await getExpandedInvoiceDetails(id);
         if (response.success) {
-          setExpandedStates((prev) => ({
+          setExpandedStates((prev: any) => ({
             ...prev,
             [id]: { ...newState, data: response.data, loading: false },
           }));
         }
       } catch (error) {
         console.error(error);
-        setExpandedStates((prev) => ({
+        setExpandedStates((prev: any) => ({
           ...prev,
           [id]: { ...newState, loading: false },
         }));
       }
     } else {
-      setExpandedStates((prev) => ({ ...prev, [id]: newState }));
+      setExpandedStates((prev: any) => ({ ...prev, [id]: newState }));
     }
   };
 
@@ -934,7 +964,7 @@ const InvoiceListPage: React.FC = () => {
         );
 
         if (invId) {
-          setExpandedStates((prev) => {
+          setExpandedStates((prev: any) => {
             const newState = { ...prev };
             delete newState[invId];
             return newState;
@@ -967,7 +997,7 @@ const InvoiceListPage: React.FC = () => {
         ),
       );
       if (invId) {
-        setExpandedStates((prev) => {
+        setExpandedStates((prev: any) => {
           const newState = { ...prev };
           delete newState[invId];
           return newState;
@@ -1045,7 +1075,7 @@ const InvoiceListPage: React.FC = () => {
 
         const res = await getExpandedInvoiceDetails(invId);
         if (res.success) {
-          setExpandedStates((prev) => ({
+          setExpandedStates((prev: any) => ({
             ...prev,
             [invId]: { ...prev[invId], data: res.data },
           }));
@@ -1076,7 +1106,7 @@ const InvoiceListPage: React.FC = () => {
       );
       if (invId) {
         const res = await getExpandedInvoiceDetails(invId);
-        setExpandedStates((prev) => ({
+        setExpandedStates((prev: any) => ({
           ...prev,
           [invId]: { ...prev[invId], data: res.data },
         }));
@@ -1429,7 +1459,7 @@ const InvoiceListPage: React.FC = () => {
   }, [orders, docFilters.documentNo]);
 
   const handleGoToItems = (orderNo: string) => {
-    setDocFilters((prev) => ({ ...prev, documentNo: orderNo }));
+    setDocFilters((prev: any) => ({ ...prev, documentNo: orderNo }));
     setActiveInvTab("auftrag");
   };
 
@@ -1550,7 +1580,7 @@ const InvoiceListPage: React.FC = () => {
     }
     const orderNo = searchParams.get("order_no");
     if (orderNo !== null) {
-      setDocFilters((prev) => ({ ...prev, documentNo: orderNo }));
+      setDocFilters((prev: any) => ({ ...prev, documentNo: orderNo }));
     }
   }, [searchParams]);
 
@@ -1721,15 +1751,23 @@ const InvoiceListPage: React.FC = () => {
         return;
       }
 
-      setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
+      setActionLoading((prev: any) => ({
+        ...prev,
+        [`paid-${invoiceId}`]: true,
+      }));
       await markInvoiceAsPaid(invoiceId);
       await loadInvoices();
-      setSelectedInvoice((prev) => (prev ? { ...prev, status: "paid" } : null));
+      setSelectedInvoice((prev: any) =>
+        prev ? { ...prev, status: "paid" } : null,
+      );
       toast.success("Invoice verified successfully");
     } catch (error) {
       console.error("Failed to mark as paid:", error);
     } finally {
-      setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: false }));
+      setActionLoading((prev: any) => ({
+        ...prev,
+        [`paid-${invoiceId}`]: false,
+      }));
     }
   };
 
@@ -1749,7 +1787,10 @@ const InvoiceListPage: React.FC = () => {
     }
 
     try {
-      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: true }));
+      setActionLoading((prev: any) => ({
+        ...prev,
+        [`save-${invoiceId}`]: true,
+      }));
       await updateInvoice({
         id: invoiceId,
         description: invoiceEditForm.description,
@@ -1758,7 +1799,7 @@ const InvoiceListPage: React.FC = () => {
       });
       setEditingInvoiceId(null);
       await loadInvoices();
-      setSelectedInvoice((prev) =>
+      setSelectedInvoice((prev: any) =>
         prev
           ? {
               ...prev,
@@ -1772,19 +1813,28 @@ const InvoiceListPage: React.FC = () => {
     } catch (error) {
       console.error("Failed to save invoice edits:", error);
     } finally {
-      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: false }));
+      setActionLoading((prev: any) => ({
+        ...prev,
+        [`save-${invoiceId}`]: false,
+      }));
     }
   };
 
   const handleCancelInvoice = async (invoiceId: string) => {
     try {
-      setActionLoading((prev) => ({ ...prev, [`cancel-${invoiceId}`]: true }));
+      setActionLoading((prev: any) => ({
+        ...prev,
+        [`cancel-${invoiceId}`]: true,
+      }));
       await cancelInvoice(invoiceId);
       await loadInvoices();
     } catch (error) {
       console.error("Failed to cancel invoice:", error);
     } finally {
-      setActionLoading((prev) => ({ ...prev, [`cancel-${invoiceId}`]: false }));
+      setActionLoading((prev: any) => ({
+        ...prev,
+        [`cancel-${invoiceId}`]: false,
+      }));
     }
   };
 
@@ -1795,7 +1845,7 @@ const InvoiceListPage: React.FC = () => {
       )
     ) {
       try {
-        setActionLoading((prev) => ({
+        setActionLoading((prev: any) => ({
           ...prev,
           [`delete-${invoiceId}`]: true,
         }));
@@ -1804,7 +1854,7 @@ const InvoiceListPage: React.FC = () => {
       } catch (error) {
         console.error("Failed to delete invoice:", error);
       } finally {
-        setActionLoading((prev) => ({
+        setActionLoading((prev: any) => ({
           ...prev,
           [`delete-${invoiceId}`]: false,
         }));
@@ -2146,15 +2196,24 @@ const InvoiceListPage: React.FC = () => {
                 {row.offerNumber || "N/A"}
               </button>
             );
-          } else if (
-            activeInvTab === "auftrag" ||
-            activeInvTab === "bestellung"
-          ) {
+          } else if (activeInvTab === "auftrag") {
             return (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleOpenAuftragPreview(row.id);
+                }}
+                className="text-green-600 hover:underline font-semibold"
+              >
+                {row.order_no || "N/A"}
+              </button>
+            );
+          } else if (activeInvTab === "bestellung") {
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenBestellungPreview(row.id);
                 }}
                 className="text-green-600 hover:underline font-semibold"
               >
@@ -2486,7 +2545,7 @@ const InvoiceListPage: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleViewOrder(row);
+                    handleOpenBestellungPreview(row.id);
                   }}
                   className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
                 >
@@ -2971,7 +3030,7 @@ const InvoiceListPage: React.FC = () => {
                   if (activeInvTab === "auftrag") {
                     handleOpenAuftragPreview(row.id);
                   } else if (activeInvTab === "bestellung") {
-                    handleViewOrder(row);
+                    handleOpenBestellungPreview(row.id);
                   } else if (activeInvTab === "rechnung") {
                     setSelectedRechnungForDetail(row);
                     setShowRechnungDetailModal(true);
@@ -3190,7 +3249,7 @@ const InvoiceListPage: React.FC = () => {
                         disabled={actionLoading[`pdf-${selectedInvoice.id}`]}
                         onClick={async () => {
                           try {
-                            setActionLoading((prev) => ({
+                            setActionLoading((prev: any) => ({
                               ...prev,
                               [`pdf-${selectedInvoice.id}`]: true,
                             }));
@@ -3203,7 +3262,7 @@ const InvoiceListPage: React.FC = () => {
                           } catch (error) {
                             console.error("PDF Generation failed", error);
                           } finally {
-                            setActionLoading((prev) => ({
+                            setActionLoading((prev: any) => ({
                               ...prev,
                               [`pdf-${selectedInvoice.id}`]: false,
                             }));
@@ -4254,10 +4313,10 @@ const InvoiceListPage: React.FC = () => {
               isEditEnabled={true}
               selectedCustomer={selectedCustomerForEdit}
               onChange={(field, value) =>
-                setBtstFormData((prev) => ({ ...prev, [field]: value }))
+                setBtstFormData((prev: any) => ({ ...prev, [field]: value }))
               }
               onBatchChange={(updates) =>
-                setBtstFormData((prev) => ({ ...prev, ...updates }))
+                setBtstFormData((prev: any) => ({ ...prev, ...updates }))
               }
             />
           </CustomModal>
@@ -4314,7 +4373,6 @@ const InvoiceListPage: React.FC = () => {
                         {cat.name}
                       </option>
                     ))}
-                    `
                   </select>
                 </div>
                 <div className="flex-1">
@@ -4354,9 +4412,12 @@ const InvoiceListPage: React.FC = () => {
                 <textarea
                   value={form.comment}
                   onChange={(e) =>
-                    setForm((prev) => ({ ...prev, comment: e.target.value }))
+                    setForm((prev: any) => ({
+                      ...prev,
+                      comment: e.target.value,
+                    }))
                   }
-                  className="w-full` px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
                   placeholder="Enter order comment..."
                   rows={3}
                 />
@@ -4452,11 +4513,11 @@ const InvoiceListPage: React.FC = () => {
             onClose={() => {
               setShowOfferModal(false);
               setSelectedOfferId(null);
-              setOfferRefreshKey((prev) => prev + 1);
+              setOfferRefreshKey((prev: any) => prev + 1);
             }}
             onChanged={() => {
               fetchOffers();
-              setOfferRefreshKey((prev) => prev + 1);
+              setOfferRefreshKey((prev: any) => prev + 1);
             }}
             userRole={user?.role}
           />
@@ -4498,6 +4559,22 @@ const InvoiceListPage: React.FC = () => {
             }}
             onChanged={() => {
               fetchOrders();
+            }}
+            userRole={user?.role}
+          />
+        )}
+        {showBestellungPreviewModal && (
+          <BestellungPreviewModal
+            isOpen={showBestellungPreviewModal}
+            orderId={selectedBestellungId}
+            initialEdit={bestellungPreviewInitialEdit}
+            onClose={() => {
+              setShowBestellungPreviewModal(false);
+              setSelectedBestellungId(null);
+              setBestellungPreviewInitialEdit(false);
+            }}
+            onChanged={() => {
+              fetchBestellungen();
             }}
             userRole={user?.role}
           />
@@ -4552,6 +4629,7 @@ const InvoiceListPage: React.FC = () => {
     </div>
   );
 };
+
 const InvoiceListPageWrapper: React.FC = () => (
   <Suspense
     fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}

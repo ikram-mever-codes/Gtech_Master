@@ -7,10 +7,14 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
-  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 import { Supplier } from "./suppliers";
+
+export enum SupplierCurrency {
+  USD = "USD",
+  RMB = "RMB",
+}
 
 @Entity()
 export class SupplierItem {
@@ -34,6 +38,13 @@ export class SupplierItem {
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   price_rmb?: number;
+
+  @Column({
+    type: "enum",
+    enum: SupplierCurrency,
+    default: SupplierCurrency.RMB,
+  })
+  currency!: SupplierCurrency;
 
   @Column({ type: "varchar", length: 1000, nullable: true })
   url?: string;

@@ -46,25 +46,86 @@ export class TransferOrderItem {
   @Column({ type: "float", nullable: true })
   weight?: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 3, default: 1, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  extraWeight!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 1,
+    transformer: numericTransformer,
+  })
   qty!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 3, default: 1, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 1,
+    transformer: numericTransformer,
+  })
   max_qty!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 3, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
   price!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  transferPrice?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  purchasePrice?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   lineTotal!: number;
 
   @Column({ type: "integer", default: 1 })
   position!: number;
 
-  @Column({ name: "source_line_item_id", type: "varchar", length: 100, nullable: true })
+  @Column({
+    name: "source_line_item_id",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
   sourceLineItemId?: string;
 
-  @Column({ name: "source_item_id", type: "varchar", length: 100, nullable: true })
+  @Column({
+    name: "source_item_id",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
   sourceItemId?: string;
 
   @Column({ type: "text", nullable: true })

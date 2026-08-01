@@ -39,17 +39,94 @@ export class TransferOrder {
   @Column({ type: "varchar", length: 10, default: "EUR" })
   currency!: string;
 
-  @Column({ type: "decimal", precision: 5, scale: 2, default: 19, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
+    default: 19,
+    transformer: numericTransformer,
+  })
   tax_rate!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   subtotal!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   tax_amount!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   total_amount!: number;
+
+  // --- NEW FIELDS ---
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  title?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  date_delivery?: string;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  net_weight!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  extra_weight!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  total_weight!: number;
+
+  @Column({ type: "varchar", length: 20, nullable: true })
+  highlight_color?: string;
+
+  @Column({ type: "json", nullable: true })
+  deliveryAddress?: {
+    addressName?: string;
+    street?: string;
+    city?: string;
+    postalCode?: string;
+    country?: string;
+    additionalInfo?: string;
+    contactName?: string;
+    contactPhone?: string;
+  };
+
+  @Column({ type: "varchar", length: 255, default: "Gtech Hong Kong" })
+  receiver!: string;
 
   @Column({ type: "text", nullable: true })
   notes?: string;
