@@ -2,7 +2,12 @@ import { api, handleApiError } from "@/utils/api";
 
 export const createAuftragFromOffer = async (
   offerId: string,
-  selectedItems: Array<{ lineItemId: string; quantity: number; price: number; itemName?: string }>,
+  selectedItems: Array<{
+    lineItemId: string;
+    quantity: number;
+    price: number;
+    itemName?: string;
+  }>,
 ) => {
   try {
     const response: any = await api.post(
@@ -18,7 +23,12 @@ export const createAuftragFromOffer = async (
 
 export const createAuftragFromInquiry = async (
   inquiryId: string,
-  payload?: { title?: string; paymentMethod?: string; shippingMethod?: string; notes?: string },
+  payload?: {
+    title?: string;
+    paymentMethod?: string;
+    shippingMethod?: string;
+    notes?: string;
+  },
 ) => {
   try {
     const response: any = await api.post(
@@ -34,14 +44,23 @@ export const createAuftragFromInquiry = async (
 
 export const createAuftragFromItems = async (payload: {
   customerId: string;
-  selectedItems: Array<{ itemId: string | number; qty: number; price?: number; itemName?: string; notes?: string }>;
+  selectedItems: Array<{
+    itemId: string | number;
+    qty: number;
+    price?: number;
+    itemName?: string;
+    notes?: string;
+  }>;
   title?: string;
   paymentMethod?: string;
   shippingMethod?: string;
   notes?: string;
 }) => {
   try {
-    const response: any = await api.post("/customer-orders/from-items", payload);
+    const response: any = await api.post(
+      "/customer-orders/from-items",
+      payload,
+    );
     return response;
   } catch (error: any) {
     handleApiError(error, "Failed to create Auftrag from Items");
@@ -91,3 +110,75 @@ export const updateCustomerOrder = async (
     throw error;
   }
 };
+
+export const createOrderLineItem = async (
+  orderId: number | string,
+  payload: any,
+) => {
+  try {
+    const response: any = await api.post(
+      `/customer-orders/${orderId}/line-items`,
+      payload,
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to add line item");
+    throw error;
+  }
+};
+
+export const updateOrderLineItem = async (
+  orderId: number | string,
+  lineItemId: string,
+  payload: any,
+) => {
+  try {
+    const response: any = await api.put(
+      `/customer-orders/${orderId}/line-items/${lineItemId}`,
+      payload,
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to update line item");
+    throw error;
+  }
+};
+
+export const deleteOrderLineItem = async (
+  orderId: number | string,
+  lineItemId: string,
+) => {
+  try {
+    const response: any = await api.delete(
+      `/customer-orders/${orderId}/line-items/${lineItemId}`,
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to delete line item");
+    throw error;
+  }
+};
+
+export const previewOrderLineItemPrice = async (
+  orderId: number | string,
+  lineItemId: string,
+  quantity: string | number,
+) => {
+  try {
+    const response: any = await api.get(
+      `/customer-orders/${orderId}/line-items/${lineItemId}/price-preview?quantity=${encodeURIComponent(String(quantity))}`,
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to preview price");
+    throw error;
+  }
+};
+
+export const formatCurrency = (
+  amount: number,
+  currency: string = "EUR",
+): string =>
+  new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(
+    Number(amount) || 0,
+  );

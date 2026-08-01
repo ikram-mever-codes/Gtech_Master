@@ -1,0 +1,1461 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  XMarkIcon,
+  PencilIcon,
+  TrashIcon,
+  PlusIcon,
+  LinkIcon,
+  CubeIcon,
+} from "@heroicons/react/24/outline";
+import { toast } from "react-hot-toast";
+import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import {
+  getCustomerOrderById,
+  updateCustomerOrder,
+  deleteCustomerOrder,
+  createOrderLineItem,
+  updateOrderLineItem,
+  deleteOrderLineItem,
+  previewOrderLineItemPrice,
+  formatCurrency,
+} from "@/api/customer_orders";
+import { getItems } from "@/api/items";
+import { getAllPaymentMethods } from "@/api/payment_methods";
+import { getAllShippingMethods } from "@/api/shipping_methods";
+import { UserRole } from "@/utils/interfaces";
+import { errorStyles, successStyles } from "@/utils/constants";
+import { parseFlexibleNumber } from "@/utils/decimal";
+import { formatDate } from "@/utils/offers";
+
+interface AuftragPreviewModalProps {
+  isOpen: boolean;
+  orderId: string | number | null;
+  onClose: () => void;
+  onChanged?: () => void;
+  userRole?: UserRole;
+}
+
+const inputCls =
+  "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
+
+const ORDER_STATUSES = [
+  "Draft",
+  "Submitted",
+  "In Progress",
+  "Completed",
+  "Cancelled",
+];
+
+const PAYMENT_METHODS = [
+  "Prepayment",
+  "Bank transfer",
+  "Cash on delivery",
+  "Invoice",
+  "Credit card",
+  "PayPal",
+];
+
+const SHIPPING_METHODS = [
+  "Standard shipping",
+  "Express shipping",
+  "Freight",
+  "Courier",
+  "Pickup",
+];
+
+const formatWeight = (kg: number): string =>
+  `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })} kg`;
+
+const toDateInputValue = (value: any): string => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+};
+
+const COUNTRY_CODES: Record<string, string> = {
+  germany: "DE",
+  deutschland: "DE",
+  austria: "AT",
+  österreich: "AT",
+  switzerland: "CH",
+  schweiz: "CH",
+};
+
+const getCountryCode = (country?: string): string => {
+  if (!country) return "";
+  const trimmed = country.trim();
+  if (trimmed.length === 2) return trimmed.toUpperCase();
+  return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
+};
+
+/** True if the "same as billing" delivery address should be shown as
+ * identical to the customer snapshot — same rule as the Offer modal. */
+const normalizeAddrValue = (v: any): string =>
+  (v || "").toString().trim().toLowerCase();
+
+const isDeliverySameAsBilling = (deliveryAddr: any, snapshot: any): boolean => {
+  const deliveryStreet = normalizeAddrValue(deliveryAddr?.street);
+  if (!deliveryStreet) return true;
+  const billingStreet = normalizeAddrValue(
+    snapshot?.address || snapshot?.street,
+  );
+  const billingPostal = normalizeAddrValue(snapshot?.postalCode);
+  const billingCity = normalizeAddrValue(snapshot?.city);
+  const billingCountry = normalizeAddrValue(snapshot?.country);
+  return (
+    deliveryStreet === billingStreet &&
+    normalizeAddrValue(deliveryAddr?.postalCode) === billingPostal &&
+    normalizeAddrValue(deliveryAddr?.city) === billingCity &&
+    normalizeAddrValue(deliveryAddr?.country) === billingCountry
+  );
+};
+
+const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
+  addr,
+  emptyText,
+}) => {
+  if (!addr) return <div className="text-sm text-gray-400">{emptyText}</div>;
+  const countryCode = getCountryCode(addr.country);
+  const isGermany = countryCode === "DE";
+  const cityLine = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
+  const addressLine = [
+    addr.address || addr.street,
+    cityLine,
+    !isGermany ? countryCode : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <div className="space-y-1 text-sm text-gray-700">
+      {addr.legalName && addr.legalName !== addr.companyName && (
+        <div>{addr.legalName}</div>
+      )}
+      {addr.contactName && <div>{addr.contactName}</div>}
+      {addressLine && (
+        <div className="whitespace-normal break-words">{addressLine}</div>
+      )}
+      {addr.vatId && !isGermany && (
+        <div className="text-gray-500">VAT ID: {addr.vatId}</div>
+      )}
+      {addr.contactPhone && (
+        <div className="text-gray-500">Phone: {addr.contactPhone}</div>
+      )}
+    </div>
+  );
+};
+
+const Field: React.FC<{
+  label: string;
+  edit: boolean;
+  value: any;
+  children?: React.ReactNode;
+}> = ({ label, edit, value, children }) => (
+  <div>
+    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+      {label}
+    </p>
+    <div className="text-sm text-gray-900 break-words">
+      {edit ? children : value || "—"}
+    </div>
+  </div>
+);
+
+const DecimalInput: React.FC<{
+  value: string | number | null | undefined;
+  onCommit: (raw: string) => void;
+  className?: string;
+}> = ({ value, onCommit, className }) => {
+  const [local, setLocal] = useState(
+    value === null || value === undefined ? "" : String(value),
+  );
+  useEffect(() => {
+    setLocal(value === null || value === undefined ? "" : String(value));
+  }, [value]);
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={className || inputCls}
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => onCommit(local)}
+    />
+  );
+};
+
+const TextCellInput: React.FC<{
+  value: string | null | undefined;
+  onCommit: (raw: string) => void;
+  className?: string;
+  placeholder?: string;
+}> = ({ value, onCommit, className, placeholder }) => {
+  const [local, setLocal] = useState(value || "");
+  useEffect(() => {
+    setLocal(value || "");
+  }, [value]);
+  return (
+    <input
+      type="text"
+      className={
+        className ||
+        "w-full px-1.5 py-1 text-sm border border-gray-300 rounded bg-white"
+      }
+      value={local}
+      placeholder={placeholder}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => onCommit(local)}
+    />
+  );
+};
+
+const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
+  item,
+  onClick,
+}) => {
+  const name = item.item_name || item.itemName || "Unnamed item";
+  const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
+  return (
+    <div
+      onClick={onClick}
+      className="flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all border-gray-200 hover:bg-gray-50"
+    >
+      <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+        {item.photo ? (
+          <img
+            src={item.photo}
+            alt="thumb"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-gray-300 text-xs">—</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-gray-900 truncate">{name}</div>
+        <div className="text-xs text-gray-500 mt-0.5">{itemNo || "—"}</div>
+      </div>
+    </div>
+  );
+};
+
+/** An order line is a "Freizeile" if it wasn't sourced from a catalog item
+ * — same rule the Offer modal uses. Only these can have their own VAT. */
+const isFreetextLine = (item: any): boolean => !item?.sourceItemId;
+
+const getLineTaxRate = (item: any, order: any): number => {
+  const orderRate = parseFlexibleNumber(order?.tax_rate) ?? 19;
+  if (isFreetextLine(item)) {
+    const own = parseFlexibleNumber(item?.taxRate);
+    return own !== null && own !== undefined ? own : orderRate;
+  }
+  return orderRate;
+};
+
+const getShippingTaxRate = (order: any): number =>
+  parseFlexibleNumber(order?.tax_rate) ?? 19;
+
+const getLineItemTotal = (item: any): number => {
+  const qty = parseFlexibleNumber(item?.quantity) ?? 1;
+  const price = parseFlexibleNumber(item?.price) ?? 0;
+  return qty * price;
+};
+
+export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
+  isOpen,
+  orderId,
+  onClose,
+  onChanged,
+  userRole,
+}) => {
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState<any>({});
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
+  const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [itemPickerSearch, setItemPickerSearch] = useState("");
+  const [items, setItems] = useState<any[]>([]);
+  const [newLine, setNewLine] = useState({
+    itemName: "",
+    quantity: "1",
+    taxRate: "",
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        const [pmRes, smRes]: any = await Promise.all([
+          getAllPaymentMethods(true).catch(() => ({ data: [] })),
+          getAllShippingMethods(true).catch(() => ({ data: [] })),
+        ]);
+        setDbPaymentMethods(
+          Array.isArray(pmRes?.data)
+            ? pmRes.data.filter((pm: any) => pm.is_active)
+            : [],
+        );
+        setDbShippingMethods(
+          Array.isArray(smRes?.data)
+            ? smRes.data.filter((sm: any) => sm.is_active)
+            : [],
+        );
+      } catch (e) {
+        console.error("Failed to load payment/shipping methods:", e);
+      }
+    })();
+  }, [isOpen]);
+
+  const fetchOrder = useCallback(async () => {
+    if (!orderId) return;
+    setLoading(true);
+    try {
+      const res = await getCustomerOrderById(orderId);
+      if (res.success) {
+        setOrder(res.data);
+        setForm(buildForm(res.data));
+      }
+    } catch (e) {
+      console.error("Failed to load Auftrag:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setEdit(false);
+    setShowItemPicker(false);
+    setItemPickerSearch("");
+    fetchOrder();
+  }, [isOpen, orderId, fetchOrder]);
+
+  useEffect(() => {
+    if (!showItemPicker || items.length > 0) return;
+    (async () => {
+      try {
+        const res: any = await getItems({ limit: 1000 });
+        setItems(Array.isArray(res?.data) ? res.data : res?.data?.items || []);
+      } catch (e) {
+        console.error("Error loading items:", e);
+      }
+    })();
+  }, [showItemPicker, items.length]);
+
+  if (!isOpen) return null;
+
+  function buildForm(o: any) {
+    return {
+      title: o.title || "",
+      status: o.status || "Draft",
+      currency: o.currency || "EUR",
+      taxRate: o.tax_rate ?? 19,
+      discountPercentage: o.discount_percentage ?? "",
+      shippingCost: o.shipping_cost ?? "",
+      shippingQuantity: o.shipping_quantity ?? 1,
+      paymentMethod: o.payment_method || "",
+      shippingMethod: o.shipping_method || "",
+      paymentTerms: o.payment_terms || "",
+      deliveryTerms: o.delivery_terms || "",
+      termsConditions: o.terms_conditions || "",
+      notes: o.notes || "",
+      internalNotes: o.internal_notes || "",
+      highlightColor: o.highlight_color || "",
+      dateDelivery: o.date_delivery || "",
+      customerSnapshot: { ...(o.customerSnapshot || {}) },
+      deliveryAddress: { ...(o.deliveryAddress || {}) },
+    };
+  }
+
+  const patch = (p: any) => setForm((f: any) => ({ ...f, ...p }));
+
+  const refreshLocal = async () => {
+    if (!order) return;
+    const updated = await getCustomerOrderById(order.id);
+    if (updated.success) setOrder(updated.data);
+  };
+
+  const handleStartEdit = () => setEdit(true);
+  const handleCancelEdit = () => {
+    setForm(buildForm(order));
+    setEdit(false);
+    setShowItemPicker(false);
+  };
+
+  const handleSave = async () => {
+    if (!order) return;
+    if (!form.title?.trim()) {
+      toast.error("Title can't be empty.", errorStyles);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await updateCustomerOrder(order.id, {
+        title: form.title,
+        status: form.status,
+        currency: form.currency,
+        taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
+        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
+        shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
+        shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
+        paymentMethod: form.paymentMethod || undefined,
+        shippingMethod: form.shippingMethod || undefined,
+        paymentTerms: form.paymentTerms,
+        deliveryTerms: form.deliveryTerms,
+        termsConditions: form.termsConditions,
+        notes: form.notes,
+        internalNotes: form.internalNotes,
+        highlightColor: form.highlightColor ?? "",
+        dateDelivery: form.dateDelivery,
+        customerSnapshot: form.customerSnapshot,
+        deliveryAddress: form.deliveryAddress,
+      });
+      if (res.success) {
+        toast.success("Auftrag updated successfully.", successStyles);
+        await refreshLocal();
+        setEdit(false);
+        onChanged?.();
+      } else {
+        toast.error(res.message || "Failed to update Auftrag.", errorStyles);
+      }
+    } catch (e: any) {
+      toast.error(e.message || "An error occurred while saving.", errorStyles);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!order) return;
+    if (!window.confirm("Delete this Auftrag? This can't be undone.")) return;
+    try {
+      await deleteCustomerOrder(order.id);
+      onClose();
+      onChanged?.();
+    } catch (e) {
+      console.error("Error deleting Auftrag:", e);
+    }
+  };
+
+  const setHighlightColor = async (color: string) => {
+    if (!order) return;
+    try {
+      await updateCustomerOrder(order.id, { highlightColor: color });
+      patch({ highlightColor: color });
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't update highlight color:", e);
+    }
+  };
+
+  const persistLine = async (lineItemId: string, payload: any) => {
+    try {
+      const res: any = await updateOrderLineItem(order.id, lineItemId, payload);
+      const updatedItem = res?.data ?? res;
+      if (updatedItem?.id) {
+        setOrder((prev: any) => ({
+          ...prev,
+          orderItems: prev.orderItems.map((li: any) =>
+            li.id === lineItemId ? updatedItem : li,
+          ),
+        }));
+        await refreshLocal();
+      }
+    } catch (e) {
+      console.error("Couldn't save line item change:", e);
+      toast.error("Couldn't save that change.", errorStyles);
+    }
+  };
+
+  const handleQuantityCommit = async (item: any, raw: string) => {
+    const newQty = raw.trim() || "1";
+    if (!item.sourceItemId) {
+      await persistLine(item.id, { quantity: newQty });
+      return;
+    }
+    try {
+      const preview: any = await previewOrderLineItemPrice(
+        order.id,
+        item.id,
+        newQty,
+      );
+      const tieredPrice = preview?.data?.price;
+      const currentPrice = parseFlexibleNumber(item.price) ?? 0;
+
+      if (
+        tieredPrice !== null &&
+        tieredPrice !== undefined &&
+        Math.abs(tieredPrice - currentPrice) > 0.0001
+      ) {
+        const confirmed = window.confirm(
+          `There is a sales price for quantity ${newQty}: ${formatCurrency(
+            tieredPrice,
+            order.currency,
+          )}. Override the current price (${formatCurrency(currentPrice, order.currency)}) with it?`,
+        );
+        if (confirmed) {
+          await persistLine(item.id, { quantity: newQty, price: tieredPrice });
+        } else {
+          await persistLine(item.id, { quantity: newQty, price: currentPrice });
+        }
+        return;
+      }
+      await persistLine(item.id, { quantity: newQty });
+    } catch (e) {
+      console.error("Couldn't check tiered pricing:", e);
+      await persistLine(item.id, { quantity: newQty });
+    }
+  };
+
+  const addLineItem = async () => {
+    if (!newLine.itemName.trim()) {
+      toast.error("Enter a name for the Freizeile first.", errorStyles);
+      return;
+    }
+    const orderRate = parseFlexibleNumber(order?.tax_rate) ?? 19;
+    const requestedRate =
+      newLine.taxRate.trim() === ""
+        ? orderRate
+        : (parseFlexibleNumber(newLine.taxRate) ?? orderRate);
+
+    try {
+      await createOrderLineItem(order.id, {
+        itemName: newLine.itemName.trim(),
+        quantity: newLine.quantity?.trim() || "1",
+        price: 0,
+        taxRate: requestedRate,
+      });
+      setNewLine({ itemName: "", quantity: "1", taxRate: "" });
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't add the Freizeile:", e);
+    }
+  };
+
+  const addExistingItem = async (it: any) => {
+    try {
+      await createOrderLineItem(order.id, {
+        itemName: it.item_name || it.itemName || "Item",
+        material: it.model || (it.ean ? String(it.ean) : undefined),
+        itemNo: it.model || undefined,
+        price: 0,
+        weight: it.weight,
+        sourceItemId: String(it.id),
+      });
+      setShowItemPicker(false);
+      setItemPickerSearch("");
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't add the item:", e);
+    }
+  };
+
+  const removeLineItem = async (lineItemId: string) => {
+    if (!window.confirm("Remove this line item?")) return;
+    try {
+      await deleteOrderLineItem(order.id, lineItemId);
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't remove the item:", e);
+    }
+  };
+
+  if (loading || !order) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="bg-white/95 rounded-2xl shadow-xl max-w-5xl w-full p-6 py-24 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
+          <p className="mt-2 text-sm text-gray-500">Loading Auftrag…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const visibleLineItems = (order.orderItems || [])
+    .slice()
+    .sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
+
+  const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
+    const qty = parseFlexibleNumber(li.quantity) ?? 1;
+    return sum + (parseFlexibleNumber(li.weight) ?? 0) * qty;
+  }, 0);
+  const extraWeightKg = visibleLineItems.reduce(
+    (sum: number, li: any) => sum + (parseFlexibleNumber(li.extraWeight) ?? 0),
+    0,
+  );
+  const totalWeightKg = netWeightKg + extraWeightKg;
+
+  const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
+    const byRate = new Map<number, number>();
+    visibleLineItems.forEach((li: any) => {
+      const rate = getLineTaxRate(li, order);
+      const lineTotal = getLineItemTotal(li);
+      byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
+    });
+
+    const shippingTotal = edit
+      ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
+      : (order.shipping_cost || 0) * (order.shipping_quantity || 1);
+
+    if (shippingTotal > 0) {
+      const shipRate = getShippingTaxRate(order);
+      byRate.set(shipRate, (byRate.get(shipRate) || 0) + shippingTotal);
+    }
+
+    const discountPct = edit
+      ? parseFlexibleNumber(form.discountPercentage) || 0
+      : order.discount_percentage || 0;
+    const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
+
+    return Array.from(byRate.entries())
+      .map(([rate, base]) => {
+        const adjustedBase = base * discountFactor;
+        return { rate, base: adjustedBase, tax: adjustedBase * (rate / 100) };
+      })
+      .sort((a, b) => b.rate - a.rate);
+  })();
+
+  const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
+  const displayTotal =
+    (order.subtotal || 0) - (order.discount_amount || 0) + vatTaxSum;
+
+  const currentDeliveryAddress = edit
+    ? form.deliveryAddress
+    : order.deliveryAddress;
+  const deliverySameAsBilling = isDeliverySameAsBilling(
+    currentDeliveryAddress,
+    order.customerSnapshot,
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-lg font-bold text-gray-900 truncate">
+                Auftrag {order.order_no}
+              </p>
+            </div>
+            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
+              {order.title}
+            </h2>
+          </div>
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <input
+              type="color"
+              value={order.highlight_color || "#ffffff"}
+              onChange={(e) => setHighlightColor(e.target.value)}
+              title="Auftrag highlight color"
+              className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+            />
+            <ViewEditToggle
+              isEditEnabled={edit}
+              onToggle={() => (edit ? handleCancelEdit() : handleStartEdit())}
+              disabled={saving}
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
+            <div className="md:col-span-1 flex flex-col gap-3">
+              <div className="block mb-1">
+                {edit ? (
+                  <div className="space-y-1.5">
+                    <input
+                      className={inputCls}
+                      placeholder="Legal name"
+                      value={form.customerSnapshot?.legalName || ""}
+                      onChange={(e) =>
+                        patch({
+                          customerSnapshot: {
+                            ...form.customerSnapshot,
+                            legalName: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                    <input
+                      className={inputCls}
+                      placeholder="Street"
+                      value={
+                        form.customerSnapshot?.address ||
+                        form.customerSnapshot?.street ||
+                        ""
+                      }
+                      onChange={(e) =>
+                        patch({
+                          customerSnapshot: {
+                            ...form.customerSnapshot,
+                            address: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        className={inputCls}
+                        placeholder="Postal code"
+                        value={form.customerSnapshot?.postalCode || ""}
+                        onChange={(e) =>
+                          patch({
+                            customerSnapshot: {
+                              ...form.customerSnapshot,
+                              postalCode: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                      <input
+                        className={inputCls}
+                        placeholder="City"
+                        value={form.customerSnapshot?.city || ""}
+                        onChange={(e) =>
+                          patch({
+                            customerSnapshot: {
+                              ...form.customerSnapshot,
+                              city: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <input
+                      className={inputCls}
+                      placeholder="Country"
+                      value={form.customerSnapshot?.country || ""}
+                      onChange={(e) =>
+                        patch({
+                          customerSnapshot: {
+                            ...form.customerSnapshot,
+                            country: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                    <input
+                      className={inputCls}
+                      placeholder="VAT ID"
+                      value={form.customerSnapshot?.vatId || ""}
+                      onChange={(e) =>
+                        patch({
+                          customerSnapshot: {
+                            ...form.customerSnapshot,
+                            vatId: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <AddressBlock
+                    addr={order.customerSnapshot}
+                    emptyText="No customer snapshot."
+                  />
+                )}
+              </div>
+
+              <div className="block mb-1">
+                {(edit || !deliverySameAsBilling) && (
+                  <span className="text-sm font-bold text-gray-900">
+                    Delivery:
+                  </span>
+                )}
+                {edit ? (
+                  <div className="space-y-1.5 mt-1">
+                    <input
+                      className={inputCls}
+                      placeholder="Street"
+                      value={form.deliveryAddress?.street || ""}
+                      onChange={(e) =>
+                        patch({
+                          deliveryAddress: {
+                            ...form.deliveryAddress,
+                            street: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        className={inputCls}
+                        placeholder="Postal code"
+                        value={form.deliveryAddress?.postalCode || ""}
+                        onChange={(e) =>
+                          patch({
+                            deliveryAddress: {
+                              ...form.deliveryAddress,
+                              postalCode: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                      <input
+                        className={inputCls}
+                        placeholder="City"
+                        value={form.deliveryAddress?.city || ""}
+                        onChange={(e) =>
+                          patch({
+                            deliveryAddress: {
+                              ...form.deliveryAddress,
+                              city: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <input
+                      className={inputCls}
+                      placeholder="Country"
+                      value={form.deliveryAddress?.country || ""}
+                      onChange={(e) =>
+                        patch({
+                          deliveryAddress: {
+                            ...form.deliveryAddress,
+                            country: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                ) : deliverySameAsBilling ? (
+                  <div className="text-sm text-gray-500">
+                    Same Delivery Address
+                  </div>
+                ) : (
+                  <AddressBlock
+                    addr={currentDeliveryAddress}
+                    emptyText="No delivery address set."
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+              <Field label="Title" edit={edit} value={order.title}>
+                <input
+                  className={inputCls}
+                  value={form.title}
+                  onChange={(e) => patch({ title: e.target.value })}
+                />
+              </Field>
+              <Field label="Status" edit={edit} value={order.status}>
+                <select
+                  className={inputCls}
+                  value={form.status}
+                  onChange={(e) => patch({ status: e.target.value })}
+                >
+                  {ORDER_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field
+                label="Delivery Date"
+                edit={edit}
+                value={
+                  order.date_delivery ? formatDate(order.date_delivery) : ""
+                }
+              >
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={toDateInputValue(form.dateDelivery)}
+                  onChange={(e) => patch({ dateDelivery: e.target.value })}
+                />
+              </Field>
+              <Field
+                label="Payment method"
+                edit={edit}
+                value={order.payment_method}
+              >
+                <select
+                  className={inputCls}
+                  value={form.paymentMethod || ""}
+                  onChange={(e) => patch({ paymentMethod: e.target.value })}
+                >
+                  <option value="">Select…</option>
+                  {(dbPaymentMethods.length > 0
+                    ? dbPaymentMethods.map((pm: any) => pm.name)
+                    : PAYMENT_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field
+                label="Payment terms"
+                edit={edit}
+                value={order.payment_terms}
+              >
+                <input
+                  className={inputCls}
+                  value={form.paymentTerms}
+                  placeholder="e.g., 30 days net"
+                  onChange={(e) => patch({ paymentTerms: e.target.value })}
+                />
+              </Field>
+              <Field
+                label="Shipping method"
+                edit={edit}
+                value={order.shipping_method}
+              >
+                <select
+                  className={inputCls}
+                  value={form.shippingMethod || ""}
+                  onChange={(e) => patch({ shippingMethod: e.target.value })}
+                >
+                  <option value="">Select…</option>
+                  {(dbShippingMethods.length > 0
+                    ? dbShippingMethods.map((sm: any) => sm.name)
+                    : SHIPPING_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
+                      Pos
+                    </th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
+                      Pic
+                    </th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                      Art.-Nr.
+                    </th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                      Bezeichnung
+                    </th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                      Hinweis
+                    </th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
+                      MwSt.
+                    </th>
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                      Menge
+                    </th>
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                      Netto-Preis
+                    </th>
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                      Netto gesamt
+                    </th>
+                    {edit && <th className="w-10" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {visibleLineItems.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={edit ? 10 : 9}
+                        className="text-center py-6 text-sm text-gray-500"
+                      >
+                        No line items yet.
+                      </td>
+                    </tr>
+                  )}
+                  {visibleLineItems.map((item: any) => {
+                    const freetext = isFreetextLine(item);
+                    const total = getLineItemTotal(item);
+                    const qtyDisplay = Math.round(
+                      parseFlexibleNumber(item.quantity) ?? 1,
+                    );
+                    const rowColor =
+                      item.highlightColor || (freetext ? "#D8964A" : null);
+                    const lineTaxRate = getLineTaxRate(item, order);
+                    return (
+                      <tr
+                        key={item.id}
+                        style={
+                          rowColor ? { backgroundColor: rowColor } : undefined
+                        }
+                      >
+                        <td className="px-2 py-2 text-gray-500">
+                          {item.position}
+                        </td>
+                        <td className="px-2 py-2">
+                          <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                            {item.photo ? (
+                              <img
+                                src={item.photo}
+                                alt="thumb"
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-gray-300 text-[10px]">
+                                —
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2">
+                          {edit ? (
+                            <TextCellInput
+                              value={item.itemNo || item.material}
+                              placeholder="Art.-Nr."
+                              onCommit={(raw) =>
+                                persistLine(item.id, { itemNo: raw })
+                              }
+                            />
+                          ) : (
+                            <span>{item.itemNo || item.material || "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {edit ? (
+                            <TextCellInput
+                              value={item.itemName}
+                              onCommit={(raw) =>
+                                persistLine(item.id, {
+                                  itemName: raw || item.itemName,
+                                })
+                              }
+                            />
+                          ) : (
+                            <span>{item.itemName || "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {edit ? (
+                            <TextCellInput
+                              value={item.notes}
+                              placeholder="Remark"
+                              onCommit={(raw) =>
+                                persistLine(item.id, { notes: raw })
+                              }
+                            />
+                          ) : (
+                            <span className="text-gray-600">
+                              {item.notes || "—"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center text-gray-600">
+                          {edit && freetext ? (
+                            <div className="flex items-center justify-center gap-0.5">
+                              <DecimalInput
+                                className="w-14 px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                                value={lineTaxRate}
+                                onCommit={(raw) => {
+                                  const parsed = parseFlexibleNumber(raw);
+                                  const orderRate =
+                                    parseFlexibleNumber(order?.tax_rate) ?? 19;
+                                  persistLine(item.id, {
+                                    taxRate:
+                                      parsed === null ? orderRate : parsed,
+                                  });
+                                }}
+                              />
+                              <span>%</span>
+                            </div>
+                          ) : (
+                            `${lineTaxRate}%`
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {edit ? (
+                            <DecimalInput
+                              className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                              value={item.quantity}
+                              onCommit={(raw) =>
+                                handleQuantityCommit(item, raw)
+                              }
+                            />
+                          ) : (
+                            <div className="text-right">{qtyDisplay}</div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {edit ? (
+                            <DecimalInput
+                              className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
+                              value={item.price}
+                              onCommit={(raw) => {
+                                const parsed = parseFlexibleNumber(raw);
+                                persistLine(item.id, {
+                                  price: parsed === null ? "0" : raw,
+                                });
+                              }}
+                            />
+                          ) : (
+                            <div className="text-right">
+                              {formatCurrency(item.price || 0, order.currency)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-right font-medium">
+                          {formatCurrency(total || 0, order.currency)}
+                        </td>
+                        {edit && (
+                          <td className="px-2 py-2 text-center">
+                            <button
+                              onClick={() => removeLineItem(item.id)}
+                              className="text-rose-500 hover:text-rose-700"
+                              title="Remove line"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+
+                  {order.shipping_method && (
+                    <tr className="bg-gray-50/80 border-t-2 border-gray-200">
+                      <td className="px-2 py-2 text-gray-400">
+                        {visibleLineItems.length + 1}
+                      </td>
+                      <td className="px-2 py-2 text-gray-400"></td>
+                      <td className="px-2 py-2 text-gray-400">—</td>
+                      <td className="px-2 py-2">
+                        {edit ? (
+                          <input
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
+                            value={form.shippingMethod || ""}
+                            onChange={(e) =>
+                              patch({ shippingMethod: e.target.value })
+                            }
+                            placeholder="Shipping method"
+                          />
+                        ) : (
+                          <span className="font-medium text-gray-700">
+                            {order.shipping_method || "No shipping method set"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-0 py-2 text-center text-gray-400"></td>
+                      <td className="px-2 py-2 text-center text-gray-600">
+                        {getShippingTaxRate(order)}%
+                      </td>
+                      <td className="px-2 py-2">
+                        {edit ? (
+                          <DecimalInput
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
+                            value={form.shippingQuantity ?? 1}
+                            onCommit={(raw) => {
+                              const val = parseFloat(raw.replace(",", "."));
+                              if (!isNaN(val) && val > 0)
+                                patch({ shippingQuantity: val });
+                            }}
+                          />
+                        ) : (
+                          <div className="text-right font-medium">
+                            {order.shipping_quantity || 1}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        {edit ? (
+                          <DecimalInput
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
+                            value={form.shippingCost ?? 0}
+                            onCommit={(raw) => {
+                              const val = parseFloat(raw.replace(",", "."));
+                              if (!isNaN(val) && val >= 0)
+                                patch({ shippingCost: val });
+                            }}
+                          />
+                        ) : (
+                          <div className="text-right font-medium">
+                            {formatCurrency(
+                              order.shipping_cost || 0,
+                              order.currency,
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right font-bold text-gray-800">
+                        {formatCurrency(
+                          (form.shippingCost || 0) *
+                            (form.shippingQuantity || 1),
+                          order.currency,
+                        )}
+                      </td>
+                      {edit && <td />}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {edit && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setShowItemPicker((s) => !s)}
+                    className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    Add existing item
+                  </button>
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <input
+                          className={inputCls}
+                          value={newLine.itemName}
+                          placeholder="Freizeile — text"
+                          onChange={(e) =>
+                            setNewLine((n) => ({
+                              ...n,
+                              itemName: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <button
+                        onClick={addLineItem}
+                        className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        Add Freizeile
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {showItemPicker && (
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+                    <input
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      placeholder="Search items…"
+                      value={itemPickerSearch}
+                      onChange={(e) => setItemPickerSearch(e.target.value)}
+                    />
+                    <div className="max-h-48 overflow-y-auto space-y-1.5">
+                      {items.filter((it) => {
+                        if (!itemPickerSearch) return true;
+                        const q = itemPickerSearch.toLowerCase();
+                        const name = it.item_name || it.itemName || "";
+                        return (
+                          name.toLowerCase().includes(q) ||
+                          String(it.ean || "").includes(itemPickerSearch)
+                        );
+                      }).length === 0 ? (
+                        <div className="text-center text-sm text-gray-500 py-3">
+                          No items match.
+                        </div>
+                      ) : (
+                        items
+                          .filter((it) => {
+                            if (!itemPickerSearch) return true;
+                            const q = itemPickerSearch.toLowerCase();
+                            const name = it.item_name || it.itemName || "";
+                            return (
+                              name.toLowerCase().includes(q) ||
+                              String(it.ean || "").includes(itemPickerSearch)
+                            );
+                          })
+                          .map((it) => (
+                            <ItemRow
+                              key={it.id}
+                              item={it}
+                              onClick={() => addExistingItem(it)}
+                            />
+                          ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field
+                label="Net weight (items)"
+                edit={false}
+                value={formatWeight(netWeightKg)}
+              />
+              <Field
+                label="Extra weight"
+                edit={edit}
+                value={formatWeight(extraWeightKg)}
+              >
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className={inputCls}
+                  defaultValue={
+                    visibleLineItems[0]?.extraWeight === null ||
+                    visibleLineItems[0]?.extraWeight === undefined
+                      ? ""
+                      : String(visibleLineItems[0].extraWeight)
+                  }
+                  placeholder="0"
+                  disabled={visibleLineItems.length === 0}
+                  onBlur={(e) => {
+                    if (!visibleLineItems[0]) return;
+                    persistLine(visibleLineItems[0].id, {
+                      extraWeight:
+                        e.target.value.trim() === "" ? "0" : e.target.value,
+                    });
+                  }}
+                />
+              </Field>
+              <Field
+                label="Total weight"
+                edit={false}
+                value={formatWeight(totalWeightKg)}
+              />
+            </div>
+            <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-medium">
+                  {formatCurrency(order.subtotal || 0, order.currency)}
+                </span>
+              </div>
+              {order.discount_amount > 0 && (
+                <div className="flex justify-between text-rose-600">
+                  <span>Discount</span>
+                  <span>
+                    −{formatCurrency(order.discount_amount, order.currency)}
+                  </span>
+                </div>
+              )}
+
+              {vatGroups
+                .filter((g) => g.rate !== 0)
+                .map((g) => (
+                  <div key={g.rate} className="flex justify-between">
+                    <span className="text-gray-600">VAT ({g.rate}%)</span>
+                    <span className="font-medium">
+                      {formatCurrency(g.tax, order.currency)}
+                    </span>
+                  </div>
+                ))}
+              <div className="border-t pt-2 flex justify-between font-bold text-lg">
+                <span>Total</span>
+                <span>{formatCurrency(displayTotal, order.currency)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Linked documents
+                </h3>
+              </div>
+              <p className="text-sm text-gray-500">No linked documents yet.</p>
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <PencilIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Comment intern
+                </h3>
+              </div>
+              {edit ? (
+                <textarea
+                  rows={3}
+                  className={inputCls}
+                  value={form.internalNotes}
+                  placeholder="Only visible to the team."
+                  onChange={(e) => patch({ internalNotes: e.target.value })}
+                />
+              ) : (
+                <p className="text-sm text-gray-600">
+                  {order.internal_notes || "—"}
+                </p>
+              )}
+            </div>
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <PencilIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Comment extern
+                </h3>
+              </div>
+              {edit ? (
+                <textarea
+                  rows={3}
+                  className={inputCls}
+                  value={form.notes}
+                  placeholder="Shown to the customer."
+                  onChange={(e) => patch({ notes: e.target.value })}
+                />
+              ) : (
+                <p className="text-sm text-gray-600">{order.notes || "—"}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
+          <div>
+            {edit && userRole === UserRole.ADMIN && (
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Delete Auftrag
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={edit ? handleCancelEdit : onClose}
+              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              {edit ? "Cancel" : "Close"}
+            </button>
+            {edit && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AuftragPreviewModal;

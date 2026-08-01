@@ -97,10 +97,7 @@ import {
   updateTransferOrderStatus,
   createBestellungFromAuftrag,
 } from "@/api/transfer_orders";
-import {
-  getAllRechnungen,
-  getLieferscheine,
-} from "@/api/rechnungen";
+import { getAllRechnungen, getLieferscheine } from "@/api/rechnungen";
 import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
 import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
 import AuftragToRechnungModal from "@/components/orders/AuftragToRechnungModal";
@@ -118,16 +115,19 @@ import {
   parseCustomDate,
   isDateInPreset,
 } from "@/utils/commercialFilters";
+import AuftragPreviewModal from "@/components/orders/AuftragPreviewModal";
+import { set } from "date-fns";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 interface Invoice {
@@ -237,6 +237,15 @@ const InvoiceListPage: React.FC = () => {
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [offerRefreshKey, setOfferRefreshKey] = useState(0);
+  const [showAuftragPreviewModal, setShowAuftragPreviewModal] = useState(false);
+  const [selectedAuftragId, setSelectedAuftragId] = useState<
+    string | number | null
+  >(null);
+
+  const handleOpenAuftragPreview = (id: string | number) => {
+    setSelectedAuftragId(id);
+    setShowAuftragPreviewModal(true);
+  };
 
   const handleOpenOfferModal = (id: string | null = null) => {
     setSelectedOfferId(id);
@@ -359,8 +368,12 @@ const InvoiceListPage: React.FC = () => {
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [bestellungen, setBestellungen] = useState<any[]>([]);
   const [loadingBestellungen, setLoadingBestellungen] = useState(false);
-  const [selectedAuftragForBestellungModal, setSelectedAuftragForBestellungModal] = useState<any>(null);
-  const [showAuftragToBestellungModal, setShowAuftragToBestellungModal] = useState(false);
+  const [
+    selectedAuftragForBestellungModal,
+    setSelectedAuftragForBestellungModal,
+  ] = useState<any>(null);
+  const [showAuftragToBestellungModal, setShowAuftragToBestellungModal] =
+    useState(false);
   const [showAuftragCreateModal, setShowAuftragCreateModal] = useState(false);
 
   const [rechnungen, setRechnungen] = useState<any[]>([]);
@@ -368,14 +381,19 @@ const InvoiceListPage: React.FC = () => {
   const [loadingRechnungen, setLoadingRechnungen] = useState(false);
   const [loadingLieferscheine, setLoadingLieferscheine] = useState(false);
 
-  const [selectedAuftragForRechnungModal, setSelectedAuftragForRechnungModal] = useState<any>(null);
-  const [showAuftragToRechnungModal, setShowAuftragToRechnungModal] = useState(false);
+  const [selectedAuftragForRechnungModal, setSelectedAuftragForRechnungModal] =
+    useState<any>(null);
+  const [showAuftragToRechnungModal, setShowAuftragToRechnungModal] =
+    useState(false);
 
   const [showRechnungDetailModal, setShowRechnungDetailModal] = useState(false);
-  const [selectedRechnungForDetail, setSelectedRechnungForDetail] = useState<any>(null);
+  const [selectedRechnungForDetail, setSelectedRechnungForDetail] =
+    useState<any>(null);
 
-  const [showLieferscheinDetailModal, setShowLieferscheinDetailModal] = useState(false);
-  const [selectedLieferscheinForDetail, setSelectedLieferscheinForDetail] = useState<any>(null);
+  const [showLieferscheinDetailModal, setShowLieferscheinDetailModal] =
+    useState(false);
+  const [selectedLieferscheinForDetail, setSelectedLieferscheinForDetail] =
+    useState<any>(null);
 
   const fetchRechnungen = useCallback(async () => {
     setLoadingRechnungen(true);
@@ -404,18 +422,32 @@ const InvoiceListPage: React.FC = () => {
   }, []);
 
   const handleDirectConvertAuftragToBestellung = async (auftrag: any) => {
-    if (!window.confirm(`Convert Auftrag ${auftrag.order_no} directly to Bestellung?`)) return;
+    if (
+      !window.confirm(
+        `Convert Auftrag ${auftrag.order_no} directly to Bestellung?`,
+      )
+    )
+      return;
     try {
-      const items = (auftrag.orderItems || auftrag.items || []).map((it: any) => ({
-        sourceLineItemId: String(it.id),
-        qty: Number(it.quantity || it.qty) || 1,
-        max_qty: Number(it.quantity || it.qty) || 1,
-        price: Number(it.price || 0),
-        itemName: it.itemName || it.item_name || "Line Item",
-      }));
-      const res = await createBestellungFromAuftrag(auftrag.id, items, auftrag.notes || "");
+      const items = (auftrag.orderItems || auftrag.items || []).map(
+        (it: any) => ({
+          sourceLineItemId: String(it.id),
+          qty: Number(it.quantity || it.qty) || 1,
+          max_qty: Number(it.quantity || it.qty) || 1,
+          price: Number(it.price || 0),
+          itemName: it.itemName || it.item_name || "Line Item",
+        }),
+      );
+      const res = await createBestellungFromAuftrag(
+        auftrag.id,
+        items,
+        auftrag.notes || "",
+      );
       if (res?.success) {
-        toast.success(res.message || `Auftrag ${auftrag.order_no} converted to Bestellung!`, successStyles);
+        toast.success(
+          res.message || `Auftrag ${auftrag.order_no} converted to Bestellung!`,
+          successStyles,
+        );
         fetchOrders();
         fetchBestellungen();
       }
@@ -440,7 +472,11 @@ const InvoiceListPage: React.FC = () => {
 
   const handleUpdateBestellungStatus = async (
     id: number | string,
-    newStatus: "draft" | "to be processed" | "partially delivered" | "delivered",
+    newStatus:
+      | "draft"
+      | "to be processed"
+      | "partially delivered"
+      | "delivered",
   ) => {
     try {
       const res = await updateTransferOrderStatus(id, newStatus);
@@ -1446,7 +1482,13 @@ const InvoiceListPage: React.FC = () => {
     fetchSuppliers();
     fetchCategories();
     fetchBestellungen();
-  }, [fetchOrders, fetchOffers, fetchSuppliers, fetchCategories, fetchBestellungen]);
+  }, [
+    fetchOrders,
+    fetchOffers,
+    fetchSuppliers,
+    fetchCategories,
+    fetchBestellungen,
+  ]);
 
   useEffect(() => {
     if (activeInvTab === "lieferschein") {
@@ -1460,7 +1502,14 @@ const InvoiceListPage: React.FC = () => {
       fetchOrders();
       fetchBestellungen();
     }
-  }, [activeInvTab, fetchBestellungen, fetchAllItems, fetchOrders, fetchRechnungen, fetchLieferscheine]);
+  }, [
+    activeInvTab,
+    fetchBestellungen,
+    fetchAllItems,
+    fetchOrders,
+    fetchRechnungen,
+    fetchLieferscheine,
+  ]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -1706,11 +1755,11 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev) =>
         prev
           ? {
-            ...prev,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1822,17 +1871,21 @@ const InvoiceListPage: React.FC = () => {
     } else if (activeInvTab === "lieferschein") {
       list = (lieferscheine || []).map((ls: any) => ({
         ...ls,
-        invoiceNumber: ls.invoiceNumber || ls.deliveryNoteNo || ls.order_no || ls.id,
+        invoiceNumber:
+          ls.invoiceNumber || ls.deliveryNoteNo || ls.order_no || ls.id,
         order_no: ls.orderNumber || ls.order_no || ls.invoiceNumber || ls.id,
         createdAt: ls.date || ls.createdAt || ls.created_at || ls.invoiceDate,
         customerSnapshot: {
-          companyName: ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
-          contactEmail: ls.customer?.email || ls.customer?.contactEmail || ls.email || "—",
+          companyName:
+            ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
+          contactEmail:
+            ls.customer?.email || ls.customer?.contactEmail || ls.email || "—",
           postalCode: ls.customer?.postalCode || ls.postalCode || "",
           city: ls.city || ls.customer?.city || "",
           country: ls.country || ls.customer?.country || "",
         },
-        customer_name: ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
+        customer_name:
+          ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
         items: ls.items || ls.lineItems || [],
         customItemCount: ls.itemCount ?? ls.items?.length ?? 0,
       }));
@@ -1841,8 +1894,12 @@ const InvoiceListPage: React.FC = () => {
     }
 
     list.sort((a: any, b: any) => {
-      const timeA = new Date(a.createdAt || a.created_at || a.invoiceDate || a.date_created || 0).getTime();
-      const timeB = new Date(b.createdAt || b.created_at || b.invoiceDate || b.date_created || 0).getTime();
+      const timeA = new Date(
+        a.createdAt || a.created_at || a.invoiceDate || a.date_created || 0,
+      ).getTime();
+      const timeB = new Date(
+        b.createdAt || b.created_at || b.invoiceDate || b.date_created || 0,
+      ).getTime();
       return timeB - timeA;
     });
 
@@ -1900,10 +1957,10 @@ const InvoiceListPage: React.FC = () => {
         const s = documentNo.toLowerCase().trim();
         const docNo = String(
           item.offerNumber ||
-          item.order_no ||
-          item.invoiceNumber ||
-          item.id ||
-          "",
+            item.order_no ||
+            item.invoiceNumber ||
+            item.id ||
+            "",
         ).toLowerCase();
         if (!docNo.includes(s)) return false;
       }
@@ -1912,11 +1969,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-          item.customer?.id ||
-          item.customer_id ||
-          item.customerSnapshot?.customerNumber ||
-          item.customerSnapshot?.id ||
-          "",
+            item.customer?.id ||
+            item.customer_id ||
+            item.customerSnapshot?.customerNumber ||
+            item.customerSnapshot?.id ||
+            "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1925,12 +1982,12 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-          item.customer_name ||
-          item.bill_to ||
-          item.ship_to ||
-          item.customerSnapshot?.companyName ||
-          item.customerSnapshot?.name ||
-          "",
+            item.customer_name ||
+            item.bill_to ||
+            item.ship_to ||
+            item.customerSnapshot?.companyName ||
+            item.customerSnapshot?.name ||
+            "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -1975,7 +2032,17 @@ const InvoiceListPage: React.FC = () => {
 
       return true;
     });
-  }, [activeInvTab, offers, orders, customerOrders, invoices, lieferscheine, bestellungen, searchTerm, docFilters]);
+  }, [
+    activeInvTab,
+    offers,
+    orders,
+    customerOrders,
+    invoices,
+    lieferscheine,
+    bestellungen,
+    searchTerm,
+    docFilters,
+  ]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -2046,7 +2113,10 @@ const InvoiceListPage: React.FC = () => {
             row.date_created ||
             row.invoiceDate ||
             row.deliveryDate;
-          if (typeof rawDate === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)) {
+          if (
+            typeof rawDate === "string" &&
+            /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)
+          ) {
             const [d, m] = rawDate.split(".");
             return `${d}.${m}.`;
           }
@@ -2078,7 +2148,7 @@ const InvoiceListPage: React.FC = () => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleGoToItems(String(row.order_no));
+                  handleOpenAuftragPreview(row.id);
                 }}
                 className="text-green-600 hover:underline font-semibold"
               >
@@ -2108,7 +2178,9 @@ const InvoiceListPage: React.FC = () => {
                 }}
                 className="text-green-600 hover:underline font-semibold"
               >
-                {row.invoiceNumber || row.order_no || String(row.id).slice(-5).toUpperCase()}
+                {row.invoiceNumber ||
+                  row.order_no ||
+                  String(row.id).slice(-5).toUpperCase()}
               </button>
             );
           } else {
@@ -2215,38 +2287,38 @@ const InvoiceListPage: React.FC = () => {
       },
       ...(activeInvTab !== "lieferschein"
         ? [
-          {
-            header: "Value_net",
-            width: "75px",
-            align: "right" as const,
-            render: (row: any) => {
-              let val = 0;
-              if (activeInvTab === "angebot") {
-                val = Number(
-                  row.totalAmount !== undefined && row.totalAmount !== null
-                    ? row.totalAmount
-                    : row.subtotal || 0,
-                );
-              } else if (
-                activeInvTab === "auftrag" ||
-                activeInvTab === "bestellung"
-              ) {
-                if (row.isCustomerOrder || row.subtotal !== undefined) {
-                  val = Number(row.subtotal ?? row.total_amount ?? 0);
-                } else {
-                  val = (row.items || []).reduce(
-                    (sum: number, it: any) =>
-                      sum + Number(it.price || 0) * Number(it.qty || 0),
-                    0,
+            {
+              header: "Value_net",
+              width: "75px",
+              align: "right" as const,
+              render: (row: any) => {
+                let val = 0;
+                if (activeInvTab === "angebot") {
+                  val = Number(
+                    row.totalAmount !== undefined && row.totalAmount !== null
+                      ? row.totalAmount
+                      : row.subtotal || 0,
                   );
+                } else if (
+                  activeInvTab === "auftrag" ||
+                  activeInvTab === "bestellung"
+                ) {
+                  if (row.isCustomerOrder || row.subtotal !== undefined) {
+                    val = Number(row.subtotal ?? row.total_amount ?? 0);
+                  } else {
+                    val = (row.items || []).reduce(
+                      (sum: number, it: any) =>
+                        sum + Number(it.price || 0) * Number(it.qty || 0),
+                      0,
+                    );
+                  }
+                } else {
+                  val = Number(row.netTotal || row.grossTotal || 0);
                 }
-              } else {
-                val = Number(row.netTotal || row.grossTotal || 0);
-              }
-              return `€${val.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                return `€${val.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              },
             },
-          },
-        ]
+          ]
         : []),
       {
         header: "Item_Count",
@@ -2267,52 +2339,52 @@ const InvoiceListPage: React.FC = () => {
       },
       ...(activeInvTab === "bestellung"
         ? [
-          {
-            header: "Status",
-            width: "130px",
-            align: "center" as const,
-            render: (row: any) => {
-              const currentStatus = row.status || "draft";
-              const getStatusStyle = (st: string) => {
-                switch (st) {
-                  case "draft":
-                    return "bg-gray-100 text-gray-800 border-gray-300";
-                  case "to be processed":
-                    return "bg-blue-50 text-blue-700 border-blue-300 font-bold";
-                  case "partially delivered":
-                    return "bg-amber-50 text-amber-700 border-amber-300 font-bold";
-                  case "delivered":
-                    return "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold";
-                  default:
-                    return "bg-gray-100 text-gray-700 border-gray-200";
-                }
-              };
-
-              return (
-                <select
-                  value={currentStatus}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) =>
-                    handleUpdateBestellungStatus(
-                      row.id,
-                      e.target.value as any,
-                    )
+            {
+              header: "Status",
+              width: "130px",
+              align: "center" as const,
+              render: (row: any) => {
+                const currentStatus = row.status || "draft";
+                const getStatusStyle = (st: string) => {
+                  switch (st) {
+                    case "draft":
+                      return "bg-gray-100 text-gray-800 border-gray-300";
+                    case "to be processed":
+                      return "bg-blue-50 text-blue-700 border-blue-300 font-bold";
+                    case "partially delivered":
+                      return "bg-amber-50 text-amber-700 border-amber-300 font-bold";
+                    case "delivered":
+                      return "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold";
+                    default:
+                      return "bg-gray-100 text-gray-700 border-gray-200";
                   }
-                  className={`text-[11px] px-2 py-1 rounded border shadow-sm cursor-pointer focus:ring-2 focus:ring-emerald-500 font-medium ${getStatusStyle(
-                    currentStatus,
-                  )}`}
-                >
-                  <option value="draft">draft</option>
-                  <option value="to be processed">to be processed</option>
-                  <option value="partially delivered">
-                    partially delivered
-                  </option>
-                  <option value="delivered">delivered</option>
-                </select>
-              );
+                };
+
+                return (
+                  <select
+                    value={currentStatus}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) =>
+                      handleUpdateBestellungStatus(
+                        row.id,
+                        e.target.value as any,
+                      )
+                    }
+                    className={`text-[11px] px-2 py-1 rounded border shadow-sm cursor-pointer focus:ring-2 focus:ring-emerald-500 font-medium ${getStatusStyle(
+                      currentStatus,
+                    )}`}
+                  >
+                    <option value="draft">draft</option>
+                    <option value="to be processed">to be processed</option>
+                    <option value="partially delivered">
+                      partially delivered
+                    </option>
+                    <option value="delivered">delivered</option>
+                  </select>
+                );
+              },
             },
-          },
-        ]
+          ]
         : []),
       {
         header: "Actions",
@@ -2336,10 +2408,23 @@ const InvoiceListPage: React.FC = () => {
           } else if (activeInvTab === "auftrag") {
             const rechnungCount = (invoices || []).filter(
               (inv: any) =>
-                (inv.orderNumber && String(inv.orderNumber).trim().toLowerCase() === String(row.order_no || "").trim().toLowerCase()) ||
-                (inv.order_number && String(inv.order_number).trim().toLowerCase() === String(row.order_no || "").trim().toLowerCase()) ||
-                (inv.auftrag_no && String(inv.auftrag_no).trim().toLowerCase() === String(row.order_no || "").trim().toLowerCase()) ||
-                (row.id && (inv.auftrag_id === row.id || inv.auftragId === row.id)),
+                (inv.orderNumber &&
+                  String(inv.orderNumber).trim().toLowerCase() ===
+                    String(row.order_no || "")
+                      .trim()
+                      .toLowerCase()) ||
+                (inv.order_number &&
+                  String(inv.order_number).trim().toLowerCase() ===
+                    String(row.order_no || "")
+                      .trim()
+                      .toLowerCase()) ||
+                (inv.auftrag_no &&
+                  String(inv.auftrag_no).trim().toLowerCase() ===
+                    String(row.order_no || "")
+                      .trim()
+                      .toLowerCase()) ||
+                (row.id &&
+                  (inv.auftrag_id === row.id || inv.auftragId === row.id)),
             ).length;
             const isConverted = rechnungCount > 0;
 
@@ -2369,10 +2454,11 @@ const InvoiceListPage: React.FC = () => {
                         ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
                         : "Generate Rechnung & Lieferschein"
                     }
-                    className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer ${isConverted
-                      ? "bg-gray-500 hover:bg-gray-600 text-white"
-                      : "bg-[#2F6B46] hover:bg-[#255638] text-white"
-                      }`}
+                    className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer ${
+                      isConverted
+                        ? "bg-gray-500 hover:bg-gray-600 text-white"
+                        : "bg-[#2F6B46] hover:bg-[#255638] text-white"
+                    }`}
                   >
                     <MoveRight className="w-3.5 h-3.5" />
                   </button>
@@ -2450,7 +2536,14 @@ const InvoiceListPage: React.FC = () => {
         },
       },
     ];
-  }, [activeInvTab, router, expandedDocIds, invoices, setSelectedRechnungForDetail, setSelectedLieferscheinForDetail]);
+  }, [
+    activeInvTab,
+    router,
+    expandedDocIds,
+    invoices,
+    setSelectedRechnungForDetail,
+    setSelectedLieferscheinForDetail,
+  ]);
 
   const totalAmount = filteredInvoices.reduce(
     (sum, inv) => sum + (Number(inv.grossTotal) || 0),
@@ -2553,10 +2646,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </button>
@@ -2805,6 +2899,10 @@ const InvoiceListPage: React.FC = () => {
             docFilters={docFilters}
             onOrderConverted={fetchOrders}
             refreshTrigger={offerRefreshKey}
+            onAuftragCreated={(auftragId: string | number) => {
+              setActiveInvTab("auftrag");
+              handleOpenAuftragPreview(auftragId);
+            }}
           />
         )}
 
@@ -2819,10 +2917,11 @@ const InvoiceListPage: React.FC = () => {
                     ? loadingOrders
                     : loading
                 }
-                emptyMessage={`No ${activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                  ? "Orders"
-                  : "Invoices"
-                  } Found`}
+                emptyMessage={`No ${
+                  activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                    ? "Orders"
+                    : "Invoices"
+                } Found`}
                 getRowClassName={(row) => {
                   if (
                     activeInvTab === "auftrag" ||
@@ -2851,10 +2950,10 @@ const InvoiceListPage: React.FC = () => {
                       title={`Line Items (${items.length}) — ${isOrder ? `Order No: ${docNumber}` : `Invoice: ${docNumber}`}`}
                       totalAmount={Number(
                         row.subtotal ||
-                        row.netTotal ||
-                        row.grossTotal ||
-                        row.totalAmount ||
-                        0,
+                          row.netTotal ||
+                          row.grossTotal ||
+                          row.totalAmount ||
+                          0,
                       )}
                       type={isOrder ? "order" : "invoice"}
                       getSupplierName={getSupplierName}
@@ -2863,10 +2962,9 @@ const InvoiceListPage: React.FC = () => {
                   );
                 }}
                 onRowClick={(row) => {
-                  if (
-                    activeInvTab === "auftrag" ||
-                    activeInvTab === "bestellung"
-                  ) {
+                  if (activeInvTab === "auftrag") {
+                    handleOpenAuftragPreview(row.id);
+                  } else if (activeInvTab === "bestellung") {
                     handleViewOrder(row);
                   } else if (activeInvTab === "rechnung") {
                     setSelectedRechnungForDetail(row);
@@ -2901,10 +2999,11 @@ const InvoiceListPage: React.FC = () => {
                       <button
                         key={i + 1}
                         onClick={() => setCurrentPage(i + 1)}
-                        className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                          }`}
+                        className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                          currentPage === i + 1
+                            ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                            : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                        }`}
                       >
                         {i + 1}
                       </button>
@@ -3093,7 +3192,7 @@ const InvoiceListPage: React.FC = () => {
                               selectedInvoice.id,
                               selectedInvoice.invoiceNumber,
                               selectedInvoice.cargo?.cargo_no ||
-                              selectedInvoice.cargoNo,
+                                selectedInvoice.cargoNo,
                             );
                           } catch (error) {
                             console.error("PDF Generation failed", error);
@@ -3270,19 +3369,21 @@ const InvoiceListPage: React.FC = () => {
                   <div className="flex border-b border-gray-200">
                     <button
                       onClick={() => setModalActiveTab("taric")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "taric"
-                        ? "border-[#8CC21B] text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "taric"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                     >
                       Taric Summary
                     </button>
                     <button
                       onClick={() => setModalActiveTab("items")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "items"
-                        ? "border-[#8CC21B] text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "items"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
                     >
                       Items List
                     </button>
@@ -3313,227 +3414,227 @@ const InvoiceListPage: React.FC = () => {
                           columns={
                             activeInvTab === "rk"
                               ? [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => it.taricNameEn,
-                                  width: "250px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 600,
-                                          }
-                                          : undefined
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate
-                                      ? `${Number(it.dutyRate).toFixed(2)}`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => it.totalQty,
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => it.unitPrice || "0.00",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    (
-                                      Number(it.totalPrice) || 0
-                                    ).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    }),
-                                  width: "100px",
-                                },
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "250px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 600,
+                                              }
+                                            : undefined
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate
+                                        ? `${Number(it.dutyRate).toFixed(2)}`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                      }),
+                                    width: "100px",
+                                  },
+                                ]
                               : [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => it.taricNameEn,
-                                  width: "250px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 600,
-                                          }
-                                          : undefined
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate
-                                      ? `${Number(it.dutyRate).toFixed(2)}`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => it.totalQty,
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => it.unitPrice || "0.00",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    (
-                                      Number(it.totalPrice) || 0
-                                    ).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    }),
-                                  width: "100px",
-                                },
-                                {
-                                  header: "Operation",
-                                  render: (group: any) => (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTaricGroup(group);
-                                        setSelectedTaricCode("");
-                                        setShowTaricModal(true);
-                                      }}
-                                      className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
-                                    >
-                                      <RefreshCw className="w-3 h-3" /> Set
-                                      taric
-                                    </button>
-                                  ),
-                                  width: "110px",
-                                },
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "250px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 600,
+                                              }
+                                            : undefined
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate
+                                        ? `${Number(it.dutyRate).toFixed(2)}`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                      }),
+                                    width: "100px",
+                                  },
+                                  {
+                                    header: "Operation",
+                                    render: (group: any) => (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedTaricGroup(group);
+                                          setSelectedTaricCode("");
+                                          setShowTaricModal(true);
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
+                                      >
+                                        <RefreshCw className="w-3 h-3" /> Set
+                                        taric
+                                      </button>
+                                    ),
+                                    width: "110px",
+                                  },
+                                ]
                           }
                           expandedRowId={null}
                           totalCols={
                             activeInvTab === "rk"
                               ? [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "80px",
-                                },
-                                {
-                                  value: (
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                  }),
-                                  width: "100px",
-                                  align: "left",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "80px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    }),
+                                    width: "100px",
+                                    align: "left",
+                                  },
+                                ]
                               : [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "80px",
-                                },
-                                {
-                                  value: (
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                  }),
-                                  width: "100px",
-                                  align: "left",
-                                },
-                                {
-                                  value: "",
-                                  width: "110px",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "80px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    }),
+                                    width: "100px",
+                                    align: "left",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "110px",
+                                  },
+                                ]
                           }
                         />
                       </div>
@@ -3547,257 +3648,257 @@ const InvoiceListPage: React.FC = () => {
                         columns={
                           activeInvTab === "rk"
                             ? [
-                              {
-                                header: "#",
-                                render: (_: any, idx: number) => idx + 1,
-                                width: "40px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-2 leading-tight py-1"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "350px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) =>
-                                  it.set_taric_code ||
-                                  it.item?.taric?.code ||
-                                  "-",
-                                width: "100px",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <span className="font-bold">{it.qty}</span>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  it.eur_special_price ||
-                                  it._fallbackEk ||
-                                  "0",
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      {totalPrice.toFixed(2)}
-                                    </span>
-                                  );
+                                {
+                                  header: "#",
+                                  render: (_: any, idx: number) => idx + 1,
+                                  width: "40px",
                                 },
-                                width: "80px",
-                                align: "center",
-                              },
-                            ]
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-2 leading-tight py-1"
+                                      title={it.item?.item_name}
+                                    >
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "350px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) =>
+                                    it.set_taric_code ||
+                                    it.item?.taric?.code ||
+                                    "-",
+                                  width: "100px",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <span className="font-bold">{it.qty}</span>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    it.eur_special_price ||
+                                    it._fallbackEk ||
+                                    "0",
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        {totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "80px",
+                                  align: "center",
+                                },
+                              ]
                             : [
-                              {
-                                header: "ID",
-                                render: (it: any) => (
-                                  <div className="flex flex-col gap-1.5 p-1">
-                                    <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
-                                      <FileText className="w-3 h-3" /> {it.id}
+                                {
+                                  header: "ID",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col gap-1.5 p-1">
+                                      <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
+                                        <FileText className="w-3 h-3" /> {it.id}
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setNewQty(it.qty_label || it.qty);
+                                            setQtyRemarks(it.remarks_cn || "");
+                                            setShowQTYModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
+                                        >
+                                          <Package className="w-2.5 h-2.5" />{" "}
+                                          QtyLabel
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setSplitQty(
+                                              Math.floor(it.qty * 0.5),
+                                            );
+                                            setTargetCargoId("");
+                                            setSplitRemarks(
+                                              it.remarks_cn || "",
+                                            );
+                                            setShowSPModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
+                                        >
+                                          <Scissors className="w-2.5 h-2.5" />{" "}
+                                          Split
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setTargetCargoId(it.cargo_id || "");
+                                            setShowREModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
+                                        >
+                                          <RefreshCw className="w-2.5 h-2.5" />{" "}
+                                          ReAssign
+                                        </button>
+                                      </div>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setNewQty(it.qty_label || it.qty);
-                                          setQtyRemarks(it.remarks_cn || "");
-                                          setShowQTYModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
-                                      >
-                                        <Package className="w-2.5 h-2.5" />{" "}
-                                        QtyLabel
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setSplitQty(
-                                            Math.floor(it.qty * 0.5),
-                                          );
-                                          setTargetCargoId("");
-                                          setSplitRemarks(
-                                            it.remarks_cn || "",
-                                          );
-                                          setShowSPModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
-                                      >
-                                        <Scissors className="w-2.5 h-2.5" />{" "}
-                                        Split
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedItem(it);
-                                          setTargetCargoId(it.cargo_id || "");
-                                          setShowREModal(true);
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
-                                      >
-                                        <RefreshCw className="w-2.5 h-2.5" />{" "}
-                                        ReAssign
-                                      </button>
-                                    </div>
-                                  </div>
-                                ),
-                                width: "100px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-3 leading-tight break-words"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "250px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) =>
-                                  it.set_taric_code || it.item?.taric?.code,
-                                width: "90px",
-                              },
-                              {
-                                header: "Remark",
-                                render: (it: any) =>
-                                  `// ${it.remark_de || ""}`,
-                                width: "80px",
-                              },
-                              {
-                                header: "Order_no",
-                                render: (it: any) =>
-                                  it.order?.order_no || "-",
-                                width: "80px",
-                              },
-                              {
-                                header: "SOID",
-                                render: (it: any) =>
-                                  it.supplier_order_id || "-",
-                                width: "50px",
-                              },
-                              {
-                                header: "Status",
-                                render: (it: any) => it.status,
-                                width: "60px",
-                              },
-                              {
-                                header: "V(dm³)",
-                                render: (it: any) => it.v?.toFixed(2),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "W(kg)",
-                                render: (it: any) => it.w?.toFixed(2),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <div className="flex flex-col items-center">
-                                    <span className="font-bold">
-                                      {it.qty_label
-                                        ? `${it.qty_label}/${it.qty}`
-                                        : it.qty}
-                                    </span>
-                                  </div>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  it.eur_special_price ||
-                                  it._fallbackEk ||
-                                  "0",
-                                width: "45px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      {totalPrice.toFixed(2)}
-                                    </span>
-                                  );
+                                  ),
+                                  width: "100px",
                                 },
-                                width: "65px",
-                                align: "center",
-                              },
-                              {
-                                header: "Action",
-                                render: (it: any) =>
-                                  it.item?.is_eur_special === "Y" &&
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-3 leading-tight break-words"
+                                      title={it.item?.item_name}
+                                    >
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "250px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) =>
+                                    it.set_taric_code || it.item?.taric?.code,
+                                  width: "90px",
+                                },
+                                {
+                                  header: "Remark",
+                                  render: (it: any) =>
+                                    `// ${it.remark_de || ""}`,
+                                  width: "80px",
+                                },
+                                {
+                                  header: "Order_no",
+                                  render: (it: any) =>
+                                    it.order?.order_no || "-",
+                                  width: "80px",
+                                },
+                                {
+                                  header: "SOID",
+                                  render: (it: any) =>
+                                    it.supplier_order_id || "-",
+                                  width: "50px",
+                                },
+                                {
+                                  header: "Status",
+                                  render: (it: any) => it.status,
+                                  width: "60px",
+                                },
+                                {
+                                  header: "V(dm³)",
+                                  render: (it: any) => it.v?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "W(kg)",
+                                  render: (it: any) => it.w?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col items-center">
+                                      <span className="font-bold">
+                                        {it.qty_label
+                                          ? `${it.qty_label}/${it.qty}`
+                                          : it.qty}
+                                      </span>
+                                    </div>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    it.eur_special_price ||
+                                    it._fallbackEk ||
+                                    "0",
+                                  width: "45px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        {totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "65px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "Action",
+                                  render: (it: any) =>
+                                    it.item?.is_eur_special === "Y" &&
                                     (!it.eur_special_price ||
                                       Number(it.eur_special_price) === 0) ? (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setExpandedPriceItemId(
-                                          expandedPriceItemId === it.id
-                                            ? null
-                                            : it.id,
-                                        );
-                                        setEditingPrice(
-                                          it.eur_special_price || 0,
-                                        );
-                                      }}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
-                                    >
-                                      <DollarSign className="w-3.5 h-3.5" />{" "}
-                                      SET EUR PRICE
-                                    </button>
-                                  ) : null,
-                                width: "120px",
-                              },
-                            ]
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedPriceItemId(
+                                            expandedPriceItemId === it.id
+                                              ? null
+                                              : it.id,
+                                          );
+                                          setEditingPrice(
+                                            it.eur_special_price || 0,
+                                          );
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
+                                      >
+                                        <DollarSign className="w-3.5 h-3.5" />{" "}
+                                        SET EUR PRICE
+                                      </button>
+                                    ) : null,
+                                  width: "120px",
+                                },
+                              ]
                         }
                         expandedRowId={expandedPriceItemId}
                         renderRowDetails={(it: any) => (
@@ -4207,6 +4308,7 @@ const InvoiceListPage: React.FC = () => {
                         {cat.name}
                       </option>
                     ))}
+                    `
                   </select>
                 </div>
                 <div className="flex-1">
@@ -4248,7 +4350,7 @@ const InvoiceListPage: React.FC = () => {
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, comment: e.target.value }))
                   }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
+                  className="w-full` px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
                   placeholder="Enter order comment..."
                   rows={3}
                 />
@@ -4378,7 +4480,20 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
-
+        {showAuftragPreviewModal && (
+          <AuftragPreviewModal
+            isOpen={showAuftragPreviewModal}
+            orderId={selectedAuftragId}
+            onClose={() => {
+              setShowAuftragPreviewModal(false);
+              setSelectedAuftragId(null);
+            }}
+            onChanged={() => {
+              fetchOrders();
+            }}
+            userRole={user?.role}
+          />
+        )}
         {showAuftragToRechnungModal && (
           <AuftragToRechnungModal
             isOpen={showAuftragToRechnungModal}
