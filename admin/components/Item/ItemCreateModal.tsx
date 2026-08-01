@@ -213,6 +213,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           width: itemFormData.width || undefined,
           height: itemFormData.height || undefined,
           remark: itemFormData.remark,
+          remark_ex: itemFormData.remark_ex,
           model: itemFormData.model,
           RMB_Price: Number(itemFormData.price) || 0,
           price_rmb: Number(itemFormData.price) || 0,

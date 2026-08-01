@@ -327,6 +327,7 @@ export const createItem = async (itemData: {
   width?: number;
   height?: number;
   remark?: string;
+  remark_ex?: string;
   model?: string;
   supplier_id?: number;
   RMB_Price?: number;
@@ -351,7 +352,6 @@ export const createItem = async (itemData: {
     toast.loading("Creating item...", loadingStyles);
     const response = await api.post("/items", itemData);
     toast.dismiss();
-    toast.success("Item created successfully", successStyles);
     return response;
   } catch (error) {
     handleApiError(error, "Failed to create item");
@@ -377,7 +377,6 @@ export const deleteItem = async (id: number) => {
     toast.loading("Deleting item...", loadingStyles);
     const response = await api.delete(`/items/${id}`);
     toast.dismiss();
-    toast.success("Item deleted successfully", successStyles);
     return response;
   } catch (error) {
     handleApiError(error, "Failed to delete item");
