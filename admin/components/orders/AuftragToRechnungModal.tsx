@@ -183,7 +183,7 @@ export default function AuftragToRechnungModal({
           photo: it.photo || it.item?.photo || it.image,
           artNr: it.articleNumber || it.item?.articleNumber || it.ean || it.item?.ean || "—",
           itemName: it.itemName || it.item_name || it.item?.item_name || "Line Item",
-          hinweis: it.notes || it.remark_de || it.description || "—",
+          hinweis: it.notes || it.item?.remark_ex || it.remark_de || it.description || "—",
           mwst: Number(it.taxRate || data.tax_rate || 19),
           max_qty: origQty,
           qty: origQty,
@@ -693,7 +693,7 @@ export default function AuftragToRechnungModal({
                       Bezeichnung
                     </th>
                     <th className="px-2 py-2 text-left font-semibold w-36">
-                      Hinweis
+                      RemarkEx
                     </th>
                     <th className="px-2 py-2 text-center font-semibold w-16">
                       MwSt.

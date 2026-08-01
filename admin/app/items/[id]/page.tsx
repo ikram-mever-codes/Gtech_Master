@@ -985,6 +985,7 @@ const ItemDetailsPage = () => {
         ean: finalEan.toString(),
         model: updatedData.model,
         remark: updatedData.remark,
+        remark_ex: updatedData.remark_ex,
         cat_id: toInt(updatedData.category_id),
         isActive: updatedData.isActive ? "Y" : "N",
         weight: toNum(updatedData.dimensions?.weight),

@@ -27,6 +27,7 @@ export interface Item {
   sales_price?: number | null;
   height: number | null;
   remark: string | null;
+  remark_ex?: string | null;
   model: string | null;
   supplier_id: number | null;
   supplier_name: string | null;

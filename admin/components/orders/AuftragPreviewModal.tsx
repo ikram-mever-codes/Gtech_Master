@@ -557,6 +557,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         itemNo: it.model || undefined,
         price: 0,
         weight: it.weight,
+        notes: it.remark_ex || it.remark || undefined,
         sourceItemId: String(it.id),
       });
       setShowItemPicker(false);
@@ -977,7 +978,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       Bezeichnung
                     </th>
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
-                      Hinweis
+                      RemarkEx
                     </th>
                     <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
                       MwSt.

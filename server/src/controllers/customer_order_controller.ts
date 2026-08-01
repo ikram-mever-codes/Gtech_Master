@@ -200,9 +200,9 @@ export const createAuftragFromOffer = async (
         warehouseItems = await warehouseRepository.find({
           where: itemIdDEs.length
             ? [
-                { ItemID_DE: In(itemIdDEs) },
-                { item_id: In(sourceItems.map((it: any) => it.id)) },
-              ]
+              { ItemID_DE: In(itemIdDEs) },
+              { item_id: In(sourceItems.map((it: any) => it.id)) },
+            ]
             : { item_id: In(sourceItems.map((it: any) => it.id)) },
         });
       } catch (e: any) {
@@ -665,6 +665,7 @@ export const createAuftragFromItems = async (
         photo: matchedItem?.photo || matchedItem?.pix_path || undefined,
         specification: matchedItem?.remark || undefined,
         description: selItem.notes || matchedItem?.remark || undefined,
+        notes: matchedItem?.remark_ex || undefined,
         weight: matchedItem?.weight || undefined,
         quantity: qty,
         price: price,

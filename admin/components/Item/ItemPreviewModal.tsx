@@ -324,6 +324,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             pixPath: raw.pix_path || "",
           },
           attachments: raw.attachments || [],
+          remark_ex: raw.remark_ex || "",
           // NEW: Stock and MSQ fields
           is_stock_item: raw.is_stock_item || "N",
           stockEU: raw.stockEU || 0,
@@ -439,10 +440,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
         const payload = {
           item_name: previewItem.name ?? previewItem.item_name,
           item_name_cn: previewItem.nameCN ?? previewItem.item_name_cn,
-          item_name_de: previewItem.item_name_de || "", // NEW
+          item_name_de: previewItem.item_name_de || "",
           ean: (previewItem.ean || "").toString(),
           model: previewItem.model,
           remark: previewItem.remark,
+          remark_ex: previewItem.remark_ex,
           cat_id: previewItem.category_id
             ? parseInt(previewItem.category_id)
             : null,
@@ -924,8 +926,20 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
               </div>
 
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <Field label="Remark (EN/DE)">
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                <Field label="RemarkEx">
+                  {previewEdit ? (
+                    <textarea
+                      rows={2}
+                      className={inputCls}
+                      value={previewItem.remark_ex ?? ""}
+                      onChange={(e) => patchPreview({ remark_ex: e.target.value })}
+                    />
+                  ) : (
+                    previewItem.remark_ex || "—"
+                  )}
+                </Field>
+                <Field label="Remark EN/DE">
                   {previewEdit ? (
                     <textarea
                       rows={2}

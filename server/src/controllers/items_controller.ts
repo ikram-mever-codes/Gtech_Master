@@ -385,6 +385,7 @@ export const getItems = async (
         "item.width",
         "item.height",
         "item.remark",
+        "item.remark_ex",
         "item.model",
         "item.is_rmb_special",
         "item.is_eur_special",
@@ -396,7 +397,6 @@ export const getItems = async (
         "item.created_at",
         "item.updated_at",
         "item.tagOrder",
-        // NEW fields
         "item.is_stock_item",
         "item.stockEU",
         "item.MSQ_EU",
@@ -489,6 +489,7 @@ export const getItems = async (
         width: item.width,
         height: item.height,
         remark: item.remark,
+        remark_ex: item.remark_ex,
         model: item.model,
         is_rmb_special: item.is_rmb_special,
         is_eur_special: item.is_eur_special,
@@ -501,7 +502,6 @@ export const getItems = async (
         updated_at: item.updated_at,
         tags: item.tags || [],
         tagOrder: item.tagOrder,
-        // NEW fields
         is_stock_item: item.is_stock_item || "N",
         stockEU: item.stockEU || 0,
         MSQ_EU: item.MSQ_EU || 0,
@@ -685,7 +685,6 @@ export const getItemById = async (
       is_new: item.is_new || "N",
       itemNo: `${item.id} / ${de_no}`,
       item_name: item.item_name || "",
-      // FIX: Use item.item_name_de from items table
       item_name_de: item.item_name_de || "",
       is_active: primaryWarehouseItem
         ? primaryWarehouseItem.is_active
@@ -698,6 +697,7 @@ export const getItemById = async (
       category_id: item.cat_id,
       model: item.model || "",
       remark: item.remark || "",
+      remark_ex: item.remark_ex || "",
       supplier_id: item.supplier_id,
       supplier_name: item.supplier?.company_name || item.supplier?.name || "",
       customer_id: item.customer_id || null,
@@ -850,29 +850,29 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-              id: defaultSi.id,
-              supplierId: defaultSi.supplier_id,
-              supplierName:
-                defaultSi.supplier?.company_name ||
-                defaultSi.supplier?.name ||
-                "Unknown",
-              priceRMB: defaultSi.price_rmb?.toString() || "0",
-              isPO: defaultSi.is_po || "No",
-              moq: defaultSi.moq?.toString() || "0",
-              interval: defaultSi.oi?.toString() || "0",
-              leadTime: defaultSi.lead_time || "",
-              noteCN: defaultSi.note_cn || "",
-              url: defaultSi.url || "",
-            }
+            id: defaultSi.id,
+            supplierId: defaultSi.supplier_id,
+            supplierName:
+              defaultSi.supplier?.company_name ||
+              defaultSi.supplier?.name ||
+              "Unknown",
+            priceRMB: defaultSi.price_rmb?.toString() || "0",
+            isPO: defaultSi.is_po || "No",
+            moq: defaultSi.moq?.toString() || "0",
+            interval: defaultSi.oi?.toString() || "0",
+            leadTime: defaultSi.lead_time || "",
+            noteCN: defaultSi.note_cn || "",
+            url: defaultSi.url || "",
+          }
           : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            };
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -918,6 +918,7 @@ export const createItem = async (
       height,
       supplier_id,
       remark,
+      remark_ex,
       model,
       RMB_Price,
       price,
@@ -1042,6 +1043,7 @@ export const createItem = async (
       width: width ? parseFloat(width) : null,
       height: height ? parseFloat(height) : null,
       remark,
+      remark_ex,
       model,
       RMB_Price: finalRMB,
       price: finalPrice,
@@ -1229,6 +1231,7 @@ export const updateItem = async (
       "width",
       "height",
       "remark",
+      "remark_ex",
       "remark_cn",
       "model",
       "isActive",
@@ -2056,9 +2059,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2134,17 +2137,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3702,23 +3705,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         let warehouseData: any = null;
@@ -3945,8 +3948,8 @@ export const exportNewItemsToCSV = async (
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
           warehouseData?.item_no_de ||
-            item.ItemID_DE?.toString() ||
-            item.id.toString(),
+          item.ItemID_DE?.toString() ||
+          item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",

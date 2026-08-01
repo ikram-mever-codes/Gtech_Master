@@ -70,7 +70,7 @@ export class Item {
   item_name_cn?: string;
 
   @Column({ type: "text", nullable: true })
-  item_name_de?: string; // NEW: ItemNameDE
+  item_name_de?: string;
 
   @Column({ type: "decimal", precision: 10, scale: 0, nullable: true })
   FOQ?: number;
@@ -89,6 +89,9 @@ export class Item {
 
   @Column({ type: "text", nullable: true })
   remark?: string;
+
+  @Column({ type: "text", nullable: true })
+  remark_ex?: string;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   price?: number;

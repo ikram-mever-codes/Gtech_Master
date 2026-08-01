@@ -51,7 +51,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
   const [itemFormData, setItemFormData] = useState<any>({
     item_name: "",
     item_name_cn: "",
-    item_name_de: "", // NEW: Item Name DE
+    item_name_de: "",
     ean: "",
     price_rmb: 0,
     parent_id: 0,
@@ -63,10 +63,9 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
     width: 0,
     height: 0,
     remark: "",
+    remark_ex: "",
     model: "",
     price: 0,
-    // NEW — plain, manually-set sales price, independent from the RMB-driven
-    // `price` field above. Never derived/recalculated, just stored as given.
     sales_price: "",
     currency: isRequest ? "EUR" : "CNY",
     isActive: true,
@@ -77,7 +76,6 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
     interval: "Monatlich",
     priority: "Normal",
     requestStatus: "Open",
-    // NEW: Stock and MSQ fields
     is_stock_item: "N",
     stockEU: 0,
     MSQ_EU: 0,
@@ -204,7 +202,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
         result = await createItem({
           item_name: itemFormData.item_name,
           item_name_cn: itemFormData.item_name_cn,
-          item_name_de: itemFormData.item_name_de, // NEW
+          item_name_de: itemFormData.item_name_de,
           ean: itemFormData.ean,
           parent_id: itemFormData.parent_id,
           taric_id: itemFormData.taric_id || undefined,
@@ -224,8 +222,8 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
 
           sales_price:
             itemFormData.sales_price === "" ||
-            itemFormData.sales_price === undefined ||
-            itemFormData.sales_price === null
+              itemFormData.sales_price === undefined ||
+              itemFormData.sales_price === null
               ? null
               : Math.round(parseFloat(itemFormData.sales_price) * 100) / 100,
           currency: itemFormData.currency || "CNY",
@@ -393,14 +391,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.parent_id
                       ? {
-                          value: itemFormData.parent_id,
-                          label: (() => {
-                            const p = refParents?.find(
-                              (x) => x.id === itemFormData.parent_id,
-                            );
-                            return p ? `${p.name_de} (${p.de_no})` : "Unknown";
-                          })(),
-                        }
+                        value: itemFormData.parent_id,
+                        label: (() => {
+                          const p = refParents?.find(
+                            (x) => x.id === itemFormData.parent_id,
+                          );
+                          return p ? `${p.name_de} (${p.de_no})` : "Unknown";
+                        })(),
+                      }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -429,14 +427,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.taric_id
                       ? {
-                          value: itemFormData.taric_id,
-                          label: (() => {
-                            const t = refTarics?.find(
-                              (x) => x.id === itemFormData.taric_id,
-                            );
-                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                          })(),
-                        }
+                        value: itemFormData.taric_id,
+                        label: (() => {
+                          const t = refTarics?.find(
+                            (x) => x.id === itemFormData.taric_id,
+                          );
+                          return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                        })(),
+                      }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -465,12 +463,12 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.cat_id
                       ? {
-                          value: itemFormData.cat_id,
-                          label:
-                            categories?.find(
-                              (x) => x.id === itemFormData.cat_id,
-                            )?.name || "Unknown",
-                        }
+                        value: itemFormData.cat_id,
+                        label:
+                          categories?.find(
+                            (x) => x.id === itemFormData.cat_id,
+                          )?.name || "Unknown",
+                      }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -499,14 +497,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.supplier_id
                       ? {
-                          value: itemFormData.supplier_id,
-                          label: (() => {
-                            const s = refSuppliers?.find(
-                              (x) => x.id === itemFormData.supplier_id,
-                            );
-                            return s ? getSupplierLabel(s) : "Unknown";
-                          })(),
-                        }
+                        value: itemFormData.supplier_id,
+                        label: (() => {
+                          const s = refSuppliers?.find(
+                            (x) => x.id === itemFormData.supplier_id,
+                          );
+                          return s ? getSupplierLabel(s) : "Unknown";
+                        })(),
+                      }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -807,20 +805,38 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                 </>
               )}
 
-              <div className="md:col-span-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  RemarkEx
+                </label>
+                <textarea
+                  value={itemFormData.remark_ex || ""}
+                  onChange={(e) =>
+                    setItemFormData({
+                      ...itemFormData,
+                      remark_ex: e.target.value,
+                    })
+                  }
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  placeholder="Extra item info / Hinweis"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Remarks
                 </label>
                 <textarea
-                  value={itemFormData.remark}
+                  value={itemFormData.remark || ""}
                   onChange={(e) =>
                     setItemFormData({
                       ...itemFormData,
                       remark: e.target.value,
                     })
                   }
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  placeholder="Enter remark"
                 />
               </div>
               <div>

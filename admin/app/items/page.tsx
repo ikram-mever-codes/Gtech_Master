@@ -2135,7 +2135,6 @@ const ItemsManagementPage: React.FC = () => {
           onSuccess={() => {
             setShowAuftragCreateModal(false);
             setSelectedGreenItem(null);
-            toast.success("Auftrag created successfully!", successStyles);
           }}
         />
       )}
