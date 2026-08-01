@@ -172,6 +172,7 @@ export const getItems = async (
     const supplier = ((req.query.supplier as string) || "").trim();
     const company = ((req.query.company as string) || "").trim();
     const isLabel = ((req.query.isLabel as string) || "").trim();
+    const isStock = ((req.query.isStock as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
 
     const tagIds = tagStr
@@ -279,6 +280,34 @@ export const getItems = async (
         "(item.isLabelPrint IS NULL OR item.isLabelPrint IN (:...labelFalse))",
         { labelFalse: [0, "0", "N", false] },
       );
+    }
+
+    if (isStock === "Y") {
+      idQb.andWhere((qb2) => {
+        const whSub = qb2
+          .subQuery()
+          .select("wi_stock.id")
+          .from(WarehouseItem, "wi_stock")
+          .where(
+            "(wi_stock.item_id = item.id OR wi_stock.ItemID_DE = item.ItemID_DE)",
+          )
+          .andWhere("wi_stock.stock_qty > 0")
+          .getQuery();
+        return `(item.stockEU > 0 OR item.stockCN > 0 OR item.is_stock_item = 'Y' OR EXISTS ${whSub})`;
+      });
+    } else if (isStock === "N") {
+      idQb.andWhere((qb2) => {
+        const whSub = qb2
+          .subQuery()
+          .select("wi_stock.id")
+          .from(WarehouseItem, "wi_stock")
+          .where(
+            "(wi_stock.item_id = item.id OR wi_stock.ItemID_DE = item.ItemID_DE)",
+          )
+          .andWhere("wi_stock.stock_qty > 0")
+          .getQuery();
+        return `((item.stockEU IS NULL OR item.stockEU <= 0) AND (item.stockCN IS NULL OR item.stockCN <= 0) AND (item.is_stock_item IS NULL OR item.is_stock_item IN ('N', '0', '')) AND NOT EXISTS ${whSub})`;
+      });
     }
 
     incTags.forEach((tid, i) => {

@@ -262,6 +262,7 @@ export const getItems = async (
     tags?: string;
     filter?: string;
     isLabel?: string;
+    isStock?: string;
     company?: string;
   },
   options?: { refresh?: boolean },
