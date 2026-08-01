@@ -39,6 +39,11 @@ export const SETTINGS_TABS = [
     label: "Countries",
     href: "/countries",
   },
+  {
+    id: "gtech-companies",
+    label: "GTech Companies",
+    href: "/gtech-companies",
+  },
 ];
 
 export default function SettingsTabs() {
