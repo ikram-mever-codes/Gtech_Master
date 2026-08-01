@@ -18,11 +18,11 @@ const CustomModal: React.FC<CustomModalProps> = ({
     return (
         <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 ${zIndex}`}>
             <div
-                className={`bg-white rounded-2xl shadow-2xl w-full ${width} transform transition-all duration-300 scale-100 border border-gray-100 overflow-hidden`}
+                className={`bg-white rounded-2xl shadow-2xl w-full ${width} transform transition-all duration-300 scale-100 border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {showHeader && (
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0 sticky top-0 z-10">
                         <h3 className="text-lg font-bold text-gray-900 tracking-tight">
                             {title}
                         </h3>
@@ -35,12 +35,12 @@ const CustomModal: React.FC<CustomModalProps> = ({
                     </div>
                 )}
 
-                <div className={`${noPadding ? "" : "px-6 py-6"} max-h-[80vh] overflow-y-auto`}>
+                <div className={`flex-1 overflow-y-auto ${noPadding ? "" : "px-6 py-6"}`}>
                     {children}
                 </div>
 
                 {footer && (
-                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end items-center gap-3">
+                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end items-center gap-3 shrink-0 sticky bottom-0 z-10">
                         {footer}
                     </div>
                 )}

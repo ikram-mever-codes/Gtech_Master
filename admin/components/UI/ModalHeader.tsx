@@ -25,7 +25,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
   extraHeaderElements,
 }) => {
   return (
-    <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
+    <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0 select-none sticky top-0 z-20 shadow-xs">
       <div className="flex items-center gap-3 min-w-0">
         {Icon && (
           <div className="w-10 h-10 rounded-xl bg-[#8CC21B]/10 flex items-center justify-center flex-shrink-0">

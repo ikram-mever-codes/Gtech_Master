@@ -30,7 +30,7 @@ export const ModalFooter: React.FC<ModalFooterProps> = ({
   const cancelLabel = isEditMode && !isEditEnabled ? "Close" : "Cancel";
 
   return (
-    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0 select-none w-full">
+    <div className="px-6 py-4 border-t border-gray-200 bg-white flex items-center justify-between flex-shrink-0 select-none w-full sticky bottom-0 z-20 shadow-xs">
       <div>
         {showDeleteBtn && (
           <button

@@ -151,10 +151,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-        item?.pix_path_eBay ||
-        item?.pictures?.shopPicture ||
-        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-        null,
+      item?.pix_path_eBay ||
+      item?.pictures?.shopPicture ||
+      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+      null,
     );
 
   const getCompany = (item: any) =>
@@ -210,10 +210,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           parent_id: raw.parent_id || null,
           parent: raw.parent
             ? {
-                ...raw.parent,
-                de_no: raw.parent.de_no,
-                name_de: raw.parent.name_de,
-              }
+              ...raw.parent,
+              de_no: raw.parent.de_no,
+              name_de: raw.parent.name_de,
+            }
             : null,
           item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
@@ -291,23 +291,23 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             raw.supplierItem ||
             (def
               ? {
-                  priceRMB: def.priceRMB || "0",
-                  isPO: def.isPO || "No",
-                  moq: def.moq || "0",
-                  interval: def.interval || "0",
-                  leadTime: def.leadTime || "",
-                  noteCN: def.noteCN || "",
-                  url: def.url || "",
-                }
+                priceRMB: def.priceRMB || "0",
+                isPO: def.isPO || "No",
+                moq: def.moq || "0",
+                interval: def.interval || "0",
+                leadTime: def.leadTime || "",
+                noteCN: def.noteCN || "",
+                url: def.url || "",
+              }
               : {
-                  priceRMB: "0",
-                  isPO: "No",
-                  moq: "0",
-                  interval: "0",
-                  leadTime: "",
-                  noteCN: "",
-                  url: "",
-                }),
+                priceRMB: "0",
+                isPO: "No",
+                moq: "0",
+                interval: "0",
+                leadTime: "",
+                noteCN: "",
+                url: "",
+              }),
           parent: raw.parent
             ? { ...raw.parent, isActive: toBool(raw.parent?.isActive) }
             : null,
@@ -468,7 +468,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           supplierItems: previewItem.supplierItems,
           sales_price:
             previewItem.sales_price === "" ||
-            previewItem.sales_price === undefined
+              previewItem.sales_price === undefined
               ? null
               : Math.round(parseFloat(previewItem.sales_price) * 100) / 100,
           supplierItem: {
@@ -721,7 +721,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           </div>
         ) : (
           <>
-            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
+            <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0 select-none sticky top-0 z-20 shadow-xs">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
                   {getThumb(previewItem) ? (
@@ -777,10 +777,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     setPreviewItem((p: any) =>
                       p
                         ? {
-                            ...p,
-                            tags: newTags,
-                            tagOrder: newTags.map((t) => t.id).join(","),
-                          }
+                          ...p,
+                          tags: newTags,
+                          tagOrder: newTags.map((t) => t.id).join(","),
+                        }
                         : p,
                     )
                   }
@@ -1290,7 +1290,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   />
                 </div>
                 {!previewItem?.attachments ||
-                previewItem.attachments.length === 0 ? (
+                  previewItem.attachments.length === 0 ? (
                   <p className="text-xs text-gray-400">
                     No attachments for this item.
                   </p>
@@ -1373,8 +1373,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                               window.open(resolveUrl(url)!, "_blank")
                             }
                             onError={(e) =>
-                              ((e.target as HTMLImageElement).src =
-                                "https://placehold.co/200x200?text=—")
+                            ((e.target as HTMLImageElement).src =
+                              "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>
@@ -1383,57 +1383,57 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   );
                 })()}
               </div>
-              <div className="flex justify-between gap-2 pt-6 mt-6 border-t">
-                <div>
-                  {previewEdit && (
-                    <button
-                      onClick={handleDeletePreviewItem}
-                      className="px-4 py-2 text-xs text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                      Delete
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {!isRequest && (
-                    <button
-                      onClick={() => router.push(`/items/${itemId}`)}
-                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold"
-                    >
-                      <EyeIconOutline className="w-4 h-4" />
-                      Full Details
-                    </button>
-                  )}
-                  {isRequest &&
-                    onConvert &&
-                    previewItem.requestStatus !== "Converted to Item" && (
-                      <button
-                        onClick={() => {
-                          onClose();
-                          if (onConvert) onConvert(previewItem);
-                        }}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-                      >
-                        Convert to Item
-                      </button>
-                    )}
+            </div>
+            <div className="flex justify-between gap-2 px-6 py-4 border-t border-gray-200 bg-white sticky bottom-0 z-20 flex-shrink-0">
+              <div>
+                {previewEdit && (
                   <button
-                    onClick={onClose}
-                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-semibold"
+                    onClick={handleDeletePreviewItem}
+                    className="px-4 py-2 text-xs text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
                   >
-                    {previewEdit ? "Cancel" : "Close"}
+                    <TrashIcon className="w-4 h-4" />
+                    Delete
                   </button>
-                  {previewEdit && (
+                )}
+              </div>
+              <div className="flex gap-2">
+                {!isRequest && (
+                  <button
+                    onClick={() => router.push(`/items/${itemId}`)}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold"
+                  >
+                    <EyeIconOutline className="w-4 h-4" />
+                    Full Details
+                  </button>
+                )}
+                {isRequest &&
+                  onConvert &&
+                  previewItem.requestStatus !== "Converted to Item" && (
                     <button
-                      onClick={handleSavePreview}
-                      disabled={previewSaving}
-                      className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 text-xs font-semibold"
+                      onClick={() => {
+                        onClose();
+                        if (onConvert) onConvert(previewItem);
+                      }}
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 text-xs font-semibold shadow-sm"
                     >
-                      {previewSaving ? "Saving..." : "Save Changes"}
+                      Convert to Item
                     </button>
                   )}
-                </div>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-semibold"
+                >
+                  {previewEdit ? "Cancel" : "Close"}
+                </button>
+                {previewEdit && (
+                  <button
+                    onClick={handleSavePreview}
+                    disabled={previewSaving}
+                    className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 text-xs font-semibold"
+                  >
+                    {previewSaving ? "Saving..." : "Save Changes"}
+                  </button>
+                )}
               </div>
             </div>
           </>
