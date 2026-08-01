@@ -241,9 +241,15 @@ const InvoiceListPage: React.FC = () => {
   const [selectedAuftragId, setSelectedAuftragId] = useState<
     string | number | null
   >(null);
+  const [auftragPreviewInitialEdit, setAuftragPreviewInitialEdit] =
+    useState(false);
 
-  const handleOpenAuftragPreview = (id: string | number) => {
+  const handleOpenAuftragPreview = (
+    id: string | number,
+    initialEdit: boolean = false,
+  ) => {
     setSelectedAuftragId(id);
+    setAuftragPreviewInitialEdit(initialEdit);
     setShowAuftragPreviewModal(true);
   };
 
@@ -4484,9 +4490,11 @@ const InvoiceListPage: React.FC = () => {
           <AuftragPreviewModal
             isOpen={showAuftragPreviewModal}
             orderId={selectedAuftragId}
+            initialEdit={auftragPreviewInitialEdit}
             onClose={() => {
               setShowAuftragPreviewModal(false);
               setSelectedAuftragId(null);
+              setAuftragPreviewInitialEdit(false);
             }}
             onChanged={() => {
               fetchOrders();
@@ -4509,11 +4517,12 @@ const InvoiceListPage: React.FC = () => {
               fetchLieferscheine();
             }}
             onEditAuftrag={(auftragToEdit) => {
-              handleEditOrder(auftragToEdit);
+              setShowAuftragToRechnungModal(false);
+              setSelectedAuftragForRechnungModal(null);
+              handleOpenAuftragPreview(auftragToEdit.id, true);
             }}
           />
         )}
-
         {showRechnungDetailModal && selectedRechnungForDetail && (
           <RechnungDetailModal
             isOpen={showRechnungDetailModal}

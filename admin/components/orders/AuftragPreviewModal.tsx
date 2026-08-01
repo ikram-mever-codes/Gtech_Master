@@ -35,6 +35,7 @@ interface AuftragPreviewModalProps {
   onClose: () => void;
   onChanged?: () => void;
   userRole?: UserRole;
+  initialEdit?: boolean;
 }
 
 const inputCls =
@@ -273,6 +274,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   onClose,
   onChanged,
   userRole,
+  initialEdit = false,
 }) => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -332,12 +334,11 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setEdit(false);
+    setEdit(initialEdit);
     setShowItemPicker(false);
     setItemPickerSearch("");
     fetchOrder();
-  }, [isOpen, orderId, fetchOrder]);
-
+  }, [isOpen, orderId, fetchOrder, initialEdit]);
   useEffect(() => {
     if (!showItemPicker || items.length > 0) return;
     (async () => {

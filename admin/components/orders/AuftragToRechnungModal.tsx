@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  XMarkIcon,
-  PencilIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
+import { XMarkIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { createRechnungFromAuftrag } from "@/api/rechnungen";
-import { updateCustomerOrder, deleteCustomerOrder } from "@/api/customer_orders";
+import {
+  updateCustomerOrder,
+  deleteCustomerOrder,
+} from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, Warehouse, ClipboardCheck, Check } from "lucide-react";
 
@@ -79,10 +78,11 @@ const Field: React.FC<{
         children
       ) : (
         <div
-          className={`${highlightOrange
-            ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
-            : ""
-            }`}
+          className={`${
+            highlightOrange
+              ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
+              : ""
+          }`}
         >
           {value || "—"}
         </div>
@@ -155,44 +155,63 @@ export default function AuftragToRechnungModal({
     if (!isOpen || !auftrag) return;
 
     const sourceItems = auftrag.orderItems || auftrag.items || [];
-    const mapped: SelectedItemState[] = sourceItems.map((it: any, index: number) => {
-      const origQty = Number(it.quantity || it.qty) || 1;
-      const itemPrice = Number(it.price || 0);
-      const isStock =
-        it.is_stock_item ||
-        it.item?.is_stock_item ||
-        it.sourceItem?.is_stock_item ||
-        "N";
+    const mapped: SelectedItemState[] = sourceItems.map(
+      (it: any, index: number) => {
+        const origQty = Number(it.quantity || it.qty) || 1;
+        const itemPrice = Number(it.price || 0);
+        const isStock =
+          it.is_stock_item ||
+          it.item?.is_stock_item ||
+          it.sourceItem?.is_stock_item ||
+          "N";
 
-      return {
-        id: String(it.id),
-        lineItemId: String(it.id),
-        position: index + 1,
-        photo: it.photo || it.item?.photo || it.image,
-        artNr: it.articleNumber || it.item?.articleNumber || it.ean || it.item?.ean || "—",
-        itemName: it.itemName || it.item_name || it.item?.item_name || "Line Item",
-        hinweis: it.notes || it.remark_de || it.description || "—",
-        mwst: Number(it.taxRate || auftrag.tax_rate || 19),
-        max_qty: origQty,
-        qty: origQty,
-        price: itemPrice,
-        selected: true,
-        is_stock_item: isStock,
-      };
-    });
+        return {
+          id: String(it.id),
+          lineItemId: String(it.id),
+          position: index + 1,
+          photo: it.photo || it.item?.photo || it.image,
+          artNr:
+            it.articleNumber ||
+            it.item?.articleNumber ||
+            it.ean ||
+            it.item?.ean ||
+            "—",
+          itemName:
+            it.itemName || it.item_name || it.item?.item_name || "Line Item",
+          hinweis: it.notes || it.remark_de || it.description || "—",
+          mwst: Number(it.taxRate || auftrag.tax_rate || 19),
+          max_qty: origQty,
+          qty: origQty,
+          price: itemPrice,
+          selected: true,
+          is_stock_item: isStock,
+        };
+      },
+    );
 
     setItems(mapped);
     setNotes(auftrag.notes || auftrag.comment || "");
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
+    setEditTitle(auftrag.title || auftrag.comment || ""); // ← add this line
 
     // Populate Customer Address & Defaults State
     const cust = auftrag.customerSnapshot || auftrag.customer || {};
-    setEditCompanyName(cust.companyName || cust.name || auftrag.customer_name || "");
-    setEditStreet(cust.address || cust.street || cust.addressLine1 || cust.bill_to_address || "");
+    setEditCompanyName(
+      cust.companyName || cust.name || auftrag.customer_name || "",
+    );
+    setEditStreet(
+      cust.address ||
+        cust.street ||
+        cust.addressLine1 ||
+        cust.bill_to_address ||
+        "",
+    );
     setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
     setEditCity(cust.city || "Göttingen");
     setEditCountry(cust.country || "DE");
-    setEditVatId(cust.vatId || cust.vatTaxId || cust.taxNumber || cust.tax_number || "");
+    setEditVatId(
+      cust.vatId || cust.vatTaxId || cust.taxNumber || cust.tax_number || "",
+    );
 
     const sMethod =
       auftrag.shippingMethod ||
@@ -213,7 +232,9 @@ export default function AuftragToRechnungModal({
     const pTerms =
       auftrag.paymentTerms ||
       auftrag.payment_terms ||
-      (cust.defaultPaymentDueDays ? `${cust.defaultPaymentDueDays} days net` : undefined) ||
+      (cust.defaultPaymentDueDays
+        ? `${cust.defaultPaymentDueDays} days net`
+        : undefined) ||
       cust.defaultPaymentTerms ||
       cust.paymentTerms ||
       "30 days net";
@@ -224,7 +245,8 @@ export default function AuftragToRechnungModal({
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
-    const rawDelivery = auftrag.deliveryTime || auftrag.delivery_date || auftrag.deliveryDate;
+    const rawDelivery =
+      auftrag.deliveryTime || auftrag.delivery_date || auftrag.deliveryDate;
 
     if (!rawDelivery) {
       setDeliveryDate(todayStr);
@@ -264,15 +286,23 @@ export default function AuftragToRechnungModal({
     setItems((prev) =>
       prev.map((it) => {
         if (it.lineItemId !== lineItemId) return it;
-        const newQty = isNaN(parsed) ? 0 : Math.min(Math.max(0, parsed), it.max_qty);
+        const newQty = isNaN(parsed)
+          ? 0
+          : Math.min(Math.max(0, parsed), it.max_qty);
         return { ...it, qty: newQty };
       }),
     );
   };
 
-  const updateItemField = (lineItemId: string, field: keyof SelectedItemState, val: any) => {
+  const updateItemField = (
+    lineItemId: string,
+    field: keyof SelectedItemState,
+    val: any,
+  ) => {
     setItems((prev) =>
-      prev.map((it) => (it.lineItemId === lineItemId ? { ...it, [field]: val } : it)),
+      prev.map((it) =>
+        it.lineItemId === lineItemId ? { ...it, [field]: val } : it,
+      ),
     );
   };
 
@@ -281,16 +311,30 @@ export default function AuftragToRechnungModal({
   };
 
   const selectedItems = items.filter((it) => it.selected && it.qty > 0);
-  const subtotal = selectedItems.reduce((acc, it) => acc + it.qty * it.price, 0);
+  const subtotal = selectedItems.reduce(
+    (acc, it) => acc + it.qty * it.price,
+    0,
+  );
   const taxRate = Number(auftrag.tax_rate ?? 19);
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
 
   const cust = auftrag.customerSnapshot || auftrag.customer || {};
-  const companyName = editCompanyName || cust.companyName || cust.name || auftrag.customer_name || "Potis GmbH & Co. KG";
+  const companyName =
+    editCompanyName ||
+    cust.companyName ||
+    cust.name ||
+    auftrag.customer_name ||
+    "Potis GmbH & Co. KG";
   const legalName = cust.legalName || cust.name || "";
-  const addressStr = editStreet || cust.address || cust.street || cust.addressLine1 || "August-Spindler-Straße 4";
-  const postalCity = `${editPostalCode || cust.postalCode || "37079"} ${editCity || cust.city || "Göttingen"}`.trim();
+  const addressStr =
+    editStreet ||
+    cust.address ||
+    cust.street ||
+    cust.addressLine1 ||
+    "August-Spindler-Straße 4";
+  const postalCity =
+    `${editPostalCode || cust.postalCode || "37079"} ${editCity || cust.city || "Göttingen"}`.trim();
 
   const deliveryName =
     auftrag.ship_to ||
@@ -339,13 +383,20 @@ export default function AuftragToRechnungModal({
   };
 
   const handleDeleteAuftrag = async () => {
-    if (!window.confirm(`Are you sure you want to delete Auftrag ${auftrag.order_no}?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete Auftrag ${auftrag.order_no}?`,
+      )
+    ) {
       return;
     }
     try {
       setDeletingAuftrag(true);
       await deleteCustomerOrder(auftrag.id);
-      toast.success(`Auftrag ${auftrag.order_no} deleted successfully!`, successStyles);
+      toast.success(
+        `Auftrag ${auftrag.order_no} deleted successfully!`,
+        successStyles,
+      );
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -358,7 +409,10 @@ export default function AuftragToRechnungModal({
 
   const handleSubmit = async () => {
     if (selectedItems.length === 0) {
-      toast.error("Please select at least 1 item with quantity > 0", errorStyles);
+      toast.error(
+        "Please select at least 1 item with quantity > 0",
+        errorStyles,
+      );
       return;
     }
 
@@ -371,14 +425,20 @@ export default function AuftragToRechnungModal({
         itemName: it.itemName,
       }));
 
-      const res = await createRechnungFromAuftrag(auftrag.id, payloadItems, notes, {
-        deliveryDate,
-        warehouse: hasStockItems ? warehouse : undefined,
-      } as any);
+      const res = await createRechnungFromAuftrag(
+        auftrag.id,
+        payloadItems,
+        notes,
+        {
+          deliveryDate,
+          warehouse: hasStockItems ? warehouse : undefined,
+        } as any,
+      );
 
       if (res?.success) {
         toast.success(
-          res.message || `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
+          res.message ||
+            `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
           successStyles,
         );
         onSuccess();
@@ -386,7 +446,10 @@ export default function AuftragToRechnungModal({
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.message || "Failed to generate Rechnung & Lieferschein", errorStyles);
+      toast.error(
+        err?.message || "Failed to generate Rechnung & Lieferschein",
+        errorStyles,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -395,7 +458,6 @@ export default function AuftragToRechnungModal({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden text-gray-900 font-sans">
-
         {/* ── Top Header Bar (Matching OfferDetailModal) ── */}
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
@@ -410,7 +472,10 @@ export default function AuftragToRechnungModal({
               )}
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {editTitle || auftrag.title || auftrag.comment || "Direction switch including motor supply cable"}
+              {editTitle ||
+                auftrag.title ||
+                auftrag.comment ||
+                "Direction switch including motor supply cable"}
             </h2>
           </div>
 
@@ -428,10 +493,8 @@ export default function AuftragToRechnungModal({
 
         {/* ── Main Body Content ── */}
         <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
-
           {/* ── 4 Column Top Grid (Matching Angebot Layout) ── */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
-
             {/* Column 1: Customer & Delivery Address */}
             <div className="md:col-span-1 flex flex-col gap-2">
               {isEditingAuftrag ? (
@@ -484,11 +547,15 @@ export default function AuftragToRechnungModal({
               ) : (
                 <div className="text-sm text-gray-800 space-y-0.5">
                   <div className="font-semibold">{companyName}</div>
-                  {legalName && legalName !== companyName && <div>{legalName}</div>}
+                  {legalName && legalName !== companyName && (
+                    <div>{legalName}</div>
+                  )}
                   <div>{addressStr}</div>
                   <div>{postalCity}</div>
                   {editCountry && <div>{editCountry}</div>}
-                  {editVatId && <div className="text-xs text-gray-500">{editVatId}</div>}
+                  {editVatId && (
+                    <div className="text-xs text-gray-500">{editVatId}</div>
+                  )}
                 </div>
               )}
 
@@ -506,12 +573,7 @@ export default function AuftragToRechnungModal({
 
             {/* Column 2, 3, 4: Fields Grid */}
             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-
-              <Field
-                label="TITLE"
-                value={editTitle}
-                isEdit={isEditingAuftrag}
-              >
+              <Field label="TITLE" value={editTitle} isEdit={isEditingAuftrag}>
                 <input
                   type="text"
                   value={editTitle}
@@ -520,10 +582,7 @@ export default function AuftragToRechnungModal({
                 />
               </Field>
 
-              <Field
-                label="TAX PROFILE"
-                value={`DE-VAT (${taxRate}%)`}
-              />
+              <Field label="TAX PROFILE" value={`DE-VAT (${taxRate}%)`} />
 
               {/* Delivery Date */}
               <div>
@@ -537,10 +596,11 @@ export default function AuftragToRechnungModal({
                     setDeliveryDate(e.target.value);
                     setIsDatePastOrEmpty(false);
                   }}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
-                    ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
-                    : "bg-white border-gray-300 text-gray-900"
-                    }`}
+                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${
+                    isDatePastOrEmpty || !deliveryDate
+                      ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
+                      : "bg-white border-gray-300 text-gray-900"
+                  }`}
                 />
               </div>
 
@@ -593,7 +653,6 @@ export default function AuftragToRechnungModal({
                   ))}
                 </select>
               </Field>
-
             </div>
           </div>
 
@@ -637,16 +696,17 @@ export default function AuftragToRechnungModal({
                       Netto gesamt
                     </th>
                     {isEditingAuftrag && (
-                      <th className="px-2 py-2 text-center font-semibold w-10">
-
-                      </th>
+                      <th className="px-2 py-2 text-center font-semibold w-10"></th>
                     )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {items.length === 0 && (
                     <tr>
-                      <td colSpan={isEditingAuftrag ? 12 : 11} className="text-center py-6 text-sm text-gray-500">
+                      <td
+                        colSpan={isEditingAuftrag ? 12 : 11}
+                        className="text-center py-6 text-sm text-gray-500"
+                      >
                         No line items found.
                       </td>
                     </tr>
@@ -660,8 +720,10 @@ export default function AuftragToRechnungModal({
                       : "bg-[#dff0d8] text-gray-900 font-medium";
 
                     return (
-                      <tr key={item.id} className={`transition-colors ${rowBgClass}`}>
-
+                      <tr
+                        key={item.id}
+                        className={`transition-colors ${rowBgClass}`}
+                      >
                         {/* Selection Checkbox */}
                         <td className="px-2 py-2 text-center">
                           <input
@@ -685,7 +747,9 @@ export default function AuftragToRechnungModal({
                                 className="w-full h-full object-contain"
                               />
                             ) : (
-                              <span className="text-gray-400 text-[10px]">—</span>
+                              <span className="text-gray-400 text-[10px]">
+                                —
+                              </span>
                             )}
                           </div>
                         </td>
@@ -696,7 +760,13 @@ export default function AuftragToRechnungModal({
                             <input
                               type="text"
                               value={item.artNr}
-                              onChange={(e) => updateItemField(item.lineItemId, "artNr", e.target.value)}
+                              onChange={(e) =>
+                                updateItemField(
+                                  item.lineItemId,
+                                  "artNr",
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white"
                             />
                           ) : (
@@ -710,7 +780,13 @@ export default function AuftragToRechnungModal({
                             <input
                               type="text"
                               value={item.itemName}
-                              onChange={(e) => updateItemField(item.lineItemId, "itemName", e.target.value)}
+                              onChange={(e) =>
+                                updateItemField(
+                                  item.lineItemId,
+                                  "itemName",
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white font-bold"
                             />
                           ) : (
@@ -724,7 +800,13 @@ export default function AuftragToRechnungModal({
                             <input
                               type="text"
                               value={item.hinweis}
-                              onChange={(e) => updateItemField(item.lineItemId, "hinweis", e.target.value)}
+                              onChange={(e) =>
+                                updateItemField(
+                                  item.lineItemId,
+                                  "hinweis",
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white"
                               placeholder="Remark..."
                             />
@@ -742,7 +824,13 @@ export default function AuftragToRechnungModal({
                             <input
                               type="number"
                               value={item.max_qty}
-                              onChange={(e) => updateItemField(item.lineItemId, "max_qty", Number(e.target.value) || 0)}
+                              onChange={(e) =>
+                                updateItemField(
+                                  item.lineItemId,
+                                  "max_qty",
+                                  Number(e.target.value) || 0,
+                                )
+                              }
                               className="w-16 px-1 py-0.5 text-xs text-right border rounded text-gray-900 bg-white font-bold"
                             />
                           ) : (
@@ -759,7 +847,9 @@ export default function AuftragToRechnungModal({
                             step="any"
                             disabled={!item.selected}
                             value={item.qty}
-                            onChange={(e) => updateQty(item.lineItemId, e.target.value)}
+                            onChange={(e) =>
+                              updateQty(item.lineItemId, e.target.value)
+                            }
                             className="w-20 px-1.5 py-1 text-right border border-orange-400 bg-amber-100 font-bold text-gray-900 rounded focus:ring-2 focus:ring-orange-500 shadow-sm"
                           />
                         </td>
@@ -771,7 +861,13 @@ export default function AuftragToRechnungModal({
                               type="number"
                               step="any"
                               value={item.price}
-                              onChange={(e) => updateItemField(item.lineItemId, "price", Number(e.target.value) || 0)}
+                              onChange={(e) =>
+                                updateItemField(
+                                  item.lineItemId,
+                                  "price",
+                                  Number(e.target.value) || 0,
+                                )
+                              }
                               className="w-20 px-1 py-0.5 text-xs text-right border rounded text-gray-900 bg-white font-bold"
                             />
                           ) : (
@@ -808,18 +904,9 @@ export default function AuftragToRechnungModal({
           {/* ── Weights & Totals Section ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field
-                label="NET WEIGHT (ITEMS)"
-                value={formatWeight(10)}
-              />
-              <Field
-                label="EXTRA WEIGHT"
-                value={formatWeight(0)}
-              />
-              <Field
-                label="TOTAL WEIGHT"
-                value={formatWeight(10)}
-              />
+              <Field label="NET WEIGHT (ITEMS)" value={formatWeight(10)} />
+              <Field label="EXTRA WEIGHT" value={formatWeight(0)} />
+              <Field label="TOTAL WEIGHT" value={formatWeight(10)} />
             </div>
 
             <div className="max-w-sm ml-auto w-full space-y-1.5 text-sm">
@@ -890,26 +977,23 @@ export default function AuftragToRechnungModal({
               </select>
             </div>
           )}
-
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0 bg-gray-50">
-
           {/* Edit Auftrag Button (Bottom Left) */}
           <div>
             <button
               type="button"
-              onClick={() => setIsEditingAuftrag((prev) => !prev)}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg border transition flex items-center gap-1.5 shadow-sm ${isEditingAuftrag
-                ? "bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100"
-                : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                }`}
+              onClick={() => {
+                onEditAuftrag?.(auftrag);
+                onClose();
+              }}
+              className="px-4 py-2 text-sm font-semibold rounded-lg border transition flex items-center gap-1.5 shadow-sm bg-white border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
             >
               <PencilIcon className="h-4 w-4 text-gray-500" />
-              {isEditingAuftrag ? "Cancel Edit Mode" : "Edit Auftrag"}
+              Edit Auftrag
             </button>
           </div>
-
           {/* Action Buttons: Cancel / Save changes / Generate */}
           <div className="flex gap-2.5 items-center">
             <button
@@ -933,14 +1017,15 @@ export default function AuftragToRechnungModal({
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-
                 Save changes
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={selectedItems.length === 0 || submitting || !deliveryDate}
+                disabled={
+                  selectedItems.length === 0 || submitting || !deliveryDate
+                }
                 className="px-5 py-2 text-sm font-bold bg-[#2F6B46] text-white rounded-lg hover:bg-[#255638] disabled:opacity-50 transition flex items-center gap-2 shadow-md"
               >
                 {submitting ? (
@@ -958,7 +1043,6 @@ export default function AuftragToRechnungModal({
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
