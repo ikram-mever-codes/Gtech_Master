@@ -629,13 +629,24 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                     </label>
                     <select
                       value={itemFormData.is_stock_item || "N"}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const newVal = e.target.value;
+                        if (newVal === "N") {
+                          const sEU = Number(itemFormData.stockEU) || 0;
+                          const mEU = Number(itemFormData.MSQ_EU) || 0;
+                          const sCN = Number(itemFormData.stockCN) || 0;
+                          const mCN = Number(itemFormData.MSQ_CN) || 0;
+                          if (sEU > 0 || mEU > 0 || sCN > 0 || mCN > 0) {
+                            toast.error("Cannot set 'Is Stock Item' to No while stock quantity exists in EU/CN warehouse.", errorStyles);
+                            return;
+                          }
+                        }
                         setItemFormData({
                           ...itemFormData,
-                          is_stock_item: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                          is_stock_item: newVal,
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
                     >
                       <option value="N">No</option>
                       <option value="Y">Yes</option>
@@ -648,6 +659,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                     <input
                       type="number"
                       min="0"
+                      disabled={itemFormData.is_stock_item !== "Y"}
                       value={itemFormData.stockEU || 0}
                       onChange={(e) =>
                         setItemFormData({
@@ -655,7 +667,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                           stockEU: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
                     />
                   </div>
                   <div>
@@ -665,6 +677,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                     <input
                       type="number"
                       min="0"
+                      disabled={itemFormData.is_stock_item !== "Y"}
                       value={itemFormData.MSQ_EU || 0}
                       onChange={(e) =>
                         setItemFormData({
@@ -672,7 +685,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                           MSQ_EU: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
                     />
                   </div>
                   <div>
@@ -682,6 +695,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                     <input
                       type="number"
                       min="0"
+                      disabled={itemFormData.is_stock_item !== "Y"}
                       value={itemFormData.stockCN || 0}
                       onChange={(e) =>
                         setItemFormData({
@@ -689,7 +703,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                           stockCN: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
                     />
                   </div>
                   <div>
@@ -699,6 +713,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                     <input
                       type="number"
                       min="0"
+                      disabled={itemFormData.is_stock_item !== "Y"}
                       value={itemFormData.MSQ_CN || 0}
                       onChange={(e) =>
                         setItemFormData({
@@ -706,7 +721,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                           MSQ_CN: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
                     />
                   </div>
                 </div>

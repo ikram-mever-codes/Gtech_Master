@@ -1060,9 +1060,20 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <select
                       className={inputCls}
                       value={previewItem.is_stock_item || "N"}
-                      onChange={(e) =>
-                        patchPreview({ is_stock_item: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const newVal = e.target.value;
+                        if (newVal === "N") {
+                          const sEU = Number(previewItem.stockEU) || 0;
+                          const mEU = Number(previewItem.MSQ_EU) || 0;
+                          const sCN = Number(previewItem.stockCN) || 0;
+                          const mCN = Number(previewItem.MSQ_CN) || 0;
+                          if (sEU > 0 || mEU > 0 || sCN > 0 || mCN > 0) {
+                            toast.error("Cannot set 'Is Stock Item' to No while stock quantity exists in EU/CN warehouse.", errorStyles);
+                            return;
+                          }
+                        }
+                        patchPreview({ is_stock_item: newVal });
+                      }}
                     >
                       <option value="N">No</option>
                       <option value="Y">Yes</option>
@@ -1079,7 +1090,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.stockEU ?? 0}
                       onChange={(e) =>
                         patchPreview({ stockEU: e.target.value })
@@ -1093,7 +1105,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.MSQ_EU ?? 0}
                       onChange={(e) => patchPreview({ MSQ_EU: e.target.value })}
                     />
@@ -1105,7 +1118,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.stockCN ?? 0}
                       onChange={(e) =>
                         patchPreview({ stockCN: e.target.value })
@@ -1119,7 +1133,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       type="number"
-                      className={inputCls}
+                      disabled={previewItem.is_stock_item !== "Y"}
+                      className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.MSQ_CN ?? 0}
                       onChange={(e) => patchPreview({ MSQ_CN: e.target.value })}
                     />
