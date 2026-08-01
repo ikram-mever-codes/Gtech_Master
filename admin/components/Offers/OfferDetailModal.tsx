@@ -3107,9 +3107,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           patch({ internalNotes: e.target.value })
                         }
                       />
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        Never shown to the customer.
-                      </p>
                     </>
                   ) : (
                     <p className="text-sm text-gray-600">
@@ -3123,7 +3120,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <div className="flex items-center gap-2 mb-3">
                     <PencilIcon className="h-4 w-4 text-gray-500" />
                     <h3 className="text-sm font-bold text-gray-900">
-                      Comment field
+                      Comment extern
                     </h3>
                   </div>
                   {edit ? (
@@ -3135,9 +3132,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         placeholder="Shown to the customer on the offer."
                         onChange={(e) => patch({ notes: e.target.value })}
                       />
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        Printed on the offer PDF.
-                      </p>
                     </>
                   ) : (
                     <p className="text-sm text-gray-600">
