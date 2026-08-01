@@ -1814,13 +1814,21 @@ const InvoiceListPage: React.FC = () => {
     } else if (activeInvTab === "lieferschein") {
       list = invoices.map((inv: any) => ({
         ...inv,
-        order_no: inv.invoiceNumber || inv.orderNumber,
+        invoiceNumber: inv.cargoNo || inv.cargo_no || inv.invoiceNumber || inv.orderNumber,
+        order_no: inv.cargoNo || inv.cargo_no || inv.invoiceNumber || inv.orderNumber,
         customer_name: inv.customer?.companyName || inv.ship_to || "—",
         items: inv.items || [],
       }));
     } else {
       list = [];
     }
+
+    // Always sort latest first (TOP of table)
+    list.sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt || a.created_at || a.invoiceDate || a.date_created || 0).getTime();
+      const timeB = new Date(b.createdAt || b.created_at || b.invoiceDate || b.date_created || 0).getTime();
+      return timeB - timeA;
+    });
 
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
@@ -2079,10 +2087,9 @@ const InvoiceListPage: React.FC = () => {
             );
           }
         },
-      },
-      {
+      },      {
         header: "Company",
-        width: "130px",
+        width: "115px",
         align: "left",
         render: (row) => {
           const text =
@@ -2092,7 +2099,7 @@ const InvoiceListPage: React.FC = () => {
                 ? row.customerSnapshot?.companyName || row.customer_name || row.customer?.companyName || "N/A"
                 : row.bill_to || row.customer?.companyName || "N/A";
           return (
-            <div className="truncate max-w-[130px]" title={text}>
+            <div className="truncate max-w-[115px]" title={text}>
               {text}
             </div>
           );
@@ -2100,7 +2107,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Person",
-        width: "110px",
+        width: "95px",
         align: "left",
         render: (row) => {
           const text =
@@ -2115,7 +2122,7 @@ const InvoiceListPage: React.FC = () => {
                 "-"
                 : row.ship_to || "-";
           return (
-            <div className="truncate max-w-[110px]" title={text}>
+            <div className="truncate max-w-[95px]" title={text}>
               {text}
             </div>
           );
@@ -2123,7 +2130,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Shipping_postal_code",
-        width: "80px",
+        width: "75px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -2149,7 +2156,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "City, county",
-        width: "110px",
+        width: "95px",
         align: "left",
         render: (row) => {
           let text = "";
@@ -2188,7 +2195,7 @@ const InvoiceListPage: React.FC = () => {
               "-";
           }
           return (
-            <div className="truncate max-w-[110px]" title={text}>
+            <div className="truncate max-w-[95px]" title={text}>
               {text}
             </div>
           );
@@ -2196,7 +2203,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Value_net",
-        width: "80px",
+        width: "75px",
         align: "right",
         render: (row) => {
           let val = 0;
@@ -2227,7 +2234,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Item_Count",
-        width: "70px",
+        width: "60px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -2246,7 +2253,7 @@ const InvoiceListPage: React.FC = () => {
         ? [
             {
               header: "Status",
-              width: "150px",
+              width: "130px",
               align: "center" as const,
               render: (row: any) => {
                 const currentStatus = row.status || "draft";
@@ -2293,7 +2300,7 @@ const InvoiceListPage: React.FC = () => {
         : []),
       {
         header: "Actions",
-        width: "110px",
+        width: "120px",
         align: "center",
         render: (row) => {
           if (activeInvTab === "angebot") {
@@ -2311,6 +2318,15 @@ const InvoiceListPage: React.FC = () => {
               </div>
             );
           } else if (activeInvTab === "auftrag") {
+            const rechnungCount = (invoices || []).filter(
+              (inv: any) =>
+                (inv.orderNumber && String(inv.orderNumber).trim().toLowerCase() === String(row.order_no || "").trim().toLowerCase()) ||
+                (inv.order_number && String(inv.order_number).trim().toLowerCase() === String(row.order_no || "").trim().toLowerCase()) ||
+                (inv.auftrag_no && String(inv.auftrag_no).trim().toLowerCase() === String(row.order_no || "").trim().toLowerCase()) ||
+                (row.id && (inv.auftrag_id === row.id || inv.auftragId === row.id)),
+            ).length;
+            const isConverted = rechnungCount > 0;
+
             return (
               <div className="flex items-center justify-center gap-1.5 font-poppins">
                 <button
@@ -2324,17 +2340,37 @@ const InvoiceListPage: React.FC = () => {
                   <MoveRight className="w-3.5 h-3.5" />
                   <span>Convert</span>
                 </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedAuftragForRechnungModal(row);
-                    setShowAuftragToRechnungModal(true);
-                  }}
-                  title="Generate Rechnung & Lieferschein"
-                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md flex items-center gap-1"
-                >
-                  <MoveRight className="w-3.5 h-3.5" />
-                </button>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAuftragForRechnungModal(row);
+                      setShowAuftragToRechnungModal(true);
+                    }}
+                    title={
+                      isConverted
+                        ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
+                        : "Generate Rechnung & Lieferschein"
+                    }
+                    className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer ${
+                      isConverted
+                        ? "bg-gray-500 hover:bg-gray-600 text-white"
+                        : "bg-[#2F6B46] hover:bg-[#255638] text-white"
+                    }`}
+                  >
+                    <MoveRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  {rechnungCount > 0 && (
+                    <span
+                      title={`Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""}`}
+                      className="px-1.5 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
+                    >
+                      {rechnungCount}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           } else if (activeInvTab === "bestellung") {
@@ -2369,7 +2405,7 @@ const InvoiceListPage: React.FC = () => {
         },
       },
     ];
-  }, [activeInvTab, router, expandedDocIds]);
+  }, [activeInvTab, router, expandedDocIds, invoices]);
 
   const totalAmount = filteredInvoices.reduce(
     (sum, inv) => sum + (Number(inv.grossTotal) || 0),

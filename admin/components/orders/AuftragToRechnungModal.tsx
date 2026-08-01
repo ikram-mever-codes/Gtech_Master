@@ -4,11 +4,12 @@ import React, { useState, useEffect } from "react";
 import {
   XMarkIcon,
   PencilIcon,
-  LinkIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import { createRechnungFromAuftrag } from "@/api/rechnungen";
-import { updateCustomerOrder } from "@/api/customer_orders";
+import { updateCustomerOrder, deleteCustomerOrder } from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, Warehouse, ClipboardCheck, Check } from "lucide-react";
 
@@ -52,12 +53,16 @@ const PAYMENT_METHODS = [
 
 const SHIPPING_METHODS = [
   "Bahnfracht + GLS",
+  "angeliefert durch GTech",
   "Standard shipping",
   "Express shipping",
   "FedEx direkt",
   "DHL Express",
   "Pickup",
 ];
+
+const inputCls =
+  "w-full px-2.5 py-1 text-xs border border-gray-300 bg-white rounded focus:ring-2 focus:ring-emerald-500 font-medium";
 
 const Field: React.FC<{
   label: string;
@@ -75,10 +80,11 @@ const Field: React.FC<{
         children
       ) : (
         <div
-          className={`${highlightOrange
-            ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
-            : ""
-            }`}
+          className={`${
+            highlightOrange
+              ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
+              : ""
+          }`}
         >
           {value || "—"}
         </div>
@@ -130,13 +136,22 @@ export default function AuftragToRechnungModal({
   const [isDatePastOrEmpty, setIsDatePastOrEmpty] = useState(false);
   const [warehouse, setWarehouse] = useState<"CN" | "EU">("CN");
 
-  // Inline Edit Mode state
+  // Inline Edit Mode state (matching OfferDetailModal)
   const [isEditingAuftrag, setIsEditingAuftrag] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editShippingMethod, setEditShippingMethod] = useState("");
   const [editPaymentMethod, setEditPaymentMethod] = useState("");
   const [editPaymentTerms, setEditPaymentTerms] = useState("");
   const [savingAuftrag, setSavingAuftrag] = useState(false);
+  const [deletingAuftrag, setDeletingAuftrag] = useState(false);
+
+  // Editable Customer Address fields
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editStreet, setEditStreet] = useState("");
+  const [editPostalCode, setEditPostalCode] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editCountry, setEditCountry] = useState("DE");
+  const [editVatId, setEditVatId] = useState("");
 
   useEffect(() => {
     if (!isOpen || !auftrag) return;
@@ -173,14 +188,23 @@ export default function AuftragToRechnungModal({
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
 
     setEditTitle(auftrag.title || auftrag.comment || auftrag.offer_id || "");
-    setEditShippingMethod(auftrag.shippingMethod || auftrag.shipping_method || "Bahnfracht + GLS");
+    setEditShippingMethod(auftrag.shippingMethod || auftrag.shipping_method || "angeliefert durch GTech");
     setEditPaymentMethod(auftrag.paymentMethod || auftrag.payment_method || "Kauf auf Rechnung");
     setEditPaymentTerms(auftrag.paymentTerms || auftrag.payment_terms || "30 days net");
+
+    // Populate Customer Address State
+    const cust = auftrag.customerSnapshot || auftrag.customer || {};
+    setEditCompanyName(cust.companyName || cust.name || auftrag.customer_name || "");
+    setEditStreet(cust.address || cust.street || cust.addressLine1 || "");
+    setEditPostalCode(cust.postalCode || "37079");
+    setEditCity(cust.city || "Göttingen");
+    setEditCountry(cust.country || "DE");
+    setEditVatId(cust.vatId || cust.vatTaxId || cust.taxNumber || "");
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
     const rawDelivery = auftrag.deliveryTime || auftrag.delivery_date || auftrag.deliveryDate;
-
+    
     if (!rawDelivery) {
       setDeliveryDate(todayStr);
       setIsDatePastOrEmpty(true);
@@ -225,22 +249,31 @@ export default function AuftragToRechnungModal({
     );
   };
 
+  const updateItemField = (lineItemId: string, field: keyof SelectedItemState, val: any) => {
+    setItems((prev) =>
+      prev.map((it) => (it.lineItemId === lineItemId ? { ...it, [field]: val } : it)),
+    );
+  };
+
+  const removeItem = (lineItemId: string) => {
+    setItems((prev) => prev.filter((it) => it.lineItemId !== lineItemId));
+  };
+
   const selectedItems = items.filter((it) => it.selected && it.qty > 0);
   const subtotal = selectedItems.reduce((acc, it) => acc + it.qty * it.price, 0);
   const taxRate = Number(auftrag.tax_rate ?? 19);
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
 
-  // Customer snapshot
+  // Display Customer snapshot
   const cust = auftrag.customerSnapshot || auftrag.customer || {};
-  const companyName = cust.companyName || cust.name || auftrag.customer_name || "Ernst Neumärker GmbH & Co. KG";
+  const companyName = editCompanyName || cust.companyName || cust.name || auftrag.customer_name || "Potis GmbH & Co. KG";
   const legalName = cust.legalName || cust.name || "";
-  const addressStr = cust.address || cust.street || cust.addressLine1 || "Teststraße 88";
-  const postalCity = `${cust.postalCode || "58675"} ${cust.city || "Hemer"}`.trim();
+  const addressStr = editStreet || cust.address || cust.street || cust.addressLine1 || "August-Spindler-Straße 4";
+  const postalCity = `${editPostalCode || cust.postalCode || "37079"} ${editCity || cust.city || "Göttingen"}`.trim();
 
   // Delivery address
-  const deliveryName = cust.deliveryAddressLine1 || cust.ship_to_full_address ? "NEUMÄRKER DELIVERY CENTER" : "Same Delivery Address";
-  const deliveryDetail = cust.deliveryAddressLine1 ? `${cust.deliveryAddressLine1}, ${cust.deliveryPostalCode || ""} ${cust.deliveryCity || ""}` : "";
+  const deliveryName = cust.deliveryAddressLine1 || cust.ship_to_full_address ? "Same as billing address" : "Same Delivery Address";
 
   const handleSaveAuftragEdits = async () => {
     try {
@@ -253,6 +286,16 @@ export default function AuftragToRechnungModal({
         deliveryDate,
         notes,
         internalNotes,
+        customerSnapshot: {
+          ...cust,
+          companyName: editCompanyName,
+          street: editStreet,
+          address: editStreet,
+          postalCode: editPostalCode,
+          city: editCity,
+          country: editCountry,
+          vatId: editVatId,
+        },
       };
       await updateCustomerOrder(auftrag.id, payload);
       toast.success("Auftrag updated successfully!", successStyles);
@@ -263,6 +306,24 @@ export default function AuftragToRechnungModal({
       toast.error(err?.message || "Failed to update Auftrag", errorStyles);
     } finally {
       setSavingAuftrag(false);
+    }
+  };
+
+  const handleDeleteAuftrag = async () => {
+    if (!window.confirm(`Are you sure you want to delete Auftrag ${auftrag.order_no}?`)) {
+      return;
+    }
+    try {
+      setDeletingAuftrag(true);
+      await deleteCustomerOrder(auftrag.id);
+      toast.success(`Auftrag ${auftrag.order_no} deleted successfully!`, successStyles);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to delete Auftrag", errorStyles);
+    } finally {
+      setDeletingAuftrag(false);
     }
   };
 
@@ -305,33 +366,34 @@ export default function AuftragToRechnungModal({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden text-gray-900 font-sans">
-
-        {/* ── Top Header Bar ── */}
+        
+        {/* ── Top Header Bar (Matching OfferDetailModal) ── */}
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-lg font-bold text-red-600 truncate">
-                Ausliefern Auftrag {auftrag.order_no}
+              <span className="text-lg font-bold text-gray-900 truncate">
+                Auftrag {auftrag.order_no}
               </span>
-              <span className="text-sm font-bold text-gray-700">
-                Angebot {auftrag.offerNumber || auftrag.order_no}
-              </span>
+              {auftrag.offerNumber && (
+                <span className="text-sm font-bold text-gray-600">
+                  Angebot {auftrag.offerNumber}
+                </span>
+              )}
               <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-700">
                 Classic
               </span>
-              {isEditingAuftrag && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                  Editing Mode
-                </span>
-              )}
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {editTitle || auftrag.title || auftrag.comment || "rocker switch KCD"}
+              {editTitle || auftrag.title || auftrag.comment || "Direction switch including motor supply cable"}
             </h2>
           </div>
 
-          {/* Top Right: ONLY Close X Icon */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Top Right: ViewEditToggle Switch + Close X */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <ViewEditToggle
+              isEditEnabled={isEditingAuftrag}
+              onToggle={() => setIsEditingAuftrag((prev) => !prev)}
+            />
             <button
               type="button"
               onClick={onClose}
@@ -345,27 +407,84 @@ export default function AuftragToRechnungModal({
         {/* ── Main Body Content ── */}
         <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
 
-          {/* ── 4 Column Top Grid (Exact Angebot Layout) ── */}
+          {/* ── 4 Column Top Grid (Matching Angebot Layout) ── */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
-
+            
             {/* Column 1: Customer & Delivery Address */}
-            <div className="md:col-span-1 flex flex-col gap-3">
-              <div className="text-sm text-gray-800 space-y-0.5">
-                <div className="font-semibold">{companyName}</div>
-                {legalName && legalName !== companyName && <div>{legalName}</div>}
-                <div>{addressStr}, {postalCity}</div>
-              </div>
+            <div className="md:col-span-1 flex flex-col gap-2">
+              {isEditingAuftrag ? (
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={editCompanyName}
+                    onChange={(e) => setEditCompanyName(e.target.value)}
+                    placeholder="Company Name"
+                    className={inputCls}
+                  />
+                  <input
+                    type="text"
+                    value={editStreet}
+                    onChange={(e) => setEditStreet(e.target.value)}
+                    placeholder="Street Address"
+                    className={inputCls}
+                  />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <input
+                      type="text"
+                      value={editPostalCode}
+                      onChange={(e) => setEditPostalCode(e.target.value)}
+                      placeholder="Postal Code"
+                      className={inputCls}
+                    />
+                    <input
+                      type="text"
+                      value={editCity}
+                      onChange={(e) => setEditCity(e.target.value)}
+                      placeholder="City"
+                      className={inputCls}
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={editCountry}
+                    onChange={(e) => setEditCountry(e.target.value)}
+                    placeholder="Country (DE)"
+                    className={inputCls}
+                  />
+                  <input
+                    type="text"
+                    value={editVatId}
+                    onChange={(e) => setEditVatId(e.target.value)}
+                    placeholder="VAT ID (DE...)"
+                    className={inputCls}
+                  />
+                </div>
+              ) : (
+                <div className="text-sm text-gray-800 space-y-0.5">
+                  <div className="font-semibold">{companyName}</div>
+                  {legalName && legalName !== companyName && <div>{legalName}</div>}
+                  <div>{addressStr}</div>
+                  <div>{postalCity}</div>
+                  {editCountry && <div>{editCountry}</div>}
+                  {editVatId && <div className="text-xs text-gray-500">{editVatId}</div>}
+                </div>
+              )}
 
               <div className="text-sm space-y-0.5 pt-1">
-                <div className="font-bold text-gray-900">Delivery:</div>
-                <div className="text-gray-700">{deliveryName}</div>
-                {deliveryDetail && <div className="text-xs text-gray-500">{deliveryDetail}</div>}
+                <div className="font-bold text-gray-900 mb-0.5">Delivery:</div>
+                {isEditingAuftrag ? (
+                  <select className={inputCls}>
+                    <option value="same">Same as billing address</option>
+                  </select>
+                ) : (
+                  <div className="text-gray-700">{deliveryName}</div>
+                )}
               </div>
             </div>
 
             {/* Column 2, 3, 4: Fields Grid */}
             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-
+              
               <Field
                 label="TITLE"
                 value={editTitle}
@@ -375,29 +494,16 @@ export default function AuftragToRechnungModal({
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 font-medium"
+                  className={inputCls}
                 />
               </Field>
 
               <Field
-                label="SHIPPING METHOD"
-                value={editShippingMethod}
-                isEdit={isEditingAuftrag}
-              >
-                <select
-                  value={editShippingMethod}
-                  onChange={(e) => setEditShippingMethod(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 font-medium"
-                >
-                  {SHIPPING_METHODS.map((sm) => (
-                    <option key={sm} value={sm}>
-                      {sm}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                label="TAX PROFILE"
+                value={`DE-VAT (${taxRate}%)`}
+              />
 
-              {/* Delivery Date: Mild Orange Highlight if past or empty */}
+              {/* Delivery Date */}
               <div>
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
                   DELIVERY DATE
@@ -409,25 +515,13 @@ export default function AuftragToRechnungModal({
                     setDeliveryDate(e.target.value);
                     setIsDatePastOrEmpty(false);
                   }}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-orange-400 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
-                    ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
-                    : "bg-white border-gray-300 text-gray-900"
-                    }`}
+                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${
+                    isDatePastOrEmpty || !deliveryDate
+                      ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
+                      : "bg-white border-gray-300 text-gray-900"
+                  }`}
                 />
               </div>
-
-              <Field
-                label="PAYMENT DUE DAYS"
-                value={editPaymentTerms}
-                isEdit={isEditingAuftrag}
-              >
-                <input
-                  type="text"
-                  value={editPaymentTerms}
-                  onChange={(e) => setEditPaymentTerms(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 font-medium"
-                />
-              </Field>
 
               <Field
                 label="PAYMENT METHOD"
@@ -437,7 +531,7 @@ export default function AuftragToRechnungModal({
                 <select
                   value={editPaymentMethod}
                   onChange={(e) => setEditPaymentMethod(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 font-medium"
+                  className={inputCls}
                 >
                   {PAYMENT_METHODS.map((pm) => (
                     <option key={pm} value={pm}>
@@ -448,9 +542,37 @@ export default function AuftragToRechnungModal({
               </Field>
 
               <Field
-                label="TAX PROFILE"
-                value={`DE-VAT (${taxRate}%)`}
-              />
+                label="PAYMENT DUE DAYS"
+                value={editPaymentTerms}
+                isEdit={isEditingAuftrag}
+              >
+                <input
+                  type="text"
+                  value={editPaymentTerms}
+                  onChange={(e) => setEditPaymentTerms(e.target.value)}
+                  placeholder="e.g., 30 days net"
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field
+                label="SHIPPING METHOD"
+                value={editShippingMethod}
+                isEdit={isEditingAuftrag}
+              >
+                <select
+                  value={editShippingMethod}
+                  onChange={(e) => setEditShippingMethod(e.target.value)}
+                  className={inputCls}
+                >
+                  {SHIPPING_METHODS.map((sm) => (
+                    <option key={sm} value={sm}>
+                      {sm}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
             </div>
           </div>
 
@@ -460,7 +582,6 @@ export default function AuftragToRechnungModal({
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 border-b border-gray-200 text-gray-600 text-xs">
                   <tr>
-                    {/* Selection column */}
                     <th className="px-2 py-2 text-center font-semibold w-10">
                       ✓
                     </th>
@@ -483,7 +604,7 @@ export default function AuftragToRechnungModal({
                       MwSt.
                     </th>
                     <th className="px-2 py-2 text-right font-semibold w-24">
-                      Liefermenge
+                      QTY Open
                     </th>
                     <th className="px-2 py-2 text-right font-semibold w-28">
                       Qty Delivered
@@ -494,12 +615,17 @@ export default function AuftragToRechnungModal({
                     <th className="px-2 py-2 text-right font-semibold w-28">
                       Netto gesamt
                     </th>
+                    {isEditingAuftrag && (
+                      <th className="px-2 py-2 text-center font-semibold w-10">
+                        
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {items.length === 0 && (
                     <tr>
-                      <td colSpan={11} className="text-center py-6 text-sm text-gray-500">
+                      <td colSpan={isEditingAuftrag ? 12 : 11} className="text-center py-6 text-sm text-gray-500">
                         No line items found.
                       </td>
                     </tr>
@@ -508,16 +634,13 @@ export default function AuftragToRechnungModal({
                     const lineTotal = item.qty * item.price;
                     const isStock = item.is_stock_item === "Y";
 
-                    // Stock Item Highlighting Rule:
-                    // is_stock_item = NO  → mild green (bg-[#dff0d8] / bg-emerald-50/80)
-                    // is_stock_item = YES → mild orange (bg-[#f0ad4e]/40 / bg-amber-200/60)
                     const rowBgClass = isStock
                       ? "bg-[#e59837]/90 text-white font-medium"
                       : "bg-[#dff0d8] text-gray-900 font-medium";
 
                     return (
                       <tr key={item.id} className={`transition-colors ${rowBgClass}`}>
-
+                        
                         {/* Selection Checkbox */}
                         <td className="px-2 py-2 text-center">
                           <input
@@ -547,23 +670,66 @@ export default function AuftragToRechnungModal({
                         </td>
 
                         {/* Art.-Nr. */}
-                        <td className="px-2 py-2">{item.artNr || "—"}</td>
+                        <td className="px-2 py-2">
+                          {isEditingAuftrag ? (
+                            <input
+                              type="text"
+                              value={item.artNr}
+                              onChange={(e) => updateItemField(item.lineItemId, "artNr", e.target.value)}
+                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white"
+                            />
+                          ) : (
+                            item.artNr || "—"
+                          )}
+                        </td>
 
                         {/* Bezeichnung */}
-                        <td className="px-2 py-2 font-bold">{item.itemName}</td>
+                        <td className="px-2 py-2 font-bold">
+                          {isEditingAuftrag ? (
+                            <input
+                              type="text"
+                              value={item.itemName}
+                              onChange={(e) => updateItemField(item.lineItemId, "itemName", e.target.value)}
+                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white font-bold"
+                            />
+                          ) : (
+                            item.itemName
+                          )}
+                        </td>
 
                         {/* Hinweis */}
-                        <td className="px-2 py-2">{item.hinweis || "—"}</td>
+                        <td className="px-2 py-2">
+                          {isEditingAuftrag ? (
+                            <input
+                              type="text"
+                              value={item.hinweis}
+                              onChange={(e) => updateItemField(item.lineItemId, "hinweis", e.target.value)}
+                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white"
+                              placeholder="Remark..."
+                            />
+                          ) : (
+                            item.hinweis || "—"
+                          )}
+                        </td>
 
                         {/* MwSt. */}
                         <td className="px-2 py-2 text-center">{item.mwst}%</td>
 
-                        {/* Liefermenge (Total Available Qty in Auftrag) */}
+                        {/* QTY Open */}
                         <td className="px-2 py-2 text-right font-bold">
-                          {item.max_qty}
+                          {isEditingAuftrag ? (
+                            <input
+                              type="number"
+                              value={item.max_qty}
+                              onChange={(e) => updateItemField(item.lineItemId, "max_qty", Number(e.target.value) || 0)}
+                              className="w-16 px-1 py-0.5 text-xs text-right border rounded text-gray-900 bg-white font-bold"
+                            />
+                          ) : (
+                            item.max_qty
+                          )}
                         </td>
 
-                        {/* Qty Delivered — EDITABLE INPUT highlighted in mild orange */}
+                        {/* Qty Delivered */}
                         <td className="px-2 py-2 text-right">
                           <input
                             type="number"
@@ -579,13 +745,37 @@ export default function AuftragToRechnungModal({
 
                         {/* Netto-Preis */}
                         <td className="px-2 py-2 text-right">
-                          {formatDeCurrency(item.price)}
+                          {isEditingAuftrag ? (
+                            <input
+                              type="number"
+                              step="any"
+                              value={item.price}
+                              onChange={(e) => updateItemField(item.lineItemId, "price", Number(e.target.value) || 0)}
+                              className="w-20 px-1 py-0.5 text-xs text-right border rounded text-gray-900 bg-white font-bold"
+                            />
+                          ) : (
+                            formatDeCurrency(item.price)
+                          )}
                         </td>
 
                         {/* Netto gesamt */}
                         <td className="px-2 py-2 text-right font-bold">
                           {formatDeCurrency(lineTotal)}
                         </td>
+
+                        {/* Trash delete icon in edit mode */}
+                        {isEditingAuftrag && (
+                          <td className="px-2 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.lineItemId)}
+                              className="text-red-500 hover:text-red-700 transition p-1"
+                              title="Remove item"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -631,29 +821,8 @@ export default function AuftragToRechnungModal({
             </div>
           </div>
 
-          {/* ── Linked Documents Section ── */}
-          <Section
-            title="Linked documents"
-            icon={<LinkIcon className="h-4 w-4 text-gray-500" />}
-          >
-            <p className="text-sm text-gray-500">No linked documents yet.</p>
-          </Section>
-
           {/* ── Comment Fields ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Section
-              title="Comment field"
-              icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
-            >
-              <textarea
-                rows={2}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Notes shown on invoice..."
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-400"
-              />
-            </Section>
-
             <Section
               title="Comment intern"
               icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
@@ -663,6 +832,18 @@ export default function AuftragToRechnungModal({
                 value={internalNotes}
                 onChange={(e) => setInternalNotes(e.target.value)}
                 placeholder="Internal team notes..."
+                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-400"
+              />
+            </Section>
+            <Section
+              title="Comment extern"
+              icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
+            >
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notes shown on invoice..."
                 className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-400"
               />
             </Section>
@@ -691,68 +872,67 @@ export default function AuftragToRechnungModal({
 
         </div>
 
-        {/* ── Bottom Footer Bar ── */}
+        {/* ── Bottom Footer Bar (Matching OfferDetailModal) ── */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0 bg-gray-50">
-
-          {/* Edit Auftrag Button (Toggles Inline Edit Mode) */}
-          <div className="flex items-center gap-2">
+          
+          {/* Delete Auftrag Red Button (Bottom Left) */}
+          <div>
             <button
               type="button"
-              onClick={() => setIsEditingAuftrag((prev) => !prev)}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg border transition flex items-center gap-1.5 shadow-sm ${isEditingAuftrag
-                ? "bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100"
-                : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                }`}
+              onClick={handleDeleteAuftrag}
+              disabled={deletingAuftrag}
+              className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
             >
-              <PencilIcon className="h-4 w-4 text-gray-500" />
-              {isEditingAuftrag ? "Cancel Edit Mode" : "Edit Auftrag"}
+              <TrashIcon className="h-4 w-4 text-red-500" />
+              {deletingAuftrag ? "Deleting..." : "Delete order"}
+            </button>
+          </div>
+
+          {/* Action Buttons: Cancel / Save changes / Generate */}
+          <div className="flex gap-2.5 items-center">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting || savingAuftrag}
+              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+            >
+              Cancel
             </button>
 
-            {isEditingAuftrag && (
+            {isEditingAuftrag ? (
               <button
                 type="button"
                 onClick={handleSaveAuftragEdits}
                 disabled={savingAuftrag}
-                className="px-4 py-2 text-sm font-bold bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] flex items-center gap-1.5 shadow-md disabled:opacity-50"
+                className="px-5 py-2 text-sm font-bold bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] flex items-center gap-1.5 shadow-md disabled:opacity-50 transition-all"
               >
                 {savingAuftrag ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                Save Auftrag Changes
+                Save changes
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={selectedItems.length === 0 || submitting || !deliveryDate}
+                className="px-5 py-2 text-sm font-bold bg-[#2F6B46] text-white rounded-lg hover:bg-[#255638] disabled:opacity-50 transition flex items-center gap-2 shadow-md"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <ClipboardCheck className="w-4 h-4" />
+                    Generate Rechnung &amp; Lieferschein
+                  </>
+                )}
               </button>
             )}
-          </div>
-
-          {/* Action Buttons: Close & Generate */}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={selectedItems.length === 0 || submitting || !deliveryDate}
-              className="px-5 py-2 text-sm font-bold bg-[#2F6B46] text-white rounded-lg hover:bg-[#255638] disabled:opacity-50 transition flex items-center gap-2 shadow-md"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <ClipboardCheck className="w-4 h-4" />
-                  Generate Rechnung &amp; Lieferschein
-                </>
-              )}
-            </button>
           </div>
         </div>
 

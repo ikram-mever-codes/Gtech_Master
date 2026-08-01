@@ -6,6 +6,7 @@ import { Invoice } from "../models/invoice";
 import { Offer } from "../models/offer";
 import { Order } from "../models/orders";
 import { Inquiry } from "../models/inquiry";
+import { CCIInvoice } from "../models/cci_invoice";
 
 const entityMapping: Record<string, { entity: any; column: string }> = {
   customer: { entity: Customer, column: "customerNumber" },
@@ -119,6 +120,49 @@ export class NumberSequenceService {
                 if (!isNaN(parsed) && parsed < 1000 && parsed > maxNum) {
                   maxNum = parsed;
                 }
+              }
+            }
+          }
+          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
+        } else if (sequenceKey === "invoice") {
+          sequence.prefix = "R";
+          const cciInvoices = await manager
+            .getRepository(CCIInvoice)
+            .createQueryBuilder("inv")
+            .select(["inv.invoice_number"])
+            .where("inv.invoice_number LIKE 'R%'")
+            .getMany();
+
+          let maxNum = 0;
+          for (const inv of cciInvoices) {
+            if (inv.invoice_number) {
+              const parts = String(inv.invoice_number).split("-");
+              const lastPart = parts[parts.length - 1];
+              const parsed = parseInt(lastPart, 10);
+              if (!isNaN(parsed) && parsed > maxNum) {
+                maxNum = parsed;
+              }
+            }
+          }
+          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
+        } else if (sequenceKey === "delivery_note") {
+          sequence.prefix = "L";
+          const cciInvoices = await manager
+            .getRepository(CCIInvoice)
+            .createQueryBuilder("inv")
+            .select(["inv.cargo_no", "inv.invoice_number"])
+            .where("inv.cargo_no LIKE 'L%' OR inv.invoice_number LIKE 'L%'")
+            .getMany();
+
+          let maxNum = 0;
+          for (const inv of cciInvoices) {
+            const val = inv.cargo_no || inv.invoice_number;
+            if (val) {
+              const parts = String(val).split("-");
+              const lastPart = parts[parts.length - 1];
+              const parsed = parseInt(lastPart, 10);
+              if (!isNaN(parsed) && parsed > maxNum) {
+                maxNum = parsed;
               }
             }
           }

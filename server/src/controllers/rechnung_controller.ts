@@ -49,7 +49,15 @@ export const createRechnungFromAuftrag = async (
       invoiceNo = await NumberSequenceService.getNextNumber("invoice");
     } catch (err) {
       console.warn("Could not generate sequence number for invoice:", err);
-      invoiceNo = `${defaultPrefix}${Date.now().toString().slice(-4)}`;
+      invoiceNo = `R${yy}${mm}-${Date.now().toString().slice(-4)}`;
+    }
+
+    let deliveryNoteNo = "";
+    try {
+      deliveryNoteNo = await NumberSequenceService.getNextNumber("delivery_note");
+    } catch (err) {
+      console.warn("Could not generate sequence number for delivery note:", err);
+      deliveryNoteNo = `L${yy}${mm}-${Date.now().toString().slice(-4)}`;
     }
 
     // Prepare customer snapshot
@@ -189,7 +197,7 @@ export const createRechnungFromAuftrag = async (
       const cciInv = cciInvRepo.create({
         invoice_number: invoiceNo,
         order_number: auftrag.order_no,
-        cargo_no: auftrag.order_no,
+        cargo_no: deliveryNoteNo || auftrag.order_no,
         invoice_date: now,
         delivery_date: deliveryDate ? new Date(deliveryDate) : now,
         due_date: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
