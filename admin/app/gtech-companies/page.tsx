@@ -77,7 +77,6 @@ export default function GtechCompaniesPage() {
     } catch (err: any) {
       const status = err?.response?.status || err?.status;
       if (status === 404) {
-        // Route not yet deployed on this server — show silent banner
         setNotDeployed(true);
       } else {
         console.error(err);

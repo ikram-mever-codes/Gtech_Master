@@ -4,26 +4,22 @@ export interface GtechCompany {
   id: string;
   legal_name: string;
   display_name?: string | null;
-  // Main address
   additional_address?: string | null;
   street?: string | null;
   postal_code?: string | null;
   city?: string | null;
   country?: string | null;
-  // Shipping address
   shipping_additional_address?: string | null;
   shipping_street?: string | null;
   shipping_postal_code?: string | null;
   shipping_city?: string | null;
   shipping_country?: string | null;
-  // Legal / Tax
   registry_no?: string | null;
   vat_id?: string | null;
   tax_no?: string | null;
   official_no1?: string | null;
   official_no2?: string | null;
   date_of_incorporation?: string | null;
-  // Contact
   contact_person_name?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
@@ -37,8 +33,11 @@ export const getAllGtechCompanies = async () => {
   try {
     const response = await api.get("/gtech-companies");
     return response;
-  } catch (error) {
-    handleApiError(error, "Failed to fetch GTech companies");
+  } catch (error: any) {
+    const status = error?.response?.status || error?.status;
+    if (status !== 404) {
+      handleApiError(error, "Failed to fetch GTech companies");
+    }
     throw error;
   }
 };
