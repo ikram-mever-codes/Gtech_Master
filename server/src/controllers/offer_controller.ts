@@ -1,3 +1,5 @@
+import { IsNull } from "typeorm";
+import { SalesPrice } from "../models/sales_prices";
 import { Request, Response } from "express";
 import { AppDataSource } from "../config/database";
 import {
@@ -738,6 +740,7 @@ export class CreateLineItemDto {
 }
 
 export class OfferController {
+  private salesPriceRepository = AppDataSource.getRepository(SalesPrice);
   private offerRepository: any = AppDataSource.getRepository(Offer);
   private lineItemRepository: any = AppDataSource.getRepository(OfferLineItem);
   private inquiryRepository = AppDataSource.getRepository(Inquiry);
@@ -761,6 +764,76 @@ export class OfferController {
     };
   }
 
+  private async resolveSalesPrice(
+    itemId: number,
+    customerId: string | null | undefined,
+    quantity: number,
+  ): Promise<number | null> {
+    if (!itemId || isNaN(itemId)) return null;
+    const qty = Number(quantity) || 1;
+
+    const query = this.salesPriceRepository
+      .createQueryBuilder("sp")
+      .where("sp.item_id = :itemId", { itemId });
+
+    if (customerId) {
+      query.andWhere(
+        "(sp.customer_id = :customerId OR sp.customer_id IS NULL)",
+        { customerId },
+      );
+    } else {
+      query.andWhere("sp.customer_id IS NULL");
+    }
+
+    const allPrices: SalesPrice[] = await query.getMany();
+    if (allPrices.length === 0) return null;
+
+    // Decimal columns can come back as strings from the driver — coerce
+    // explicitly with parseFloat rather than relying on implicit coercion.
+    const minQty = (p: SalesPrice) => parseFloat(String(p.min_quantity));
+    const unitPrice = (p: SalesPrice) => parseFloat(String(p.unit_price_eur));
+    const isCustomerScoped = (p: SalesPrice) => !!p.customer_id;
+
+    const qualifying = allPrices.filter((p) => minQty(p) <= qty);
+
+    if (qualifying.length > 0) {
+      qualifying.sort((a, b) => {
+        const diff = minQty(b) - minQty(a);
+        if (diff !== 0) return diff;
+        // Tie on min_quantity: the row scoped to this specific customer
+        // always wins over a catalog-wide (customer_id NULL) row.
+        return (isCustomerScoped(b) ? 1 : 0) - (isCustomerScoped(a) ? 1 : 0);
+      });
+      return unitPrice(qualifying[0]);
+    }
+
+    // Nothing qualifies for this quantity yet — fall back to the lowest
+    // min_quantity row available, preferring the customer-scoped one.
+    const sortedByMinQty = allPrices
+      .slice()
+      .sort((a, b) => minQty(a) - minQty(b));
+    const customerFallback = sortedByMinQty.find(isCustomerScoped);
+    const chosen = customerFallback || sortedByMinQty[0];
+    return unitPrice(chosen);
+  }
+  /**
+   * Effective unit price for a line item: sales_prices tier (customer-
+   * specific, then general) if one exists, otherwise the item's own plain
+   * `price` column.
+   */
+  private async getEffectiveUnitPrice(
+    item: any,
+    customerId: string | null | undefined,
+    quantity: number,
+  ): Promise<number> {
+    const tiered = await this.resolveSalesPrice(
+      Number(item.id),
+      customerId,
+      quantity,
+    );
+    if (tiered !== null) return tiered;
+    return Number(item.price) || 0;
+  }
   private async getCustomerTaxProfile(
     customerId?: string | null,
   ): Promise<any> {
@@ -1214,12 +1287,6 @@ export class OfferController {
       }
 
       const itemRepository = AppDataSource.getRepository(Item);
-      // "parent" — de_no lives on the Item's parent record, not on Item
-      // itself (see getItemById, which resolves de_no the same way:
-      // warehouse item_no_de first, falling back to parent.de_no).
-      // "customer.shippingAddresses" — needed so the fallback customer
-      // (orderedItems[0].customer, used when body.customerId is absent)
-      // carries its default shipping address for buildDeliveryAddress.
       const fetchedItems: any[] = await itemRepository.find({
         where: { id: In(requestedIds) },
         relations: [
@@ -1247,10 +1314,6 @@ export class OfferController {
           .json({ success: false, message: "No matching items found." });
       }
 
-      // batch-load warehouse records for all requested items, matched
-      // the same way getItemById matches a single item — by ItemID_DE first,
-      // falling back to item_id — so `de_no` here resolves identically to
-      // what the item detail view shows.
       const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
       const itemIdDEs = orderedItems
         .map((it) => it.ItemID_DE)
@@ -1338,8 +1401,6 @@ export class OfferController {
         notes: body.notes,
         internalNotes: body.internalNotes,
         paymentMethod: body.paymentMethod,
-        // Same default payment due days fill as createOfferFromInquiry,
-        // sourced from the recipient customer's own standing terms.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
           customer.defaultPaymentDueDays !== null
@@ -1360,48 +1421,55 @@ export class OfferController {
       });
 
       const savedOffer = await this.offerRepository.save(offer);
-      const lineItems = orderedItems.map((item, idx) => {
+
+      // NEW: per-line price resolution — customer-specific tiered price
+      // first, then general tiered price, then the item's own plain
+      // `price` column. Resolved sequentially (not Promise.all) to keep
+      // the DB query load predictable for larger multi-item offers.
+      const lineItems: OfferLineItem[] = [];
+      for (let idx = 0; idx < orderedItems.length; idx++) {
+        const item = orderedItems[idx];
         const snap = this.buildItemSnapshot(item);
 
-        // baseQuantity <- body.itemQuantities[item.id] when provided by the
-        //   create-offer picker (per-item quantity entered directly), else
-        //   falls back to the single shared body.baseQuantity, then "1".
-        // basePrice <- item.price (the Item entity's own `price` column)
-        // material  <- item's de_no, resolved the same way getItemById
-        //   resolves it: warehouse item_no_de first, falling back to
-        //   parent.de_no.
-        // photo     <- item.photo (the Item entity's own thumbnail column,
-        //   same field getItemById/getItems already expose to the frontend).
         const requestedQty =
           body.itemQuantities?.[String(item.id)]?.trim() ||
           body.baseQuantity ||
           "1";
+        const qtyNum = parseFlexibleNumber(requestedQty) || 1;
 
-        return this.lineItemRepository.create({
-          offer: savedOffer,
-          offerId: savedOffer.id,
-          sourceItemId: snap.id,
-          itemName: snap.itemName,
-          specification: snap.specification,
-          description: snap.description,
-          weight: snap.weight,
-          width: snap.width,
-          height: snap.height,
-          length: snap.length,
-          purchasePrice: snap.purchasePrice,
-          purchaseCurrency: snap.purchaseCurrency,
-          baseQuantity: requestedQty,
-          basePrice: item.price ?? 0,
-          material: getDeNo(item),
-          photo: item.photo || undefined,
-          position: idx + 1,
-          priceMatrix:
-            pricingMode === "matrix"
-              ? this.createDefaultPriceMatrix()
-              : undefined,
-          lineTotal: 0,
-        });
-      });
+        const resolvedPrice = await this.getEffectiveUnitPrice(
+          item,
+          customer.id,
+          qtyNum,
+        );
+
+        lineItems.push(
+          this.lineItemRepository.create({
+            offer: savedOffer,
+            offerId: savedOffer.id,
+            sourceItemId: snap.id,
+            itemName: snap.itemName,
+            specification: snap.specification,
+            description: snap.description,
+            weight: snap.weight,
+            width: snap.width,
+            height: snap.height,
+            length: snap.length,
+            purchasePrice: snap.purchasePrice,
+            purchaseCurrency: snap.purchaseCurrency,
+            baseQuantity: requestedQty,
+            basePrice: resolvedPrice,
+            material: getDeNo(item),
+            photo: item.photo || undefined,
+            position: idx + 1,
+            priceMatrix:
+              pricingMode === "matrix"
+                ? this.createDefaultPriceMatrix()
+                : undefined,
+            lineTotal: 0,
+          }),
+        );
+      }
 
       await this.lineItemRepository.save(lineItems);
       await this.calculateOfferTotals(savedOffer.id);
@@ -1428,6 +1496,7 @@ export class OfferController {
       });
     }
   }
+
   private buildDeliveryAddress(customer: any): Offer["deliveryAddress"] {
     const defaultAddress = (customer.shippingAddresses || []).find(
       (addr: any) => addr.is_default,
@@ -1523,16 +1592,35 @@ export class OfferController {
           (max: number, li: OfferLineItem) => Math.max(max, li.position || 0),
           0,
         ) + 1;
-      const basePrice = parseFlexibleNumber(body.basePrice) ?? 0;
       const baseQuantity = body.baseQuantity?.trim() || "1";
+      const qtyNum = parseFlexibleNumber(baseQuantity) || 1;
       const weight = parseFlexibleNumber(body.weight);
-      // Falls back to the offer's own tax rate whenever the caller doesn't
-      // specify one (e.g. "Add existing item"), and to 19% only if neither
-      // is available.
       const taxRate =
         body.taxRate !== undefined
           ? (parseFlexibleNumber(body.taxRate) ?? offer.taxRate ?? 19)
           : (offer.taxRate ?? 19);
+
+      // NEW: whenever this line is tied to a catalog item (sourceItemId,
+      // e.g. "Add existing item"), the price always comes from the
+      // sales_prices resolution — customer-specific tier, then general
+      // tier, then the item's own plain price — never from the caller's
+      // basePrice, since the frontend can't know these tiers itself.
+      // Freetext ("Freizeile") lines with no sourceItemId keep using
+      // whatever basePrice was supplied (defaults to 0, edited afterwards).
+      let basePrice = parseFlexibleNumber(body.basePrice) ?? 0;
+      if (body.sourceItemId) {
+        const itemRepository = AppDataSource.getRepository(Item);
+        const sourceItem = await itemRepository.findOne({
+          where: { id: parseInt(body.sourceItemId, 10) },
+        });
+        if (sourceItem) {
+          basePrice = await this.getEffectiveUnitPrice(
+            sourceItem,
+            offer.customerId,
+            qtyNum,
+          );
+        }
+      }
 
       const lineItem = this.lineItemRepository.create({
         offer,
@@ -1549,10 +1637,7 @@ export class OfferController {
         weight: weight ?? undefined,
         sourceItemId: body.sourceItemId || undefined,
         taxRate,
-        lineTotal:
-          basePrice !== null
-            ? basePrice * (parseFlexibleNumber(body.baseQuantity) || 1)
-            : 0,
+        lineTotal: basePrice !== null ? basePrice * qtyNum : 0,
       });
 
       const saved = await this.lineItemRepository.save(lineItem);
@@ -1572,6 +1657,7 @@ export class OfferController {
       });
     }
   }
+
   async deleteLineItem(request: Request, response: Response) {
     try {
       const { offerId, lineItemId } = request.params;
@@ -1676,6 +1762,63 @@ export class OfferController {
     }
   }
 
+  async previewLineItemPrice(request: Request, response: Response) {
+    try {
+      const { offerId, lineItemId } = request.params;
+      const quantity =
+        parseFlexibleNumber(request.query.quantity as string) || 1;
+
+      const offer = await this.offerRepository.findOne({
+        where: { id: offerId },
+      });
+      if (!offer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Offer not found" });
+      }
+
+      const lineItem = await this.lineItemRepository.findOne({
+        where: { id: lineItemId, offerId },
+      });
+      if (!lineItem) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Line item not found" });
+      }
+
+      // Only catalog-sourced lines have tiered sales prices to check;
+      // Freizeile lines have no source item, so there's nothing to preview.
+      if (!lineItem.sourceItemId) {
+        return response
+          .status(200)
+          .json({ success: true, data: { price: null } });
+      }
+
+      const itemRepository = AppDataSource.getRepository(Item);
+      const sourceItem = await itemRepository.findOne({
+        where: { id: parseInt(lineItem.sourceItemId, 10) },
+      });
+      if (!sourceItem) {
+        return response
+          .status(200)
+          .json({ success: true, data: { price: null } });
+      }
+
+      const price = await this.getEffectiveUnitPrice(
+        sourceItem,
+        offer.customerId,
+        quantity,
+      );
+
+      return response.status(200).json({ success: true, data: { price } });
+    } catch (error) {
+      console.error("Error previewing line item price:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
   async convertOfferToItem(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -2518,12 +2661,35 @@ export class OfferController {
       ) {
         (updateLineItemDto as any).baseQuantity = "1";
       }
-      // Coerce the per-line VAT rate the same way basePrice/samplePrice are
-      // coerced above — accepts "19", "19,00", 19, etc., and falls back to
-      // the offer's own rate (then 19%) if it can't be parsed.
       if (updateLineItemDto.taxRate !== undefined) {
         (updateLineItemDto as any).taxRate =
           parseFlexibleNumber(updateLineItemDto.taxRate) ?? offer.taxRate ?? 19;
+      }
+
+      // NEW: if the quantity is changing on a catalog-sourced line and the
+      // caller didn't explicitly pass a basePrice, re-resolve the price
+      // from sales_prices for the new quantity — a bigger quantity may
+      // cross into a cheaper tier. An explicit basePrice in the request
+      // (a manual edit in the offer table) always wins and skips this.
+      if (
+        updateLineItemDto.baseQuantity !== undefined &&
+        updateLineItemDto.basePrice === undefined &&
+        lineItem.sourceItemId
+      ) {
+        const itemRepository = AppDataSource.getRepository(Item);
+        const sourceItem = await itemRepository.findOne({
+          where: { id: parseInt(lineItem.sourceItemId, 10) },
+        });
+        if (sourceItem) {
+          const qtyNum =
+            parseFlexibleNumber(updateLineItemDto.baseQuantity) || 1;
+          (updateLineItemDto as any).basePrice =
+            await this.getEffectiveUnitPrice(
+              sourceItem,
+              offer.customerId,
+              qtyNum,
+            );
+        }
       }
 
       Object.assign(lineItem, updateLineItemDto);
@@ -2545,9 +2711,6 @@ export class OfferController {
       }
 
       const updatedLineItem = await this.lineItemRepository.save(lineItem);
-      // A tax-rate change doesn't touch lineTotal but does change which VAT
-      // group this line falls into and how much tax the offer owes overall,
-      // so recalculation must always run — not just on price/qty changes.
       await this.calculateOfferTotals(offerId);
 
       return response.status(200).json({

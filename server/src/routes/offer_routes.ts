@@ -56,6 +56,10 @@ router.delete(
   offerController.deleteOffer.bind(offerController),
 );
 
+router.get(
+  "/:offerId/line-items/:lineItemId/price-preview",
+  offerController.previewLineItemPrice.bind(offerController),
+);
 // Offer revisions
 router.post(
   "/:id/revisions",

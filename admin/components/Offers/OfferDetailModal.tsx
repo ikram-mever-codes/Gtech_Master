@@ -38,6 +38,7 @@ import {
   getCustomerShippingAddresses,
   type LinkedDocumentsResult,
   type CustomerShippingAddress,
+  previewLineItemPrice,
 } from "@/api/offers";
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
@@ -738,6 +739,65 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     });
   }
 
+  /** Commits a quantity change on a classic line item. If the item is
+   * catalog-sourced, first checks whether a sales-price tier applies to
+   * the new quantity; if that resolved price differs from the current
+   * one, asks for confirmation before overriding it. Either way, the
+   * quantity itself is always saved. */
+  const handleQuantityCommit = async (item: any, raw: string) => {
+    const newQty = raw.trim() || "1";
+
+    if (!item.sourceItemId) {
+      await persistLine(item.id, { baseQuantity: newQty });
+      return;
+    }
+
+    try {
+      const preview: any = await previewLineItemPrice(
+        offer.id,
+        item.id,
+        newQty,
+      );
+      const tieredPrice = preview?.data?.price;
+      const currentPrice = parseFlexibleNumber(item.basePrice) ?? 0;
+
+      if (
+        tieredPrice !== null &&
+        tieredPrice !== undefined &&
+        Math.abs(tieredPrice - currentPrice) > 0.0001
+      ) {
+        const confirmed = window.confirm(
+          `There is a sales price for quantity ${newQty}: ${formatCurrency(
+            tieredPrice,
+            offer.currency,
+          )}. Override the current price (${formatCurrency(
+            currentPrice,
+            offer.currency,
+          )}) with it?`,
+        );
+
+        if (confirmed) {
+          await persistLine(item.id, {
+            baseQuantity: newQty,
+            basePrice: tieredPrice,
+          });
+        } else {
+          // Declined — keep the current price explicitly so the backend
+          // doesn't silently re-resolve it from the new quantity.
+          await persistLine(item.id, {
+            baseQuantity: newQty,
+            basePrice: currentPrice,
+          });
+        }
+        return;
+      }
+
+      await persistLine(item.id, { baseQuantity: newQty });
+    } catch (e) {
+      console.error("Couldn't check tiered pricing:", e);
+      await persistLine(item.id, { baseQuantity: newQty });
+    }
+  };
   function buildForm(o: any) {
     return {
       title: o.title || "",
@@ -798,17 +858,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         deliveryAddress: {
           addressName: "",
           contactName:
-            offer.customerSnapshot?.legalName ||
-            offer.customerSnapshot?.companyName ||
+            offer?.customerSnapshot?.legalName ||
+            offer?.customerSnapshot?.companyName ||
             "",
           street:
-            offer.customerSnapshot?.address ||
-            offer.customerSnapshot?.street ||
+            offer?.customerSnapshot?.address ||
+            offer?.customerSnapshot?.street ||
             "",
-          postalCode: offer.customerSnapshot?.postalCode || "",
-          city: offer.customerSnapshot?.city || "",
-          country: offer.customerSnapshot?.country || "",
-          contactPhone: offer.customerSnapshot?.contactPhoneNumber || "",
+          postalCode: offer?.customerSnapshot?.postalCode || "",
+          city: offer?.customerSnapshot?.city || "",
+          country: offer?.customerSnapshot?.country || "",
+          contactPhone: offer?.customerSnapshot?.contactPhoneNumber || "",
         },
       });
       return;
@@ -1368,6 +1428,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       })
       .sort((a, b) => b.rate - a.rate);
   })();
+
+  const shippingTotalForDisplay = edit
+    ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
+    : (offer?.shippingCost || 0) * (offer?.shippingQuantity || 1);
+  const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
+  const displayTotal =
+    (offer?.subtotal || 0) - (offer?.discountAmount || 0) + vatTaxSum;
   // --- Linked documents ---------------------------------------------------
   const linkedDocsCount = linkedDocs
     ? (
@@ -1633,14 +1700,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         ) : (
                           <AddressBlock
                             addr={{
-                              companyName: offer.customerSnapshot?.companyName,
-                              legalName: offer.customerSnapshot?.legalName,
-                              address: offer.customerSnapshot?.address,
-                              street: offer.customerSnapshot?.street,
-                              postalCode: offer.customerSnapshot?.postalCode,
-                              city: offer.customerSnapshot?.city,
-                              country: offer.customerSnapshot?.country,
-                              vatId: offer.customerSnapshot?.vatId,
+                              companyName: offer?.customerSnapshot?.companyName,
+                              legalName: offer?.customerSnapshot?.legalName,
+                              address: offer?.customerSnapshot?.address,
+                              street: offer?.customerSnapshot?.street,
+                              postalCode: offer?.customerSnapshot?.postalCode,
+                              city: offer?.customerSnapshot?.city,
+                              country: offer?.customerSnapshot?.country,
+                              vatId: offer?.customerSnapshot?.vatId,
                             }}
                             emptyText="No customer snapshot."
                           />
@@ -2442,9 +2509,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                                     value={item.baseQuantity}
                                     onCommit={(raw) =>
-                                      persistLine(item.id, {
-                                        baseQuantity: raw.trim() || "1",
-                                      })
+                                      handleQuantityCommit(item, raw)
                                     }
                                   />
                                 ) : (
@@ -2965,9 +3030,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     ))}
                   <div className="border-t pt-2 flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span>
-                      {formatCurrency(offer.totalAmount || 0, offer.currency)}
-                    </span>
+                    <span>{formatCurrency(displayTotal, offer.currency)}</span>
                   </div>
                 </div>
               </div>
