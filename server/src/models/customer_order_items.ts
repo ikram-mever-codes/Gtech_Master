@@ -46,22 +46,68 @@ export class CustomerOrderItem {
   @Column({ type: "float", nullable: true })
   weight?: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 3, default: 1, transformer: numericTransformer })
+  @Column({ type: "float", nullable: true })
+  extraWeight?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 1,
+    transformer: numericTransformer,
+  })
   quantity!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 3, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
   price!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  /** Per-line VAT override — only meaningful for Freizeile lines (no
+   * sourceItemId/sourceLineItemId); catalog lines always follow the
+   * order's own tax_rate. Mirrors OfferLineItem.taxRate. */
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  taxRate?: number;
+
+  @Column({ type: "varchar", length: 20, nullable: true })
+  highlightColor?: string;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   lineTotal!: number;
 
   @Column({ type: "integer", default: 1 })
   position!: number;
 
-  @Column({ name: "source_line_item_id", type: "varchar", length: 100, nullable: true })
+  @Column({
+    name: "source_line_item_id",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
   sourceLineItemId?: string;
 
-  @Column({ name: "source_item_id", type: "varchar", length: 100, nullable: true })
+  @Column({
+    name: "source_item_id",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
   sourceItemId?: string;
 
   @Column({ type: "text", nullable: true })
