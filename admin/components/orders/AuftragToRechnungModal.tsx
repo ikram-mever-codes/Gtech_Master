@@ -25,6 +25,8 @@ interface SelectedItemState {
   price: number;
   selected: boolean;
   is_stock_item?: "Y" | "N" | string;
+  stock_eu?: number | null;
+  stock_cn?: number | null;
 }
 
 interface AuftragToRechnungModalProps {
@@ -36,7 +38,7 @@ interface AuftragToRechnungModalProps {
 }
 
 const WAREHOUSE_OPTIONS = [
-  { value: "CN", label: "CN — China Warehouse (Default)" },
+  { value: "CN", label: "CN — China Warehouse" },
   { value: "EU", label: "EU — Europe Warehouse" },
 ];
 
@@ -132,7 +134,11 @@ export default function AuftragToRechnungModal({
   const [submitting, setSubmitting] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [isDatePastOrEmpty, setIsDatePastOrEmpty] = useState(false);
-  const [warehouse, setWarehouse] = useState<"CN" | "EU">("CN");
+  // Single source of truth for the selected warehouse — used both by the
+  // header selector and by the per-line stock validation. Previously this
+  // was split across two states ("warehouse" and "stockWhere"), which let
+  // the selector and the validation drift out of sync.
+  const [stockWhere, setStockWhere] = useState<"CN" | "EU">("CN");
 
   // Inline Edit Mode state (matching OfferDetailModal)
   const [isEditingAuftrag, setIsEditingAuftrag] = useState(false);
@@ -164,6 +170,8 @@ export default function AuftragToRechnungModal({
           it.item?.is_stock_item ||
           it.sourceItem?.is_stock_item ||
           "N";
+        const stockEu = it.stock_eu ?? it.item?.stock_eu ?? null;
+        const stockCn = it.stock_cn ?? it.item?.stock_cn ?? null;
 
         return {
           id: String(it.id),
@@ -185,6 +193,8 @@ export default function AuftragToRechnungModal({
           price: itemPrice,
           selected: true,
           is_stock_item: isStock,
+          stock_eu: stockEu,
+          stock_cn: stockCn,
         };
       },
     );
@@ -192,8 +202,7 @@ export default function AuftragToRechnungModal({
     setItems(mapped);
     setNotes(auftrag.notes || auftrag.comment || "");
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
-    setEditTitle(auftrag.title || auftrag.comment || ""); // ← add this line
-
+    setEditTitle(auftrag.title || auftrag.comment || "");
     // Populate Customer Address & Defaults State
     const cust = auftrag.customerSnapshot || auftrag.customer || {};
     setEditCompanyName(
@@ -265,13 +274,31 @@ export default function AuftragToRechnungModal({
       }
     }
 
-    setWarehouse("CN");
+    // Set warehouse from existing order if available, else default to CN
+    setStockWhere((auftrag.stock_where as "CN" | "EU") || "CN");
+
     setIsEditingAuftrag(false);
   }, [isOpen, auftrag]);
 
   if (!isOpen || !auftrag) return null;
-
   const hasStockItems = items.some((it) => it.is_stock_item === "Y");
+
+  /** The actual on-hand quantity for a stock item at the currently
+   * selected warehouse — null for non-stock lines. */
+  const getAvailableStock = (item: SelectedItemState): number | null => {
+    if (item.is_stock_item !== "Y") return null;
+    const val = stockWhere === "CN" ? item.stock_cn : item.stock_eu;
+    return val ?? 0;
+  };
+
+  /** True if this line, as currently selected/quantified, would block
+   * "Generate Rechnung & Lieferschein" — only stock lines can be invalid,
+   * and only while selected with a qty exceeding what's on hand. */
+  const isStockInvalid = (item: SelectedItemState): boolean => {
+    if (item.is_stock_item !== "Y" || !item.selected) return false;
+    const available = getAvailableStock(item);
+    return available !== null && item.qty > available;
+  };
 
   const toggleSelect = (lineItemId: string) => {
     setItems((prev) =>
@@ -319,6 +346,10 @@ export default function AuftragToRechnungModal({
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
 
+  // Whether any currently-selected line would block generation because it
+  // requests more stock than is available at the chosen warehouse.
+  const hasInvalidSelection = selectedItems.some((it) => isStockInvalid(it));
+
   const cust = auftrag.customerSnapshot || auftrag.customer || {};
   const companyName =
     editCompanyName ||
@@ -359,6 +390,7 @@ export default function AuftragToRechnungModal({
         deliveryDate,
         notes,
         internalNotes,
+        stock_where: hasStockItems ? stockWhere : undefined,
         customerSnapshot: {
           ...cust,
           companyName: editCompanyName,
@@ -415,6 +447,13 @@ export default function AuftragToRechnungModal({
       );
       return;
     }
+    if (hasInvalidSelection) {
+      toast.error(
+        "One or more stock items exceed available stock.",
+        errorStyles,
+      );
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -431,7 +470,7 @@ export default function AuftragToRechnungModal({
         notes,
         {
           deliveryDate,
-          warehouse: hasStockItems ? warehouse : undefined,
+          warehouse: hasStockItems ? stockWhere : undefined,
         } as any,
       );
 
@@ -479,8 +518,25 @@ export default function AuftragToRechnungModal({
             </h2>
           </div>
 
-          {/* Close X Button */}
+          {/* Warehouse Selector + Close Button in Header */}
           <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Warehouse Selector - only show if there are stock items */}
+            {hasStockItems && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg">
+                <Warehouse className="w-4 h-4 text-amber-600" />
+                <select
+                  value={stockWhere}
+                  onChange={(e) => setStockWhere(e.target.value as "CN" | "EU")}
+                  className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-800 cursor-pointer"
+                >
+                  {WAREHOUSE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -686,6 +742,9 @@ export default function AuftragToRechnungModal({
                     <th className="px-2 py-2 text-right font-semibold w-24">
                       QTY Open
                     </th>
+                    <th className="px-2 py-2 text-right font-semibold w-20">
+                      Stock
+                    </th>
                     <th className="px-2 py-2 text-right font-semibold w-28">
                       Qty Delivered
                     </th>
@@ -696,7 +755,7 @@ export default function AuftragToRechnungModal({
                       Netto gesamt
                     </th>
                     {isEditingAuftrag && (
-                      <th className="px-2 py-2 text-center font-semibold w-10"></th>
+                      <th className="px-2 py-2 text-center font-semibold w-10" />
                     )}
                   </tr>
                 </thead>
@@ -704,7 +763,7 @@ export default function AuftragToRechnungModal({
                   {items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={isEditingAuftrag ? 12 : 11}
+                        colSpan={isEditingAuftrag ? 13 : 12}
                         className="text-center py-6 text-sm text-gray-500"
                       >
                         No line items found.
@@ -714,9 +773,11 @@ export default function AuftragToRechnungModal({
                   {items.map((item) => {
                     const lineTotal = item.qty * item.price;
                     const isStock = item.is_stock_item === "Y";
+                    const availableStock = getAvailableStock(item);
+                    const invalid = isStockInvalid(item);
 
-                    const rowBgClass = isStock
-                      ? "bg-[#e59837]/90 text-white font-medium"
+                    const rowBgClass = invalid
+                      ? "bg-rose-200/70 text-rose-900 font-medium"
                       : "bg-[#dff0d8] text-gray-900 font-medium";
 
                     return (
@@ -838,6 +899,23 @@ export default function AuftragToRechnungModal({
                           )}
                         </td>
 
+                        {/* Stock */}
+                        <td className="px-2 py-2 text-right">
+                          {isStock ? (
+                            <span
+                              className={
+                                invalid
+                                  ? "font-bold text-rose-700"
+                                  : "font-medium text-gray-700"
+                              }
+                            >
+                              {availableStock}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+
                         {/* Qty Delivered */}
                         <td className="px-2 py-2 text-right">
                           <input
@@ -850,7 +928,11 @@ export default function AuftragToRechnungModal({
                             onChange={(e) =>
                               updateQty(item.lineItemId, e.target.value)
                             }
-                            className="w-20 px-1.5 py-1 text-right border border-orange-400 bg-amber-100 font-bold text-gray-900 rounded focus:ring-2 focus:ring-orange-500 shadow-sm"
+                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${
+                              invalid
+                                ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
+                                : "border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500"
+                            }`}
                           />
                         </td>
 
@@ -880,7 +962,6 @@ export default function AuftragToRechnungModal({
                           {formatDeCurrency(lineTotal)}
                         </td>
 
-                        {/* Trash delete icon in edit mode */}
                         {isEditingAuftrag && (
                           <td className="px-2 py-2 text-center">
                             <button
@@ -956,27 +1037,6 @@ export default function AuftragToRechnungModal({
               />
             </Section>
           </div>
-
-          {/* ── Warehouse Selector (If Stock Items Exist) ── */}
-          {hasStockItems && (
-            <div className="p-3 border border-amber-400 bg-amber-50 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
-                <Warehouse className="w-4 h-4 text-orange-600" />
-                <span>Stock item(s) present — Choose Warehouse:</span>
-              </div>
-              <select
-                value={warehouse}
-                onChange={(e) => setWarehouse(e.target.value as "CN" | "EU")}
-                className="px-3 py-1 text-sm font-bold border border-orange-400 bg-white rounded text-gray-900 focus:ring-2 focus:ring-orange-500"
-              >
-                {WAREHOUSE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0 bg-gray-50">
@@ -1024,7 +1084,10 @@ export default function AuftragToRechnungModal({
                 type="button"
                 onClick={handleSubmit}
                 disabled={
-                  selectedItems.length === 0 || submitting || !deliveryDate
+                  selectedItems.length === 0 ||
+                  submitting ||
+                  !deliveryDate ||
+                  hasInvalidSelection
                 }
                 className="px-5 py-2 text-sm font-bold bg-[#2F6B46] text-white rounded-lg hover:bg-[#255638] disabled:opacity-50 transition flex items-center gap-2 shadow-md"
               >

@@ -12,6 +12,11 @@ import { CustomerOrderItem } from "./customer_order_items";
 import { Customer } from "./customers";
 import { numericTransformer } from "../utils/numeric-transformer";
 
+export enum StockWhere {
+  EU = "EU",
+  CN = "CN",
+}
+
 @Entity({ name: "customer_orders" })
 export class CustomerOrder {
   @PrimaryGeneratedColumn()
@@ -162,6 +167,13 @@ export class CustomerOrder {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   date_delivery?: string;
+
+  @Column({
+    type: "enum",
+    enum: StockWhere,
+    default: StockWhere.EU,
+  })
+  stock_where!: StockWhere;
 
   @OneToMany(() => CustomerOrderItem, (item) => item.customerOrder, {
     cascade: true,

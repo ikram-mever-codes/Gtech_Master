@@ -1,7 +1,7 @@
 import { In, IsNull } from "typeorm";
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
-import { CustomerOrder } from "../models/customer_orders";
+import { CustomerOrder, StockWhere } from "../models/customer_orders";
 import { CustomerOrderItem } from "../models/customer_order_items";
 import { Customer } from "../models/customers";
 import { Item } from "../models/items";
@@ -16,6 +16,44 @@ import {
 import { WarehouseItem } from "../models/warehouse_items";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
+
+/**
+ * Helper function to check if any of the order's line items are stock items
+ * Returns true if at least one line item has is_stock_item = "Y"
+ */
+async function hasStockItems(orderId: number): Promise<boolean> {
+  const orderItemRepo = AppDataSource.getRepository(CustomerOrderItem);
+  const orderItems = await orderItemRepo.find({
+    where: { customerOrderId: orderId },
+    relations: ["sourceItem"],
+  });
+
+  for (const item of orderItems) {
+    if (item.sourceItemId) {
+      // Check if the source item has is_stock_item = "Y"
+      const itemRepo = AppDataSource.getRepository(Item);
+      const sourceItem = await itemRepo.findOne({
+        where: { id: parseInt(item.sourceItemId, 10) },
+      });
+      if (sourceItem && sourceItem.is_stock_item === "Y") {
+        return true;
+      }
+    }
+    // Also check if the line item itself has isStockItem flag
+    if ((item as any).isStockItem === true) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Helper function to determine if stock_where should be set
+ * Only sets stock_where if there's at least one stock item in the order
+ */
+async function shouldSetStockWhere(orderId: number): Promise<boolean> {
+  return await hasStockItems(orderId);
+}
 
 // --- Tiered sales price resolution — identical rule to the Offer flow ----
 async function resolveSalesPrice(
@@ -142,7 +180,7 @@ export const createAuftragFromOffer = async (
 ) => {
   try {
     const { offerId } = req.params;
-    const { selectedItems } = req.body;
+    const { selectedItems, stock_where } = req.body;
 
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       res.status(400).json({
@@ -163,13 +201,6 @@ export const createAuftragFromOffer = async (
       return;
     }
 
-    // ---------------------------------------------------------------
-    // Backfill material (Art.-Nr.) / photo for any offer line item that's
-    // still missing them, exactly like OfferController.getOfferById does —
-    // reading the offer straight from its repository here skips that
-    // backfill, so without this step the Auftrag would inherit blank
-    // Art.-Nr./thumbnail for older line items.
-    // ---------------------------------------------------------------
     const itemRepository = AppDataSource.getRepository(Item);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
@@ -238,6 +269,16 @@ export const createAuftragFromOffer = async (
     }
 
     const orderItemsToCreate: Partial<CustomerOrderItem>[] = [];
+    const hasStockItem = selectedItems.some((selItem: any) => {
+      const lineItem = (offer.lineItems || []).find(
+        (li) => li.id === selItem.lineItemId,
+      );
+      if (lineItem?.sourceItemId) {
+        const src = sourceItemById.get(String(lineItem.sourceItemId));
+        return src?.is_stock_item === "Y";
+      }
+      return false;
+    });
 
     selectedItems.forEach((selItem: any, idx: number) => {
       const lineItem = (offer.lineItems || []).find(
@@ -298,6 +339,15 @@ export const createAuftragFromOffer = async (
       .padStart(2, "0")}.${now.getFullYear()}`;
 
     const customerOrderRepo: any = AppDataSource.getRepository(CustomerOrder);
+
+    let finalStockWhere = null;
+    if (hasStockItem && stock_where) {
+      finalStockWhere = stock_where;
+    } else if (hasStockItem && !stock_where) {
+      finalStockWhere = StockWhere.CN; // ← was StockWhere.EU
+    }
+    // If no stock items, stock_where remains undefined (won't be set)
+
     const customerOrder = customerOrderRepo.create({
       order_no: auftragNo,
       offer_id: offer.id,
@@ -321,6 +371,7 @@ export const createAuftragFromOffer = async (
       deliveryAddress: offer.deliveryAddress || null,
       date_created: dateCreatedStr,
       date_delivery: offer.deliveryTime,
+      ...(finalStockWhere && { stock_where: finalStockWhere }),
     });
 
     const savedOrder: any = await customerOrderRepo.save(customerOrder);
@@ -367,6 +418,8 @@ export const getAllCustomerOrders = async (
       relations: ["orderItems", "customer"],
     });
 
+    await attachStockInfoToOrders(orders);
+
     res.json({ success: true, data: orders });
   } catch (error) {
     next(error);
@@ -403,6 +456,8 @@ export const getCustomerOrderById = async (
       }
     }
 
+    await attachStockInfoToOrders([order]);
+
     res.json({ success: true, data: order });
   } catch (error) {
     next(error);
@@ -433,142 +488,6 @@ export const deleteCustomerOrder = async (
   }
 };
 
-export const createAuftragFromInquiry = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { inquiryId } = req.params;
-    const { title, paymentMethod, shippingMethod, notes } = req.body;
-
-    const inquiryRepo = AppDataSource.getRepository(Inquiry);
-    const inquiry = await inquiryRepo.findOne({
-      where: { id: inquiryId },
-      relations: ["customer", "customer.businessDetails", "requests"],
-    });
-
-    if (!inquiry) {
-      res.status(404).json({ success: false, message: "Inquiry not found" });
-      return;
-    }
-
-    const customer = inquiry.customer;
-    if (!customer) {
-      res.status(404).json({
-        success: false,
-        message: "Customer not found for this inquiry",
-      });
-      return;
-    }
-
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const defaultPrefix = `B${yy}${mm}-`;
-
-    let auftragNo = "";
-    try {
-      auftragNo = await NumberSequenceService.getNextNumber("customer_order");
-    } catch (err) {
-      console.warn(
-        "Could not generate sequence number for customer_order:",
-        err,
-      );
-      auftragNo = `${defaultPrefix}${Date.now().toString().slice(-4)}`;
-    }
-
-    const orderItemsToCreate: Partial<CustomerOrderItem>[] = [];
-    const requests = inquiry.requests || [];
-    requests.forEach((reqItem: any, idx: number) => {
-      const qty = Number(reqItem.qty) || 1;
-      const price = Number(reqItem.salesPrice || reqItem.purchasePrice || 0);
-      const lineTotal = qty * price;
-
-      orderItemsToCreate.push({
-        itemName: reqItem.itemName || "Item",
-        material: reqItem.material || "",
-        itemNo: reqItem.material || "",
-        photo: (reqItem as any).photo || (reqItem as any).picture || undefined,
-        specification: reqItem.specification || "",
-        description: reqItem.comment || reqItem.extraNote || "",
-        weight: reqItem.weight || undefined,
-        quantity: qty,
-        price: price,
-        lineTotal: lineTotal,
-        position: idx + 1,
-        sourceLineItemId: reqItem.id || undefined,
-        notes: reqItem.comment || "",
-      });
-    });
-
-    const taxRate = 19;
-    const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
-      now.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}.${now.getFullYear()}`;
-
-    const customerSnapshot = {
-      id: customer.id,
-      customerNumber: customer.customerNumber,
-      companyName: customer.companyName,
-      legalName: customer.legalName,
-      email: customer.email,
-      contactEmail: customer.contactEmail,
-      contactPhoneNumber: customer.contactPhoneNumber,
-      vatId: customer.vatTaxId || customer.taxNumber || "",
-      address: customer.businessDetails?.address || "",
-      city: customer.businessDetails?.city || "",
-      postalCode: customer.businessDetails?.postalCode || "",
-      country: customer.businessDetails?.country || customer.country || "",
-      street: (customer.businessDetails as any)?.street,
-    };
-
-    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
-    const customerOrder = customerOrderRepo.create({
-      order_no: auftragNo,
-      title: title || inquiry.name,
-      customer_id: customer.id,
-      status: "Draft",
-      currency: "EUR",
-      tax_rate: taxRate,
-      payment_method: paymentMethod,
-      shipping_method: shippingMethod,
-      notes: notes || inquiry.description || "",
-      customerSnapshot: customerSnapshot,
-      date_created: dateCreatedStr,
-    });
-
-    const savedOrder = await customerOrderRepo.save(customerOrder);
-
-    const customerOrderItemRepo =
-      AppDataSource.getRepository(CustomerOrderItem);
-    const itemEntities = orderItemsToCreate.map((item) =>
-      customerOrderItemRepo.create({
-        ...item,
-        customerOrder: savedOrder,
-        customerOrderId: savedOrder.id,
-      }),
-    );
-    await customerOrderItemRepo.save(itemEntities);
-    await calculateOrderTotals(savedOrder.id);
-
-    const fullOrder = await customerOrderRepo.findOne({
-      where: { id: savedOrder.id },
-      relations: ["orderItems", "customer"],
-    });
-
-    res.status(201).json({
-      success: true,
-      message: `Auftrag ${auftragNo} created successfully`,
-      data: fullOrder,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const createAuftragFromItems = async (
   req: Request,
   res: Response,
@@ -582,6 +501,7 @@ export const createAuftragFromItems = async (
       paymentMethod,
       shippingMethod,
       notes,
+      stock_where,
     } = req.body;
 
     if (!customerId) {
@@ -620,6 +540,12 @@ export const createAuftragFromItems = async (
         ? await itemRepo.find({ where: { id: In(itemIds) } })
         : [];
     const itemMap = new Map(dbItems.map((it) => [String(it.id), it]));
+
+    // Check if any selected item is a stock item
+    const hasStockItem = selectedItems.some((selItem: any) => {
+      const matchedItem = itemMap.get(String(selItem.itemId || selItem.id));
+      return matchedItem?.is_stock_item === "Y";
+    });
 
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
@@ -705,6 +631,15 @@ export const createAuftragFromItems = async (
     };
 
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+
+    // Only set stock_where if there's at least one stock item
+    let finalStockWhere = null;
+    if (hasStockItem && stock_where) {
+      finalStockWhere = stock_where;
+    } else if (hasStockItem && !stock_where) {
+      finalStockWhere = StockWhere.CN; // ← was StockWhere.EU
+    }
+
     const customerOrder = customerOrderRepo.create({
       order_no: auftragNo,
       title: orderTitle,
@@ -717,9 +652,10 @@ export const createAuftragFromItems = async (
       notes: notes || "",
       customerSnapshot: customerSnapshot,
       date_created: dateCreatedStr,
+      ...(finalStockWhere && { stock_where: finalStockWhere }),
     });
 
-    const savedOrder = await customerOrderRepo.save(customerOrder);
+    const savedOrder: any = await customerOrderRepo.save(customerOrder);
 
     const customerOrderItemRepo =
       AppDataSource.getRepository(CustomerOrderItem);
@@ -774,6 +710,7 @@ export const updateCustomerOrder = async (
       deliveryTerms,
       termsConditions,
       highlightColor,
+      stock_where,
     } = req.body;
 
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
@@ -812,6 +749,26 @@ export const updateCustomerOrder = async (
     if (discountPercentage !== undefined)
       auftrag.discount_percentage =
         parseFlexibleNumberOrZero(discountPercentage);
+
+    // Only update stock_where if the order has stock items
+    if (stock_where !== undefined) {
+      const hasStock = await hasStockItems(Number(id));
+      if (hasStock) {
+        // Validate that the value is either "EU" or "CN"
+        if (stock_where === StockWhere.EU || stock_where === StockWhere.CN) {
+          auftrag.stock_where = stock_where;
+        } else {
+          res.status(400).json({
+            success: false,
+            message: "stock_where must be either 'EU' or 'CN'",
+          });
+          return;
+        }
+      } else {
+        // If no stock items, remove stock_where if it exists
+        auftrag.stock_where = undefined as any;
+      }
+    }
 
     const taxRateChanged =
       taxRate !== undefined && Number(taxRate) !== Number(auftrag.tax_rate);
@@ -875,6 +832,7 @@ export const createOrderLineItem = async (
     const quantity = parseFlexibleNumber(body.quantity) || 1;
     let price = parseFlexibleNumber(body.price) ?? 0;
 
+    let isStockItem = false;
     if (body.sourceItemId) {
       const itemRepository = AppDataSource.getRepository(Item);
       const sourceItem = await itemRepository.findOne({
@@ -886,6 +844,7 @@ export const createOrderLineItem = async (
           order.customer_id,
           quantity,
         );
+        isStockItem = sourceItem.is_stock_item === "Y";
       }
     }
 
@@ -920,6 +879,20 @@ export const createOrderLineItem = async (
 
     const saved = await orderItemRepo.save(lineItem);
     await calculateOrderTotals(order.id);
+
+    // After adding a line item, check if we need to update stock_where on the order
+    if (isStockItem && !order.stock_where) {
+      order.stock_where = StockWhere.CN; // ← was StockWhere.EU
+      await customerOrderRepo.save(order);
+    } else if (!isStockItem && order.stock_where) {
+      // Check if there are any other stock items in the order
+      const hasOtherStock = await hasStockItems(order.id);
+      if (!hasOtherStock) {
+        // If no stock items remain, remove stock_where
+        order.stock_where = undefined as any;
+        await customerOrderRepo.save(order);
+      }
+    }
 
     res
       .status(201)
@@ -1030,8 +1003,37 @@ export const deleteOrderLineItem = async (
       res.status(404).json({ success: false, message: "Line item not found" });
       return;
     }
+
+    // Check if this was a stock item before deleting
+    let wasStockItem = false;
+    if (lineItem.sourceItemId) {
+      const itemRepo = AppDataSource.getRepository(Item);
+      const sourceItem = await itemRepo.findOne({
+        where: { id: parseInt(lineItem.sourceItemId, 10) },
+      });
+      if (sourceItem && sourceItem.is_stock_item === "Y") {
+        wasStockItem = true;
+      }
+    }
+
     await orderItemRepo.remove(lineItem);
     await calculateOrderTotals(Number(orderId));
+
+    // If we deleted a stock item, check if any stock items remain
+    if (wasStockItem) {
+      const hasStock = await hasStockItems(Number(orderId));
+      if (!hasStock) {
+        // If no stock items remain, remove stock_where from the order
+        const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+        const order = await customerOrderRepo.findOne({
+          where: { id: Number(orderId) },
+        });
+        if (order && order.stock_where) {
+          order.stock_where = undefined as any;
+          await customerOrderRepo.save(order);
+        }
+      }
+    }
 
     res.status(200).json({ success: true, message: "Line item deleted" });
   } catch (error) {
@@ -1090,3 +1092,51 @@ export const previewOrderLineItemPrice = async (
     next(error);
   }
 };
+
+/**
+ * Attaches stock info to every order item across the given orders, in a
+ * single batched Item query — mirrors the Offer backfill pattern. Sends
+ * BOTH stock_eu and stock_cn per line so the frontend can switch the
+ * warehouse selector locally without a re-fetch. is_stock_item is always
+ * attached too, even for non-stock lines ("N"), so the frontend never has
+ * to guess.
+ */
+async function attachStockInfoToOrders(orders: CustomerOrder[]): Promise<void> {
+  const itemRepo = AppDataSource.getRepository(Item);
+
+  const sourceItemIds = Array.from(
+    new Set(
+      orders
+        .flatMap((o) => o.orderItems || [])
+        .filter((li: any) => li.sourceItemId)
+        .map((li: any) => parseInt(li.sourceItemId, 10))
+        .filter((id: number) => !isNaN(id)),
+    ),
+  );
+
+  let itemById = new Map<string, any>();
+  if (sourceItemIds.length > 0) {
+    const items = await itemRepo.find({
+      where: { id: In(sourceItemIds) },
+      select: ["id", "is_stock_item", "stockEU", "stockCN"],
+    });
+    itemById = new Map(items.map((it: any) => [String(it.id), it]));
+  }
+
+  for (const order of orders) {
+    for (const li of (order.orderItems || []) as any[]) {
+      const src = li.sourceItemId
+        ? itemById.get(String(li.sourceItemId))
+        : undefined;
+      if (!src) {
+        li.is_stock_item = "N";
+        li.stock_eu = null;
+        li.stock_cn = null;
+        continue;
+      }
+      li.is_stock_item = src.is_stock_item || "N";
+      li.stock_eu = src.is_stock_item === "Y" ? Number(src.stockEU) || 0 : null;
+      li.stock_cn = src.is_stock_item === "Y" ? Number(src.stockCN) || 0 : null;
+    }
+  }
+}
