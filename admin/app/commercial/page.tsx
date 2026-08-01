@@ -2899,6 +2899,10 @@ const InvoiceListPage: React.FC = () => {
             docFilters={docFilters}
             onOrderConverted={fetchOrders}
             refreshTrigger={offerRefreshKey}
+            onAuftragCreated={(auftragId: string | number) => {
+              setActiveInvTab("auftrag");
+              handleOpenAuftragPreview(auftragId);
+            }}
           />
         )}
 

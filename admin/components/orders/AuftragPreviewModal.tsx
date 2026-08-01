@@ -134,16 +134,6 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
 
   return (
     <div className="space-y-1 text-sm text-gray-700">
-      {addr.addressName && (
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          {addr.addressName}
-        </div>
-      )}
-      {addr.companyName && (
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          {addr.companyName}
-        </div>
-      )}
       {addr.legalName && addr.legalName !== addr.companyName && (
         <div>{addr.legalName}</div>
       )}
@@ -692,19 +682,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               <div className="block mb-1">
                 {edit ? (
                   <div className="space-y-1.5">
-                    <input
-                      className={inputCls}
-                      placeholder="Company name"
-                      value={form.customerSnapshot?.companyName || ""}
-                      onChange={(e) =>
-                        patch({
-                          customerSnapshot: {
-                            ...form.customerSnapshot,
-                            companyName: e.target.value,
-                          },
-                        })
-                      }
-                    />
                     <input
                       className={inputCls}
                       placeholder="Legal name"
@@ -1374,18 +1351,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   </span>
                 </div>
               )}
-              {edit && (
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Discount %</span>
-                  <div className="w-20">
-                    <DecimalInput
-                      className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
-                      value={form.discountPercentage}
-                      onCommit={(raw) => patch({ discountPercentage: raw })}
-                    />
-                  </div>
-                </div>
-              )}
+
               {vatGroups
                 .filter((g) => g.rate !== 0)
                 .map((g) => (
