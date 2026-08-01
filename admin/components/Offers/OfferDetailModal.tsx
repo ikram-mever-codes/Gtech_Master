@@ -755,10 +755,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       shippingQuantity: o.shippingQuantity ?? 1,
       taxRate: o.taxRate ?? 19,
       notes: o.notes || "",
+      deliveryAddress: { ...(o.deliveryAddress || {}) },
+      customerSnapshot: { ...(o.customerSnapshot || {}) },
+      pricingMode: (o.pricingMode || "classic") as PricingMode,
       internalNotes: o.internalNotes || "",
       highlightColor: o.highlightColor || "",
-      deliveryAddress: { ...(o.deliveryAddress || {}) },
-      pricingMode: (o.pricingMode || "classic") as PricingMode,
       unitPriceDecimalPlaces: o.unitPriceDecimalPlaces || 3,
       totalPriceDecimalPlaces: o.totalPriceDecimalPlaces || 2,
       maxUnitPriceColumns: o.maxUnitPriceColumns || 3,
@@ -1009,6 +1010,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         validUntil: form.validUntil,
         deliveryTime: form.deliveryTime,
         paymentTerms: form.paymentTerms,
+        deliveryAddress: form.deliveryAddress,
+        customerSnapshot: form.customerSnapshot,
+        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
         paymentMethod: form.paymentMethod || undefined,
         shippingMethod: form.shippingMethod || undefined,
         deliveryTerms: form.deliveryTerms,
@@ -1016,8 +1020,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         notes: form.notes,
         internalNotes: form.internalNotes,
         highlightColor: form.highlightColor ?? "",
-        deliveryAddress: form.deliveryAddress,
-        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
         shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
         shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
         taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
@@ -1525,20 +1527,126 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                       Customer address
                     </p>
-                    <AddressBlock
-                      addr={{
-                        companyName: selectedCustomer.companyName,
-                        legalName: selectedCustomer.legalName,
-                        address: selectedCustomer.addressLine1,
-                        postalCode: selectedCustomer.postalCode,
-                        city: selectedCustomer.city,
-                        country: selectedCustomer.country,
-                        vatId:
-                          selectedCustomer.vatTaxId ||
-                          selectedCustomer.taxNumber,
-                      }}
-                      emptyText="No address on file."
-                    />
+
+                    <div className="md:col-span-1 flex flex-col gap-3">
+                      <div className="block mb-1">
+                        {edit ? (
+                          <div className="space-y-1.5">
+                            <input
+                              className={inputCls}
+                              placeholder="Company name"
+                              value={form.customerSnapshot?.companyName || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    companyName: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="Legal name"
+                              value={form.customerSnapshot?.legalName || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    legalName: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="Street"
+                              value={
+                                form.customerSnapshot?.address ||
+                                form.customerSnapshot?.street ||
+                                ""
+                              }
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    address: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <div className="flex gap-1.5">
+                              <input
+                                className={inputCls}
+                                placeholder="Postal code"
+                                value={form.customerSnapshot?.postalCode || ""}
+                                onChange={(e) =>
+                                  patch({
+                                    customerSnapshot: {
+                                      ...form.customerSnapshot,
+                                      postalCode: e.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                              <input
+                                className={inputCls}
+                                placeholder="City"
+                                value={form.customerSnapshot?.city || ""}
+                                onChange={(e) =>
+                                  patch({
+                                    customerSnapshot: {
+                                      ...form.customerSnapshot,
+                                      city: e.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                            </div>
+                            <input
+                              className={inputCls}
+                              placeholder="Country"
+                              value={form.customerSnapshot?.country || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    country: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="VAT ID"
+                              value={form.customerSnapshot?.vatId || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    vatId: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                        ) : (
+                          <AddressBlock
+                            addr={{
+                              companyName: offer.customerSnapshot?.companyName,
+                              legalName: offer.customerSnapshot?.legalName,
+                              address: offer.customerSnapshot?.address,
+                              street: offer.customerSnapshot?.street,
+                              postalCode: offer.customerSnapshot?.postalCode,
+                              city: offer.customerSnapshot?.city,
+                              country: offer.customerSnapshot?.country,
+                              vatId: offer.customerSnapshot?.vatId,
+                            }}
+                            emptyText="No customer snapshot."
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
                     {selectedCustomer.deliveryAddressLine1 && (
@@ -1804,20 +1912,111 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
                 <div className="md:col-span-1 flex flex-col gap-3">
-                  <div className="block mb-1">
-                    <AddressBlock
-                      addr={{
-                        companyName: offer.customerSnapshot?.companyName,
-                        legalName: offer.customerSnapshot?.legalName,
-                        address: offer.customerSnapshot?.address,
-                        street: offer.customerSnapshot?.street,
-                        postalCode: offer.customerSnapshot?.postalCode,
-                        city: offer.customerSnapshot?.city,
-                        country: offer.customerSnapshot?.country,
-                        vatId: offer.customerSnapshot?.vatId,
-                      }}
-                      emptyText="No customer snapshot."
-                    />
+                  <div className="md:col-span-1 flex flex-col gap-3">
+                    <div className="block mb-1">
+                      {edit ? (
+                        <div className="space-y-1.5">
+                          <input
+                            className={inputCls}
+                            placeholder="Legal name"
+                            value={form.customerSnapshot?.legalName || ""}
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  legalName: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="Street"
+                            value={
+                              form.customerSnapshot?.address ||
+                              form.customerSnapshot?.street ||
+                              ""
+                            }
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  address: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <div className="flex gap-1.5">
+                            <input
+                              className={inputCls}
+                              placeholder="Postal code"
+                              value={form.customerSnapshot?.postalCode || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    postalCode: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="City"
+                              value={form.customerSnapshot?.city || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    city: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                          <input
+                            className={inputCls}
+                            placeholder="Country"
+                            value={form.customerSnapshot?.country || ""}
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  country: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="VAT ID"
+                            value={form.customerSnapshot?.vatId || ""}
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  vatId: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <AddressBlock
+                          addr={{
+                            companyName: offer.customerSnapshot?.companyName,
+                            legalName: offer.customerSnapshot?.legalName,
+                            address: offer.customerSnapshot?.address,
+                            street: offer.customerSnapshot?.street,
+                            postalCode: offer.customerSnapshot?.postalCode,
+                            city: offer.customerSnapshot?.city,
+                            country: offer.customerSnapshot?.country,
+                            vatId: offer.customerSnapshot?.vatId,
+                          }}
+                          emptyText="No customer snapshot."
+                        />
+                      )}
+                    </div>
                   </div>
 
                   <div className="block mb-1">

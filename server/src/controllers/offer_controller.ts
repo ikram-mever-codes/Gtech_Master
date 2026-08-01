@@ -332,6 +332,10 @@ export class UpdateOfferDto {
   deliveryTerms?: string;
 
   @IsOptional()
+  @IsObject()
+  customerSnapshot?: Record<string, any>;
+
+  @IsOptional()
   @IsString()
   paymentDueDays?: string;
 
@@ -2277,12 +2281,13 @@ export class OfferController {
         "conversionCount",
         "currency",
         "deliveryAddress",
+        "customerSnapshot",
         "pricingMode",
         "taxRate",
         "unitPriceDecimalPlaces",
         "totalPriceDecimalPlaces",
         "maxUnitPriceColumns",
-        "shippingQuantity", // ADD THIS
+        "shippingQuantity",
       ];
 
       fieldsToUpdate.forEach((field) => {
