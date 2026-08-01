@@ -64,17 +64,25 @@ export default function GtechCompaniesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isEditEnabled, setIsEditEnabled] = useState(false);
   const [editFormData, setEditFormData] = useState<GtechCompanyPayload>(initialFormState);
+  const [notDeployed, setNotDeployed] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
+    setNotDeployed(false);
     try {
       const res: any = await getAllGtechCompanies();
       if (res && res.success) {
         setCompanies(res.data || []);
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load GTech companies");
+    } catch (err: any) {
+      const status = err?.response?.status || err?.status;
+      if (status === 404) {
+        // Route not yet deployed on this server — show silent banner
+        setNotDeployed(true);
+      } else {
+        console.error(err);
+        toast.error("Failed to load GTech companies");
+      }
     } finally {
       setLoading(false);
     }
@@ -586,6 +594,19 @@ export default function GtechCompaniesPage() {
           <span className="text-sm font-semibold text-gray-500">
             Loading GTech companies...
           </span>
+        </div>
+      ) : notDeployed ? (
+        <div className="p-12 flex flex-col items-center justify-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-amber-400" />
+          </div>
+          <div className="text-center">
+            <p className="text-gray-700 font-semibold text-base">Feature Not Yet Available</p>
+            <p className="text-sm text-gray-400 mt-1 max-w-md">
+              The GTech Companies API is not deployed on this server yet.
+              Please ask your senior developer to deploy the latest server update.
+            </p>
+          </div>
         </div>
       ) : filteredCompanies.length === 0 ? (
         <div className="p-12 text-center">
