@@ -266,7 +266,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none sticky top-0 z-10">
           <h2 className="text-lg font-bold text-gray-900">
             {isRequest ? "Create New Request Item" : "Create New Item"}
           </h2>
@@ -860,7 +860,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
             </div>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-2 flex-shrink-0">
+        <div className="px-6 py-4 border-t border-gray-100 bg-white flex justify-end gap-2 flex-shrink-0 sticky bottom-0 z-10">
           <button
             onClick={onClose}
             className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors"
