@@ -81,8 +81,8 @@ const Field: React.FC<{
       ) : (
         <div
           className={`${highlightOrange
-              ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
-              : ""
+            ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
+            : ""
             }`}
         >
           {value || "—"}
@@ -515,8 +515,8 @@ export default function AuftragToRechnungModal({
                     setIsDatePastOrEmpty(false);
                   }}
                   className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
-                      ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
-                      : "bg-white border-gray-300 text-gray-900"
+                    ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
+                    : "bg-white border-gray-300 text-gray-900"
                     }`}
                 />
               </div>
@@ -878,8 +878,8 @@ export default function AuftragToRechnungModal({
               type="button"
               onClick={() => setIsEditingAuftrag((prev) => !prev)}
               className={`px-4 py-2 text-sm font-semibold rounded-lg border transition flex items-center gap-1.5 shadow-sm ${isEditingAuftrag
-                  ? "bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100"
-                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                ? "bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100"
+                : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 }`}
             >
               <PencilIcon className="h-4 w-4 text-gray-500" />
@@ -910,6 +910,7 @@ export default function AuftragToRechnungModal({
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
+
                 Save changes
               </button>
             ) : (
