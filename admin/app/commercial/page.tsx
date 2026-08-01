@@ -104,6 +104,8 @@ import {
 import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
 import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
 import AuftragToRechnungModal from "@/components/orders/AuftragToRechnungModal";
+import RechnungDetailModal from "@/components/orders/RechnungDetailModal";
+import LieferscheinDetailModal from "@/components/orders/LieferscheinDetailModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
@@ -368,6 +370,12 @@ const InvoiceListPage: React.FC = () => {
 
   const [selectedAuftragForRechnungModal, setSelectedAuftragForRechnungModal] = useState<any>(null);
   const [showAuftragToRechnungModal, setShowAuftragToRechnungModal] = useState(false);
+
+  const [showRechnungDetailModal, setShowRechnungDetailModal] = useState(false);
+  const [selectedRechnungForDetail, setSelectedRechnungForDetail] = useState<any>(null);
+
+  const [showLieferscheinDetailModal, setShowLieferscheinDetailModal] = useState(false);
+  const [selectedLieferscheinForDetail, setSelectedLieferscheinForDetail] = useState<any>(null);
 
   const fetchRechnungen = useCallback(async () => {
     setLoadingRechnungen(true);
@@ -1812,18 +1820,26 @@ const InvoiceListPage: React.FC = () => {
         (inv: any) => inv.status === "paid" || inv.status === "cancelled",
       );
     } else if (activeInvTab === "lieferschein") {
-      list = invoices.map((inv: any) => ({
-        ...inv,
-        invoiceNumber: inv.cargoNo || inv.cargo_no || inv.invoiceNumber || inv.orderNumber,
-        order_no: inv.cargoNo || inv.cargo_no || inv.invoiceNumber || inv.orderNumber,
-        customer_name: inv.customer?.companyName || inv.ship_to || "—",
-        items: inv.items || [],
+      list = (lieferscheine || []).map((ls: any) => ({
+        ...ls,
+        invoiceNumber: ls.invoiceNumber || ls.deliveryNoteNo || ls.order_no || ls.id,
+        order_no: ls.orderNumber || ls.order_no || ls.invoiceNumber || ls.id,
+        createdAt: ls.date || ls.createdAt || ls.created_at || ls.invoiceDate,
+        customerSnapshot: {
+          companyName: ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
+          contactEmail: ls.customer?.email || ls.customer?.contactEmail || ls.email || "—",
+          postalCode: ls.customer?.postalCode || ls.postalCode || "",
+          city: ls.city || ls.customer?.city || "",
+          country: ls.country || ls.customer?.country || "",
+        },
+        customer_name: ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
+        items: ls.items || ls.lineItems || [],
+        customItemCount: ls.itemCount ?? ls.items?.length ?? 0,
       }));
     } else {
       list = [];
     }
 
-    // Always sort latest first (TOP of table)
     list.sort((a: any, b: any) => {
       const timeA = new Date(a.createdAt || a.created_at || a.invoiceDate || a.date_created || 0).getTime();
       const timeB = new Date(b.createdAt || b.created_at || b.invoiceDate || b.date_created || 0).getTime();
@@ -1959,7 +1975,7 @@ const InvoiceListPage: React.FC = () => {
 
       return true;
     });
-  }, [activeInvTab, offers, orders, customerOrders, invoices, searchTerm, docFilters]);
+  }, [activeInvTab, offers, orders, customerOrders, invoices, lieferscheine, bestellungen, searchTerm, docFilters]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -2024,21 +2040,17 @@ const InvoiceListPage: React.FC = () => {
         width: "100px",
         align: "center",
         render: (row) => {
-          if (activeInvTab === "angebot") {
-            return row.createdAt ? formatDate(row.createdAt) : "-";
-          } else if (
-            activeInvTab === "auftrag" ||
-            activeInvTab === "bestellung"
-          ) {
-            const rawDate = row.created_at || row.createdAt || row.date_created;
-            if (typeof rawDate === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)) {
-              const [d, m] = rawDate.split(".");
-              return `${d}.${m}.`;
-            }
-            return rawDate ? formatDate(rawDate) : "-";
-          } else {
-            return row.invoiceDate ? formatDate(row.invoiceDate) : "-";
+          const rawDate =
+            row.createdAt ||
+            row.created_at ||
+            row.date_created ||
+            row.invoiceDate ||
+            row.deliveryDate;
+          if (typeof rawDate === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)) {
+            const [d, m] = rawDate.split(".");
+            return `${d}.${m}.`;
           }
+          return rawDate ? formatDate(rawDate) : "-";
         },
       },
       {
@@ -2073,6 +2085,32 @@ const InvoiceListPage: React.FC = () => {
                 {row.order_no || "N/A"}
               </button>
             );
+          } else if (activeInvTab === "rechnung") {
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedRechnungForDetail(row);
+                  setShowRechnungDetailModal(true);
+                }}
+                className="text-green-600 hover:underline font-semibold"
+              >
+                {row.invoiceNumber || String(row.id).slice(-5).toUpperCase()}
+              </button>
+            );
+          } else if (activeInvTab === "lieferschein") {
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedLieferscheinForDetail(row);
+                  setShowLieferscheinDetailModal(true);
+                }}
+                className="text-green-600 hover:underline font-semibold"
+              >
+                {row.invoiceNumber || row.order_no || String(row.id).slice(-5).toUpperCase()}
+              </button>
+            );
           } else {
             return (
               <button
@@ -2087,17 +2125,21 @@ const InvoiceListPage: React.FC = () => {
             );
           }
         },
-      },      {
+      },
+      {
         header: "Company",
         width: "115px",
         align: "left",
         render: (row) => {
           const text =
-            activeInvTab === "angebot"
-              ? row.customerSnapshot?.companyName || "N/A"
-              : activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                ? row.customerSnapshot?.companyName || row.customer_name || row.customer?.companyName || "N/A"
-                : row.bill_to || row.customer?.companyName || "N/A";
+            row.customerSnapshot?.companyName ||
+            row.customerSnapshot?.name ||
+            row.customer?.companyName ||
+            row.customer?.name ||
+            row.customer_name ||
+            row.bill_to ||
+            row.ship_to ||
+            "N/A";
           return (
             <div className="truncate max-w-[115px]" title={text}>
               {text}
@@ -2111,16 +2153,15 @@ const InvoiceListPage: React.FC = () => {
         align: "left",
         render: (row) => {
           const text =
-            activeInvTab === "angebot"
-              ? row.customerSnapshot?.contactEmail ||
-              row.customerSnapshot?.contactPhoneNumber ||
-              "-"
-              : activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                ? row.customerSnapshot?.contactEmail ||
-                row.customerSnapshot?.contactPhoneNumber ||
-                row.customer?.contactEmail ||
-                "-"
-                : row.ship_to || "-";
+            row.customerSnapshot?.contactEmail ||
+            row.customerSnapshot?.contactPhoneNumber ||
+            row.customerSnapshot?.contactName ||
+            row.customer?.email ||
+            row.customer?.contactEmail ||
+            row.customer?.contactPhoneNumber ||
+            row.customer?.contactName ||
+            row.ship_to ||
+            "-";
           return (
             <div className="truncate max-w-[95px]" title={text}>
               {text}
@@ -2133,25 +2174,14 @@ const InvoiceListPage: React.FC = () => {
         width: "75px",
         align: "center",
         render: (row) => {
-          if (activeInvTab === "angebot") {
-            return (
-              row.deliveryAddress?.postalCode ||
-              row.customerSnapshot?.postalCode ||
-              "-"
-            );
-          } else if (
-            activeInvTab === "auftrag" ||
-            activeInvTab === "bestellung"
-          ) {
-            return (
-              row.customerSnapshot?.postalCode ||
-              row.customer?.postalCode ||
-              row.cargo?.customer?.postalCode ||
-              "-"
-            );
-          } else {
-            return row.customer?.postalCode || "-";
-          }
+          return (
+            row.deliveryAddress?.postalCode ||
+            row.customerSnapshot?.postalCode ||
+            row.customer?.postalCode ||
+            row.cargo?.customer?.postalCode ||
+            row.postalCode ||
+            "-"
+          );
         },
       },
       {
@@ -2159,41 +2189,23 @@ const InvoiceListPage: React.FC = () => {
         width: "95px",
         align: "left",
         render: (row) => {
-          let text = "";
-          if (activeInvTab === "angebot") {
-            const city =
-              row.deliveryAddress?.city || row.customerSnapshot?.city || "";
-            const country =
-              row.deliveryAddress?.country ||
-              row.customerSnapshot?.country ||
-              "";
-            text =
-              [city, formatCountryCode(country)].filter(Boolean).join(", ") ||
-              "-";
-          } else if (
-            activeInvTab === "auftrag" ||
-            activeInvTab === "bestellung"
-          ) {
-            const city =
-              row.customerSnapshot?.city ||
-              row.customer?.city ||
-              row.cargo?.customer?.city ||
-              "";
-            const country =
-              row.customerSnapshot?.country ||
-              row.customer?.country ||
-              row.cargo?.customer?.country ||
-              "";
-            text =
-              [city, formatCountryCode(country)].filter(Boolean).join(", ") ||
-              "-";
-          } else {
-            const city = row.customer?.city || "";
-            const country = row.customer?.country || "";
-            text =
-              [city, formatCountryCode(country)].filter(Boolean).join(", ") ||
-              "-";
-          }
+          const city =
+            row.deliveryAddress?.city ||
+            row.customerSnapshot?.city ||
+            row.customer?.city ||
+            row.cargo?.customer?.city ||
+            row.city ||
+            "";
+          const country =
+            row.deliveryAddress?.country ||
+            row.customerSnapshot?.country ||
+            row.customer?.country ||
+            row.cargo?.customer?.country ||
+            row.country ||
+            "";
+          const text =
+            [city, formatCountryCode(country)].filter(Boolean).join(", ") ||
+            "-";
           return (
             <div className="truncate max-w-[95px]" title={text}>
               {text}
@@ -2201,37 +2213,41 @@ const InvoiceListPage: React.FC = () => {
           );
         },
       },
-      {
-        header: "Value_net",
-        width: "75px",
-        align: "right",
-        render: (row) => {
-          let val = 0;
-          if (activeInvTab === "angebot") {
-            val = Number(
-              row.totalAmount !== undefined && row.totalAmount !== null
-                ? row.totalAmount
-                : row.subtotal || 0,
-            );
-          } else if (
-            activeInvTab === "auftrag" ||
-            activeInvTab === "bestellung"
-          ) {
-            if (row.isCustomerOrder || row.subtotal !== undefined) {
-              val = Number(row.subtotal ?? row.total_amount ?? 0);
-            } else {
-              val = (row.items || []).reduce(
-                (sum: number, it: any) =>
-                  sum + Number(it.price || 0) * Number(it.qty || 0),
-                0,
-              );
-            }
-          } else {
-            val = Number(row.netTotal || row.grossTotal || 0);
-          }
-          return `€${val.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        },
-      },
+      ...(activeInvTab !== "lieferschein"
+        ? [
+          {
+            header: "Value_net",
+            width: "75px",
+            align: "right" as const,
+            render: (row: any) => {
+              let val = 0;
+              if (activeInvTab === "angebot") {
+                val = Number(
+                  row.totalAmount !== undefined && row.totalAmount !== null
+                    ? row.totalAmount
+                    : row.subtotal || 0,
+                );
+              } else if (
+                activeInvTab === "auftrag" ||
+                activeInvTab === "bestellung"
+              ) {
+                if (row.isCustomerOrder || row.subtotal !== undefined) {
+                  val = Number(row.subtotal ?? row.total_amount ?? 0);
+                } else {
+                  val = (row.items || []).reduce(
+                    (sum: number, it: any) =>
+                      sum + Number(it.price || 0) * Number(it.qty || 0),
+                    0,
+                  );
+                }
+              } else {
+                val = Number(row.netTotal || row.grossTotal || 0);
+              }
+              return `€${val.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            },
+          },
+        ]
+        : []),
       {
         header: "Item_Count",
         width: "60px",
@@ -2251,52 +2267,52 @@ const InvoiceListPage: React.FC = () => {
       },
       ...(activeInvTab === "bestellung"
         ? [
-            {
-              header: "Status",
-              width: "130px",
-              align: "center" as const,
-              render: (row: any) => {
-                const currentStatus = row.status || "draft";
-                const getStatusStyle = (st: string) => {
-                  switch (st) {
-                    case "draft":
-                      return "bg-gray-100 text-gray-800 border-gray-300";
-                    case "to be processed":
-                      return "bg-blue-50 text-blue-700 border-blue-300 font-bold";
-                    case "partially delivered":
-                      return "bg-amber-50 text-amber-700 border-amber-300 font-bold";
-                    case "delivered":
-                      return "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold";
-                    default:
-                      return "bg-gray-100 text-gray-700 border-gray-200";
-                  }
-                };
+          {
+            header: "Status",
+            width: "130px",
+            align: "center" as const,
+            render: (row: any) => {
+              const currentStatus = row.status || "draft";
+              const getStatusStyle = (st: string) => {
+                switch (st) {
+                  case "draft":
+                    return "bg-gray-100 text-gray-800 border-gray-300";
+                  case "to be processed":
+                    return "bg-blue-50 text-blue-700 border-blue-300 font-bold";
+                  case "partially delivered":
+                    return "bg-amber-50 text-amber-700 border-amber-300 font-bold";
+                  case "delivered":
+                    return "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold";
+                  default:
+                    return "bg-gray-100 text-gray-700 border-gray-200";
+                }
+              };
 
-                return (
-                  <select
-                    value={currentStatus}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      handleUpdateBestellungStatus(
-                        row.id,
-                        e.target.value as any,
-                      )
-                    }
-                    className={`text-[11px] px-2 py-1 rounded border shadow-sm cursor-pointer focus:ring-2 focus:ring-emerald-500 font-medium ${getStatusStyle(
-                      currentStatus,
-                    )}`}
-                  >
-                    <option value="draft">draft</option>
-                    <option value="to be processed">to be processed</option>
-                    <option value="partially delivered">
-                      partially delivered
-                    </option>
-                    <option value="delivered">delivered</option>
-                  </select>
-                );
-              },
+              return (
+                <select
+                  value={currentStatus}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) =>
+                    handleUpdateBestellungStatus(
+                      row.id,
+                      e.target.value as any,
+                    )
+                  }
+                  className={`text-[11px] px-2 py-1 rounded border shadow-sm cursor-pointer focus:ring-2 focus:ring-emerald-500 font-medium ${getStatusStyle(
+                    currentStatus,
+                  )}`}
+                >
+                  <option value="draft">draft</option>
+                  <option value="to be processed">to be processed</option>
+                  <option value="partially delivered">
+                    partially delivered
+                  </option>
+                  <option value="delivered">delivered</option>
+                </select>
+              );
             },
-          ]
+          },
+        ]
         : []),
       {
         header: "Actions",
@@ -2353,11 +2369,10 @@ const InvoiceListPage: React.FC = () => {
                         ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
                         : "Generate Rechnung & Lieferschein"
                     }
-                    className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer ${
-                      isConverted
-                        ? "bg-gray-500 hover:bg-gray-600 text-white"
-                        : "bg-[#2F6B46] hover:bg-[#255638] text-white"
-                    }`}
+                    className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer ${isConverted
+                      ? "bg-gray-500 hover:bg-gray-600 text-white"
+                      : "bg-[#2F6B46] hover:bg-[#255638] text-white"
+                      }`}
                   >
                     <MoveRight className="w-3.5 h-3.5" />
                   </button>
@@ -2387,6 +2402,36 @@ const InvoiceListPage: React.FC = () => {
                 </button>
               </div>
             );
+          } else if (activeInvTab === "rechnung" || activeInvTab === "rk") {
+            return (
+              <div className="flex items-center justify-center gap-1.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRechnungForDetail(row);
+                    setShowRechnungDetailModal(true);
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
+                >
+                  View
+                </button>
+              </div>
+            );
+          } else if (activeInvTab === "lieferschein") {
+            return (
+              <div className="flex items-center justify-center gap-1.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedLieferscheinForDetail(row);
+                    setShowLieferscheinDetailModal(true);
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
+                >
+                  View
+                </button>
+              </div>
+            );
           } else {
             return (
               <div className="flex items-center justify-center gap-1.5">
@@ -2405,7 +2450,7 @@ const InvoiceListPage: React.FC = () => {
         },
       },
     ];
-  }, [activeInvTab, router, expandedDocIds, invoices]);
+  }, [activeInvTab, router, expandedDocIds, invoices, setSelectedRechnungForDetail, setSelectedLieferscheinForDetail]);
 
   const totalAmount = filteredInvoices.reduce(
     (sum, inv) => sum + (Number(inv.grossTotal) || 0),
@@ -2823,6 +2868,12 @@ const InvoiceListPage: React.FC = () => {
                     activeInvTab === "bestellung"
                   ) {
                     handleViewOrder(row);
+                  } else if (activeInvTab === "rechnung") {
+                    setSelectedRechnungForDetail(row);
+                    setShowRechnungDetailModal(true);
+                  } else if (activeInvTab === "lieferschein") {
+                    setSelectedLieferscheinForDetail(row);
+                    setShowLieferscheinDetailModal(true);
                   } else {
                     handleOpenInvoiceDetails(row);
                   }
@@ -4345,6 +4396,32 @@ const InvoiceListPage: React.FC = () => {
             onEditAuftrag={(auftragToEdit) => {
               handleEditOrder(auftragToEdit);
             }}
+          />
+        )}
+
+        {showRechnungDetailModal && selectedRechnungForDetail && (
+          <RechnungDetailModal
+            isOpen={showRechnungDetailModal}
+            onClose={() => {
+              setShowRechnungDetailModal(false);
+              setSelectedRechnungForDetail(null);
+            }}
+            rechnung={selectedRechnungForDetail}
+            onSuccess={() => {
+              fetchRechnungen();
+              loadInvoices();
+            }}
+          />
+        )}
+
+        {showLieferscheinDetailModal && selectedLieferscheinForDetail && (
+          <LieferscheinDetailModal
+            isOpen={showLieferscheinDetailModal}
+            onClose={() => {
+              setShowLieferscheinDetailModal(false);
+              setSelectedLieferscheinForDetail(null);
+            }}
+            lieferschein={selectedLieferscheinForDetail}
           />
         )}
       </div>
