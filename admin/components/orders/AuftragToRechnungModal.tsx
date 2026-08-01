@@ -80,11 +80,10 @@ const Field: React.FC<{
         children
       ) : (
         <div
-          className={`${
-            highlightOrange
+          className={`${highlightOrange
               ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
               : ""
-          }`}
+            }`}
         >
           {value || "—"}
         </div>
@@ -204,7 +203,7 @@ export default function AuftragToRechnungModal({
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
     const rawDelivery = auftrag.deliveryTime || auftrag.delivery_date || auftrag.deliveryDate;
-    
+
     if (!rawDelivery) {
       setDeliveryDate(todayStr);
       setIsDatePastOrEmpty(true);
@@ -366,7 +365,7 @@ export default function AuftragToRechnungModal({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden text-gray-900 font-sans">
-        
+
         {/* ── Top Header Bar (Matching OfferDetailModal) ── */}
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
@@ -409,7 +408,7 @@ export default function AuftragToRechnungModal({
 
           {/* ── 4 Column Top Grid (Matching Angebot Layout) ── */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
-            
+
             {/* Column 1: Customer & Delivery Address */}
             <div className="md:col-span-1 flex flex-col gap-2">
               {isEditingAuftrag ? (
@@ -484,7 +483,7 @@ export default function AuftragToRechnungModal({
 
             {/* Column 2, 3, 4: Fields Grid */}
             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-              
+
               <Field
                 label="TITLE"
                 value={editTitle}
@@ -515,11 +514,10 @@ export default function AuftragToRechnungModal({
                     setDeliveryDate(e.target.value);
                     setIsDatePastOrEmpty(false);
                   }}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${
-                    isDatePastOrEmpty || !deliveryDate
+                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
                       ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
                       : "bg-white border-gray-300 text-gray-900"
-                  }`}
+                    }`}
                 />
               </div>
 
@@ -617,7 +615,7 @@ export default function AuftragToRechnungModal({
                     </th>
                     {isEditingAuftrag && (
                       <th className="px-2 py-2 text-center font-semibold w-10">
-                        
+
                       </th>
                     )}
                   </tr>
@@ -640,7 +638,7 @@ export default function AuftragToRechnungModal({
 
                     return (
                       <tr key={item.id} className={`transition-colors ${rowBgClass}`}>
-                        
+
                         {/* Selection Checkbox */}
                         <td className="px-2 py-2 text-center">
                           <input
@@ -872,19 +870,20 @@ export default function AuftragToRechnungModal({
 
         </div>
 
-        {/* ── Bottom Footer Bar (Matching OfferDetailModal) ── */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0 bg-gray-50">
-          
-          {/* Delete Auftrag Red Button (Bottom Left) */}
+
+          {/* Edit Auftrag Button (Bottom Left) */}
           <div>
             <button
               type="button"
-              onClick={handleDeleteAuftrag}
-              disabled={deletingAuftrag}
-              className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              onClick={() => setIsEditingAuftrag((prev) => !prev)}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg border transition flex items-center gap-1.5 shadow-sm ${isEditingAuftrag
+                  ? "bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100"
+                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                }`}
             >
-              <TrashIcon className="h-4 w-4 text-red-500" />
-              {deletingAuftrag ? "Deleting..." : "Delete order"}
+              <PencilIcon className="h-4 w-4 text-gray-500" />
+              {isEditingAuftrag ? "Cancel Edit Mode" : "Edit Auftrag"}
             </button>
           </div>
 
