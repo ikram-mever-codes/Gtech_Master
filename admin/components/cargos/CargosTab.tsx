@@ -521,11 +521,52 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
     };
 
     const handleMarkAsDeliveredClick = () => {
-        if (confirm("Are you sure you want to mark this cargo as Delivered?")) {
+        const cargoTypeStr = formData.cargo_type_id ? getCargoTypeName(formData.cargo_type_id) : "Cargo";
+        const cargoNoStr = formData.cargo_no || "this cargo";
+        const etaStr = formData.eta ? formatDateInput(formData.eta) : "N/A";
+        const confirmMsg = `Has ${cargoTypeStr} ${cargoNoStr} with Expected Delivery Date ${etaStr} arrived?`;
+
+        if (confirm(confirmMsg)) {
             setFormData(prev => ({
                 ...prev,
                 cargo_status: "Delivered"
             }));
+        }
+    };
+
+    const handleMarkAsShippedDirect = async (cargo: any) => {
+        const cargoNoStr = cargo.cargo_no || `ID #${cargo.id}`;
+        if (confirm(`Are you sure you want to mark cargo "${cargoNoStr}" as Shipped?`)) {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                await updateCargo(cargo.id, {
+                    cargo_status: "Shipped",
+                    shipped_at: today,
+                });
+                toast.success(`Cargo ${cargoNoStr} marked as Shipped`, successStyles);
+                fetchCargos();
+            } catch (err: any) {
+                toast.error(err?.message || "Failed to update cargo status", errorStyles);
+            }
+        }
+    };
+
+    const handleMarkAsArrivedDirect = async (cargo: any) => {
+        const cargoTypeStr = cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "Cargo";
+        const cargoNoStr = cargo.cargo_no || `ID #${cargo.id}`;
+        const etaStr = cargo.eta ? formatCargoDateShort(cargo.eta) : "N/A";
+        const confirmMsg = `Has ${cargoTypeStr} ${cargoNoStr} with Expected Delivery Date ${etaStr} arrived?`;
+
+        if (confirm(confirmMsg)) {
+            try {
+                await updateCargo(cargo.id, {
+                    cargo_status: "Delivered",
+                });
+                toast.success(`Cargo ${cargoNoStr} marked as Delivered`, successStyles);
+                fetchCargos();
+            } catch (err: any) {
+                toast.error(err?.message || "Failed to update cargo status", errorStyles);
+            }
         }
     };
 
@@ -708,39 +749,42 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
-                                    <th className="w-10 px-4 py-3"></th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="w-8 px-2 py-2.5"></th>
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         ID
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         CARGO NO
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         STATUS
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         CARGO TYPE
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         SHIP TO
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         EST. DEPARTURE
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         SHIPPED
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         EST. ARRIVAL
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         ARRIVED (DAYS)
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         ONLINE TRACK
                                     </th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
                                         REMARKS
+                                    </th>
+                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase text-right">
+                                        ACTION
                                     </th>
                                 </tr>
                             </thead>
@@ -751,7 +795,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                             className="hover:bg-gray-50 cursor-pointer transition-colors"
                                             onClick={() => handleOpenEdit(cargo.id)}
                                         >
-                                            <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <td className="px-2 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     onClick={(e) => toggleExpandCargo(cargo.id, e)}
                                                     className="p-1 rounded-full hover:bg-gray-100 transition-colors"
@@ -765,36 +809,36 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                     />
                                                 </button>
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800 font-bold">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800 font-bold">
                                                 {cargo.id}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800 font-semibold">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800 font-semibold">
                                                 {cargo.cargo_no || "-"}
                                             </td>
-                                            <td className="px-4 py-3 text-sm">
+                                            <td className="px-2.5 py-2.5 text-sm">
                                                 <span className="text-[10px] font-bold text-[#495057]">
                                                     {cargo.cargo_status || "Open"}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
                                                 {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
                                                 {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
                                                 {formatCargoDateShort(cargo.dep_date)}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
                                                 {formatCargoDateShort(cargo.shipped_at)}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
                                                 {formatCargoDateShort(cargo.eta)}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
                                                 -
                                             </td>
-                                            <td className="px-4 py-3 text-sm max-w-[120px] truncate">
+                                            <td className="px-2.5 py-2.5 text-sm max-w-[120px] truncate">
                                                 {cargo.online_track ? (
                                                     <a
                                                         href={cargo.online_track}
@@ -807,13 +851,38 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                     </a>
                                                 ) : "-"}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-800 max-w-[150px] truncate">
+                                            <td className="px-2.5 py-2.5 text-sm text-gray-800 max-w-[150px] truncate">
                                                 {cargo.remark || cargo.note || cargo.cargo_no || "-"}
+                                            </td>
+                                            <td className="px-2.5 py-2.5 text-sm text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                {(cargo.cargo_status === "Open" || !cargo.cargo_status) && (
+                                                    <button
+                                                        onClick={() => handleMarkAsShippedDirect(cargo)}
+                                                        className="px-2 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 rounded-md transition-all shadow-sm inline-flex items-center gap-1 cursor-pointer"
+                                                    >
+                                                        🚢 Ship
+                                                    </button>
+                                                )}
+
+                                                {cargo.cargo_status === "Shipped" && (
+                                                    <button
+                                                        onClick={() => handleMarkAsArrivedDirect(cargo)}
+                                                        className="px-2 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-200 rounded-md transition-all shadow-sm inline-flex items-center gap-1 cursor-pointer"
+                                                    >
+                                                        📦 Arrived
+                                                    </button>
+                                                )}
+
+                                                {cargo.cargo_status === "Delivered" && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 rounded-md">
+                                                        ✅ Delivered
+                                                    </span>
+                                                )}
                                             </td>
                                         </tr>
                                         {expandedCargoIds.has(cargo.id) && (
                                             <tr className="bg-gray-50/50 border-t border-b border-gray-100">
-                                                <td colSpan={12} className="px-6 py-4">
+                                                <td colSpan={13} className="px-6 py-4">
                                                     <div>
                                                         <div className="text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wider flex items-center gap-1.5 select-none">
                                                             <ClipboardList className="h-4 w-4 text-blue-500" />
