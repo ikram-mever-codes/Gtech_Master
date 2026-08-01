@@ -1434,9 +1434,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     picEntries.push({ url: u, label: `Gallery ${i + 1}` })
                   );
                   if (picEntries.length === 0)
-                    return (
-                      <p className="text-xs text-gray-400">No pictures.</p>
-                    );
+                    return null;
                   return (
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                       {picEntries.map(({ url, label }, i) => (
