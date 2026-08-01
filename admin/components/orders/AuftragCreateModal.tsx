@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { XMarkIcon, CubeIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { getAllCustomers } from "@/api/customers";
@@ -9,6 +9,9 @@ import { createAuftragFromItems } from "@/api/customer_orders";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2 } from "lucide-react";
+import { getAllPaymentMethods } from "@/api/payment_methods";
+import { getAllShippingMethods } from "@/api/shipping_methods";
+
 
 const PAYMENT_METHODS = [
   "Prepayment (Vorkasse)",
@@ -29,7 +32,8 @@ const ItemRow: React.FC<{
   item: any;
   selected: boolean;
   onClick: () => void;
-}> = ({ item, selected, onClick }) => {
+  rowRef?: React.Ref<HTMLDivElement>;
+}> = ({ item, selected, onClick, rowRef }) => {
   const thumb = item.photo || item.pix_path;
   const name = item.item_name || item.itemName || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
@@ -37,6 +41,7 @@ const ItemRow: React.FC<{
 
   return (
     <div
+      ref={rowRef}
       onClick={onClick}
       className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
         ? "border-primary bg-primary/5 shadow-sm"
@@ -77,17 +82,26 @@ interface AuftragCreateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialItem?: any;
+  initialCustomerId?: string;
 }
 
 export default function AuftragCreateModal({
   isOpen,
   onClose,
   onSuccess,
+  initialItem,
+  initialCustomerId,
 }: AuftragCreateModalProps) {
+  const selectedSectionRef = useRef<HTMLDivElement | null>(null);
+  const qtyInputRef = useRef<HTMLInputElement | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
+  const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
 
   const [filterCustomerId, setFilterCustomerId] = useState<string>("");
   const [sourceSearch, setSourceSearch] = useState("");
@@ -103,11 +117,12 @@ export default function AuftragCreateModal({
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
-    setSelectedItems([]);
-    setItemQuantities({});
-    setFilterCustomerId("");
+    const itemKey = initialItem?.id ? String(initialItem.id) : "";
+    setSelectedItems(initialItem ? [initialItem] : []);
+    setItemQuantities(itemKey ? { [itemKey]: "" } : {});
+    setFilterCustomerId(initialCustomerId ? String(initialCustomerId) : "");
     setSourceSearch("");
-    setTitle("");
+    setTitle(initialItem ? (initialItem.name_de || initialItem.item_name || initialItem.name || "") : "");
     setPaymentMethod("");
     setShippingMethod("");
     setNotes("");
@@ -115,15 +130,27 @@ export default function AuftragCreateModal({
     Promise.all([
       getAllCustomers({ limit: 1000 }).catch(() => ({ data: [] })),
       getItems({ limit: 1000 }).catch(() => ({ data: [] })),
+      getAllPaymentMethods(true).catch(() => ({ data: [] })),
+      getAllShippingMethods(true).catch(() => ({ data: [] })),
     ])
-      .then(([custRes, itemRes]: any) => {
+      .then(([custRes, itemRes, pmRes, smRes]: any) => {
         const custData = custRes?.data?.businesses ?? custRes?.data ?? custRes;
         const itemData = itemRes?.data ?? itemRes;
         setCustomers(Array.isArray(custData) ? custData : []);
         setItems(Array.isArray(itemData) ? itemData : []);
+        if (pmRes?.data) setDbPaymentMethods(pmRes.data);
+        if (smRes?.data) setDbShippingMethods(smRes.data);
       })
       .catch((err) => console.error("Error loading customers/items:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        if (initialItem) {
+          setTimeout(() => {
+            selectedSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            qtyInputRef.current?.focus();
+          }, 300);
+        }
+      });
   }, [isOpen]);
 
   const selectedCustomer = useMemo(() => {
@@ -157,7 +184,7 @@ export default function AuftragCreateModal({
         const { [key]: _removed, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [key]: "1" };
+      return { ...prev, [key]: "" };
     });
   };
 
@@ -336,12 +363,12 @@ export default function AuftragCreateModal({
           </div>
 
           {selectedItems.length > 0 && (
-            <div className="space-y-2 border border-gray-200 rounded-lg p-3 bg-white">
+            <div ref={selectedSectionRef} className="space-y-2 border border-gray-200 rounded-lg p-3 bg-white scroll-mt-6">
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                 Selected items ({selectedItems.length})
               </p>
               <div className="space-y-2">
-                {selectedItems.map((it) => (
+                {selectedItems.map((it, idx) => (
                   <div key={it.id} className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <ItemRow item={it} selected onClick={() => toggleItem(it)} />
@@ -351,8 +378,9 @@ export default function AuftragCreateModal({
                         Qty
                       </label>
                       <input
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
-                        value={itemQuantities[String(it.id)] ?? "1"}
+                        ref={idx === 0 ? qtyInputRef : undefined}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent font-bold bg-amber-50/40"
+                        value={itemQuantities[String(it.id)] ?? ""}
                         onChange={(e) => setItemQuantity(it.id, e.target.value)}
                       />
                     </div>
@@ -392,7 +420,18 @@ export default function AuftragCreateModal({
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             >
               <option value="">Select…</option>
-              {PAYMENT_METHODS.map((m) => (
+              {paymentMethod &&
+                !(
+                  dbPaymentMethods.length > 0
+                    ? dbPaymentMethods.map((pm: any) => pm.name)
+                    : PAYMENT_METHODS
+                ).includes(paymentMethod) && (
+                  <option value={paymentMethod}>{paymentMethod}</option>
+                )}
+              {(dbPaymentMethods.length > 0
+                ? dbPaymentMethods.map((pm: any) => pm.name)
+                : PAYMENT_METHODS
+              ).map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -410,7 +449,18 @@ export default function AuftragCreateModal({
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             >
               <option value="">Select…</option>
-              {SHIPPING_METHODS.map((m) => (
+              {shippingMethod &&
+                !(
+                  dbShippingMethods.length > 0
+                    ? dbShippingMethods.map((sm: any) => sm.name)
+                    : SHIPPING_METHODS
+                ).includes(shippingMethod) && (
+                  <option value={shippingMethod}>{shippingMethod}</option>
+                )}
+              {(dbShippingMethods.length > 0
+                ? dbShippingMethods.map((sm: any) => sm.name)
+                : SHIPPING_METHODS
+              ).map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>

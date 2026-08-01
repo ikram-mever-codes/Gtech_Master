@@ -354,8 +354,15 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   if (!isOpen) return null;
 
   function buildForm(o: any) {
+    const item1Title =
+      o.orderItems?.[0]?.itemName ||
+      o.orderItems?.[0]?.item_name ||
+      o.orderItems?.[0]?.description ||
+      o.items?.[0]?.itemName ||
+      o.items?.[0]?.item_name;
+
     return {
-      title: o.title || "",
+      title: item1Title || o.title || "",
       status: o.status || "Draft",
       currency: o.currency || "EUR",
       taxRate: o.tax_rate ?? 19,
@@ -640,6 +647,15 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     order.customerSnapshot,
   );
 
+  const item1Title =
+    visibleLineItems[0]?.itemName ||
+    visibleLineItems[0]?.item_name ||
+    visibleLineItems[0]?.description ||
+    order.orderItems?.[0]?.itemName ||
+    order.orderItems?.[0]?.item_name ||
+    order.title ||
+    "—";
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -651,7 +667,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </p>
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {order.title}
+              {item1Title}
             </h2>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
@@ -853,10 +869,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
             </div>
 
             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-              <Field label="Title" edit={edit} value={order.title}>
+              <Field label="TITLE" edit={edit} value={item1Title}>
                 <input
                   className={inputCls}
-                  value={form.title}
+                  value={form.title || item1Title}
                   onChange={(e) => patch({ title: e.target.value })}
                 />
               </Field>
@@ -1204,7 +1220,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-right font-bold text-gray-800">
                         {formatCurrency(
                           (form.shippingCost || 0) *
-                            (form.shippingQuantity || 1),
+                          (form.shippingQuantity || 1),
                           order.currency,
                         )}
                       </td>
@@ -1316,7 +1332,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                    visibleLineItems[0]?.extraWeight === undefined
+                      visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : String(visibleLineItems[0].extraWeight)
                   }
