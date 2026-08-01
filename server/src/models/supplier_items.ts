@@ -1,4 +1,3 @@
-// src/entities/supplier_items.ts
 import {
   Entity,
   PrimaryGeneratedColumn,
