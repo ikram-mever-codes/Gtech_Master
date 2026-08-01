@@ -1881,6 +1881,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     />
                   </Field>
                   <Field
+                    label="Tax profile"
+                    edit={false}
+                    value={
+                      taxProfile
+                        ? `${taxProfile.name} (${taxProfile.taxRate}%)`
+                        : "No tax profile assigned to this customer"
+                    }
+                  />
+                  <Field
                     label="Delivery Date"
                     edit={edit}
                     value={
@@ -1915,6 +1924,19 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       ))}
                     </select>
                   </Field>
+
+                  <Field
+                    label="Payment Due Days"
+                    edit={edit}
+                    value={offer.paymentDueDays}
+                  >
+                    <input
+                      className={inputCls}
+                      value={form.paymentTerms}
+                      placeholder="e.g., 30 days net"
+                      onChange={(e) => patch({ paymentTerms: e.target.value })}
+                    />
+                  </Field>
                   <Field
                     label="Shipping method"
                     edit={edit}
@@ -1938,27 +1960,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       ))}
                     </select>
                   </Field>
-                  <Field
-                    label="Payment Due Days"
-                    edit={edit}
-                    value={offer.paymentDueDays}
-                  >
-                    <input
-                      className={inputCls}
-                      value={form.paymentTerms}
-                      placeholder="e.g., 30 days net"
-                      onChange={(e) => patch({ paymentTerms: e.target.value })}
-                    />
-                  </Field>
-                  <Field
-                    label="Tax profile"
-                    edit={false}
-                    value={
-                      taxProfile
-                        ? `${taxProfile.name} (${taxProfile.taxRate}%)`
-                        : "No tax profile assigned to this customer"
-                    }
-                  />
                 </div>
               </div>
 
@@ -2773,82 +2774,66 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               </div>
 
               {/* LINKED DOCUMENTS */}
-              <Section
-                title="Linked documents"
-                icon={<LinkIcon className="h-4 w-4 text-gray-500" />}
-              >
-                {linkedDocsLoading ? (
-                  <div className="text-sm text-gray-500 py-2">
-                    Loading linked documents…
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
+                {/* LINKED DOCUMENTS */}
+                <div className="bg-white rounded-lg  p-4 px-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <LinkIcon className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Linked documents
+                    </h3>
                   </div>
-                ) : linkedDocsCount > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    {(
-                      Object.keys(
-                        LINKED_DOC_LABELS,
-                      ) as (keyof LinkedDocumentsResult)[]
-                    ).map((key) => {
-                      const list = linkedDocs?.[key] || [];
-                      if (list.length === 0) return null;
-                      return (
-                        <div key={key}>
-                          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                            {LINKED_DOC_LABELS[key]}
-                          </p>
-                          <ul className="space-y-1">
-                            {list.map((d) => (
-                              <li
-                                key={d.id}
-                                className="flex justify-between text-gray-700"
-                              >
-                                <span>{d.number}</span>
-                                {d.date && (
-                                  <span className="text-gray-400">
-                                    {formatDate(d.date)}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    No linked documents yet.
-                  </p>
-                )}
-              </Section>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Section
-                  title="Comment field"
-                  icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
-                >
-                  {edit ? (
-                    <>
-                      <textarea
-                        rows={3}
-                        className={inputCls}
-                        value={form.notes}
-                        placeholder="Shown to the customer on the offer."
-                        onChange={(e) => patch({ notes: e.target.value })}
-                      />
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        Printed on the offer PDF.
-                      </p>
-                    </>
+                  {linkedDocsLoading ? (
+                    <div className="text-sm text-gray-500 py-2">
+                      Loading linked documents…
+                    </div>
+                  ) : linkedDocsCount > 0 ? (
+                    <div className="space-y-2 text-sm">
+                      {(
+                        Object.keys(
+                          LINKED_DOC_LABELS,
+                        ) as (keyof LinkedDocumentsResult)[]
+                      ).map((key) => {
+                        const list = linkedDocs?.[key] || [];
+                        if (list.length === 0) return null;
+                        return (
+                          <div key={key}>
+                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                              {LINKED_DOC_LABELS[key]}
+                            </p>
+                            <ul className="space-y-1">
+                              {list.map((d) => (
+                                <li
+                                  key={d.id}
+                                  className="flex justify-between text-gray-700"
+                                >
+                                  <span>{d.number}</span>
+                                  {d.date && (
+                                    <span className="text-gray-400">
+                                      {formatDate(d.date)}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <p className="text-sm text-gray-600">
-                      {offer.notes || "—"}
+                    <p className="text-sm text-gray-500">
+                      No linked documents yet.
                     </p>
                   )}
-                </Section>
-                <Section
-                  title="Comment intern"
-                  icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
-                >
+                </div>
+
+                <div className="bg-white rounded-lg px-2 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <PencilIcon className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Comment intern
+                    </h3>
+                  </div>
                   {edit ? (
                     <>
                       <textarea
@@ -2869,7 +2854,37 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       {offer.internalNotes || "—"}
                     </p>
                   )}
-                </Section>
+                </div>
+
+                {/* Comment field */}
+                <div className="bg-white rounded-lg px-2 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <PencilIcon className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Comment field
+                    </h3>
+                  </div>
+                  {edit ? (
+                    <>
+                      <textarea
+                        rows={3}
+                        className={inputCls}
+                        value={form.notes}
+                        placeholder="Shown to the customer on the offer."
+                        onChange={(e) => patch({ notes: e.target.value })}
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Printed on the offer PDF.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      {offer.notes || "—"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Comment intern */}
               </div>
             </div>
 

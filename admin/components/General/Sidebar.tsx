@@ -677,15 +677,11 @@ const Sidebar = () => {
               display: "flex",
               alignItems: "center",
               gap: 1.5,
-              padding: isCollapsed ? "8px" : "8px 12px",
+              padding: "0px",
               borderRadius: 1.5,
-              backgroundColor: "rgba(255, 255, 255, 0.06)",
               cursor: "pointer",
               transition: "all 0.2s ease",
               justifyContent: isCollapsed ? "center" : "flex-start",
-              "&:hover": {
-                backgroundColor: "rgba(255, 255, 255, 0.12)",
-              },
             }}
           >
             <Avatar
@@ -771,7 +767,10 @@ const Sidebar = () => {
                   {!user?.avatar && user?.name?.charAt(0)}
                 </Avatar>
                 <Box sx={{ ml: 1.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 600, lineHeight: 1.2 }}
+                  >
                     {user?.name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
@@ -809,9 +808,15 @@ const Sidebar = () => {
 
             <MenuItem sx={{ py: 1 }}>
               <ListItemIcon>
-                <LucideSettings size={18} color={theme.palette.text.secondary} />
+                <LucideSettings
+                  size={18}
+                  color={theme.palette.text.secondary}
+                />
               </ListItemIcon>
-              <ListItemText primary="Account Settings" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              <ListItemText
+                primary="Account Settings"
+                primaryTypographyProps={{ fontSize: "0.85rem" }}
+              />
             </MenuItem>
 
             <MenuItem
@@ -824,21 +829,30 @@ const Sidebar = () => {
               <ListItemIcon>
                 <LucideUser size={18} color={theme.palette.text.secondary} />
               </ListItemIcon>
-              <ListItemText primary="Profile" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              <ListItemText
+                primary="Profile"
+                primaryTypographyProps={{ fontSize: "0.85rem" }}
+              />
             </MenuItem>
 
             <MenuItem sx={{ py: 1 }}>
               <ListItemIcon>
                 <Bell size={18} color={theme.palette.text.secondary} />
               </ListItemIcon>
-              <ListItemText primary="Notifications" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              <ListItemText
+                primary="Notifications"
+                primaryTypographyProps={{ fontSize: "0.85rem" }}
+              />
             </MenuItem>
 
             <MenuItem sx={{ py: 1 }}>
               <ListItemIcon>
                 <Mail size={18} color={theme.palette.text.secondary} />
               </ListItemIcon>
-              <ListItemText primary="Messages" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              <ListItemText
+                primary="Messages"
+                primaryTypographyProps={{ fontSize: "0.85rem" }}
+              />
             </MenuItem>
 
             <Divider />
