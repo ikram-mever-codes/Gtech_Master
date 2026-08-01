@@ -7,7 +7,6 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import { createRechnungFromAuftrag } from "@/api/rechnungen";
 import { updateCustomerOrder, deleteCustomerOrder } from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
@@ -387,12 +386,8 @@ export default function AuftragToRechnungModal({
             </h2>
           </div>
 
-          {/* Top Right: ViewEditToggle Switch + Close X */}
+          {/* Close X Button */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            <ViewEditToggle
-              isEditEnabled={isEditingAuftrag}
-              onToggle={() => setIsEditingAuftrag((prev) => !prev)}
-            />
             <button
               type="button"
               onClick={onClose}
