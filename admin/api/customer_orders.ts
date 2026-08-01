@@ -78,3 +78,16 @@ export const deleteCustomerOrder = async (id: number | string) => {
     throw error;
   }
 };
+
+export const updateCustomerOrder = async (
+  id: number | string,
+  payload: any,
+) => {
+  try {
+    const response: any = await api.put(`/customer-orders/${id}`, payload);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to update customer order");
+    throw error;
+  }
+};

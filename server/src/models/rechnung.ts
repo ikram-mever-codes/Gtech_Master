@@ -35,6 +35,12 @@ export class Rechnung {
   @Column({ type: "date", nullable: true })
   due_date?: Date;
 
+  @Column({ type: "date", nullable: true })
+  delivery_date?: Date;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  warehouse?: string;
+
   @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
   subtotal!: number;
 

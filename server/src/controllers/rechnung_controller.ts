@@ -4,7 +4,11 @@ import { Rechnung } from "../models/rechnung";
 import { RechnungCustomer } from "../models/rechnung_customer";
 import { RechnungItem } from "../models/rechnung_items";
 import { CustomerOrder } from "../models/customer_orders";
+import { CustomerOrderItem } from "../models/customer_order_items";
 import { Customer } from "../models/customers";
+import { CCIInvoice } from "../models/cci_invoice";
+import { CCICustomer } from "../models/cci_customer";
+import { CCIItem } from "../models/cci_items";
 import { NumberSequenceService } from "../services/number_sequence_service";
 
 export const createRechnungFromAuftrag = async (
@@ -14,7 +18,7 @@ export const createRechnungFromAuftrag = async (
 ) => {
   try {
     const { auftragId } = req.params;
-    const { selectedItems, notes } = req.body;
+    const { selectedItems, notes, deliveryDate, warehouse } = req.body;
 
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       res.status(400).json({
@@ -84,8 +88,9 @@ export const createRechnungFromAuftrag = async (
 
     let subtotal = 0;
     const itemsToCreate: Partial<RechnungItem>[] = [];
+    const customerOrderItemRepo = AppDataSource.getRepository(CustomerOrderItem);
 
-    selectedItems.forEach((selItem: any) => {
+    for (const selItem of selectedItems) {
       const sourceLine = (auftrag.orderItems || []).find(
         (li) => String(li.id) === String(selItem.sourceLineItemId || selItem.lineItemId),
       );
@@ -106,7 +111,28 @@ export const createRechnungFromAuftrag = async (
         order_no: auftrag.order_no,
         remark: selItem.notes || sourceLine?.description || undefined,
       });
-    });
+
+      // Deduct delivered quantity from Auftrag line item remaining quantity
+      if (sourceLine) {
+        const currentQty = Number(sourceLine.quantity) || 0;
+        const newRemainingQty = Math.max(0, currentQty - qty);
+        sourceLine.quantity = newRemainingQty;
+        sourceLine.lineTotal = newRemainingQty * Number(sourceLine.price || 0);
+        await customerOrderItemRepo.save(sourceLine);
+      }
+    }
+
+    // Update Auftrag status based on remaining quantities
+    const totalRemainingQty = (auftrag.orderItems || []).reduce(
+      (sum, li) => sum + Number(li.quantity || 0),
+      0,
+    );
+    if (totalRemainingQty <= 0) {
+      auftrag.status = "Completed";
+    } else {
+      auftrag.status = "In Progress";
+    }
+    await customerOrderRepo.save(auftrag);
 
     const taxRate = Number(auftrag.tax_rate ?? 19);
     const taxAmount = (subtotal * taxRate) / 100;
@@ -118,6 +144,8 @@ export const createRechnungFromAuftrag = async (
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,
+      delivery_date: deliveryDate ? new Date(deliveryDate) : undefined,
+      warehouse: warehouse || "CN",
       subtotal: subtotal,
       tax_rate: taxRate,
       tax_amount: taxAmount,
@@ -129,7 +157,7 @@ export const createRechnungFromAuftrag = async (
       rechnung_customer_id: savedCustomerSnapshot.id,
     });
 
-    const savedRechnung = await rechnungRepo.save(rechnung);
+    const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
 
     const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
     const itemEntities = itemsToCreate.map((item) =>
@@ -140,6 +168,60 @@ export const createRechnungFromAuftrag = async (
       }),
     );
     await rechnungItemRepo.save(itemEntities);
+
+    // ALSO save to 3 CCI Tables so commercial page /invoices endpoint picks it up!
+    try {
+      const cciCustRepo = AppDataSource.getRepository(CCICustomer);
+      const cciCust = cciCustRepo.create({
+        original_customer_id: auftrag.customer_id ? String(auftrag.customer_id) : undefined,
+        company_name: savedCustomerSnapshot.company_name,
+        email: savedCustomerSnapshot.email,
+        tax_number: savedCustomerSnapshot.tax_number,
+        bill_to_address: savedCustomerSnapshot.bill_to_address,
+        ship_to_address: savedCustomerSnapshot.ship_to_address,
+        city: savedCustomerSnapshot.city,
+        country: savedCustomerSnapshot.country,
+        phone: savedCustomerSnapshot.phone,
+      });
+      const savedCciCust = await cciCustRepo.save(cciCust);
+
+      const cciInvRepo = AppDataSource.getRepository(CCIInvoice);
+      const cciInv = cciInvRepo.create({
+        invoice_number: invoiceNo,
+        order_number: auftrag.order_no,
+        cargo_no: auftrag.order_no,
+        invoice_date: now,
+        delivery_date: deliveryDate ? new Date(deliveryDate) : now,
+        due_date: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        net_total: subtotal,
+        tax_amount: taxAmount,
+        gross_total: totalAmount,
+        freight_cost: 0,
+        description: notes || auftrag.notes || "",
+        status: "open",
+        customer: savedCciCust,
+        cci_customer_id: savedCciCust.id,
+      });
+      const savedCciInv = await cciInvRepo.save(cciInv);
+
+      const cciItemRepo = AppDataSource.getRepository(CCIItem);
+      const cciItems = itemsToCreate.map((it) =>
+        cciItemRepo.create({
+          cci_invoice: savedCciInv,
+          cci_invoice_id: savedCciInv.id,
+          item_name: it.item_name || "Item",
+          item_no_de: it.item_no_de,
+          quantity: it.quantity || 1,
+          unit_price: it.unit_price || 0,
+          total_price: it.total_price || 0,
+          order_no: auftrag.order_no,
+          remark: it.remark,
+        }),
+      );
+      await cciItemRepo.save(cciItems);
+    } catch (cciErr) {
+      console.warn("Could not mirror to CCI tables:", cciErr);
+    }
 
     const fullRechnung = await rechnungRepo.findOne({
       where: { id: savedRechnung.id },

@@ -4,11 +4,12 @@ export const createRechnungFromAuftrag = async (
   auftragId: string | number,
   selectedItems: Array<{ lineItemId: string; qty: number; price: number; itemName?: string }>,
   notes?: string,
+  extra?: { deliveryDate?: string; warehouse?: "CN" | "EU" },
 ) => {
   try {
     const response: any = await api.post(
       `/rechnungen/from-auftrag/${auftragId}`,
-      { selectedItems, notes },
+      { selectedItems, notes, ...(extra || {}) },
     );
     return response;
   } catch (error: any) {

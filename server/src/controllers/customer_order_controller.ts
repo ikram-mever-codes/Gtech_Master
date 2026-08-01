@@ -491,3 +491,44 @@ export const createAuftragFromItems = async (
   }
 };
 
+export const updateCustomerOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { title, paymentMethod, shippingMethod, paymentTerms, deliveryDate, notes, internalNotes } = req.body;
+
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const auftrag = await customerOrderRepo.findOne({
+      where: { id: Number(id) },
+      relations: ["orderItems", "customer"],
+    });
+
+    if (!auftrag) {
+      res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+
+    if (title !== undefined) auftrag.offer_id = title;
+    if (notes !== undefined) auftrag.notes = notes;
+    if (deliveryDate !== undefined) (auftrag as any).delivery_date = deliveryDate;
+    if (paymentMethod !== undefined) (auftrag as any).payment_method = paymentMethod;
+    if (shippingMethod !== undefined) (auftrag as any).shipping_method = shippingMethod;
+    if (paymentTerms !== undefined) (auftrag as any).payment_terms = paymentTerms;
+    if (internalNotes !== undefined) (auftrag as any).internal_notes = internalNotes;
+
+    const updated = await customerOrderRepo.save(auftrag);
+
+    res.json({
+      success: true,
+      message: "Auftrag updated successfully",
+      data: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+

@@ -1811,6 +1811,13 @@ const InvoiceListPage: React.FC = () => {
       list = invoices.filter(
         (inv: any) => inv.status === "paid" || inv.status === "cancelled",
       );
+    } else if (activeInvTab === "lieferschein") {
+      list = invoices.map((inv: any) => ({
+        ...inv,
+        order_no: inv.invoiceNumber || inv.orderNumber,
+        customer_name: inv.customer?.companyName || inv.ship_to || "—",
+        items: inv.items || [],
+      }));
     } else {
       list = [];
     }
@@ -4295,8 +4302,12 @@ const InvoiceListPage: React.FC = () => {
             auftrag={selectedAuftragForRechnungModal}
             onSuccess={() => {
               fetchOrders();
+              loadInvoices();
               fetchRechnungen();
               fetchLieferscheine();
+            }}
+            onEditAuftrag={(auftragToEdit) => {
+              handleEditOrder(auftragToEdit);
             }}
           />
         )}
