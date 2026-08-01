@@ -8,7 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { createRechnungFromAuftrag } from "@/api/rechnungen";
-import { updateCustomerOrder, deleteCustomerOrder } from "@/api/customer_orders";
+import { getCustomerOrderById, updateCustomerOrder, deleteCustomerOrder } from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, Warehouse, ClipboardCheck, Check } from "lucide-react";
 
@@ -165,97 +165,126 @@ export default function AuftragToRechnungModal({
   useEffect(() => {
     if (!isOpen || !auftrag) return;
 
-    const sourceItems = auftrag.orderItems || auftrag.items || [];
-    const mapped: SelectedItemState[] = sourceItems.map((it: any, index: number) => {
-      const origQty = Number(it.quantity || it.qty) || 1;
-      const itemPrice = Number(it.price || 0);
-      const isStock =
-        it.is_stock_item ||
-        it.item?.is_stock_item ||
-        it.sourceItem?.is_stock_item ||
-        "N";
+    const loadOrderData = (data: any) => {
+      const sourceItems = data.orderItems || data.items || [];
+      const mapped: SelectedItemState[] = sourceItems.map((it: any, index: number) => {
+        const origQty = Number(it.quantity || it.qty) || 1;
+        const itemPrice = Number(it.price || 0);
+        const isStock =
+          it.is_stock_item ||
+          it.item?.is_stock_item ||
+          it.sourceItem?.is_stock_item ||
+          "N";
 
-      return {
-        id: String(it.id),
-        lineItemId: String(it.id),
-        position: index + 1,
-        photo: it.photo || it.item?.photo || it.image,
-        artNr: it.articleNumber || it.item?.articleNumber || it.ean || it.item?.ean || "—",
-        itemName: it.itemName || it.item_name || it.item?.item_name || "Line Item",
-        hinweis: it.notes || it.remark_de || it.description || "—",
-        mwst: Number(it.taxRate || auftrag.tax_rate || 19),
-        max_qty: origQty,
-        qty: origQty,
-        price: itemPrice,
-        selected: true,
-        is_stock_item: isStock,
-      };
-    });
+        return {
+          id: String(it.id),
+          lineItemId: String(it.id),
+          position: index + 1,
+          photo: it.photo || it.item?.photo || it.image,
+          artNr: it.articleNumber || it.item?.articleNumber || it.ean || it.item?.ean || "—",
+          itemName: it.itemName || it.item_name || it.item?.item_name || "Line Item",
+          hinweis: it.notes || it.remark_de || it.description || "—",
+          mwst: Number(it.taxRate || data.tax_rate || 19),
+          max_qty: origQty,
+          qty: origQty,
+          price: itemPrice,
+          selected: true,
+          is_stock_item: isStock,
+        };
+      });
 
-    setItems(mapped);
-    setNotes(auftrag.notes || auftrag.comment || "");
-    setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
+      setItems(mapped);
+      setNotes(data.notes || data.comment || "");
+      setInternalNotes(data.internalNotes || data.internal_notes || "");
 
-    // Populate Customer Address & Defaults State
-    const cust = auftrag.customerSnapshot || auftrag.customer || {};
-    setEditCompanyName(cust.companyName || cust.name || auftrag.customer_name || "");
-    setEditStreet(cust.address || cust.street || cust.addressLine1 || cust.bill_to_address || "");
-    setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
-    setEditCity(cust.city || "Göttingen");
-    setEditCountry(cust.country || "DE");
-    setEditVatId(cust.vatId || cust.vatTaxId || cust.taxNumber || cust.tax_number || "");
+      const firstItemTitle =
+        mapped[0]?.itemName && mapped[0]?.itemName !== "Line Item"
+          ? mapped[0]?.itemName
+          : sourceItems[0]?.itemName ||
+            sourceItems[0]?.item_name ||
+            sourceItems[0]?.description ||
+            sourceItems[0]?.item?.item_name ||
+            sourceItems[0]?.item?.description;
 
-    const sMethod =
-      auftrag.shippingMethod ||
-      auftrag.shipping_method ||
-      cust.defaultShippingMethod ||
-      cust.shippingMethod ||
-      cust.shipping_method ||
-      "angeliefert durch GTech";
+      const resolvedTitle = firstItemTitle || data.title || "";
+      setEditTitle(resolvedTitle);
 
-    const pMethod =
-      auftrag.paymentMethod ||
-      auftrag.payment_method ||
-      cust.defaultPaymentMethod ||
-      cust.paymentMethod ||
-      cust.payment_method ||
-      "Kauf auf Rechnung";
+      // Populate Customer Address & Defaults State
+      const cust = data.customerSnapshot || data.customer || {};
+      setEditCompanyName(cust.companyName || cust.name || data.customer_name || "");
+      setEditStreet(cust.address || cust.street || cust.addressLine1 || cust.bill_to_address || "");
+      setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
+      setEditCity(cust.city || "Göttingen");
+      setEditCountry(cust.country || "DE");
+      setEditVatId(cust.vatId || cust.vatTaxId || cust.taxNumber || cust.tax_number || "");
 
-    const pTerms =
-      auftrag.paymentTerms ||
-      auftrag.payment_terms ||
-      (cust.defaultPaymentDueDays ? `${cust.defaultPaymentDueDays} days net` : undefined) ||
-      cust.defaultPaymentTerms ||
-      cust.paymentTerms ||
-      "30 days net";
+      const sMethod =
+        data.shippingMethod ||
+        data.shipping_method ||
+        cust.defaultShippingMethod ||
+        cust.shippingMethod ||
+        cust.shipping_method ||
+        "angeliefert durch GTech";
 
-    setEditShippingMethod(sMethod);
-    setEditPaymentMethod(pMethod);
-    setEditPaymentTerms(pTerms);
+      const pMethod =
+        data.paymentMethod ||
+        data.payment_method ||
+        cust.defaultPaymentMethod ||
+        cust.paymentMethod ||
+        cust.payment_method ||
+        "Kauf auf Rechnung";
 
-    // Delivery date evaluation logic
-    const todayStr = new Date().toISOString().split("T")[0];
-    const rawDelivery = auftrag.deliveryTime || auftrag.delivery_date || auftrag.deliveryDate;
+      const pTerms =
+        data.paymentTerms ||
+        data.payment_terms ||
+        (cust.defaultPaymentDueDays ? `${cust.defaultPaymentDueDays} days net` : undefined) ||
+        cust.defaultPaymentTerms ||
+        cust.paymentTerms ||
+        "30 days net";
 
-    if (!rawDelivery) {
-      setDeliveryDate(todayStr);
-      setIsDatePastOrEmpty(true);
-    } else {
-      const parsedDate = new Date(rawDelivery);
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
+      setEditShippingMethod(sMethod);
+      setEditPaymentMethod(pMethod);
+      setEditPaymentTerms(pTerms);
 
-      if (isNaN(parsedDate.getTime()) || parsedDate < todayDate) {
+      // Delivery date evaluation logic
+      const todayStr = new Date().toISOString().split("T")[0];
+      const rawDelivery = data.deliveryTime || data.delivery_date || data.deliveryDate;
+
+      if (!rawDelivery) {
         setDeliveryDate(todayStr);
         setIsDatePastOrEmpty(true);
       } else {
-        setDeliveryDate(parsedDate.toISOString().split("T")[0]);
-        setIsDatePastOrEmpty(false);
-      }
-    }
+        const parsedDate = new Date(rawDelivery);
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
 
-    setWarehouse("CN");
-    setIsEditingAuftrag(false);
+        if (isNaN(parsedDate.getTime()) || parsedDate < todayDate) {
+          setDeliveryDate(todayStr);
+          setIsDatePastOrEmpty(true);
+        } else {
+          setDeliveryDate(parsedDate.toISOString().split("T")[0]);
+          setIsDatePastOrEmpty(false);
+        }
+      }
+      
+      setWarehouse("CN");
+      setIsEditingAuftrag(false);
+    };
+
+    const hasItems =
+      (auftrag.orderItems && auftrag.orderItems.length > 0) ||
+      (auftrag.items && auftrag.items.length > 0);
+
+    if (!hasItems && auftrag.id) {
+      getCustomerOrderById(auftrag.id)
+        .then((res: any) => {
+          const fullData = res?.data || res?.order || auftrag;
+          loadOrderData(fullData);
+        })
+        .catch(() => loadOrderData(auftrag));
+    } else {
+      loadOrderData(auftrag);
+    }
   }, [isOpen, auftrag]);
 
   if (!isOpen || !auftrag) return null;
@@ -520,7 +549,13 @@ export default function AuftragToRechnungModal({
 
               <Field
                 label="TITLE"
-                value={editTitle}
+                value={
+                  editTitle ||
+                  (items[0]?.itemName !== "Line Item" ? items[0]?.itemName : "") ||
+                  auftrag.orderItems?.[0]?.itemName ||
+                  auftrag.orderItems?.[0]?.item_name ||
+                  " — "
+                }
                 isEdit={isEditingAuftrag}
               >
                 <input
@@ -949,7 +984,6 @@ export default function AuftragToRechnungModal({
             </button>
           </div>
 
-          {/* Action Buttons: Cancel / Save changes / Generate */}
           <div className="flex gap-2.5 items-center">
             <button
               type="button"
