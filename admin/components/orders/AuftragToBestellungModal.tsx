@@ -63,7 +63,9 @@ export default function AuftragToBestellungModal({
 
   const handleToggleSelect = (index: number) => {
     setItems((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, selected: !row.selected } : row)),
+      prev.map((row, i) =>
+        i === index ? { ...row, selected: !row.selected } : row,
+      ),
     );
   };
 
@@ -100,7 +102,9 @@ export default function AuftragToBestellungModal({
         description: it.description,
       }));
 
-      const res = await createBestellungFromAuftrag(auftrag.id, selectedItems, notes);
+      const res = await createBestellungFromAuftrag(auftrag.id, selectedItems, {
+        notes,
+      });
       if (res?.success) {
         toast.success(res.message || "Converted to Bestellung successfully!");
         onSuccess();
@@ -126,7 +130,11 @@ export default function AuftragToBestellungModal({
       footer={
         <div className="flex items-center justify-between w-full">
           <div className="text-xs text-gray-500 font-medium">
-            Subtotal: <span className="font-bold text-gray-900">€{calcSubtotal.toFixed(2)}</span> ({selectedCount} item{selectedCount === 1 ? "" : "s"} selected)
+            Subtotal:{" "}
+            <span className="font-bold text-gray-900">
+              €{calcSubtotal.toFixed(2)}
+            </span>{" "}
+            ({selectedCount} item{selectedCount === 1 ? "" : "s"} selected)
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -161,9 +169,18 @@ export default function AuftragToBestellungModal({
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
           <p className="font-semibold mb-1">Auftrag Conversion Summary</p>
           <p>
-            Customer: <strong>{auftrag.customerSnapshot?.companyName || auftrag.customer_name || auftrag.customer?.companyName || "N/A"}</strong>
+            Customer:{" "}
+            <strong>
+              {auftrag.customerSnapshot?.companyName ||
+                auftrag.customer_name ||
+                auftrag.customer?.companyName ||
+                "N/A"}
+            </strong>
           </p>
-          <p>Review items and quantities below. By default, quantity is set to maximum.</p>
+          <p>
+            Review items and quantities below. By default, quantity is set to
+            maximum.
+          </p>
         </div>
 
         <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -179,7 +196,12 @@ export default function AuftragToBestellungModal({
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {items.map((row, idx) => (
-                <tr key={idx} className={row.selected ? "bg-white" : "bg-gray-50/50 opacity-60"}>
+                <tr
+                  key={idx}
+                  className={
+                    row.selected ? "bg-white" : "bg-gray-50/50 opacity-60"
+                  }
+                >
                   <td className="p-3 text-center">
                     <input
                       type="checkbox"
@@ -189,8 +211,14 @@ export default function AuftragToBestellungModal({
                     />
                   </td>
                   <td className="p-3">
-                    <div className="font-semibold text-gray-900">{row.itemName}</div>
-                    {row.description && <div className="text-[11px] text-gray-400 truncate max-w-xs">{row.description}</div>}
+                    <div className="font-semibold text-gray-900">
+                      {row.itemName}
+                    </div>
+                    {row.description && (
+                      <div className="text-[11px] text-gray-400 truncate max-w-xs">
+                        {row.description}
+                      </div>
+                    )}
                   </td>
                   <td className="p-3 text-center">
                     <div className="flex items-center justify-center gap-1">
@@ -200,10 +228,14 @@ export default function AuftragToBestellungModal({
                         max={row.max_qty}
                         disabled={!row.selected}
                         value={row.qty}
-                        onChange={(e) => handleQtyChange(idx, Number(e.target.value))}
+                        onChange={(e) =>
+                          handleQtyChange(idx, Number(e.target.value))
+                        }
                         className="w-16 px-2 py-1 text-center font-bold border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 text-gray-900 bg-white disabled:bg-gray-100"
                       />
-                      <span className="text-[10px] text-gray-500 font-medium">/ {row.max_qty}</span>
+                      <span className="text-[10px] text-gray-500 font-medium">
+                        / {row.max_qty}
+                      </span>
                     </div>
                   </td>
                   <td className="p-3 text-right font-medium text-gray-700">
