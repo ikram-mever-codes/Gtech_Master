@@ -9,6 +9,9 @@ import { createAuftragFromItems } from "@/api/customer_orders";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2 } from "lucide-react";
+import { getAllPaymentMethods } from "@/api/payment_methods";
+import { getAllShippingMethods } from "@/api/shipping_methods";
+
 
 const PAYMENT_METHODS = [
   "Prepayment (Vorkasse)",
@@ -89,6 +92,9 @@ export default function AuftragCreateModal({
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
+  const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
+
   const [filterCustomerId, setFilterCustomerId] = useState<string>("");
   const [sourceSearch, setSourceSearch] = useState("");
 
@@ -115,12 +121,16 @@ export default function AuftragCreateModal({
     Promise.all([
       getAllCustomers({ limit: 1000 }).catch(() => ({ data: [] })),
       getItems({ limit: 1000 }).catch(() => ({ data: [] })),
+      getAllPaymentMethods(true).catch(() => ({ data: [] })),
+      getAllShippingMethods(true).catch(() => ({ data: [] })),
     ])
-      .then(([custRes, itemRes]: any) => {
+      .then(([custRes, itemRes, pmRes, smRes]: any) => {
         const custData = custRes?.data?.businesses ?? custRes?.data ?? custRes;
         const itemData = itemRes?.data ?? itemRes;
         setCustomers(Array.isArray(custData) ? custData : []);
         setItems(Array.isArray(itemData) ? itemData : []);
+        if (pmRes?.data) setDbPaymentMethods(pmRes.data);
+        if (smRes?.data) setDbShippingMethods(smRes.data);
       })
       .catch((err) => console.error("Error loading customers/items:", err))
       .finally(() => setLoading(false));
@@ -392,7 +402,18 @@ export default function AuftragCreateModal({
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             >
               <option value="">Select…</option>
-              {PAYMENT_METHODS.map((m) => (
+              {paymentMethod &&
+                !(
+                  dbPaymentMethods.length > 0
+                    ? dbPaymentMethods.map((pm: any) => pm.name)
+                    : PAYMENT_METHODS
+                ).includes(paymentMethod) && (
+                  <option value={paymentMethod}>{paymentMethod}</option>
+                )}
+              {(dbPaymentMethods.length > 0
+                ? dbPaymentMethods.map((pm: any) => pm.name)
+                : PAYMENT_METHODS
+              ).map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -410,7 +431,18 @@ export default function AuftragCreateModal({
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             >
               <option value="">Select…</option>
-              {SHIPPING_METHODS.map((m) => (
+              {shippingMethod &&
+                !(
+                  dbShippingMethods.length > 0
+                    ? dbShippingMethods.map((sm: any) => sm.name)
+                    : SHIPPING_METHODS
+                ).includes(shippingMethod) && (
+                  <option value={shippingMethod}>{shippingMethod}</option>
+                )}
+              {(dbShippingMethods.length > 0
+                ? dbShippingMethods.map((sm: any) => sm.name)
+                : SHIPPING_METHODS
+              ).map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>

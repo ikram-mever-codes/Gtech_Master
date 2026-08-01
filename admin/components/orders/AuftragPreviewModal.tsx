@@ -1203,7 +1203,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-right font-bold text-gray-800">
                         {formatCurrency(
                           (form.shippingCost || 0) *
-                            (form.shippingQuantity || 1),
+                          (form.shippingQuantity || 1),
                           order.currency,
                         )}
                       </td>
@@ -1315,7 +1315,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                    visibleLineItems[0]?.extraWeight === undefined
+                      visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : String(visibleLineItems[0].extraWeight)
                   }
