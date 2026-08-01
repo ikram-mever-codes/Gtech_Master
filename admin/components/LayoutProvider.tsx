@@ -34,9 +34,15 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
               <Sidebar />
             </aside>
 
-            <div className="flex-1 flex flex-col min-w-0" suppressHydrationWarning>
-              <main className="flex-1 p-4 md:p-6 bg-gray-50 overflow-y-auto">
-                <div className="w-full px-4 md:px-8 py-4 mb-[2rem] mx-auto" suppressHydrationWarning>
+            <div
+              className="flex-1 flex flex-col min-w-0"
+              suppressHydrationWarning
+            >
+              <main className="flex-1 p-4 py-0 md:py-0 md:p-6 bg-gray-50 overflow-y-auto">
+                <div
+                  className="w-full px-4 md:px-8 py-4 mb-[2rem] mx-auto"
+                  suppressHydrationWarning
+                >
                   {children}
                 </div>
               </main>
@@ -47,7 +53,9 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
             </div>
           </div>
         ) : (
-          <div className="w-full min-h-screen" suppressHydrationWarning>{children}</div>
+          <div className="w-full min-h-screen" suppressHydrationWarning>
+            {children}
+          </div>
         )}
       </ThemeProvider>
     </Provider>

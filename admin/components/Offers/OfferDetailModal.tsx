@@ -38,6 +38,7 @@ import {
   getCustomerShippingAddresses,
   type LinkedDocumentsResult,
   type CustomerShippingAddress,
+  previewLineItemPrice,
 } from "@/api/offers";
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
@@ -738,6 +739,65 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     });
   }
 
+  /** Commits a quantity change on a classic line item. If the item is
+   * catalog-sourced, first checks whether a sales-price tier applies to
+   * the new quantity; if that resolved price differs from the current
+   * one, asks for confirmation before overriding it. Either way, the
+   * quantity itself is always saved. */
+  const handleQuantityCommit = async (item: any, raw: string) => {
+    const newQty = raw.trim() || "1";
+
+    if (!item.sourceItemId) {
+      await persistLine(item.id, { baseQuantity: newQty });
+      return;
+    }
+
+    try {
+      const preview: any = await previewLineItemPrice(
+        offer.id,
+        item.id,
+        newQty,
+      );
+      const tieredPrice = preview?.data?.price;
+      const currentPrice = parseFlexibleNumber(item.basePrice) ?? 0;
+
+      if (
+        tieredPrice !== null &&
+        tieredPrice !== undefined &&
+        Math.abs(tieredPrice - currentPrice) > 0.0001
+      ) {
+        const confirmed = window.confirm(
+          `There is a sales price for quantity ${newQty}: ${formatCurrency(
+            tieredPrice,
+            offer.currency,
+          )}. Override the current price (${formatCurrency(
+            currentPrice,
+            offer.currency,
+          )}) with it?`,
+        );
+
+        if (confirmed) {
+          await persistLine(item.id, {
+            baseQuantity: newQty,
+            basePrice: tieredPrice,
+          });
+        } else {
+          // Declined — keep the current price explicitly so the backend
+          // doesn't silently re-resolve it from the new quantity.
+          await persistLine(item.id, {
+            baseQuantity: newQty,
+            basePrice: currentPrice,
+          });
+        }
+        return;
+      }
+
+      await persistLine(item.id, { baseQuantity: newQty });
+    } catch (e) {
+      console.error("Couldn't check tiered pricing:", e);
+      await persistLine(item.id, { baseQuantity: newQty });
+    }
+  };
   function buildForm(o: any) {
     return {
       title: o.title || "",
@@ -755,10 +815,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       shippingQuantity: o.shippingQuantity ?? 1,
       taxRate: o.taxRate ?? 19,
       notes: o.notes || "",
+      deliveryAddress: { ...(o.deliveryAddress || {}) },
+      customerSnapshot: { ...(o.customerSnapshot || {}) },
+      pricingMode: (o.pricingMode || "classic") as PricingMode,
       internalNotes: o.internalNotes || "",
       highlightColor: o.highlightColor || "",
-      deliveryAddress: { ...(o.deliveryAddress || {}) },
-      pricingMode: (o.pricingMode || "classic") as PricingMode,
       unitPriceDecimalPlaces: o.unitPriceDecimalPlaces || 3,
       totalPriceDecimalPlaces: o.totalPriceDecimalPlaces || 2,
       maxUnitPriceColumns: o.maxUnitPriceColumns || 3,
@@ -797,17 +858,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         deliveryAddress: {
           addressName: "",
           contactName:
-            offer.customerSnapshot?.legalName ||
-            offer.customerSnapshot?.companyName ||
+            offer?.customerSnapshot?.legalName ||
+            offer?.customerSnapshot?.companyName ||
             "",
           street:
-            offer.customerSnapshot?.address ||
-            offer.customerSnapshot?.street ||
+            offer?.customerSnapshot?.address ||
+            offer?.customerSnapshot?.street ||
             "",
-          postalCode: offer.customerSnapshot?.postalCode || "",
-          city: offer.customerSnapshot?.city || "",
-          country: offer.customerSnapshot?.country || "",
-          contactPhone: offer.customerSnapshot?.contactPhoneNumber || "",
+          postalCode: offer?.customerSnapshot?.postalCode || "",
+          city: offer?.customerSnapshot?.city || "",
+          country: offer?.customerSnapshot?.country || "",
+          contactPhone: offer?.customerSnapshot?.contactPhoneNumber || "",
         },
       });
       return;
@@ -1009,6 +1070,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         validUntil: form.validUntil,
         deliveryTime: form.deliveryTime,
         paymentTerms: form.paymentTerms,
+        deliveryAddress: form.deliveryAddress,
+        customerSnapshot: form.customerSnapshot,
+        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
         paymentMethod: form.paymentMethod || undefined,
         shippingMethod: form.shippingMethod || undefined,
         deliveryTerms: form.deliveryTerms,
@@ -1016,8 +1080,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         notes: form.notes,
         internalNotes: form.internalNotes,
         highlightColor: form.highlightColor ?? "",
-        deliveryAddress: form.deliveryAddress,
-        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
         shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
         shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
         taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
@@ -1366,6 +1428,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       })
       .sort((a, b) => b.rate - a.rate);
   })();
+
+  const shippingTotalForDisplay = edit
+    ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
+    : (offer?.shippingCost || 0) * (offer?.shippingQuantity || 1);
+  const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
+  const displayTotal =
+    (offer?.subtotal || 0) - (offer?.discountAmount || 0) + vatTaxSum;
   // --- Linked documents ---------------------------------------------------
   const linkedDocsCount = linkedDocs
     ? (
@@ -1525,20 +1594,126 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                       Customer address
                     </p>
-                    <AddressBlock
-                      addr={{
-                        companyName: selectedCustomer.companyName,
-                        legalName: selectedCustomer.legalName,
-                        address: selectedCustomer.addressLine1,
-                        postalCode: selectedCustomer.postalCode,
-                        city: selectedCustomer.city,
-                        country: selectedCustomer.country,
-                        vatId:
-                          selectedCustomer.vatTaxId ||
-                          selectedCustomer.taxNumber,
-                      }}
-                      emptyText="No address on file."
-                    />
+
+                    <div className="md:col-span-1 flex flex-col gap-3">
+                      <div className="block mb-1">
+                        {edit ? (
+                          <div className="space-y-1.5">
+                            <input
+                              className={inputCls}
+                              placeholder="Company name"
+                              value={form.customerSnapshot?.companyName || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    companyName: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="Legal name"
+                              value={form.customerSnapshot?.legalName || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    legalName: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="Street"
+                              value={
+                                form.customerSnapshot?.address ||
+                                form.customerSnapshot?.street ||
+                                ""
+                              }
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    address: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <div className="flex gap-1.5">
+                              <input
+                                className={inputCls}
+                                placeholder="Postal code"
+                                value={form.customerSnapshot?.postalCode || ""}
+                                onChange={(e) =>
+                                  patch({
+                                    customerSnapshot: {
+                                      ...form.customerSnapshot,
+                                      postalCode: e.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                              <input
+                                className={inputCls}
+                                placeholder="City"
+                                value={form.customerSnapshot?.city || ""}
+                                onChange={(e) =>
+                                  patch({
+                                    customerSnapshot: {
+                                      ...form.customerSnapshot,
+                                      city: e.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                            </div>
+                            <input
+                              className={inputCls}
+                              placeholder="Country"
+                              value={form.customerSnapshot?.country || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    country: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="VAT ID"
+                              value={form.customerSnapshot?.vatId || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    vatId: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                        ) : (
+                          <AddressBlock
+                            addr={{
+                              companyName: offer?.customerSnapshot?.companyName,
+                              legalName: offer?.customerSnapshot?.legalName,
+                              address: offer?.customerSnapshot?.address,
+                              street: offer?.customerSnapshot?.street,
+                              postalCode: offer?.customerSnapshot?.postalCode,
+                              city: offer?.customerSnapshot?.city,
+                              country: offer?.customerSnapshot?.country,
+                              vatId: offer?.customerSnapshot?.vatId,
+                            }}
+                            emptyText="No customer snapshot."
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
                     {selectedCustomer.deliveryAddressLine1 && (
@@ -1804,20 +1979,111 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
                 <div className="md:col-span-1 flex flex-col gap-3">
-                  <div className="block mb-1">
-                    <AddressBlock
-                      addr={{
-                        companyName: offer.customerSnapshot?.companyName,
-                        legalName: offer.customerSnapshot?.legalName,
-                        address: offer.customerSnapshot?.address,
-                        street: offer.customerSnapshot?.street,
-                        postalCode: offer.customerSnapshot?.postalCode,
-                        city: offer.customerSnapshot?.city,
-                        country: offer.customerSnapshot?.country,
-                        vatId: offer.customerSnapshot?.vatId,
-                      }}
-                      emptyText="No customer snapshot."
-                    />
+                  <div className="md:col-span-1 flex flex-col gap-3">
+                    <div className="block mb-1">
+                      {edit ? (
+                        <div className="space-y-1.5">
+                          <input
+                            className={inputCls}
+                            placeholder="Legal name"
+                            value={form.customerSnapshot?.legalName || ""}
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  legalName: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="Street"
+                            value={
+                              form.customerSnapshot?.address ||
+                              form.customerSnapshot?.street ||
+                              ""
+                            }
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  address: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <div className="flex gap-1.5">
+                            <input
+                              className={inputCls}
+                              placeholder="Postal code"
+                              value={form.customerSnapshot?.postalCode || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    postalCode: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="City"
+                              value={form.customerSnapshot?.city || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    city: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                          <input
+                            className={inputCls}
+                            placeholder="Country"
+                            value={form.customerSnapshot?.country || ""}
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  country: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="VAT ID"
+                            value={form.customerSnapshot?.vatId || ""}
+                            onChange={(e) =>
+                              patch({
+                                customerSnapshot: {
+                                  ...form.customerSnapshot,
+                                  vatId: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <AddressBlock
+                          addr={{
+                            companyName: offer.customerSnapshot?.companyName,
+                            legalName: offer.customerSnapshot?.legalName,
+                            address: offer.customerSnapshot?.address,
+                            street: offer.customerSnapshot?.street,
+                            postalCode: offer.customerSnapshot?.postalCode,
+                            city: offer.customerSnapshot?.city,
+                            country: offer.customerSnapshot?.country,
+                            vatId: offer.customerSnapshot?.vatId,
+                          }}
+                          emptyText="No customer snapshot."
+                        />
+                      )}
+                    </div>
                   </div>
 
                   <div className="block mb-1">
@@ -1881,6 +2147,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     />
                   </Field>
                   <Field
+                    label="Tax profile"
+                    edit={false}
+                    value={
+                      taxProfile
+                        ? `${taxProfile.name} (${taxProfile.taxRate}%)`
+                        : "No tax profile assigned to this customer"
+                    }
+                  />
+                  <Field
                     label="Delivery Date"
                     edit={edit}
                     value={
@@ -1915,6 +2190,19 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       ))}
                     </select>
                   </Field>
+
+                  <Field
+                    label="Payment Due Days"
+                    edit={edit}
+                    value={offer.paymentDueDays}
+                  >
+                    <input
+                      className={inputCls}
+                      value={form.paymentTerms}
+                      placeholder="e.g., 30 days net"
+                      onChange={(e) => patch({ paymentTerms: e.target.value })}
+                    />
+                  </Field>
                   <Field
                     label="Shipping method"
                     edit={edit}
@@ -1938,27 +2226,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       ))}
                     </select>
                   </Field>
-                  <Field
-                    label="Payment Due Days"
-                    edit={edit}
-                    value={offer.paymentDueDays}
-                  >
-                    <input
-                      className={inputCls}
-                      value={form.paymentTerms}
-                      placeholder="e.g., 30 days net"
-                      onChange={(e) => patch({ paymentTerms: e.target.value })}
-                    />
-                  </Field>
-                  <Field
-                    label="Tax profile"
-                    edit={false}
-                    value={
-                      taxProfile
-                        ? `${taxProfile.name} (${taxProfile.taxRate}%)`
-                        : "No tax profile assigned to this customer"
-                    }
-                  />
                 </div>
               </div>
 
@@ -2242,9 +2509,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                                     value={item.baseQuantity}
                                     onCommit={(raw) =>
-                                      persistLine(item.id, {
-                                        baseQuantity: raw.trim() || "1",
-                                      })
+                                      handleQuantityCommit(item, raw)
                                     }
                                   />
                                 ) : (
@@ -2765,90 +3030,72 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     ))}
                   <div className="border-t pt-2 flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span>
-                      {formatCurrency(offer.totalAmount || 0, offer.currency)}
-                    </span>
+                    <span>{formatCurrency(displayTotal, offer.currency)}</span>
                   </div>
                 </div>
               </div>
 
               {/* LINKED DOCUMENTS */}
-              <Section
-                title="Linked documents"
-                icon={<LinkIcon className="h-4 w-4 text-gray-500" />}
-              >
-                {linkedDocsLoading ? (
-                  <div className="text-sm text-gray-500 py-2">
-                    Loading linked documents…
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
+                {/* LINKED DOCUMENTS */}
+                <div className="bg-white rounded-lg  p-4 px-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <LinkIcon className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Linked documents
+                    </h3>
                   </div>
-                ) : linkedDocsCount > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    {(
-                      Object.keys(
-                        LINKED_DOC_LABELS,
-                      ) as (keyof LinkedDocumentsResult)[]
-                    ).map((key) => {
-                      const list = linkedDocs?.[key] || [];
-                      if (list.length === 0) return null;
-                      return (
-                        <div key={key}>
-                          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                            {LINKED_DOC_LABELS[key]}
-                          </p>
-                          <ul className="space-y-1">
-                            {list.map((d) => (
-                              <li
-                                key={d.id}
-                                className="flex justify-between text-gray-700"
-                              >
-                                <span>{d.number}</span>
-                                {d.date && (
-                                  <span className="text-gray-400">
-                                    {formatDate(d.date)}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    No linked documents yet.
-                  </p>
-                )}
-              </Section>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Section
-                  title="Comment field"
-                  icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
-                >
-                  {edit ? (
-                    <>
-                      <textarea
-                        rows={3}
-                        className={inputCls}
-                        value={form.notes}
-                        placeholder="Shown to the customer on the offer."
-                        onChange={(e) => patch({ notes: e.target.value })}
-                      />
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        Printed on the offer PDF.
-                      </p>
-                    </>
+                  {linkedDocsLoading ? (
+                    <div className="text-sm text-gray-500 py-2">
+                      Loading linked documents…
+                    </div>
+                  ) : linkedDocsCount > 0 ? (
+                    <div className="space-y-2 text-sm">
+                      {(
+                        Object.keys(
+                          LINKED_DOC_LABELS,
+                        ) as (keyof LinkedDocumentsResult)[]
+                      ).map((key) => {
+                        const list = linkedDocs?.[key] || [];
+                        if (list.length === 0) return null;
+                        return (
+                          <div key={key}>
+                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                              {LINKED_DOC_LABELS[key]}
+                            </p>
+                            <ul className="space-y-1">
+                              {list.map((d) => (
+                                <li
+                                  key={d.id}
+                                  className="flex justify-between text-gray-700"
+                                >
+                                  <span>{d.number}</span>
+                                  {d.date && (
+                                    <span className="text-gray-400">
+                                      {formatDate(d.date)}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <p className="text-sm text-gray-600">
-                      {offer.notes || "—"}
+                    <p className="text-sm text-gray-500">
+                      No linked documents yet.
                     </p>
                   )}
-                </Section>
-                <Section
-                  title="Comment intern"
-                  icon={<PencilIcon className="h-4 w-4 text-gray-500" />}
-                >
+                </div>
+
+                <div className="bg-white rounded-lg px-2 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <PencilIcon className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Comment intern
+                    </h3>
+                  </div>
                   {edit ? (
                     <>
                       <textarea
@@ -2869,7 +3116,37 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       {offer.internalNotes || "—"}
                     </p>
                   )}
-                </Section>
+                </div>
+
+                {/* Comment field */}
+                <div className="bg-white rounded-lg px-2 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <PencilIcon className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Comment field
+                    </h3>
+                  </div>
+                  {edit ? (
+                    <>
+                      <textarea
+                        rows={3}
+                        className={inputCls}
+                        value={form.notes}
+                        placeholder="Shown to the customer on the offer."
+                        onChange={(e) => patch({ notes: e.target.value })}
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Printed on the offer PDF.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      {offer.notes || "—"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Comment intern */}
               </div>
             </div>
 

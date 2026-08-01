@@ -557,6 +557,19 @@ export const getOfferStatusesFromApi = async () => {
   }
 };
 
+export const previewLineItemPrice = async (
+  offerId: string,
+  lineItemId: string,
+  quantity: string | number,
+) => {
+  const res = await api.get(
+    `offers/${offerId}/line-items/${lineItemId}/price-preview?quantity=${encodeURIComponent(
+      String(quantity),
+    )}`,
+  );
+  return res;
+};
+
 export const getAvailableCurrenciesFromApi = async () => {
   try {
     const response: any = await api.get("/offers/currencies");
