@@ -46,11 +46,13 @@ export default function RootLayout({ children }: any) {
           reverseOrder={false}
           gutter={8}
           containerClassName=""
-          containerStyle={{}}
+          containerStyle={{ zIndex: 99999 }}
           toastOptions={{
             className: "",
             duration: 5000,
-            style: {},
+            style: {
+              zIndex: 99999,
+            },
           }}
         />
       </body>
