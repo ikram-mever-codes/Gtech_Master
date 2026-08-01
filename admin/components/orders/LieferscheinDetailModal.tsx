@@ -135,13 +135,27 @@ export default function LieferscheinDetailModal({
     "";
 
   const paymentMethod =
-    data.paymentMethod || lieferschein.paymentMethod || "—";
+    data.paymentMethod ||
+    lieferschein.paymentMethod ||
+    customer.defaultPaymentMethod ||
+    customer.paymentMethod ||
+    "—";
   const shippingMethod =
-    data.shippingMethod || lieferschein.shippingMethod || "—";
+    data.shippingMethod ||
+    lieferschein.shippingMethod ||
+    customer.defaultShippingMethod ||
+    customer.shippingMethod ||
+    "—";
   const title =
     data.title || lieferschein.title || lieferschein.notes || lieferschein.description || "";
   const notes = data.notes || lieferschein.notes || "";
-  const shipTo = data.ship_to || lieferschein.ship_to || companyName;
+  const shipTo =
+    data.ship_to ||
+    lieferschein.ship_to ||
+    customer.ship_to_address ||
+    customer.ship_to ||
+    customer.deliveryAddressLine1 ||
+    companyName;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">

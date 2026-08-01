@@ -135,15 +135,17 @@ export default function RechnungDetailModal({
   const data = detailData || rechnung;
 
   const invoiceItems: any[] = data.items || data.lineItems || rechnung.items || [];
-  const customer = data.customer || rechnung.customer || {};
-  const companyName = customer.companyName || rechnung.bill_to || "—";
+  const customer = data.customer || rechnung.customer || rechnung.customerSnapshot || {};
+  const companyName = customer.company_name || customer.companyName || customer.name || rechnung.bill_to || rechnung.customer_name || "—";
+  const legalName = customer.legalName || customer.legal_name || customer.name || "";
   const email = customer.email || customer.contactEmail || "—";
-  const phone = customer.contactPhoneNumber || "—";
-  const vatId = customer.taxNumber || customer.vatId || "—";
-  const addressLine1 = customer.addressLine1 || "—";
+  const phone = customer.phone || customer.contactPhoneNumber || "—";
+  const vatId = customer.tax_number || customer.taxNumber || customer.vatId || customer.vatTaxId || "—";
+  const addressLine1 = customer.bill_to_address || customer.addressLine1 || customer.address || customer.street || "—";
+  const postalCode = customer.postalCode || customer.postal_code || "";
   const city = customer.city || "";
   const country = customer.country || "";
-  const postalCity = [city, country].filter(Boolean).join(", ");
+  const postalCity = `${postalCode} ${city}`.trim() || country || "—";
 
   const netTotal = Number(data.netTotal || rechnung.netTotal || 0);
   const taxAmount = Number(data.taxAmount || rechnung.taxAmount || 0);
@@ -155,11 +157,27 @@ export default function RechnungDetailModal({
   const orderNumber = data.orderNumber || rechnung.orderNumber || "—";
   const invoiceDate = data.invoiceDate || rechnung.invoiceDate || "";
   const deliveryDate = data.deliveryDate || rechnung.deliveryDate || "";
-  const paymentMethod = data.paymentMethod || rechnung.paymentMethod || "—";
-  const shippingMethod = data.shippingMethod || rechnung.shippingMethod || "—";
+  const paymentMethod =
+    data.paymentMethod ||
+    rechnung.paymentMethod ||
+    customer.defaultPaymentMethod ||
+    customer.paymentMethod ||
+    "—";
+  const shippingMethod =
+    data.shippingMethod ||
+    rechnung.shippingMethod ||
+    customer.defaultShippingMethod ||
+    customer.shippingMethod ||
+    "—";
   const status = data.status || rechnung.status || "draft";
   const billTo = data.bill_to || rechnung.bill_to || companyName;
-  const shipTo = data.ship_to || rechnung.ship_to || billTo;
+  const shipTo =
+    data.ship_to ||
+    rechnung.ship_to ||
+    customer.ship_to_address ||
+    customer.ship_to ||
+    customer.deliveryAddressLine1 ||
+    billTo;
 
   const handleMarkAsPaid = async () => {
     if (!window.confirm(`Mark Rechnung ${invoiceNumber} as paid?`)) return;
