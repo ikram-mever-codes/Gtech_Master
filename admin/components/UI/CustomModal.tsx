@@ -35,7 +35,7 @@ const CustomModal: React.FC<CustomModalProps> = ({
                     </div>
                 )}
 
-                <div className={`flex-1 overflow-y-auto ${noPadding ? "" : "px-6 py-6"}`}>
+                <div className={`flex-1 ${noPadding ? "min-h-0 flex flex-col" : "overflow-y-auto px-6 py-6"}`}>
                     {children}
                 </div>
 
