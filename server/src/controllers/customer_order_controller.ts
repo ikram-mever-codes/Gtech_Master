@@ -415,7 +415,7 @@ export const getAllCustomerOrders = async (
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
     const orders = await customerOrderRepo.find({
       order: { created_at: "DESC" },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
     });
 
     await attachStockInfoToOrders(orders);
@@ -436,7 +436,7 @@ export const getCustomerOrderById = async (
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
     const order = await customerOrderRepo.findOne({
       where: { id: Number(id) },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
     });
 
     if (!order) {
@@ -712,12 +712,24 @@ export const updateCustomerOrder = async (
       termsConditions,
       highlightColor,
       stock_where,
+      auftrag_status,
+      auftragStatus,
+      real_delivery_date,
+      realDeliveryDate,
+      is_weiterversand,
+      isWeiterversand,
+      weiterversand_service_provider_id,
+      weiterversandServiceProviderId,
+      weiterversand_labels,
+      weiterversandLabels,
+      weiterversand_tracking,
+      weiterversandTracking,
     } = req.body;
 
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
     const auftrag = await customerOrderRepo.findOne({
       where: { id: Number(id) },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
     });
 
     if (!auftrag) {
@@ -751,6 +763,25 @@ export const updateCustomerOrder = async (
       auftrag.discount_percentage =
         parseFlexibleNumberOrZero(discountPercentage);
 
+    // Extra fields mapping
+    const finalAuftragStatus = auftrag_status !== undefined ? auftrag_status : auftragStatus;
+    if (finalAuftragStatus !== undefined) auftrag.auftrag_status = finalAuftragStatus;
+
+    const finalRealDeliveryDate = real_delivery_date !== undefined ? real_delivery_date : realDeliveryDate;
+    if (finalRealDeliveryDate !== undefined) auftrag.real_delivery_date = finalRealDeliveryDate || null as any;
+
+    const finalIsWeiterversand = is_weiterversand !== undefined ? is_weiterversand : isWeiterversand;
+    if (finalIsWeiterversand !== undefined) auftrag.is_weiterversand = Boolean(finalIsWeiterversand);
+
+    const finalProviderId = weiterversand_service_provider_id !== undefined ? weiterversand_service_provider_id : weiterversandServiceProviderId;
+    if (finalProviderId !== undefined) auftrag.weiterversand_service_provider_id = finalProviderId ? Number(finalProviderId) : null as any;
+
+    const finalLabels = weiterversand_labels !== undefined ? weiterversand_labels : weiterversandLabels;
+    if (finalLabels !== undefined) auftrag.weiterversand_labels = finalLabels;
+
+    const finalTracking = weiterversand_tracking !== undefined ? weiterversand_tracking : weiterversandTracking;
+    if (finalTracking !== undefined) auftrag.weiterversand_tracking = finalTracking;
+
     // Only update stock_where if the order has stock items
     if (stock_where !== undefined) {
       const hasStock = await hasStockItems(Number(id));
@@ -777,13 +808,10 @@ export const updateCustomerOrder = async (
       auftrag.tax_rate = parseFlexibleNumber(taxRate) ?? 19;
 
     await customerOrderRepo.save(auftrag);
-
-    // Any of these touch subtotal/tax/total, so always recalc.
     await calculateOrderTotals(auftrag.id);
-
     const fullOrder = await customerOrderRepo.findOne({
       where: { id: auftrag.id },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
     });
 
     res.json({
@@ -795,10 +823,6 @@ export const updateCustomerOrder = async (
     next(error);
   }
 };
-
-// ---------------------------------------------------------------------
-// Line items
-// ---------------------------------------------------------------------
 
 export const createOrderLineItem = async (
   req: Request,
@@ -849,8 +873,6 @@ export const createOrderLineItem = async (
       }
     }
 
-    // Only Freizeile lines (no sourceItemId) may set their own taxRate;
-    // falls back to the order's own tax_rate if not provided.
     const taxRate =
       !body.sourceItemId && body.taxRate !== undefined
         ? (parseFlexibleNumber(body.taxRate) ?? order.tax_rate ?? 19)

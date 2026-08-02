@@ -117,12 +117,12 @@ const allMenuItems: MenuEntry[] = [
     resource: "Orders",
   },
 
-  {
-    icon: AlertTriangle,
-    text: "Attention",
-    path: "/attention",
-    resource: "Attention",
-  },
+  // {
+  //   icon: AlertTriangle,
+  //   text: "Attention",
+  //   path: "/attention",
+  //   resource: "Attention",
+  // },
   {
     icon: Settings,
     text: "Settings",

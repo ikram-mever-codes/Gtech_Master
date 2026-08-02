@@ -42,7 +42,6 @@ export const createRechnungFromAuftrag = async (
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const defaultPrefix = `R${yy}${mm}-`;
 
     let invoiceNo = "";
     try {
