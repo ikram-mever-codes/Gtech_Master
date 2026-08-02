@@ -256,6 +256,9 @@ const InvoiceListPage: React.FC = () => {
   >(null);
   const [bestellungPreviewInitialEdit, setBestellungPreviewInitialEdit] =
     useState(false);
+  const [showCreateBestellungModal, setShowCreateBestellungModal] =
+    useState(false);
+
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [offerRefreshKey, setOfferRefreshKey] = useState(0);
@@ -2384,7 +2387,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Person",
-        width: "95px",
+        width: "150px",
         align: "left",
         render: (row) => {
           const text =
@@ -2398,7 +2401,7 @@ const InvoiceListPage: React.FC = () => {
             row.ship_to ||
             "-";
           return (
-            <div className="truncate max-w-[95px]" title={text}>
+            <div className="truncate max-w-[150px]" title={text}>
               {text}
             </div>
           );
@@ -2523,27 +2526,13 @@ const InvoiceListPage: React.FC = () => {
                   }
                 };
 
+                // Return as read-only text, not a select dropdown
                 return (
-                  <select
-                    value={currentStatus}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      handleUpdateBestellungStatus(
-                        row.id,
-                        e.target.value as any,
-                      )
-                    }
-                    className={`text-[11px] px-2 py-1 rounded border shadow-sm cursor-pointer focus:ring-2 focus:ring-emerald-500 font-medium ${getStatusStyle(
-                      currentStatus,
-                    )}`}
+                  <span
+                    className={`text-[11px] px-2 py-1 rounded border shadow-sm font-medium ${getStatusStyle(currentStatus)}`}
                   >
-                    <option value="draft">draft</option>
-                    <option value="to be processed">to be processed</option>
-                    <option value="partially delivered">
-                      partially delivered
-                    </option>
-                    <option value="delivered">delivered</option>
-                  </select>
+                    {currentStatus}
+                  </span>
                 );
               },
             },
@@ -2638,17 +2627,20 @@ const InvoiceListPage: React.FC = () => {
               </div>
             );
           } else if (activeInvTab === "bestellung") {
+            const currentStatus = row.status || "draft";
             return (
               <div className="flex items-center justify-center gap-1.5 font-poppins">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenBestellungPreview(row.id);
-                  }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
-                >
-                  View
-                </button>
+                {currentStatus === "draft" && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUpdateBestellungStatus(row.id, "to be processed");
+                    }}
+                    className="px-2 py-1 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition shadow-md"
+                  >
+                    Processing
+                  </button>
+                )}
               </div>
             );
           } else if (activeInvTab === "rechnung" || activeInvTab === "rk") {
@@ -2804,9 +2796,7 @@ const InvoiceListPage: React.FC = () => {
                   if (activeInvTab === "auftrag") {
                     setShowAuftragCreateModal(true);
                   } else {
-                    resetForm();
-                    setMode("create");
-                    setShowModal(true);
+                    setShowCreateBestellungModal(true);
                   }
                 }}
                 gradient
@@ -4705,10 +4695,12 @@ const InvoiceListPage: React.FC = () => {
             userRole={user?.role}
           />
         )}
-        {showBestellungPreviewModal && (
+
+        {showBestellungPreviewModal && selectedBestellungId && (
           <BestellungPreviewModal
             isOpen={showBestellungPreviewModal}
             orderId={selectedBestellungId}
+            isCreate={false}
             initialEdit={bestellungPreviewInitialEdit}
             onClose={() => {
               setShowBestellungPreviewModal(false);
@@ -4933,7 +4925,23 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
-
+        {showCreateBestellungModal && (
+          <BestellungPreviewModal
+            isOpen={showCreateBestellungModal}
+            isCreate={true}
+            onClose={() => {
+              setShowCreateBestellungModal(false);
+            }}
+            onChanged={() => {
+              fetchBestellungen();
+            }}
+            onCreated={(id) => {
+              setShowCreateBestellungModal(false);
+              handleOpenBestellungPreview(id);
+            }}
+            userRole={user?.role}
+          />
+        )}
         {showLieferscheinDetailModal && selectedLieferscheinForDetail && (
           <LieferscheinDetailModal
             isOpen={showLieferscheinDetailModal}

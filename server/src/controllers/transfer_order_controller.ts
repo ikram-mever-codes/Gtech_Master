@@ -14,6 +14,7 @@ import {
   parseFlexibleNumber,
   parseFlexibleNumberOrZero,
 } from "../utils/decimal";
+import { Customer } from "../models/customers";
 
 /** Recomputes subtotal/tax/total AND the stored weight columns from the
  * order's line items — TransferOrder persists net/extra/total weight
@@ -35,10 +36,20 @@ async function calculateTransferOrderTotals(orderId: number): Promise<void> {
 
   for (const it of items) {
     const qty = Number(it.qty) || 1;
+    // Use transferPrice if available, otherwise fallback to purchasePrice
+    // This ensures we use the correct price after refreshLineItemPurchasePrices
     const price = Number(it.transferPrice ?? it.purchasePrice ?? 0);
-    subtotal += qty * price;
+    const lineTotal = qty * price;
+
+    // Update the line item's lineTotal
+    it.lineTotal = lineTotal;
+
+    subtotal += lineTotal;
     netWeight += (Number(it.weight) || 0) * qty;
     extraWeight += Number(it.extraWeight) || 0;
+
+    // Save each line item to persist the lineTotal
+    await AppDataSource.getRepository(TransferOrderItem).save(it);
   }
 
   const round2 = (n: number) =>
@@ -47,7 +58,7 @@ async function calculateTransferOrderTotals(orderId: number): Promise<void> {
     isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 1000) / 1000;
 
   order.subtotal = round2(subtotal);
-  order.total_amount = round2(subtotal);
+  order.total_amount = round2(subtotal); // No tax for transfer orders
   order.net_weight = round3(netWeight);
   order.extra_weight = round3(extraWeight);
   order.total_weight = round3(netWeight + extraWeight);
@@ -107,13 +118,10 @@ export const createTransferOrderFromAuftrag = async (
     const orderItemsToCreate: Partial<TransferOrderItem>[] = [];
 
     // Filter selectedItems to only include catalog items (those with sourceItemId)
-    // Freizeile (freetext) items have no sourceItemId and should be skipped
     const catalogItems = selectedItems.filter((selItem: any) => {
-      // Use sourceLineItemId (not lineItemId) to find the line item
       const lineItem = (auftrag.orderItems || []).find(
         (li) => String(li.id) === String(selItem.sourceLineItemId),
       );
-      // Only include if the line item has a sourceItemId (catalog item)
       return lineItem && lineItem.sourceItemId;
     });
 
@@ -126,7 +134,6 @@ export const createTransferOrderFromAuftrag = async (
       return;
     }
 
-    // Log warning about skipped Freizeile items
     const skippedCount = selectedItems.length - catalogItems.length;
     if (skippedCount > 0) {
       console.warn(
@@ -140,16 +147,19 @@ export const createTransferOrderFromAuftrag = async (
       );
 
       const qty = Number(selItem.qty ?? selItem.quantity) || 1;
-      const price = Number(selItem.price ?? lineItem?.price ?? 0);
-      const lineTotal = qty * price;
+
+      // IMPORTANT: Use transferPrice if available, otherwise use price from selItem or lineItem
+      // but DO NOT calculate lineTotal yet - it will be calculated after purchase prices are resolved
+      const transferPrice =
+        selItem.transferPrice || selItem.price || lineItem?.price || 0;
+
+      // Store the price but don't calculate lineTotal yet
+      // lineTotal will be calculated in calculateTransferOrderTotals after purchase prices are resolved
 
       orderItemsToCreate.push({
-        // Core identification
         sourceLineItemId: lineItem?.id || selItem.sourceLineItemId || undefined,
         sourceItemId:
           lineItem?.sourceItemId || selItem.sourceItemId || undefined,
-
-        // Basic item info - use values from selItem first, then lineItem as fallback
         itemName: selItem.itemName || lineItem?.itemName || "Item",
         itemNo: selItem.itemNo || lineItem?.itemNo || lineItem?.material || "",
         material: selItem.material || lineItem?.material || "",
@@ -157,26 +167,14 @@ export const createTransferOrderFromAuftrag = async (
         specification: selItem.specification || lineItem?.specification || "",
         description: selItem.description || lineItem?.description || "",
         notes: selItem.notes || lineItem?.notes || "",
-        // remark_order_item:
-        // selItem.remark_order_item || lineItem?.remark_order_item || "",
-
-        // Quantities
         qty: qty,
         max_qty: qty,
-
-        // Weights
         weight: selItem.weight || lineItem?.weight || undefined,
         extraWeight: selItem.extraWeight || lineItem?.extraWeight || 0,
-
-        // Pricing - use values from selItem first
-        transferPrice: selItem.transferPrice || selItem.price || price,
-        // purchasePrice: selItem.purchasePrice || lineItem?.purchasePrice || undefined,
-        // purchaseCurrency: selItem.purchaseCurrency || lineItem?.purchaseCurrency || "EUR",
-
-        // Line total
-        lineTotal: lineTotal,
-
-        // Position
+        // Set transferPrice from the Auftrag line item
+        transferPrice: transferPrice,
+        // DO NOT set lineTotal here - it will be calculated after purchase prices are resolved
+        // lineTotal: 0, // Will be calculated later
         position: idx + 1,
       });
     });
@@ -213,12 +211,15 @@ export const createTransferOrderFromAuftrag = async (
         ...item,
         transferOrder: savedOrder,
         transferOrderId: savedOrder.id,
+        // Set lineTotal to 0 initially - will be recalculated
+        lineTotal: 0,
       }),
     );
     await transferOrderItemRepo.save(itemEntities);
 
     // After creating the order, refresh purchase prices based on receiver
     await refreshLineItemPurchasePrices(savedOrder.id);
+    // This will recalculate all totals including lineTotal for each item
     await calculateTransferOrderTotals(savedOrder.id);
 
     const fullOrder = await transferOrderRepo.findOne({
@@ -318,6 +319,7 @@ export const deleteTransferOrder = async (
   }
 };
 
+// In the updateTransferOrder controller, add customer_id handling
 export const updateTransferOrder = async (
   req: Request,
   res: Response,
@@ -334,6 +336,7 @@ export const updateTransferOrder = async (
       highlightColor,
       receiver,
       supplierId,
+      customerId, // Add this
     } = req.body;
 
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
@@ -345,6 +348,34 @@ export const updateTransferOrder = async (
     if (!bestellung) {
       res.status(404).json({ success: false, message: "Bestellung not found" });
       return;
+    }
+
+    // Check if order is from Auftrag - if so, prevent customer editing
+    const isFromAuftrag =
+      bestellung.auftrag_id !== null && bestellung.auftrag_id !== undefined;
+
+    if (customerId !== undefined) {
+      if (isFromAuftrag) {
+        res.status(403).json({
+          success: false,
+          message: "Cannot change customer for Bestellung created from Auftrag",
+        });
+        return;
+      }
+
+      // Validate customer exists
+      const customerRepo = AppDataSource.getRepository(Customer);
+      const customer = await customerRepo.findOne({
+        where: { id: customerId },
+      });
+      if (!customer) {
+        res.status(404).json({
+          success: false,
+          message: "Customer not found",
+        });
+        return;
+      }
+      bestellung.customer_id = customerId;
     }
 
     if (title !== undefined) bestellung.title = title;
@@ -401,6 +432,7 @@ export const updateTransferOrder = async (
     if (receiverOrSupplierChanged) {
       await refreshLineItemPurchasePrices(bestellung.id);
     }
+    await calculateTransferOrderTotals(bestellung.id);
 
     const fullOrder = await transferOrderRepo.findOne({
       where: { id: bestellung.id },
@@ -416,7 +448,6 @@ export const updateTransferOrder = async (
     next(error);
   }
 };
-
 // ---------------------------------------------------------------------
 // Line items
 // ---------------------------------------------------------------------
@@ -677,3 +708,94 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
     }
   }
 }
+
+export const createTransferOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      title,
+      status = "draft",
+      currency = "EUR",
+      notes,
+      highlightColor,
+      dateDelivery,
+      receiver = ReceiverType.GTECH_HK,
+      supplierId,
+      customerId,
+    } = req.body;
+
+    if (!title?.trim()) {
+      res.status(400).json({
+        success: false,
+        message: "Title is required",
+      });
+      return;
+    }
+
+    // Validate customer exists - only if customerId is provided
+    let customer = null;
+    if (customerId) {
+      const customerRepo = AppDataSource.getRepository(Customer);
+      customer = await customerRepo.findOne({
+        where: { id: customerId },
+      });
+      if (!customer) {
+        res.status(404).json({
+          success: false,
+          message: "Customer not found",
+        });
+        return;
+      }
+    }
+
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const defaultPrefix = `T${yy}${mm}-`;
+
+    let orderNo = "";
+    try {
+      orderNo = await NumberSequenceService.getNextNumber("transfer_order");
+    } catch (err) {
+      console.warn(
+        "Could not generate sequence number for transfer_order:",
+        err,
+      );
+      orderNo = `${defaultPrefix}${Date.now().toString().slice(-4)}`;
+    }
+
+    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+    const transferOrder = transferOrderRepo.create({
+      order_no: orderNo,
+      customer_id: customerId || undefined, // Optional - can be undefined
+      title: title.trim(),
+      status: status,
+      currency: currency,
+      notes: notes || "",
+      highlight_color: highlightColor || "",
+      date_delivery: dateDelivery || "",
+      receiver: receiver,
+      supplier_id: receiver === ReceiverType.SUPPLIER ? supplierId : null,
+      date_created: `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`,
+    });
+
+    const savedOrder = await transferOrderRepo.save(transferOrder);
+
+    const fullOrder = await transferOrderRepo.findOne({
+      where: { id: savedOrder.id },
+      relations: ["orderItems", "customer", "supplier"],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Bestellung ${orderNo} created successfully`,
+      data: fullOrder,
+    });
+  } catch (error) {
+    console.error("Error creating Bestellung:", error);
+    next(error);
+  }
+};

@@ -9,6 +9,7 @@ import {
   createTransferOrderLineItem,
   updateTransferOrderLineItem,
   deleteTransferOrderLineItem,
+  createTransferOrder,
 } from "../controllers/transfer_order_controller";
 
 const router = Router();
@@ -19,7 +20,7 @@ router.get("/:id", getTransferOrderById);
 router.put("/:id", updateTransferOrder);
 router.put("/:id/status", updateTransferOrderStatus);
 router.delete("/:id", deleteTransferOrder);
-
+router.post("/", createTransferOrder);
 router.patch("/:id/status", updateTransferOrderStatus);
 
 router.post("/:orderId/line-items", createTransferOrderLineItem);
