@@ -735,17 +735,20 @@ export const createTransferOrder = async (
       return;
     }
 
-    // Validate customer exists
-    const customerRepo = AppDataSource.getRepository(Customer);
-    const customer = await customerRepo.findOne({
-      where: { id: customerId },
-    });
-    if (!customer) {
-      res.status(404).json({
-        success: false,
-        message: "Customer not found",
+    // Validate customer exists - only if customerId is provided
+    let customer = null;
+    if (customerId) {
+      const customerRepo = AppDataSource.getRepository(Customer);
+      customer = await customerRepo.findOne({
+        where: { id: customerId },
       });
-      return;
+      if (!customer) {
+        res.status(404).json({
+          success: false,
+          message: "Customer not found",
+        });
+        return;
+      }
     }
 
     const now = new Date();
@@ -767,7 +770,7 @@ export const createTransferOrder = async (
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const transferOrder = transferOrderRepo.create({
       order_no: orderNo,
-      customer_id: customerId,
+      customer_id: customerId || undefined, // Optional - can be undefined
       title: title.trim(),
       status: status,
       currency: currency,

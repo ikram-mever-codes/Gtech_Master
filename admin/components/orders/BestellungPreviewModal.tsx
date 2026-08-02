@@ -546,10 +546,11 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
         );
         return;
       }
+      console.log("Adding existing item to Bestellung:", it);
       await createTransferOrderLineItem(orderIdToUse, {
         itemName: it.item_name || it.itemName || "Item",
         material: it.model || "",
-        itemNo: it.itemNo,
+        itemNo: it.de_no,
         weight: it.weight,
         sourceItemId: String(it.id),
       });
@@ -716,6 +717,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                       );
                       return cust?.companyName || cust?.name || "";
                     })()}
+                    disabled={!edit && !isCreate}
                     onChange={(id) => {
                       setSelectedCustomerId(id);
                       if (isCreate) {
