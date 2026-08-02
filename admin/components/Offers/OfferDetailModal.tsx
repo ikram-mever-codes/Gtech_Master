@@ -15,6 +15,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import {
   getOfferById,
@@ -1949,12 +1950,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </h2>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
-                <input
-                  type="color"
-                  value={offer.highlightColor || "#ffffff"}
-                  onChange={(e) => setHighlightColor(e.target.value)}
-                  title="Offer highlight color (shown on the offers list row)"
-                  className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+                <SystemColourSelect
+                  value={offer.highlightColor}
+                  onChange={setHighlightColor}
+                  edit={edit}
                 />
                 <ViewEditToggle
                   isEditEnabled={edit}

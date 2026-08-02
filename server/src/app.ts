@@ -38,6 +38,7 @@ import customerOrderRoutes from "./routes/customer_orders";
 import transferOrderRoutes from "./routes/transfer_orders";
 import rechnungRoutes from "./routes/rechnung_routes";
 import gtechCompanyRoutes from "./routes/gtech_company_routes";
+import systemParameterRoutes from "./routes/system_parameter_routes";
 
 const app: any = express();
 
@@ -106,6 +107,7 @@ app.use("/api/v1/customer-orders", customerOrderRoutes);
 app.use("/api/v1/transfer-orders", transferOrderRoutes);
 app.use("/api/v1/rechnungen", rechnungRoutes);
 app.use("/api/v1/gtech-companies", gtechCompanyRoutes);
+app.use("/api/v1/system-parameters", systemParameterRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));

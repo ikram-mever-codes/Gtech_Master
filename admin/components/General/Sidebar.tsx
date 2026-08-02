@@ -205,6 +205,8 @@ const Sidebar = () => {
         "/countries",
         "/gtech-companies",
         "/settings/gtech-companies",
+        "/parameters-templates",
+        "/settings/parameters-templates",
       ];
       if (path === "/tags" && settingsPaths.some((sp) => activePath === sp || activePath.startsWith(sp))) {
         return true;
