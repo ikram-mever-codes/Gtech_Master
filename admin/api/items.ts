@@ -139,6 +139,7 @@ export interface ItemDetails {
     is_dim_weight_estimated?: boolean;
     weight: string;
     length: string;
+    isbn: string;
     width: string;
     height: string;
   };
