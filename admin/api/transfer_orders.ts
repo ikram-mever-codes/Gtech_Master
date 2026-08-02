@@ -1,7 +1,7 @@
 import { api, handleApiError } from "@/utils/api";
 
 // Create Transfer Order from Auftrag
-export const createTransferOrderFromAuftrag = async (
+export const createBestellungFromAuftrag = async (
   auftragId: number | string,
   selectedItems: any,
 ) => {

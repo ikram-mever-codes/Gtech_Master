@@ -96,7 +96,7 @@ import {
   getAllTransferOrders,
   updateTransferOrderStatus,
 } from "@/api/transfer_orders";
-import { createTransferOrderFromAuftrag as createBestellungFromAuftrag } from "@/api/transfer_orders";
+import { createBestellungFromAuftrag } from "@/api/transfer_orders";
 import { getAllRechnungen, getLieferscheine } from "@/api/rechnungen";
 import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
 import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
