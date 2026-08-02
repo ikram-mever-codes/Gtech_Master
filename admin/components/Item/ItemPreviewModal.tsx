@@ -771,27 +771,33 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Tags</span>
-                  <EntityTagSelector
-                    entityId={previewItem.id}
-                    entityType={isRequest ? "request_item" : "item"}
-                    initialTags={previewItem.tags || []}
-                    tagOrder={previewItem.tagOrder}
-                    disabled={!previewEdit}
-                    onTagsUpdated={(newTags: any[]) =>
-                      setPreviewItem((p: any) =>
-                        p
-                          ? {
-                            ...p,
-                            tags: newTags,
-                            tagOrder: newTags.map((t) => t.id).join(","),
-                          }
-                          : p,
-                      )
-                    }
-                  />
-                </div>
+                {(previewEdit || (previewItem?.tags && previewItem.tags.length > 0)) && (
+                  <div className="flex items-center gap-2">
+                    {previewEdit && (
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        TAGS
+                      </span>
+                    )}
+                    <EntityTagSelector
+                      entityId={previewItem.id}
+                      entityType={isRequest ? "request_item" : "item"}
+                      initialTags={previewItem.tags || []}
+                      tagOrder={previewItem.tagOrder}
+                      disabled={!previewEdit}
+                      onTagsUpdated={(newTags: any[]) =>
+                        setPreviewItem((p: any) =>
+                          p
+                            ? {
+                                ...p,
+                                tags: newTags,
+                              }
+                            : p,
+                        )
+                      }
+                    />
+                  </div>
+                )}
+
                 <ViewEditToggle
                   isEditEnabled={previewEdit}
                   onToggle={() => setPreviewEdit(!previewEdit)}
@@ -1036,78 +1042,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   )}
                 </Field>
               </div>
-
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-
-                <Field label="Default Supplier">
-                  {previewEdit ? (
-                    <select
-                      className={inputCls}
-                      value={previewItem.supplier_id?.toString() ?? ""}
-                      onChange={(e) =>
-                        patchPreview({ supplier_id: e.target.value })
-                      }
-                    >
-                      <option value="">Select a Supplier</option>
-                      {refSuppliers.map((s: any) => (
-                        <option
-                          key={s.id}
-                          value={s.id.toString()}
-                        >{`[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div>
-                      <div className="font-semibold text-gray-900">
-                        {previewItem.supplier_id
-                          ? `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name
-                            ? previewItem.supplier_name.replace(/^Supplier\s*/i, "")
-                            : getSupplierName(previewItem.supplier_id)
-                          }`
-                          : "—"}
-                      </div>
-                      {(previewItem.supplierItem?.priceRMB !== undefined ||
-                        previewItem.priceRMB !== undefined) && (
-                          <div className="text-xs text-rose-600 font-bold mt-0.5">
-                            PP: {previewItem.supplierItem?.priceRMB || previewItem.priceRMB || "0"} {previewItem.supplierItem?.currency || "RMB"}
-                          </div>
-                        )}
-                    </div>
-                  )}
-                </Field>
-
-                <Field label="Transfer Price">
-                  {previewEdit ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputCls}
-                      value={previewItem.price ?? ""}
-                      onChange={(e) => patchPreview({ price: e.target.value })}
-                    />
-                  ) : (
-                    `${previewItem.price || "0.00"} ${previewItem.currency || "EUR"}`
-                  )}
-                </Field>
-                <Field label="Sales Price">
-                  {previewEdit ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputCls}
-                      value={previewItem.sales_price ?? ""}
-                      onChange={(e) =>
-                        patchPreview({ sales_price: e.target.value })
-                      }
-                    />
-                  ) : previewItem.sales_price !== null &&
-                    previewItem.sales_price !== undefined ? (
-                    `${Number(previewItem.sales_price).toFixed(2)} ${previewItem.currency || "EUR"}`
-                  ) : (
-                    "—"
-                  )}
-                </Field>
-              </div>
               <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4">
                 <Field label="Is Stock Item">
                   {previewEdit ? (
@@ -1197,6 +1131,87 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   )}
                 </Field>
               </div>
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-5 gap-x-6 gap-y-4">
+                <div className="md:col-span-2">
+                  <Field label="Default Supplier">
+                    {previewEdit ? (
+                      <select
+                        className={inputCls}
+                        value={previewItem.supplier_id?.toString() ?? ""}
+                        onChange={(e) =>
+                          patchPreview({ supplier_id: e.target.value })
+                        }
+                      >
+                        <option value="">Select a Supplier</option>
+                        {refSuppliers.map((s: any) => (
+                          <option
+                            key={s.id}
+                            value={s.id.toString()}
+                          >{`[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="font-semibold text-gray-900 truncate">
+                        {previewItem.supplier_id
+                          ? `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name
+                            ? previewItem.supplier_name.replace(/^Supplier\s*/i, "")
+                            : getSupplierName(previewItem.supplier_id)
+                          }`
+                          : "—"}
+                      </div>
+                    )}
+                  </Field>
+                </div>
+
+                <Field label="Purchase Price">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={inputCls}
+                      value={previewItem.supplierItem?.priceRMB ?? previewItem.priceRMB ?? ""}
+                      onChange={(e) => patchPreviewSupplierItem({ priceRMB: e.target.value })}
+                    />
+                  ) : (
+                    previewItem.supplierItem?.priceRMB || previewItem.priceRMB
+                      ? `${previewItem.supplierItem?.priceRMB || previewItem.priceRMB} ${previewItem.supplierItem?.currency || "RMB"}`
+                      : "—"
+                  )}
+                </Field>
+                <Field label="Transfer Price">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={inputCls}
+                      value={previewItem.price ?? ""}
+                      onChange={(e) => patchPreview({ price: e.target.value })}
+                    />
+                  ) : (
+                    `${previewItem.price || "0.00"} ${previewItem.currency || "EUR"}`
+                  )}
+                </Field>
+
+                <Field label="Sales Price">
+                  {previewEdit ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={inputCls}
+                      value={previewItem.sales_price ?? ""}
+                      onChange={(e) =>
+                        patchPreview({ sales_price: e.target.value })
+                      }
+                    />
+                  ) : previewItem.sales_price !== null &&
+                    previewItem.sales_price !== undefined ? (
+                    `${Number(previewItem.sales_price).toFixed(2)} ${previewItem.currency || "EUR"}`
+                  ) : (
+                    "—"
+                  )}
+                </Field>
+              </div>
+
 
               {isRequest && (
                 <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 bg-gray-50 p-4 rounded-xl">
