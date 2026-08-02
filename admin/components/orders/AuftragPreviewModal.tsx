@@ -390,7 +390,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       deliveryAddress: { ...(o.deliveryAddress || {}) },
       auftragStatus: o.auftrag_status || "open",
       realDeliveryDate: o.real_delivery_date || "",
-      isWeiterversand: Boolean(o.is_weiterversand),
+      isWeiterversand:
+        o.is_weiterversand === true ||
+        o.is_weiterversand === 1 ||
+        o.is_weiterversand === "true" ||
+        o.is_weiterversand === "1" ||
+        o.is_weiterversand === "Yes",
       weiterversandServiceProviderId: o.weiterversand_service_provider_id || o.weiterversandServiceProvider?.id || "",
       weiterversandLabels: o.weiterversand_labels || "",
       weiterversandTracking: o.weiterversand_tracking || "",
@@ -1020,7 +1025,15 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               <Field
                 label="Weiterversand"
                 edit={edit}
-                value={order.is_weiterversand ? "Yes" : "No"}
+                value={
+                  order.is_weiterversand === true ||
+                  order.is_weiterversand === 1 ||
+                  order.is_weiterversand === "true" ||
+                  order.is_weiterversand === "1" ||
+                  order.is_weiterversand === "Yes"
+                    ? "Yes"
+                    : "No"
+                }
               >
                 <select
                   className={inputCls}
@@ -1032,7 +1045,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 </select>
               </Field>
 
-              {(edit || order.is_weiterversand || form.isWeiterversand) && (
+              {(edit
+                ? form.isWeiterversand
+                : order.is_weiterversand === true ||
+                  order.is_weiterversand === 1 ||
+                  order.is_weiterversand === "true" ||
+                  order.is_weiterversand === "1" ||
+                  order.is_weiterversand === "Yes") && (
                 <>
                   <Field
                     label="Weiterversand Service Provider"
