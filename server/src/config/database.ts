@@ -48,7 +48,7 @@ import { PaymentMethod } from "../models/payment_methods";
 import { PaymentAccount } from "../models/payment_account";
 import { PaymentInbound } from "../models/payment_inbound";
 import { ShippingMethod } from "../models/shipping_methods";
-
+import { WeiterversandServiceProvider } from "../models/weiterversand_service_provider";
 
 import { NumberSequence } from "../models/number_sequence";
 import { GtechCompany } from "../models/gtech_company";
@@ -134,7 +134,7 @@ export const AppDataSource = new DataSource({
     PaymentAccount,
     PaymentInbound,
     ShippingMethod,
-
+    WeiterversandServiceProvider,
 
     NumberSequence,
     Rechnung,
@@ -208,18 +208,14 @@ export const initializeDatabase = async (): Promise<DataSource> => {
       await AppDataSource.runMigrations();
       console.log("Migrations executed successfully");
     }
-
     await bootstrapAdminUser();
-
     const { NumberSequenceService } =
       await import("../services/number_sequence_service");
     await NumberSequenceService.seedDefaultSequences();
 
     const { seedDatabase } = await import("../services/seedDatabase");
     await seedDatabase();
-
     await fixSequences();
-
     return AppDataSource;
   } catch (error) {
     console.error("Database connection error:", error);

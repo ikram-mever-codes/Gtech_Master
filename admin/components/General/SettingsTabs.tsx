@@ -55,8 +55,12 @@ export const SETTINGS_TABS = [
     label: "Parameters & Templates",
     href: "/parameters-templates",
   },
+  {
+    id: "weiterversand-service-providers",
+    label: "WeiterversandServiceProviders",
+    href: "/weiterversand-service-providers",
+  },
 ];
-
 
 export default function SettingsTabs() {
   const pathname = usePathname();

@@ -36,13 +36,14 @@ import paymentAccountRoutes from "./routes/payment_account_routes";
 import paymentInboundRoutes from "./routes/payment_inbound_routes";
 import shippingMethodRoutes from "./routes/shipping_method_routes";
 
-
 import salesPriceRoutes from "./routes/sales_price_routes";
 import customerOrderRoutes from "./routes/customer_orders";
 import transferOrderRoutes from "./routes/transfer_orders";
 import rechnungRoutes from "./routes/rechnung_routes";
 import gtechCompanyRoutes from "./routes/gtech_company_routes";
 import systemParameterRoutes from "./routes/system_parameter_routes";
+import weiterversandServiceRoutes from "./routes/weiterversand_service_provider_routes";
+
 
 const app: any = express();
 
@@ -110,12 +111,12 @@ app.use("/api/v1/payment-accounts", paymentAccountRoutes);
 app.use("/api/v1/payment-inbounds", paymentInboundRoutes);
 app.use("/api/v1/shipping-methods", shippingMethodRoutes);
 
-
 app.use("/api/v1/customer-orders", customerOrderRoutes);
 app.use("/api/v1/transfer-orders", transferOrderRoutes);
 app.use("/api/v1/rechnungen", rechnungRoutes);
 app.use("/api/v1/gtech-companies", gtechCompanyRoutes);
 app.use("/api/v1/system-parameters", systemParameterRoutes);
+app.use("/api/v1/weiterversand-service-providers", weiterversandServiceRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));
