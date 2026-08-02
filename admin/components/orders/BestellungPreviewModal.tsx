@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import {
   getTransferOrderById,
   updateTransferOrder,
@@ -460,6 +461,18 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     if (updated.success) setOrder(updated.data);
   };
 
+  const setHighlightColor = async (color: string) => {
+    patch({ highlightColor: color });
+    if (!order || isCreate) return;
+    try {
+      await updateTransferOrder(order.id, { highlightColor: color });
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't update highlight color:", e);
+    }
+  };
+
   const handleStartEdit = () => setEdit(true);
   const handleCancelEdit = () => {
     if (isCreate) {
@@ -536,14 +549,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       } else {
         toast.error(
           res.message ||
-            `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
+          `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
           errorStyles,
         );
       }
     } catch (e: any) {
       toast.error(
         e.message ||
-          `An error occurred while ${isCreate ? "creating" : "saving"}.`,
+        `An error occurred while ${isCreate ? "creating" : "saving"}.`,
         errorStyles,
       );
     } finally {
@@ -561,18 +574,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       onChanged?.();
     } catch (e) {
       console.error("Error deleting Bestellung:", e);
-    }
-  };
-
-  const setHighlightColor = async (color: string) => {
-    if (!order || isCreate) return;
-    try {
-      await updateTransferOrder(order.id, { highlightColor: color });
-      patch({ highlightColor: color });
-      await refreshLocal();
-      onChanged?.();
-    } catch (e) {
-      console.error("Couldn't update highlight color:", e);
     }
   };
 
@@ -731,8 +732,8 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
   const visibleLineItems = order?.orderItems
     ? [...order.orderItems].sort(
-        (a: any, b: any) => (a.position || 0) - (b.position || 0),
-      )
+      (a: any, b: any) => (a.position || 0) - (b.position || 0),
+    )
     : [];
 
   // Loading state for existing order
@@ -794,12 +795,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
             {!isCreate && (
-              <input
-                type="color"
-                value={displayOrder.highlight_color || "#ffffff"}
-                onChange={(e) => setHighlightColor(e.target.value)}
-                title="Bestellung highlight color"
-                className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+              <SystemColourSelect
+                value={form.highlightColor ?? displayOrder.highlight_color}
+                onChange={setHighlightColor}
+                edit={edit}
               />
             )}
             {!isCreate && (
@@ -821,7 +820,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
         <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-            {/* Customer - only show in create mode or if editable */}
             {(isCreate || isCustomerEditable) && (
               <div>
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
@@ -1272,7 +1270,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                    visibleLineItems[0]?.extraWeight === undefined
+                      visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : String(visibleLineItems[0].extraWeight)
                   }

@@ -19,6 +19,7 @@ export type DataTableProps<T> = {
     emptyMessage?: string;
     showTotals?: boolean;
     getRowClassName?: (row: T, index: number) => string;
+    getRowStyle?: (row: T, index: number) => React.CSSProperties | undefined;
     renderRowDetails?: (row: T, index: number) => React.ReactNode;
     expandedRowId?: string | number | null;
     expandedRowIds?: (string | number)[] | Set<string | number>;
@@ -40,6 +41,7 @@ export function DataTable<T>({
     emptyMessage = "No Data Found",
     showTotals = false,
     getRowClassName,
+    getRowStyle,
     renderRowDetails,
     expandedRowId,
     expandedRowIds,
@@ -203,10 +205,12 @@ export function DataTable<T>({
                                 );
                             }
 
+                            const rowStyle = getRowStyle ? getRowStyle(row, idx) : undefined;
                             return (
                                 <React.Fragment key={(row as any).id || (row as any)._id || idx}>
                                     <tr
                                         className={`hover:bg-gray-50/50 transition-all ${getRowClassName ? getRowClassName(row, idx) : ""} ${onRowClick ? "cursor-pointer" : ""}`}
+                                        style={rowStyle}
                                         onClick={(e) => {
                                             if (!onRowClick) return;
                                             const target = e.target as HTMLElement;
@@ -218,8 +222,11 @@ export function DataTable<T>({
                                         {columns.map((c, i) => (
                                             <td
                                                 key={i}
-                                                className={tdClassName || `px-4 py-3.5 text-${c.align || "left"} border-b border-gray-100 text-gray-700 font-medium`}
-                                                style={c.width ? { width: c.width, minWidth: c.width } : {}}
+                                                className={tdClassName || `px-4 py-3.5 text-${c.align || "left"} border-b border-gray-100 ${rowStyle?.color ? "" : "text-gray-700"} font-medium`}
+                                                style={{
+                                                    ...(c.width ? { width: c.width, minWidth: c.width } : {}),
+                                                    ...(rowStyle?.color ? { color: rowStyle.color } : {})
+                                                }}
                                             >
                                                 {c.render(row, idx)}
                                             </td>

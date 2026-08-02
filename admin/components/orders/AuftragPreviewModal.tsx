@@ -725,7 +725,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
             <SystemColourSelect
-              value={order.highlight_color}
+              value={form.highlightColor ?? order.highlight_color}
               onChange={setHighlightColor}
               edit={edit}
             />

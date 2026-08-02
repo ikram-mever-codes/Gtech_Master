@@ -54,7 +54,9 @@ export default function SystemColourSelect({
   }, []);
 
   const matched = options.find(
-    (o) => o.hex?.toLowerCase() === value?.toLowerCase()
+    (o) =>
+      o.hex?.toLowerCase() === value?.toLowerCase() ||
+      o.name?.toLowerCase() === value?.toLowerCase()
   );
 
   if (!edit) {
