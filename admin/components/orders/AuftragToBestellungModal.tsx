@@ -102,9 +102,7 @@ export default function AuftragToBestellungModal({
         description: it.description,
       }));
 
-      const res = await createBestellungFromAuftrag(auftrag.id, selectedItems, {
-        notes,
-      });
+      const res = await createBestellungFromAuftrag(auftrag.id, selectedItems);
       if (res?.success) {
         toast.success(res.message || "Converted to Bestellung successfully!");
         onSuccess();
