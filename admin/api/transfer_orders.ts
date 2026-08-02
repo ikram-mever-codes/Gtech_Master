@@ -158,3 +158,23 @@ export const deleteTransferOrderLineItem = async (
     throw error;
   }
 };
+
+export const createTransferOrder = async (data: {
+  title: string;
+  status?: "draft" | "to be processed" | "partially delivered" | "delivered";
+  currency?: string;
+  notes?: string;
+  highlightColor?: string;
+  dateDelivery?: string;
+  receiver?: "Gtech Hong Kong" | "Supplier";
+  supplierId?: number | null;
+  customerId: string;
+}) => {
+  try {
+    const response: any = await api.post("/transfer-orders", data);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to create Bestellung");
+    throw error;
+  }
+};

@@ -14,6 +14,7 @@ import {
   parseFlexibleNumber,
   parseFlexibleNumberOrZero,
 } from "../utils/decimal";
+import { Customer } from "../models/customers";
 
 /** Recomputes subtotal/tax/total AND the stored weight columns from the
  * order's line items — TransferOrder persists net/extra/total weight
@@ -318,6 +319,7 @@ export const deleteTransferOrder = async (
   }
 };
 
+// In the updateTransferOrder controller, add customer_id handling
 export const updateTransferOrder = async (
   req: Request,
   res: Response,
@@ -334,6 +336,7 @@ export const updateTransferOrder = async (
       highlightColor,
       receiver,
       supplierId,
+      customerId, // Add this
     } = req.body;
 
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
@@ -345,6 +348,34 @@ export const updateTransferOrder = async (
     if (!bestellung) {
       res.status(404).json({ success: false, message: "Bestellung not found" });
       return;
+    }
+
+    // Check if order is from Auftrag - if so, prevent customer editing
+    const isFromAuftrag =
+      bestellung.auftrag_id !== null && bestellung.auftrag_id !== undefined;
+
+    if (customerId !== undefined) {
+      if (isFromAuftrag) {
+        res.status(403).json({
+          success: false,
+          message: "Cannot change customer for Bestellung created from Auftrag",
+        });
+        return;
+      }
+
+      // Validate customer exists
+      const customerRepo = AppDataSource.getRepository(Customer);
+      const customer = await customerRepo.findOne({
+        where: { id: customerId },
+      });
+      if (!customer) {
+        res.status(404).json({
+          success: false,
+          message: "Customer not found",
+        });
+        return;
+      }
+      bestellung.customer_id = customerId;
     }
 
     if (title !== undefined) bestellung.title = title;
@@ -401,6 +432,7 @@ export const updateTransferOrder = async (
     if (receiverOrSupplierChanged) {
       await refreshLineItemPurchasePrices(bestellung.id);
     }
+    await calculateTransferOrderTotals(bestellung.id);
 
     const fullOrder = await transferOrderRepo.findOne({
       where: { id: bestellung.id },
@@ -416,7 +448,6 @@ export const updateTransferOrder = async (
     next(error);
   }
 };
-
 // ---------------------------------------------------------------------
 // Line items
 // ---------------------------------------------------------------------
@@ -677,3 +708,99 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
     }
   }
 }
+
+export const createTransferOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      title,
+      status = "draft",
+      currency = "EUR",
+      notes,
+      highlightColor,
+      dateDelivery,
+      receiver = ReceiverType.GTECH_HK,
+      supplierId,
+      customerId,
+    } = req.body;
+
+    if (!title?.trim()) {
+      res.status(400).json({
+        success: false,
+        message: "Title is required",
+      });
+      return;
+    }
+
+    if (!customerId) {
+      res.status(400).json({
+        success: false,
+        message: "Customer is required",
+      });
+      return;
+    }
+
+    // Validate customer exists
+    const customerRepo = AppDataSource.getRepository(Customer);
+    const customer = await customerRepo.findOne({
+      where: { id: customerId },
+    });
+    if (!customer) {
+      res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+      return;
+    }
+
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const defaultPrefix = `T${yy}${mm}-`;
+
+    let orderNo = "";
+    try {
+      orderNo = await NumberSequenceService.getNextNumber("transfer_order");
+    } catch (err) {
+      console.warn(
+        "Could not generate sequence number for transfer_order:",
+        err,
+      );
+      orderNo = `${defaultPrefix}${Date.now().toString().slice(-4)}`;
+    }
+
+    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+    const transferOrder = transferOrderRepo.create({
+      order_no: orderNo,
+      customer_id: customerId,
+      title: title.trim(),
+      status: status,
+      currency: currency,
+      notes: notes || "",
+      highlight_color: highlightColor || "",
+      date_delivery: dateDelivery || "",
+      receiver: receiver,
+      supplier_id: receiver === ReceiverType.SUPPLIER ? supplierId : null,
+      date_created: `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`,
+    });
+
+    const savedOrder = await transferOrderRepo.save(transferOrder);
+
+    const fullOrder = await transferOrderRepo.findOne({
+      where: { id: savedOrder.id },
+      relations: ["orderItems", "customer", "supplier"],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Bestellung ${orderNo} created successfully`,
+      data: fullOrder,
+    });
+  } catch (error) {
+    console.error("Error creating Bestellung:", error);
+    next(error);
+  }
+};

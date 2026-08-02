@@ -2703,9 +2703,10 @@ const InvoiceListPage: React.FC = () => {
                   if (activeInvTab === "auftrag") {
                     setShowAuftragCreateModal(true);
                   } else {
-                    resetForm();
-                    setMode("create");
-                    setShowModal(true);
+                    // Open the BestellungPreviewModal in create mode
+                    setSelectedBestellungId(null);
+                    setBestellungPreviewInitialEdit(true);
+                    setShowBestellungPreviewModal(true);
                   }
                 }}
                 gradient
@@ -4578,10 +4579,12 @@ const InvoiceListPage: React.FC = () => {
             userRole={user?.role}
           />
         )}
+
         {showBestellungPreviewModal && (
           <BestellungPreviewModal
             isOpen={showBestellungPreviewModal}
             orderId={selectedBestellungId}
+            isCreate={!selectedBestellungId}
             initialEdit={bestellungPreviewInitialEdit}
             onClose={() => {
               setShowBestellungPreviewModal(false);
@@ -4591,9 +4594,14 @@ const InvoiceListPage: React.FC = () => {
             onChanged={() => {
               fetchBestellungen();
             }}
+            onCreated={(id) => {
+              setSelectedBestellungId(id);
+              setBestellungPreviewInitialEdit(true);
+            }}
             userRole={user?.role}
           />
         )}
+
         {showAuftragToRechnungModal && (
           <AuftragToRechnungModal
             isOpen={showAuftragToRechnungModal}
