@@ -15,10 +15,16 @@ export const SETTINGS_TABS = [
     href: "/payment-methods",
   },
   {
+    id: "payment-accounts",
+    label: "PaymentAccounts",
+    href: "/payment-accounts",
+  },
+  {
     id: "shipping-methods",
     label: "Shipmentmethods",
     href: "/shipping-methods",
   },
+
   {
     id: "tax-profiles",
     label: "TaxProfiles",
@@ -49,12 +55,8 @@ export const SETTINGS_TABS = [
     label: "Parameters & Templates",
     href: "/parameters-templates",
   },
-  {
-    id: "payment-accounts",
-    label: "PaymentAccounts",
-    href: "/payment-accounts",
-  },
 ];
+
 
 export default function SettingsTabs() {
   const pathname = usePathname();

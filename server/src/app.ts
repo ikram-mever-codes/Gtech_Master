@@ -32,7 +32,11 @@ import countryRoutes from "./routes/country_routes";
 import shippingAddressRoutes from "./routes/shipping_address_routes";
 import numberSequenceRoutes from "./routes/number_sequence_routes";
 import paymentMethodRoutes from "./routes/payment_method_routes";
+import paymentAccountRoutes from "./routes/payment_account_routes";
+import paymentInboundRoutes from "./routes/payment_inbound_routes";
 import shippingMethodRoutes from "./routes/shipping_method_routes";
+
+
 import salesPriceRoutes from "./routes/sales_price_routes";
 import customerOrderRoutes from "./routes/customer_orders";
 import transferOrderRoutes from "./routes/transfer_orders";
@@ -102,7 +106,11 @@ app.use(
   shippingAddressRoutes,
 );
 app.use("/api/v1/payment-methods", paymentMethodRoutes);
+app.use("/api/v1/payment-accounts", paymentAccountRoutes);
+app.use("/api/v1/payment-inbounds", paymentInboundRoutes);
 app.use("/api/v1/shipping-methods", shippingMethodRoutes);
+
+
 app.use("/api/v1/customer-orders", customerOrderRoutes);
 app.use("/api/v1/transfer-orders", transferOrderRoutes);
 app.use("/api/v1/rechnungen", rechnungRoutes);

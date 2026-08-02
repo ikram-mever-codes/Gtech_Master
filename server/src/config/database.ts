@@ -45,7 +45,11 @@ import { TaxProfile } from "../models/tax_profile";
 import { Country } from "../models/country";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
 import { PaymentMethod } from "../models/payment_methods";
+import { PaymentAccount } from "../models/payment_account";
+import { PaymentInbound } from "../models/payment_inbound";
 import { ShippingMethod } from "../models/shipping_methods";
+
+
 import { NumberSequence } from "../models/number_sequence";
 import { GtechCompany } from "../models/gtech_company";
 import { SystemParameter } from "../models/system_parameter";
@@ -127,7 +131,11 @@ export const AppDataSource = new DataSource({
     Country,
     CompanyShippingAddress,
     PaymentMethod,
+    PaymentAccount,
+    PaymentInbound,
     ShippingMethod,
+
+
     NumberSequence,
     Rechnung,
     RechnungCustomer,
