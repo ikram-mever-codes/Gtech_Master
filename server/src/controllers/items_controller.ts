@@ -174,6 +174,7 @@ export const getItems = async (
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const isStock = ((req.query.isStock as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
+    const idsStr = ((req.query.ids as string) || "").trim(); // NEW: Comma-separated item IDs
 
     const tagIds = tagStr
       .split(",")
@@ -194,6 +195,19 @@ export const getItems = async (
       .addSelect("item.created_at")
       .leftJoin("item.parent", "parent")
       .leftJoin("item.category", "category");
+
+    // NEW: Filter by specific item IDs
+    if (idsStr) {
+      const itemIds = idsStr
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id && !isNaN(Number(id)))
+        .map((id) => Number(id));
+
+      if (itemIds.length > 0) {
+        idQb.andWhere("item.id IN (:...itemIds)", { itemIds });
+      }
+    }
 
     // Name search — case-insensitive
     if (search) {
@@ -366,9 +380,9 @@ export const getItems = async (
         "item.id",
         "item.item_name",
         "item.item_name_cn",
-        "item.item_name_de", // From items table
+        "item.item_name_de",
         "item.ean",
-        "item.ItemID_DE", // From items table
+        "item.ItemID_DE",
         "item.isActive",
         "item.parent_id",
         "item.taric_id",
@@ -458,17 +472,14 @@ export const getItems = async (
 
       return {
         id: item.id,
-        // de_no comes from warehouse (fallback to parent)
         de_no: warehouseData?.item_no_de || parentData?.de_no || null,
         name_de: parentData?.name_de || null,
         name_en: parentData?.name_en || null,
         name_cn: parentData?.name_cn || null,
         item_name: item.item_name,
         item_name_cn: item.item_name_cn,
-        // FIX: Use item.item_name_de from items table, not warehouse
         item_name_de: item.item_name_de || null,
         ean: item.ean || warehouseData?.ean || null,
-        // FIX: Use item.ItemID_DE from items table, not warehouse
         ItemID_DE: item.ItemID_DE || null,
         is_active: warehouseData
           ? warehouseData.is_active
@@ -507,6 +518,8 @@ export const getItems = async (
         MSQ_EU: item.MSQ_EU || 0,
         stockCN: item.stockCN || 0,
         MSQ_CN: item.MSQ_CN || 0,
+        // NEW: Add supplierItems relation for frontend to access supplier pricing
+        supplierItems: item.supplierItems || [],
       };
     });
 
@@ -830,6 +843,7 @@ export const getItemById = async (
         supplierName:
           si.supplier?.company_name || si.supplier?.name || "Unknown",
         priceRMB: si.price_rmb?.toString() || "0",
+        currency: si.currency || "RMB",
         isPO: si.is_po || "No",
         moq: si.moq?.toString() || "0",
         interval: si.oi?.toString() || "0",
@@ -850,29 +864,31 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-            id: defaultSi.id,
-            supplierId: defaultSi.supplier_id,
-            supplierName:
-              defaultSi.supplier?.company_name ||
-              defaultSi.supplier?.name ||
-              "Unknown",
-            priceRMB: defaultSi.price_rmb?.toString() || "0",
-            isPO: defaultSi.is_po || "No",
-            moq: defaultSi.moq?.toString() || "0",
-            interval: defaultSi.oi?.toString() || "0",
-            leadTime: defaultSi.lead_time || "",
-            noteCN: defaultSi.note_cn || "",
-            url: defaultSi.url || "",
-          }
+              id: defaultSi.id,
+              supplierId: defaultSi.supplier_id,
+              supplierName:
+                defaultSi.supplier?.company_name ||
+                defaultSi.supplier?.name ||
+                "Unknown",
+              priceRMB: defaultSi.price_rmb?.toString() || "0",
+              currency: defaultSi.currency || "RMB",
+              isPO: defaultSi.is_po || "No",
+              moq: defaultSi.moq?.toString() || "0",
+              interval: defaultSi.oi?.toString() || "0",
+              leadTime: defaultSi.lead_time || "",
+              noteCN: defaultSi.note_cn || "",
+              url: defaultSi.url || "",
+            }
           : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          };
+              priceRMB: "0",
+              currency: "RMB",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -1344,6 +1360,8 @@ export const updateItem = async (
               siData.priceRMB !== undefined && siData.priceRMB !== ""
                 ? parseFloat(siData.priceRMB)
                 : undefined,
+            currency:
+              siData.currency !== undefined ? siData.currency : undefined,
             moq:
               siData.moq !== undefined && siData.moq !== ""
                 ? parseInt(siData.moq)
@@ -1364,6 +1382,7 @@ export const updateItem = async (
             supplier_id: siData.supplierId,
             is_default: siData.isDefault ? "Y" : "N",
             price_rmb: parseFloat(siData.priceRMB) || 0,
+            currency: siData.currency || "RMB",
             moq: parseInt(siData.moq) || 0,
             lead_time: siData.leadTime || "",
           });
@@ -1384,7 +1403,6 @@ export const updateItem = async (
       let supplierItem = await supplierItemRepository.findOne({
         where: { item_id: item.id, supplier_id: targetSupplierId },
       });
-
       if (supplierItem) {
         let sChanges = false;
         if (supplierItemData.price_rmb !== undefined) {
@@ -1396,7 +1414,13 @@ export const updateItem = async (
             sChanges = true;
           }
         }
-
+        if (
+          supplierItemData.currency !== undefined &&
+          supplierItem.currency !== supplierItemData.currency
+        ) {
+          supplierItem.currency = supplierItemData.currency;
+          sChanges = true;
+        }
         if (supplierItemData.is_po !== undefined) {
           supplierItem.is_po = supplierItemData.is_po;
           sChanges = true;
@@ -1421,7 +1445,6 @@ export const updateItem = async (
           supplierItem.note_cn = supplierItemData.note_cn;
           sChanges = true;
         }
-
         if (sChanges) {
           await supplierItemRepository.save(supplierItem);
           hasChanges = true;
@@ -1431,6 +1454,7 @@ export const updateItem = async (
           item_id: item.id,
           supplier_id: targetSupplierId || 0,
           price_rmb: toNum(supplierItemData.price_rmb),
+          currency: supplierItemData.currency || "RMB",
           is_po: supplierItemData.is_po || "No",
           moq: toInt(supplierItemData.moq),
           oi: toInt(supplierItemData.oi),
@@ -1443,7 +1467,6 @@ export const updateItem = async (
         hasChanges = true;
       }
     }
-
     const categoryName = category?.name || item.supp_cat || "STD";
 
     if (currentRMBPrice !== null && !isNaN(currentRMBPrice)) {
@@ -2059,9 +2082,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2137,17 +2160,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3705,23 +3728,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-            where: { id: item.parent_id },
-            select: ["id", "de_no", "name_de", "name_en"],
-          })
+              where: { id: item.parent_id },
+              select: ["id", "de_no", "name_de", "name_en"],
+            })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-            where: { id: item.cat_id },
-            select: ["id", "name"],
-          })
+              where: { id: item.cat_id },
+              select: ["id", "name"],
+            })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-            where: { id: item.supplier_id },
-            select: ["id", "name", "company_name"],
-          })
+              where: { id: item.supplier_id },
+              select: ["id", "name", "company_name"],
+            })
           : null;
 
         let warehouseData: any = null;
@@ -3948,8 +3971,8 @@ export const exportNewItemsToCSV = async (
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
           warehouseData?.item_no_de ||
-          item.ItemID_DE?.toString() ||
-          item.id.toString(),
+            item.ItemID_DE?.toString() ||
+            item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",

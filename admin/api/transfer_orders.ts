@@ -1,13 +1,9 @@
 import { api, handleApiError } from "@/utils/api";
 
+// Create Transfer Order from Auftrag
 export const createTransferOrderFromAuftrag = async (
-  auftragId: string | number,
-  selectedItems: Array<{
-    lineItemId: string;
-    qty: number;
-    price: number;
-    itemName?: string;
-  }>,
+  auftragId: number | string,
+  selectedItems: any,
 ) => {
   try {
     const response: any = await api.post(
@@ -26,7 +22,7 @@ export const getAllTransferOrders = async () => {
     const response: any = await api.get("/transfer-orders");
     return response;
   } catch (error: any) {
-    handleApiError(error, "Failed to fetch Bestellungen");
+    handleApiError(error, "Failed to fetch transfer orders");
     throw error;
   }
 };
@@ -36,7 +32,45 @@ export const getTransferOrderById = async (id: number | string) => {
     const response: any = await api.get(`/transfer-orders/${id}`);
     return response;
   } catch (error: any) {
-    handleApiError(error, "Failed to fetch Bestellung");
+    handleApiError(error, "Failed to fetch transfer order");
+    throw error;
+  }
+};
+
+export const updateTransferOrder = async (
+  id: number | string,
+  data: {
+    title?: string;
+    status?: "draft" | "to be processed" | "partially delivered" | "delivered";
+    currency?: string;
+    notes?: string;
+    dateDelivery?: string;
+    highlightColor?: string;
+    receiver?: "Gtech Hong Kong" | "Supplier";
+    supplierId?: number | null;
+  },
+) => {
+  try {
+    const response: any = await api.put(`/transfer-orders/${id}`, data);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to update transfer order");
+    throw error;
+  }
+};
+
+// NEW: Update only the status of a transfer order
+export const updateTransferOrderStatus = async (
+  id: number | string,
+  status: "draft" | "to be processed" | "partially delivered" | "delivered",
+) => {
+  try {
+    const response: any = await api.patch(`/transfer-orders/${id}/status`, {
+      status,
+    });
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to update transfer order status");
     throw error;
   }
 };
@@ -46,36 +80,37 @@ export const deleteTransferOrder = async (id: number | string) => {
     const response: any = await api.delete(`/transfer-orders/${id}`);
     return response;
   } catch (error: any) {
-    handleApiError(error, "Failed to delete Bestellung");
+    handleApiError(error, "Failed to delete transfer order");
     throw error;
   }
 };
 
-export const updateTransferOrder = async (
-  id: number | string,
-  payload: any,
-) => {
-  try {
-    const response: any = await api.put(`/transfer-orders/${id}`, payload);
-    return response;
-  } catch (error: any) {
-    handleApiError(error, "Failed to update Bestellung");
-    throw error;
-  }
-};
-
+// Line Items
 export const createTransferOrderLineItem = async (
   orderId: number | string,
-  payload: any,
+  data: {
+    itemName: string;
+    itemNo?: string;
+    material?: string;
+    specification?: string;
+    description?: string;
+    weight?: number;
+    qty?: number;
+    transferPrice?: number;
+    purchasePrice?: number;
+    remark_order_item?: string;
+    sourceItemId?: string;
+    notes?: string;
+  },
 ) => {
   try {
     const response: any = await api.post(
       `/transfer-orders/${orderId}/line-items`,
-      payload,
+      data,
     );
     return response;
   } catch (error: any) {
-    handleApiError(error, "Failed to add line item");
+    handleApiError(error, "Failed to create line item");
     throw error;
   }
 };
@@ -83,12 +118,24 @@ export const createTransferOrderLineItem = async (
 export const updateTransferOrderLineItem = async (
   orderId: number | string,
   lineItemId: string,
-  payload: any,
+  data: {
+    itemName?: string;
+    itemNo?: string;
+    material?: string;
+    specification?: string;
+    description?: string;
+    qty?: number;
+    extraWeight?: number;
+    transferPrice?: number;
+    purchasePrice?: number;
+    remark_order_item?: string;
+    notes?: string;
+  },
 ) => {
   try {
     const response: any = await api.put(
       `/transfer-orders/${orderId}/line-items/${lineItemId}`,
-      payload,
+      data,
     );
     return response;
   } catch (error: any) {
@@ -108,68 +155,6 @@ export const deleteTransferOrderLineItem = async (
     return response;
   } catch (error: any) {
     handleApiError(error, "Failed to delete line item");
-    throw error;
-  }
-};
-
-export const formatCurrency = (
-  amount: number,
-  currency: string = "EUR",
-): string =>
-  new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(
-    Number(amount) || 0,
-  );
-
-export const createBestellungFromAuftrag = async (
-  auftragId: number | string,
-  selectedItems: Array<{
-    sourceLineItemId?: string;
-    qty: number;
-    max_qty?: number;
-    price?: number;
-    transferPrice?: number; // NEW
-    purchasePrice?: number; // NEW
-    extraWeight?: number; // NEW
-    itemName?: string;
-    itemNo?: string;
-    material?: string;
-    specification?: string;
-    description?: string;
-    weight?: number;
-    notes?: string;
-  }>,
-  options?: {
-    notes?: string;
-    receiver?: string; // NEW
-  },
-) => {
-  try {
-    const response: any = await api.post(
-      `/transfer-orders/from-auftrag/${auftragId}`,
-      {
-        selectedItems,
-        notes: options?.notes || "",
-        receiver: options?.receiver || "Gtech Hong Kong",
-      },
-    );
-    return response;
-  } catch (error: any) {
-    handleApiError(error, "Failed to create Bestellung from Auftrag");
-    throw error;
-  }
-};
-
-export const updateTransferOrderStatus = async (
-  id: number | string,
-  status: string,
-) => {
-  try {
-    const response: any = await api.put(`/transfer-orders/${id}/status`, {
-      status,
-    });
-    return response;
-  } catch (error: any) {
-    handleApiError(error, "Failed to update Bestellung status");
     throw error;
   }
 };

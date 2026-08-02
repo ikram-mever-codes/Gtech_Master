@@ -61,8 +61,9 @@ const StatusIndicator = ({
   label?: string;
 }) => (
   <span
-    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-      }`}
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+      value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+    }`}
   >
     {value ? (
       <CheckCircleIcon className="h-3 w-3" />
@@ -356,6 +357,10 @@ const ItemDetailsPage = () => {
                 resolved.supplierItem.priceRMB !== undefined
                   ? resolved.supplierItem.priceRMB
                   : si.priceRMB,
+              currency:
+                resolved.supplierItem.currency !== undefined
+                  ? resolved.supplierItem.currency
+                  : si.currency || "RMB",
               isPO:
                 resolved.supplierItem.isPO !== undefined
                   ? resolved.supplierItem.isPO
@@ -427,28 +432,33 @@ const ItemDetailsPage = () => {
         rawItem.supplierItem ||
         (defaultSupplierItem
           ? {
-            priceRMB: defaultSupplierItem.priceRMB || "0",
-            isPO: defaultSupplierItem.isPO || "No",
-            moq: defaultSupplierItem.moq || "0",
-            interval: defaultSupplierItem.interval || "0",
-            leadTime: defaultSupplierItem.leadTime || "",
-            noteCN: defaultSupplierItem.noteCN || "",
-            url: defaultSupplierItem.url || "",
-          }
+              priceRMB: defaultSupplierItem.priceRMB || "0",
+              currency: defaultSupplierItem.currency || "RMB",
+              isPO: defaultSupplierItem.isPO || "No",
+              moq: defaultSupplierItem.moq || "0",
+              interval: defaultSupplierItem.interval || "0",
+              leadTime: defaultSupplierItem.leadTime || "",
+              noteCN: defaultSupplierItem.noteCN || "",
+              url: defaultSupplierItem.url || "",
+            }
           : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          }),
+              priceRMB: "0",
+              currency: "RMB",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            }),
       isLabelPrint:
         rawItem.isLabelPrint !== undefined
           ? toBool(rawItem.isLabelPrint)
           : false,
-      supplierItems: rawItem.supplierItems || [],
+      supplierItems: (rawItem.supplierItems || []).map((si: any) => ({
+        ...si,
+        currency: si.currency || "RMB",
+      })),
       isActive: toBool(rawItem.isActive),
       parent: {
         ...rawItem.parent,
@@ -527,8 +537,8 @@ const ItemDetailsPage = () => {
     const term = customerSearch.trim().toLowerCase();
     const list = term
       ? allCustomers.filter((c) =>
-        (c.companyName || "").toLowerCase().includes(term),
-      )
+          (c.companyName || "").toLowerCase().includes(term),
+        )
       : allCustomers;
     return list.slice(0, 50);
   })();
@@ -646,6 +656,7 @@ const ItemDetailsPage = () => {
       supplierId: supplier.id,
       supplierName: String(supplier.company_name || supplier.name || "Unknown"),
       priceRMB: "0",
+      currency: "RMB",
       isPO: "No",
       moq: "0",
       interval: "0",
@@ -1016,6 +1027,7 @@ const ItemDetailsPage = () => {
 
         supplierItem: {
           price_rmb: toNum(updatedData.supplierItem?.priceRMB),
+          currency: updatedData.supplierItem?.currency || "RMB",
           is_po: updatedData.supplierItem?.isPO,
           moq: toInt(updatedData.supplierItem?.moq),
           oi: toInt(updatedData.supplierItem?.interval),
@@ -1159,10 +1171,11 @@ const ItemDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
-                  ? "text-gray-900 border-b-2 border-gray-600"
-                  : "text-gray-500 hover:text-gray-700"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? "text-gray-900 border-b-2 border-gray-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
               >
                 {tab.label}
               </button>
@@ -1237,7 +1250,7 @@ const ItemDetailsPage = () => {
                           updated.supplier_id = newSupplierId;
 
                           const supplierName = name;
-                          let existingItem = updated.supplierItems?.find(
+                          let existingItem: any = updated.supplierItems?.find(
                             (si: any) =>
                               Number(si.supplierId) === Number(newSupplierId),
                           );
@@ -1257,6 +1270,7 @@ const ItemDetailsPage = () => {
                               supplierId: newSupplierId,
                               supplierName: supplierName,
                               priceRMB: "0",
+                              currency: "RMB",
                               isPO: "No",
                               moq: "0",
                               interval: "0",
@@ -1279,6 +1293,7 @@ const ItemDetailsPage = () => {
 
                           updated.supplierItem = {
                             priceRMB: existingItem.priceRMB || "0",
+                            currency: existingItem.currency || "RMB",
                             isPO: existingItem.isPO || "No",
                             moq: existingItem.moq || "0",
                             interval: existingItem.interval || "0",
@@ -1294,12 +1309,12 @@ const ItemDetailsPage = () => {
 
                           setItemData(updated);
                         }}
-                        initialLabel={
-                          (() => {
-                            const s = allSuppliers.find((s) => s.id === itemData.supplier_id);
-                            return s ? (s.company_name || s.name || "") : "";
-                          })()
-                        }
+                        initialLabel={(() => {
+                          const s = allSuppliers.find(
+                            (s) => s.id === itemData.supplier_id,
+                          );
+                          return s ? s.company_name || s.name || "" : "";
+                        })()}
                       />
                     ) : (
                       <span className="text-gray-900">
@@ -1333,7 +1348,9 @@ const ItemDetailsPage = () => {
                         initialLabel={selectedCustomerName}
                         onChange={(id) => {
                           setItemData((prev) =>
-                            prev ? ({ ...prev, customer_id: id || null } as any) : prev,
+                            prev
+                              ? ({ ...prev, customer_id: id || null } as any)
+                              : prev,
                           );
                         }}
                         placeholder="Search customer by name or number..."
@@ -1362,7 +1379,7 @@ const ItemDetailsPage = () => {
                   setItemData={setItemData}
                 />
                 <EditableInfoRow
-                  label="Price (RMB) ¥"
+                  label="Purchase Price"
                   value={
                     itemData.supplierItem?.priceRMB ||
                     (itemData as any).others?.rmbPrice
@@ -1932,445 +1949,501 @@ const ItemDetailsPage = () => {
 
               <div className="grid grid-cols-1 gap-4">
                 {itemData.supplierItems && itemData.supplierItems.length > 0 ? (
-                  itemData.supplierItems.map((si: any) => (
-                    <div
-                      key={si.id}
-                      className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${si.isDefault
-                        ? "bg-blue-50/20 border-blue-200 shadow-sm"
-                        : "bg-white border-gray-100 hover:border-gray-200"
+                  itemData.supplierItems.map((si: any) => {
+                    const currency = si.currency || "RMB";
+                    const currencySymbol = currency === "USD" ? "$" : "¥";
+
+                    return (
+                      <div
+                        key={si.id}
+                        className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${
+                          si.isDefault
+                            ? "bg-blue-50/20 border-blue-200 shadow-sm"
+                            : "bg-white border-gray-100 hover:border-gray-200"
                         }`}
-                    >
-                      <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={`p-2 rounded-lg ${si.isDefault
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-gray-100 text-gray-400"
+                      >
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`p-2 rounded-lg ${
+                                si.isDefault
+                                  ? "bg-blue-100 text-blue-600"
+                                  : "bg-gray-100 text-gray-400"
                               }`}
-                          >
-                            <Package className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-gray-900 line-clamp-1">
-                                {(() => {
-                                  const sDetail = allSuppliers.find(
-                                    (s) =>
-                                      String(s.id) === String(si.supplierId),
-                                  );
-                                  const bestName =
-                                    sDetail?.company_name ||
-                                    sDetail?.name ||
-                                    sDetail?.name_de ||
-                                    si.supplierName;
-                                  return bestName &&
-                                    bestName !== "Unknown" &&
-                                    bestName !== "-"
-                                    ? bestName
-                                    : "Supplier #" + si.supplierId;
-                                })()}
-                              </h4>
-                              <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
-                                ID: {si.supplierId}
-                              </span>
+                            >
+                              <Package className="h-5 w-5" />
                             </div>
-                            {si.isDefault && (
-                              <div className="mt-1">
-                                <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                                  Default Source
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-gray-900 line-clamp-1">
+                                  {(() => {
+                                    const sDetail = allSuppliers.find(
+                                      (s) =>
+                                        String(s.id) === String(si.supplierId),
+                                    );
+                                    const bestName =
+                                      sDetail?.company_name ||
+                                      sDetail?.name ||
+                                      sDetail?.name_de ||
+                                      si.supplierName;
+                                    return bestName &&
+                                      bestName !== "Unknown" &&
+                                      bestName !== "-"
+                                      ? bestName
+                                      : "Supplier #" + si.supplierId;
+                                  })()}
+                                </h4>
+                                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
+                                  ID: {si.supplierId}
                                 </span>
                               </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => window.open(si.url, "_blank")}
-                            disabled={!si.url}
-                            className={`p-2 rounded-lg transition-all ${si.url
-                              ? "text-blue-500 hover:bg-blue-50"
-                              : "text-gray-300 cursor-not-allowed"
-                              }`}
-                          >
-                            <LinkIcon className="h-5 w-5" />
-                          </button>
-
-                          {editMode && (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={async () => {
-                                  const updated = { ...itemData };
-                                  updated.supplier_id = si.supplierId;
-                                  updated.supplierItems =
-                                    updated.supplierItems.map((x: any) => ({
-                                      ...x,
-                                      isDefault: x.id === si.id,
-                                    }));
-                                  updated.supplierItem = {
-                                    priceRMB: si.priceRMB || "0",
-                                    isPO: si.isPO || "No",
-                                    moq: si.moq || "0",
-                                    interval: si.interval || "0",
-                                    leadTime: si.leadTime || "",
-                                    noteCN: si.noteCN || "",
-                                    url: si.url || "",
-                                  };
-                                  if (updated.others) {
-                                    updated.others.rmbPrice =
-                                      si.priceRMB || "0";
-                                  }
-                                  setItemData(updated);
-                                  await handleUpdateItem(updated);
-                                  toast.success(
-                                    "Default supplier source updated",
-                                    successStyles,
-                                  );
-                                }}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
-                                  }`}
-                              >
-                                {si.isDefault ? "Default" : "Set Default"}
-                              </button>
-                              {!si.isDefault && (
-                                <button
-                                  onClick={() => handleRemoveSupplier(si.id)}
-                                  className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                >
-                                  <TrashIcon className="h-5 w-5" />
-                                </button>
+                              {si.isDefault && (
+                                <div className="mt-1">
+                                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                    Default Source
+                                  </span>
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mt-2 border-t border-gray-100 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Price (RMB)
-                          </label>
-                          {editMode ? (
-                            <input
-                              type="number"
-                              value={si.priceRMB || ""}
-                              onChange={(e) => {
-                                const updated = { ...itemData };
-                                updated.supplierItems =
-                                  updated.supplierItems.map((x: any) =>
-                                    x.id === si.id
-                                      ? { ...x, priceRMB: e.target.value }
-                                      : x,
-                                  );
-                                if (si.isDefault) {
-                                  updated.supplierItem = {
-                                    ...updated.supplierItem,
-                                    priceRMB: e.target.value,
-                                  };
-                                  if (updated.others) {
-                                    updated.others.rmbPrice = e.target.value;
-                                  }
-                                }
-                                setItemData(updated);
-                              }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
-                            />
-                          ) : (
-                            <span className="text-sm font-semibold text-gray-900">
-                              ¥{si.priceRMB || "0"}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            MOQ
-                          </label>
-                          {editMode ? (
-                            <input
-                              type="number"
-                              value={si.moq || ""}
-                              onChange={(e) => {
-                                const updated = { ...itemData };
-                                updated.supplierItems =
-                                  updated.supplierItems.map((x: any) =>
-                                    x.id === si.id
-                                      ? { ...x, moq: e.target.value }
-                                      : x,
-                                  );
-                                if (si.isDefault) {
-                                  updated.supplierItem = {
-                                    ...updated.supplierItem,
-                                    moq: e.target.value,
-                                  };
-                                }
-                                setItemData(updated);
-                              }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
-                            />
-                          ) : (
-                            <span className="text-sm font-semibold text-gray-900">
-                              {si.moq || "0"}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Lead Time
-                          </label>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              value={si.leadTime || ""}
-                              onChange={(e) => {
-                                const updated = { ...itemData };
-                                updated.supplierItems =
-                                  updated.supplierItems.map((x: any) =>
-                                    x.id === si.id
-                                      ? { ...x, leadTime: e.target.value }
-                                      : x,
-                                  );
-                                if (si.isDefault) {
-                                  updated.supplierItem = {
-                                    ...updated.supplierItem,
-                                    leadTime: e.target.value,
-                                  };
-                                }
-                                setItemData(updated);
-                              }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
-                            />
-                          ) : (
-                            <span className="text-sm font-semibold text-gray-900">
-                              {si.leadTime || "—"}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Is PO
-                          </label>
-                          {editMode ? (
-                            <select
-                              value={si.isPO || "No"}
-                              onChange={(e) => {
-                                const updated = { ...itemData };
-                                updated.supplierItems =
-                                  updated.supplierItems.map((x: any) =>
-                                    x.id === si.id
-                                      ? { ...x, isPO: e.target.value }
-                                      : x,
-                                  );
-                                if (si.isDefault) {
-                                  updated.supplierItem = {
-                                    ...updated.supplierItem,
-                                    isPO: e.target.value,
-                                  };
-                                }
-                                setItemData(updated);
-                              }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => window.open(si.url, "_blank")}
+                              disabled={!si.url}
+                              className={`p-2 rounded-lg transition-all ${
+                                si.url
+                                  ? "text-blue-500 hover:bg-blue-50"
+                                  : "text-gray-300 cursor-not-allowed"
+                              }`}
                             >
-                              <option value="Yes">Yes</option>
-                              <option value="No">No</option>
-                            </select>
-                          ) : (
-                            <span className="text-sm font-semibold text-gray-900">
-                              {si.isPO || "No"}
-                            </span>
-                          )}
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            URL
-                          </label>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              value={si.url || ""}
-                              onChange={(e) => {
-                                const updated = { ...itemData };
-                                updated.supplierItems =
-                                  updated.supplierItems.map((x: any) =>
-                                    x.id === si.id
-                                      ? { ...x, url: e.target.value }
-                                      : x,
-                                  );
-                                if (si.isDefault) {
-                                  updated.supplierItem = {
-                                    ...updated.supplierItem,
-                                    url: e.target.value,
-                                  };
-                                }
-                                setItemData(updated);
-                              }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
-                            />
-                          ) : (
-                            <span className="text-sm text-blue-500 truncate block">
-                              {si.url ? (
-                                <a
-                                  href={si.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="hover:underline"
+                              <LinkIcon className="h-5 w-5" />
+                            </button>
+
+                            {editMode && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={async () => {
+                                    const updated = { ...itemData };
+                                    updated.supplier_id = si.supplierId;
+                                    updated.supplierItems =
+                                      updated.supplierItems.map((x: any) => ({
+                                        ...x,
+                                        isDefault: x.id === si.id,
+                                      }));
+                                    updated.supplierItem = {
+                                      priceRMB: si.priceRMB || "0",
+                                      currency: si.currency || "RMB",
+                                      isPO: si.isPO || "No",
+                                      moq: si.moq || "0",
+                                      interval: si.interval || "0",
+                                      leadTime: si.leadTime || "",
+                                      noteCN: si.noteCN || "",
+                                      url: si.url || "",
+                                    };
+                                    if (updated.others) {
+                                      updated.others.rmbPrice =
+                                        si.priceRMB || "0";
+                                    }
+                                    setItemData(updated);
+                                    await handleUpdateItem(updated);
+                                    toast.success(
+                                      "Default supplier source updated",
+                                      successStyles,
+                                    );
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                    si.isDefault
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
+                                  }`}
                                 >
-                                  {si.url}
-                                </a>
-                              ) : (
-                                "—"
-                              )}
-                            </span>
-                          )}
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Note (CN)
-                          </label>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              value={si.noteCN || ""}
-                              onChange={(e) => {
-                                const updated = { ...itemData };
-                                updated.supplierItems =
-                                  updated.supplierItems.map((x: any) =>
-                                    x.id === si.id
-                                      ? { ...x, noteCN: e.target.value }
-                                      : x,
-                                  );
-                                if (si.isDefault) {
-                                  updated.supplierItem = {
-                                    ...updated.supplierItem,
-                                    noteCN: e.target.value,
-                                  };
-                                }
-                                setItemData(updated);
-                              }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
-                            />
-                          ) : (
-                            <span className="text-sm font-semibold text-gray-900 truncate block">
-                              {si.noteCN || "—"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-2 border-t border-gray-100 pt-4">
-                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="text-xs font-bold text-gray-700">
-                              Supplier Item Catalog
-                            </span>
-                            <span className="text-[11px] font-medium text-gray-500 bg-gray-200/50 px-2 py-0.5 rounded-full">
-                              Total:{" "}
-                              {supplierRelatedItems[Number(si.supplierId)]
-                                ?.length || 0}{" "}
-                              items
-                            </span>
-                          </div>
-
-                          <div className="relative mb-3">
-                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                            <input
-                              type="text"
-                              placeholder="Search catalog items..."
-                              value={
-                                supplierSearchTerms[Number(si.supplierId)] || ""
-                              }
-                              onChange={(e) =>
-                                setSupplierSearchTerms((prev) => ({
-                                  ...prev,
-                                  [Number(si.supplierId)]: e.target.value,
-                                }))
-                              }
-                              className="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all"
-                            />
-                          </div>
-
-                          <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-                            {loadingSupplierRelatedItems[
-                              Number(si.supplierId)
-                            ] ? (
-                              <div className="py-6 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
-                                <div className="w-4 h-4 border-2 border-[#8CC21B] border-t-transparent rounded-full animate-spin"></div>
-                                Loading items...
+                                  {si.isDefault ? "Default" : "Set Default"}
+                                </button>
+                                {!si.isDefault && (
+                                  <button
+                                    onClick={() => handleRemoveSupplier(si.id)}
+                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                  >
+                                    <TrashIcon className="h-5 w-5" />
+                                  </button>
+                                )}
                               </div>
-                            ) : (
-                              (() => {
-                                const items =
-                                  supplierRelatedItems[Number(si.supplierId)] ||
-                                  [];
-                                const term = (
-                                  supplierSearchTerms[Number(si.supplierId)] ||
-                                  ""
-                                ).toLowerCase();
-                                const filtered = items.filter(
-                                  (item) =>
-                                    String(item.id).includes(term) ||
-                                    (item.item_name &&
-                                      item.item_name
-                                        .toLowerCase()
-                                        .includes(term)) ||
-                                    (item.name_de &&
-                                      item.name_de
-                                        .toLowerCase()
-                                        .includes(term)),
-                                );
-
-                                if (filtered.length === 0) {
-                                  return (
-                                    <div className="py-6 text-center text-xs text-gray-400">
-                                      No items found.
-                                    </div>
-                                  );
-                                }
-
-                                return filtered.map((item: any) => {
-                                  const isCurrent =
-                                    Number(item.id) === Number(id);
-                                  return (
-                                    <div
-                                      key={item.id}
-                                      onClick={() =>
-                                        router.push(`/items/${item.id}`)
-                                      }
-                                      className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${isCurrent
-                                        ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
-                                        : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
-                                        }`}
-                                    >
-                                      <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
-                                        <span className="font-semibold line-clamp-1 group-hover/item:text-[#8CC21B] transition-colors">
-                                          {item.item_name ||
-                                            item.name_de ||
-                                            "Unnamed Item"}
-                                        </span>
-                                        <span className="text-[10px] text-gray-400 flex items-center gap-2">
-                                          <span>ID: {item.id}</span>
-                                          {item.ean && (
-                                            <span>• EAN: {item.ean}</span>
-                                          )}
-                                        </span>
-                                      </div>
-                                      {isCurrent ? (
-                                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0">
-                                          Current
-                                        </span>
-                                      ) : (
-                                        <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400 group-hover/item:translate-x-0.5 transition-transform shrink-0" />
-                                      )}
-                                    </div>
-                                  );
-                                });
-                              })()
                             )}
                           </div>
                         </div>
+                        <div className="mt-2 border-t border-gray-100 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                              Purchase Price ({currency})
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-semibold text-gray-600">
+                                {currencySymbol}
+                              </span>
+                              {editMode ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={si.priceRMB || ""}
+                                  onChange={(e) => {
+                                    const updated = { ...itemData };
+                                    updated.supplierItems =
+                                      updated.supplierItems.map((x: any) =>
+                                        x.id === si.id
+                                          ? { ...x, priceRMB: e.target.value }
+                                          : x,
+                                      );
+                                    if (si.isDefault) {
+                                      updated.supplierItem = {
+                                        ...updated.supplierItem,
+                                        priceRMB: e.target.value,
+                                      };
+                                      if (updated.others) {
+                                        updated.others.rmbPrice =
+                                          e.target.value;
+                                      }
+                                    }
+                                    setItemData(updated);
+                                  }}
+                                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                                />
+                              ) : (
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {si.priceRMB || "0"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {/* Currency Selector */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                              Currency
+                            </label>
+                            {editMode ? (
+                              <select
+                                value={currency}
+                                onChange={(e) => {
+                                  const updated = { ...itemData };
+                                  updated.supplierItems =
+                                    updated.supplierItems.map((x: any) =>
+                                      x.id === si.id
+                                        ? { ...x, currency: e.target.value }
+                                        : x,
+                                    );
+                                  if (si.isDefault) {
+                                    updated.supplierItem = {
+                                      ...updated.supplierItem,
+                                      currency: e.target.value,
+                                    };
+                                  }
+                                  setItemData(updated);
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                              >
+                                <option value="RMB">RMB (¥)</option>
+                                <option value="USD">USD ($)</option>
+                              </select>
+                            ) : (
+                              <span className="text-sm font-semibold text-gray-900">
+                                {currency} ({currencySymbol})
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                              MOQ
+                            </label>
+                            {editMode ? (
+                              <input
+                                type="number"
+                                value={si.moq || ""}
+                                onChange={(e) => {
+                                  const updated = { ...itemData };
+                                  updated.supplierItems =
+                                    updated.supplierItems.map((x: any) =>
+                                      x.id === si.id
+                                        ? { ...x, moq: e.target.value }
+                                        : x,
+                                    );
+                                  if (si.isDefault) {
+                                    updated.supplierItem = {
+                                      ...updated.supplierItem,
+                                      moq: e.target.value,
+                                    };
+                                  }
+                                  setItemData(updated);
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                              />
+                            ) : (
+                              <span className="text-sm font-semibold text-gray-900">
+                                {si.moq || "0"}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                              Lead Time
+                            </label>
+                            {editMode ? (
+                              <input
+                                type="text"
+                                value={si.leadTime || ""}
+                                onChange={(e) => {
+                                  const updated = { ...itemData };
+                                  updated.supplierItems =
+                                    updated.supplierItems.map((x: any) =>
+                                      x.id === si.id
+                                        ? { ...x, leadTime: e.target.value }
+                                        : x,
+                                    );
+                                  if (si.isDefault) {
+                                    updated.supplierItem = {
+                                      ...updated.supplierItem,
+                                      leadTime: e.target.value,
+                                    };
+                                  }
+                                  setItemData(updated);
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                              />
+                            ) : (
+                              <span className="text-sm font-semibold text-gray-900">
+                                {si.leadTime || "—"}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                              Is PO
+                            </label>
+                            {editMode ? (
+                              <select
+                                value={si.isPO || "No"}
+                                onChange={(e) => {
+                                  const updated = { ...itemData };
+                                  updated.supplierItems =
+                                    updated.supplierItems.map((x: any) =>
+                                      x.id === si.id
+                                        ? { ...x, isPO: e.target.value }
+                                        : x,
+                                    );
+                                  if (si.isDefault) {
+                                    updated.supplierItem = {
+                                      ...updated.supplierItem,
+                                      isPO: e.target.value,
+                                    };
+                                  }
+                                  setItemData(updated);
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                              >
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                              </select>
+                            ) : (
+                              <span className="text-sm font-semibold text-gray-900">
+                                {si.isPO || "No"}
+                              </span>
+                            )}
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                              URL
+                            </label>
+                            {editMode ? (
+                              <input
+                                type="text"
+                                value={si.url || ""}
+                                onChange={(e) => {
+                                  const updated = { ...itemData };
+                                  updated.supplierItems =
+                                    updated.supplierItems.map((x: any) =>
+                                      x.id === si.id
+                                        ? { ...x, url: e.target.value }
+                                        : x,
+                                    );
+                                  if (si.isDefault) {
+                                    updated.supplierItem = {
+                                      ...updated.supplierItem,
+                                      url: e.target.value,
+                                    };
+                                  }
+                                  setItemData(updated);
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                              />
+                            ) : (
+                              <span className="text-sm text-blue-500 truncate block">
+                                {si.url ? (
+                                  <a
+                                    href={si.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="hover:underline"
+                                  >
+                                    {si.url}
+                                  </a>
+                                ) : (
+                                  "—"
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                              Note (CN)
+                            </label>
+                            {editMode ? (
+                              <input
+                                type="text"
+                                value={si.noteCN || ""}
+                                onChange={(e) => {
+                                  const updated = { ...itemData };
+                                  updated.supplierItems =
+                                    updated.supplierItems.map((x: any) =>
+                                      x.id === si.id
+                                        ? { ...x, noteCN: e.target.value }
+                                        : x,
+                                    );
+                                  if (si.isDefault) {
+                                    updated.supplierItem = {
+                                      ...updated.supplierItem,
+                                      noteCN: e.target.value,
+                                    };
+                                  }
+                                  setItemData(updated);
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                              />
+                            ) : (
+                              <span className="text-sm font-semibold text-gray-900 truncate block">
+                                {si.noteCN || "—"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-2 border-t border-gray-100 pt-4">
+                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="text-xs font-bold text-gray-700">
+                                Supplier Item Catalog
+                              </span>
+                              <span className="text-[11px] font-medium text-gray-500 bg-gray-200/50 px-2 py-0.5 rounded-full">
+                                Total:{" "}
+                                {supplierRelatedItems[Number(si.supplierId)]
+                                  ?.length || 0}{" "}
+                                items
+                              </span>
+                            </div>
+
+                            <div className="relative mb-3">
+                              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                              <input
+                                type="text"
+                                placeholder="Search catalog items..."
+                                value={
+                                  supplierSearchTerms[Number(si.supplierId)] ||
+                                  ""
+                                }
+                                onChange={(e) =>
+                                  setSupplierSearchTerms((prev) => ({
+                                    ...prev,
+                                    [Number(si.supplierId)]: e.target.value,
+                                  }))
+                                }
+                                className="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all"
+                              />
+                            </div>
+
+                            <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                              {loadingSupplierRelatedItems[
+                                Number(si.supplierId)
+                              ] ? (
+                                <div className="py-6 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                                  <div className="w-4 h-4 border-2 border-[#8CC21B] border-t-transparent rounded-full animate-spin"></div>
+                                  Loading items...
+                                </div>
+                              ) : (
+                                (() => {
+                                  const items =
+                                    supplierRelatedItems[
+                                      Number(si.supplierId)
+                                    ] || [];
+                                  const term = (
+                                    supplierSearchTerms[
+                                      Number(si.supplierId)
+                                    ] || ""
+                                  ).toLowerCase();
+                                  const filtered = items.filter(
+                                    (item) =>
+                                      String(item.id).includes(term) ||
+                                      (item.item_name &&
+                                        item.item_name
+                                          .toLowerCase()
+                                          .includes(term)) ||
+                                      (item.name_de &&
+                                        item.name_de
+                                          .toLowerCase()
+                                          .includes(term)),
+                                  );
+
+                                  if (filtered.length === 0) {
+                                    return (
+                                      <div className="py-6 text-center text-xs text-gray-400">
+                                        No items found.
+                                      </div>
+                                    );
+                                  }
+
+                                  return filtered.map((item: any) => {
+                                    const isCurrent =
+                                      Number(item.id) === Number(id);
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        onClick={() =>
+                                          router.push(`/items/${item.id}`)
+                                        }
+                                        className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${
+                                          isCurrent
+                                            ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
+                                            : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
+                                        }`}
+                                      >
+                                        <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
+                                          <span className="font-semibold line-clamp-1 group-hover/item:text-[#8CC21B] transition-colors">
+                                            {item.item_name ||
+                                              item.name_de ||
+                                              "Unnamed Item"}
+                                          </span>
+                                          <span className="text-[10px] text-gray-400 flex items-center gap-2">
+                                            <span>ID: {item.id}</span>
+                                            {item.ean && (
+                                              <span>• EAN: {item.ean}</span>
+                                            )}
+                                          </span>
+                                        </div>
+                                        {isCurrent ? (
+                                          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0">
+                                            Current
+                                          </span>
+                                        ) : (
+                                          <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400 group-hover/item:translate-x-0.5 transition-transform shrink-0" />
+                                        )}
+                                      </div>
+                                    );
+                                  });
+                                })()
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                     <LinkIcon className="h-10 w-10 text-gray-300 mx-auto mb-3" />
@@ -2625,11 +2698,11 @@ const ItemDetailsPage = () => {
                                   <a
                                     href={
                                       finalUrl.includes("cloudinary") &&
-                                        !finalUrl.includes("/raw/")
+                                      !finalUrl.includes("/raw/")
                                         ? finalUrl.replace(
-                                          "/upload/",
-                                          "/upload/fl_attachment/",
-                                        )
+                                            "/upload/",
+                                            "/upload/fl_attachment/",
+                                          )
                                         : finalUrl
                                     }
                                     download={
@@ -2687,11 +2760,11 @@ const ItemDetailsPage = () => {
               </div>
 
               {itemData.pictures &&
-                [
-                  itemData.pictures.shopPicture,
-                  itemData.pictures.ebayPictures,
-                  ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
-                ].filter(Boolean).length > 0 ? (
+              [
+                itemData.pictures.shopPicture,
+                itemData.pictures.ebayPictures,
+                ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
+              ].filter(Boolean).length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {[
                     {
@@ -2717,7 +2790,6 @@ const ItemDetailsPage = () => {
                           src={getCorrectUrl(pic.url)}
                           alt={`Item ${index + 1}`}
                           className="w-full h-full object-contain bg-white"
-
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.src =
@@ -2840,8 +2912,9 @@ const ItemDetailsPage = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
+                uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               <PhotoIcon className="h-4 w-4" />
               {uploadingPictures ? "Uploading..." : "Add Pictures"}
@@ -2982,12 +3055,12 @@ const ItemDetailsPage = () => {
               value={selectedSupplierToLink}
               onChange={(id) => setSelectedSupplierToLink(id)}
               placeholder="Choose a supplier..."
-              initialLabel={
-                (() => {
-                  const s = allSuppliers.find((s) => String(s.id) === String(selectedSupplierToLink));
-                  return s ? (s.company_name || s.name || "") : "";
-                })()
-              }
+              initialLabel={(() => {
+                const s = allSuppliers.find(
+                  (s) => String(s.id) === String(selectedSupplierToLink),
+                );
+                return s ? s.company_name || s.name || "" : "";
+              })()}
             />
             <p className="text-xs text-gray-500 italic">
               Link an additional supplier to this item. You can then set

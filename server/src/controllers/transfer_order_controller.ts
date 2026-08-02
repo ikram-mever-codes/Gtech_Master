@@ -4,7 +4,11 @@ import { AppDataSource } from "../config/database";
 import { TransferOrder } from "../models/transfer_order";
 import { TransferOrderItem } from "../models/transfer_order_items";
 import { CustomerOrder } from "../models/customer_orders";
+import { CustomerOrderItem } from "../models/customer_order_items";
 import { Item } from "../models/items";
+import { Supplier } from "../models/suppliers";
+import { SupplierItem } from "../models/supplier_items";
+import { ReceiverType } from "../models/transfer_order";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import {
   parseFlexibleNumber,
@@ -31,21 +35,19 @@ async function calculateTransferOrderTotals(orderId: number): Promise<void> {
 
   for (const it of items) {
     const qty = Number(it.qty) || 1;
-    const price = Number(it.price) || 0;
+    const price = Number(it.transferPrice ?? it.purchasePrice ?? 0);
     subtotal += qty * price;
     netWeight += (Number(it.weight) || 0) * qty;
     extraWeight += Number(it.extraWeight) || 0;
   }
 
-  const taxAmount = subtotal * ((Number(order.tax_rate) || 19) / 100);
   const round2 = (n: number) =>
     isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
   const round3 = (n: number) =>
     isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 1000) / 1000;
 
   order.subtotal = round2(subtotal);
-  order.tax_amount = round2(taxAmount);
-  order.total_amount = round2(subtotal + taxAmount);
+  order.total_amount = round2(subtotal);
   order.net_weight = round3(netWeight);
   order.extra_weight = round3(extraWeight);
   order.total_weight = round3(netWeight + extraWeight);
@@ -65,6 +67,7 @@ export const createTransferOrderFromAuftrag = async (
   try {
     const { auftragId } = req.params;
     const { selectedItems } = req.body;
+    console.log("Selected Items:", JSON.stringify(selectedItems, null, 2));
 
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       res.status(400).json({
@@ -90,7 +93,7 @@ export const createTransferOrderFromAuftrag = async (
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const defaultPrefix = `T${yy}${mm}-`;
 
-    let orderNo = "";
+    let orderNo: any = "";
     try {
       orderNo = await NumberSequenceService.getNextNumber("transfer_order");
     } catch (err) {
@@ -103,9 +106,37 @@ export const createTransferOrderFromAuftrag = async (
 
     const orderItemsToCreate: Partial<TransferOrderItem>[] = [];
 
-    selectedItems.forEach((selItem: any, idx: number) => {
+    // Filter selectedItems to only include catalog items (those with sourceItemId)
+    // Freizeile (freetext) items have no sourceItemId and should be skipped
+    const catalogItems = selectedItems.filter((selItem: any) => {
+      // Use sourceLineItemId (not lineItemId) to find the line item
       const lineItem = (auftrag.orderItems || []).find(
-        (li) => String(li.id) === String(selItem.lineItemId),
+        (li) => String(li.id) === String(selItem.sourceLineItemId),
+      );
+      // Only include if the line item has a sourceItemId (catalog item)
+      return lineItem && lineItem.sourceItemId;
+    });
+
+    if (catalogItems.length === 0) {
+      res.status(400).json({
+        success: false,
+        message:
+          "No catalog items selected for Bestellung. Freizeile items cannot be transferred.",
+      });
+      return;
+    }
+
+    // Log warning about skipped Freizeile items
+    const skippedCount = selectedItems.length - catalogItems.length;
+    if (skippedCount > 0) {
+      console.warn(
+        `Skipped ${skippedCount} Freizeile item(s) (no sourceItemId) while creating Bestellung from Auftrag ${auftragId}`,
+      );
+    }
+
+    catalogItems.forEach((selItem: any, idx: number) => {
+      const lineItem = (auftrag.orderItems || []).find(
+        (li) => String(li.id) === String(selItem.sourceLineItemId),
       );
 
       const qty = Number(selItem.qty ?? selItem.quantity) || 1;
@@ -113,21 +144,40 @@ export const createTransferOrderFromAuftrag = async (
       const lineTotal = qty * price;
 
       orderItemsToCreate.push({
-        itemName: lineItem ? lineItem.itemName : selItem.itemName || "Item",
-        material: lineItem?.material || "",
-        itemNo: lineItem?.itemNo || lineItem?.material || "",
-        photo: lineItem?.photo || undefined,
-        specification: lineItem?.specification || "",
-        description: lineItem?.description || "",
-        weight: lineItem?.weight || undefined,
-        qty,
+        // Core identification
+        sourceLineItemId: lineItem?.id || selItem.sourceLineItemId || undefined,
+        sourceItemId:
+          lineItem?.sourceItemId || selItem.sourceItemId || undefined,
+
+        // Basic item info - use values from selItem first, then lineItem as fallback
+        itemName: selItem.itemName || lineItem?.itemName || "Item",
+        itemNo: selItem.itemNo || lineItem?.itemNo || lineItem?.material || "",
+        material: selItem.material || lineItem?.material || "",
+        photo: selItem.photo || lineItem?.photo || undefined,
+        specification: selItem.specification || lineItem?.specification || "",
+        description: selItem.description || lineItem?.description || "",
+        notes: selItem.notes || lineItem?.notes || "",
+        // remark_order_item:
+        // selItem.remark_order_item || lineItem?.remark_order_item || "",
+
+        // Quantities
+        qty: qty,
         max_qty: qty,
-        price,
-        lineTotal,
+
+        // Weights
+        weight: selItem.weight || lineItem?.weight || undefined,
+        extraWeight: selItem.extraWeight || lineItem?.extraWeight || 0,
+
+        // Pricing - use values from selItem first
+        transferPrice: selItem.transferPrice || selItem.price || price,
+        // purchasePrice: selItem.purchasePrice || lineItem?.purchasePrice || undefined,
+        // purchaseCurrency: selItem.purchaseCurrency || lineItem?.purchaseCurrency || "EUR",
+
+        // Line total
+        lineTotal: lineTotal,
+
+        // Position
         position: idx + 1,
-        sourceLineItemId: lineItem?.id || undefined,
-        sourceItemId: lineItem?.sourceItemId || undefined,
-        notes: lineItem?.notes || "",
       });
     });
 
@@ -137,7 +187,7 @@ export const createTransferOrderFromAuftrag = async (
       .toString()
       .padStart(2, "0")}.${now.getFullYear()}`;
 
-    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+    const transferOrderRepo: any = AppDataSource.getRepository(TransferOrder);
     const transferOrder = transferOrderRepo.create({
       order_no: orderNo,
       auftrag_id: auftrag.id,
@@ -146,14 +196,15 @@ export const createTransferOrderFromAuftrag = async (
       title: auftrag.title,
       status: "draft",
       currency: auftrag.currency || "EUR",
-      tax_rate: Number(auftrag.tax_rate ?? 19),
       notes: auftrag.notes || "",
       customerSnapshot: auftrag.customerSnapshot || null,
       date_created: dateCreatedStr,
       date_delivery: auftrag.date_delivery,
+      highlight_color: auftrag.highlight_color || "",
+      deliveryAddress: auftrag.deliveryAddress || null,
     });
 
-    const savedOrder = await transferOrderRepo.save(transferOrder);
+    const savedOrder: any = await transferOrderRepo.save(transferOrder);
 
     const transferOrderItemRepo =
       AppDataSource.getRepository(TransferOrderItem);
@@ -165,19 +216,23 @@ export const createTransferOrderFromAuftrag = async (
       }),
     );
     await transferOrderItemRepo.save(itemEntities);
+
+    // After creating the order, refresh purchase prices based on receiver
+    await refreshLineItemPurchasePrices(savedOrder.id);
     await calculateTransferOrderTotals(savedOrder.id);
 
     const fullOrder = await transferOrderRepo.findOne({
       where: { id: savedOrder.id },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "supplier"],
     });
 
     res.status(201).json({
       success: true,
-      message: `Bestellung ${orderNo} created successfully`,
+      message: `Bestellung ${orderNo} created successfully with ${orderItemsToCreate.length} catalog item(s)${skippedCount > 0 ? ` (${skippedCount} Freizeile item(s) skipped)` : ""}`,
       data: fullOrder,
     });
   } catch (error) {
+    console.error("Error creating Bestellung from Auftrag:", error);
     next(error);
   }
 };
@@ -195,7 +250,7 @@ export const getAllTransferOrders = async (
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const orders = await transferOrderRepo.find({
       order: { created_at: "DESC" },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "supplier"],
     });
     res.json({ success: true, data: orders });
   } catch (error) {
@@ -213,7 +268,7 @@ export const getTransferOrderById = async (
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const order = await transferOrderRepo.findOne({
       where: { id: Number(id) },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "supplier"],
     });
 
     if (!order) {
@@ -228,7 +283,6 @@ export const getTransferOrderById = async (
       });
       if (updated) {
         order.subtotal = updated.subtotal;
-        order.tax_amount = updated.tax_amount;
         order.total_amount = updated.total_amount;
         order.net_weight = updated.net_weight;
         order.extra_weight = updated.extra_weight;
@@ -275,17 +329,17 @@ export const updateTransferOrder = async (
       title,
       status,
       currency,
-      taxRate,
       notes,
       dateDelivery,
       highlightColor,
       receiver,
+      supplierId,
     } = req.body;
 
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const bestellung = await transferOrderRepo.findOne({
       where: { id: Number(id) },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "supplier"],
     });
 
     if (!bestellung) {
@@ -300,19 +354,57 @@ export const updateTransferOrder = async (
     if (dateDelivery !== undefined) bestellung.date_delivery = dateDelivery;
     if (highlightColor !== undefined)
       bestellung.highlight_color = highlightColor;
-    if (receiver !== undefined) bestellung.receiver = receiver;
 
-    const taxRateChanged =
-      taxRate !== undefined && Number(taxRate) !== Number(bestellung.tax_rate);
-    if (taxRate !== undefined)
-      bestellung.tax_rate = parseFlexibleNumber(taxRate) ?? 19;
+    let receiverOrSupplierChanged = false;
+
+    if (receiver !== undefined) {
+      if (!Object.values(ReceiverType).includes(receiver)) {
+        res.status(400).json({
+          success: false,
+          message: `receiver must be one of: ${Object.values(ReceiverType).join(", ")}`,
+        });
+        return;
+      }
+      if (bestellung.receiver !== receiver) {
+        bestellung.receiver = receiver;
+        receiverOrSupplierChanged = true;
+      }
+      if (receiver === ReceiverType.GTECH_HK) {
+        bestellung.supplier_id = undefined;
+      }
+    }
+
+    if (supplierId !== undefined) {
+      const supplierRepo = AppDataSource.getRepository(Supplier);
+      if (supplierId === null) {
+        bestellung.supplier_id = undefined;
+        receiverOrSupplierChanged = true;
+      } else {
+        const supplier = await supplierRepo.findOne({
+          where: { id: Number(supplierId) },
+        });
+        if (!supplier) {
+          res
+            .status(404)
+            .json({ success: false, message: "Supplier not found" });
+          return;
+        }
+        if (Number(bestellung.supplier_id) !== Number(supplierId)) {
+          bestellung.supplier_id = Number(supplierId);
+          receiverOrSupplierChanged = true;
+        }
+      }
+    }
 
     await transferOrderRepo.save(bestellung);
-    if (taxRateChanged) await calculateTransferOrderTotals(bestellung.id);
+
+    if (receiverOrSupplierChanged) {
+      await refreshLineItemPurchasePrices(bestellung.id);
+    }
 
     const fullOrder = await transferOrderRepo.findOne({
       where: { id: bestellung.id },
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "supplier"],
     });
 
     res.json({
@@ -360,7 +452,6 @@ export const createTransferOrderLineItem = async (
       ) + 1;
 
     const qty = parseFlexibleNumber(body.qty) || 1;
-    const price = parseFlexibleNumberOrZero(body.price);
 
     const orderItemRepo = AppDataSource.getRepository(TransferOrderItem);
     const lineItem = orderItemRepo.create({
@@ -377,7 +468,6 @@ export const createTransferOrderLineItem = async (
           : undefined,
       qty,
       max_qty: qty,
-      price,
       transferPrice:
         body.transferPrice !== undefined
           ? (parseFlexibleNumber(body.transferPrice) ?? undefined)
@@ -386,7 +476,7 @@ export const createTransferOrderLineItem = async (
         body.purchasePrice !== undefined
           ? (parseFlexibleNumber(body.purchasePrice) ?? undefined)
           : undefined,
-      lineTotal: qty * price,
+      remark_order_item: body.remark_order_item || "",
       position: nextPosition,
       sourceItemId: body.sourceItemId || undefined,
       notes: body.notes,
@@ -439,8 +529,6 @@ export const updateTransferOrderLineItem = async (
     if (body.notes !== undefined) lineItem.notes = body.notes;
     if (body.qty !== undefined)
       lineItem.qty = parseFlexibleNumber(body.qty) || 1;
-    if (body.price !== undefined)
-      lineItem.price = parseFlexibleNumberOrZero(body.price);
     if (body.extraWeight !== undefined)
       lineItem.extraWeight = parseFlexibleNumberOrZero(body.extraWeight);
     if (body.transferPrice !== undefined)
@@ -449,8 +537,8 @@ export const updateTransferOrderLineItem = async (
     if (body.purchasePrice !== undefined)
       lineItem.purchasePrice =
         parseFlexibleNumber(body.purchasePrice) ?? undefined;
-
-    lineItem.lineTotal = Number(lineItem.qty) * Number(lineItem.price);
+    if (body.remark_order_item !== undefined)
+      lineItem.remark_order_item = body.remark_order_item;
 
     const updated = await orderItemRepo.save(lineItem);
     await calculateTransferOrderTotals(order.id);
@@ -537,3 +625,55 @@ export const updateTransferOrderStatus = async (
     next(error);
   }
 };
+
+async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
+  const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+  const order = await transferOrderRepo.findOne({
+    where: { id: orderId },
+    relations: ["orderItems"],
+  });
+  if (!order) return;
+
+  const items = order.orderItems || [];
+  const catalogLines = items.filter((li) => !!li.sourceItemId);
+  if (catalogLines.length === 0) return;
+
+  const itemRepo = AppDataSource.getRepository(Item);
+  const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+  const orderItemRepo = AppDataSource.getRepository(TransferOrderItem);
+
+  const sourceIds = catalogLines.map((li) => parseInt(li.sourceItemId!, 10));
+
+  if (order.receiver === ReceiverType.SUPPLIER && order.supplier_id) {
+    const supplierItems = await supplierItemRepo.find({
+      where: { item_id: In(sourceIds), supplier_id: order.supplier_id },
+    });
+    const bySourceId = new Map(
+      supplierItems.map((si) => [String(si.item_id), si]),
+    );
+
+    for (const li of catalogLines) {
+      const match = bySourceId.get(String(li.sourceItemId));
+      li.purchasePrice = match ? Number(match.price_rmb) || 0 : undefined;
+      li.purchaseCurrency = match ? match.currency : undefined;
+      await orderItemRepo.save(li);
+    }
+  } else {
+    const sourceItems = await itemRepo.find({
+      where: { id: In(sourceIds) },
+      select: ["id", "transfer_price_EUR"],
+    });
+    const bySourceId = new Map(
+      sourceItems.map((it: any) => [String(it.id), it]),
+    );
+
+    for (const li of catalogLines) {
+      const match = bySourceId.get(String(li.sourceItemId));
+      li.purchasePrice = match
+        ? Number(match.transfer_price_EUR) || 0
+        : undefined;
+      li.purchaseCurrency = "EUR";
+      await orderItemRepo.save(li);
+    }
+  }
+}

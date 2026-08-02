@@ -77,15 +77,6 @@ export class TransferOrderItem {
     type: "decimal",
     precision: 12,
     scale: 3,
-    default: 0,
-    transformer: numericTransformer,
-  })
-  price!: number;
-
-  @Column({
-    type: "decimal",
-    precision: 12,
-    scale: 3,
     nullable: true,
     transformer: numericTransformer,
   })
@@ -99,6 +90,13 @@ export class TransferOrderItem {
     transformer: numericTransformer,
   })
   purchasePrice?: number;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  purchaseCurrency?: string;
+
+  // --- NEW FIELD: Remark for order item ---
+  @Column({ type: "text", nullable: true })
+  remark_order_item?: string;
 
   @Column({
     type: "decimal",

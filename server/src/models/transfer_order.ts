@@ -10,7 +10,13 @@ import {
 } from "typeorm";
 import { TransferOrderItem } from "./transfer_order_items";
 import { Customer } from "./customers";
+import { Supplier } from "./suppliers";
 import { numericTransformer } from "../utils/numeric-transformer";
+
+export enum ReceiverType {
+  GTECH_HK = "Gtech Hong Kong",
+  SUPPLIER = "Supplier",
+}
 
 @Entity({ name: "transfer_orders" })
 export class TransferOrder {
@@ -41,15 +47,6 @@ export class TransferOrder {
 
   @Column({
     type: "decimal",
-    precision: 5,
-    scale: 2,
-    default: 19,
-    transformer: numericTransformer,
-  })
-  tax_rate!: number;
-
-  @Column({
-    type: "decimal",
     precision: 12,
     scale: 2,
     default: 0,
@@ -64,18 +61,7 @@ export class TransferOrder {
     default: 0,
     transformer: numericTransformer,
   })
-  tax_amount!: number;
-
-  @Column({
-    type: "decimal",
-    precision: 12,
-    scale: 2,
-    default: 0,
-    transformer: numericTransformer,
-  })
   total_amount!: number;
-
-  // --- NEW FIELDS ---
 
   @Column({ type: "varchar", length: 255, nullable: true })
   title?: string;
@@ -125,8 +111,24 @@ export class TransferOrder {
     contactPhone?: string;
   };
 
-  @Column({ type: "varchar", length: 255, default: "Gtech Hong Kong" })
-  receiver!: string;
+  // Replaces the old plain string default — "Gtech Hong Kong" stays the
+  // default receiver, but the value is now constrained to these two
+  // options, and "Supplier" unlocks the supplier_id relation below.
+  @Column({
+    type: "enum",
+    enum: ReceiverType,
+    default: ReceiverType.GTECH_HK,
+  })
+  receiver!: ReceiverType;
+
+  // Only meaningful when receiver = ReceiverType.SUPPLIER. Nullable
+  // because it's unset while receiver is Gtech Hong Kong.
+  @Column({ type: "int", nullable: true })
+  supplier_id?: number;
+
+  @ManyToOne(() => Supplier, { nullable: true })
+  @JoinColumn({ name: "supplier_id" })
+  supplier?: Supplier;
 
   @Column({ type: "text", nullable: true })
   notes?: string;

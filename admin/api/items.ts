@@ -179,6 +179,7 @@ export interface ItemDetails {
     priceRMB: string;
     isPO: string;
     moq: string;
+    currency: string;
     interval: string;
     leadTime: string;
     noteCN: string;
@@ -245,6 +246,7 @@ export const invalidateItemsCache = () => {
   itemsCache.clear();
   itemsInFlight.clear();
 };
+
 export const getItems = async (
   params?: {
     page?: number;
@@ -265,6 +267,7 @@ export const getItems = async (
     isLabel?: string;
     isStock?: string;
     company?: string;
+    ids?: string;
   },
   options?: { refresh?: boolean },
 ) => {

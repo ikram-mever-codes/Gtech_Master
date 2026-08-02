@@ -95,8 +95,8 @@ import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import {
   getAllTransferOrders,
   updateTransferOrderStatus,
-  createBestellungFromAuftrag,
 } from "@/api/transfer_orders";
+import { createTransferOrderFromAuftrag as createBestellungFromAuftrag } from "@/api/transfer_orders";
 import { getAllRechnungen, getLieferscheine } from "@/api/rechnungen";
 import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
 import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
@@ -466,6 +466,7 @@ const InvoiceListPage: React.FC = () => {
   // asked that a successful conversion switch to the Bestellung tab and
   // open the new Bestellung directly, same as the Angebot→Auftrag flow.
   const handleDirectConvertAuftragToBestellung = async (auftrag: any) => {
+    console.log(auftrag);
     if (
       !window.confirm(
         `Convert Auftrag ${auftrag.order_no} directly to Bestellung?`,
@@ -473,20 +474,34 @@ const InvoiceListPage: React.FC = () => {
     )
       return;
     try {
-      const items = (auftrag.orderItems || auftrag.items || []).map(
-        (it: any) => ({
+      const items = (auftrag.orderItems || auftrag.items || [])
+        .filter((it: any) => it.sourceItemId) // Only include catalog items (skip Freizeile)
+        .map((it: any) => ({
           sourceLineItemId: String(it.id),
+          sourceItemId: it.sourceItemId || undefined,
           qty: Number(it.quantity || it.qty) || 1,
           max_qty: Number(it.quantity || it.qty) || 1,
-          price: Number(it.price || 0),
           itemName: it.itemName || it.item_name || "Line Item",
-        }),
-      );
-      const res: any = await createBestellungFromAuftrag(
-        auftrag.id,
-        items,
-        auftrag.notes || "",
-      );
+          itemNo: it.itemNo || it.material || "",
+          material: it.material || "",
+          photo: it.photo || undefined,
+          specification: it.specification || "",
+          description: it.description || "",
+          weight: it.weight || undefined,
+          extraWeight: it.extraWeight || 0,
+          notes: it.notes || "",
+          remark_order_item: it.remark_order_item || "",
+          // Price fields
+          price: Number(it.price) || 0,
+          transferPrice: Number(it.price) || 0, // Default to same as price
+          purchasePrice: it.purchasePrice || undefined,
+          purchaseCurrency: it.purchaseCurrency || "EUR",
+          // Position
+          position: it.position || 1,
+        }));
+
+      console.log(items);
+      const res: any = await createBestellungFromAuftrag(auftrag.id, items);
       if (res?.success) {
         toast.success(
           res.message || `Auftrag ${auftrag.order_no} converted to Bestellung!`,
@@ -511,7 +526,7 @@ const InvoiceListPage: React.FC = () => {
   // tab renders.
   const handleUpdateBestellungStatus = async (
     id: string | number,
-    status: string,
+    status: any,
   ) => {
     try {
       await updateTransferOrderStatus(id, status);

@@ -20,6 +20,8 @@ router.put("/:id", updateTransferOrder);
 router.put("/:id/status", updateTransferOrderStatus);
 router.delete("/:id", deleteTransferOrder);
 
+router.patch("/:id/status", updateTransferOrderStatus);
+
 router.post("/:orderId/line-items", createTransferOrderLineItem);
 router.put("/:orderId/line-items/:lineItemId", updateTransferOrderLineItem);
 router.delete("/:orderId/line-items/:lineItemId", deleteTransferOrderLineItem);

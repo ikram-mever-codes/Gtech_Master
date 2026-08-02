@@ -17,13 +17,13 @@ import {
   createTransferOrderLineItem,
   updateTransferOrderLineItem,
   deleteTransferOrderLineItem,
-  formatCurrency,
 } from "@/api/transfer_orders";
 import { getItems } from "@/api/items";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { parseFlexibleNumber } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
+import { formatCurrency } from "@/api/customer_orders";
 
 interface BestellungPreviewModalProps {
   isOpen: boolean;
@@ -55,6 +55,27 @@ const toDateInputValue = (value: any): string => {
   const d = new Date(value);
   if (isNaN(d.getTime())) return "";
   return d.toISOString().split("T")[0];
+};
+
+const currencySymbol = (currency?: string | null): string =>
+  currency === "USD"
+    ? "$"
+    : currency === "RMB"
+      ? "¥"
+      : currency === "EUR"
+        ? "€"
+        : "";
+
+const formatPrice = (
+  price: number | null | undefined,
+  currency?: string | null,
+): string => {
+  if (price === null || price === undefined) return "—";
+  const symbol = currencySymbol(currency);
+  return `${symbol}${Number(price).toLocaleString("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 const Field: React.FC<{
@@ -153,7 +174,8 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
 
 const getLineItemTotal = (item: any): number => {
   const qty = parseFlexibleNumber(item?.qty) ?? 1;
-  const price = parseFlexibleNumber(item?.price) ?? 0;
+  const price =
+    parseFlexibleNumber(item?.transferPrice ?? item?.purchasePrice ?? 0) ?? 0;
   return qty * price;
 };
 
@@ -173,7 +195,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [itemPickerSearch, setItemPickerSearch] = useState("");
   const [items, setItems] = useState<any[]>([]);
-  const [newLine, setNewLine] = useState({ itemName: "", qty: "1" });
+  const [newLine, setNewLine] = useState({ itemName: "", qty: 0 });
+
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     if (!orderId) return;
@@ -199,6 +224,71 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     fetchOrder();
   }, [isOpen, orderId, fetchOrder, initialEdit]);
 
+  // Load suppliers - only those associated with items in this order
+  useEffect(() => {
+    if (!isOpen || !order?.orderItems?.length) return;
+    (async () => {
+      setLoadingSuppliers(true);
+      try {
+        // Get all sourceItemIds from the order items
+        const sourceItemIds = order.orderItems
+          .filter((li: any) => li.sourceItemId)
+          .map((li: any) => Number(li.sourceItemId))
+          .filter((id: number) => !isNaN(id));
+
+        if (sourceItemIds.length === 0) {
+          setSuppliers([]);
+          setLoadingSuppliers(false);
+          return;
+        }
+
+        // Fetch items with their supplier relations
+        const { getItems } = await import("@/api/items");
+        const itemsRes: any = await getItems({
+          ids: sourceItemIds.join(","),
+          limit: 1000,
+        });
+
+        const itemsData = Array.isArray(itemsRes?.data) ? itemsRes.data : [];
+
+        // Collect all supplier IDs from the items
+        const supplierIds = new Set<number>();
+        itemsData.forEach((item: any) => {
+          if (item.supplier_id) {
+            supplierIds.add(Number(item.supplier_id));
+          }
+          // Also check supplierItems relation if available
+          if (item.supplierItems) {
+            item.supplierItems.forEach((si: any) => {
+              if (si.supplierId) {
+                supplierIds.add(Number(si.supplierId));
+              }
+            });
+          }
+        });
+
+        // Fetch supplier details
+        if (supplierIds.size > 0) {
+          const { getAllSuppliers } = await import("@/api/suppliers");
+          const suppliersRes: any = await getAllSuppliers({
+            ids: Array.from(supplierIds).join(","),
+            limit: 1000,
+          });
+          setSuppliers(
+            Array.isArray(suppliersRes?.data) ? suppliersRes.data : [],
+          );
+        } else {
+          setSuppliers([]);
+        }
+      } catch (e) {
+        console.error("Failed to load suppliers:", e);
+        setSuppliers([]);
+      } finally {
+        setLoadingSuppliers(false);
+      }
+    })();
+  }, [isOpen, order?.orderItems]);
+
   useEffect(() => {
     if (!showItemPicker || items.length > 0) return;
     (async () => {
@@ -218,10 +308,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       title: o.title || "",
       status: o.status || "draft",
       currency: o.currency || "EUR",
-      taxRate: o.tax_rate ?? 19,
       notes: o.notes || "",
       highlightColor: o.highlight_color || "",
-      receiver: o.receiver || "",
+      receiver: o.receiver || "Gtech Hong Kong",
+      supplierId: o.supplier_id ?? null,
       dateDelivery: o.date_delivery || "",
     };
   }
@@ -247,17 +337,21 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       toast.error("Title can't be empty.", errorStyles);
       return;
     }
+    if (form.receiver === "Supplier" && !form.supplierId) {
+      toast.error("Select a supplier for this Bestellung.", errorStyles);
+      return;
+    }
     setSaving(true);
     try {
       const res = await updateTransferOrder(order.id, {
         title: form.title,
         status: form.status,
         currency: form.currency,
-        taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
         notes: form.notes,
         highlightColor: form.highlightColor ?? "",
-        receiver: form.receiver,
         dateDelivery: form.dateDelivery,
+        receiver: form.receiver,
+        supplierId: form.receiver === "Supplier" ? form.supplierId : null,
       });
       if (res.success) {
         toast.success("Bestellung updated successfully.", successStyles);
@@ -330,10 +424,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     try {
       await createTransferOrderLineItem(order.id, {
         itemName: newLine.itemName.trim(),
-        qty: newLine.qty?.trim() || "1",
-        price: 0,
+        qty: Number(newLine.qty) || 0,
       });
-      setNewLine({ itemName: "", qty: "1" });
+      setNewLine({ itemName: "", qty: 0 });
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -347,7 +440,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
         itemName: it.item_name || it.itemName || "Item",
         material: it.model || (it.ean ? String(it.ean) : undefined),
         itemNo: it.model || undefined,
-        price: 0,
         weight: it.weight,
         sourceItemId: String(it.id),
       });
@@ -371,6 +463,40 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     }
   };
 
+  // Calculate totals from line items
+  const calculateTotals = useCallback(() => {
+    const items = order?.orderItems || [];
+    let total = 0;
+    let firstCurrency = "EUR";
+    let allSameCurrency = true;
+
+    items.forEach((item: any) => {
+      const qty = parseFlexibleNumber(item?.qty) ?? 1;
+      const price =
+        parseFlexibleNumber(item?.transferPrice ?? item?.purchasePrice ?? 0) ??
+        0;
+      const lineTotal = qty * price;
+      total += lineTotal;
+
+      // Track currency for display
+      const itemCurrency =
+        order?.receiver === "Supplier" ? item.purchaseCurrency || "EUR" : "EUR";
+
+      if (firstCurrency === "EUR") {
+        firstCurrency = itemCurrency;
+      } else if (firstCurrency !== itemCurrency) {
+        allSameCurrency = false;
+      }
+    });
+
+    // If multiple currencies, default to EUR for display
+    const displayCurrency = allSameCurrency ? firstCurrency : "EUR";
+
+    return { total, displayCurrency };
+  }, [order?.orderItems, order?.receiver]);
+
+  const { total: displayTotal, displayCurrency } = calculateTotals();
+
   if (loading || !order) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -386,12 +512,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     .slice()
     .sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
 
-  const taxRate =
-    parseFlexibleNumber(form.taxRate) ?? Number(order.tax_rate ?? 19);
-  const displaySubtotal = Number(order.subtotal || 0);
-  const displayTax = displaySubtotal * (taxRate / 100);
-  const displayTotal = displaySubtotal + displayTax;
-
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -401,12 +521,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               <p className="text-lg font-bold text-gray-900 truncate">
                 Bestellung {order.order_no}
               </p>
-              {order.auftrag_no && (
-                <span className="text-sm font-bold text-gray-900 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
-                  <LinkIcon className="h-3 w-3" />
-                  {order.auftrag_no}
-                </span>
-              )}
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
               {order.title}
@@ -436,7 +550,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
         </div>
 
         <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
-          {/* No customer snapshot / delivery address section for Bestellung. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
             <Field label="Title" edit={edit} value={order.title}>
               <input
@@ -470,19 +583,61 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 onChange={(e) => patch({ dateDelivery: e.target.value })}
               />
             </Field>
-            <Field label="Receiver" edit={edit} value={order.receiver}>
-              <input
+
+            <Field
+              label="Receiver"
+              edit={edit}
+              value={
+                order.receiver === "Supplier"
+                  ? `Supplier — ${order.supplier?.company_name || order.supplier?.name || "—"}`
+                  : order.receiver
+              }
+            >
+              <select
                 className={inputCls}
                 value={form.receiver}
-                onChange={(e) => patch({ receiver: e.target.value })}
-              />
+                onChange={(e) => {
+                  const val = e.target.value;
+                  patch({
+                    receiver: val,
+                    supplierId: val === "Supplier" ? form.supplierId : null,
+                  });
+                }}
+              >
+                <option value="Gtech Hong Kong">Gtech Hong Kong</option>
+                <option value="Supplier">Supplier</option>
+              </select>
             </Field>
-            <Field label="Tax rate" edit={edit} value={`${order.tax_rate}%`}>
-              <DecimalInput
-                value={form.taxRate}
-                onCommit={(raw) => patch({ taxRate: raw })}
-              />
-            </Field>
+
+            {form.receiver === "Supplier" && (
+              <Field
+                label="Supplier"
+                edit={edit}
+                value={order.supplier?.company_name || order.supplier?.name}
+              >
+                <select
+                  className={inputCls}
+                  value={form.supplierId ?? ""}
+                  onChange={(e) =>
+                    patch({
+                      supplierId: e.target.value
+                        ? Number(e.target.value)
+                        : null,
+                    })
+                  }
+                  disabled={loadingSuppliers}
+                >
+                  <option value="">
+                    {loadingSuppliers ? "Loading…" : "Select supplier…"}
+                  </option>
+                  {suppliers.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.company_name || s.name || `Supplier #${s.id}`}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -505,11 +660,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
                       Hinweis
                     </th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                      Remark
+                    </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
                       Menge
                     </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-                      Netto-Preis
+                      Price
                     </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                       Netto gesamt
@@ -521,7 +679,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   {visibleLineItems.length === 0 && (
                     <tr>
                       <td
-                        colSpan={edit ? 9 : 8}
+                        colSpan={edit ? 11 : 10}
                         className="text-center py-6 text-sm text-gray-500"
                       >
                         No line items yet.
@@ -534,15 +692,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     const qtyDisplay = Math.round(
                       parseFlexibleNumber(item.qty) ?? 1,
                     );
+                    // Determine currency for this line item
+                    const lineCurrency =
+                      order.receiver === "Supplier"
+                        ? item.purchaseCurrency || "EUR"
+                        : "EUR";
                     return (
-                      <tr
-                        key={item.id}
-                        style={
-                          isFreetext
-                            ? { backgroundColor: "#D8964A" }
-                            : undefined
-                        }
-                      >
+                      <tr key={item.id}>
                         <td className="px-2 py-2 text-gray-500">
                           {item.position}
                         </td>
@@ -592,7 +748,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           {edit ? (
                             <TextCellInput
                               value={item.notes}
-                              placeholder="Remark"
+                              placeholder="Hinweis"
                               onCommit={(raw) =>
                                 persistLine(item.id, { notes: raw })
                               }
@@ -600,6 +756,21 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           ) : (
                             <span className="text-gray-600">
                               {item.notes || "—"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {edit ? (
+                            <TextCellInput
+                              value={item.remark_order_item}
+                              placeholder="Remark"
+                              onCommit={(raw) =>
+                                persistLine(item.id, { remark_order_item: raw })
+                              }
+                            />
+                          ) : (
+                            <span className="text-gray-600">
+                              {item.remark_order_item || "—"}
                             </span>
                           )}
                         </td>
@@ -618,26 +789,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                             <div className="text-right">{qtyDisplay}</div>
                           )}
                         </td>
-                        <td className="px-2 py-2">
-                          {edit ? (
-                            <DecimalInput
-                              className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
-                              value={item.price}
-                              onCommit={(raw) => {
-                                const parsed = parseFlexibleNumber(raw);
-                                persistLine(item.id, {
-                                  price: parsed === null ? "0" : raw,
-                                });
-                              }}
-                            />
-                          ) : (
-                            <div className="text-right">
-                              {formatCurrency(item.price || 0, order.currency)}
-                            </div>
-                          )}
+                        <td className="px-2 py-2 text-right text-gray-600">
+                          {item.sourceItemId
+                            ? formatPrice(item.purchasePrice, lineCurrency)
+                            : "—"}
                         </td>
                         <td className="px-2 py-2 text-right font-medium">
-                          {formatCurrency(total || 0, order.currency)}
+                          {formatPrice(total, lineCurrency)}
                         </td>
                         {edit && (
                           <td className="px-2 py-2 text-center">
@@ -780,21 +938,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               />
             </div>
             <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">
-                  {formatCurrency(displaySubtotal, order.currency)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">VAT ({taxRate}%)</span>
-                <span className="font-medium">
-                  {formatCurrency(displayTax, order.currency)}
-                </span>
-              </div>
-              <div className="border-t pt-2 flex justify-between font-bold text-lg">
+              <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>{formatCurrency(displayTotal, order.currency)}</span>
+                <span>{formatPrice(displayTotal, displayCurrency)}</span>
               </div>
             </div>
           </div>
