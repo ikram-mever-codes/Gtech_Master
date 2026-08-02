@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { getAllSystemParameters, SystemColourItem } from "@/api/system_parameters";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 export const DEFAULT_DYNAMIC_COLOURS: SystemColourItem[] = [
   { id: "1", name: "GTech Green", hex: "#8CC21B" },
@@ -33,7 +34,7 @@ export default function SystemColourSelect({
       try {
         const res: any = await getAllSystemParameters();
         const palette = res?.data?.find((p: any) => p.key === "system_colours")?.value;
-        
+
         if (Array.isArray(palette) && palette.length > 0) {
           setOptions(palette);
         } else if (palette && typeof palette === "object") {
@@ -72,7 +73,7 @@ export default function SystemColourSelect({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       {matched && (
         <span
           className="w-5 h-5 rounded-md border border-black/10 shrink-0 transition-all"
@@ -83,17 +84,27 @@ export default function SystemColourSelect({
         value={matched ? matched.hex : ""}
         onChange={(e) => {
           const hex = e.target.value;
-          if (hex) onChange(hex);
+          onChange(hex);
         }}
-        className="text-xs font-medium border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-[#8CC21B] transition-all min-w-[160px]"
+        className="text-xs font-medium border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-[#8CC21B] transition-all min-w-[150px]"
       >
-        <option value="">Select colour…</option>
+        <option value="">No colour</option>
         {options.map((opt) => (
           <option key={opt.id || opt.name} value={opt.hex}>
             {opt.name}
           </option>
         ))}
       </select>
+      {(matched || (value && value !== "")) && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          title="Clear colour"
+          className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+        >
+          <XMarkIcon className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 }

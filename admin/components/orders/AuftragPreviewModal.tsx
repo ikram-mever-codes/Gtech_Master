@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import {
   getCustomerOrderById,
   updateCustomerOrder,
@@ -697,12 +698,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
             </h2>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
-            <input
-              type="color"
-              value={order.highlight_color || "#ffffff"}
-              onChange={(e) => setHighlightColor(e.target.value)}
-              title="Auftrag highlight color"
-              className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+            <SystemColourSelect
+              value={order.highlight_color}
+              onChange={setHighlightColor}
+              edit={edit}
             />
             <ViewEditToggle
               isEditEnabled={edit}
