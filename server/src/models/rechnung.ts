@@ -41,16 +41,40 @@ export class Rechnung {
   @Column({ type: "varchar", length: 50, nullable: true })
   warehouse?: string;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   subtotal!: number;
 
-  @Column({ type: "decimal", precision: 5, scale: 2, default: 19, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
+    default: 19,
+    transformer: numericTransformer,
+  })
   tax_rate!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   tax_amount!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   total_amount!: number;
 
   @Column({ type: "varchar", length: 50, default: "EUR" })
@@ -71,14 +95,21 @@ export class Rechnung {
   @Column({ type: "uuid", nullable: true })
   rechnung_customer_id?: string;
 
-  @ManyToOne(() => RechnungCustomer, (customer: RechnungCustomer) => customer.rechnungen, {
-    nullable: true,
-    cascade: true,
-  })
+  @ManyToOne(
+    () => RechnungCustomer,
+    (customer: RechnungCustomer) => customer.rechnungen,
+    {
+      nullable: true,
+      cascade: true,
+    },
+  )
   @JoinColumn({ name: "rechnung_customer_id" })
   customer?: RechnungCustomer | null;
 
-  @OneToMany(() => RechnungItem, (item: RechnungItem) => item.rechnung, { cascade: true, eager: true })
+  @OneToMany(() => RechnungItem, (item: RechnungItem) => item.rechnung, {
+    cascade: true,
+    eager: true,
+  })
   items!: RechnungItem[];
 
   @CreateDateColumn()

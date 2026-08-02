@@ -2304,7 +2304,7 @@ const InvoiceListPage: React.FC = () => {
       },
       {
         header: "Person",
-        width: "95px",
+        width: "150px",
         align: "left",
         render: (row) => {
           const text =
@@ -2318,7 +2318,7 @@ const InvoiceListPage: React.FC = () => {
             row.ship_to ||
             "-";
           return (
-            <div className="truncate max-w-[95px]" title={text}>
+            <div className="truncate max-w-[150px]" title={text}>
               {text}
             </div>
           );

@@ -863,64 +863,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 )}
               </div>
             )}
-
-            {/* Customer - read-only for Auftrag-created orders */}
-            {!isCreate && !isCustomerEditable && displayOrder.customer_id && (
-              <Field
-                label="Customer"
-                edit={false}
-                value={displayOrder.customer?.companyName || "—"}
-              />
-            )}
-
-            <Field
-              label="Title"
-              edit={edit || isCreate}
-              value={displayOrder.title}
-            >
-              <input
-                className={inputCls}
-                value={form.title}
-                onChange={(e) => patch({ title: e.target.value })}
-              />
-            </Field>
-
-            <Field
-              label="Status"
-              edit={edit || isCreate}
-              value={displayOrder.status}
-            >
-              <select
-                className={inputCls}
-                value={form.status}
-                disabled
-                onChange={(e) => patch({ status: e.target.value })}
-              >
-                {ORDER_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field
-              label="Delivery Date"
-              edit={edit || isCreate}
-              value={
-                displayOrder.date_delivery
-                  ? formatDate(displayOrder.date_delivery)
-                  : ""
-              }
-            >
-              <input
-                type="date"
-                className={inputCls}
-                value={toDateInputValue(form.dateDelivery)}
-                onChange={(e) => patch({ dateDelivery: e.target.value })}
-              />
-            </Field>
-
             <Field
               label="Receiver"
               edit={edit || isCreate}
@@ -952,6 +894,41 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 <option value="Supplier">Supplier</option>
               </select>
             </Field>
+            <Field
+              label="Title"
+              edit={edit || isCreate}
+              value={displayOrder.title}
+            >
+              <input
+                className={inputCls}
+                value={form.title}
+                onChange={(e) => patch({ title: e.target.value })}
+              />
+            </Field>
+            <Field
+              label="Delivery Date"
+              edit={edit || isCreate}
+              value={
+                displayOrder.date_delivery
+                  ? formatDate(displayOrder.date_delivery)
+                  : ""
+              }
+            >
+              <input
+                type="date"
+                className={inputCls}
+                value={toDateInputValue(form.dateDelivery)}
+                onChange={(e) => patch({ dateDelivery: e.target.value })}
+              />
+            </Field>
+            {/* Customer - read-only for Auftrag-created orders */}
+            {!isCreate && !isCustomerEditable && displayOrder.customer_id && (
+              <Field
+                label="Customer"
+                edit={false}
+                value={displayOrder.customer?.companyName || "—"}
+              />
+            )}
 
             {form.receiver === "Supplier" && (
               <Field
@@ -1130,7 +1107,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           {edit || isCreate ? (
                             <TextCellInput
                               value={item.remark_order_item}
-                              placeholder="Remark"
+                              placeholder="Remark Order Item"
                               onCommit={(raw) =>
                                 persistLine(item.id, { remark_order_item: raw })
                               }
@@ -1325,7 +1302,17 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
           </div>
 
           {/* Comment */}
-          <div className="grid grid-cols-1 gap-2 mt-4">
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Linked documents
+                </h3>
+              </div>
+              <p className="text-sm text-gray-500">No linked documents yet.</p>
+            </div>
+
             <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
               <div className="flex items-center gap-2 mb-3">
                 <PencilIcon className="h-4 w-4 text-gray-500" />
