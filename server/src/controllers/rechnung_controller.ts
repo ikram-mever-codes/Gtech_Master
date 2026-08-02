@@ -466,17 +466,7 @@ export const updateRechnung = async (
 ) => {
   try {
     const { id } = req.params;
-    const {
-      notes,
-      internalNotes,
-      paymentMethod,
-      paymentTerms,
-      shippingMethod,
-      deliveryTerms,
-      termsConditions,
-      customerSnapshot,
-      deliveryAddress,
-    } = req.body;
+    const { customerSnapshot, deliveryAddress } = req.body;
 
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = await rechnungRepo.findOne({
@@ -489,52 +479,48 @@ export const updateRechnung = async (
       return;
     }
 
-    if (notes !== undefined) rechnung.notes = notes;
-    if (internalNotes !== undefined) rechnung.internal_notes = internalNotes;
-    if (paymentMethod !== undefined) rechnung.payment_method = paymentMethod;
-    if (paymentTerms !== undefined) rechnung.payment_terms = paymentTerms;
-    if (shippingMethod !== undefined) rechnung.shipping_method = shippingMethod;
-    if (deliveryTerms !== undefined) rechnung.delivery_terms = deliveryTerms;
-    if (termsConditions !== undefined)
-      rechnung.terms_conditions = termsConditions;
+    // Rechnung is a frozen commercial document once created — only the
+    // billing/delivery address snapshot may ever be corrected, and only
+    // within the editable window. Payment method, payment terms, shipping
+    // method, and notes are set at creation time and are never editable.
+    if (customerSnapshot === undefined && deliveryAddress === undefined) {
+      res.status(400).json({
+        success: false,
+        message:
+          "Nothing to update — only customerSnapshot/deliveryAddress may be changed.",
+      });
+      return;
+    }
 
-    let addressPatch: Record<string, any> | null = null;
+    if (!isWithinEditableWindow(rechnung.invoice_date)) {
+      res.status(403).json({
+        success: false,
+        message:
+          "This Rechnung is older than 3 months — the billing/delivery address can no longer be edited.",
+      });
+      return;
+    }
 
-    if (customerSnapshot !== undefined || deliveryAddress !== undefined) {
-      if (!isWithinEditableWindow(rechnung.invoice_date)) {
-        res.status(403).json({
-          success: false,
-          message:
-            "This Rechnung is older than 3 months — the billing/delivery address can no longer be edited.",
-        });
-        return;
-      }
-
-      addressPatch = {};
-      if (customerSnapshot !== undefined) {
-        rechnung.customerSnapshot = { ...customerSnapshot };
-        // Entity property name — TypeORM resolves this to the real
-        // column ("customerSnapshot", no name: override on the entity).
-        addressPatch.customerSnapshot = rechnung.customerSnapshot;
-      }
-      if (deliveryAddress !== undefined) {
-        rechnung.deliveryAddress = { ...deliveryAddress };
-        addressPatch.deliveryAddress = rechnung.deliveryAddress;
-      }
+    const addressPatch: Record<string, any> = {};
+    if (customerSnapshot !== undefined) {
+      rechnung.customerSnapshot = { ...customerSnapshot };
+      addressPatch.customerSnapshot = rechnung.customerSnapshot;
+    }
+    if (deliveryAddress !== undefined) {
+      rechnung.deliveryAddress = { ...deliveryAddress };
+      addressPatch.deliveryAddress = rechnung.deliveryAddress;
     }
 
     await rechnungRepo.save(rechnung);
 
     // Fallback direct UPDATE, in case the entity-based save silently skips
     // the json columns on some driver/version combos.
-    if (addressPatch) {
-      await rechnungRepo
-        .createQueryBuilder()
-        .update(Rechnung)
-        .set(addressPatch)
-        .where("id = :id", { id })
-        .execute();
-    }
+    await rechnungRepo
+      .createQueryBuilder()
+      .update(Rechnung)
+      .set(addressPatch)
+      .where("id = :id", { id })
+      .execute();
 
     const fullRechnung = await rechnungRepo.findOne({
       where: { id: rechnung.id },

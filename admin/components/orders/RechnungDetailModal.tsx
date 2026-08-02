@@ -48,15 +48,23 @@ const getCountryCode = (country?: string): string => {
   return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
 };
 
-/** Same address rendering as AuftragPreviewModal, incl. suppressing the
- * VAT ID line for German addresses. */
+const isGermanCountry = (country?: string): boolean => {
+  if (!country) return false;
+  const normalized = country.trim().toLowerCase();
+  return (
+    normalized === "germany" ||
+    normalized === "de" ||
+    normalized === "deutschland"
+  );
+};
+
 const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   addr,
   emptyText,
 }) => {
   if (!addr) return <div className="text-sm text-gray-400">{emptyText}</div>;
   const countryCode = getCountryCode(addr.country);
-  const isGermany = countryCode === "DE";
+  const isGermany = isGermanCountry(addr.country);
   const cityLine = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
   const addressLine = [
     addr.address || addr.street,
@@ -82,6 +90,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
     </div>
   );
 };
+
 const normalizeAddrValue = (v: any): string =>
   (v || "").toString().trim().toLowerCase();
 
@@ -144,12 +153,10 @@ export default function RechnungDetailModal({
   const [deletingRechnung, setDeletingRechnung] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
+  // Editing is now scoped to the billing/delivery address ONLY — payment
+  // method, payment terms, shipping method, and notes are fixed at
+  // creation time and are never editable from this modal.
   const [isEditing, setIsEditing] = useState(false);
-  const [editNotes, setEditNotes] = useState("");
-  const [editInternalNotes, setEditInternalNotes] = useState("");
-  const [editPaymentMethod, setEditPaymentMethod] = useState("");
-  const [editPaymentTerms, setEditPaymentTerms] = useState("");
-  const [editShippingMethod, setEditShippingMethod] = useState("");
   const [editCustomerSnapshot, setEditCustomerSnapshot] = useState<any>({});
   const [editDeliveryAddress, setEditDeliveryAddress] = useState<any>({});
   const [savingEdit, setSavingEdit] = useState(false);
@@ -157,11 +164,6 @@ export default function RechnungDetailModal({
   useEffect(() => {
     if (!isOpen || !rechnung) return;
 
-    setEditNotes(rechnung.notes || "");
-    setEditInternalNotes(rechnung.internal_notes || "");
-    setEditPaymentMethod(rechnung.payment_method || "");
-    setEditPaymentTerms(rechnung.payment_terms || "");
-    setEditShippingMethod(rechnung.shipping_method || "");
     setIsEditing(false);
 
     if (!rechnung.items || rechnung.items.length === 0) {
@@ -185,10 +187,7 @@ export default function RechnungDetailModal({
 
   const invoiceItems: any[] = data.items || rechnung.items || [];
 
-  // RechnungCustomer relation — real field names only.
   const rechnungCustomer = data.customer || rechnung.customer || {};
-
-  // Auftrag-style snapshot jsonb, if it was populated at creation time.
   const snapshot = data.customerSnapshot || rechnung.customerSnapshot || null;
 
   const companyName =
@@ -234,11 +233,13 @@ export default function RechnungDetailModal({
     "";
   const deliveryDate = data.delivery_date || rechnung.delivery_date || "";
 
+  // Fixed at creation — read-only, always.
   const paymentMethod = data.payment_method || rechnung.payment_method || "";
   const paymentTerms = data.payment_terms || rechnung.payment_terms || "";
   const shippingMethod = data.shipping_method || rechnung.shipping_method || "";
+  const internalNotes = data.internal_notes || rechnung.internal_notes || "";
+  const notes = data.notes || rechnung.notes || "";
 
-  // Weight is only tracked at the line-item level on RechnungItem.
   const netWeightKg = invoiceItems.reduce((sum, it) => {
     const qty = Number(it.quantity) || 1;
     return sum + (Number(it.weight) || 0) * qty;
@@ -313,24 +314,20 @@ export default function RechnungDetailModal({
   };
 
   const handleSaveEdits = async () => {
+    if (!addressEditable) {
+      toast.error(
+        "This Rechnung is older than 3 months — the address can no longer be edited.",
+        errorStyles,
+      );
+      return;
+    }
     try {
       setSavingEdit(true);
       const res: any = await updateRechnung(rechnung.id, {
-        notes: editNotes,
-        internalNotes: editInternalNotes,
-        paymentMethod: editPaymentMethod,
-        paymentTerms: editPaymentTerms,
-        shippingMethod: editShippingMethod,
-        ...(addressEditable
-          ? {
-              customerSnapshot: editCustomerSnapshot,
-              deliveryAddress: editDeliveryAddress,
-            }
-          : {}),
+        customerSnapshot: editCustomerSnapshot,
+        deliveryAddress: editDeliveryAddress,
       });
 
-      // The backend already returns the full updated Rechnung — use it
-      // directly instead of waiting on the parent to hand back fresh props.
       const updated = res?.data ?? res;
       if (updated) {
         setDetailData(updated);
@@ -400,7 +397,6 @@ export default function RechnungDetailModal({
                             }))
                           }
                         />
-
                         <input
                           className={inputCls}
                           placeholder="Street"
@@ -451,11 +447,11 @@ export default function RechnungDetailModal({
                             }))
                           }
                         />
-                        {editCustomerSnapshot?.country?.toLowerCase() !==
-                          "germany" &&
-                          editCustomerSnapshot?.country?.toLowerCase() !==
+                        {editCustomerSnapshot?.country.toLowerCase() !==
+                          "Germany" &&
+                          editCustomerSnapshot?.country.toLowerCase() !==
                             "deutschland" &&
-                          editCustomerSnapshot?.country?.toLowerCase() !==
+                          editCustomerSnapshot?.country.toLowerCase() !==
                             "de" && (
                             <input
                               className={inputCls}
@@ -561,48 +557,9 @@ export default function RechnungDetailModal({
                     label="Delivery Date"
                     value={deliveryDate ? formatDate(deliveryDate) : ""}
                   />
-                  {isEditing ? (
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-                        Payment method
-                      </p>
-                      <input
-                        className={inputCls}
-                        value={editPaymentMethod}
-                        onChange={(e) => setEditPaymentMethod(e.target.value)}
-                      />
-                    </div>
-                  ) : (
-                    <Field label="Payment method" value={paymentMethod} />
-                  )}
-                  {isEditing ? (
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-                        Payment terms
-                      </p>
-                      <input
-                        className={inputCls}
-                        value={editPaymentTerms}
-                        onChange={(e) => setEditPaymentTerms(e.target.value)}
-                      />
-                    </div>
-                  ) : (
-                    <Field label="Payment terms" value={paymentTerms} />
-                  )}
-                  {isEditing ? (
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-                        Shipping method
-                      </p>
-                      <input
-                        className={inputCls}
-                        value={editShippingMethod}
-                        onChange={(e) => setEditShippingMethod(e.target.value)}
-                      />
-                    </div>
-                  ) : (
-                    <Field label="Shipping method" value={shippingMethod} />
-                  )}
+                  <Field label="Payment method" value={paymentMethod} />
+                  <Field label="Payment terms" value={paymentTerms} />
+                  <Field label="Shipping method" value={shippingMethod} />
                 </div>
               </div>
 
@@ -763,19 +720,9 @@ export default function RechnungDetailModal({
                       Comment intern
                     </h3>
                   </div>
-                  {isEditing ? (
-                    <textarea
-                      rows={3}
-                      className={inputCls}
-                      value={editInternalNotes}
-                      placeholder="Only visible to the team."
-                      onChange={(e) => setEditInternalNotes(e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-600">
-                      {rechnung.internal_notes || data.internal_notes || "—"}
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-600">
+                    {internalNotes || "—"}
+                  </p>
                 </div>
                 <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
                   <div className="flex items-center gap-2 mb-3">
@@ -784,19 +731,7 @@ export default function RechnungDetailModal({
                       Comment extern
                     </h3>
                   </div>
-                  {isEditing ? (
-                    <textarea
-                      rows={3}
-                      className={inputCls}
-                      value={editNotes}
-                      placeholder="Shown to the customer."
-                      onChange={(e) => setEditNotes(e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-600">
-                      {rechnung.notes || data.notes || "—"}
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-600">{notes || "—"}</p>
                 </div>
               </div>
             </>
@@ -845,7 +780,7 @@ export default function RechnungDetailModal({
                 if (isEditing) handleSaveEdits();
                 else startEdit();
               }}
-              disabled={savingEdit}
+              disabled={savingEdit || (isEditing && !addressEditable)}
               className="px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50"
             >
               {savingEdit
