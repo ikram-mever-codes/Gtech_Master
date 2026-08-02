@@ -302,18 +302,12 @@ export default function ParametersTemplatesPage() {
                 onClick={handleAddColour}
                 className="px-3.5 py-1.5 bg-[#8CC21B] hover:bg-[#7ab318] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
               >
-                <Plus className="w-3.5 h-3.5" /> Add Color
+                <Plus className="w-3.5 h-3.5" /> Color
               </button>
             </div>
 
             <div className="space-y-2.5 pt-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Color Options ({colours.length})
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[190px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
                 {colours.map((item, idx) => (
                   <div
                     key={item.id || idx}
@@ -354,21 +348,23 @@ export default function ParametersTemplatesPage() {
                     </div>
                   </div>
                 ))}
+
+                <div className="lg:col-start-4 flex justify-end items-center">
+                  <button
+                    type="button"
+                    onClick={handleSaveColours}
+                    disabled={savingColours}
+                    className="px-3.5 py-1.5 bg-[#8CC21B] hover:bg-[#7ab318] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    {savingColours && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                    Save Colours
+                  </button>
+                </div>
               </div>
             </div>
-
-            <div className="flex justify-end pt-3 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={handleSaveColours}
-                disabled={savingColours}
-                className="px-4 py-2 bg-[#8CC21B] hover:bg-[#7ab318] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
-              >
-                {savingColours && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                Save Colours
-              </button>
-            </div>
           </div>
+
+
 
 
           <div className="space-y-6">
@@ -424,15 +420,13 @@ export default function ParametersTemplatesPage() {
 
                       <label className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${uploadingTemplate ? "opacity-50 pointer-events-none" : ""} bg-blue-50 hover:bg-blue-100 text-blue-700`}>
                         {uploadingTemplate ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
-                        {isDefault ? "Upload Custom Template" : "Replace Template"}
+                        {isDefault ? "Upload Custom Template" : "+ New"}
                         <input type="file" onChange={handleFileUpload} disabled={uploadingTemplate} className="hidden" />
                       </label>
                     </div>
                   </div>
                 );
               })()}
-
-
               {templateVersions.filter((v) => !v.is_active).length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 pt-1">

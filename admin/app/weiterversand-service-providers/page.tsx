@@ -186,7 +186,7 @@ export default function WeiterversandServiceProvidersPage() {
         setShowModal(true);
       }}
     >
-      Add Provider
+      Provider
     </CustomButton>
   );
 

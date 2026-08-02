@@ -215,7 +215,7 @@ export default function CountriesPage() {
         setShowModal(true);
       }}
     >
-      Add Country
+      Country
     </CustomButton>
   );
 

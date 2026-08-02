@@ -130,13 +130,12 @@ export default function UsersPage() {
       label: "Verification",
       render: (value: boolean) => (
         <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${
-            value === true
+          className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${value === true
               ? "bg-green-100 text-green-700"
               : value === false
                 ? "bg-amber-100 text-amber-800"
                 : "bg-red-100 text-red-800"
-          }`}
+            }`}
         >
           {value === true ? "Verified" : "Unverified"}
         </span>
@@ -147,11 +146,10 @@ export default function UsersPage() {
       label: "Login",
       render: (value: boolean) => (
         <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${
-            value !== false
+          className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${value !== false
               ? "bg-emerald-50 text-emerald-600"
               : "bg-red-55 text-red-600"
-          }`}
+            }`}
         >
           {value !== false ? "Enabled" : "Disabled"}
         </span>
@@ -202,7 +200,7 @@ export default function UsersPage() {
       shadow="large"
       onClick={() => router.push("/users/create")}
     >
-      Create User
+      User
     </CustomButton>
   );
 

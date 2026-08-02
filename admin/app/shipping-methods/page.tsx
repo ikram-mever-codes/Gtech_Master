@@ -183,7 +183,7 @@ export default function ShippingMethodsPage() {
         setShowModal(true);
       }}
     >
-      Add Shipping Method
+      Shipping Method
     </CustomButton>
   );
 
@@ -235,9 +235,8 @@ export default function ShippingMethodsPage() {
                 <tr
                   key={sm.id}
                   onClick={() => handleRowClick(sm)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
-                    !sm.is_active ? "opacity-60" : ""
-                  }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!sm.is_active ? "opacity-60" : ""
+                    }`}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">
                     {sm.name}
@@ -372,11 +371,10 @@ export default function ShippingMethodsPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          selectedMethod.is_active
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_active
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : "bg-gray-100 text-gray-400 border border-gray-200"
-                        }`}
+                          }`}
                       >
                         {selectedMethod.is_active ? (
                           <CheckCircle className="w-3.5 h-3.5" />

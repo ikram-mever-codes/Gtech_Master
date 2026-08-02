@@ -202,7 +202,7 @@ export default function PaymentAccountsPage() {
         setShowModal(true);
       }}
     >
-      Add Payment Account
+      Payment Account
     </CustomButton>
   );
 
@@ -257,9 +257,8 @@ export default function PaymentAccountsPage() {
                 <tr
                   key={account.id}
                   onClick={() => handleRowClick(account)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
-                    !account.is_active ? "opacity-60" : ""
-                  }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!account.is_active ? "opacity-60" : ""
+                    }`}
                 >
                   <td className="px-6 py-4 font-mono text-xs text-gray-500 max-w-[120px] truncate">
                     {account.id}
@@ -490,11 +489,10 @@ export default function PaymentAccountsPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          selectedAccount.is_active
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-gray-100 text-gray-400 border border-gray-200"
-                        }`}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedAccount.is_active
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-gray-100 text-gray-400 border border-gray-200"
+                          }`}
                       >
                         {selectedAccount.is_active ? (
                           <CheckCircle className="w-3.5 h-3.5" />
