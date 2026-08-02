@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   XMarkIcon,
   PencilIcon,
@@ -207,7 +207,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
-
+  const [orderItemSupplierById, setOrderItemSupplierById] = useState<
+    Record<string, number | undefined>
+  >({});
   // For create mode
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -216,14 +218,40 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const isFromAuftrag =
     order?.auftrag_id !== null && order?.auftrag_id !== undefined;
 
+  // The supplier this Bestellung is locked to, either explicitly chosen or
+  // implied by an already-added catalog item whose supplier hasn't been
+  // persisted to form.supplierId yet.
+  const lockedSupplierId = useMemo(() => {
+    if (form.supplierId) return Number(form.supplierId);
+    const catalogLineItems = (order?.orderItems || []).filter(
+      (li: any) => li.sourceItemId,
+    );
+    for (const li of catalogLineItems) {
+      const sId = orderItemSupplierById[String(li.sourceItemId)];
+      if (sId) return sId;
+    }
+    return null;
+  }, [form.supplierId, order?.orderItems, orderItemSupplierById]);
+
+  const pickerItems = useMemo(() => {
+    if (!lockedSupplierId) return items;
+    return items.filter(
+      (it) => Number(it.supplier_id) === Number(lockedSupplierId),
+    );
+  }, [items, lockedSupplierId]);
+
   const fetchOrder = useCallback(async () => {
+    console.log("fetchOrder called", { orderId, isCreate });
     if (!orderId || isCreate) {
-      setLoading(false); // ← Reset loading when not fetching
+      console.log("fetchOrder skipped - no orderId or isCreate");
+      setLoading(false);
       return;
     }
     setLoading(true);
     try {
+      console.log("Fetching order with ID:", orderId);
       const res = await getTransferOrderById(orderId);
+      console.log("Fetch response:", res);
       if (res.success) {
         setOrder(res.data);
         setForm(buildForm(res.data));
@@ -234,31 +262,95 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       setLoading(false);
     }
   }, [orderId, isCreate]);
+
   useEffect(() => {
+    console.log("BestellungPreviewModal mounted", {
+      isOpen,
+      orderId,
+      isCreate,
+    });
     if (!isOpen) return;
     if (isCreate) {
-      setEdit(true);
-      setOrder(null);
-      setForm({
-        title: "",
-        status: "draft",
-        currency: "EUR",
-        notes: "",
-        highlightColor: "",
-        receiver: "Gtech Hong Kong",
-        supplierId: null,
-        dateDelivery: "",
-      });
-      setSelectedCustomerId("");
-      setCustomerSearch("");
-      setLoading(false); // ← Make sure loading is false
+      console.log("Create mode - setting up form");
+      // ... rest of create mode setup
     } else {
+      console.log("View/Edit mode - fetching order", orderId);
       setEdit(initialEdit);
       setShowItemPicker(false);
       setItemPickerSearch("");
       fetchOrder();
     }
   }, [isOpen, orderId, fetchOrder, initialEdit, isCreate]);
+
+  useEffect(() => {
+    if (!isOpen || isCreate || !order?.orderItems?.length) return;
+    (async () => {
+      setLoadingSuppliers(true);
+      try {
+        const sourceItemIds = order.orderItems
+          .filter((li: any) => li.sourceItemId)
+          .map((li: any) => Number(li.sourceItemId))
+          .filter((id: number) => !isNaN(id));
+
+        if (sourceItemIds.length === 0) {
+          setSuppliers([]);
+          setOrderItemSupplierById({});
+          setLoadingSuppliers(false);
+          return;
+        }
+
+        const { getItems } = await import("@/api/items");
+        const itemsRes: any = await getItems({
+          ids: sourceItemIds.join(","),
+          limit: 1000,
+        });
+
+        const itemsData = Array.isArray(itemsRes?.data) ? itemsRes.data : [];
+
+        // Track each line item's primary supplier so we can enforce a
+        // single-supplier Bestellung even before form.supplierId is set.
+        const supplierByItemId: Record<string, number | undefined> = {};
+        itemsData.forEach((item: any) => {
+          supplierByItemId[String(item.id)] = item.supplier_id
+            ? Number(item.supplier_id)
+            : undefined;
+        });
+        setOrderItemSupplierById(supplierByItemId);
+
+        const supplierIds = new Set<number>();
+        itemsData.forEach((item: any) => {
+          if (item.supplier_id) {
+            supplierIds.add(Number(item.supplier_id));
+          }
+          if (item.supplierItems) {
+            item.supplierItems.forEach((si: any) => {
+              if (si.supplierId) {
+                supplierIds.add(Number(si.supplierId));
+              }
+            });
+          }
+        });
+
+        if (supplierIds.size > 0) {
+          const { getAllSuppliers } = await import("@/api/suppliers");
+          const suppliersRes: any = await getAllSuppliers({
+            ids: Array.from(supplierIds).join(","),
+            limit: 1000,
+          });
+          setSuppliers(
+            Array.isArray(suppliersRes?.data) ? suppliersRes.data : [],
+          );
+        } else {
+          setSuppliers([]);
+        }
+      } catch (e) {
+        console.error("Failed to load suppliers:", e);
+        setSuppliers([]);
+      } finally {
+        setLoadingSuppliers(false);
+      }
+    })();
+  }, [isOpen, isCreate, order?.orderItems]);
   // Load customers for create mode
   useEffect(() => {
     if (!isOpen || !isCreate) return;
@@ -546,7 +638,23 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
         );
         return;
       }
-      console.log("Adding existing item to Bestellung:", it);
+
+      const itemSupplierId = it.supplier_id
+        ? Number(it.supplier_id)
+        : undefined;
+
+      if (
+        lockedSupplierId &&
+        itemSupplierId !== undefined &&
+        itemSupplierId !== lockedSupplierId
+      ) {
+        toast.error(
+          "This item belongs to a different supplier. Remove the existing items first if you want to switch suppliers.",
+          errorStyles,
+        );
+        return;
+      }
+
       await createTransferOrderLineItem(orderIdToUse, {
         itemName: it.item_name || it.itemName || "Item",
         material: it.model || "",
@@ -554,6 +662,21 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
         weight: it.weight,
         sourceItemId: String(it.id),
       });
+
+      // First catalog item on a Bestellung with no supplier chosen yet —
+      // lock the Bestellung to this item's supplier.
+      if (!lockedSupplierId && itemSupplierId !== undefined) {
+        try {
+          await updateTransferOrder(order.id, {
+            receiver: "Supplier",
+            supplierId: itemSupplierId,
+          });
+          patch({ receiver: "Supplier", supplierId: itemSupplierId });
+        } catch (e) {
+          console.error("Couldn't lock Bestellung supplier:", e);
+        }
+      }
+
       setShowItemPicker(false);
       setItemPickerSearch("");
       await refreshLocal();
@@ -812,6 +935,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 value={form.receiver}
                 onChange={(e) => {
                   const val = e.target.value;
+                  if (val !== "Supplier" && lockedSupplierId) {
+                    toast.error(
+                      "This Bestellung already contains items tied to a supplier. Remove them first before changing the receiver.",
+                      errorStyles,
+                    );
+                    return;
+                  }
                   patch({
                     receiver: val,
                     supplierId: val === "Supplier" ? form.supplierId : null,
@@ -835,17 +965,35 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 <select
                   className={inputCls}
                   value={form.supplierId ?? ""}
-                  onChange={(e) =>
-                    patch({
-                      supplierId: e.target.value
-                        ? Number(e.target.value)
-                        : null,
-                    })
-                  }
+                  onChange={(e) => {
+                    const newSupplierId = e.target.value
+                      ? Number(e.target.value)
+                      : null;
+                    const catalogLineItems = (order?.orderItems || []).filter(
+                      (li: any) => li.sourceItemId,
+                    );
+                    const hasConflictingItems = catalogLineItems.some(
+                      (li: any) => {
+                        const sId =
+                          orderItemSupplierById[String(li.sourceItemId)];
+                        return sId !== undefined && sId !== newSupplierId;
+                      },
+                    );
+                    if (hasConflictingItems) {
+                      toast.error(
+                        "This Bestellung already contains items from another supplier. Remove them first before changing the supplier.",
+                        errorStyles,
+                      );
+                      return;
+                    }
+                    patch({ supplierId: newSupplierId });
+                  }}
                   disabled={loadingSuppliers}
                 >
                   <option value="">
-                    {loadingSuppliers ? "Loading…" : "Select supplier…"}
+                    {loadingSuppliers
+                      ? "Loading suppliers..."
+                      : "Select supplier..."}
                   </option>
                   {suppliers.map((s: any) => (
                     <option key={s.id} value={s.id}>
@@ -1072,6 +1220,11 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
                 {showItemPicker && (
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+                    {lockedSupplierId && (
+                      <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1">
+                        Showing items from the locked supplier only.
+                      </p>
+                    )}
                     <input
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       placeholder="Search items…"
@@ -1079,7 +1232,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                       onChange={(e) => setItemPickerSearch(e.target.value)}
                     />
                     <div className="max-h-48 overflow-y-auto space-y-1.5">
-                      {items.filter((it) => {
+                      {pickerItems.filter((it) => {
                         if (!itemPickerSearch) return true;
                         const q = itemPickerSearch.toLowerCase();
                         const name = it.item_name || it.itemName || "";
@@ -1092,7 +1245,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           No items match.
                         </div>
                       ) : (
-                        items
+                        pickerItems
                           .filter((it) => {
                             if (!itemPickerSearch) return true;
                             const q = itemPickerSearch.toLowerCase();
