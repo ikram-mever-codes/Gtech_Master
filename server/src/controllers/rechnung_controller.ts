@@ -184,7 +184,6 @@ export const createRechnungFromAuftrag = async (
       }
     }
 
-    // Update Auftrag status based on remaining quantities
     const totalRemainingQty = (auftrag.orderItems || []).reduce(
       (sum, li) => sum + Number(li.quantity || 0),
       0,
@@ -255,7 +254,6 @@ export const createRechnungFromAuftrag = async (
     );
     await rechnungItemRepo.save(itemEntities);
 
-    // ALSO save to 3 CCI Tables so commercial page /invoices endpoint picks it up!
     try {
       const cciCustRepo = AppDataSource.getRepository(CCICustomer);
       const cciCust = cciCustRepo.create({
@@ -372,8 +370,6 @@ export const getLieferscheine = async (
       order: { created_at: "DESC" },
       relations: ["items", "customer"],
     });
-
-    // Map into Delivery Note items (omitting prices & tax)
     const lieferscheine = rechnungen.map((rec) => ({
       id: rec.id,
       deliveryNoteNo: rec.invoice_number.replace(/^R/, "LS"),

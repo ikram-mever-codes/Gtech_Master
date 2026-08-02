@@ -130,6 +130,8 @@ import {
 } from "@/utils/commercialFilters";
 import AuftragPreviewModal from "@/components/orders/AuftragPreviewModal";
 import BestellungPreviewModal from "@/components/orders/BestellungPreviewModal";
+import { DEFAULT_DYNAMIC_COLOURS } from "@/components/UI/SystemColourSelect";
+import { getAllSystemParameters } from "@/api/system_parameters";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -242,6 +244,22 @@ const InvoiceListPage: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [systemColours, setSystemColours] = useState<any[]>(DEFAULT_DYNAMIC_COLOURS);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res: any = await getAllSystemParameters();
+        const palette = res?.data?.find((p: any) => p.key === "system_colours")?.value;
+        if (Array.isArray(palette) && palette.length > 0) {
+          setSystemColours(palette);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, []);
+
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<APICustomerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3117,6 +3135,34 @@ const InvoiceListPage: React.FC = () => {
                     return isExpress ? "bg-red-50" : "";
                   }
                   return "";
+                }}
+                getRowStyle={(row: any) => {
+                  const val = row.highlight_color || row.highlightColor;
+                  if (!val || val === "#FFFFFF" || val === "#ffffff") return undefined;
+
+                  let hex = val;
+                  if (!val.startsWith("#")) {
+                    const matched = systemColours.find(
+                      (c: any) => c.name?.toLowerCase() === val.toLowerCase()
+                    );
+                    if (matched) hex = matched.hex;
+                  }
+
+                  if (!hex || !hex.startsWith("#")) return undefined;
+
+                  const cleanHex = hex.replace("#", "");
+                  let textColor = undefined;
+                  if (cleanHex.length === 6) {
+                    const r = parseInt(cleanHex.substring(0, 2), 16);
+                    const g = parseInt(cleanHex.substring(2, 4), 16);
+                    const b = parseInt(cleanHex.substring(4, 6), 16);
+                    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+                    textColor = yiq >= 128 ? "#111827" : "#FFFFFF";
+                  }
+                  return {
+                    backgroundColor: hex,
+                    color: textColor,
+                  };
                 }}
                 expandedRowIds={expandedDocIds}
                 renderRowDetails={(row) => {

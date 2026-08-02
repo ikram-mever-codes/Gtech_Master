@@ -8,9 +8,11 @@ import {
   PlusIcon,
   LinkIcon,
   CubeIcon,
+  ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import {
   getCustomerOrderById,
   updateCustomerOrder,
@@ -44,6 +46,19 @@ interface AuftragPreviewModalProps {
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
+
+const parseLabels = (raw?: string | null): Array<{ name: string; url: string }> => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    if (typeof raw === "string" && raw.trim()) {
+      return [{ name: "Document Label", url: raw.trim() }];
+    }
+  }
+  return [];
+};
 
 const ORDER_STATUSES = [
   "Draft",
@@ -687,22 +702,32 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <p className="text-lg font-bold text-gray-900 truncate">
                 Auftrag {order.order_no}
               </p>
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.auftrag_status === "delivered" || order.status === "Completed"
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : order.auftrag_status === "partially_delivered" || order.status === "In Progress"
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}>
+                {order.auftrag_status === "delivered" || order.status === "Completed"
+                  ? "Delivered"
+                  : order.auftrag_status === "partially_delivered" || order.status === "In Progress"
+                    ? "Partially Delivered"
+                    : "Open"}
+              </span>
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
               {item1Title}
             </h2>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
-            <input
-              type="color"
-              value={order.highlight_color || "#ffffff"}
-              onChange={(e) => setHighlightColor(e.target.value)}
-              title="Auftrag highlight color"
-              className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+            <SystemColourSelect
+              value={form.highlightColor ?? order.highlight_color}
+              onChange={setHighlightColor}
+              edit={edit}
             />
             <ViewEditToggle
               isEditEnabled={edit}
@@ -902,7 +927,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   onChange={(e) => patch({ title: e.target.value })}
                 />
               </Field>
-              <Field label="Status" edit={edit} value={order.status}>
+              {/* <Field label="Status" edit={edit} value={order.status}>
                 <select
                   className={inputCls}
                   value={form.status}
@@ -914,7 +939,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     </option>
                   ))}
                 </select>
-              </Field>
+              </Field> */}
               <Field
                 label="Delivery Date"
                 edit={edit}
@@ -984,140 +1009,126 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 </select>
               </Field>
 
-              {/* Auftrag Extra Fields */}
-              <Field
-                label="Auftrag Status"
-                edit={edit}
-                value={
-                  order.auftrag_status === "delivered"
-                    ? "Delivered"
-                    : order.auftrag_status === "partially_delivered"
-                      ? "Partially Delivered"
-                      : "Open"
-                }
-              >
-                <select
-                  className={inputCls}
-                  value={form.auftragStatus || "open"}
-                  onChange={(e) => patch({ auftragStatus: e.target.value })}
-                >
-                  <option value="open">Open</option>
-                  <option value="partially_delivered">Partially Delivered</option>
-                  <option value="delivered">Delivered</option>
-                </select>
-              </Field>
+              <div className="col-span-full border-t border-gray-100 pt-3 mt-1">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="w-28 shrink-0">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                      Weiterversand
+                    </label>
+                    {edit ? (
+                      <select
+                        className={inputCls}
+                        value={form.isWeiterversand ? "Yes" : "No"}
+                        onChange={(e) => patch({ isWeiterversand: e.target.value === "Yes" })}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    ) : (
+                      <div className="text-sm font-medium text-gray-800 py-1.5">
+                        {order.is_weiterversand ? "Yes" : "No"}
+                      </div>
+                    )}
+                  </div>
 
-              <Field
-                label="Real Delivery Date"
-                edit={edit}
-                value={
-                  order.real_delivery_date ? formatDate(order.real_delivery_date) : "—"
-                }
-              >
-                <input
-                  type="date"
-                  className={inputCls}
-                  value={toDateInputValue(form.realDeliveryDate)}
-                  onChange={(e) => patch({ realDeliveryDate: e.target.value })}
-                />
-              </Field>
+                  {(edit
+                    ? form.isWeiterversand
+                    : order.is_weiterversand === true ||
+                    order.is_weiterversand === 1 ||
+                    order.is_weiterversand === "true" ||
+                    order.is_weiterversand === "1" ||
+                    order.is_weiterversand === "Yes") && (
+                      <>
+                        <div className="w-48 shrink-0">
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Service Provider
+                          </label>
+                          {edit ? (
+                            <select
+                              className={inputCls}
+                              value={form.weiterversandServiceProviderId || ""}
+                              onChange={(e) =>
+                                patch({ weiterversandServiceProviderId: e.target.value })
+                              }
+                            >
+                              <option value="">Select Provider…</option>
+                              {dbServiceProviders.map((sp) => (
+                                <option key={sp.id} value={sp.id}>
+                                  {sp.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="text-sm font-medium text-gray-800 py-1.5">
+                              {order.weiterversandServiceProvider?.name || "—"}
+                            </div>
+                          )}
+                        </div>
 
-              <Field
-                label="Weiterversand"
-                edit={edit}
-                value={
-                  order.is_weiterversand === true ||
-                  order.is_weiterversand === 1 ||
-                  order.is_weiterversand === "true" ||
-                  order.is_weiterversand === "1" ||
-                  order.is_weiterversand === "Yes"
-                    ? "Yes"
-                    : "No"
-                }
-              >
-                <select
-                  className={inputCls}
-                  value={form.isWeiterversand ? "Yes" : "No"}
-                  onChange={(e) => patch({ isWeiterversand: e.target.value === "Yes" })}
-                >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
-              </Field>
+                        <div className="w-40 shrink-0">
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Tracking No.
+                          </label>
+                          {edit ? (
+                            <input
+                              type="text"
+                              className={inputCls}
+                              placeholder="Tracking No."
+                              value={form.weiterversandTracking || ""}
+                              onChange={(e) =>
+                                patch({ weiterversandTracking: e.target.value })
+                              }
+                            />
+                          ) : (
+                            <div className="text-sm font-medium text-gray-800 py-1.5">
+                              {order.weiterversand_tracking || "—"}
+                            </div>
+                          )}
+                        </div>
 
-              {(edit
-                ? form.isWeiterversand
-                : order.is_weiterversand === true ||
-                  order.is_weiterversand === 1 ||
-                  order.is_weiterversand === "true" ||
-                  order.is_weiterversand === "1" ||
-                  order.is_weiterversand === "Yes") && (
-                <>
-                  <Field
-                    label="Weiterversand Service Provider"
-                    edit={edit}
-                    value={order.weiterversandServiceProvider?.name || "—"}
-                  >
-                    <select
-                      className={inputCls}
-                      value={form.weiterversandServiceProviderId || ""}
-                      onChange={(e) =>
-                        patch({ weiterversandServiceProviderId: e.target.value })
-                      }
-                    >
-                      <option value="">Select Provider…</option>
-                      {dbServiceProviders.map((sp) => (
-                        <option key={sp.id} value={sp.id}>
-                          {sp.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field
-                    label="Weiterversand Labels"
-                    edit={edit}
-                    value={
-                      order.weiterversand_labels ? (
-                        <a
-                          href={order.weiterversand_labels}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
-                        >
-                          <LinkIcon className="w-3.5 h-3.5" /> Open Label(s)
-                        </a>
-                      ) : (
-                        "—"
-                      )
-                    }
-                  >
-                    <input
-                      type="text"
-                      className={inputCls}
-                      placeholder="Label URL / Link"
-                      value={form.weiterversandLabels || ""}
-                      onChange={(e) => patch({ weiterversandLabels: e.target.value })}
-                    />
-                  </Field>
-
-                  <Field
-                    label="Weiterversand Tracking"
-                    edit={edit}
-                    value={order.weiterversand_tracking || "—"}
-                  >
-                    <input
-                      type="text"
-                      className={inputCls}
-                      placeholder="Tracking No."
-                      value={form.weiterversandTracking || ""}
-                      onChange={(e) =>
-                        patch({ weiterversandTracking: e.target.value })
-                      }
-                    />
-                  </Field>
-                </>
-              )}
+                        {edit && (
+                          <div className="shrink-0 self-end">
+                            <label
+                              htmlFor="weiterversand-label-file"
+                              className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
+                            >
+                              <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
+                              Upload Label(s)
+                            </label>
+                            <input
+                              id="weiterversand-label-file"
+                              type="file"
+                              multiple
+                              className="hidden"
+                              accept="application/pdf,image/*"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                if (files.length === 0) return;
+                                const currentList = parseLabels(
+                                  form.weiterversandLabels || order.weiterversand_labels
+                                );
+                                let count = 0;
+                                files.forEach((file) => {
+                                  const reader = new FileReader();
+                                  reader.onload = (evt) => {
+                                    const dataUrl = evt.target?.result as string;
+                                    currentList.push({ name: file.name, url: dataUrl });
+                                    count++;
+                                    if (count === files.length) {
+                                      patch({ weiterversandLabels: JSON.stringify(currentList) });
+                                      toast.success(`Attached ${files.length} document(s)`);
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                });
+                              }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1548,14 +1559,60 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-            <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
-              <div className="flex items-center gap-2 mb-3">
-                <LinkIcon className="h-4 w-4 text-gray-500" />
-                <h3 className="text-sm font-bold text-gray-900">
-                  Linked documents
-                </h3>
+            <div className="bg-white rounded-lg p-4 px-3 border border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <LinkIcon className="h-4 w-4 text-gray-500" />
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Linked documents
+                  </h3>
+                </div>
+                {parseLabels(form.weiterversandLabels || order.weiterversand_labels).length > 0 && (
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                    {parseLabels(form.weiterversandLabels || order.weiterversand_labels).length}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-500">No linked documents yet.</p>
+              {parseLabels(form.weiterversandLabels || order.weiterversand_labels).length > 0 ? (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {parseLabels(form.weiterversandLabels || order.weiterversand_labels).map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-2 bg-blue-50/70 border border-blue-200/80 px-2.5 py-1.5 rounded-lg text-xs"
+                    >
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-700 hover:underline flex items-center gap-1.5 font-medium truncate flex-1"
+                        title={doc.name}
+                      >
+                        <LinkIcon className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                        <span className="truncate">{doc.name || `Document ${idx + 1}`}</span>
+                      </a>
+                      {edit && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const list = parseLabels(
+                              form.weiterversandLabels || order.weiterversand_labels
+                            );
+                            list.splice(idx, 1);
+                            patch({ weiterversandLabels: JSON.stringify(list) });
+                            toast.success("Document removed");
+                          }}
+                          className="text-rose-500 hover:text-rose-700 p-0.5 rounded hover:bg-rose-100 shrink-0"
+                          title="Remove document"
+                        >
+                          <XMarkIcon className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No linked documents yet.</p>
+              )}
             </div>
 
             <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
@@ -1635,5 +1692,4 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     </div>
   );
 };
-
 export default AuftragPreviewModal;
