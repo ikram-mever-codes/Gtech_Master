@@ -83,8 +83,8 @@ export const createRechnungFromAuftrag = async (
     const rechnungCustomer = rechnungCustomerRepo.create({
       original_customer_id: auftrag.customer_id || undefined,
       company_name:
-        auftrag.customerSnapshot?.companyName ||
-        originalCust?.companyName ||
+        auftrag.customerSnapshot?.legalName ||
+        originalCust?.legalName ||
         originalCust?.legalName ||
         "Customer",
       email:
@@ -450,6 +450,108 @@ export const deleteRechnung = async (
       message: "Rechnung deleted successfully",
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+const THREE_MONTHS_MS = 1000 * 60 * 60 * 24 * 30 * 3;
+
+const isWithinEditableWindow = (dateVal: any): boolean => {
+  if (!dateVal) return true;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return true;
+  return Date.now() - d.getTime() <= THREE_MONTHS_MS;
+};
+
+export const updateRechnung = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const {
+      notes,
+      internalNotes,
+      paymentMethod,
+      paymentTerms,
+      shippingMethod,
+      deliveryTerms,
+      termsConditions,
+      customerSnapshot,
+      deliveryAddress,
+    } = req.body;
+
+    const rechnungRepo = AppDataSource.getRepository(Rechnung);
+    const rechnung = await rechnungRepo.findOne({
+      where: { id },
+      relations: ["items", "customer"],
+    });
+
+    if (!rechnung) {
+      res.status(404).json({ success: false, message: "Rechnung not found" });
+      return;
+    }
+
+    if (notes !== undefined) rechnung.notes = notes;
+    if (internalNotes !== undefined) rechnung.internal_notes = internalNotes;
+    if (paymentMethod !== undefined) rechnung.payment_method = paymentMethod;
+    if (paymentTerms !== undefined) rechnung.payment_terms = paymentTerms;
+    if (shippingMethod !== undefined) rechnung.shipping_method = shippingMethod;
+    if (deliveryTerms !== undefined) rechnung.delivery_terms = deliveryTerms;
+    if (termsConditions !== undefined)
+      rechnung.terms_conditions = termsConditions;
+
+    let addressPatch: Record<string, any> | null = null;
+
+    if (customerSnapshot !== undefined || deliveryAddress !== undefined) {
+      if (!isWithinEditableWindow(rechnung.invoice_date)) {
+        res.status(403).json({
+          success: false,
+          message:
+            "This Rechnung is older than 3 months — the billing/delivery address can no longer be edited.",
+        });
+        return;
+      }
+
+      addressPatch = {};
+      if (customerSnapshot !== undefined) {
+        rechnung.customerSnapshot = { ...customerSnapshot };
+        // Entity property name — TypeORM resolves this to the real
+        // column ("customerSnapshot", no name: override on the entity).
+        addressPatch.customerSnapshot = rechnung.customerSnapshot;
+      }
+      if (deliveryAddress !== undefined) {
+        rechnung.deliveryAddress = { ...deliveryAddress };
+        addressPatch.deliveryAddress = rechnung.deliveryAddress;
+      }
+    }
+
+    await rechnungRepo.save(rechnung);
+
+    // Fallback direct UPDATE, in case the entity-based save silently skips
+    // the json columns on some driver/version combos.
+    if (addressPatch) {
+      await rechnungRepo
+        .createQueryBuilder()
+        .update(Rechnung)
+        .set(addressPatch)
+        .where("id = :id", { id })
+        .execute();
+    }
+
+    const fullRechnung = await rechnungRepo.findOne({
+      where: { id: rechnung.id },
+      relations: ["items", "customer"],
+    });
+
+    res.json({
+      success: true,
+      message: "Rechnung updated successfully",
+      data: fullRechnung,
+    });
+  } catch (error) {
+    console.error("[updateRechnung] error:", error);
     next(error);
   }
 };

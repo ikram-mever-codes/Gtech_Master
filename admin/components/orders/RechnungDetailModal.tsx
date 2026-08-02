@@ -10,12 +10,12 @@ import {
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, FileText, LinkIcon } from "lucide-react";
-import { getRechnungById, deleteRechnung } from "@/api/rechnungen";
 import {
-  markInvoiceAsPaid,
-  generateInvoicePdf,
-  updateInvoice,
-} from "@/api/invoice";
+  getRechnungById,
+  deleteRechnung,
+  updateRechnung,
+} from "@/api/rechnungen";
+import { markInvoiceAsPaid, generateInvoicePdf } from "@/api/invoice";
 import { formatDate } from "@/utils/date";
 
 const formatDeCurrency = (val: number) => {
@@ -25,6 +25,12 @@ const formatDeCurrency = (val: number) => {
     maximumFractionDigits: 2,
   })} €`;
 };
+
+const formatWeight = (kg: number): string =>
+  `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })} kg`;
 
 const COUNTRY_CODES: Record<string, string> = {
   germany: "DE",
@@ -42,7 +48,8 @@ const getCountryCode = (country?: string): string => {
   return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
 };
 
-/** Copied verbatim from AuftragPreviewModal — same address rendering. */
+/** Same address rendering as AuftragPreviewModal, incl. suppressing the
+ * VAT ID line for German addresses. */
 const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   addr,
   emptyText,
@@ -61,9 +68,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
 
   return (
     <div className="space-y-1 text-sm text-gray-700">
-      {addr.legalName && addr.legalName !== addr.companyName && (
-        <div>{addr.legalName}</div>
-      )}
+      {addr.legalName && <div>{addr.legalName}</div>}
       {addr.contactName && <div>{addr.contactName}</div>}
       {addressLine && (
         <div className="whitespace-normal break-words">{addressLine}</div>
@@ -77,8 +82,6 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
     </div>
   );
 };
-
-/** Copied verbatim from AuftragPreviewModal — same "same as billing" check. */
 const normalizeAddrValue = (v: any): string =>
   (v || "").toString().trim().toLowerCase();
 
@@ -99,10 +102,7 @@ const isDeliverySameAsBilling = (deliveryAddr: any, snapshot: any): boolean => {
   );
 };
 
-const Field: React.FC<{
-  label: string;
-  value: any;
-}> = ({ label, value }) => (
+const Field: React.FC<{ label: string; value: any }> = ({ label, value }) => (
   <div>
     <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
       {label}
@@ -113,6 +113,17 @@ const Field: React.FC<{
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
+
+/** Billing/delivery address is only editable while the Rechnung is fresh —
+ * once older than 3 months, the snapshot is locked. */
+const THREE_MONTHS_MS = 1000 * 60 * 60 * 24 * 30 * 3;
+
+const isWithinEditableWindow = (dateStr: any): boolean => {
+  if (!dateStr) return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+  return Date.now() - d.getTime() <= THREE_MONTHS_MS;
+};
 
 interface RechnungDetailModalProps {
   isOpen: boolean;
@@ -135,18 +146,22 @@ export default function RechnungDetailModal({
 
   const [isEditing, setIsEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editRemark, setEditRemark] = useState("");
-  const [editFreightCost, setEditFreightCost] = useState("");
+  const [editInternalNotes, setEditInternalNotes] = useState("");
+  const [editPaymentMethod, setEditPaymentMethod] = useState("");
+  const [editPaymentTerms, setEditPaymentTerms] = useState("");
+  const [editShippingMethod, setEditShippingMethod] = useState("");
+  const [editCustomerSnapshot, setEditCustomerSnapshot] = useState<any>({});
+  const [editDeliveryAddress, setEditDeliveryAddress] = useState<any>({});
   const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !rechnung) return;
 
     setEditNotes(rechnung.notes || "");
-    setEditDescription(rechnung.description || "");
-    setEditRemark(rechnung.remark || "");
-    setEditFreightCost(rechnung.freightCost?.toString() || "");
+    setEditInternalNotes(rechnung.internal_notes || "");
+    setEditPaymentMethod(rechnung.payment_method || "");
+    setEditPaymentTerms(rechnung.payment_terms || "");
+    setEditShippingMethod(rechnung.shipping_method || "");
     setIsEditing(false);
 
     if (!rechnung.items || rechnung.items.length === 0) {
@@ -168,115 +183,89 @@ export default function RechnungDetailModal({
 
   const data = detailData || rechnung;
 
-  const invoiceItems: any[] =
-    data.items || data.lineItems || rechnung.items || [];
-  const customer =
-    data.customer || rechnung.customer || rechnung.customerSnapshot || {};
+  const invoiceItems: any[] = data.items || rechnung.items || [];
+
+  // RechnungCustomer relation — real field names only.
+  const rechnungCustomer = data.customer || rechnung.customer || {};
+
+  // Auftrag-style snapshot jsonb, if it was populated at creation time.
+  const snapshot = data.customerSnapshot || rechnung.customerSnapshot || null;
+
   const companyName =
-    customer.company_name ||
-    customer.companyName ||
-    customer.name ||
-    rechnung.bill_to ||
-    rechnung.customer_name ||
+    snapshot?.legalName ||
+    snapshot?.companyName ||
+    rechnungCustomer.company_name ||
     "—";
 
-  // Reshape into the same customerSnapshot-like object AddressBlock expects
-  // in AuftragPreviewModal — no fields invented, just remapped.
-  const billingAddr = {
-    legalName: customer.legalName || customer.legal_name,
-    companyName,
-    contactName: customer.contactName || customer.contact_name,
+  const billingAddrBase = {
+    legalName: companyName,
+    contactName: snapshot?.contactName,
     address:
-      customer.bill_to_address ||
-      customer.addressLine1 ||
-      customer.address ||
-      customer.street,
-    postalCode: customer.postalCode || customer.postal_code,
-    city: customer.city,
-    country: customer.country,
-    vatId:
-      customer.tax_number ||
-      customer.taxNumber ||
-      customer.vatId ||
-      customer.vatTaxId,
-    contactPhone: customer.phone || customer.contactPhoneNumber,
+      snapshot?.address || snapshot?.street || rechnungCustomer.bill_to_address,
+    postalCode: snapshot?.postalCode,
+    city: snapshot?.city || rechnungCustomer.city,
+    country: snapshot?.country || rechnungCustomer.country,
+    vatId: snapshot?.vatId || rechnungCustomer.tax_number,
+    contactPhone: snapshot?.contactPhoneNumber || rechnungCustomer.phone,
   };
 
-  const shipToRaw =
-    data.ship_to || rechnung.ship_to || customer.ship_to_address || null;
-  const deliveryAddr =
-    shipToRaw && typeof shipToRaw === "object"
-      ? shipToRaw
-      : shipToRaw
-        ? { street: shipToRaw }
-        : null;
+  const deliveryAddressRaw =
+    data.deliveryAddress || rechnung.deliveryAddress || null;
+  const deliveryAddrBase =
+    deliveryAddressRaw ||
+    (rechnungCustomer.ship_to_address
+      ? { street: rechnungCustomer.ship_to_address }
+      : {});
 
-  const netTotal = Number(
-    data.subtotal ??
-      rechnung.subtotal ??
-      data.netTotal ??
-      rechnung.netTotal ??
-      0,
-  );
-  const taxAmount = Number(
-    data.tax_amount ??
-      rechnung.tax_amount ??
-      data.taxAmount ??
-      rechnung.taxAmount ??
-      0,
-  );
-  const grossTotal = Number(
-    data.total_amount ??
-      rechnung.total_amount ??
-      data.grossTotal ??
-      rechnung.grossTotal ??
-      0,
-  );
-  const taxRate = Number(
-    data.tax_rate ??
-      rechnung.tax_rate ??
-      data.taxRate ??
-      rechnung.taxRate ??
-      19,
-  );
+  const netTotal = Number(data.subtotal ?? rechnung.subtotal ?? 0);
+  const taxAmount = Number(data.tax_amount ?? rechnung.tax_amount ?? 0);
+  const grossTotal = Number(data.total_amount ?? rechnung.total_amount ?? 0);
+  const taxRate = Number(data.tax_rate ?? rechnung.tax_rate ?? 19);
 
   const invoiceNumber =
-    data.invoice_number ||
-    rechnung.invoice_number ||
-    data.invoiceNumber ||
-    rechnung.invoiceNumber ||
-    rechnung.id;
+    data.invoice_number || rechnung.invoice_number || rechnung.id;
+  const auftragNo = data.auftrag_no || rechnung.auftrag_no || "—";
 
-  const deliveryDate =
-    data.delivery_date ||
-    rechnung.delivery_date ||
-    data.deliveryDate ||
-    rechnung.deliveryDate ||
+  const invoiceDate =
+    data.invoice_date ||
+    rechnung.invoice_date ||
+    data.created_at ||
+    rechnung.created_at ||
     "";
+  const deliveryDate = data.delivery_date || rechnung.delivery_date || "";
 
-  const paymentMethod =
-    data.payment_method ||
-    rechnung.payment_method ||
-    data.paymentMethod ||
-    rechnung.paymentMethod ||
-    customer.defaultPaymentMethod ||
-    customer.paymentMethod ||
-    "";
-  const shippingMethod =
-    data.shipping_method ||
-    rechnung.shipping_method ||
-    data.shippingMethod ||
-    rechnung.shippingMethod ||
-    customer.defaultShippingMethod ||
-    customer.shippingMethod ||
-    "";
+  const paymentMethod = data.payment_method || rechnung.payment_method || "";
+  const paymentTerms = data.payment_terms || rechnung.payment_terms || "";
+  const shippingMethod = data.shipping_method || rechnung.shipping_method || "";
 
-  const displayTitle =
-    data.title || rechnung.title || rechnung.description || invoiceNumber;
+  // Weight is only tracked at the line-item level on RechnungItem.
+  const netWeightKg = invoiceItems.reduce((sum, it) => {
+    const qty = Number(it.quantity) || 1;
+    return sum + (Number(it.weight) || 0) * qty;
+  }, 0);
+  const extraWeightKg = invoiceItems.reduce(
+    (sum, it) => sum + (Number(it.extraWeight) || 0),
+    0,
+  );
+  const totalWeightKg = netWeightKg + extraWeightKg;
+
+  const addressEditable = isWithinEditableWindow(invoiceDate);
+
+  const startEdit = () => {
+    setEditCustomerSnapshot({ ...billingAddrBase });
+    setEditDeliveryAddress({ ...deliveryAddrBase });
+    setIsEditing(true);
+  };
+  const cancelEdit = () => setIsEditing(false);
+
+  const currentBillingAddr = isEditing ? editCustomerSnapshot : billingAddrBase;
+  const currentDeliveryAddr = isEditing
+    ? editDeliveryAddress
+    : deliveryAddrBase;
 
   const deliverySameAsBilling = isDeliverySameAsBilling(
-    deliveryAddr,
-    billingAddr,
+    currentDeliveryAddr,
+    currentBillingAddr,
   );
 
   const handleMarkAsPaid = async () => {
@@ -326,13 +315,27 @@ export default function RechnungDetailModal({
   const handleSaveEdits = async () => {
     try {
       setSavingEdit(true);
-      await updateInvoice({
-        id: rechnung.id,
+      const res: any = await updateRechnung(rechnung.id, {
         notes: editNotes,
-        description: editDescription,
-        remark: editRemark,
-        freightCost: editFreightCost ? Number(editFreightCost) : undefined,
+        internalNotes: editInternalNotes,
+        paymentMethod: editPaymentMethod,
+        paymentTerms: editPaymentTerms,
+        shippingMethod: editShippingMethod,
+        ...(addressEditable
+          ? {
+              customerSnapshot: editCustomerSnapshot,
+              deliveryAddress: editDeliveryAddress,
+            }
+          : {}),
       });
+
+      // The backend already returns the full updated Rechnung — use it
+      // directly instead of waiting on the parent to hand back fresh props.
+      const updated = res?.data ?? res;
+      if (updated) {
+        setDetailData(updated);
+      }
+
       toast.success("Rechnung updated!", successStyles);
       setIsEditing(false);
       onSuccess();
@@ -355,7 +358,7 @@ export default function RechnungDetailModal({
               </p>
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {displayTitle}
+              {companyName}
             </h2>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
@@ -384,25 +387,167 @@ export default function RechnungDetailModal({
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
                 <div className="md:col-span-1 flex flex-col gap-3">
                   <div className="block mb-1">
-                    <AddressBlock
-                      addr={billingAddr}
-                      emptyText="No customer snapshot."
-                    />
+                    {isEditing && addressEditable ? (
+                      <div className="space-y-1.5">
+                        <input
+                          className={inputCls}
+                          placeholder="Legal name"
+                          value={editCustomerSnapshot?.legalName || ""}
+                          onChange={(e) =>
+                            setEditCustomerSnapshot((s: any) => ({
+                              ...s,
+                              legalName: e.target.value,
+                            }))
+                          }
+                        />
+
+                        <input
+                          className={inputCls}
+                          placeholder="Street"
+                          value={
+                            editCustomerSnapshot?.address ||
+                            editCustomerSnapshot?.street ||
+                            ""
+                          }
+                          onChange={(e) =>
+                            setEditCustomerSnapshot((s: any) => ({
+                              ...s,
+                              address: e.target.value,
+                            }))
+                          }
+                        />
+                        <div className="flex gap-1.5">
+                          <input
+                            className={inputCls}
+                            placeholder="Postal code"
+                            value={editCustomerSnapshot?.postalCode || ""}
+                            onChange={(e) =>
+                              setEditCustomerSnapshot((s: any) => ({
+                                ...s,
+                                postalCode: e.target.value,
+                              }))
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="City"
+                            value={editCustomerSnapshot?.city || ""}
+                            onChange={(e) =>
+                              setEditCustomerSnapshot((s: any) => ({
+                                ...s,
+                                city: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <input
+                          className={inputCls}
+                          placeholder="Country"
+                          value={editCustomerSnapshot?.country || ""}
+                          onChange={(e) =>
+                            setEditCustomerSnapshot((s: any) => ({
+                              ...s,
+                              country: e.target.value,
+                            }))
+                          }
+                        />
+                        {editCustomerSnapshot?.country?.toLowerCase() !==
+                          "germany" &&
+                          editCustomerSnapshot?.country?.toLowerCase() !==
+                            "deutschland" &&
+                          editCustomerSnapshot?.country?.toLowerCase() !==
+                            "de" && (
+                            <input
+                              className={inputCls}
+                              placeholder="VAT ID"
+                              value={editCustomerSnapshot?.vatId || ""}
+                              onChange={(e) =>
+                                setEditCustomerSnapshot((s: any) => ({
+                                  ...s,
+                                  vatId: e.target.value,
+                                }))
+                              }
+                            />
+                          )}
+                      </div>
+                    ) : (
+                      <>
+                        <AddressBlock
+                          addr={billingAddrBase}
+                          emptyText="No customer snapshot."
+                        />
+                        {isEditing && !addressEditable && (
+                          <p className="text-[11px] text-amber-600 mt-1.5">
+                            This Rechnung is older than 3 months — the billing
+                            address can no longer be edited.
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   <div className="block mb-1">
-                    {!deliverySameAsBilling && (
+                    {(isEditing || !deliverySameAsBilling) && (
                       <span className="text-sm font-bold text-gray-900">
                         Delivery:
                       </span>
                     )}
-                    {deliverySameAsBilling ? (
+                    {isEditing && addressEditable ? (
+                      <div className="space-y-1.5 mt-1">
+                        <input
+                          className={inputCls}
+                          placeholder="Street"
+                          value={editDeliveryAddress?.street || ""}
+                          onChange={(e) =>
+                            setEditDeliveryAddress((s: any) => ({
+                              ...s,
+                              street: e.target.value,
+                            }))
+                          }
+                        />
+                        <div className="flex gap-1.5">
+                          <input
+                            className={inputCls}
+                            placeholder="Postal code"
+                            value={editDeliveryAddress?.postalCode || ""}
+                            onChange={(e) =>
+                              setEditDeliveryAddress((s: any) => ({
+                                ...s,
+                                postalCode: e.target.value,
+                              }))
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="City"
+                            value={editDeliveryAddress?.city || ""}
+                            onChange={(e) =>
+                              setEditDeliveryAddress((s: any) => ({
+                                ...s,
+                                city: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <input
+                          className={inputCls}
+                          placeholder="Country"
+                          value={editDeliveryAddress?.country || ""}
+                          onChange={(e) =>
+                            setEditDeliveryAddress((s: any) => ({
+                              ...s,
+                              country: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    ) : deliverySameAsBilling ? (
                       <div className="text-sm text-gray-500">
                         Same Delivery Address
                       </div>
                     ) : (
                       <AddressBlock
-                        addr={deliveryAddr}
+                        addr={deliveryAddrBase}
                         emptyText="No delivery address set."
                       />
                     )}
@@ -410,37 +555,54 @@ export default function RechnungDetailModal({
                 </div>
 
                 <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                  {isEditing ? (
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-                        TITLE
-                      </p>
-                      <input
-                        className={inputCls}
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                      />
-                    </div>
-                  ) : (
-                    <Field label="TITLE" value={displayTitle} />
-                  )}
+                  <Field label="AUFTRAG NO" value={auftragNo} />
                   <Field label="TAX PROFILE" value={`DE-VAT (${taxRate}%)`} />
                   <Field
                     label="Delivery Date"
                     value={deliveryDate ? formatDate(deliveryDate) : ""}
                   />
-                  <Field label="Payment method" value={paymentMethod} />
-                  <Field
-                    label="Payment terms"
-                    value={
-                      data.payment_terms ||
-                      rechnung.payment_terms ||
-                      data.paymentTerms ||
-                      rechnung.paymentTerms ||
-                      "30 days net"
-                    }
-                  />
-                  <Field label="Shipping method" value={shippingMethod} />
+                  {isEditing ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                        Payment method
+                      </p>
+                      <input
+                        className={inputCls}
+                        value={editPaymentMethod}
+                        onChange={(e) => setEditPaymentMethod(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <Field label="Payment method" value={paymentMethod} />
+                  )}
+                  {isEditing ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                        Payment terms
+                      </p>
+                      <input
+                        className={inputCls}
+                        value={editPaymentTerms}
+                        onChange={(e) => setEditPaymentTerms(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <Field label="Payment terms" value={paymentTerms} />
+                  )}
+                  {isEditing ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                        Shipping method
+                      </p>
+                      <input
+                        className={inputCls}
+                        value={editShippingMethod}
+                        onChange={(e) => setEditShippingMethod(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <Field label="Shipping method" value={shippingMethod} />
+                  )}
                 </div>
               </div>
 
@@ -461,6 +623,9 @@ export default function RechnungDetailModal({
                         <th className="px-2 py-2 text-left font-semibold text-gray-600">
                           Bezeichnung
                         </th>
+                        <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                          Remark
+                        </th>
                         <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
                           MwSt.
                         </th>
@@ -479,7 +644,7 @@ export default function RechnungDetailModal({
                       {invoiceItems.length === 0 && (
                         <tr>
                           <td
-                            colSpan={8}
+                            colSpan={9}
                             className="text-center py-6 text-sm text-gray-500"
                           >
                             No line items found.
@@ -487,20 +652,17 @@ export default function RechnungDetailModal({
                         </tr>
                       )}
                       {invoiceItems.map((item: any, idx: number) => {
-                        const qty = Number(item.quantity || item.qty || 1);
+                        const qty = Number(item.quantity) || 1;
                         const unitPrice = Number(
-                          item.unitPrice || item.price || item.netPrice || 0,
+                          item.price ?? item.unit_price_eur ?? 0,
                         );
-                        const lineTotal = qty * unitPrice;
-                        const taxRate = Number(item.taxRate || 19);
-                        const articleNumber =
-                          item.articleNumber || item.artNr || item.ean || "—";
-                        const description =
-                          item.description ||
-                          item.itemName ||
-                          item.item_name ||
-                          "Line Item";
-                        const photo = item.photo || item.image || null;
+                        const lineTotal = Number(
+                          item.total_price ?? item.lineTotal ?? qty * unitPrice,
+                        );
+                        const lineTaxRate = Number(item.taxRate ?? taxRate);
+                        const itemNo = item.itemNo || item.material || "—";
+                        const itemName = item.item_name || "Line Item";
+                        const remark = item.remark || item.notes || "";
 
                         return (
                           <tr key={item.id || idx}>
@@ -509,9 +671,9 @@ export default function RechnungDetailModal({
                             </td>
                             <td className="px-2 py-2">
                               <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
-                                {photo ? (
+                                {item.photo ? (
                                   <img
-                                    src={photo}
+                                    src={item.photo}
                                     alt="thumb"
                                     className="w-full h-full object-contain"
                                   />
@@ -522,10 +684,13 @@ export default function RechnungDetailModal({
                                 )}
                               </div>
                             </td>
-                            <td className="px-2 py-2">{articleNumber}</td>
-                            <td className="px-2 py-2">{description}</td>
+                            <td className="px-2 py-2">{itemNo}</td>
+                            <td className="px-2 py-2">{itemName}</td>
+                            <td className="px-2 py-2 text-gray-600">
+                              {remark || "—"}
+                            </td>
                             <td className="px-2 py-2 text-center text-gray-600">
-                              {taxRate}%
+                              {lineTaxRate}%
                             </td>
                             <td className="px-2 py-2 text-right">{qty}</td>
                             <td className="px-2 py-2 text-right">
@@ -546,15 +711,15 @@ export default function RechnungDetailModal({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Field
                     label="Net weight (items)"
-                    value={`${(data.netWeightKg || 0).toLocaleString("de-DE", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`}
+                    value={formatWeight(netWeightKg)}
                   />
                   <Field
                     label="Extra weight"
-                    value={`${(data.extraWeightKg || 0).toLocaleString("de-DE", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`}
+                    value={formatWeight(extraWeightKg)}
                   />
                   <Field
                     label="Total weight"
-                    value={`${(data.totalWeightKg || 0).toLocaleString("de-DE", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`}
+                    value={formatWeight(totalWeightKg)}
                   />
                 </div>
                 <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
@@ -565,7 +730,7 @@ export default function RechnungDetailModal({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">MwSt.</span>
+                    <span className="text-gray-600">MwSt. ({taxRate}%)</span>
                     <span className="font-medium">
                       {formatDeCurrency(taxAmount)}
                     </span>
@@ -577,7 +742,7 @@ export default function RechnungDetailModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
                 <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
                   <div className="flex items-center gap-2 mb-3">
                     <LinkIcon className="h-4 w-4 text-gray-500" />
@@ -586,7 +751,9 @@ export default function RechnungDetailModal({
                     </h3>
                   </div>
                   <p className="text-sm text-gray-500">
-                    No linked documents yet.
+                    {auftragNo !== "—"
+                      ? `Auftrag ${auftragNo}`
+                      : "No linked documents yet."}
                   </p>
                 </div>
                 <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
@@ -600,17 +767,13 @@ export default function RechnungDetailModal({
                     <textarea
                       rows={3}
                       className={inputCls}
-                      value={editRemark}
+                      value={editInternalNotes}
                       placeholder="Only visible to the team."
-                      onChange={(e) => setEditRemark(e.target.value)}
+                      onChange={(e) => setEditInternalNotes(e.target.value)}
                     />
                   ) : (
                     <p className="text-sm text-gray-600">
-                      {rechnung.internalNotes ||
-                        data.internalNotes ||
-                        rechnung.remark ||
-                        data.remark ||
-                        "—"}
+                      {rechnung.internal_notes || data.internal_notes || "—"}
                     </p>
                   )}
                 </div>
@@ -658,7 +821,7 @@ export default function RechnungDetailModal({
           </div>
           <div className="flex gap-2">
             <button
-              onClick={isEditing ? () => setIsEditing(false) : onClose}
+              onClick={isEditing ? cancelEdit : onClose}
               className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               {isEditing ? "Cancel" : "Close"}
@@ -680,7 +843,7 @@ export default function RechnungDetailModal({
               type="button"
               onClick={() => {
                 if (isEditing) handleSaveEdits();
-                else setIsEditing(true);
+                else startEdit();
               }}
               disabled={savingEdit}
               className="px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50"

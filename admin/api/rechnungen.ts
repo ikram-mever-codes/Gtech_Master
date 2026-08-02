@@ -2,7 +2,12 @@ import { api, handleApiError } from "@/utils/api";
 
 export const createRechnungFromAuftrag = async (
   auftragId: string | number,
-  selectedItems: Array<{ lineItemId: string; qty: number; price: number; itemName?: string }>,
+  selectedItems: Array<{
+    lineItemId: string;
+    qty: number;
+    price: number;
+    itemName?: string;
+  }>,
   notes?: string,
   extra?: { deliveryDate?: string; warehouse?: "CN" | "EU" },
 ) => {
@@ -54,6 +59,29 @@ export const deleteRechnung = async (id: string | number) => {
     return response;
   } catch (error: any) {
     handleApiError(error, "Failed to delete Rechnung");
+    throw error;
+  }
+};
+
+export const updateRechnung = async (
+  id: string | number,
+  updates: {
+    notes?: string;
+    internalNotes?: string;
+    paymentMethod?: string;
+    paymentTerms?: string;
+    shippingMethod?: string;
+    deliveryTerms?: string;
+    termsConditions?: string;
+    customerSnapshot?: any;
+    deliveryAddress?: any;
+  },
+) => {
+  try {
+    const response: any = await api.patch(`/rechnungen/${id}`, updates);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to update Rechnung");
     throw error;
   }
 };
