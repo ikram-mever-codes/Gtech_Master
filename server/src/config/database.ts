@@ -48,6 +48,7 @@ import { PaymentMethod } from "../models/payment_methods";
 import { ShippingMethod } from "../models/shipping_methods";
 import { NumberSequence } from "../models/number_sequence";
 import { GtechCompany } from "../models/gtech_company";
+import { SystemParameter } from "../models/system_parameter";
 
 import { CustomerOrder } from "../models/customer_orders";
 import { CustomerOrderItem } from "../models/customer_order_items";
@@ -132,6 +133,7 @@ export const AppDataSource = new DataSource({
     RechnungCustomer,
     RechnungItem,
     GtechCompany,
+    SystemParameter,
   ],
   extra: {
     ssl:

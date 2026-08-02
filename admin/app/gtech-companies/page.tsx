@@ -228,7 +228,7 @@ export default function GtechCompaniesPage() {
         setShowCreateModal(true);
       }}
     >
-      +GTech
+      GTech
     </CustomButton>
   );
 
@@ -612,9 +612,6 @@ export default function GtechCompaniesPage() {
           <Building2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 font-medium font-poppins">
             No GTech companies found.
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Click "+GTech" to create a new GTech company record.
           </p>
         </div>
       ) : (
