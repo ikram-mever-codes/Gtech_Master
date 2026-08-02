@@ -628,16 +628,6 @@ async function createOrderFromBestellung(
   }
 
   const now = new Date();
-  let orderNo = "";
-  try {
-    orderNo = await NumberSequenceService.getNextNumber("order");
-  } catch (err) {
-    console.warn("Could not generate sequence number for order:", err);
-    const yy = now.getFullYear().toString().slice(-2);
-    const mm = (now.getMonth() + 1).toString().padStart(2, "0");
-    orderNo = `B${yy}${mm}-${Date.now().toString().slice(-4)}`;
-  }
-
   const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
     now.getMonth() + 1
   )
@@ -650,17 +640,37 @@ async function createOrderFromBestellung(
     const orderRepo = manager.getRepository(Order);
     const orderItemRepo = manager.getRepository(OrderItem);
 
+    // Order.order_no is unique — check for a pre-existing Order with the
+    // same order_no before insert, since a Bestellung could theoretically
+    // be reprocessed. Guards against a duplicate-key failure instead of
+    // silently colliding.
+    const existing = await orderRepo.findOne({
+      where: { order_no: bestellung.order_no },
+    });
+    if (existing) {
+      createdOrderId = existing.id;
+      console.warn(
+        `Order ${bestellung.order_no} already exists (id ${existing.id}) — reusing it instead of creating a duplicate.`,
+      );
+      return;
+    }
+
     const order = orderRepo.create({
-      order_no: orderNo,
+      // Reuse the Bestellung's own order_no rather than generating a new
+      // sequence number — it's already unique and identifies the same
+      // commercial document.
+      order_no: bestellung.order_no,
       customer_id: bestellung.customer_id || undefined,
+      category_id: undefined,
       // 1 = Draft/New, matching the status codes already used in the
       // Order status filter dropdown on the frontend.
       status: 1,
       comment:
-        bestellung.notes ||
+        [bestellung.title, bestellung.notes].filter(Boolean).join(" — ") ||
         `Created automatically from Bestellung ${bestellung.order_no}`,
       supplier_id: bestellung.supplier_id || undefined,
-      date_created: dateCreatedStr,
+      cargo_id: undefined,
+      date_created: bestellung.date_created || dateCreatedStr,
       date_delivery: bestellung.date_delivery || undefined,
     });
     const savedOrder = await orderRepo.save(order);
@@ -678,7 +688,7 @@ async function createOrderFromBestellung(
           li.transferPrice !== undefined && li.transferPrice !== null
             ? li.transferPrice
             : (li.purchasePrice ?? undefined),
-        currency: li.purchaseCurrency || "EUR",
+        currency: li.purchaseCurrency || bestellung.currency || "EUR",
         status: "NSO",
       }),
     );
@@ -686,7 +696,7 @@ async function createOrderFromBestellung(
   });
 
   console.log(
-    `Bestellung ${bestellung.order_no} → created Order ${orderNo} (id ${createdOrderId}) with ${catalogItems.length} item(s), ${skippedCount} Freizeile line(s) skipped.`,
+    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${catalogItems.length} item(s), ${skippedCount} Freizeile line(s) skipped.`,
   );
 
   return { createdOrderId, skippedCount };
