@@ -57,7 +57,7 @@ export const SETTINGS_TABS = [
   },
   {
     id: "weiterversand-service-providers",
-    label: "WeiterversandServiceProviders",
+    label: "Weiterversand",
     href: "/weiterversand-service-providers",
   },
 ];
