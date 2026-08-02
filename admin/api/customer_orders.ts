@@ -177,8 +177,21 @@ export const previewOrderLineItemPrice = async (
 
 export const formatCurrency = (
   amount: number,
-  currency: string = "EUR",
-): string =>
-  new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(
-    Number(amount) || 0,
-  );
+  currency?: string | null,
+): string => {
+  const safeCurrency =
+    currency && typeof currency === "string" && currency.trim()
+      ? currency.trim().toUpperCase()
+      : "EUR";
+  try {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: safeCurrency,
+    }).format(Number(amount) || 0);
+  } catch (e) {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(Number(amount) || 0);
+  }
+};

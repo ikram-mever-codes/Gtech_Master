@@ -24,6 +24,10 @@ import {
 import { getItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
+import {
+  getWeiterversandServiceProviders,
+  WeiterversandServiceProvider,
+} from "@/api/weiterversand_service_providers";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { parseFlexibleNumber } from "@/utils/decimal";
@@ -292,13 +296,16 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     taxRate: "",
   });
 
+  const [dbServiceProviders, setDbServiceProviders] = useState<WeiterversandServiceProvider[]>([]);
+
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
       try {
-        const [pmRes, smRes]: any = await Promise.all([
+        const [pmRes, smRes, spRes]: any = await Promise.all([
           getAllPaymentMethods(true).catch(() => ({ data: [] })),
           getAllShippingMethods(true).catch(() => ({ data: [] })),
+          getWeiterversandServiceProviders().catch(() => []),
         ]);
         setDbPaymentMethods(
           Array.isArray(pmRes?.data)
@@ -310,8 +317,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
             ? smRes.data.filter((sm: any) => sm.is_active)
             : [],
         );
+        setDbServiceProviders(Array.isArray(spRes) ? spRes : []);
       } catch (e) {
-        console.error("Failed to load payment/shipping methods:", e);
+        console.error("Failed to load payment/shipping/service providers:", e);
       }
     })();
   }, [isOpen]);
@@ -380,6 +388,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       dateDelivery: o.date_delivery || "",
       customerSnapshot: { ...(o.customerSnapshot || {}) },
       deliveryAddress: { ...(o.deliveryAddress || {}) },
+      auftragStatus: o.auftrag_status || "open",
+      realDeliveryDate: o.real_delivery_date || "",
+      isWeiterversand: Boolean(o.is_weiterversand),
+      weiterversandServiceProviderId: o.weiterversand_service_provider_id || o.weiterversandServiceProvider?.id || "",
+      weiterversandLabels: o.weiterversand_labels || "",
+      weiterversandTracking: o.weiterversand_tracking || "",
     };
   }
 
@@ -425,6 +439,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         dateDelivery: form.dateDelivery,
         customerSnapshot: form.customerSnapshot,
         deliveryAddress: form.deliveryAddress,
+        auftragStatus: form.auftragStatus,
+        realDeliveryDate: form.realDeliveryDate || null,
+        isWeiterversand: form.isWeiterversand,
+        weiterversandServiceProviderId: form.weiterversandServiceProviderId ? Number(form.weiterversandServiceProviderId) : null,
+        weiterversandLabels: form.weiterversandLabels,
+        weiterversandTracking: form.weiterversandTracking,
       });
       if (res.success) {
         toast.success("Auftrag updated successfully.", successStyles);
@@ -507,8 +527,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         const confirmed = window.confirm(
           `There is a sales price for quantity ${newQty}: ${formatCurrency(
             tieredPrice,
-            order.currency,
-          )}. Override the current price (${formatCurrency(currentPrice, order.currency)}) with it?`,
+            order?.currency || "EUR",
+          )}. Override the current price (${formatCurrency(currentPrice, order?.currency || "EUR")}) with it?`,
         );
         if (confirmed) {
           await persistLine(item.id, { quantity: newQty, price: tieredPrice });
@@ -958,6 +978,127 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   ))}
                 </select>
               </Field>
+
+              {/* Auftrag Extra Fields */}
+              <Field
+                label="Auftrag Status"
+                edit={edit}
+                value={
+                  order.auftrag_status === "delivered"
+                    ? "Delivered"
+                    : order.auftrag_status === "partially_delivered"
+                      ? "Partially Delivered"
+                      : "Open"
+                }
+              >
+                <select
+                  className={inputCls}
+                  value={form.auftragStatus || "open"}
+                  onChange={(e) => patch({ auftragStatus: e.target.value })}
+                >
+                  <option value="open">Open</option>
+                  <option value="partially_delivered">Partially Delivered</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              </Field>
+
+              <Field
+                label="Real Delivery Date"
+                edit={edit}
+                value={
+                  order.real_delivery_date ? formatDate(order.real_delivery_date) : "—"
+                }
+              >
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={toDateInputValue(form.realDeliveryDate)}
+                  onChange={(e) => patch({ realDeliveryDate: e.target.value })}
+                />
+              </Field>
+
+              <Field
+                label="Weiterversand"
+                edit={edit}
+                value={order.is_weiterversand ? "Yes" : "No"}
+              >
+                <select
+                  className={inputCls}
+                  value={form.isWeiterversand ? "Yes" : "No"}
+                  onChange={(e) => patch({ isWeiterversand: e.target.value === "Yes" })}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </Field>
+
+              {(edit || order.is_weiterversand || form.isWeiterversand) && (
+                <>
+                  <Field
+                    label="Weiterversand Service Provider"
+                    edit={edit}
+                    value={order.weiterversandServiceProvider?.name || "—"}
+                  >
+                    <select
+                      className={inputCls}
+                      value={form.weiterversandServiceProviderId || ""}
+                      onChange={(e) =>
+                        patch({ weiterversandServiceProviderId: e.target.value })
+                      }
+                    >
+                      <option value="">Select Provider…</option>
+                      {dbServiceProviders.map((sp) => (
+                        <option key={sp.id} value={sp.id}>
+                          {sp.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field
+                    label="Weiterversand Labels"
+                    edit={edit}
+                    value={
+                      order.weiterversand_labels ? (
+                        <a
+                          href={order.weiterversand_labels}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
+                        >
+                          <LinkIcon className="w-3.5 h-3.5" /> Open Label(s)
+                        </a>
+                      ) : (
+                        "—"
+                      )
+                    }
+                  >
+                    <input
+                      type="text"
+                      className={inputCls}
+                      placeholder="Label URL / Link"
+                      value={form.weiterversandLabels || ""}
+                      onChange={(e) => patch({ weiterversandLabels: e.target.value })}
+                    />
+                  </Field>
+
+                  <Field
+                    label="Weiterversand Tracking"
+                    edit={edit}
+                    value={order.weiterversand_tracking || "—"}
+                  >
+                    <input
+                      type="text"
+                      className={inputCls}
+                      placeholder="Tracking No."
+                      value={form.weiterversandTracking || ""}
+                      onChange={(e) =>
+                        patch({ weiterversandTracking: e.target.value })
+                      }
+                    />
+                  </Field>
+                </>
+              )}
             </div>
           </div>
 
@@ -1132,12 +1273,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                             />
                           ) : (
                             <div className="text-right">
-                              {formatCurrency(item.price || 0, order.currency)}
+                              {formatCurrency(item.price || 0, order?.currency || "EUR")}
                             </div>
                           )}
                         </td>
                         <td className="px-2 py-2 text-right font-medium">
-                          {formatCurrency(total || 0, order.currency)}
+                          {formatCurrency(total || 0, order?.currency || "EUR")}
                         </td>
                         {edit && (
                           <td className="px-2 py-2 text-center">
@@ -1213,7 +1354,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           <div className="text-right font-medium">
                             {formatCurrency(
                               order.shipping_cost || 0,
-                              order.currency,
+                              order?.currency || "EUR",
                             )}
                           </div>
                         )}
@@ -1222,7 +1363,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         {formatCurrency(
                           (form.shippingCost || 0) *
                           (form.shippingQuantity || 1),
-                          order.currency,
+                          order?.currency || "EUR",
                         )}
                       </td>
                       {edit && <td />}
@@ -1358,14 +1499,14 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium">
-                  {formatCurrency(order.subtotal || 0, order.currency)}
+                  {formatCurrency(order.subtotal || 0, order?.currency || "EUR")}
                 </span>
               </div>
               {order.discount_amount > 0 && (
                 <div className="flex justify-between text-rose-600">
                   <span>Discount</span>
                   <span>
-                    −{formatCurrency(order.discount_amount, order.currency)}
+                    −{formatCurrency(order.discount_amount, order?.currency || "EUR")}
                   </span>
                 </div>
               )}
@@ -1376,13 +1517,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   <div key={g.rate} className="flex justify-between">
                     <span className="text-gray-600">VAT ({g.rate}%)</span>
                     <span className="font-medium">
-                      {formatCurrency(g.tax, order.currency)}
+                      {formatCurrency(g.tax, order?.currency || "EUR")}
                     </span>
                   </div>
                 ))}
               <div className="border-t pt-2 flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>{formatCurrency(displayTotal, order.currency)}</span>
+                <span>{formatCurrency(displayTotal, order?.currency || "EUR")}</span>
               </div>
             </div>
           </div>
