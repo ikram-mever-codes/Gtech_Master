@@ -27,7 +27,7 @@ export class RechnungItem {
 
   // --- Basic Item Info ---
   @Column({ type: "varchar", length: 255 })
-  itemName!: string;
+  item_name!: string; // Changed from itemName to match controller
 
   @Column({ type: "varchar", length: 255, nullable: true })
   itemNo?: string;
@@ -52,7 +52,7 @@ export class RechnungItem {
     default: 1,
     transformer: numericTransformer,
   })
-  qty!: number;
+  quantity!: number; // Changed from qty to match controller
 
   @Column({
     type: "decimal",
@@ -122,6 +122,15 @@ export class RechnungItem {
   })
   unit_price_eur!: number;
 
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  total_price!: number; // Added to match controller
+
   // --- Weights ---
   @Column({ type: "float", nullable: true })
   weight?: number;
@@ -154,9 +163,16 @@ export class RechnungItem {
   })
   sourceItemId?: string;
 
+  // --- Order Reference ---
+  @Column({ type: "varchar", length: 100, nullable: true })
+  order_no?: string; // Added to match controller
+
   // --- Remarks ---
   @Column({ type: "text", nullable: true })
   notes?: string;
+
+  @Column({ type: "text", nullable: true })
+  remark?: string; // Added to match controller (used for remark field)
 
   @Column({ type: "text", nullable: true })
   remark_order_item?: string;

@@ -472,11 +472,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   };
 
   const handleSave = async () => {
-    if (!form.title?.trim()) {
-      toast.error("Title can't be empty.", errorStyles);
-      return;
-    }
-
     if (form.receiver === "Supplier" && !form.supplierId) {
       toast.error("Select a supplier for this Bestellung.", errorStyles);
       return;
@@ -626,7 +621,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       console.error("Couldn't add the Freizeile:", e);
     }
   };
-
   const addExistingItem = async (it: any) => {
     if (!order && !isCreate) return;
     try {
@@ -663,19 +657,11 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
         sourceItemId: String(it.id),
       });
 
-      // First catalog item on a Bestellung with no supplier chosen yet —
-      // lock the Bestellung to this item's supplier.
-      if (!lockedSupplierId && itemSupplierId !== undefined) {
-        try {
-          await updateTransferOrder(order.id, {
-            receiver: "Supplier",
-            supplierId: itemSupplierId,
-          });
-          patch({ receiver: "Supplier", supplierId: itemSupplierId });
-        } catch (e) {
-          console.error("Couldn't lock Bestellung supplier:", e);
-        }
-      }
+      // Do NOT auto-change receiver/supplier here — that's a user-driven
+      // decision made via the Receiver/Supplier dropdowns. The item's
+      // supplier is still enforced for the picker via lockedSupplierId,
+      // which is derived from orderItemSupplierById once refreshLocal()
+      // reloads the order below — no server-side receiver update needed.
 
       setShowItemPicker(false);
       setItemPickerSearch("");
@@ -685,7 +671,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       console.error("Couldn't add the item:", e);
     }
   };
-
   const removeLineItem = async (lineItemId: string) => {
     if (!order || isCreate) return;
     if (!window.confirm("Remove this line item?")) return;

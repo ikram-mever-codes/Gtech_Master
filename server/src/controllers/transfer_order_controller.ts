@@ -727,13 +727,9 @@ export const createTransferOrder = async (
       customerId,
     } = req.body;
 
-    if (!title?.trim()) {
-      res.status(400).json({
-        success: false,
-        message: "Title is required",
-      });
-      return;
-    }
+    // Title is now optional - remove the validation
+    // Just trim it if provided, or set to empty string
+    const trimmedTitle = title?.trim() || "";
 
     // Validate customer exists - only if customerId is provided
     let customer = null;
@@ -770,8 +766,8 @@ export const createTransferOrder = async (
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const transferOrder = transferOrderRepo.create({
       order_no: orderNo,
-      customer_id: customerId || undefined, // Optional - can be undefined
-      title: title.trim(),
+      customer_id: customerId || undefined,
+      title: trimmedTitle,
       status: status,
       currency: currency,
       notes: notes || "",
