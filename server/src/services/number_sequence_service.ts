@@ -7,6 +7,7 @@ import { Offer } from "../models/offer";
 import { Order } from "../models/orders";
 import { Inquiry } from "../models/inquiry";
 import { CCIInvoice } from "../models/cci_invoice";
+import { Rechnung } from "../models/rechnung";
 
 const entityMapping: Record<string, { entity: any; column: string }> = {
   customer: { entity: Customer, column: "customerNumber" },
@@ -126,24 +127,32 @@ export class NumberSequenceService {
           runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
         } else if (sequenceKey === "invoice") {
           sequence.prefix = "R";
-          const cciInvoices = await manager
-            .getRepository(CCIInvoice)
-            .createQueryBuilder("inv")
-            .select(["inv.invoice_number"])
-            .where("inv.invoice_number LIKE 'R%'")
-            .getMany();
+          sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
+
+          const [rechnungen, cciInvoices, legacyInvoices] = await Promise.all([
+            manager.getRepository(Rechnung).find({ select: ["invoice_number"] }),
+            manager.getRepository(CCIInvoice).find({ select: ["invoice_number"] }),
+            manager.getRepository(Invoice).find({ select: ["invoiceNumber"] }),
+          ]);
 
           let maxNum = 0;
-          for (const inv of cciInvoices) {
-            if (inv.invoice_number) {
-              const parts = String(inv.invoice_number).split("-");
+          const checkNum = (invNo?: string) => {
+            if (!invNo) return;
+            const str = String(invNo).trim();
+            if (str.toUpperCase().startsWith("R")) {
+              const parts = str.split("-");
               const lastPart = parts[parts.length - 1];
               const parsed = parseInt(lastPart, 10);
               if (!isNaN(parsed) && parsed > maxNum) {
                 maxNum = parsed;
               }
             }
-          }
+          };
+
+          rechnungen.forEach((r) => checkNum(r.invoice_number));
+          cciInvoices.forEach((c) => checkNum(c.invoice_number));
+          legacyInvoices.forEach((i) => checkNum(i.invoiceNumber));
+
           runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
         } else if (sequenceKey === "delivery_note") {
           sequence.prefix = "L";
@@ -253,7 +262,7 @@ export class NumberSequenceService {
       { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "order", name: "Auftrag", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
-      { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       {
         sequenceKey: "invoice_correction",
         name: "Rechnungskorrektur",

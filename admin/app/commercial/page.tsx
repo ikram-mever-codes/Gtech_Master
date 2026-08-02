@@ -1932,9 +1932,25 @@ const InvoiceListPage: React.FC = () => {
         items: b.orderItems || b.items || [],
       }));
     } else if (activeInvTab === "rechnung") {
-      list = invoices.filter(
+      const mappedRechnungen = (rechnungen || []).map((r: any) => ({
+        ...r,
+        invoiceNumber: r.invoice_number || r.invoiceNumber || r.id,
+        invoiceDate: r.invoice_date || r.invoiceDate,
+        createdAt: r.created_at || r.createdAt || r.invoice_date,
+        netTotal: r.subtotal,
+        grossTotal: r.total_amount || r.grossTotal,
+        customer_name: r.customer?.company_name || r.customer?.name || r.customer_name || "—",
+        customerSnapshot: {
+          companyName: r.customer?.company_name || r.customer?.name || "—",
+          email: r.customer?.email || "—",
+          country: r.customer?.country || "",
+          city: r.customer?.city || "",
+        },
+      }));
+      const filteredInvoices = (invoices || []).filter(
         (inv: any) => inv.status !== "paid" && inv.status !== "cancelled",
       );
+      list = [...mappedRechnungen, ...filteredInvoices];
     } else if (activeInvTab === "rk") {
       list = invoices.filter(
         (inv: any) => inv.status === "paid" || inv.status === "cancelled",

@@ -49,6 +49,11 @@ export const SETTINGS_TABS = [
     label: "Parameters & Templates",
     href: "/parameters-templates",
   },
+  {
+    id: "payment-accounts",
+    label: "PaymentAccounts",
+    href: "/payment-accounts",
+  },
 ];
 
 export default function SettingsTabs() {
