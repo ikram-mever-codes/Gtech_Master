@@ -735,14 +735,6 @@ export const createTransferOrder = async (
       return;
     }
 
-    if (!customerId) {
-      res.status(400).json({
-        success: false,
-        message: "Customer is required",
-      });
-      return;
-    }
-
     // Validate customer exists
     const customerRepo = AppDataSource.getRepository(Customer);
     const customer = await customerRepo.findOne({

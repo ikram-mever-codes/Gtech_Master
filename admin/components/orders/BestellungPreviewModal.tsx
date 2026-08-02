@@ -385,12 +385,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       return;
     }
 
-    // For create mode, customer is required
-    if (isCreate && !selectedCustomerId) {
-      toast.error("Please select a customer.", errorStyles);
-      return;
-    }
-
     if (form.receiver === "Supplier" && !form.supplierId) {
       toast.error("Select a supplier for this Bestellung.", errorStyles);
       return;
@@ -554,8 +548,8 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       }
       await createTransferOrderLineItem(orderIdToUse, {
         itemName: it.item_name || it.itemName || "Item",
-        material: it.model || (it.ean ? String(it.ean) : undefined),
-        itemNo: it.model || undefined,
+        material: it.model || "",
+        itemNo: it.itemNo,
         weight: it.weight,
         sourceItemId: String(it.id),
       });
@@ -707,7 +701,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
             {(isCreate || isCustomerEditable) && (
               <div>
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-                  Customer *
+                  Customer
                 </p>
                 {isCreate || isCustomerEditable ? (
                   <CustomerSearchInput
@@ -774,6 +768,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               <select
                 className={inputCls}
                 value={form.status}
+                disabled
                 onChange={(e) => patch({ status: e.target.value })}
               >
                 {ORDER_STATUSES.map((s) => (
