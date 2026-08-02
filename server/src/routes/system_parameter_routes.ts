@@ -5,6 +5,7 @@ import {
   updateSystemColours,
   checkColourInUse,
   uploadDocumentTemplate,
+  restoreDocumentTemplate,
   deleteDocumentTemplate,
 } from "../controllers/system_parameter_controller";
 import { authenticateUser } from "../middlewares/authorized";
@@ -22,6 +23,7 @@ router.post(
   uploadSingleFile,
   uploadDocumentTemplate as any
 );
+router.post("/restore-template", authenticateUser, restoreDocumentTemplate as any);
 router.delete(
   "/template/:key",
   authenticateUser,

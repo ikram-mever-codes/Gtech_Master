@@ -6,6 +6,27 @@ import ErrorHandler from "../utils/errorHandler";
 import fs from "fs";
 import path from "path";
 
+export interface TemplateVersion {
+  id: string;
+  file_url: string;
+  file_name: string;
+  file_type: string;
+  valid_from: string;
+  valid_to?: string;
+  is_active: boolean;
+  is_default?: boolean;
+}
+
+export const DEFAULT_CUSTOMER_TEMPLATE: TemplateVersion = {
+  id: "default_svg",
+  file_url: "/public/Customer_Document.svg",
+  file_name: "Customer_Document.svg",
+  file_type: "image/svg+xml",
+  valid_from: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+  is_active: true,
+  is_default: true,
+};
+
 export const getAllSystemParameters = async (
   req: Request,
   res: Response,
@@ -68,7 +89,6 @@ export const checkColourInUse = async (
     return next(error);
   }
 };
-
 
 export const updateSystemColours = async (
   req: Request,
@@ -149,6 +169,41 @@ export const uploadDocumentTemplate = async (
     const repository = AppDataSource.getRepository(SystemParameter);
     let param = await repository.findOne({ where: { key } });
     const file_url = `/uploads/${file.filename}`;
+    const nowIso = new Date().toISOString();
+
+    let versions: TemplateVersion[] = [];
+
+    if (param && param.value && Array.isArray(param.value.versions)) {
+      versions = param.value.versions;
+    } else {
+      versions.push({
+        ...DEFAULT_CUSTOMER_TEMPLATE,
+        valid_to: nowIso,
+        is_active: false,
+      });
+    }
+
+    versions = versions.map((v) => {
+      if (v.is_active) {
+        return {
+          ...v,
+          is_active: false,
+          valid_to: v.valid_to || nowIso,
+        };
+      }
+      return v;
+    });
+
+    const newVersion: TemplateVersion = {
+      id: `ver_${Date.now()}`,
+      file_url,
+      file_name: file.originalname,
+      file_type: file.mimetype,
+      valid_from: nowIso,
+      is_active: true,
+    };
+
+    versions.unshift(newVersion);
 
     if (!param) {
       param = repository.create({
@@ -157,30 +212,86 @@ export const uploadDocumentTemplate = async (
         file_name: file.originalname,
         file_type: file.mimetype,
         uploaded_at: new Date(),
+        value: { versions },
       });
     } else {
-      if (param.file_url && param.file_url.startsWith("/uploads/")) {
-        const oldFilePath = path.join(process.cwd(), param.file_url);
-        if (fs.existsSync(oldFilePath)) {
-          try {
-            fs.unlinkSync(oldFilePath);
-          } catch (e) {
-            console.warn("Could not delete old template file:", e);
-          }
-        }
-      }
-
       param.file_url = file_url;
       param.file_name = file.originalname;
       param.file_type = file.mimetype;
       param.uploaded_at = new Date();
+      param.value = { ...(param.value || {}), versions };
     }
 
     await repository.save(param);
 
     return res.status(200).json({
       success: true,
-      message: "Document template uploaded successfully",
+      message: "Document template uploaded & archived successfully",
+      data: param,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const restoreDocumentTemplate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { key, versionId } = req.body;
+    if (!key || !versionId) {
+      return next(new ErrorHandler("Key and versionId are required", 400));
+    }
+
+    const repository = AppDataSource.getRepository(SystemParameter);
+    const param = await repository.findOne({ where: { key } });
+
+    if (!param || !param.value || !Array.isArray(param.value.versions)) {
+      return next(new ErrorHandler("No template version history found", 404));
+    }
+
+    const nowIso = new Date().toISOString();
+    let targetVersion: TemplateVersion | undefined;
+
+    let versions: TemplateVersion[] = param.value.versions.map((v: TemplateVersion) => {
+      if (v.id === versionId) {
+        targetVersion = {
+          ...v,
+          is_active: true,
+          valid_from: nowIso,
+          valid_to: undefined,
+        };
+        return targetVersion;
+      }
+      return {
+        ...v,
+        is_active: false,
+        valid_to: v.valid_to || nowIso,
+      };
+    });
+
+    if (!targetVersion) {
+      return next(new ErrorHandler("Specified version not found in history", 404));
+    }
+
+    versions = [
+      targetVersion,
+      ...versions.filter((v) => v.id !== versionId),
+    ];
+
+    param.file_url = targetVersion.file_url;
+    param.file_name = targetVersion.file_name;
+    param.file_type = targetVersion.file_type;
+    param.uploaded_at = new Date();
+    param.value = { ...param.value, versions };
+
+    await repository.save(param);
+
+    return res.status(200).json({
+      success: true,
+      message: "Template version restored successfully",
       data: param,
     });
   } catch (error) {
@@ -202,30 +313,45 @@ export const deleteDocumentTemplate = async (
       return next(new ErrorHandler("Template parameter not found", 404));
     }
 
-    if (param.file_url && param.file_url.startsWith("/uploads/")) {
-      const filePath = path.join(process.cwd(), param.file_url);
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {
-          console.warn("Could not delete template file:", e);
-        }
-      }
-    }
-
     param.file_url = undefined;
     param.file_name = undefined;
     param.file_type = undefined;
     param.uploaded_at = undefined;
+    param.value = { versions: [] };
 
     await repository.save(param);
 
     return res.status(200).json({
       success: true,
-      message: "Document template deleted successfully",
+      message: "Document template reset successfully",
       data: param,
     });
   } catch (error) {
     return next(error);
   }
+};
+
+export const getActiveTemplateFilePath = async (
+  key: string = "customer_doc_template"
+): Promise<string> => {
+  try {
+    const repository = AppDataSource.getRepository(SystemParameter);
+    const param = await repository.findOne({ where: { key } });
+
+    if (param && param.file_url) {
+      if (param.file_url.startsWith("/public/")) {
+        const fallbackPath = path.join(process.cwd(), param.file_url);
+        if (fs.existsSync(fallbackPath)) return fallbackPath;
+      }
+
+      if (param.file_url.startsWith("/uploads/")) {
+        const uploadPath = path.join(process.cwd(), param.file_url);
+        if (fs.existsSync(uploadPath)) return uploadPath;
+      }
+    }
+  } catch (err) {
+    console.warn("Error resolving active document template:", err);
+  }
+
+  return path.join(process.cwd(), "public/Customer_Document.svg");
 };

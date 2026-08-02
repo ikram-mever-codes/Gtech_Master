@@ -34,16 +34,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -54,7 +54,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -111,37 +111,115 @@ import { In } from "typeorm";
 import { WarehouseItem } from "../models/warehouse_items";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
 
-let cachedCustomerSvg: string | null = null;
+import { getActiveTemplateFilePath } from "./system_parameter_controller";
+import * as pdfLib from "pdf-lib";
 
-function drawCustomerSvgBackground(doc: any): void {
-  if (cachedCustomerSvg === null) {
-    const svgPath = path.join(process.cwd(), "public/Customer_Document.svg");
-    if (fs.existsSync(svgPath)) {
-      try {
-        const rawSvg = fs.readFileSync(svgPath, "utf8");
-        cachedCustomerSvg = rawSvg.replace(
-          /<path[^>]*id="path25"[^>]*\/>/gi,
-          "",
-        );
-      } catch (err) {
-        console.error("Failed to load Customer_Document.svg:", err);
+let cachedCustomerSvg: string | null = null;
+let cachedTemplatePath: string | null = null;
+
+/**
+ * For SVG templates: draws the SVG as background on the current PDFKit page.
+ * For PDF templates: skipped during PDFKit generation; handled by mergePdfTemplate() post-processing.
+ */
+async function drawCustomerSvgBackground(doc: any): Promise<void> {
+  try {
+    const activePath = await getActiveTemplateFilePath("customer_doc_template");
+
+    // Only handle SVG files in this step
+    const isSvg = activePath.toLowerCase().endsWith(".svg");
+    if (!isSvg) return;
+
+    if (cachedTemplatePath !== activePath) {
+      cachedCustomerSvg = null;
+      cachedTemplatePath = activePath;
+    }
+
+    if (cachedCustomerSvg === null) {
+      if (fs.existsSync(activePath)) {
+        try {
+          let rawSvg = fs.readFileSync(activePath, "utf8");
+          rawSvg = rawSvg
+            .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
+            .replace(/x_Document_Title/gi, "")
+            .replace(/Document_Title/gi, "");
+          cachedCustomerSvg = rawSvg;
+        } catch (err) {
+          console.error("Failed to load Customer Document SVG template:", err);
+          cachedCustomerSvg = "";
+        }
+      } else {
         cachedCustomerSvg = "";
       }
-    } else {
-      cachedCustomerSvg = "";
     }
-  }
 
-  if (cachedCustomerSvg) {
-    try {
-      SVGtoPDF(doc, cachedCustomerSvg, 0, 0, {
-        width: 595.28,
-        height: 841.89,
-        preserveAspectRatio: "none",
-      });
-    } catch (e) {
-      console.error("Error rendering Customer_Document.svg background:", e);
+    if (cachedCustomerSvg) {
+      try {
+        SVGtoPDF(doc, cachedCustomerSvg, 0, 0, {
+          width: 595.28,
+          height: 841.89,
+          preserveAspectRatio: "none",
+        });
+      } catch (e) {
+        console.error("Error rendering Customer Document SVG background:", e);
+      }
     }
+  } catch (err) {
+    console.error("Error in drawCustomerSvgBackground:", err);
+  }
+}
+
+/**
+ * For PDF templates: merges the template PDF as background behind the generated content PDF.
+ * Covers placeholder text like "x_Document_Title" in the template.
+ * Overwrites the generated file in-place.
+ */
+async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
+  try {
+    const activePath = await getActiveTemplateFilePath("customer_doc_template");
+    const isPdf = activePath.toLowerCase().endsWith(".pdf");
+    if (!isPdf || !fs.existsSync(activePath) || !fs.existsSync(contentPdfPath)) return;
+
+    const templateBytes = fs.readFileSync(activePath);
+    const contentBytes = fs.readFileSync(contentPdfPath);
+
+    const templatePdf = await pdfLib.PDFDocument.load(templateBytes);
+    const contentPdf = await pdfLib.PDFDocument.load(contentBytes);
+
+    const mergedPdf = await pdfLib.PDFDocument.create();
+    const templatePageCount = templatePdf.getPageCount();
+    const contentPageCount = contentPdf.getPageCount();
+
+    for (let i = 0; i < contentPageCount; i++) {
+      const templatePageIdx = Math.min(i, templatePageCount - 1);
+
+      const [embeddedTemplate] = await mergedPdf.embedPdf(templateBytes, [templatePageIdx]);
+      const [embeddedContent] = await mergedPdf.embedPdf(contentBytes, [i]);
+
+      const contentPage = contentPdf.getPage(i);
+      const { width, height } = contentPage.getSize();
+
+      const newPage = mergedPdf.addPage([width, height]);
+
+      // 1. Draw template as background (full page)
+      newPage.drawPage(embeddedTemplate, { x: 0, y: 0, width, height });
+
+      // 2. Cover placeholder "x_Document_Title" from template background with a clean white rectangle
+      newPage.drawRectangle({
+        x: 300,
+        y: 670,
+        width: 270,
+        height: 70,
+        color: pdfLib.rgb(1, 1, 1),
+      });
+
+      // 3. Draw generated content on top
+      newPage.drawPage(embeddedContent, { x: 0, y: 0, width, height });
+    }
+
+    const mergedBytes = await mergedPdf.save();
+    fs.writeFileSync(contentPdfPath, mergedBytes);
+  } catch (err) {
+    console.error("Error in mergePdfTemplate:", err);
   }
 }
 
@@ -169,7 +247,6 @@ export class PriceMatrixEntryDto {
   @IsString()
   quantity!: string;
 
-  // number, or null/undefined/"." for "not calculated"
   @IsOptional()
   price?: number | string | null;
 
@@ -605,10 +682,6 @@ export class CreateOfferFromItemDto {
   @IsString()
   baseQuantity?: string;
 
-  // NEW: per-item base quantity, keyed by item id (as string). Lets the
-  // create-offer picker set each line's quantity directly instead of the
-  // single shared `baseQuantity` fallback above. Falls back to
-  // `baseQuantity` (then "1") for any item id not present here.
   @IsOptional()
   @IsObject()
   itemQuantities?: Record<string, string>;
@@ -1093,9 +1166,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-                createOfferDto.defaultPriceMatrix,
-                createOfferDto.totalPriceDecimalPlaces || 2,
-              )
+              createOfferDto.defaultPriceMatrix,
+              createOfferDto.totalPriceDecimalPlaces || 2,
+            )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -1126,7 +1199,7 @@ export class OfferController {
         // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         paymentMethod: createOfferDto.paymentMethod,
@@ -1324,9 +1397,9 @@ export class OfferController {
         warehouseItems = await warehouseRepository.find({
           where: itemIdDEs.length
             ? [
-                { ItemID_DE: In(itemIdDEs) },
-                { item_id: In(orderedItems.map((it) => it.id)) },
-              ]
+              { ItemID_DE: In(itemIdDEs) },
+              { item_id: In(orderedItems.map((it) => it.id)) },
+            ]
             : { item_id: In(orderedItems.map((it) => it.id)) },
         });
       } catch (e: any) {
@@ -1403,7 +1476,7 @@ export class OfferController {
         paymentMethod: body.paymentMethod,
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         shippingMethod: body.shippingMethod,
@@ -2075,9 +2148,9 @@ export class OfferController {
             warehouseItems = await warehouseRepository.find({
               where: itemIdDEs.length
                 ? [
-                    { ItemID_DE: In(itemIdDEs) },
-                    { item_id: In(sourceItems.map((it: any) => it.id)) },
-                  ]
+                  { ItemID_DE: In(itemIdDEs) },
+                  { item_id: In(sourceItems.map((it: any) => it.id)) },
+                ]
                 : { item_id: In(sourceItems.map((it: any) => it.id)) },
             });
           } catch (e: any) {
@@ -3023,10 +3096,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                    totalPriceDecimalPlaces,
-                  ),
-                );
+                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                  totalPriceDecimalPlaces,
+                ),
+              );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -3236,11 +3309,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-                ...tpl,
-                price: match.price,
-                total: match.total,
-                isActive: match.isActive,
-              }
+              ...tpl,
+              price: match.price,
+              total: match.total,
+              isActive: match.isActive,
+            }
             : { ...tpl };
         });
 
@@ -3629,8 +3702,8 @@ export class OfferController {
         [
           "Kundennr.",
           offer.inquiry?.customer?.customerNumber ||
-            customer.customerNumber ||
-            "—",
+          customer.customerNumber ||
+          "—",
         ],
         ["Datum", formatDate(offer.createdAt)],
       ];
@@ -4009,6 +4082,9 @@ export class OfferController {
 
       doc.end();
       await pdfWritePromise;
+
+      // If template is a PDF file, merge it as background via pdf-lib
+      await mergePdfTemplate(pdfPath);
 
       try {
         offer.pdfPath = `/uploads/offers/${pdfFileName}`;

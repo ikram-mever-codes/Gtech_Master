@@ -73,6 +73,17 @@ export const uploadDocumentTemplate = async (file: File, key: string = "customer
   }
 };
 
+export const restoreDocumentTemplate = async (key: string, versionId: string) => {
+  try {
+    const response = await api.post("/system-parameters/restore-template", { key, versionId });
+    toast.success("Template version restored successfully");
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to restore document template version");
+    throw error;
+  }
+};
+
 export const deleteDocumentTemplate = async (key: string) => {
   try {
     const response = await api.delete(`/system-parameters/template/${key}`);
