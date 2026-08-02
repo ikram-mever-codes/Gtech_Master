@@ -168,7 +168,8 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           inquiryId,
           itemName: itemFormData.item_name,
           item_name_cn: itemFormData.item_name_cn,
-          item_name_de: itemFormData.item_name_de, // NEW
+          item_name_de: itemFormData.item_name_de,
+          isbn: itemFormData.isbn || undefined,
           ean: itemFormData.ean,
           parent_id: itemFormData.parent_id,
           taric_id: itemFormData.taric_id || undefined,
@@ -223,8 +224,8 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
 
           sales_price:
             itemFormData.sales_price === "" ||
-              itemFormData.sales_price === undefined ||
-              itemFormData.sales_price === null
+            itemFormData.sales_price === undefined ||
+            itemFormData.sales_price === null
               ? null
               : Math.round(parseFloat(itemFormData.sales_price) * 100) / 100,
           currency: itemFormData.currency || "CNY",
@@ -392,14 +393,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.parent_id
                       ? {
-                        value: itemFormData.parent_id,
-                        label: (() => {
-                          const p = refParents?.find(
-                            (x) => x.id === itemFormData.parent_id,
-                          );
-                          return p ? `${p.name_de} (${p.de_no})` : "Unknown";
-                        })(),
-                      }
+                          value: itemFormData.parent_id,
+                          label: (() => {
+                            const p = refParents?.find(
+                              (x) => x.id === itemFormData.parent_id,
+                            );
+                            return p ? `${p.name_de} (${p.de_no})` : "Unknown";
+                          })(),
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -428,14 +429,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.taric_id
                       ? {
-                        value: itemFormData.taric_id,
-                        label: (() => {
-                          const t = refTarics?.find(
-                            (x) => x.id === itemFormData.taric_id,
-                          );
-                          return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                        })(),
-                      }
+                          value: itemFormData.taric_id,
+                          label: (() => {
+                            const t = refTarics?.find(
+                              (x) => x.id === itemFormData.taric_id,
+                            );
+                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                          })(),
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -464,12 +465,12 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.cat_id
                       ? {
-                        value: itemFormData.cat_id,
-                        label:
-                          categories?.find(
-                            (x) => x.id === itemFormData.cat_id,
-                          )?.name || "Unknown",
-                      }
+                          value: itemFormData.cat_id,
+                          label:
+                            categories?.find(
+                              (x) => x.id === itemFormData.cat_id,
+                            )?.name || "Unknown",
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -498,14 +499,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   value={
                     itemFormData.supplier_id
                       ? {
-                        value: itemFormData.supplier_id,
-                        label: (() => {
-                          const s = refSuppliers?.find(
-                            (x) => x.id === itemFormData.supplier_id,
-                          );
-                          return s ? getSupplierLabel(s) : "Unknown";
-                        })(),
-                      }
+                          value: itemFormData.supplier_id,
+                          label: (() => {
+                            const s = refSuppliers?.find(
+                              (x) => x.id === itemFormData.supplier_id,
+                            );
+                            return s ? getSupplierLabel(s) : "Unknown";
+                          })(),
+                        }
                       : null
                   }
                   onChange={(opt: any) =>
@@ -636,7 +637,10 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                           const sCN = Number(itemFormData.stockCN) || 0;
                           const mCN = Number(itemFormData.MSQ_CN) || 0;
                           if (sEU > 0 || mEU > 0 || sCN > 0 || mCN > 0) {
-                            toast.error("Cannot set 'Is Stock Item' to No while stock quantity exists in EU/CN warehouse.", errorStyles);
+                            toast.error(
+                              "Cannot set 'Is Stock Item' to No while stock quantity exists in EU/CN warehouse.",
+                              errorStyles,
+                            );
                             return;
                           }
                         }

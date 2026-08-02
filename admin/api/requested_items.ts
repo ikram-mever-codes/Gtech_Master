@@ -105,6 +105,8 @@ export interface RequestedItemCreatePayload {
   contactPersonId?: string;
   itemName: string;
   itemNo?: string;
+  isbn?: string;
+  item_name_de?: string;
   qualityCriteria?: any;
   attachments?: any;
   taric?: any;
