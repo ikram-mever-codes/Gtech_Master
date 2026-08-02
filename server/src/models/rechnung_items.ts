@@ -25,11 +25,10 @@ export class RechnungItem {
   @Column({ name: "rechnung_id" })
   rechnungId!: string;
 
-  // --- Basic Item Info ---
-  @Column({ type: "varchar", length: 255 })
-  itemName!: string;
+  @Column({ name: "item_name", type: "varchar", length: 255, nullable: true })
+  itemName?: string;
 
-  @Column({ type: "varchar", length: 255, nullable: true })
+  @Column({ name: "item_no_de", type: "varchar", length: 255, nullable: true })
   itemNo?: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
@@ -44,34 +43,37 @@ export class RechnungItem {
   @Column({ type: "text", nullable: true })
   description?: string;
 
-  // --- Quantities ---
   @Column({
+    name: "quantity",
     type: "decimal",
     precision: 12,
     scale: 3,
     default: 1,
+    nullable: true,
     transformer: numericTransformer,
   })
-  qty!: number;
+  qty?: number;
 
   @Column({
     type: "decimal",
     precision: 12,
     scale: 3,
     default: 1,
+    nullable: true,
     transformer: numericTransformer,
   })
-  max_qty!: number;
+  max_qty?: number;
 
-  // --- Pricing ---
   @Column({
+    name: "unit_price",
     type: "decimal",
     precision: 12,
     scale: 3,
     default: 0,
+    nullable: true,
     transformer: numericTransformer,
   })
-  price!: number;
+  price?: number;
 
   @Column({
     type: "decimal",
@@ -104,40 +106,38 @@ export class RechnungItem {
   taxRate?: number;
 
   @Column({
+    name: "total_price",
     type: "decimal",
     precision: 12,
     scale: 2,
     default: 0,
+    nullable: true,
     transformer: numericTransformer,
   })
-  lineTotal!: number;
+  lineTotal?: number;
 
-  // --- Unit Price ---
   @Column({
     type: "decimal",
     precision: 12,
     scale: 3,
     default: 0,
+    nullable: true,
     transformer: numericTransformer,
   })
-  unit_price_eur!: number;
+  unit_price_eur?: number;
 
-  // --- Weights ---
   @Column({ type: "float", nullable: true })
   weight?: number;
 
   @Column({ type: "float", nullable: true })
   extraWeight?: number;
 
-  // --- Position ---
-  @Column({ type: "integer", default: 1 })
-  position!: number;
+  @Column({ type: "integer", default: 1, nullable: true })
+  position?: number;
 
-  // --- UI ---
   @Column({ type: "varchar", length: 20, nullable: true })
   highlightColor?: string;
 
-  // --- Source References ---
   @Column({
     name: "source_line_item_id",
     type: "varchar",
@@ -154,14 +154,12 @@ export class RechnungItem {
   })
   sourceItemId?: string;
 
-  // --- Remarks ---
-  @Column({ type: "text", nullable: true })
+  @Column({ name: "remark", type: "text", nullable: true })
   notes?: string;
 
   @Column({ type: "text", nullable: true })
   remark_order_item?: string;
 
-  // --- Timestamps ---
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -292,7 +292,7 @@ export default function WeiterversandServiceProvidersPage() {
         isOpen={showModal}
         onClose={resetForm}
         title="Create Service Provider"
-        width="max-w-md"
+        width="max-w-xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
@@ -393,7 +393,7 @@ export default function WeiterversandServiceProvidersPage() {
           title=""
           showHeader={false}
           noPadding={true}
-          width="max-w-md"
+          width="max-w-xl"
         >
           <div className="bg-white rounded-2xl overflow-hidden">
             <ModalHeader

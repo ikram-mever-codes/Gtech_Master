@@ -42,7 +42,6 @@ export const createRechnungFromAuftrag = async (
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const defaultPrefix = `R${yy}${mm}-`;
 
     let invoiceNo = "";
     try {
@@ -111,13 +110,12 @@ export const createRechnungFromAuftrag = async (
       const itemName = selItem.itemName || sourceLine?.itemName || "Item";
 
       itemsToCreate.push({
-        item_name: itemName,
-        item_no_de: selItem.itemNo || sourceLine?.material || undefined,
-        quantity: qty,
-        unit_price: price,
-        total_price: lineTotal,
-        order_no: auftrag.order_no,
-        remark: selItem.notes || sourceLine?.description || undefined,
+        itemName: itemName,
+        itemNo: selItem.itemNo || sourceLine?.material || undefined,
+        qty: qty,
+        price: price,
+        lineTotal: lineTotal,
+        notes: selItem.notes || sourceLine?.description || undefined,
       });
 
       // Deduct delivered quantity from Auftrag line item remaining quantity
@@ -172,7 +170,7 @@ export const createRechnungFromAuftrag = async (
       rechnungItemRepo.create({
         ...item,
         rechnung: savedRechnung,
-        rechnung_id: savedRechnung.id,
+        rechnungId: savedRechnung.id,
       }),
     );
     await rechnungItemRepo.save(itemEntities);
@@ -217,13 +215,13 @@ export const createRechnungFromAuftrag = async (
         cciItemRepo.create({
           cci_invoice: savedCciInv,
           cci_invoice_id: savedCciInv.id,
-          item_name: it.item_name || "Item",
-          item_no_de: it.item_no_de,
-          quantity: it.quantity || 1,
-          unit_price: it.unit_price || 0,
-          total_price: it.total_price || 0,
+          item_name: it.itemName || "Item",
+          item_no_de: it.itemNo,
+          quantity: it.qty || 1,
+          unit_price: it.price || 0,
+          total_price: it.lineTotal || 0,
           order_no: auftrag.order_no,
-          remark: it.remark,
+          remark: it.notes,
         }),
       );
       await cciItemRepo.save(cciItems);
@@ -292,10 +290,10 @@ export const getLieferscheine = async (
       itemCount: rec.items?.length || 0,
       items: (rec.items || []).map((it) => ({
         id: it.id,
-        itemName: it.item_name,
-        itemNo: it.item_no_de || "—",
-        quantity: it.quantity,
-        remark: it.remark,
+        itemName: it.itemName || "—",
+        itemNo: it.itemNo || "—",
+        quantity: it.qty || 0,
+        remark: it.notes || "—",
       })),
     }));
 
