@@ -248,7 +248,7 @@ export default function NumberSequencesPage() {
         setShowCreateModal(true);
       }}
     >
-      Add Sequence
+      Sequence
     </CustomButton>
   );
 

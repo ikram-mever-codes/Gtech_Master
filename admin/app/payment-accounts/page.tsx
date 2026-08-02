@@ -2,20 +2,19 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Truck,
+  Wallet,
   Plus,
-  RefreshCw,
   Search,
   CheckCircle,
   XCircle,
 } from "lucide-react";
 import {
-  getAllShippingMethods,
-  createShippingMethod,
-  updateShippingMethod,
-  deleteShippingMethod,
-  ShippingMethod,
-} from "@/api/shipping_methods";
+  getAllPaymentAccounts,
+  createPaymentAccount,
+  updatePaymentAccount,
+  deletePaymentAccount,
+  PaymentAccountData,
+} from "@/api/payment_accounts";
 import { toast } from "react-hot-toast";
 import MasterPageLayout from "@/components/General/MasterPageLayout";
 import CustomModal from "@/components/UI/CustomModal";
@@ -23,32 +22,38 @@ import CustomButton from "@/components/UI/CustomButton";
 import ModalHeader from "@/components/UI/ModalHeader";
 import ModalFooter from "@/components/UI/ModalFooter";
 
-export default function ShippingMethodsPage() {
-  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
+export default function PaymentAccountsPage() {
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [name, setName] = useState("");
 
-  const [selectedMethod, setSelectedMethod] = useState<ShippingMethod | null>(
-    null,
-  );
+  // Form State (Create)
+  const [name, setName] = useState("");
+  const [currencyCode, setCurrencyCode] = useState("EUR");
+  const [externalAccountId, setExternalAccountId] = useState("");
+  const [isActive, setIsActive] = useState(true);
+
+  // Form State (Edit)
+  const [selectedAccount, setSelectedAccount] = useState<PaymentAccountData | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isEditEnabled, setIsEditEnabled] = useState(false);
   const [editName, setEditName] = useState("");
+  const [editCurrencyCode, setEditCurrencyCode] = useState("EUR");
+  const [editExternalAccountId, setEditExternalAccountId] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res: any = await getAllShippingMethods(true);
+      const res: any = await getAllPaymentAccounts(true);
       if (res && res.success) {
-        setShippingMethods(res.data || []);
+        setPaymentAccounts(res.data || []);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load shipping methods");
+      toast.error("Failed to load payment accounts");
     } finally {
       setLoading(false);
     }
@@ -60,25 +65,31 @@ export default function ShippingMethodsPage() {
 
   const resetForm = () => {
     setName("");
+    setCurrencyCode("EUR");
+    setExternalAccountId("");
+    setIsActive(true);
     setShowModal(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("Shipping method name is required");
+      toast.error("Payment account name is required");
       return;
     }
 
     setSubmitting(true);
     const payload = {
       name: name.trim(),
+      currency_code: (currencyCode || "EUR").trim().toUpperCase(),
+      external_account_id: externalAccountId.trim() || undefined,
+      is_active: isActive,
     };
 
     try {
-      const res: any = await createShippingMethod(payload);
+      const res: any = await createPaymentAccount(payload);
       if (res && res.success) {
-        toast.success("Shipping method created successfully");
+        toast.success("Payment account created successfully");
         fetchData();
         resetForm();
       }
@@ -91,37 +102,41 @@ export default function ShippingMethodsPage() {
     }
   };
 
-  const handleRowClick = (sm: ShippingMethod) => {
-    setSelectedMethod(sm);
-    setEditName(sm.name);
-    setEditIsActive(sm.is_active);
+  const handleRowClick = (account: PaymentAccountData) => {
+    setSelectedAccount(account);
+    setEditName(account.name);
+    setEditCurrencyCode(account.currency_code || "EUR");
+    setEditExternalAccountId(account.external_account_id || "");
+    setEditIsActive(account.is_active);
     setIsEditEnabled(false);
     setShowEditModal(true);
   };
 
   const handleEditSave = async () => {
-    if (!selectedMethod) return;
+    if (!selectedAccount?.id) return;
     if (!editName.trim()) {
-      toast.error("Shipping method name is required");
+      toast.error("Payment account name is required");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res: any = await updateShippingMethod(selectedMethod.id, {
+      const res: any = await updatePaymentAccount(selectedAccount.id, {
         name: editName.trim(),
+        currency_code: (editCurrencyCode || "EUR").trim().toUpperCase(),
+        external_account_id: editExternalAccountId.trim() || undefined,
         is_active: editIsActive,
       });
       if (res && res.success) {
-        toast.success("Shipping method updated successfully");
+        toast.success("Payment account updated successfully");
         fetchData();
         setShowEditModal(false);
-        setSelectedMethod(null);
+        setSelectedAccount(null);
       }
     } catch (err: any) {
       console.error(err);
       toast.error(
-        err?.response?.data?.message || "Failed to update shipping method",
+        err?.response?.data?.message || "Failed to update payment account"
       );
     } finally {
       setSubmitting(false);
@@ -129,26 +144,26 @@ export default function ShippingMethodsPage() {
   };
 
   const handleEditDelete = async () => {
-    if (!selectedMethod) return;
+    if (!selectedAccount?.id) return;
     if (
       !confirm(
-        `Are you sure you want to delete the shipping method "${selectedMethod.name}"? This action cannot be undone.`,
+        `Are you sure you want to delete the payment account "${selectedAccount.name}"? This action cannot be undone.`
       )
     )
       return;
     setSubmitting(true);
     try {
-      const res: any = await deleteShippingMethod(selectedMethod.id);
+      const res: any = await deletePaymentAccount(selectedAccount.id);
       if (res && res.success) {
-        toast.success("Shipping method deleted successfully");
+        toast.success("Payment account deleted successfully");
         fetchData();
         setShowEditModal(false);
-        setSelectedMethod(null);
+        setSelectedAccount(null);
       }
     } catch (err: any) {
       console.error(err);
       toast.error(
-        err?.response?.data?.message || "Failed to delete shipping method",
+        err?.response?.data?.message || "Failed to delete payment account"
       );
     } finally {
       setSubmitting(false);
@@ -158,20 +173,24 @@ export default function ShippingMethodsPage() {
   const handleEditCancel = () => {
     if (!isEditEnabled) {
       setShowEditModal(false);
-      setSelectedMethod(null);
+      setSelectedAccount(null);
     } else {
       setIsEditEnabled(false);
-      if (selectedMethod) {
-        setEditName(selectedMethod.name);
-        setEditIsActive(selectedMethod.is_active);
+      if (selectedAccount) {
+        setEditName(selectedAccount.name);
+        setEditCurrencyCode(selectedAccount.currency_code || "EUR");
+        setEditExternalAccountId(selectedAccount.external_account_id || "");
+        setEditIsActive(selectedAccount.is_active);
       }
     }
   };
 
-  const filteredMethods = shippingMethods.filter((sm) => {
+  const filteredAccounts = paymentAccounts.filter((account) => {
     const q = searchQuery.toLowerCase().trim();
-    const nameVal = (sm.name || "").toLowerCase();
-    return nameVal.includes(q);
+    const nameVal = (account.name || "").toLowerCase();
+    const extVal = (account.external_account_id || "").toLowerCase();
+    const currVal = (account.currency_code || "").toLowerCase();
+    return nameVal.includes(q) || extVal.includes(q) || currVal.includes(q);
   });
 
   const actionButtons = (
@@ -183,7 +202,7 @@ export default function ShippingMethodsPage() {
         setShowModal(true);
       }}
     >
-      Shipping Method
+      Payment Account
     </CustomButton>
   );
 
@@ -193,7 +212,7 @@ export default function ShippingMethodsPage() {
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
         <input
           type="text"
-          placeholder="Search shipping methods..."
+          placeholder="Search payment accounts..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white"
@@ -208,17 +227,17 @@ export default function ShippingMethodsPage() {
         <div className="p-12 flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-2 border-[#8CC21B] border-t-transparent rounded-full animate-spin"></div>
           <span className="text-sm font-semibold text-gray-500">
-            Loading shipping methods...
+            Loading payment accounts...
           </span>
         </div>
-      ) : filteredMethods.length === 0 ? (
+      ) : filteredAccounts.length === 0 ? (
         <div className="p-12 text-center">
-          <Truck className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <Wallet className="h-10 w-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 font-medium font-poppins">
-            No shipping methods found.
+            No payment accounts found.
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            Try a different search or create a new shipping method.
+            Try a different search or create a new payment account.
           </p>
         </div>
       ) : (
@@ -226,31 +245,45 @@ export default function ShippingMethodsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <th className="px-6 py-4">Id</th>
                 <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4 text-center">Status</th>
+                <th className="px-6 py-4 text-center">CurrencyCode</th>
+                <th className="px-6 py-4 text-center">ExternalAccountId</th>
+                <th className="px-6 py-4 text-center">IsActive</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
-              {filteredMethods.map((sm) => (
+              {filteredAccounts.map((account) => (
                 <tr
-                  key={sm.id}
-                  onClick={() => handleRowClick(sm)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!sm.is_active ? "opacity-60" : ""
+                  key={account.id}
+                  onClick={() => handleRowClick(account)}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!account.is_active ? "opacity-60" : ""
                     }`}
                 >
+                  <td className="px-6 py-4 font-mono text-xs text-gray-500 max-w-[120px] truncate">
+                    {account.id}
+                  </td>
                   <td className="px-6 py-4 font-semibold text-gray-900">
-                    {sm.name}
+                    {account.name}
                   </td>
                   <td className="px-6 py-4 text-center whitespace-nowrap">
-                    {sm.is_active ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+                      {account.currency_code || "EUR"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center text-gray-600 font-mono text-xs">
+                    {account.external_account_id || "—"}
+                  </td>
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
+                    {account.is_active ? (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
                         <CheckCircle className="h-3 w-3" />
-                        Active
+                        Yes
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100">
                         <XCircle className="h-3 w-3" />
-                        Inactive
+                        No
                       </span>
                     )}
                   </td>
@@ -268,25 +301,74 @@ export default function ShippingMethodsPage() {
       <CustomModal
         isOpen={showModal}
         onClose={resetForm}
-        title="Create New Shipping Method"
+        title="Create New Payment Account"
         width="max-w-md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label
-              htmlFor="method_name"
+              htmlFor="account_name"
               className="text-xs font-bold text-gray-700 uppercase tracking-wider block"
             >
-              Shipping Method Name
+              Name *
             </label>
             <input
-              id="method_name"
+              id="account_name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. DHL Express"
+              placeholder="e.g. Commerzbank Dortmund"
+              required
               className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-gray-50/50"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="currency_code"
+              className="text-xs font-bold text-gray-700 uppercase tracking-wider block"
+            >
+              Currency Code (default EUR)
+            </label>
+            <input
+              id="currency_code"
+              type="text"
+              value={currencyCode}
+              onChange={(e) => setCurrencyCode(e.target.value)}
+              placeholder="e.g. EUR, USD, CNY"
+              className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-gray-50/50 uppercase"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="external_account_id"
+              className="text-xs font-bold text-gray-700 uppercase tracking-wider block"
+            >
+              External Account ID
+            </label>
+            <input
+              id="external_account_id"
+              type="text"
+              value={externalAccountId}
+              onChange={(e) => setExternalAccountId(e.target.value)}
+              placeholder="e.g. DE16 4404 0037 0210 9288 00"
+              className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-gray-50/50"
+            />
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4.5 w-4.5 border-gray-300"
+              />
+              <span className="text-xs font-semibold text-gray-700">
+                Is Active (Yes / No)
+              </span>
+            </label>
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-gray-100">
@@ -302,18 +384,18 @@ export default function ShippingMethodsPage() {
               disabled={submitting}
               className="flex-1 px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm"
             >
-              Create Method
+              Create Account
             </button>
           </div>
         </form>
       </CustomModal>
 
-      {selectedMethod && (
+      {selectedAccount && (
         <CustomModal
           isOpen={showEditModal}
           onClose={() => {
             setShowEditModal(false);
-            setSelectedMethod(null);
+            setSelectedAccount(null);
           }}
           title=""
           showHeader={false}
@@ -322,22 +404,22 @@ export default function ShippingMethodsPage() {
         >
           <div className="bg-white rounded-2xl overflow-hidden">
             <ModalHeader
-              entityName="Shipping Method"
-              entityNo={selectedMethod.name}
-              icon={Truck}
+              entityName="Payment Account"
+              entityNo={selectedAccount.name}
+              icon={Wallet}
               isEditMode={true}
               isEditEnabled={isEditEnabled}
               onToggleEdit={() => setIsEditEnabled((prev) => !prev)}
               onClose={() => {
                 setShowEditModal(false);
-                setSelectedMethod(null);
+                setSelectedAccount(null);
               }}
             />
             <div className="p-6 space-y-6">
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-                    Shipping Method Name
+                    Name
                   </label>
                   {isEditEnabled ? (
                     <input
@@ -348,7 +430,43 @@ export default function ShippingMethodsPage() {
                     />
                   ) : (
                     <div className="px-3.5 py-2.5 text-sm font-semibold text-gray-900">
-                      {selectedMethod.name}
+                      {selectedAccount.name}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Currency Code
+                  </label>
+                  {isEditEnabled ? (
+                    <input
+                      type="text"
+                      value={editCurrencyCode}
+                      onChange={(e) => setEditCurrencyCode(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all uppercase"
+                    />
+                  ) : (
+                    <div className="px-3.5 py-2.5 text-sm font-semibold text-gray-900">
+                      {selectedAccount.currency_code || "EUR"}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    External Account ID
+                  </label>
+                  {isEditEnabled ? (
+                    <input
+                      type="text"
+                      value={editExternalAccountId}
+                      onChange={(e) => setEditExternalAccountId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all"
+                    />
+                  ) : (
+                    <div className="px-3.5 py-2.5 text-sm font-semibold text-gray-900 font-mono text-xs">
+                      {selectedAccount.external_account_id || "—"}
                     </div>
                   )}
                 </div>
@@ -364,24 +482,24 @@ export default function ShippingMethodsPage() {
                           className="rounded text-[#8CC21B] focus:ring-[#8CC21B]/20 h-4 w-4 border-gray-300"
                         />
                         <span className="text-xs font-semibold text-gray-700">
-                          Active
+                          Is Active (Yes / No)
                         </span>
                       </label>
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_active
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-gray-100 text-gray-400 border border-gray-200"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedAccount.is_active
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-gray-100 text-gray-400 border border-gray-200"
                           }`}
                       >
-                        {selectedMethod.is_active ? (
+                        {selectedAccount.is_active ? (
                           <CheckCircle className="w-3.5 h-3.5" />
                         ) : (
                           <XCircle className="w-3.5 h-3.5" />
                         )}
-                        Active
+                        {selectedAccount.is_active ? "Active (Yes)" : "Inactive (No)"}
                       </span>
                     </div>
                   )}
@@ -406,8 +524,8 @@ export default function ShippingMethodsPage() {
 
   return (
     <MasterPageLayout
-      title="Shipping Method"
-      icon={Truck}
+      title="Payment Account"
+      icon={Wallet}
       actionButtons={actionButtons}
       filterBar={filterBar}
       tableContent={tableContent}

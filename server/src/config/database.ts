@@ -45,7 +45,11 @@ import { TaxProfile } from "../models/tax_profile";
 import { Country } from "../models/country";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
 import { PaymentMethod } from "../models/payment_methods";
+import { PaymentAccount } from "../models/payment_account";
+import { PaymentInbound } from "../models/payment_inbound";
 import { ShippingMethod } from "../models/shipping_methods";
+import { WeiterversandServiceProvider } from "../models/weiterversand_service_provider";
+
 import { NumberSequence } from "../models/number_sequence";
 import { GtechCompany } from "../models/gtech_company";
 import { SystemParameter } from "../models/system_parameter";
@@ -127,7 +131,11 @@ export const AppDataSource = new DataSource({
     Country,
     CompanyShippingAddress,
     PaymentMethod,
+    PaymentAccount,
+    PaymentInbound,
     ShippingMethod,
+    WeiterversandServiceProvider,
+
     NumberSequence,
     Rechnung,
     RechnungCustomer,
@@ -200,18 +208,14 @@ export const initializeDatabase = async (): Promise<DataSource> => {
       await AppDataSource.runMigrations();
       console.log("Migrations executed successfully");
     }
-
     await bootstrapAdminUser();
-
     const { NumberSequenceService } =
       await import("../services/number_sequence_service");
     await NumberSequenceService.seedDefaultSequences();
 
     const { seedDatabase } = await import("../services/seedDatabase");
     await seedDatabase();
-
     await fixSequences();
-
     return AppDataSource;
   } catch (error) {
     console.error("Database connection error:", error);

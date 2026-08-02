@@ -161,7 +161,7 @@ export default function TagsPage() {
         setShowModal(true);
       }}
     >
-      Add Tag
+      Tag
     </CustomButton>
   );
 

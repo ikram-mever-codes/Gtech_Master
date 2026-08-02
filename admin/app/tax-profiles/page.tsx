@@ -251,7 +251,7 @@ export default function TaxProfilesPage() {
         setShowModal(true);
       }}
     >
-      Add Tax Profile
+      Tax Profile
     </CustomButton>
   );
 
@@ -306,9 +306,8 @@ export default function TaxProfilesPage() {
                 <tr
                   key={p.id}
                   onClick={() => handleRowClick(p)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
-                    !p.is_active ? "opacity-60" : ""
-                  }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!p.is_active ? "opacity-60" : ""
+                    }`}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">
                     <div>

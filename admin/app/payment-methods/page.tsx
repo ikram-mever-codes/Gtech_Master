@@ -190,7 +190,7 @@ export default function PaymentMethodsPage() {
         setShowModal(true);
       }}
     >
-      Add Payment Method
+      Payment Method
     </CustomButton>
   );
 
@@ -243,9 +243,8 @@ export default function PaymentMethodsPage() {
                 <tr
                   key={pm.id}
                   onClick={() => handleRowClick(pm)}
-                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${
-                    !pm.is_active ? "opacity-60" : ""
-                  }`}
+                  className={`hover:bg-gray-50/50 cursor-pointer transition-all ${!pm.is_active ? "opacity-60" : ""
+                    }`}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">
                     {pm.name}
@@ -418,11 +417,10 @@ export default function PaymentMethodsPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          selectedMethod.is_prepayment
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_prepayment
                             ? "bg-amber-50 text-amber-700 border border-amber-200"
                             : "bg-gray-100 text-gray-400 border border-gray-200"
-                        }`}
+                          }`}
                       >
                         {selectedMethod.is_prepayment ? (
                           <CheckCircle className="w-3.5 h-3.5" />
@@ -432,11 +430,10 @@ export default function PaymentMethodsPage() {
                         Prepayment Required
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          selectedMethod.is_active
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_active
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : "bg-gray-100 text-gray-400 border border-gray-200"
-                        }`}
+                          }`}
                       >
                         {selectedMethod.is_active ? (
                           <CheckCircle className="w-3.5 h-3.5" />

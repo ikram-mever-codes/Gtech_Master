@@ -98,6 +98,18 @@ import {
 } from "@/api/transfer_orders";
 import { createBestellungFromAuftrag } from "@/api/transfer_orders";
 import { getAllRechnungen, getLieferscheine } from "@/api/rechnungen";
+import {
+  getAllPaymentInbounds,
+  createPaymentInbound,
+  updatePaymentInbound,
+  deletePaymentInbound,
+  PaymentInboundData,
+} from "@/api/payment_inbounds";
+import {
+  getAllPaymentAccounts,
+  PaymentAccountData,
+} from "@/api/payment_accounts";
+
 import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
 import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
 import AuftragToRechnungModal from "@/components/orders/AuftragToRechnungModal";
@@ -197,9 +209,11 @@ const invoiceTabs = [
   { id: "auftrag", label: "Auftrag" },
   { id: "bestellung", label: "Bestellung" },
   { id: "rechnung", label: "Rechnung" },
+  { id: "payment_inbound", label: "Payment Inbounds" },
   { id: "rk", label: "RK" },
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
+
 
 type Item = {
   id: string | number;
@@ -424,6 +438,44 @@ const InvoiceListPage: React.FC = () => {
     useState(false);
   const [selectedLieferscheinForDetail, setSelectedLieferscheinForDetail] =
     useState<any>(null);
+
+  const [paymentInbounds, setPaymentInbounds] = useState<PaymentInboundData[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>([]);
+  const [loadingPaymentInbounds, setLoadingPaymentInbounds] = useState(false);
+  const [showInboundModal, setShowInboundModal] = useState(false);
+  const [submittingInbound, setSubmittingInbound] = useState(false);
+  const [inboundForm, setInboundForm] = useState({
+    paymentAccountId: "",
+    receivedDate: new Date().toISOString().split("T")[0],
+    amount: "",
+    currencyCode: "EUR",
+    payerName: "",
+    reference: "",
+  });
+
+  const fetchPaymentInbounds = useCallback(async () => {
+    setLoadingPaymentInbounds(true);
+    try {
+      const res = await getAllPaymentInbounds();
+      if (res?.success) setPaymentInbounds(res.data || []);
+      else if (Array.isArray(res?.data)) setPaymentInbounds(res.data);
+    } catch (err) {
+      console.error("Error fetching PaymentInbounds:", err);
+    } finally {
+      setLoadingPaymentInbounds(false);
+    }
+  }, []);
+
+  const fetchPaymentAccounts = useCallback(async () => {
+    try {
+      const res = await getAllPaymentAccounts(true);
+      if (res?.success) setPaymentAccounts(res.data || []);
+      else if (Array.isArray(res?.data)) setPaymentAccounts(res.data);
+    } catch (err) {
+      console.error("Error fetching PaymentAccounts for dropdown:", err);
+    }
+  }, []);
+
 
   const fetchRechnungen = useCallback(async () => {
     setLoadingRechnungen(true);
@@ -950,7 +1002,10 @@ const InvoiceListPage: React.FC = () => {
     getAllTaricsSimple().then((res) => {
       if (res.success) setTarics(res.data);
     });
-  }, []);
+    fetchPaymentInbounds();
+    fetchPaymentAccounts();
+  }, [fetchPaymentInbounds, fetchPaymentAccounts]);
+
 
   const handleReassignItem = async () => {
     if (!selectedItem || !targetCargoId) return;
@@ -1935,9 +1990,37 @@ const InvoiceListPage: React.FC = () => {
         items: b.orderItems || b.items || [],
       }));
     } else if (activeInvTab === "rechnung") {
-      list = invoices.filter(
+      const mappedRechnungen = (rechnungen || []).map((r: any) => ({
+        ...r,
+        invoiceNumber: r.invoice_number || r.invoiceNumber || r.id,
+        invoiceDate: r.invoice_date || r.invoiceDate,
+        createdAt: r.created_at || r.createdAt || r.invoice_date,
+        netTotal: r.subtotal,
+        grossTotal: r.total_amount || r.grossTotal,
+        customer_name: r.customer?.company_name || r.customer?.name || r.customer_name || "—",
+        customerSnapshot: {
+          companyName: r.customer?.company_name || r.customer?.name || "—",
+          email: r.customer?.email || "—",
+          country: r.customer?.country || "",
+          city: r.customer?.city || "",
+        },
+      }));
+      const filteredInvoices = (invoices || []).filter(
         (inv: any) => inv.status !== "paid" && inv.status !== "cancelled",
       );
+      list = [...mappedRechnungen, ...filteredInvoices];
+    } else if (activeInvTab === "payment_inbound") {
+      list = (paymentInbounds || []).map((pi: any) => ({
+        ...pi,
+        invoiceNumber: pi.reference || pi.external_transaction_id || pi.id,
+        createdAt: pi.received_date || pi.created_at,
+        grossTotal: pi.amount,
+        customer_name: pi.payer_name || pi.paymentAccount?.name || "—",
+        customerSnapshot: {
+          companyName: pi.payer_name || "—",
+          email: pi.payer_account_reference || "",
+        },
+      }));
     } else if (activeInvTab === "rk") {
       list = invoices.filter(
         (inv: any) => inv.status === "paid" || inv.status === "cancelled",
@@ -2590,6 +2673,23 @@ const InvoiceListPage: React.FC = () => {
                 </button>
               </div>
             );
+          } else if (activeInvTab === "payment_inbound") {
+            return (
+              <div className="flex items-center justify-center gap-1.5">
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (confirm("Are you sure you want to delete this payment inbound record?")) {
+                      await deletePaymentInbound(row.id);
+                      fetchPaymentInbounds();
+                    }
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-[4px] transition shadow-md"
+                >
+                  Delete
+                </button>
+              </div>
+            );
           } else {
             return (
               <div className="flex items-center justify-center gap-1.5">
@@ -2605,6 +2705,7 @@ const InvoiceListPage: React.FC = () => {
               </div>
             );
           }
+
         },
       },
     ];
@@ -2705,6 +2806,27 @@ const InvoiceListPage: React.FC = () => {
                 {activeInvTab === "bestellung" ? "Bestellung" : "Auftrag"}
               </CustomButton>
             )}
+            {activeInvTab === "payment_inbound" && (
+              <CustomButton
+                onClick={() => {
+                  setInboundForm({
+                    paymentAccountId: paymentAccounts[0]?.id || "",
+                    receivedDate: new Date().toISOString().split("T")[0],
+                    amount: "",
+                    currencyCode: "EUR",
+                    payerName: "",
+                    reference: "",
+                  });
+                  setShowInboundModal(true);
+                }}
+                gradient
+                size="small"
+                startIcon={<Plus className="h-4 w-4" />}
+              >
+                Payment Inbound
+              </CustomButton>
+            )}
+
           </div>
         </div>
 
@@ -2983,10 +3105,15 @@ const InvoiceListPage: React.FC = () => {
                 data={currentItems}
                 columns={commercialColumns}
                 loading={
-                  activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                    ? loadingOrders
-                    : loading
+                  activeInvTab === "payment_inbound"
+                    ? loadingPaymentInbounds
+                    : activeInvTab === "rechnung"
+                      ? loadingRechnungen
+                      : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                        ? loadingOrders
+                        : loading
                 }
+
                 emptyMessage={`No ${
                   activeInvTab === "auftrag" || activeInvTab === "bestellung"
                     ? "Orders"
@@ -4607,7 +4734,184 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
+        {showInboundModal && (
+          <CustomModal
+            isOpen={showInboundModal}
+            onClose={() => setShowInboundModal(false)}
+            title="Manual Payment Inbound Entry"
+            width="max-w-lg"
+          >
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!inboundForm.amount || Number(inboundForm.amount) <= 0) {
+                  toast.error("Please enter a valid amount > 0");
+                  return;
+                }
+                try {
+                  setSubmittingInbound(true);
+                  const res = await createPaymentInbound({
+                    payment_account_id: inboundForm.paymentAccountId || undefined,
+                    received_date: inboundForm.receivedDate,
+                    amount: Number(inboundForm.amount),
+                    currency_code: inboundForm.currencyCode || "EUR",
+                    payer_name: inboundForm.payerName,
+                    reference: inboundForm.reference,
+                    source: "manual",
+                  });
+                  if (res?.success) {
+                    setShowInboundModal(false);
+                    fetchPaymentInbounds();
+                  }
+                } catch (err) {
+                  console.error(err);
+                } finally {
+                  setSubmittingInbound(false);
+                }
+              }}
+              className="space-y-4 font-poppins"
+            >
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                  Payment Account
+                </label>
+                <select
+                  value={inboundForm.paymentAccountId}
+                  onChange={(e) =>
+                    setInboundForm((prev) => ({
+                      ...prev,
+                      paymentAccountId: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white font-medium"
+                >
+                  <option value="">-- Select Account (Optional) --</option>
+                  {paymentAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.currency_code || "EUR"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    Received Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={inboundForm.receivedDate}
+                    onChange={(e) =>
+                      setInboundForm((prev) => ({
+                        ...prev,
+                        receivedDate: e.target.value,
+                      }))
+                    }
+                    required
+                    className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    Amount *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inboundForm.amount}
+                    onChange={(e) =>
+                      setInboundForm((prev) => ({
+                        ...prev,
+                        amount: e.target.value,
+                      }))
+                    }
+                    placeholder="0.00"
+                    required
+                    className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    Currency Code
+                  </label>
+                  <input
+                    type="text"
+                    value={inboundForm.currencyCode}
+                    onChange={(e) =>
+                      setInboundForm((prev) => ({
+                        ...prev,
+                        currencyCode: e.target.value,
+                      }))
+                    }
+                    placeholder="EUR"
+                    className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white uppercase font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    Payer Name
+                  </label>
+                  <input
+                    type="text"
+                    value={inboundForm.payerName}
+                    onChange={(e) =>
+                      setInboundForm((prev) => ({
+                        ...prev,
+                        payerName: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. Customer GmbH"
+                    className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                  Reference (Invoice No / Memo)
+                </label>
+                <input
+                  type="text"
+                  value={inboundForm.reference}
+                  onChange={(e) =>
+                    setInboundForm((prev) => ({
+                      ...prev,
+                      reference: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. R2608-10 / INV-2026-001"
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white font-medium"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowInboundModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingInbound}
+                  className="flex-1 px-4 py-2.5 bg-[#8CC21B] hover:bg-[#7ab318] disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                  Save Inbound
+                </button>
+              </div>
+            </form>
+          </CustomModal>
+        )}
+
         {showRechnungDetailModal && selectedRechnungForDetail && (
+
           <RechnungDetailModal
             isOpen={showRechnungDetailModal}
             onClose={() => {
