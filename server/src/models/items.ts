@@ -81,8 +81,9 @@ export class Item {
   @Column({ type: "char", length: 1, default: "N" })
   is_qty_dividable!: string;
 
-  @Column({ default: 0 })
-  ISBN!: number;
+  @Column({ type: "boolean", default: false })
+  is_dim_weight_estimated!: boolean;
+
 
   @Column({ nullable: true })
   cat_id?: number;

@@ -145,8 +145,7 @@ export interface RequestedItemCreatePayload {
   is_eur_special?: "Y" | "N";
   isActive?: "Y" | "N";
   supplier_id?: number;
-  item_name_de?: string;
-  // NEW: Stock and MSQ fields
+  is_dim_weight_estimated?: boolean;
   is_stock_item?: "Y" | "N";
   stockEU?: number;
   MSQ_EU?: number;

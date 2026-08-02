@@ -19,13 +19,16 @@ const inputCls =
 
 interface SalesPriceSectionProps {
   itemId: number | string;
+  isEditEnabled?: boolean;
 }
 
 const formatPrice = (v: number) => v.toFixed(4);
 
 export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
   itemId,
+  isEditEnabled = true,
 }) => {
+
   const [data, setData] = useState<SalesPricesForItem | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -249,8 +252,8 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
       setSelectedCustomerData(customerData);
       setNewCustomerName(
         customerData.companyName ||
-          customerData.legalName ||
-          "Selected customer",
+        customerData.legalName ||
+        "Selected customer",
       );
     } else {
       setSelectedCustomerData(null);
@@ -271,16 +274,17 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
 
   return (
     <div className="space-y-3  mt-3">
-      <div className="w-full justify-between">
-        <button
-          onClick={startAddCustomer}
-          className="text-xs font-medium text-blue-700 hover:text-blue-900 flex items-center gap-1 transition-colors"
-        >
-          <PlusIcon className="w-3.5 h-3.5" />
-          Add customer price
-        </button>
-      </div>
-
+      {isEditEnabled && (
+        <div className="w-full justify-between">
+          <button
+            onClick={startAddCustomer}
+            className="text-xs font-medium text-blue-700 hover:text-blue-900 flex items-center gap-1 transition-colors"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            Add customer price
+          </button>
+        </div>
+      )}
       {rowsWithData.length === 0 ? (
         <div className="text-sm text-gray-400 py-4 text-center border border-gray-200 rounded-lg bg-gray-50">
           No customer-specific prices. Click "Add customer price" to create one.
@@ -326,11 +330,10 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
                   <td className="px-3 py-2 text-right">
                     <button
                       onClick={() => openIndividualModal(row)}
-                      className={`px-2 py-0.5 rounded transition-colors text-sm ${
-                        row.individual
+                      className={`px-2 py-0.5 rounded transition-colors text-sm ${row.individual
                           ? "font-semibold text-gray-900 hover:bg-gray-100"
                           : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                      }`}
+                        }`}
                     >
                       {row.individual
                         ? formatPrice(row.individual.unitPriceEur)

@@ -136,12 +136,13 @@ export interface ItemDetails {
     isDimensionSpecial: boolean;
   };
   dimensions: {
-    isbn: string;
+    is_dim_weight_estimated?: boolean;
     weight: string;
     length: string;
     width: string;
     height: string;
   };
+
   variationsDE: {
     variations: string[];
     values: string[];
