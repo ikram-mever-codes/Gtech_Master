@@ -452,8 +452,17 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     }
   };
 
-  const removeLineItem = async (lineItemId: string) => {
-    if (!window.confirm("Remove this line item?")) return;
+  const removeLineItem = async (
+    lineItemId: string,
+    lineItemName: string,
+    lineItemNo: string,
+  ) => {
+    if (
+      !window.confirm(
+        `Remove "${lineItemNo} - ${lineItemName}" from this Bestellung?`,
+      )
+    )
+      return;
     try {
       await deleteTransferOrderLineItem(order.id, lineItemId);
       await refreshLocal();
@@ -660,9 +669,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
                       Hinweis
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
-                      Remark
-                    </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
                       Menge
                     </th>
@@ -671,6 +677,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                       Netto gesamt
+                    </th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                      Remark
                     </th>
                     {edit && <th className="w-10" />}
                   </tr>
@@ -759,21 +768,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                             </span>
                           )}
                         </td>
-                        <td className="px-2 py-2">
-                          {edit ? (
-                            <TextCellInput
-                              value={item.remark_order_item}
-                              placeholder="Remark"
-                              onCommit={(raw) =>
-                                persistLine(item.id, { remark_order_item: raw })
-                              }
-                            />
-                          ) : (
-                            <span className="text-gray-600">
-                              {item.remark_order_item || "—"}
-                            </span>
-                          )}
-                        </td>
+
                         <td className="px-2 py-2">
                           {edit ? (
                             <DecimalInput
@@ -797,10 +792,31 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                         <td className="px-2 py-2 text-right font-medium">
                           {formatPrice(total, lineCurrency)}
                         </td>
+                        <td className="px-2 py-2">
+                          {edit ? (
+                            <TextCellInput
+                              value={item.remark_order_item}
+                              placeholder="Remark"
+                              onCommit={(raw) =>
+                                persistLine(item.id, { remark_order_item: raw })
+                              }
+                            />
+                          ) : (
+                            <span className="text-gray-600">
+                              {item.remark_order_item || "—"}
+                            </span>
+                          )}
+                        </td>
                         {edit && (
                           <td className="px-2 py-2 text-center">
                             <button
-                              onClick={() => removeLineItem(item.id)}
+                              onClick={() =>
+                                removeLineItem(
+                                  item.id,
+                                  item.itemName,
+                                  item.itemNo,
+                                )
+                              }
                               className="text-rose-500 hover:text-rose-700"
                               title="Remove line"
                             >
