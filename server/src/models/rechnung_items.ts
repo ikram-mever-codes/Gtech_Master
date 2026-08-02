@@ -26,7 +26,7 @@ export class RechnungItem {
   rechnungId!: string;
 
   // --- Basic Item Info ---
-  @Column({ type: "varchar", length: 255 })
+  @Column({ type: "varchar", length: 255, nullable: true })
   item_name!: string; // Changed from itemName to match controller
 
   @Column({ name: "item_no_de", type: "varchar", length: 255, nullable: true })
@@ -107,7 +107,7 @@ export class RechnungItem {
   taxRate?: number;
 
   @Column({
-    name: "total_price",
+    name: "linear_total",
     type: "decimal",
     precision: 12,
     scale: 2,
