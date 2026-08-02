@@ -15,46 +15,156 @@ export class RechnungItem {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ type: "uuid" })
-  rechnung_id!: string;
-
-  @ManyToOne(() => Rechnung, (rechnung: Rechnung) => rechnung.items, { onDelete: "CASCADE" })
+  @ManyToOne(() => Rechnung, (rechnung: Rechnung) => rechnung.items, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "rechnung_id" })
   rechnung!: Rechnung;
 
-  @Column({ type: "int", nullable: true })
-  item_id?: number | null;
+  @Column({ name: "rechnung_id" })
+  rechnungId!: string;
 
-  @Column({ type: "varchar", length: 100, nullable: true })
-  ean?: string;
+  // --- Basic Item Info ---
+  @Column({ type: "varchar", length: 255 })
+  itemName!: string;
 
-  @Column({ type: "varchar", length: 100, nullable: true })
-  item_no_de?: string;
+  @Column({ type: "varchar", length: 255, nullable: true })
+  itemNo?: string;
 
-  @Column({ type: "varchar", length: 500 })
-  item_name!: string;
+  @Column({ type: "varchar", length: 255, nullable: true })
+  material?: string;
 
-  @Column({ type: "varchar", length: 100, nullable: true })
-  taric_code?: string;
-
-  @Column({ type: "decimal", precision: 12, scale: 3, default: 1, transformer: numericTransformer })
-  quantity!: number;
-
-  @Column({ type: "decimal", precision: 12, scale: 3, default: 0, transformer: numericTransformer })
-  unit_price!: number;
-
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
-  total_price!: number;
-
-  @Column({ type: "varchar", length: 100, nullable: true })
-  order_no?: string;
+  @Column({ type: "varchar", length: 500, nullable: true })
+  photo?: string;
 
   @Column({ type: "text", nullable: true })
-  remark?: string;
+  specification?: string;
 
+  @Column({ type: "text", nullable: true })
+  description?: string;
+
+  // --- Quantities ---
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 1,
+    transformer: numericTransformer,
+  })
+  qty!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 1,
+    transformer: numericTransformer,
+  })
+  max_qty!: number;
+
+  // --- Pricing ---
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  price!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  transferPrice?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  purchasePrice?: number;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  purchaseCurrency?: string;
+
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  taxRate?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  lineTotal!: number;
+
+  // --- Unit Price ---
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 3,
+    default: 0,
+    transformer: numericTransformer,
+  })
+  unit_price_eur!: number;
+
+  // --- Weights ---
+  @Column({ type: "float", nullable: true })
+  weight?: number;
+
+  @Column({ type: "float", nullable: true })
+  extraWeight?: number;
+
+  // --- Position ---
+  @Column({ type: "integer", default: 1 })
+  position!: number;
+
+  // --- UI ---
+  @Column({ type: "varchar", length: 20, nullable: true })
+  highlightColor?: string;
+
+  // --- Source References ---
+  @Column({
+    name: "source_line_item_id",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
+  sourceLineItemId?: string;
+
+  @Column({
+    name: "source_item_id",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
+  sourceItemId?: string;
+
+  // --- Remarks ---
+  @Column({ type: "text", nullable: true })
+  notes?: string;
+
+  @Column({ type: "text", nullable: true })
+  remark_order_item?: string;
+
+  // --- Timestamps ---
   @CreateDateColumn()
-  created_at!: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updated_at!: Date;
+  updatedAt!: Date;
 }
