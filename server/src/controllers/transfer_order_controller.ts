@@ -15,6 +15,8 @@ import {
   parseFlexibleNumberOrZero,
 } from "../utils/decimal";
 import { Customer } from "../models/customers";
+import { Order } from "../models/orders";
+import { OrderItem } from "../models/order_items";
 
 /** Recomputes subtotal/tax/total AND the stored weight columns from the
  * order's line items — TransferOrder persists net/extra/total weight
@@ -606,6 +608,90 @@ export const deleteTransferOrderLineItem = async (
   }
 };
 
+async function createOrderFromBestellung(
+  bestellung: TransferOrder,
+): Promise<{ createdOrderId: number; skippedCount: number } | null> {
+  const allItems = bestellung.orderItems || [];
+  const catalogItems = allItems.filter(
+    (li) =>
+      li.sourceItemId !== undefined &&
+      li.sourceItemId !== null &&
+      !isNaN(parseInt(li.sourceItemId, 10)),
+  );
+  const skippedCount = allItems.length - catalogItems.length;
+
+  if (catalogItems.length === 0) {
+    console.warn(
+      `Bestellung ${bestellung.order_no}: no catalog line items with a valid sourceItemId — skipping Order creation (${skippedCount} Freizeile line(s) present).`,
+    );
+    return null;
+  }
+
+  const now = new Date();
+  let orderNo = "";
+  try {
+    orderNo = await NumberSequenceService.getNextNumber("order");
+  } catch (err) {
+    console.warn("Could not generate sequence number for order:", err);
+    const yy = now.getFullYear().toString().slice(-2);
+    const mm = (now.getMonth() + 1).toString().padStart(2, "0");
+    orderNo = `B${yy}${mm}-${Date.now().toString().slice(-4)}`;
+  }
+
+  const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
+    now.getMonth() + 1
+  )
+    .toString()
+    .padStart(2, "0")}.${now.getFullYear()}`;
+
+  let createdOrderId = 0;
+
+  await AppDataSource.transaction(async (manager) => {
+    const orderRepo = manager.getRepository(Order);
+    const orderItemRepo = manager.getRepository(OrderItem);
+
+    const order = orderRepo.create({
+      order_no: orderNo,
+      customer_id: bestellung.customer_id || undefined,
+      // 1 = Draft/New, matching the status codes already used in the
+      // Order status filter dropdown on the frontend.
+      status: 1,
+      comment:
+        bestellung.notes ||
+        `Created automatically from Bestellung ${bestellung.order_no}`,
+      supplier_id: bestellung.supplier_id || undefined,
+      date_created: dateCreatedStr,
+      date_delivery: bestellung.date_delivery || undefined,
+    });
+    const savedOrder = await orderRepo.save(order);
+    createdOrderId = savedOrder.id;
+
+    const orderItemEntities = catalogItems.map((li) =>
+      orderItemRepo.create({
+        item_id: parseInt(li.sourceItemId as string, 10),
+        order_id: savedOrder.id,
+        // OrderItem.qty is an integer column; TransferOrderItem.qty is
+        // decimal, so round rather than truncate, and never drop below 1.
+        qty: Math.max(1, Math.round(Number(li.qty) || 1)),
+        remark_de: li.remark_order_item || li.notes || undefined,
+        price:
+          li.transferPrice !== undefined && li.transferPrice !== null
+            ? li.transferPrice
+            : (li.purchasePrice ?? undefined),
+        currency: li.purchaseCurrency || "EUR",
+        status: "NSO",
+      }),
+    );
+    await orderItemRepo.save(orderItemEntities);
+  });
+
+  console.log(
+    `Bestellung ${bestellung.order_no} → created Order ${orderNo} (id ${createdOrderId}) with ${catalogItems.length} item(s), ${skippedCount} Freizeile line(s) skipped.`,
+  );
+
+  return { createdOrderId, skippedCount };
+}
+
 export const updateTransferOrderStatus = async (
   req: Request,
   res: Response,
@@ -632,6 +718,7 @@ export const updateTransferOrderStatus = async (
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const bestellung = await transferOrderRepo.findOne({
       where: { id: Number(id) },
+      relations: ["orderItems"],
     });
 
     if (!bestellung) {
@@ -639,24 +726,60 @@ export const updateTransferOrderStatus = async (
       return;
     }
 
+    const previousStatus = bestellung.status;
     bestellung.status = status;
     await transferOrderRepo.save(bestellung);
+
+    let conversionResult: {
+      createdOrderId: number;
+      skippedCount: number;
+    } | null = null;
+
+    // Only fires on the exact draft → "to be processed" transition, so a
+    // Bestellung is never converted more than once even if it's later
+    // moved back and forth between statuses.
+    if (previousStatus === "draft" && status === "to be processed") {
+      try {
+        conversionResult = await createOrderFromBestellung(bestellung);
+      } catch (conversionErr) {
+        console.error(
+          `Failed to create Order/OrderItems from Bestellung ${bestellung.order_no}:`,
+          conversionErr,
+        );
+        // The status change itself already committed above and stays in
+        // effect — don't roll it back over a downstream conversion
+        // failure, just surface it in the response message.
+      }
+    }
 
     const fullOrder = await transferOrderRepo.findOne({
       where: { id: bestellung.id },
       relations: ["orderItems", "customer"],
     });
 
+    let message = "Bestellung status updated successfully";
+    if (previousStatus === "draft" && status === "to be processed") {
+      if (conversionResult) {
+        message += ` — Order created${
+          conversionResult.skippedCount > 0
+            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
+            : ""
+        }.`;
+      } else {
+        message +=
+          " — no Order was created (no catalog line items found on this Bestellung).";
+      }
+    }
+
     res.json({
       success: true,
-      message: "Bestellung status updated successfully",
+      message,
       data: fullOrder,
     });
   } catch (error) {
     next(error);
   }
 };
-
 async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
   const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
   const order = await transferOrderRepo.findOne({
