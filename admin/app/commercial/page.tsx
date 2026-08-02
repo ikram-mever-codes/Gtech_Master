@@ -214,7 +214,6 @@ const invoiceTabs = [
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
 
-
 type Item = {
   id: string | number;
   item_name?: string;
@@ -439,8 +438,12 @@ const InvoiceListPage: React.FC = () => {
   const [selectedLieferscheinForDetail, setSelectedLieferscheinForDetail] =
     useState<any>(null);
 
-  const [paymentInbounds, setPaymentInbounds] = useState<PaymentInboundData[]>([]);
-  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>([]);
+  const [paymentInbounds, setPaymentInbounds] = useState<PaymentInboundData[]>(
+    [],
+  );
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>(
+    [],
+  );
   const [loadingPaymentInbounds, setLoadingPaymentInbounds] = useState(false);
   const [showInboundModal, setShowInboundModal] = useState(false);
   const [submittingInbound, setSubmittingInbound] = useState(false);
@@ -475,7 +478,6 @@ const InvoiceListPage: React.FC = () => {
       console.error("Error fetching PaymentAccounts for dropdown:", err);
     }
   }, []);
-
 
   const fetchRechnungen = useCallback(async () => {
     setLoadingRechnungen(true);
@@ -1006,7 +1008,6 @@ const InvoiceListPage: React.FC = () => {
     fetchPaymentAccounts();
   }, [fetchPaymentInbounds, fetchPaymentAccounts]);
 
-
   const handleReassignItem = async () => {
     if (!selectedItem || !targetCargoId) return;
     try {
@@ -1043,8 +1044,6 @@ const InvoiceListPage: React.FC = () => {
             return newState;
           });
         }
-
-        await loadInvoices();
       }
     } catch (err) {
       console.error(err);
@@ -1076,7 +1075,6 @@ const InvoiceListPage: React.FC = () => {
           return newState;
         });
       }
-      await loadInvoices();
     } catch (err) {
       console.error(err);
     }
@@ -1604,7 +1602,6 @@ const InvoiceListPage: React.FC = () => {
       fetchCustomers();
       fetchLieferscheine();
     } else if (activeInvTab === "rechnung" || activeInvTab === "rk") {
-      loadInvoices();
       fetchRechnungen();
     } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
       fetchAllItems();
@@ -1778,18 +1775,6 @@ const InvoiceListPage: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, filters, invoices, sortField, sortDirection, activeInvTab]);
 
-  const loadInvoices = async () => {
-    try {
-      setLoading(true);
-      const response = await getAllInvoices();
-      setInvoices(response?.data);
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to load invoices:", error);
-      setLoading(false);
-    }
-  };
-
   const handleSort = (field: keyof Invoice) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -1829,7 +1814,6 @@ const InvoiceListPage: React.FC = () => {
         [`paid-${invoiceId}`]: true,
       }));
       await markInvoiceAsPaid(invoiceId);
-      await loadInvoices();
       setSelectedInvoice((prev: any) =>
         prev ? { ...prev, status: "paid" } : null,
       );
@@ -1871,7 +1855,6 @@ const InvoiceListPage: React.FC = () => {
         remark: invoiceEditForm.remark,
       });
       setEditingInvoiceId(null);
-      await loadInvoices();
       setSelectedInvoice((prev: any) =>
         prev
           ? {
@@ -1900,7 +1883,6 @@ const InvoiceListPage: React.FC = () => {
         [`cancel-${invoiceId}`]: true,
       }));
       await cancelInvoice(invoiceId);
-      await loadInvoices();
     } catch (error) {
       console.error("Failed to cancel invoice:", error);
     } finally {
@@ -1923,7 +1905,6 @@ const InvoiceListPage: React.FC = () => {
           [`delete-${invoiceId}`]: true,
         }));
         await deleteInvoice(invoiceId);
-        await loadInvoices();
       } catch (error) {
         console.error("Failed to delete invoice:", error);
       } finally {
@@ -1997,7 +1978,11 @@ const InvoiceListPage: React.FC = () => {
         createdAt: r.created_at || r.createdAt || r.invoice_date,
         netTotal: r.subtotal,
         grossTotal: r.total_amount || r.grossTotal,
-        customer_name: r.customer?.company_name || r.customer?.name || r.customer_name || "—",
+        customer_name:
+          r.customer?.company_name ||
+          r.customer?.name ||
+          r.customer_name ||
+          "—",
         customerSnapshot: {
           companyName: r.customer?.company_name || r.customer?.name || "—",
           email: r.customer?.email || "—",
@@ -2679,7 +2664,11 @@ const InvoiceListPage: React.FC = () => {
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
-                    if (confirm("Are you sure you want to delete this payment inbound record?")) {
+                    if (
+                      confirm(
+                        "Are you sure you want to delete this payment inbound record?",
+                      )
+                    ) {
                       await deletePaymentInbound(row.id);
                       fetchPaymentInbounds();
                     }
@@ -2705,7 +2694,6 @@ const InvoiceListPage: React.FC = () => {
               </div>
             );
           }
-
         },
       },
     ];
@@ -2826,7 +2814,6 @@ const InvoiceListPage: React.FC = () => {
                 Payment Inbound
               </CustomButton>
             )}
-
           </div>
         </div>
 
@@ -3109,11 +3096,11 @@ const InvoiceListPage: React.FC = () => {
                     ? loadingPaymentInbounds
                     : activeInvTab === "rechnung"
                       ? loadingRechnungen
-                      : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                      : activeInvTab === "auftrag" ||
+                          activeInvTab === "bestellung"
                         ? loadingOrders
                         : loading
                 }
-
                 emptyMessage={`No ${
                   activeInvTab === "auftrag" || activeInvTab === "bestellung"
                     ? "Orders"
@@ -4723,7 +4710,6 @@ const InvoiceListPage: React.FC = () => {
             auftrag={selectedAuftragForRechnungModal}
             onSuccess={() => {
               fetchOrders();
-              loadInvoices();
               fetchRechnungen();
               fetchLieferscheine();
             }}
@@ -4751,7 +4737,8 @@ const InvoiceListPage: React.FC = () => {
                 try {
                   setSubmittingInbound(true);
                   const res = await createPaymentInbound({
-                    payment_account_id: inboundForm.paymentAccountId || undefined,
+                    payment_account_id:
+                      inboundForm.paymentAccountId || undefined,
                     received_date: inboundForm.receivedDate,
                     amount: Number(inboundForm.amount),
                     currency_code: inboundForm.currencyCode || "EUR",
@@ -4911,7 +4898,6 @@ const InvoiceListPage: React.FC = () => {
         )}
 
         {showRechnungDetailModal && selectedRechnungForDetail && (
-
           <RechnungDetailModal
             isOpen={showRechnungDetailModal}
             onClose={() => {
@@ -4921,7 +4907,6 @@ const InvoiceListPage: React.FC = () => {
             rechnung={selectedRechnungForDetail}
             onSuccess={() => {
               fetchRechnungen();
-              loadInvoices();
             }}
           />
         )}
