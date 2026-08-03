@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { LinkIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, FileText, Pencil, Save, X, AlertCircle } from "lucide-react";
@@ -105,6 +105,9 @@ interface RechnungDetailModalProps {
   onChanged?: () => void;
   onCorrectionCreated?: () => void;
   onSwitchTab?: (tab: string) => void;
+  onSwitchToAuftrag?: (auftragId: string | number) => void;
+  onSwitchToRechnung?: (rechnungId: string) => void;
+  onSwitchToRechnungK?: (rechnungKId: string) => void;
 }
 
 const EditableCell: React.FC<{
@@ -129,6 +132,13 @@ const EditableCell: React.FC<{
   );
 };
 
+const sortByCreatedAtDesc = (docs: any[]): any[] =>
+  [...(docs || [])].sort((a, b) => {
+    const timeA = new Date(a?.created_at || 0).getTime();
+    const timeB = new Date(b?.created_at || 0).getTime();
+    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+  });
+
 export default function RechnungDetailModal({
   isOpen,
   onClose,
@@ -138,6 +148,9 @@ export default function RechnungDetailModal({
   onChanged,
   onCorrectionCreated,
   onSwitchTab,
+  onSwitchToAuftrag,
+  onSwitchToRechnung,
+  onSwitchToRechnungK,
 }: RechnungDetailModalProps) {
   const [data, setData] = useState<any>(rechnung);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
@@ -146,6 +159,10 @@ export default function RechnungDetailModal({
     Record<string, { quantity: number; price: number }>
   >({});
   const [isCreating, setIsCreating] = useState(false);
+  const linkedDocs = rechnung?.linkedDocuments || {};
+  const auftragDocs = sortByCreatedAtDesc(linkedDocs.auftrag || []);
+  const rechnungenKDocs = sortByCreatedAtDesc(linkedDocs.rechnungenK || []);
+  const rechnungDocs = sortByCreatedAtDesc(linkedDocs.rechnung || []);
 
   useEffect(() => {
     setData(rechnung);
@@ -742,6 +759,135 @@ export default function RechnungDetailModal({
                 <span>{formatDeCurrency(grossTotal)}</span>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <LinkIcon className="h-4 w-4 text-gray-500" />
+              <h3 className="text-sm font-bold text-gray-900">
+                Linked documents
+              </h3>
+            </div>
+            {auftragDocs.length === 0 &&
+            rechnungenKDocs.length === 0 &&
+            rechnungDocs.length === 0 ? (
+              <p className="text-sm text-gray-500">No linked documents yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {!isCorrection && auftragDocs.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      Auftrag
+                    </p>
+                    {auftragDocs.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                            onSwitchToAuftrag?.(doc.id);
+                          }}
+                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                        >
+                          {doc.order_no}{" "}
+                          <span className="text-xs text-gray-400">→</span>
+                        </button>
+                        <span className="text-gray-400 text-xs">
+                          {formatDate(doc.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!isCorrection && rechnungenKDocs.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      RK
+                    </p>
+                    {rechnungenKDocs.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                            onSwitchToRechnungK?.(doc.id);
+                          }}
+                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                        >
+                          {doc.invoice_number}{" "}
+                          <span className="text-xs text-gray-400">→</span>
+                        </button>
+                        <span className="text-gray-400 text-xs">
+                          {formatDate(doc.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isCorrection && rechnungDocs.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      Rechnung
+                    </p>
+                    {rechnungDocs.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                            onSwitchToRechnung?.(doc.id);
+                          }}
+                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                        >
+                          {doc.invoice_number}{" "}
+                          <span className="text-xs text-gray-400">→</span>
+                        </button>
+                        <span className="text-gray-400 text-xs">
+                          {formatDate(doc.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isCorrection && auftragDocs.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      Auftrag
+                    </p>
+                    {auftragDocs.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                            onSwitchToAuftrag?.(doc.id);
+                          }}
+                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                        >
+                          {doc.order_no}{" "}
+                          <span className="text-xs text-gray-400">→</span>
+                        </button>
+                        <span className="text-gray-400 text-xs">
+                          {formatDate(doc.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

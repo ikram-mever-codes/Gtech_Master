@@ -2304,6 +2304,7 @@ const InvoiceListPage: React.FC = () => {
             userRole={user?.role}
           />
         )}
+
         {showRechnungDetailModal && selectedRechnungForDetail && (
           <RechnungDetailModal
             isOpen={showRechnungDetailModal}
@@ -2319,7 +2320,6 @@ const InvoiceListPage: React.FC = () => {
             onCorrectionCreated={async () => {
               await tabData.refetchRechnungenK();
               await tabData.refetchRechnungen();
-
               try {
                 const rksRes: any = await getAllRechnungenK();
                 if (rksRes?.success && rksRes.data.length > 0) {
@@ -2337,6 +2337,13 @@ const InvoiceListPage: React.FC = () => {
               }
             }}
             onSwitchTab={(tab) => setActiveInvTab(tab as InvoiceTab)}
+            onSwitchToAuftrag={(auftragId: string | number) => {
+              setActiveInvTab("auftrag");
+              setTimeout(() => handleOpenAuftragPreview(auftragId), 100);
+            }}
+            onSwitchToRechnungK={(rechnungKId: string) => {
+              handleOpenRechnungKDetail({ id: rechnungKId });
+            }}
           />
         )}
         {showRechnungKModal && selectedRechnungKData && (
@@ -2351,6 +2358,26 @@ const InvoiceListPage: React.FC = () => {
             onChanged={() => {
               tabData.refetchRechnungenK();
               tabData.refetchRechnungen();
+            }}
+            onSwitchToAuftrag={(auftragId: string | number) => {
+              setActiveInvTab("auftrag");
+              setTimeout(() => handleOpenAuftragPreview(auftragId), 100);
+            }}
+            onSwitchToRechnung={(rechnungId: string) => {
+              handleOpenRechnungKDetail; // not used here
+              const found = (tabData.rechnungen || []).find(
+                (r: any) => r.id === rechnungId,
+              );
+              if (found) {
+                setSelectedRechnungForDetail(found);
+                setShowRechnungDetailModal(true);
+                setOpenQuantities(allOpenQuantities[found.id] || {});
+              } else {
+                console.warn(
+                  "Couldn't find Rechnung in loaded tab data:",
+                  rechnungId,
+                );
+              }
             }}
           />
         )}

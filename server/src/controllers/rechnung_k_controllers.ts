@@ -6,7 +6,97 @@ import { Rechnung_k } from "../models/rechnung_k";
 import { RechnungKItem } from "../models/rechnung_k_items";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { numericTransformer } from "../utils/numeric-transformer";
+import { In } from "typeorm";
+import { CustomerOrder } from "../models/customer_orders";
 
+/** Fetches documents linked to a correction invoice (Rechnung_k): the
+ * original Rechnung it was created from, and the originating Auftrag
+ * (CustomerOrder). Full records, not just ids. */
+async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
+  const rechnungRepo = AppDataSource.getRepository(Rechnung);
+  const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+
+  const [originalRechnung, auftrag] = await Promise.all([
+    rechnungK.original_rechnung_id
+      ? rechnungRepo.findOne({
+          where: { id: rechnungK.original_rechnung_id },
+          select: ["id", "invoice_number", "created_at"],
+        })
+      : Promise.resolve(null),
+    rechnungK.auftrag_id
+      ? customerOrderRepo.findOne({
+          where: { id: rechnungK.auftrag_id },
+          select: ["id", "order_no", "created_at"],
+        })
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    rechnung: originalRechnung ? [originalRechnung] : [],
+    auftrag: auftrag ? [auftrag] : [],
+  };
+}
+
+/** Same as above, batched for many Rechnung_k at once. Returns a Map keyed
+ * by rechnungK id. */
+async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
+  const empty = () => ({ rechnung: [] as any[], auftrag: [] as any[] });
+  const result = new Map<string, ReturnType<typeof empty>>();
+  rechnungenK.forEach((rk) => result.set(rk.id, empty()));
+
+  if (rechnungenK.length === 0) return result;
+
+  const rechnungRepo = AppDataSource.getRepository(Rechnung);
+  const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+
+  const originalRechnungIds = Array.from(
+    new Set(
+      rechnungenK
+        .map((rk) => rk.original_rechnung_id)
+        .filter((v): v is string => !!v),
+    ),
+  );
+  const auftragIds = Array.from(
+    new Set(
+      rechnungenK
+        .map((rk) => rk.auftrag_id)
+        .filter((v): v is number => typeof v === "number"),
+    ),
+  );
+
+  const [rechnungen, auftraege] = await Promise.all([
+    originalRechnungIds.length
+      ? rechnungRepo.find({
+          where: { id: In(originalRechnungIds) },
+          select: ["id", "invoice_number", "created_at"],
+        })
+      : Promise.resolve([]),
+    auftragIds.length
+      ? customerOrderRepo.find({
+          where: { id: In(auftragIds) },
+          select: ["id", "order_no", "created_at"],
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const rechnungById = new Map(rechnungen.map((r: any) => [r.id, r]));
+  const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
+
+  for (const rk of rechnungenK) {
+    const bucket = result.get(rk.id);
+    if (!bucket) continue;
+    if (rk.original_rechnung_id) {
+      const orig = rechnungById.get(rk.original_rechnung_id);
+      if (orig) bucket.rechnung.push(orig);
+    }
+    if (rk.auftrag_id) {
+      const auftrag = auftragById.get(rk.auftrag_id);
+      if (auftrag) bucket.auftrag.push(auftrag);
+    }
+  }
+
+  return result;
+}
 /** Recomputes subtotal/tax/total on a correction invoice from its items */
 async function recalculateRechnungKTotals(rechnungKId: string): Promise<void> {
   const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
@@ -409,7 +499,18 @@ export const getAllRechnungenK = async (
       relations: ["items", "customer"],
     });
 
-    res.json({ success: true, data: rechnungenK });
+    const linkedDocumentsByRechnungKId =
+      await getLinkedDocumentsForRechnungenK(rechnungenK);
+
+    const rechnungenKWithLinkedDocuments = rechnungenK.map((rk: any) => ({
+      ...rk,
+      linkedDocuments: linkedDocumentsByRechnungKId.get(rk.id) || {
+        rechnung: [],
+        auftrag: [],
+      },
+    }));
+
+    res.json({ success: true, data: rechnungenKWithLinkedDocuments });
   } catch (error) {
     next(error);
   }
@@ -435,7 +536,9 @@ export const getRechnungKById = async (
       return;
     }
 
-    res.json({ success: true, data: rechnungK });
+    const linkedDocuments = await getLinkedDocumentsForRechnungK(rechnungK);
+
+    res.json({ success: true, data: { ...rechnungK, linkedDocuments } });
   } catch (error) {
     next(error);
   }

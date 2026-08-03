@@ -12,6 +12,88 @@ import { CCIItem } from "../models/cci_items";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { createLieferscheinFromRechnung } from "./lieferschein_controller";
 import { Lieferschein } from "../models/lieferscheine";
+import { In } from "typeorm/find-options/operator/In";
+import { Rechnung_k } from "../models/rechnung_k";
+
+/** Fetches documents linked to a Rechnung: the originating Auftrag
+ * (CustomerOrder, via auftrag_id) and every correction invoice
+ * (Rechnung_k) created against it (via original_rechnung_id). Full
+ * records, not just ids. */
+async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
+  const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+  const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
+
+  const [auftrag, rechnungenK] = await Promise.all([
+    rechnung.auftrag_id
+      ? customerOrderRepo.findOne({
+          where: { id: rechnung.auftrag_id },
+          select: ["id", "order_no", "created_at"],
+        })
+      : Promise.resolve(null),
+    rechnungKRepo.find({
+      where: { original_rechnung_id: rechnung.id },
+      select: ["id", "invoice_number", "created_at", "original_rechnung_id"],
+      order: { created_at: "DESC" },
+    }),
+  ]);
+
+  return {
+    auftrag: auftrag ? [auftrag] : [],
+    rechnungenK,
+  };
+}
+
+/** Same as above, batched for many Rechnungen at once. Returns a Map keyed
+ * by rechnung id. */
+async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
+  const empty = () => ({ auftrag: [] as any[], rechnungenK: [] as any[] });
+  const result = new Map<string, ReturnType<typeof empty>>();
+  rechnungen.forEach((r) => result.set(r.id, empty()));
+
+  if (rechnungen.length === 0) return result;
+
+  const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+  const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
+
+  const auftragIds = Array.from(
+    new Set(
+      rechnungen
+        .map((r) => r.auftrag_id)
+        .filter((v): v is number => typeof v === "number"),
+    ),
+  );
+  const rechnungIds = rechnungen.map((r) => r.id);
+
+  const [auftraege, rechnungenK] = await Promise.all([
+    auftragIds.length
+      ? customerOrderRepo.find({
+          where: { id: In(auftragIds) },
+          select: ["id", "order_no", "created_at"],
+        })
+      : Promise.resolve([]),
+    rechnungKRepo.find({
+      where: { original_rechnung_id: In(rechnungIds) },
+      select: ["id", "invoice_number", "created_at", "original_rechnung_id"],
+      order: { created_at: "DESC" },
+    }),
+  ]);
+
+  const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
+
+  for (const r of rechnungen) {
+    if (!r.auftrag_id) continue;
+    const bucket = result.get(r.id);
+    const auftrag = auftragById.get(r.auftrag_id);
+    if (bucket && auftrag) bucket.auftrag.push(auftrag);
+  }
+
+  for (const rk of rechnungenK) {
+    const bucket = result.get(rk.original_rechnung_id as any);
+    if (bucket) bucket.rechnungenK.push(rk);
+  }
+
+  return result;
+}
 
 export const createRechnungFromAuftrag = async (
   req: Request,
@@ -369,9 +451,20 @@ export const getAllRechnungen = async (
       relations: ["items", "customer"],
     });
 
+    const linkedDocumentsByRechnungId =
+      await getLinkedDocumentsForRechnungen(rechnungen);
+
+    const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => ({
+      ...r,
+      linkedDocuments: linkedDocumentsByRechnungId.get(r.id) || {
+        auftrag: [],
+        rechnungenK: [],
+      },
+    }));
+
     res.json({
       success: true,
-      data: rechnungen,
+      data: rechnungenWithLinkedDocuments,
     });
   } catch (error) {
     next(error);
@@ -450,9 +543,11 @@ export const getRechnungById = async (
       return;
     }
 
+    const linkedDocuments = await getLinkedDocumentsForRechnung(rechnung);
+
     res.json({
       success: true,
-      data: rechnung,
+      data: { ...rechnung, linkedDocuments },
     });
   } catch (error) {
     next(error);
