@@ -66,7 +66,7 @@ export const BestellungPreviewModal = dynamic(
 );
 
 export const InvoiceDetailsModal = dynamic(
-  () => import("./InvoiceDetailsModal"),
+  () => import("./invoicedetailsmodal"),
   { ssr: false },
 );
 
