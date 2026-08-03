@@ -40,21 +40,7 @@ export class NumberSequenceService {
       if (sequenceKey === "customer") {
         sequence.minDigits = 1;
       }
-      if (sequenceKey === "order") {
-        sequence.prefix = "B";
-        sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
-        sequence.minDigits = 1;
-      }
-      if (sequenceKey === "transfer_order") {
-        sequence.prefix = "DE";
-        sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
-        sequence.minDigits = 1;
-      }
-      if (sequenceKey === "cargo") {
-        sequence.prefix = "C";
-        sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
-        sequence.minDigits = 1;
-      }
+
       let runningNo = sequence.nextRunningNo;
       const mapping = entityMapping[sequenceKey];
 
@@ -126,8 +112,6 @@ export class NumberSequenceService {
           }
           runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
         } else if (sequenceKey === "invoice") {
-          sequence.prefix = "R";
-          sequence.formatPattern = "{prefix}{yy}{mm}-{number}";
 
           const [rechnungen, cciInvoices, legacyInvoices] = await Promise.all([
             manager.getRepository(Rechnung).find({ select: ["invoice_number"] }),
@@ -155,7 +139,6 @@ export class NumberSequenceService {
 
           runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
         } else if (sequenceKey === "delivery_note") {
-          sequence.prefix = "L";
           const cciInvoices = await manager
             .getRepository(CCIInvoice)
             .createQueryBuilder("inv")
@@ -259,18 +242,18 @@ export class NumberSequenceService {
   static async seedDefaultSequences(): Promise<void> {
     const repo = AppDataSource.getRepository(NumberSequence);
     const defaults = [
-      { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "order", name: "Auftrag", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
-      { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       {
         sequenceKey: "invoice_correction",
         name: "Rechnungskorrektur",
         prefix: "RK",
-        formatPattern: "{prefix}{yyyy}{mm}-{number}",
+        formatPattern: "{prefix}{yy}{mm}-{number}",
         minDigits: 1,
       },
-      { sequenceKey: "delivery_note", name: "Lieferschein", prefix: "L", formatPattern: "{prefix}{yyyy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "delivery_note", name: "Lieferschein", prefix: "L", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       {
         sequenceKey: "customer",
         name: "Kunde",
@@ -289,14 +272,14 @@ export class NumberSequenceService {
         sequenceKey: "closed_ci",
         name: "Commercial Invoice",
         prefix: "CI",
-        formatPattern: "{prefix}{yyyy}{mm}-{number}",
+        formatPattern: "{prefix}{yy}{mm}-{number}",
         minDigits: 1,
       },
       {
         sequenceKey: "inquiry",
         name: "Anfrage",
         prefix: "AF",
-        formatPattern: "{prefix}{yy}-{number}",
+        formatPattern: "{prefix}{yy}{mm}-{number}",
         minDigits: 1,
       },
     ];
