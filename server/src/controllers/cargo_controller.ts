@@ -67,23 +67,6 @@ export const generateInvoicesForOrders = async (
         relations: ["customer"],
       });
       if (!cargo) continue;
-      if (cargo.cargo_type_id) {
-        const cargoType = await cargoTypeRepo.findOne({
-          where: { id: cargo.cargo_type_id },
-        });
-        if (cargoType && cargoType.has_pl === false) {
-          const existingInvoice = await invoiceRepo.findOne({
-            where: { orderNumber: cargoNo },
-          });
-          if (existingInvoice) {
-            await invoiceItemRepo.delete({
-              invoice: { id: existingInvoice.id },
-            });
-            await invoiceRepo.delete(existingInvoice.id);
-          }
-          continue;
-        }
-      }
 
       const linkedCargoOrders = await AppDataSource.getRepository(
         CargoOrder,
@@ -108,6 +91,7 @@ export const generateInvoicesForOrders = async (
       rawItems.forEach((oi) => itemMap.set(oi.id, oi));
       const items = Array.from(itemMap.values());
 
+      console.log(`[InvoiceSync] Cargo ${cargoNo}: found ${items.length} order items. Syncing invoice record...`);
       await syncInvoiceRecord(
         cargoNo,
         items,
@@ -125,10 +109,11 @@ export const generateInvoicesForOrders = async (
       if (existingInvoice) {
         await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
         await invoiceRepo.delete(existingInvoice.id);
+        console.log(`[InvoiceSync] Cleaned up standalone order invoice for orderNo: ${orderNo}`);
       }
     }
   } catch (e) {
-    console.error("Failed to sync invoices", e);
+    console.error("[InvoiceSync] Failed to sync invoices:", e);
   }
 };
 
@@ -145,7 +130,10 @@ const syncInvoiceRecord = async (
     relations: ["items"],
   });
 
-  if (!invoice && items.length === 0) return;
+  if (!invoice && items.length === 0) {
+    console.log(`[InvoiceSync] Cargo ${orderNumber}: no existing invoice and 0 items. Skipping.`);
+    return;
+  }
 
   if (invoice) {
     await invoiceItemRepo.delete({ invoice: { id: invoice.id } });
@@ -254,6 +242,7 @@ const syncInvoiceRecord = async (
   if (customer) invoice.customer = customer;
 
   await invoiceRepo.save(invoice);
+  console.log(`[InvoiceSync] Successfully saved invoice record for cargo/order ${orderNumber} (InvoiceNo: ${invoice.invoiceNumber}, Status: ${invoice.status}, GrossTotal: ${grossTotal}, Items: ${invoiceItems.length}).`);
 };
 
 export const getAllCargos = async (
