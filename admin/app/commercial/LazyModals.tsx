@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { ComponentProps } from "react";
+import type { OfferDetailModal as OfferDetailModalType } from "../../components/Offers/OfferDetailModal";
 
 /**
  * Every one of these modals is only rendered when its `show*Modal` flag is
@@ -14,13 +16,19 @@ import dynamic from "next/dynamic";
  * loaded later. Swap the static imports in the page for these.
  */
 
-export const OfferDetailModalLazy = dynamic(
+type OfferDetailModalProps = ComponentProps<typeof OfferDetailModalType>;
+
+const OfferDetailModalInner = dynamic(
   () =>
-    import("@/components/Offers/OfferDetailModal").then(
+    import("../../components/Offers/OfferDetailModal").then(
       (m) => m.OfferDetailModal,
     ),
   { ssr: false },
 );
+
+export const OfferDetailModalLazy: React.FC<OfferDetailModalProps> = (
+  props,
+) => <OfferDetailModalInner {...props} />;
 
 export const AuftragToBestellungModal = dynamic(
   () => import("@/components/orders/AuftragToBestellungModal"),

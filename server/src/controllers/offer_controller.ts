@@ -34,16 +34,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => { },
-      IsEnum: () => () => { },
-      IsNumber: () => () => { },
-      IsObject: () => () => { },
-      IsOptional: () => () => { },
-      IsString: () => () => { },
-      Max: () => () => { },
-      Min: () => () => { },
-      IsBoolean: () => () => { },
-      IsArray: () => () => { },
+      IsDate: () => () => {},
+      IsEnum: () => () => {},
+      IsNumber: () => () => {},
+      IsObject: () => () => {},
+      IsOptional: () => () => {},
+      IsString: () => () => {},
+      Max: () => () => {},
+      Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -54,7 +54,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => { },
+      Type: () => () => {},
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -113,6 +113,7 @@ import { CompanyShippingAddress } from "../models/company_shipping_address";
 
 import { getActiveTemplateFilePath } from "./system_parameter_controller";
 import * as pdfLib from "pdf-lib";
+import { CustomerOrder } from "../models/customer_orders";
 
 let cachedCustomerSvg: string | null = null;
 let cachedTemplatePath: string | null = null;
@@ -177,7 +178,8 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
   try {
     const activePath = await getActiveTemplateFilePath("customer_doc_template");
     const isPdf = activePath.toLowerCase().endsWith(".pdf");
-    if (!isPdf || !fs.existsSync(activePath) || !fs.existsSync(contentPdfPath)) return;
+    if (!isPdf || !fs.existsSync(activePath) || !fs.existsSync(contentPdfPath))
+      return;
 
     const templateBytes = fs.readFileSync(activePath);
     const contentBytes = fs.readFileSync(contentPdfPath);
@@ -192,7 +194,9 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     for (let i = 0; i < contentPageCount; i++) {
       const templatePageIdx = Math.min(i, templatePageCount - 1);
 
-      const [embeddedTemplate] = await mergedPdf.embedPdf(templateBytes, [templatePageIdx]);
+      const [embeddedTemplate] = await mergedPdf.embedPdf(templateBytes, [
+        templatePageIdx,
+      ]);
       const [embeddedContent] = await mergedPdf.embedPdf(contentBytes, [i]);
 
       const contentPage = contentPdf.getPage(i);
@@ -1166,9 +1170,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-              createOfferDto.defaultPriceMatrix,
-              createOfferDto.totalPriceDecimalPlaces || 2,
-            )
+                createOfferDto.defaultPriceMatrix,
+                createOfferDto.totalPriceDecimalPlaces || 2,
+              )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -1199,7 +1203,7 @@ export class OfferController {
         // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-            customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         paymentMethod: createOfferDto.paymentMethod,
@@ -1397,9 +1401,9 @@ export class OfferController {
         warehouseItems = await warehouseRepository.find({
           where: itemIdDEs.length
             ? [
-              { ItemID_DE: In(itemIdDEs) },
-              { item_id: In(orderedItems.map((it) => it.id)) },
-            ]
+                { ItemID_DE: In(itemIdDEs) },
+                { item_id: In(orderedItems.map((it) => it.id)) },
+              ]
             : { item_id: In(orderedItems.map((it) => it.id)) },
         });
       } catch (e: any) {
@@ -1476,7 +1480,7 @@ export class OfferController {
         paymentMethod: body.paymentMethod,
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-            customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         shippingMethod: body.shippingMethod,
@@ -2094,18 +2098,7 @@ export class OfferController {
       // ---------------------------------------------------------------
       // Backfill `material` (Art.-Nr.) / `basePrice` (Price) / `photo`
       // (thumbnail) from the originating Item whenever a line item is
-      // missing them — e.g. for line items created before this snapshot
-      // logic existed, or ones whose sourceItemId points to an item that
-      // never had these set on creation. Only touches line items that
-      // actually have a sourceItemId and are missing the value; never
-      // overwrites a value that's already there (so manual edits in the
-      // offer itself are preserved).
-      //
-      // `material` is derived the same way `de_no` is derived in
-      // getItemById — warehouse item_no_de first, falling back to
-      // parent.de_no — so it matches what createOfferFromItem stores and
-      // what the item detail view shows. `photo` is simply copied from the
-      // source Item's own `photo` column.
+      // missing them
       // ---------------------------------------------------------------
       if (offer.lineItems && offer.lineItems.length > 0) {
         const missingIds = offer.lineItems
@@ -2134,9 +2127,6 @@ export class OfferController {
             sourceItems.map((it: any) => [String(it.id), it]),
           );
 
-          // Batch-load warehouse records for these items, matched the same
-          // way getItemById matches a single item — by ItemID_DE first,
-          // falling back to item_id.
           const warehouseRepository =
             AppDataSource.getRepository(WarehouseItem);
           const itemIdDEs = sourceItems
@@ -2148,9 +2138,9 @@ export class OfferController {
             warehouseItems = await warehouseRepository.find({
               where: itemIdDEs.length
                 ? [
-                  { ItemID_DE: In(itemIdDEs) },
-                  { item_id: In(sourceItems.map((it: any) => it.id)) },
-                ]
+                    { ItemID_DE: In(itemIdDEs) },
+                    { item_id: In(sourceItems.map((it: any) => it.id)) },
+                  ]
                 : { item_id: In(sourceItems.map((it: any) => it.id)) },
             });
           } catch (e: any) {
@@ -2186,8 +2176,6 @@ export class OfferController {
               li.basePrice = src.price ?? 0;
               needsSave = true;
             }
-            // NEW: backfill the line item's thumbnail from the source
-            // Item's own `photo` column whenever it's missing.
             if (
               li.photo === null ||
               li.photo === undefined ||
@@ -2207,23 +2195,31 @@ export class OfferController {
       if (offer.lineItems) {
         offer.lineItems = offer.lineItems.map((item: any) => ({
           ...item,
-          // Alias so the "Art.-Nr." cell shows the same value whether the
-          // frontend reads `item.itemNo` (edit mode) or `item.material`
-          // (view mode) — both now resolve to the same stored field.
           itemNo: item.material,
           activePrice: this.getActiveMatrixEntry(item),
         }));
       }
 
-      // Live-resolved tax profile — always loaded fresh from the customer's
-      // currently-assigned `defaultTaxProfile` relation, never stored on the
-      // offer itself, so it reflects whatever the customer's profile is
-      // right now, not what it was when the offer was created.
+      // Live-resolved tax profile
       const taxProfile = await this.getCustomerTaxProfile(offer.customerId);
+
+      // Linked Aufträge (CustomerOrder records) for this offer — full
+      // records, not just ids, so the frontend can show the order number
+      // and date without a second request.
+      const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+      const linkedOrders = await customerOrderRepo.find({
+        where: { offer_id: id },
+        select: ["id", "order_no", "created_at", "offer_id"],
+        order: { created_at: "DESC" },
+      });
 
       return response.status(200).json({
         success: true,
-        data: { ...offer, taxProfile },
+        data: {
+          ...offer,
+          taxProfile,
+          linkedDocuments: linkedOrders,
+        },
       });
     } catch (error) {
       console.error("Error fetching offer:", error);
@@ -2281,17 +2277,7 @@ export class OfferController {
         }
       }
 
-      // ---------------------------------------------------------------
-      // NEW: for any line item across this page of offers that's missing
-      // `photo` but has a `sourceItemId`, look up the source Item's own
-      // `photo` column and fill it in on the response. This is a
-      // read-only fill — unlike getOfferById's backfill, we deliberately
-      // do NOT persist it back to the line item here, since that would
-      // mean a save per offer on every single list page load. Once a
-      // given offer is opened in the detail view, getOfferById's backfill
-      // will persist it permanently, and subsequent list loads won't need
-      // this fallback for that offer anymore.
-      // ---------------------------------------------------------------
+      // Photo backfill for line items
       const missingPhotoIds = Array.from(
         new Set(
           offers
@@ -2320,9 +2306,7 @@ export class OfferController {
         );
       }
 
-      // Live-resolved tax profiles for this page's customers — one batched
-      // query instead of one lookup per offer, resolved fresh on every list
-      // load and never stored on the offer itself.
+      // Live-resolved tax profiles
       const customerIds = Array.from(
         new Set(
           offers
@@ -2345,25 +2329,49 @@ export class OfferController {
         );
       }
 
-      // Same alias as getOfferById — the "Art.-Nr." cell reads
-      // `item.itemNo` in edit mode and `item.material` in view mode, so
-      // expose both to the same stored value here too.
-      const offersWithItemNo = offers.map((offer: any) => ({
-        ...offer,
-        taxProfile: offer.customerId
-          ? taxProfileByCustomerId.get(offer.customerId) || null
-          : null,
-        lineItems: (offer.lineItems || []).map((item: any) => ({
-          ...item,
-          itemNo: item.material,
-          photo:
-            item.photo ||
-            (item.sourceItemId
-              ? photoByItemId.get(String(item.sourceItemId))
-              : undefined) ||
-            item.photo,
-        })),
-      }));
+      // Linked Aufträge (CustomerOrder records) for every offer on this
+      // page, batched into a single query rather than one per offer.
+      const offerIds = offers.map((o: any) => o.id);
+      const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+
+      let linkedOrdersByOfferId = new Map<string, any[]>();
+      if (offerIds.length > 0) {
+        const allLinkedOrders = await customerOrderRepo.find({
+          where: { offer_id: In(offerIds) },
+          select: ["id", "order_no", "created_at", "offer_id"],
+          order: { created_at: "DESC" },
+        });
+
+        linkedOrdersByOfferId = allLinkedOrders.reduce((map, order) => {
+          const key = order.offer_id as string;
+          if (!map.has(key)) {
+            map.set(key, []);
+          }
+          map.get(key)!.push(order);
+          return map;
+        }, new Map<string, any[]>());
+      }
+
+      // Transform offers with linked documents attached inline
+      const offersWithItemNo = offers.map((offer: any) => {
+        return {
+          ...offer,
+          taxProfile: offer.customerId
+            ? taxProfileByCustomerId.get(offer.customerId) || null
+            : null,
+          lineItems: (offer.lineItems || []).map((item: any) => ({
+            ...item,
+            itemNo: item.material,
+            photo:
+              item.photo ||
+              (item.sourceItemId
+                ? photoByItemId.get(String(item.sourceItemId))
+                : undefined) ||
+              item.photo,
+          })),
+          linkedDocuments: linkedOrdersByOfferId.get(offer.id) || [],
+        };
+      });
 
       return response.status(200).json({
         success: true,
@@ -2383,6 +2391,7 @@ export class OfferController {
       });
     }
   }
+
   async updateOffer(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -3096,10 +3105,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                  totalPriceDecimalPlaces,
-                ),
-              );
+                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                    totalPriceDecimalPlaces,
+                  ),
+                );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -3309,11 +3318,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-              ...tpl,
-              price: match.price,
-              total: match.total,
-              isActive: match.isActive,
-            }
+                ...tpl,
+                price: match.price,
+                total: match.total,
+                isActive: match.isActive,
+              }
             : { ...tpl };
         });
 
@@ -3636,7 +3645,8 @@ export class OfferController {
         doc.text(customer.additionalInfo, MM(25), addrY, {
           width: MM(80),
         });
-        addrY += doc.heightOfString(customer.additionalInfo, { width: MM(80) }) + 2;
+        addrY +=
+          doc.heightOfString(customer.additionalInfo, { width: MM(80) }) + 2;
       }
 
       const streetAddress = customer.address || customer.street || "";
@@ -3699,10 +3709,7 @@ export class OfferController {
         });
 
       const offerTitleText =
-        offer.title ||
-        offer.inquiry?.name ||
-        offer.inquirySnapshot?.name ||
-        "";
+        offer.title || offer.inquiry?.name || offer.inquirySnapshot?.name || "";
       if (offerTitleText) {
         doc
           .font(R)
@@ -4174,37 +4181,6 @@ export class OfferController {
           details: error.message,
         });
       }
-    }
-  }
-
-  async getLinkedDocuments(request: Request, response: Response) {
-    try {
-      const { id } = request.params;
-      const offer = await this.offerRepository.findOne({ where: { id } });
-      if (!offer) {
-        return response
-          .status(404)
-          .json({ success: false, message: "Offer not found" });
-      }
-
-      // TODO: replace with real queries once Order / Invoice / DeliveryNote
-      // repositories are available, e.g. filtering by offer.id or
-      // offer.offerNumber.
-      return response.status(200).json({
-        success: true,
-        data: {
-          orders: [],
-          invoices: [],
-          invoiceCorrections: [],
-          deliveryNotes: [],
-        },
-      });
-    } catch (error) {
-      console.error("Error fetching linked documents:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
     }
   }
 

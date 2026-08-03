@@ -35,9 +35,7 @@ import {
   getOfferStatuses,
   getOfferStatusColor,
   deletePriceColumn,
-  getOfferLinkedDocuments,
   getCustomerShippingAddresses,
-  type LinkedDocumentsResult,
   type CustomerShippingAddress,
   previewLineItemPrice,
 } from "@/api/offers";
@@ -55,6 +53,8 @@ import { PrinterIcon } from "lucide-react";
 
 type PricingMode = "classic" | "matrix";
 
+type SourceType = "inquiry" | "item";
+
 interface OfferDetailModalProps {
   isOpen: boolean;
   offerId: string | null;
@@ -62,9 +62,8 @@ interface OfferDetailModalProps {
   onChanged?: () => void;
   userRole?: UserRole;
   fetchOffers?: any;
+  onSwitchToAuftrag?: (auftragId: string | number) => void;
 }
-
-type SourceType = "inquiry" | "item";
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
@@ -286,10 +285,11 @@ const ItemRow: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
           ? "border-primary bg-primary/5"
           : "border-gray-200 hover:bg-gray-50"
-        }`}
+      }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -339,10 +339,11 @@ const PickerRow: React.FC<{
 }> = ({ selected, onClick, title, subtitle, meta }) => (
   <div
     onClick={onClick}
-    className={`p-3 border rounded-lg cursor-pointer transition-all ${selected
+    className={`p-3 border rounded-lg cursor-pointer transition-all ${
+      selected
         ? "border-primary bg-primary/5"
         : "border-gray-200 hover:bg-gray-50"
-      }`}
+    }`}
   >
     <div className="flex justify-between items-start">
       <div className="min-w-0">
@@ -492,12 +493,14 @@ const TextCellInput: React.FC<{
   );
 };
 
-const LINKED_DOC_LABELS: Record<keyof LinkedDocumentsResult, string> = {
-  orders: "Orders",
-  invoices: "Invoices",
-  invoiceCorrections: "Invoice corrections",
-  deliveryNotes: "Delivery notes",
-};
+/** Sorts an array of linked Auftrag records by created_at, newest first.
+ * Falls back gracefully if created_at is missing/unparseable on a row. */
+const sortByCreatedAtDesc = (docs: any[]): any[] =>
+  [...(docs || [])].sort((a, b) => {
+    const timeA = new Date(a?.created_at || 0).getTime();
+    const timeB = new Date(b?.created_at || 0).getTime();
+    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+  });
 
 export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   isOpen,
@@ -505,6 +508,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   onClose,
   onChanged,
   userRole,
+  onSwitchToAuftrag,
   fetchOffers,
 }) => {
   const [offer, setOffer] = useState<any>(null);
@@ -519,11 +523,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [edit, setEdit] = useState(false);
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
-
-  const [linkedDocs, setLinkedDocs] = useState<LinkedDocumentsResult | null>(
-    null,
-  );
-  const [linkedDocsLoading, setLinkedDocsLoading] = useState(false);
 
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [itemPickerSearch, setItemPickerSearch] = useState("");
@@ -685,20 +684,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       }
     })();
   }, [showItemPicker, items.length]);
-
-  // Linked documents (orders / invoices / invoice corrections / delivery
-  // notes) tied to this specific offer.
-  useEffect(() => {
-    if (!offer?.id) {
-      setLinkedDocs(null);
-      return;
-    }
-    setLinkedDocsLoading(true);
-    getOfferLinkedDocuments(offer.id)
-      .then((res) => setLinkedDocs(res.success ? res.data : null))
-      .catch(() => setLinkedDocs(null))
-      .finally(() => setLinkedDocsLoading(false));
-  }, [offer?.id]);
 
   // Saved shipping addresses for this offer's customer — only fetched while
   // editing, since that's the only place the picker is shown.
@@ -945,7 +930,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         selectedCustomer.defaultShippingMethod || f.shippingMethod,
       paymentTerms:
         selectedCustomer.defaultPaymentDueDays !== undefined &&
-          selectedCustomer.defaultPaymentDueDays !== null
+        selectedCustomer.defaultPaymentDueDays !== null
           ? `${selectedCustomer.defaultPaymentDueDays}`
           : f.paymentTerms,
     }));
@@ -1435,29 +1420,29 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
   const displayTotal =
     (offer?.subtotal || 0) - (offer?.discountAmount || 0) + vatTaxSum;
-  // --- Linked documents ---------------------------------------------------
-  const linkedDocsCount = linkedDocs
-    ? (
-      Object.keys(LINKED_DOC_LABELS) as (keyof LinkedDocumentsResult)[]
-    ).reduce((sum, key) => sum + (linkedDocs[key]?.length || 0), 0)
-    : 0;
+
+  // --- Linked documents (Aufträge) -----------------------------------------
+  // offer.linkedDocuments is now an array of full CustomerOrder records
+  // ({ id, order_no, created_at, offer_id }) coming straight from
+  // getOfferById / getAllOffers on the backend — sorted newest first here.
+  const linkedDocuments = sortByCreatedAtDesc(offer?.linkedDocuments || []);
 
   const sourceTabs: {
     key: SourceType;
     label: string;
     icon: React.ReactNode;
   }[] = [
-      {
-        key: "inquiry",
-        label: "From inquiry",
-        icon: <LinkIcon className="h-4 w-4" />,
-      },
-      {
-        key: "item",
-        label: "Customer + item(s)",
-        icon: <CubeIcon className="h-4 w-4" />,
-      },
-    ];
+    {
+      key: "inquiry",
+      label: "From inquiry",
+      icon: <LinkIcon className="h-4 w-4" />,
+    },
+    {
+      key: "item",
+      label: "Customer + item(s)",
+      icon: <CubeIcon className="h-4 w-4" />,
+    },
+  ];
 
   // --- Delivery-address-vs-billing state (used below in the address block) --
   const currentDeliveryAddress = offer
@@ -1502,10 +1487,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSelectedItems([]);
                       setItemQuantities({});
                     }}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${sourceType === t.key
+                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+                      sourceType === t.key
                         ? "border-primary bg-primary/5 text-primary font-semibold"
                         : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
+                    }`}
                   >
                     {t.icon}
                     {t.label}
@@ -1538,10 +1524,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <button
                       key={m}
                       onClick={() => cPatch({ pricingMode: m })}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${createForm.pricingMode === m
+                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${
+                        createForm.pricingMode === m
                           ? "border-primary bg-primary/5 text-primary font-semibold"
                           : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                        }`}
+                      }`}
                     >
                       {m === "classic"
                         ? "Classic (1 qty · 1 price)"
@@ -1723,15 +1710,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       addr={
                         selectedCustomer.deliveryAddressLine1
                           ? {
-                            contactName:
-                              selectedCustomer.legalName ||
-                              selectedCustomer.companyName,
-                            street: selectedCustomer.deliveryAddressLine1,
-                            postalCode: selectedCustomer.deliveryPostalCode,
-                            city: selectedCustomer.deliveryCity,
-                            country: selectedCustomer.deliveryCountry,
-                            contactPhone: selectedCustomer.contactPhoneNumber,
-                          }
+                              contactName:
+                                selectedCustomer.legalName ||
+                                selectedCustomer.companyName,
+                              street: selectedCustomer.deliveryAddressLine1,
+                              postalCode: selectedCustomer.deliveryPostalCode,
+                              city: selectedCustomer.deliveryCity,
+                              country: selectedCustomer.deliveryCountry,
+                              contactPhone: selectedCustomer.contactPhoneNumber,
+                            }
                           : null
                       }
                       emptyText="Same as customer address."
@@ -1766,7 +1753,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             paymentTerms:
                               inq.customer?.defaultPaymentDueDays !==
                                 undefined &&
-                                inq.customer?.defaultPaymentDueDays !== null
+                              inq.customer?.defaultPaymentDueDays !== null
                                 ? `${inq.customer.defaultPaymentDueDays}`
                                 : f.paymentTerms || "",
                           }));
@@ -2405,9 +2392,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                       alt="thumb"
                                       className="w-full h-full object-contain"
                                       onError={(e) =>
-                                      ((
-                                        e.target as HTMLImageElement
-                                      ).style.display = "none")
+                                        ((
+                                          e.target as HTMLImageElement
+                                        ).style.display = "none")
                                       }
                                     />
                                   ) : (
@@ -2626,7 +2613,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <td className="px-2 py-2 text-right font-bold text-gray-800">
                               {formatCurrency(
                                 (form.shippingCost || 0) *
-                                (form.shippingQuantity || 1),
+                                  (form.shippingQuantity || 1),
                                 offer.currency,
                               )}
                             </td>
@@ -2728,9 +2715,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   alt="thumb"
                                   className="w-full h-full object-cover"
                                   onError={(e) =>
-                                  ((
-                                    e.target as HTMLImageElement
-                                  ).style.display = "none")
+                                    ((
+                                      e.target as HTMLImageElement
+                                    ).style.display = "none")
                                   }
                                 />
                               ) : (
@@ -2855,7 +2842,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                               {formatMatrixPrice(
                                                 p.price,
                                                 offer.unitPriceDecimalPlaces ||
-                                                3,
+                                                  3,
                                               )}
                                             </span>
                                           )}
@@ -2864,9 +2851,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                           {p.total === null
                                             ? "."
                                             : formatCurrency(
-                                              p.total,
-                                              offer.currency,
-                                            )}
+                                                p.total,
+                                                offer.currency,
+                                              )}
                                         </td>
                                         <td className="px-3 py-2">
                                           {p.isActive ? (
@@ -2977,7 +2964,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className={inputCls}
                       defaultValue={
                         visibleLineItems[0]?.extraWeight === null ||
-                          visibleLineItems[0]?.extraWeight === undefined
+                        visibleLineItems[0]?.extraWeight === undefined
                           ? ""
                           : String(visibleLineItems[0].extraWeight)
                       }
@@ -3034,49 +3021,54 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
               {/* LINKED DOCUMENTS */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
                 {/* LINKED DOCUMENTS */}
-                <div className="bg-white rounded-lg  p-4 px-2">
+                <div className="bg-white rounded-lg p-4 px-2">
                   <div className="flex items-center gap-2 mb-3">
                     <LinkIcon className="h-4 w-4 text-gray-500" />
                     <h3 className="text-sm font-bold text-gray-900">
-                      Linked documents
+                      Linked Documents
                     </h3>
+                    {linkedDocuments.length > 0 && (
+                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                        {linkedDocuments.length}
+                      </span>
+                    )}
                   </div>
-                  {linkedDocsLoading ? (
-                    <div className="text-sm text-gray-500 py-2">
-                      Loading linked documents…
-                    </div>
-                  ) : linkedDocsCount > 0 ? (
-                    <div className="space-y-2 text-sm">
-                      {(
-                        Object.keys(
-                          LINKED_DOC_LABELS,
-                        ) as (keyof LinkedDocumentsResult)[]
-                      ).map((key) => {
-                        const list = linkedDocs?.[key] || [];
-                        if (list.length === 0) return null;
-                        return (
-                          <div key={key}>
-                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                              {LINKED_DOC_LABELS[key]}
-                            </p>
-                            <ul className="space-y-1">
-                              {list.map((d) => (
-                                <li
-                                  key={d.id}
-                                  className="flex justify-between text-gray-700"
-                                >
-                                  <span>{d.number}</span>
-                                  {d.date && (
-                                    <span className="text-gray-400">
-                                      {formatDate(d.date)}
-                                    </span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
+                  {linkedDocuments.length > 0 ? (
+                    <div className="space-y-1.5 text-sm">
+                      {linkedDocuments.map((doc: any, index: number) => (
+                        <div
+                          key={doc.id ?? index}
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!onSwitchToAuftrag) {
+                              console.warn(
+                                "OfferDetailModal: onSwitchToAuftrag callback is not provided; can't navigate to Auftrag",
+                                doc,
+                              );
+                              return;
+                            }
+                            onClose();
+                            onSwitchToAuftrag(doc.id);
+                          }}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-1 rounded cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium text-[#8CC21B] group-hover:text-[#7ab318] group-hover:underline truncate">
+                              {doc.order_no || doc.id}
+                            </span>
+                            <span className="text-xs text-gray-400 shrink-0">
+                              →
+                            </span>
                           </div>
-                        );
-                      })}
+                          {doc.created_at && (
+                            <span className="text-gray-400 text-xs shrink-0 ml-2">
+                              {formatDate(doc.created_at)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500">
@@ -3084,7 +3076,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </p>
                   )}
                 </div>
-
                 <div className="bg-white rounded-lg px-2 p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <PencilIcon className="h-4 w-4 text-gray-500" />

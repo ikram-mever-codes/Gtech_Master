@@ -1682,6 +1682,7 @@ const InvoiceListPage: React.FC = () => {
             setSearchTerm("");
           }}
         />
+
         {activeInvTab === "angebot" && (
           <OffersPage
             embedded={true}
@@ -1691,6 +1692,12 @@ const InvoiceListPage: React.FC = () => {
             onAuftragCreated={(auftragId: string | number) => {
               setActiveInvTab("auftrag");
               handleOpenAuftragPreview(auftragId);
+            }}
+            onSwitchToAuftrag={(auftragId: string | number) => {
+              setActiveInvTab("auftrag");
+              setTimeout(() => {
+                handleOpenAuftragPreview(auftragId);
+              }, 100);
             }}
           />
         )}
@@ -1985,6 +1992,7 @@ const InvoiceListPage: React.FC = () => {
           onRemoveOrderItem={handleRemoveOrderItem}
           onSubmit={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
         />
+
         {showOfferModal && (
           <OfferDetailModalLazy
             isOpen={showOfferModal}
@@ -1999,6 +2007,12 @@ const InvoiceListPage: React.FC = () => {
               setOfferRefreshKey((prev: any) => prev + 1);
             }}
             userRole={user?.role}
+            onSwitchToAuftrag={(auftragId: string | number) => {
+              setActiveInvTab("auftrag");
+              setTimeout(() => {
+                handleOpenAuftragPreview(auftragId);
+              }, 100);
+            }}
           />
         )}
         {showAuftragToBestellungModal && (

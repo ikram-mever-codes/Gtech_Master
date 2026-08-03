@@ -280,6 +280,7 @@ const OffersPage: React.FC<any> = ({
   onOrderConverted,
   refreshTrigger,
   onAuftragCreated,
+  onSwitchToAuftrag,
 }) => {
   const { user } = useSelector((state: RootState) => state.user);
 
@@ -889,6 +890,7 @@ const OffersPage: React.FC<any> = ({
           }}
           onChanged={fetchOffers}
           userRole={user?.role}
+          onSwitchToAuftrag={onSwitchToAuftrag}
         />
       )}
     </>
