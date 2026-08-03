@@ -14,6 +14,7 @@ import {
   getAllCustomers,
   getSingleUser,
   updateCustomerStatus,
+  syncCustomerData,
 } from "../controllers/customer_controllers";
 import {
   authenticateUser,
@@ -27,6 +28,9 @@ const router: any = express.Router();
 // Customer Account Lifecycle
 router.post("/request-account", requestCustomerAccount);
 router.get("/verify-email/:code", verifyEmail);
+
+// Bulk import/sync customers + contacts from /public/customers.csv
+router.get("/sync", syncCustomerData);
 
 // Authentication Routes
 router.post("/login", login);
@@ -46,7 +50,7 @@ router.get(
   "/all",
   authenticateUser,
   authorize(UserRole.SALES, UserRole.PURCHASING),
-  getAllCustomers
+  getAllCustomers,
 );
 
 router.get(
@@ -68,14 +72,14 @@ router.get(
       authenticateCustomer(req, res, next);
     }
   },
-  getSingleUser
+  getSingleUser,
 );
 
 router.put(
   "/:customerId/status",
   authenticateUser,
   authorize(UserRole.SALES, UserRole.PURCHASING),
-  updateCustomerStatus
+  updateCustomerStatus,
 );
 
 export default router;

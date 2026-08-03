@@ -1,0 +1,147 @@
+﻿90625;Kundennummer;Legal Name;Additional Line;Street & No;postal code;City;Country ISO;Phone;Email;URL;VATNo;DebitorNo;PayMethod;PayDueDays;Comment put at end1;Customer Comment put at end2;Sex;Name;FamilyName;ContactPhone
+90626;K011111;CEYLAN GmbH; ;Adlerstr. 6;45307;Essen;DE;+49 201 815 0 390;buchhaltung@ceylan-online.de;http://www.ceylan-online.de;DE813350068;10001;Kauf-auf-Rechnung;40;  seit ;31.01.2017;Male;Saban;Göçmen;+49 177 5555629
+90627;K022222;H.& F. Lauterjung GmbH & Co. KG; ;Gasstraße 35b;42657;Solingen;DE;+49 212 24852-0;invoice@lauterjung.de;www.lauterjung.de;DE120876926;10002;Kauf-auf-Rechnung;20;  seit ;08.08.2017;;;;
+90628;K082776;Uyar GmbH & Co. KG;Uyar Kebab Equipment ;Carl-Bosch-Straße 6;33790;Halle;DE;05201 971800;rechnung@uyar-online.de;;;10003;Kauf-auf-Rechnung;20;  seit ;02.11.2018;Male;Jörg;Joswieg;05201 97180 18
+90629;K054800;Dost GmbH; ;Luisenburgstraße 7;95032;Hof;DE;09281 860661;info@dost-gmbh.de;www.dost-doenermesser.de/;;10004;Kauf-auf-Rechnung;10;  seit ;22.05.2018;Male;Fazli;Bacak;1728395360
+90630;K054796;Dogan Dönerproduktions GmbH; ;Karlshöhlchen 2;76872;Freckenfeld;DE;06340 / 9259818;dogan.food@web.de;;;10007;Kauf-auf-Rechnung;10;  seit ;05.07.2017;Male;;Dogan;4,91734E+11
+90631;K054815;GOEK LTD Niederlassung Deutschland; ;Raiffeisenstraße 7; ;Wörth am Rhein;DE;07271 / 42140;ig@goek-systeme.de;;;10017;Kauf-auf-Rechnung;10;  seit ;07.07.2017;Male;;Goek;
+90632;K054843;SCHRADER Großküchentechnik; ;Wendenweg 7;44149;Dortmund;DE;231828339;info@gastro-schrader.de;;DE228716332;10045;Kauf-auf-Rechnung;10;  seit ;18.01.2017;Male;Burhan;Gündogan;
+90633;K054852;Alkadur RobotSystems GmbH; ;Robert-Bosch-Straße 27;73431;Aalen;DE;+49 7361 5566880;jessica.rieck@alkadur.de;;DE264379155;10055;Kauf-auf-Rechnung;20;  seit ;03.06.2021;Female;Jessica;Hutschenreuter-Rieck;+49 152 09062405
+90634;K044444;SOLIDSENSE GmbH; ;Hölderlinstrasse 55;70193;Stuttgart;DE;4971195807525;order@solid-sense.de;www.solid-sense.de;;10057;Kauf-auf-Rechnung;10;  seit ;12.09.2018;Male;Marcus;Raether;4,91521E+12
+90635;K054889;DAS SCHAUWERK GmbH; ;Steinbeisstraße 8-10;71691;Freiberg am Neckar;DE;49714178858;felix.woestmann@das-schauwerk.de;das-schauwerk.de;;10058;Kauf-auf-Rechnung;10;  seit ;09.08.2018;Male;Felix;Wöstmann;4,91638E+11
+90636;K054861;Ingenieurbüro Frank Klessascheck UG; ;Marienstrasse 23;6526;Sangerhausen;DE;+49 3464 - 34 3000;f.klessascheck@fk-ing.de;;;10060;Kauf-auf-Rechnung;10;  seit ;01.10.2018;Male;Frank;Klessascheck;+49 176 75 62 30 60
+90637;EK054857;Ingenieurbüro Christian Reil; ;Am Münsterbühl 10;93413;Cham;DE;;info@cr-ingenieurbuero.de;;;10063;Kauf-auf-Rechnung;10;  seit ;30.12.2018;Male;Christian;Reil;
+90638;K054875;Seibert System Solutions GmbH & Co. KG; ;Philipp.Reis-Str.3;34582;Borken;DE;05682/739825;torben-rex@seibert-automation.de;;DE 317641361;10064;Kauf-auf-Rechnung;10;  seit ;20.12.2018;;;;
+90639;K054855;Brandschutztechnik Müller GmbH; ;Kasseler Str. 37  - 39;34289;Zierenberg;DE;5606518257;c.hahn@brandschutztechnikmueller.de;;;10065;Kauf-auf-Rechnung;10;  seit ;09.08.2019;Male;Christian;Hahn;
+90640;K054866;MIS Industrie Systeme GmbH & Co. KG; ;Lohwiese 7;86937;Scheuring;DE;08195 998400211;rmannhardt@mibtec.de;www.mibtec.de;;10066;Kauf-auf-Rechnung;10;  seit ;29.07.2019;Male;Ralf;Mannhardt;
+90641;K054883;Weber GmbH; ;Sülzbach 1;37293;Herleshausen;DE;565492489148;jens.bierschenk@weber-werke.de;www.weber-werke.de;DE258019019;10067;Kauf-auf-Rechnung;10;  seit ;19.11.2020;Male;Jens;Bierschenk;
+90642;K054868;Märzhäuser Wetzlar GmbH & Co. KG; ;In der Murch 15;35579;Wetzlar;DE;+49 (0) 6441 9116-0;Peter.wenzel@marzhauser.com;;DE113743616;10070;Kauf-auf-Rechnung;20;  seit ;01.03.2019;Male;Peter;Wenzel;
+90643;K054884;W/BZ Winkler Bildungszentrum GmbH; ;Wilhelm-Schickard-Straße 5;78052;Villingen-Schwenningen;DE;+49 (0) 7721/9198-75;marc.hellwig@wbzgmbh.de;www.einen-schritt-weiter.de;;10072;Kauf-auf-Rechnung;10;  seit ;12.12.2019;Male;Marc;Hellwig;
+90644;K054869;Neumann&Müller GmbH & Co. KG; ;Zeppelinstraße 126;73730;Esslingen am Neckar;DE;+49 711 30529 312;;www.neumannmueller.com;;10073;Kauf-auf-Rechnung;10;  seit ;17.01.2019;Male;Timothy;James;
+90645;K054871;PSG Procurement Services GmbH; ;Haus Sülz 6;53797;Lohmar;DE;+49 (0) 2205 9278-280;mradoi@ips-psg.de;;DE813502791;10074;Kauf-auf-Rechnung;10;  seit ;23.08.2019;Female;Madalina;Radoi;
+90646;K054892;Wieghaus Landtechnik; ;Schulweg 11;49681;Garrel;DE;;info@ludgerwieghaus.de;;;10075;Kauf-auf-Rechnung;10;  seit ;20.05.2020;Male;Ludger;Wieghaus;1517200248
+90647;K054874;Tobias Richter Feinwerktechnik; ;Scheerenbergerstraße 63;37520;Osterode am Harz;DE;;Richter-Feinwerktechnik@gmx.de;;;10076;Kauf-auf-Rechnung;10;  seit ;25.10.2019;;;;1776717185
+90648;K054860;HV Plückhahn UG; ;Fürstenwalder Damm 482;12587;Berlin;DE;1725341577;k.plueckhahn@hv-plueckhahn.de;;;10077;Kauf-auf-Rechnung;10;  seit ;25.05.2020;Male;Kristian;Plückhahn;
+90649;K054858;FEG Fein- und Elektronikgerätebau Jena GmbH; ;Felsbachstraße 5;7745;Jena;DE;+49 3641 23778-23;s.neuhaus@feg-jena.de;;;10078;Kauf-auf-Rechnung;10;  seit ;04.08.2020;Male;;Neuhaus;
+90650;K054867;FIBU Montanuniversität Leoben; ;Franz-Josef-Straße 18;8700;Leoben;AT;4,36648E+13;michael.denzel@unileoben.ac.at;;ATU57480504;10079;Kauf-auf-Rechnung;10;  seit ;15.04.2020;Male;Michael;Denzel (Bergbaukunde);
+90651;K054885;ZIRKONZAHN GmbH; ;An der Ahr 7;39030;Gais;IT;+39 0474 066660;info@zirkonzahn.com;www.zirkonzahn.com;IT02376910218;10080;Kauf-auf-Rechnung;10;  seit ;21.01.2020;Female;Brugger;Sylvia;
+90652;K054878;FH Technikum Wien; ;Höchstädtplatz 6;1200;Wien;AT;;lechnerr@technikum-wien.at;;ATU65565658;10081;Kauf-auf-Rechnung;20;  seit ;19.10.2020;Male;Robert;Lechner;
+90653;K054870;good-old-hifi; ;Großstr. 28;14823;Niemegk;DE;033843-30404;post@good-old-hifi.de;;DE276484921;10082;Kauf-auf-Rechnung;10;  seit ;21.10.2020;Male;Lennart;Kahn;
+90654;K054879;Vogt Silo & Anlagenbau GmbH; ;Kirnautalstraße 35;74749;Rosenberg;DE;06295 929926;thomas.ebert@vogt-rosenberg.de;;DE813670215;10084;Kauf-auf-Rechnung;10;  seit ;10.02.2021;Male;Thomas;Ebert;
+90655;K054873;Chr. Renz GmbH; ;Rechbergstr. 44;73540;Heubach;DE;07173/186-51;Mangold@renz.com;www.renz.com;DE813145796;10085;Kauf-auf-Rechnung;10;  seit ;02.07.2021;Male;Björn;Mangold;
+90656;K054872;Metallgestaltung Aurin GmbH; ;Hauptstraße 5;1877;Bischofswerda OT Schönbrunn;DE;3594702439;kunstschmiede.aurin@t-online.de;www.kunstschmiede-aurin.de;DE202327859;10086;Kauf-auf-Rechnung;10;  seit ;01.07.2021;Male;Steffen;Aurin;1624983199
+90657;K054859;Hekatron Technik GmbH; ;Brühlmatten 3a – 9;79295;Sulzburg;DE;+49 7634 500-7342;Rechnung2100@hekatron.de;;DE813235909;10087;Kauf-auf-Rechnung;10;  seit ;08.03.2021;Male;Tobias;Wiesler;
+90658;K054894;GTech Industries Service Limited; Office No 101;Dimitri Kalergi 8;8025;Anavargos, Paphos;CY;+357 96 145 425;marina@gtech-industries.com;;CY10418092A;10088;Kauf-auf-Rechnung;10;  seit ;10.03.2021;Female;Marina;Schellenberg;+357 96 145 425
+90659;EK054895;GTech Industries Global Holding Limited; off Andrea Makri Street;Sotrioanastaseos Street 1;8270;Tremithousa, Paphos;CY;+357 96 145 425;joschua@gtech-industries.com;;CY10404371N;10089;Kauf-auf-Rechnung;10;  seit ;10.03.2021;Male;Joschua;Grenzheuser;+357 96 145 425
+90660;K054856;Cleanlight GmbH; ;Specksloh 7;59757;Arnsberg;DE;29329318071;konstruktion@clean-light.de;;DE256897694;10091;Kauf-auf-Rechnung;10;  seit ;20.07.2021;Male;Leonard;Kanthak;
+90661;K054853;axiss GmbH; ;Felix-Wankel-Str. 3;75210;Keltern;DE;07236 981401;info@axiss.de;;;10092;Kauf-auf-Rechnung;10;  seit ;26.03.2021;Male;Markus;Stölzle;
+90662;K054851;LMB Automation GmbH; ;Liegnitzer Straße 1 ;58642;Iserlohn;DE;+49 2374 4093 263;il.kasancev@lmb-gruppe.de;www.lmba.de;DE813049031;10093;Kauf-auf-Rechnung;10;  seit ;11.01.2017;;;;
+90663;K054877;tic Medizintechnik GmbH & Co. KG; ;Endelner Feld 9;46286;Dorsten;DE;+49 (0) 23 69 - 20 85 - 30;kaltenhaeuser@ticmed.de;;;10108;Kauf-auf-Rechnung;10;  seit ;12.10.2018;;;;
+90664;K054777;Electrical Engineering Braun; ;Schulstr.15;92533;Wernberg;DE;09662/832766;tobias.braun@e-e-b.de;;DE261182406;10118;Kauf-auf-Rechnung;10;  seit ;13.02.2018;Male;Tobias;Braun;0170/4193582
+90665;K054891;WABCO GmbH; ;Am Lindener Hafen 21;30453;Hannover;DE;4,95119E+11;Christian.timpe@wabco-auto.com;www.wabco-auto.com;DE251311524;10121;Kauf-auf-Rechnung;10;  seit ;13.03.2017;;;;
+90666;K030492;J. Wagner GmbH;4400001894;Otto- Lilienthal-Str. 18;88677;Markdorf;DE;75445051504;jasmin.schmeh@wagner-group.com;;DE813021567;10123;Kauf-auf-Rechnung;10;  seit ;06.03.2020;Female;;Schmeh;
+90667;K054876;Schneider Technologies GmbH + Co. KG; ;Maumker Str. 15;57368;Lennestadt;DE;02721 985010;b.schneider@schneider-technologies.eu;;DE195570149;10124;Kauf-auf-Rechnung;10;  seit ;21.12.2021;;;;
+90668;K039346;TÜV Rheinland Lichttechnik GmbH; ;Rhinstrasse 46;12681;Berlin;DE;+49 30 7562-4908;Marc.Tiedemann@de.tuv.com;;DE813750506;10125;Kauf-auf-Rechnung;10;  seit ;28.10.2020;Male;Marc;Tiedemann;
+90669;K014378;Hema GmbH; ;Papenhöher Weg 1;37520;Osterode am Harz;DE;05522-9004-12;szemeitat@hema.eu;;DE811421288;10126;Kauf-auf-Rechnung;7;  seit ;05.11.2018;Male;Axel;Szemeitat;
+90670;K017381;KW automotive GmbH; ;Aspachweg 14;74427;Fichtenberg;DE;07971 9630-0;invoice@kwautomotive.de;www.KWautomotive.de;DE812382653;10127;Kauf-auf-Rechnung;10;  seit ;31.01.2019;;;;
+90671;K055652;Sudbrock GmbH Möbelhandwerk; ;Brunnenstraße 2;33397;Rietberg;DE;+49 (0) 52 44-98 00-22;d.brockschnieder@sudbrock.de;http://www.sudbrock.de;DE811243148;10128;Kauf-auf-Rechnung;10;  seit ;19.01.2022;Male;Heinz Dieter;Brockschnieder;
+90672;K056828;R. Brücklmeier GmbH;Pulverbeschichtung - Sandstrahlen - KTL-Beschichtung ;Gutenbergstr.1;92421;Schwandorf;DE;+49 94717432;roland@bruecklmeier-gmbh.de;;DE815007167;10129;Kauf-auf-Rechnung;14;  seit ;17.02.2022;Male;;;0170-2160671
+90673;K055577;cab Produkttechnik;Sömmerda GmbH ;Am Unterwege 18/20;99610;Sömmerda;DE;+49 036346860120;n.ahnert@cab.de;;DE143593113;10131;Kauf-auf-Rechnung;10;  seit ;17.01.2022;Female;;Ahnert;
+90674;K057718;GeBE Elektronik und Feinwerktechnik GmbH; ;Industriestraße 9;82110;Germering;DE;+49 89.89 41 41-0;invoice@gebe.net;www.gebe.net;DE128225231;10132;Kauf-auf-Rechnung;10;  seit ;11.03.2022;;Pleurat;Koca;
+90675;K050268;Universal Labortechnik GmbH & Co. KG; Haus B;Angerstraße 40-42;4177;Leipzig;DE;0341-87065990;michael.bauer@universallab.de;;DE251028774;10136;Kauf-auf-Rechnung;10;  seit ;04.08.2021;Male;Michael;Bauer;
+90676;K037815;Novomatics GmbH; ;Aubachstr. 1;56410;Montabaur;DE;26029199622;payments@novomatics.de;www.novomatics.de;DE813231908;10141;Kauf-auf-Rechnung;14;  seit ;22.06.2022;Female;Adriana;Thyroke;
+90677;K051057;Schreinerei Haas Mathias; ;Ortsstraße 15;88239;Wangen im Allgäu;DE;75229758610;info@haas-wangen.com;;DE291264748;10142;Kauf-auf-Rechnung;10;  seit ;02.09.2021;Male;Mathias;Haas;
+90678;K066958;Allplast GmbH; ;Neurieder Str. 8;82131;Gauting;DE;089 / 790 789-63;systeme@allplast.de;;DE229091477;10143;Kauf-auf-Rechnung;10;  seit ;28.02.2023;;Ralph;Negele;
+90679;K029754;3B Scientific GmbH; ;Ludwig-Erhard-Straße 20;20459;Hamburg;DE;37467597280;susann.kleider@3bscientific.com;;DE118678720;10144;Kauf-auf-Rechnung;10;  seit ;18.02.2020;Female;Susann;Kleider;
+90680;K054896;go development GmbH; ;Strohgäustraße 3;73765;Neuhausen auf den Fildern;DE;;;;;10145;Kauf-auf-Rechnung;10;  seit ;22.02.2021;Male;Max;Braun;
+90681;K064839;GoodBytz GmbH; ;Werner-Otto-Strasse 13g;22179;Hamburg;DE;;vendor-bills@goodbytz.com;;DE348206166;10146;Kauf-auf-Rechnung;14;  seit ;15.12.2022;Female;Jennifer;Ahrens;
+90682;K064937;G.DIEHM Glasbläserei; ;Dietenhaner Straße 2;97877;Wertheim-Urphar;DE;;info@gdiehm.de;;DE146570518;10147;Kauf-auf-Rechnung;7;  seit ;19.12.2022;Male;Günter;Diehm;
+90683;K046236;ESI-Prüftechnik GmbH; ;An den Kiesgruben 54;73240;Wendlingen am Neckar;DE;+49 7024920310;einkauf@esi-prueftechnik.de;;DE146269717;10148;Kauf-auf-Rechnung;7;  seit ;31.03.2021;Female;Christine;van Engelen;
+90684;K042889;Zweckverband Mainhafen und Fähre Wertheim; ;Mühlenstraße 26;97877;Wertheim;DE;1703131502;mainfaehre-mondfeld@web.de;;;10150;Kauf-auf-Rechnung;7;  seit ;18.01.2021;Male;;Hörnig;
+90685;K066350;eleven teamsports GmbH; ;Im Winkel 1-3;74589;Satteldorf;DE;15733874965;kerstin.etzel@11teamsports.com;;DE252734710;10152;Kauf-auf-Rechnung;7;  seit ;07.02.2023;Female;Kerstin;Etzel;
+90686;K064154;Cottec Automation GmbH; ;Klingaer Straße 13;4668;Grimma;DE;+49 (0)34293 4749 – 0;info@cottec.com;www.cottec.com;DE303819025;10153;Kauf-auf-Rechnung;10;  seit ;26.02.2018;;;;
+90687;EK063393;Schreinerei Bessler;CNC Holzfräse ;Am Luftschacht 3;45886;Gelsenkirchen;DE;+49 01774154679;janina.bessler@schreinerei-bessler.de;;;10154;Kauf-auf-Rechnung;10;  seit ;17.10.2022;;;;
+90688;K065710;CNC14; ;Fuchsweg 32;50389;Wesseling;DE;1639290952;hell@cnc14.de;;;10155;Kauf-auf-Rechnung;10;  seit ;17.01.2023;Female;Birgit;Hellendahl;
+90689;K056682;xolo GmbH; ;Volmerstr 9B;12489;Berlin;DE;15125242270;marcus.reuter@xolo3d.com;;DE322705397;10157;Kauf-auf-Rechnung;7;  seit ;14.02.2022;Male;Marcus;Reuter;
+90690;K070791;PTSS GmbH; ;Karl-Schneider-Straße 8 ;45966;Gladbeck;DE;+49 (0) 20 43 968 292;;www.ptss-gmbh.de;DE233799815;10158;Kauf-auf-Rechnung;10;  seit ;04.08.2023;;;;+49 (0) 159 062 152 13
+90691;K071242;LKS GmbH; ;Gerhard-von-Rad-Str. 8;90425;Nürnberg;DE;15222798844;majid.taheri@das-lks.de;;DE340335128;10159;Kauf-auf-Rechnung;10;  seit ;23.08.2023;Male;Majid;Taheri;15222798844
+90692;K071375;OPED GmbH; F&E;Medizinpark 1;83626;Valley-Oberlaindern;DE;802460818403;f.erbe@oped.de;;DE129429626;10160;Kauf-auf-Rechnung;10;  seit ;28.08.2023;Male;Florian;Erbe;
+90693;K064310;SMELA GmbH; ;Mittagstraße 16P;39124;Magdeburg;DE;+49 017623777258;einkauf@smela.com;;;10161;Kauf-auf-Rechnung;10;  seit ;22.11.2022;Male;Oleksandr;Tyshakin;
+90694;K063972;Sattler GmbH; ;Wilhelm-Zwick-Strasse 6;73035;Göppingen-Jebenhausen;DE;0049 7161-920193-15;einkauf@sattler-lighting.com;www.sattler-lighting.com;DE145559188;10162;Kauf-auf-Rechnung;14;  seit ;09.05.2023;Male;Tim;Sattler;
+90695;K063975;Clauß & Hornig GbR; ;Chemnitzer Str. 45;9427;Ehrenfriedersdorf;DE;;info@clauss-hornig.de;;;10164;Kauf-auf-Rechnung;10;  seit ;09.11.2022;Male;Michael;Clauß;
+90696;K074801;Deutsche Bahn AG;DB Global Business Service ;Elisabeth-Schwarzhaupt-Platz 1;10115;Berlin;DE;;;;DE811569869;10175;Kauf-auf-Rechnung;30;  seit ;22.01.2024;;;;
+90697;K075837;Korkmaz Mekatronik; ;Yedi Eylul Mh. Philsa Cd. No:42/1;35860;Torbali - Izmir;TR;;merve.atar@korkmazmekatronik.com.tr;;;10177;Kauf-auf-Rechnung;10;  seit ;06.03.2024;;;;
+90698;K075859;ADAC Heliservice GmbH; ;Richthofenstr. 126;53757;St. Augustin;DE;;aurora.castrillo.llamas@heliservice.adac.de;http://www.heliservice.adac.de;DE811358488;10178;Kauf-auf-Rechnung;7;  seit ;07.03.2024;;;;
+90699;K075484;Dorn Helmut GmbH; ;Gewerbepark 252;8230;Greinbach;AT;4,33333E+12;josef.wilfinger@kfz-dorn.at;;ATU62980812;10179;Kauf-auf-Rechnung;7;  seit ;21.02.2024;Male;Helmut;Dorn;
+90700;K069109;Pfiffner Schaltgeräte AG; ;Reuslistrasse 35;4450;Sissach;CH;+ 41 61 976 34 31;invoice-ap@pfiffner-sg.com;the-rsgroup.com;CHE-107.358.207;10181;Kauf-auf-Rechnung;25;  seit ;23.05.2023;Male;Thomas;Drews;+ 41 79 885 05 76
+90701;K066666;Potis GmbH & Co. KG; ;August-Spindler-Straße 4;37079;Göttingen;DE;;rechnung@potis.de;;;10186;Kauf-auf-Rechnung;14;  seit ;02.07.2024;Male;Sören;Gellert;
+90702;K052748;Martel Innovation; ;Kreisental 11;74925;Epfenbach;DE;+49 155-60338194;info@martel.de;;DE 235 766 262;10189;Kauf-auf-Rechnung;14;  seit ;06.08.2024;Male;Viktor;Martel;+49 155-60338194
+90703;K078790;Future Beat Industries GmbH; ;Pforzheimerstr. 39;75210;Keltern;DE;;;;;10197;Kauf-auf-Rechnung;0;  seit ;03.09.2024;;;;
+90704;K078784;PodoPrinter BV; ;Zwaanstraat 31F;5651 CA ;Eindhoven;NL;;s.schurmann@podoprinter.com;;NL860219094B01;10198;Kauf-auf-Rechnung;7;  seit ;03.09.2024;Male;Stephan;Schurmann;+ 49 (0)177 – 3333 597
+90705;K045633;Freiberg Instruments GmbH; ;Delfter Str. 6;9599;Freiberg;DE;37314195424;einkauf@freiberginstruments.com;;DE246095095;10199;Kauf-auf-Rechnung;7;  seit ;16.03.2021;Female;Diana;Trinks;
+90706;K079543;ABUS Kransysteme GmbH; ;Sonnenweg 1;51647;Gummersbach-Lantenbach;DE;+49 2261 37-361;volker.simon@abus-kransysteme.de;;DE811575164;10200;Kauf-auf-Rechnung;14;  seit ;24.10.2024;;;;
+90707;K079592;Schaeffler Technologies AG & Co. KG; ;Industriestraße 1-3;91074;Herzogenaurach;DE;09132-8288219;maximilian.welker@schaeffler.com;;DE291636029;10202;Kauf-auf-Rechnung;14;  seit ;28.10.2024;;Maximilian;Welker;
+90708;K079720;Wieland Electric GmbH; ;Rodezstraße 10;96052;Bamberg;DE;;Marcel.Schwinn@wieland-electric.com;;DE132269926;10203;Kauf-auf-Rechnung;7;  seit ;05.11.2024;;;;
+90709;K067436;Heatmaster; ;grotenoord 1;3341 LT;Hendrik ido ambacht;NL;;bh@heatmaster.nl;heatmaster.nl;NL804636941B01;10204;Kauf-auf-Rechnung;7;  seit ;15.03.2023;Male;Bastian;Höner;629408628
+90710;K079523;Stucke Elektronik GmbH; ;Merkurring 26;22143;Hamburg;DE;+49 40 227468 0;bartels@stuckegroup.de;;;10205;Kauf-auf-Rechnung;14;  seit ;22.10.2024;Male;Kevin;Bartels;
+90711;K080172;Festool GmbH; ;Wertstraße 20;73240;Wendlingen am Neckar;DE;+49 7024 804 25506;billing-festool@b2b.tts-company.com;;DE250064631;10207;Kauf-auf-Rechnung;10;  seit ;02.12.2024;;;;
+90712;K073940;Wepatronic GmbH; ;General-Bishop-Str. 48;32339;Espelkamp;DE;05772-9725-17;mareike.redeker@wepatronic.de;;DE813 668 533;10208;Kauf-auf-Rechnung;10;  seit ;12.12.2023;Female;Mareike;Redeker;
+90713;K081155;igus SE & Co. KG; ;Spicher Str. 1a;51147;Köln;DE;02203 964 972 06;de-invoice@igus.net;;DE121976915;10209;Kauf-auf-Rechnung;7;  seit ;05.02.2025;;;;
+90714;K081267;DR. JOHANNES HEIDENHAIN GmbH; ;Dr.-Johannes-Heidenhain-Str. 5;83301;Traunreut;DE;+49 8669 31-0;Julia.Bauer@heidenhain.com;;DE131557292;10210;Kauf-auf-Rechnung;10;  seit ;12.02.2025;;;;
+90715;K068157;GH Verpackungen Vertriebs GmbH & Co. KG; ;Kreisstraße 8;33790;Halle (Westfalen);DE;;olech@gh-verpackungen.de;;DE128583016;10211;Kauf-auf-Rechnung;10;  seit ;12.04.2023;Male;Michael;Olechnowicz;4,91764E+12
+90716;K080374;Cambaum GmbH; ;Im Rollfeld 15;76532;Baden-Baden;DE;07221 9694666;purchase@cambaum.de;;DE288298278;10212;Kauf-auf-Rechnung;14;  seit ;16.12.2024;Male;Walter;Heidt;
+90717;K081938;Büchsenmachermeister; ;Schaftnacher Straße 33;91126;Schwabach ;DE;09122 - 639 51;helge-lehner@t-online.de;;;10214;Kauf-auf-Rechnung;7;  seit ;25.03.2025;;Helge;Lehner;
+90718;K080875;Naext GmbH; ;Beckedorfer Bogen 21;21218;Seevetal;DE;4,94105E+12;payment@naext.de;;;10216;Kauf-auf-Rechnung;7;  seit ;20.01.2025;Male;Marcel;Rezac;
+90719;K079331;Berghof Automation GmbH; ;Arbachtalstr. 26;72800;Eningen;DE;07121 894131;achim.machura@berghof.com;;DE146477881;10217;Kauf-auf-Rechnung;10;  seit ;09.10.2024;Male;Achim;Machura;
+90720;K081358;groninger & co. gmbh; ;Hofäckerstraße 9;74564;Crailsheim;DE;;office@groninger.de;;;10218;Kauf-auf-Rechnung;14;  seit ;17.02.2025;;;;
+90721;K064172;Additivum GmbH; Halle R (FSD Fertig.service Diehl);Goebelstr. 21;64293;Darmstadt;DE;06151 628 99 11;einkauf@additivum.de;www.additivum.de;DE347439029;10219;Kauf-auf-Rechnung;10;  seit ;17.11.2022;Male;Tobias;Iser;0172 143 7840
+90722;K082429;Welland &Tuxhorn AG; ;Gütersloher Str. 257;33649;Bielefeld;DE;4,95219E+11;invoice@welland-tuxhorn.de;;DE813547849;10220;Kauf-auf-Rechnung;14;  seit ;05.05.2025;Male;Andreas;Hildebrandt;
+90723;K068321;KNAUER Wissenschaftliche Geräte GmbH; ;Hegauer Weg 38;14163;Berlin;DE;4,93081E+11;einkauf@knauer.net;www.knauer.net;DE136737469;10222;Kauf-auf-Rechnung;10;  seit ;18.04.2023;Male;Florian;Schneider;
+90724;K078472;CNC Technik Stückelberger GmbH; ;Waltersdorferstrasse 10;8750;Judenburg;AT;436641200914;office@cnc-technik.co.at;;ATU67439346;10224;Kauf-auf-Rechnung;0;  seit ;07.08.2024;;;;
+90725;K078515;JFJ Aviation & Defence GmbH; ;Au 2;5274;Burgkirchen;AT;+43 676 606 47 11;manuel.duller@jfj.at;;ATU76974428;10225;Kauf-auf-Rechnung;14;  seit ;12.08.2024;;;;
+90726;K082543;WOCKEN Industriepartner GmbH & Co. KG; ;Industriestraße 14;49716;Meppen;DE;49593180157;jstrodt@wocken.com;;DE117336012;10226;Kauf-auf-Rechnung;14;  seit ;30.05.2025;Male;Jens;Strodt;
+90727;K082740;Wenglor GmbH; ;Wenglor Straße 3;88069;Tettnang;DE;4,97543E+12;einkauf@wenglor.com;;DE145372740;10227;Kauf-auf-Rechnung;14;  seit ;16.07.2025;Female;Lisa;Joos;
+90728;K033333;MONTI-Werkzeuge GmbH; ;Reisertstr. 21;53773;Hennef;DE;;invoices@montipower.com;;DE122269575;10228;Kauf-auf-Rechnung;14;  seit ;23.07.2025;;;;
+90729;K082829;Gesellschaft für Silizium-Mikrosysteme mbH; GeSiM mbH;Bautzner Landstraße 45;1454;Radeberg;DE;4,93513E+11;ischolze@gesim.de;;;10229;Kauf-auf-Rechnung;14;  seit ;12.08.2025;Female;Isa;Scholze;
+90730;K076864;NORIS Automation GmbH; ;Friedrich-Barnewitz-Str. 10;18119;Rostock;DE;3815199440;purchase.nar@noris-group.com;;;10230;Kauf-auf-Rechnung;14;  seit ;26.04.2024;Male;Waldemar;Renz;
+90731;K082861;Geuder AG; ;Hertzstrasse 4;69126;Heidelberg;DE;6221306942;agoehrig@geuder.de;www.geuder.de;DE143459517;10231;Kauf-auf-Rechnung;14;  seit ;22.08.2025;Male;Andre;Göhrig;
+90732;K076430;Palux AG; ;Wilhelm-Frank-Straße 36;97980;Bad Mergentheim;DE;+49 7931 55 134;vanessa.kleinhans@palux.de;www.palux.de;DE224359773;10234;Kauf-auf-Rechnung;14;  seit ;04.04.2024;Female;Vanessa;Kleinhans;
+90733;K082536;Balance Drive AG; ;Bodenmattstrasse 5;3185;Schmitten;CH;+41 26 497 92 92;buchhaltung@balance-drive.ch;www.balance-drive.ch;;10236;Kauf-auf-Rechnung;14;  seit ;26.05.2025;;;;
+90734;K079417;Kitzberger Möbel GmbH; ;Böhmerwaldstraße 23;4121;Altenfelden;AT;+43 7282 5595 521;s.wundsam@kitzberger.com;;ATU66815459;10238;Kauf-auf-Rechnung;14;  seit ;14.10.2024;Female;Stefanie;Wundsam;
+90735;K083399;Roll GmbH; ;Klaus-Peter-Kleiner-Str. 7 ;72829;Engstingen Haid;DE;-99879;stephan.roll@roll-gmbh.de;https://www.roll-gmbh.de/;DE146481515;10239;Kauf-auf-Rechnung;14;  seit ;15.01.2026;Male;Stephan;Roll;
+90736;K083032;Knürr GmbH; ;Mariakirchener Str. 38 ;94424;Arnstorf;DE;+49 8723 28 114;invoices@knuerr.com;;DE363797731;10240;Kauf-auf-Rechnung;14;  seit ;09.10.2025;;;;
+90737;K083046;Vossloh Rail Services Deutschland GmbH; ;Hannoversche Straße 10;21079;Hamburg;DE;;Andreas.Pohlmann@vossloh.com;www.vossloh.com;DE123841251;10241;Kauf-auf-Rechnung;14;  seit ;13.10.2025;;;;
+90738;K083060;Bernhard + Hermann Schröer GmbH; ;Uentroper Str. 4 - 6;59229;Ahlen-Dolberg;DE;;re@tischlerei-schroeer.de;www.tischlerei-schroeer.de;DE811897599;10243;Kauf-auf-Rechnung;14;  seit ;16.10.2025;;;;
+90739;K083432;digicolor GmbH; ;Zeissstraße 1-3;32052;Herford;DE;+49 (0) 5221 - 34 24 - 213;f.korfmacher@digicolor.de;;DE124007160;10244;Kauf-auf-Rechnung;14;  seit ;23.01.2026;Male;Florian;Korfmacher;
+90740;K051262;V-Module GmbH; ;Hermann-Oberth-Str. 6;83052;Bruckmühl;DE;4,98063E+12;info@v-module.de;;DE814544284;10245;Kauf-auf-Rechnung;14;  seit ;10.09.2021;;;;
+90741;K083625;KSF Grillgeräte GmbH; ;Anni-Sturz.Straße 1;93489;Schorndorf;DE;(0)9467-71114-21;einkauf@ksf.info;;DE206900865;10246;Kauf-auf-Rechnung;14;  seit ;16.03.2026;;;;
+90742;K083674;Bühler GmbH; ;Gewerbeparkstraße 44;51580;Reichshof;DE;02265 9988376;heinrich.koerner@buhlergroup.com;;;10248;Kauf-auf-Rechnung;14;  seit ;27.03.2026;Male;Heinrich;Körner;
+90743;K082801;STROMBOLI GmbH; ;Von-Waldthausen-Str. 79;44894;Bochum;DE;+49 234 68 71 800;rechnung@stromboli.de;www.stromboli.de;DE124086899;10249;Kauf-auf-Rechnung;14;  seit ;05.08.2025;;;;
+90744;K083706;Komet Maschinenfabrik GmbH; ;Am Filswehr 1;43207;Plochingen;DE;+49 7153 83 25 0;KOMET@vakuumverpacken.de;;;10250;Kauf-auf-Rechnung;14;  seit ;09.04.2026;Male;Harald;Janke;
+90745;K083713;POLYMOLD GmbH; ;Am Hörnbachl 5;82396;Pähl;DE;+49 8808 92454-0;mail@polymold.de;;DE241744781;10251;Kauf-auf-Rechnung;14;  seit ;13.04.2026;;;;
+90746;K083673;Stabilus GmbH; ;Wallersheimer Weg 100;56070;Koblenz;DE;4,92619E+12;jschueller@stabilus.com;www.stabilus.com;DE811140842;10252;Kauf-auf-Rechnung;14;  seit ;27.03.2026;Male;Julius;Schüller;
+90747;K083729;AVOLA MASCHINENFABRIK;A. Volkenborn GmbH & CO. KG ;Heiskampstr. 11;45527;Hattingen;DE;+49 (0) 23 24 – 96 36 – 0;info@avola.de;;DE121547178;10253;Kauf-auf-Rechnung;14;  seit ;22.04.2026;;;;
+90748;EK083737;Deutsche Bahn AG; ;Sommerkamp 31;22335;Hamburg;DE;15233129374;Stefan.Nowack@deutschebahn.com;;;10254;Kauf-auf-Rechnung;14;  seit ;30.04.2026;Male;Stefan;Nowack;
+90749;K083749;Hans Kratt Maschinenfabrik GmbH;Mussana ;Mülheimer Str. 5;68219;Mannheim;DE;62189991684;j.kramer@mussana.de;;;10255;Kauf-auf-Rechnung;14;  seit ;15.05.2026;;;;
+90750;EK083443;xolo GmbH; ;Volmerstraße 9B;12489;Berlin;DE;4,91738E+11;maciej.woloszka@xolo3d.com;;DE322705397;10256;Kauf-auf-Rechnung;14;  seit ;26.01.2026;Male;Maciej;Woloszka;
+90751;K083759;NOCK Maschinenbau GmbH; ;Industriestraße 14;77948;Friesenheim;DE;+49  7821 92 3898-0;info@nock-gmbh.com;www.nock-gmbh.com;DE811472904;10257;Kauf-auf-Rechnung;14;  seit ;29.05.2026;;;;
+90752;K083763;BOGA GmbH;Gesellschaft für moderne Gerätetechnik ;Werkstraße 16;59494;Soest;DE;02921 969430;info@boga.de;;DE126638539;10258;Kauf-auf-Rechnung;14;  seit ;10.06.2026;Male;Joscha;Dahlhoff;
+90753;K083764;REK Reinigungstechnik GmbH; ;Chemnitzer Straße 28-32;71540;Murrhardt;DE;+49 (0) 7192 / 9255-24;;;DE154682436;10259;Kauf-auf-Rechnung;14;  seit ;10.06.2026;;;;
+90754;K083770;bojati food GmbH; ;Margarete-Steiff-Str. 10;28876;Oyten;DE;+49 4207 666 27 - 0;info@bojati-food.de;;DE303846648;10260;Kauf-auf-Rechnung;14;  seit ;26.06.2026;;;;
+90755;K083771;Eltako Jans;Zu Händen Claus Rölle ;Am Lettenhof 11;88339;Bad Waldsee;DE;4975248934;claus-roelle@gmx.de;;DE81974206374;10261;Kauf-auf-Rechnung;14;  seit ;26.06.2026;;;;
+90756;K083772;MTF Technik Hardy Schürfeld GmbH & Co.KG; ;Stadionstraße 8;51702;Bergneustadt;DE;;+49 2261 9431-29;;DE814397807;10262;Kauf-auf-Rechnung;14;  seit ;06.07.2026;;;;
+90757;K083773;Rollex Förderelemente GmbH & Co. KG; ;Gewerbehof 22;59368;Werne;DE;;info@rollex-group.com;;DE125906300;10263;Kauf-auf-Rechnung;14;  seit ;10.07.2026;;;;
+90758;K083774;Unabhängige Energie; ;Von-Ketteler-Str. 2;53919;Weilerswist;DE;;info@ua-energie.de;;DE229650856;10264;Kauf-auf-Rechnung;14;  seit ;13.07.2026;Male;Michael;Marx;0162 5828192
+90759;K083776;TM Technischer Gerätebau GmbH; ;Böttgerstr. 13;89231;Neu-Ulm;DE;4,9732E+11;n.schmid@tmtech.de;;DE130854136;10265;Kauf-auf-Rechnung;14;  seit ;14.07.2026;;;;
+90760;K083768;EURODIMA GmbH & Co KG; ; Lagerstraße 6;5071;Wals;AT;+43 662 / 42 42 48-319;fs@eurodima.com;;ATU70507702;10266;Kauf-auf-Rechnung;14;  seit ;19.06.2026;Male;Florian;Schischek;
+90761;K083777;B3D GmbH; ;In der Aue 1;57584;Wallmenroth;DE;;l.behner@b-3d.com;;;10267;Kauf-auf-Rechnung;14;  seit ;03.08.2026;Male;Lucas;Behner;0160 9215 8452
+90762;K010020;Bohrtec GmbH; ;Konrad-Zuse-Str 24;52477;Alsdorf;DE;+49 (0) 24 04-98 81-0;info@bohrtec.de;www.bohrtec.de;;60000;Kauf-auf-Rechnung;10;  seit ;17.05.2018;Male;Walter;Augustin-Weber;
+90763;K014008;Schmidt Hochstromtechnik GmbH; ;Heinrich-Hertz-Str.141;47445;Moers;DE;;;;;60000;Kauf-auf-Rechnung;20;  seit ;24.10.2018;;;;
+90764;K052547;Lufttransportgruppe;Hubschraubergeschwader 64 ;Fliegerhorstallee 1 ;4916;Schönewalde;DE;035389 86 54433;janetmaegel@bundeswehr.org;;DE814335846;60000;Kauf-auf-Rechnung;20;  seit ;28.10.2021;Female;Janet;Mägel;
+90765;EK052874;PSG Procurement Services GmbH; ;Haus Sülz 6;53797;Lohmar ;DE;+49 2205 9278-416;tlopezaivar@psg-procurement.com;www.psg-procurement.com;DE813502791;60000;Kauf-auf-Rechnung;10;  seit ;08.11.2021;Female;Tina;Lopez Aivar;
+90766;K052915;Technische Universität Dortmund;Fachgebiet Maschinenelemente ;Leonhard-Euler-Straße 5;44227;Dortmund;DE;0231/755-2657;philipp2.seifert@tu-dortmund.de;;DE811258273;60000;Kauf-auf-Rechnung;20;  seit ;09.11.2021;Male;Philipp;Seifert;
+90767;K053138;Carl Benz Schule; ;Beatusstraße 143-147;56073;Koblenz am Rhein;DE;0261 9418321;haushalt@bbs-technik-koblenz.de;www.bbs-technik-koblenz.de;;60000;Kauf-auf-Rechnung;20;  seit ;16.11.2021;Male;Johannes;Kalowsky;
+90768;K067387;Fraunhofer-Institut für Schicht- und Oberflächentechnik IST; ;Bienroder Weg 51E;38108;Braunschweig;DE;;einkauf@ist.fraunhofer.de;;;60000;Kauf-auf-Rechnung;20;  seit ;14.03.2023;Female;Stefanie;Niese;
+90769;K068470;Miele & Cie. KG; ;Roitzheimer Str. 110;53879;Euskirchen;DE;4,92252E+12;invoices0011@miele.de;;DE126784329;60000;Kauf-auf-Rechnung;10;  seit ;24.04.2023;;;;
+90770;K075548;aberu GmbH; ;Achauerstr. 8;78647;Trossingen;DE;74253300856;einkauf@aberu.eu;;;60000;Kauf-auf-Rechnung;7;  seit ;23.02.2024;Male;Friedhelm;Keller;
+90771;K076373;BWS SICHERHEITSDIENSTE GmbH; ;Heinrich-Krumm-Straße 9;63073;Offenbach am Main;DE;+49 69 829 709 121;;;;60000;Kauf-auf-Rechnung;7;  seit ;02.04.2024;Male;Armin;Queißer;+49 170 3375 116

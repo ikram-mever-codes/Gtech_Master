@@ -11,7 +11,11 @@ import cloudinary from "../config/cloudinary";
 import fs from "fs";
 import { AuthorizedCustomerRequest } from "../middlewares/authenticateCustomer";
 import { List } from "../models/list";
-
+import { BusinessDetails } from "../models/business_details";
+import { Country } from "../models/country";
+import { ContactPerson, Sex } from "../models/contact_person";
+import { StarBusinessDetails } from "../models/star_business_details";
+import path from "path";
 // 1. Request Customer Account
 export const requestCustomerAccount = async (
   req: Request,
@@ -1135,5 +1139,358 @@ export const getSingleUser = async (
   } catch (error) {
     console.error("Get single user error:", error);
     return next(new ErrorHandler("Failed to fetch customer", 500));
+  }
+};
+
+interface CustomerCsvRow {
+  id: string;
+  kundennummer: string;
+  legalName: string;
+  additionalLine: string;
+  streetNo: string;
+  postalCode: string;
+  city: string;
+  countryIso: string;
+  phone: string;
+  email: string;
+  url: string;
+  vatNo: string;
+  debitorNo: string;
+  payMethod: string;
+  payDueDays: string;
+  commentEnd1: string;
+  commentEnd2: string;
+  sex: string;
+  name: string;
+  familyName: string;
+  contactPhone: string;
+}
+
+const CSV_COLUMN_ORDER: (keyof CustomerCsvRow)[] = [
+  "id",
+  "kundennummer",
+  "legalName",
+  "additionalLine",
+  "streetNo",
+  "postalCode",
+  "city",
+  "countryIso",
+  "phone",
+  "email",
+  "url",
+  "vatNo",
+  "debitorNo",
+  "payMethod",
+  "payDueDays",
+  "commentEnd1",
+  "commentEnd2",
+  "sex",
+  "name",
+  "familyName",
+  "contactPhone",
+];
+
+/** Splits one semicolon-delimited CSV line into fields, honoring
+ * double-quote-wrapped values (with "" as an escaped quote) even though
+ * the sample data doesn't currently use them — cheap insurance against a
+ * future export that does. */
+function parseSemicolonLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ";") {
+        fields.push(current);
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+  }
+  fields.push(current);
+  return fields.map((f) => f.trim());
+}
+
+/** Reads /public/customers.csv, strips the BOM, and returns typed rows.
+ * Blank lines are skipped; rows without a Kundennummer are skipped since
+ * that's the key we match/create customers on. */
+function parseCustomerCsv(filePath: string): CustomerCsvRow[] {
+  const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+  const lines = raw.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
+
+  if (lines.length === 0) return [];
+
+  // First line is the header — we rely on fixed column order (from the
+  // known export format) rather than matching header names, since the
+  // header text itself is inconsistent casing/spacing.
+  const dataLines = lines.slice(1);
+
+  const rows: CustomerCsvRow[] = [];
+  for (const line of dataLines) {
+    const fields = parseSemicolonLine(line);
+    if (fields.length < CSV_COLUMN_ORDER.length) {
+      // Pad short rows so trailing empty columns (e.g. no contact info)
+      // don't throw off the mapping.
+      while (fields.length < CSV_COLUMN_ORDER.length) fields.push("");
+    }
+
+    const row = {} as CustomerCsvRow;
+    CSV_COLUMN_ORDER.forEach((key, idx) => {
+      (row as any)[key] = fields[idx] ?? "";
+    });
+
+    if (!row.kundennummer) continue; // no key to match/create against
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+/** First whitespace-separated token of the legal name, used as the
+ * customer's short display name (companyName). Falls back to the full
+ * legal name if it has no spaces, or a placeholder if legalName is empty. */
+function extractDisplayName(legalName: string): string {
+  const trimmed = (legalName || "").trim();
+  if (!trimmed) return "Unnamed Customer";
+  return trimmed.split(/\s+/)[0];
+}
+
+/** "Male"/"Female" (any casing) -> the entity's lowercase enum values;
+ * anything else (blank, unrecognized) -> "Not Specified". */
+function mapSex(raw: string): Sex {
+  const normalized = (raw || "").trim().toLowerCase();
+  if (normalized === "male") return "male";
+  if (normalized === "female") return "female";
+  return "Not Specified";
+}
+
+/** Combines "Additional Line" + "Street & No" into one address line, since
+ * BusinessDetails has a single `address` field rather than a separate
+ * additional-line column. Empty additionalLine is dropped entirely rather
+ * than leaving a stray leading comma. */
+function buildAddressLine(additionalLine: string, streetNo: string): string {
+  const parts = [additionalLine, streetNo]
+    .map((p) => (p || "").trim())
+    .filter((p) => p.length > 0);
+  return parts.join(", ");
+}
+
+/** "Comment put at end1" and "Customer Comment put at end2" concatenated
+ * into BusinessDetails.description, in that order. */
+function buildDescription(commentEnd1: string, commentEnd2: string): string {
+  return [commentEnd1, commentEnd2]
+    .map((p) => (p || "").trim())
+    .filter((p) => p.length > 0)
+    .join(" ");
+}
+
+interface SyncSummary {
+  totalRows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: { kundennummer: string; message: string }[];
+}
+
+export const syncCustomerData = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const csvPath = path.join(process.cwd(), "public", "customers.csv");
+
+    if (!fs.existsSync(csvPath)) {
+      res.status(400).json({
+        success: false,
+        message: `customers.csv not found at ${csvPath}`,
+      });
+      return;
+    }
+
+    const rows = parseCustomerCsv(csvPath);
+
+    const customerRepo = AppDataSource.getRepository(Customer);
+    const businessDetailsRepo = AppDataSource.getRepository(BusinessDetails);
+    const countryRepo = AppDataSource.getRepository(Country);
+    const starBusinessDetailsRepo =
+      AppDataSource.getRepository(StarBusinessDetails);
+    const contactPersonRepo = AppDataSource.getRepository(ContactPerson);
+
+    // Cache country lookups — the same ISO code repeats across many rows.
+    const countryCache = new Map<string, Country | null>();
+    const getCountryByIso = async (iso: string): Promise<Country | null> => {
+      const code = (iso || "").trim().toUpperCase();
+      if (!code) return null;
+      if (countryCache.has(code)) return countryCache.get(code)!;
+      const country = await countryRepo.findOne({ where: { iso2: code } });
+      countryCache.set(code, country);
+      return country;
+    };
+
+    const summary: SyncSummary = {
+      totalRows: rows.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+    };
+
+    for (const row of rows) {
+      try {
+        const country = await getCountryByIso(row.countryIso);
+        const description = buildDescription(row.commentEnd1, row.commentEnd2);
+        const displayName = extractDisplayName(row.legalName);
+        const payDueDays = parseInt(row.payDueDays, 10);
+
+        let customer = await customerRepo.findOne({
+          where: { customerNumber: row.kundennummer },
+          relations: ["businessDetails", "starBusinessDetails"],
+        });
+
+        const isNewCustomer = !customer;
+
+        if (!customer) {
+          customer = customerRepo.create({
+            customerNumber: row.kundennummer,
+          });
+        }
+
+        // --- Customer-level fields ---
+        customer.legalName = row.legalName || customer.legalName;
+        customer.companyName = displayName;
+        customer.vatTaxId = row.vatNo || customer.vatTaxId;
+        customer.debtor_no = row.debitorNo || customer.debtor_no;
+        if (row.payMethod) customer.defaultPaymentMethod = row.payMethod;
+        if (!isNaN(payDueDays)) {
+          customer.defaultPaymentDueDays = payDueDays;
+        }
+
+        // "Additional Line" lives directly on the customer, per the
+        // existing getAllBusinesses mapping (addressAdditional ->
+        // customer.addressLine2) — it is NOT folded into the business
+        // address/street below.
+        if (row.additionalLine) customer.addressLine2 = row.additionalLine;
+
+        // Phone and email are mirrored onto the customer entity directly
+        // (contactPhoneNumber / email), matching how getAllBusinesses
+        // reads them at the top level of its response, in addition to the
+        // BusinessDetails copies further down.
+        if (row.phone) customer.contactPhoneNumber = row.phone;
+        if (row.email) customer.email = row.email;
+
+        if (country) {
+          customer.countryEntity = country;
+          customer.country_id = country.id;
+        }
+
+        // --- BusinessDetails ---
+        let businessDetails = customer.businessDetails;
+        if (!businessDetails) {
+          businessDetails = businessDetailsRepo.create({});
+        }
+
+        // "Street & No" is the business address itself — no concatenation
+        // with Additional Line, which is stored separately above.
+        businessDetails.address = row.streetNo || businessDetails.address;
+        businessDetails.postalCode =
+          row.postalCode || businessDetails.postalCode;
+        businessDetails.city = row.city || businessDetails.city;
+        businessDetails.contactPhone =
+          row.phone || businessDetails.contactPhone;
+        businessDetails.website = row.url || businessDetails.website;
+        if (row.email) businessDetails.email = row.email;
+        businessDetails.description =
+          description || businessDetails.description;
+
+        if (country) {
+          businessDetails.country = country.name;
+          businessDetails.countryEntity = country;
+          businessDetails.country_id = country.id;
+        }
+
+        customer.businessDetails =
+          await businessDetailsRepo.save(businessDetails);
+
+        customer = await customerRepo.save(customer);
+
+        // --- Contact person ---
+        // ContactPerson requires a non-nullable starBusinessDetailsId, so a
+        // StarBusinessDetails record is created for the customer if one
+        // doesn't exist yet, purely as the attachment point for the
+        // contact. ASSUMPTION: StarBusinessDetails has no other required
+        // fields beyond its defaults — if it does, this save fails and
+        // surfaces in summary.errors for that row without stopping the
+        // rest of the import.
+        if (row.name || row.familyName) {
+          let starBusinessDetails = customer.starBusinessDetails;
+          if (!starBusinessDetails) {
+            starBusinessDetails = starBusinessDetailsRepo.create({});
+            starBusinessDetails =
+              await starBusinessDetailsRepo.save(starBusinessDetails);
+            customer.starBusinessDetails = starBusinessDetails;
+            await customerRepo.save(customer);
+          }
+
+          const existingContact = await contactPersonRepo.findOne({
+            where: {
+              starBusinessDetailsId: starBusinessDetails.id,
+              name: row.name,
+              familyName: row.familyName,
+            },
+          });
+
+          const contactPerson =
+            existingContact ||
+            contactPersonRepo.create({
+              starBusinessDetailsId: starBusinessDetails.id,
+            });
+
+          contactPerson.name = row.name || contactPerson.name || "";
+          contactPerson.familyName =
+            row.familyName || contactPerson.familyName || "";
+          contactPerson.sex = mapSex(row.sex);
+          contactPerson.phone = row.contactPhone || contactPerson.phone;
+
+          await contactPersonRepo.save(contactPerson);
+        }
+
+        if (isNewCustomer) summary.created++;
+        else summary.updated++;
+      } catch (rowError: any) {
+        summary.skipped++;
+        summary.errors.push({
+          kundennummer: row.kundennummer,
+          message: rowError?.message || "Unknown error",
+        });
+        console.error(`Error syncing customer ${row.kundennummer}:`, rowError);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Processed ${summary.totalRows} rows: ${summary.created} created, ${summary.updated} updated, ${summary.skipped} skipped.`,
+      data: summary,
+    });
+  } catch (error) {
+    console.error("Customer sync error:", error);
+    return next(new ErrorHandler("Failed to sync customer data", 500));
   }
 };
