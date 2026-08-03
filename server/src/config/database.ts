@@ -66,6 +66,8 @@ import { CCIItem } from "../models/cci_items";
 import { Rechnung } from "../models/rechnung";
 import { RechnungCustomer } from "../models/rechnung_customer";
 import { RechnungItem } from "../models/rechnung_items";
+import { Rechnung_k } from "../models/rechnung_k";
+import { RechnungKItem } from "../models/rechnung_k_items";
 
 dotenv.config();
 
@@ -140,6 +142,8 @@ export const AppDataSource = new DataSource({
     Rechnung,
     RechnungCustomer,
     RechnungItem,
+    Rechnung_k,
+    RechnungKItem,
     GtechCompany,
     SystemParameter,
   ],
@@ -147,8 +151,8 @@ export const AppDataSource = new DataSource({
     ssl:
       process.env.DB_SSL === "true"
         ? {
-          rejectUnauthorized: false,
-        }
+            rejectUnauthorized: false,
+          }
         : false,
   },
   poolSize: 10,

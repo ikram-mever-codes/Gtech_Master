@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from "typeorm";
 import { Rechnung } from "./rechnung";
+import { Rechnung_k } from "./rechnung_k";
 
 @Entity("rechnung_customers")
 export class RechnungCustomer {
@@ -42,6 +43,9 @@ export class RechnungCustomer {
 
   @OneToMany(() => Rechnung, (rechnung: Rechnung) => rechnung.customer)
   rechnungen!: Rechnung[];
+
+  @OneToMany(() => Rechnung_k, (rechnungK: Rechnung_k) => rechnungK.customer)
+  rechnungenK!: Rechnung_k[];
 
   @CreateDateColumn()
   created_at!: Date;

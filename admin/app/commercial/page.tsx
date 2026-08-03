@@ -4,66 +4,22 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
-  useRef,
   Suspense,
 } from "react";
-import Select from "react-select";
-import { FunnelIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
-import {
-  Search,
-  Filter,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
-  Plus,
-  Calendar,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  MoreVertical,
-  Check,
-  X,
-  RefreshCw,
-  User,
-  DollarSign,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  PlusCircle,
-  Loader2,
-  ChevronDown,
-  Package,
-  Clock,
-} from "lucide-react";
+import { FunnelIcon } from "@heroicons/react/24/outline";
+import { Plus, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
 
-import {
-  getAllInvoices,
-  generateInvoicePdf,
-  deleteInvoice,
-  markInvoiceAsPaid,
-  cancelInvoice,
-  getExpandedInvoiceDetails,
-  updateInvoice,
-} from "@/api/invoice";
-import SpreadSheet from "@/components/UI/SpreadSheet";
+import { getExpandedInvoiceDetails, updateInvoice } from "@/api/invoice";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
-import Link from "next/link";
 
-import {
-  getAllCustomers,
-  CustomerData as APICustomerData,
-  updateCustomerProfile,
-} from "@/api/customers";
+import { updateCustomerProfile } from "@/api/customers";
 import {
   updateOrderItemStatus,
   splitOrderItem,
   updateOrderItemPrice,
   downloadCommercialInvoice,
-  getAllOrders,
-  getOrderStatusColor,
   getOrderById,
   createOrder,
   updateOrder,
@@ -71,12 +27,10 @@ import {
 } from "@/api/orders";
 import { getAllCargos, CargoType, assignOrdersToCargo } from "@/api/cargos";
 import { getAllTaricsSimple, getItems, updateItem } from "@/api/items";
-import { getAllSuppliers, getSupplierItems } from "@/api/suppliers";
-import { getCategories } from "@/api/categories";
+import { getSupplierItems } from "@/api/suppliers";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
-import { ShoppingCart, Truck } from "lucide-react";
 import BillToShipToForm, {
   BillToShipToData,
   WAREHOUSE_BILL_TO,
@@ -84,127 +38,67 @@ import BillToShipToForm, {
 import { toast } from "react-hot-toast";
 import { successStyles, errorStyles } from "@/utils/constants";
 import CustomModal from "@/components/UI/CustomModal";
-import { Pencil, Scissors, MoveRight } from "lucide-react";
-import { getAllOffers } from "@/api/offers";
-import { getAllCustomerOrders } from "@/api/customer_orders";
+import { createRechnungKFromRechnung } from "@/api/rechnungen_k";
 import OffersPage from "../offers/page";
-import { OfferDetailModal } from "@/components/Offers/OfferDetailModal";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
-import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import {
-  getAllTransferOrders,
+  createBestellungFromAuftrag,
   updateTransferOrderStatus,
 } from "@/api/transfer_orders";
-import { createBestellungFromAuftrag } from "@/api/transfer_orders";
-import { getAllRechnungen, getLieferscheine } from "@/api/rechnungen";
 import {
-  getAllPaymentInbounds,
   createPaymentInbound,
-  updatePaymentInbound,
   deletePaymentInbound,
-  PaymentInboundData,
 } from "@/api/payment_inbounds";
 import {
   getAllPaymentAccounts,
   PaymentAccountData,
 } from "@/api/payment_accounts";
-
-import AuftragToBestellungModal from "@/components/orders/AuftragToBestellungModal";
-import AuftragCreateModal from "@/components/orders/AuftragCreateModal";
-import AuftragToRechnungModal from "@/components/orders/AuftragToRechnungModal";
-import RechnungDetailModal from "@/components/orders/RechnungDetailModal";
-import LieferscheinDetailModal from "@/components/orders/LieferscheinDetailModal";
 import { formatDate } from "@/utils/date";
-import { formatCountryCode } from "@/utils/address";
-import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
-
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
-import { UserRole } from "@/utils/interfaces";
 import {
   CommercialFilters,
   initialCommercialFilters,
   isValueMatching,
-  parseCustomDate,
   isDateInPreset,
 } from "@/utils/commercialFilters";
-import AuftragPreviewModal from "@/components/orders/AuftragPreviewModal";
-import BestellungPreviewModal from "@/components/orders/BestellungPreviewModal";
 import { DEFAULT_DYNAMIC_COLOURS } from "@/components/UI/SystemColourSelect";
 import { getAllSystemParameters } from "@/api/system_parameters";
+import { getOrderStatusColor } from "@/api/orders";
+
+import {
+  useCommercialTabData,
+  InvoiceTab,
+} from "../../hooks/useCommercialTabData";
+import CommercialFilterBar from "./CommercialFilterBar";
+import {
+  OfferDetailModalLazy,
+  AuftragToBestellungModal,
+  AuftragCreateModal,
+  AuftragToRechnungModal,
+  // RechnungDetailModal intentionally not imported here — see the comment
+  // above the commented-out render block near the end of this file. It's
+  // still exported from LazyModals.ts for when that decision is made.
+  LieferscheinDetailModal,
+  AuftragPreviewModal,
+  BestellungPreviewModal,
+  RechnungKPreviewModal,
+  InvoiceDetailsModal,
+  OrderFormModal,
+  ReassignModal,
+  SplitModal,
+  TaricModal,
+  QtyModal,
+} from "./LazyModals";
+
+import { buildAuftragColumns } from "./auftragColumns";
+import { buildBestellungColumns } from "./bestellungColumns";
+import { buildRechnungColumns } from "./rechnungColumns";
+import { buildRkColumns } from "./rkColumns";
+import { buildLieferscheinColumns } from "./lieferscheinColumns";
+import { buildPaymentInboundColumns } from "./paymentInboundColumns";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
-
-const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
-  }`;
-};
-
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  orderNumber?: string;
-  cargoNo?: string;
-  invoiceDate: string;
-  deliveryDate: string;
-  netTotal: number;
-  taxAmount: number;
-  pdfUrl: string;
-  grossTotal: number;
-  paidAmount: number;
-  outstandingAmount: number;
-  paymentMethod: string;
-  shippingMethod: string;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
-  notes?: string;
-  customer: {
-    id: string;
-    companyName: string;
-    email: string;
-    contactPhoneNumber: string;
-    contactEmail?: string;
-    taxNumber?: string;
-    addressLine1?: string;
-    city?: string;
-    country?: string;
-  };
-  items?: Array<{
-    id: string;
-    quantity: number;
-    articleNumber?: string;
-    description: string;
-    unitPrice: number;
-    netPrice: number;
-    taxRate: number;
-    taxAmount: number;
-    grossPrice: number;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-  bill_to?: string;
-  ship_to?: string;
-  customItemCount?: number;
-  description?: string;
-  freightCost?: number | string;
-  remark?: string;
-  customTotalQty?: number;
-  cargoId?: number | null;
-  cargo?: { id: number; cargo_no?: string } | null;
-}
-
-interface FilterOptions {
-  status: string;
-  dateFrom: string;
-  dateTo: string;
-  customer: string;
-  minAmount: string;
-  maxAmount: string;
-}
 
 const invoiceTabs = [
   { id: "angebot", label: "Angebot" },
@@ -216,41 +110,24 @@ const invoiceTabs = [
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
 
-type Item = {
-  id: string | number;
-  item_name?: string;
-  name?: string;
-  ean?: number | string;
-  RMB_Price?: number;
-  supplier_id?: string | number;
-  length?: number;
-  width?: number;
-  height?: number;
-  weight?: number;
-  item: any;
-  taric?: any;
-  price?: number;
-  currency?: string;
-  supplier_name?: string;
-};
-
-type Option = { value: string; label: string };
-
-type InvoiceTab = (typeof invoiceTabs)[number]["id"];
-
 const InvoiceListPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useSelector((state: RootState) => state.user);
 
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [systemColours, setSystemColours] = useState<any[]>(DEFAULT_DYNAMIC_COLOURS);
+  const tabData = useCommercialTabData();
+
+  const [systemColours, setSystemColours] = useState<any[]>(
+    DEFAULT_DYNAMIC_COLOURS,
+  );
 
   useEffect(() => {
     (async () => {
       try {
         const res: any = await getAllSystemParameters();
-        const palette = res?.data?.find((p: any) => p.key === "system_colours")?.value;
+        const palette = res?.data?.find(
+          (p: any) => p.key === "system_colours",
+        )?.value;
         if (Array.isArray(palette) && palette.length > 0) {
           setSystemColours(palette);
         }
@@ -260,12 +137,40 @@ const InvoiceListPage: React.FC = () => {
     })();
   }, []);
 
-  const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
-  const [customers, setCustomers] = useState<APICustomerData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeInvTab, setActiveInvTab] = useState<InvoiceTab>(
     () => (searchParams.get("tab") as InvoiceTab) || "angebot",
   );
+
+  // Fetch each tab's data lazily, the first time it becomes active — this
+  // is the fix for the original page fetching every tab's data on mount
+  // regardless of which one was showing.
+  useEffect(() => {
+    tabData.ensureLoaded(activeInvTab);
+  }, [activeInvTab, tabData]);
+
+  // cargos / tarics / payment accounts: cheap single-collection reads used
+  // by several modals across tabs (reassign/split/taric, payment inbound
+  // form) — left eager on mount rather than tab-gated, same as before.
+  const [cargos, setCargos] = useState<CargoType[]>([]);
+  const [tarics, setTarics] = useState<any[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>(
+    [],
+  );
+  useEffect(() => {
+    getAllCargos({ limit: 1000, availableOnly: true }).then((res) => {
+      if (res.success) setCargos(res.data);
+    });
+    getAllTaricsSimple().then((res) => {
+      if (res.success) setTarics(res.data);
+    });
+    getAllPaymentAccounts(true)
+      .then((res: any) => {
+        if (res?.success) setPaymentAccounts(res.data || []);
+        else if (Array.isArray(res?.data)) setPaymentAccounts(res.data);
+      })
+      .catch((err) => console.error("Error fetching PaymentAccounts:", err));
+  }, []);
+
   const [showBestellungPreviewModal, setShowBestellungPreviewModal] =
     useState(false);
   const [selectedBestellungId, setSelectedBestellungId] = useState<
@@ -275,6 +180,10 @@ const InvoiceListPage: React.FC = () => {
     useState(false);
   const [showCreateBestellungModal, setShowCreateBestellungModal] =
     useState(false);
+
+  const [showRechnungKModal, setShowRechnungKModal] = useState(false);
+  const [selectedRechnungKData, setSelectedRechnungKData] = useState<any>(null);
+  const [creatingRkForId, setCreatingRkForId] = useState<string | null>(null);
 
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
@@ -295,10 +204,6 @@ const InvoiceListPage: React.FC = () => {
     setShowAuftragPreviewModal(true);
   };
 
-  // Was previously declared as state but never wired to anything —
-  // no function opened it, nothing imported/rendered BestellungPreviewModal,
-  // and every click on a Bestellung row fell through to the Auftrag
-  // handlers instead. This is the counterpart to handleOpenAuftragPreview.
   const handleOpenBestellungPreview = (
     id: string | number,
     initialEdit: boolean = false,
@@ -312,25 +217,13 @@ const InvoiceListPage: React.FC = () => {
     setSelectedOfferId(id);
     setShowOfferModal(true);
   };
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortField, setSortField] = useState<keyof Invoice>("createdAt");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>(
     {},
   );
-
-  const [filters, setFilters] = useState<FilterOptions>({
-    status: "",
-    dateFrom: "",
-    dateTo: "",
-    customer: "",
-    minAmount: "",
-    maxAmount: "",
-  });
 
   const [expandedStates, setExpandedStates] = useState<
     Record<
@@ -339,7 +232,7 @@ const InvoiceListPage: React.FC = () => {
     >
   >({});
 
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
   const [modalActiveTab, setModalActiveTab] = useState<"taric" | "items">(
     "taric",
@@ -347,8 +240,13 @@ const InvoiceListPage: React.FC = () => {
   const [expandedDocIds, setExpandedDocIds] = useState<Set<string | number>>(
     new Set(),
   );
+  const [invoiceEditForm, setInvoiceEditForm] = useState({
+    description: "",
+    freightCost: "",
+    remark: "",
+  });
 
-  const handleOpenInvoiceDetails = async (invoice: Invoice) => {
+  const handleOpenInvoiceDetails = async (invoice: any) => {
     setSelectedInvoice(invoice);
     setShowInvoiceDetailsModal(true);
     setModalActiveTab("taric");
@@ -391,7 +289,6 @@ const InvoiceListPage: React.FC = () => {
   const [showSPModal, setShowSPModal] = useState(false);
   const [showQTYModal, setShowQTYModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [cargos, setCargos] = useState<CargoType[]>([]);
   const [splitQty, setSplitQty] = useState<number>(0);
   const [newQty, setNewQty] = useState<number>(0);
   const [targetCargoId, setTargetCargoId] = useState<string>("");
@@ -406,29 +303,13 @@ const InvoiceListPage: React.FC = () => {
     null,
   );
   const [editingPrice, setEditingPrice] = useState<number>(0);
-
   const [splitRemarks, setSplitRemarks] = useState<string>("");
-  const [tarics, setTarics] = useState<any[]>([]);
   const [selectedTaricCode, setSelectedTaricCode] = useState<string>("");
-  const [expandedTaricGroupId, setExpandedTaricGroupId] = useState<
-    string | null
-  >(null);
-
-  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
-  const [invoiceEditForm, setInvoiceEditForm] = useState({
-    description: "",
-    freightCost: "",
-    remark: "",
-  });
 
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [selectedTaricGroup, setSelectedTaricGroup] = useState<any>(null);
   const [qtyRemarks, setQtyRemarks] = useState("");
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
-  const [bestellungen, setBestellungen] = useState<any[]>([]);
-  const [loadingBestellungen, setLoadingBestellungen] = useState(false);
   const [
     selectedAuftragForBestellungModal,
     setSelectedAuftragForBestellungModal,
@@ -436,11 +317,6 @@ const InvoiceListPage: React.FC = () => {
   const [showAuftragToBestellungModal, setShowAuftragToBestellungModal] =
     useState(false);
   const [showAuftragCreateModal, setShowAuftragCreateModal] = useState(false);
-
-  const [rechnungen, setRechnungen] = useState<any[]>([]);
-  const [lieferscheine, setLieferscheine] = useState<any[]>([]);
-  const [loadingRechnungen, setLoadingRechnungen] = useState(false);
-  const [loadingLieferscheine, setLoadingLieferscheine] = useState(false);
 
   const [selectedAuftragForRechnungModal, setSelectedAuftragForRechnungModal] =
     useState<any>(null);
@@ -456,13 +332,6 @@ const InvoiceListPage: React.FC = () => {
   const [selectedLieferscheinForDetail, setSelectedLieferscheinForDetail] =
     useState<any>(null);
 
-  const [paymentInbounds, setPaymentInbounds] = useState<PaymentInboundData[]>(
-    [],
-  );
-  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>(
-    [],
-  );
-  const [loadingPaymentInbounds, setLoadingPaymentInbounds] = useState(false);
   const [showInboundModal, setShowInboundModal] = useState(false);
   const [submittingInbound, setSubmittingInbound] = useState(false);
   const [inboundForm, setInboundForm] = useState({
@@ -474,154 +343,8 @@ const InvoiceListPage: React.FC = () => {
     reference: "",
   });
 
-  const fetchPaymentInbounds = useCallback(async () => {
-    setLoadingPaymentInbounds(true);
-    try {
-      const res = await getAllPaymentInbounds();
-      if (res?.success) setPaymentInbounds(res.data || []);
-      else if (Array.isArray(res?.data)) setPaymentInbounds(res.data);
-    } catch (err) {
-      console.error("Error fetching PaymentInbounds:", err);
-    } finally {
-      setLoadingPaymentInbounds(false);
-    }
-  }, []);
-
-  const fetchPaymentAccounts = useCallback(async () => {
-    try {
-      const res = await getAllPaymentAccounts(true);
-      if (res?.success) setPaymentAccounts(res.data || []);
-      else if (Array.isArray(res?.data)) setPaymentAccounts(res.data);
-    } catch (err) {
-      console.error("Error fetching PaymentAccounts for dropdown:", err);
-    }
-  }, []);
-
-  const fetchRechnungen = useCallback(async () => {
-    setLoadingRechnungen(true);
-    try {
-      const res = await getAllRechnungen();
-      if (res?.success) setRechnungen(res.data || []);
-      else if (Array.isArray(res?.data)) setRechnungen(res.data);
-    } catch (err) {
-      console.error("Error fetching Rechnungen:", err);
-    } finally {
-      setLoadingRechnungen(false);
-    }
-  }, []);
-
-  const fetchLieferscheine = useCallback(async () => {
-    setLoadingLieferscheine(true);
-    try {
-      const res = await getLieferscheine();
-      if (res?.success) setLieferscheine(res.data || []);
-      else if (Array.isArray(res?.data)) setLieferscheine(res.data);
-    } catch (err) {
-      console.error("Error fetching Lieferscheine:", err);
-    } finally {
-      setLoadingLieferscheine(false);
-    }
-  }, []);
-
-  const fetchBestellungen = useCallback(async () => {
-    setLoadingBestellungen(true);
-    try {
-      const res = await getAllTransferOrders();
-      if (res?.success) setBestellungen(res.data || []);
-      else if (res?.data) setBestellungen(res.data);
-      else if (Array.isArray(res)) setBestellungen(res);
-    } catch (error) {
-      console.error("Error fetching transfer orders (Bestellung):", error);
-    } finally {
-      setLoadingBestellungen(false);
-    }
-  }, []);
-
-  // Was calling fetchOrders/fetchBestellungen with no follow-up — the user
-  // asked that a successful conversion switch to the Bestellung tab and
-  // open the new Bestellung directly, same as the Angebot→Auftrag flow.
-  const handleDirectConvertAuftragToBestellung = async (auftrag: any) => {
-    console.log(auftrag);
-    if (
-      !window.confirm(
-        `Convert Auftrag ${auftrag.order_no} directly to Bestellung?`,
-      )
-    )
-      return;
-    try {
-      const items = (auftrag.orderItems || auftrag.items || [])
-        .filter((it: any) => it.sourceItemId) // Only include catalog items (skip Freizeile)
-        .map((it: any) => ({
-          sourceLineItemId: String(it.id),
-          sourceItemId: it.sourceItemId || undefined,
-          qty: Number(it.quantity || it.qty) || 1,
-          max_qty: Number(it.quantity || it.qty) || 1,
-          itemName: it.itemName || it.item_name || "Line Item",
-          itemNo: it.itemNo || it.material || "",
-          material: it.material || "",
-          photo: it.photo || undefined,
-          specification: it.specification || "",
-          description: it.description || "",
-          weight: it.weight || undefined,
-          extraWeight: it.extraWeight || 0,
-          notes: it.notes || "",
-          remark_order_item: it.remark_order_item || "",
-          // Price fields
-          price: Number(it.price) || 0,
-          transferPrice: Number(it.price) || 0, // Default to same as price
-          purchasePrice: it.purchasePrice || undefined,
-          purchaseCurrency: it.purchaseCurrency || "EUR",
-          // Position
-          position: it.position || 1,
-        }));
-
-      console.log(items);
-      const res: any = await createBestellungFromAuftrag(auftrag.id, items);
-      if (res?.success) {
-        toast.success(
-          res.message || `Auftrag ${auftrag.order_no} converted to Bestellung!`,
-          successStyles,
-        );
-        fetchOrders();
-        fetchBestellungen();
-
-        const createdBestellungId = res?.data?.id;
-        if (createdBestellungId) {
-          setActiveInvTab("bestellung");
-          handleOpenBestellungPreview(createdBestellungId);
-        }
-      }
-    } catch (err) {
-      console.error("Error converting Auftrag to Bestellung:", err);
-    }
-  };
-
-  // Was referenced by the Bestellung Status column but never defined —
-  // that's a guaranteed runtime ReferenceError the moment the Bestellung
-  // tab renders.
-  const handleUpdateBestellungStatus = async (
-    id: string | number,
-    status: any,
-  ) => {
-    try {
-      await updateTransferOrderStatus(id, status);
-      toast.success("Bestellung status updated.", successStyles);
-      fetchBestellungen();
-    } catch (err) {
-      console.error("Error updating Bestellung status:", err);
-      toast.error("Failed to update Bestellung status.", errorStyles);
-    }
-  };
-
-  const [offers, setOffers] = useState<any[]>([]);
-  const [loadingOffers, setLoadingOffers] = useState(false);
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [itemsAll, setItemsAll] = useState<any[]>([]);
   const [itemsByCategory, setItemsByCategory] = useState<any[]>([]);
   const [itemsBySupplier, setItemsBySupplier] = useState<any[]>([]);
-  const [loadingItemsAll, setLoadingItemsAll] = useState(false);
   const [loadingItemsByCategory, setLoadingItemsByCategory] = useState(false);
   const [loadingItemsBySupplier, setLoadingItemsBySupplier] = useState(false);
   const [docFilters, setDocFilters] = useState<CommercialFilters>(
@@ -639,10 +362,10 @@ const InvoiceListPage: React.FC = () => {
       !!searchTerm
     );
   }, [docFilters, searchTerm]);
+
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewOrder, setViewOrder] = useState<any>(null);
   const [viewItems, setViewItems] = useState<any[]>([]);
-  const [remarksCN, setRemarksCN] = useState("");
 
   const [showModal, setShowModal] = useState(false);
   const [mode, setMode] = useState<"create" | "edit" | "convert">("create");
@@ -659,23 +382,22 @@ const InvoiceListPage: React.FC = () => {
   });
 
   const isTab1 = activeInvTab !== "auftrag";
-  const isTab2 = false;
   const isConvertMode = mode === "convert";
 
   const effectiveItems = useMemo(() => {
     if (form.supplier_id) return itemsBySupplier;
     if (form.category_id) return itemsByCategory;
-    return itemsAll;
+    return tabData.itemsAll;
   }, [
     form.supplier_id,
     itemsBySupplier,
     form.category_id,
     itemsByCategory,
-    itemsAll,
+    tabData.itemsAll,
   ]);
 
   const loadingItems =
-    loadingItemsAll ||
+    tabData.loadingItemsAll ||
     (isTab1 && !!form.supplier_id && loadingItemsBySupplier) ||
     (isTab1 && !!form.category_id && loadingItemsByCategory);
 
@@ -683,9 +405,7 @@ const InvoiceListPage: React.FC = () => {
     if (isConvertMode) return orderItems.length > 0;
     const hasItems = orderItems.length > 0;
     const hasComment = !!form.comment?.trim();
-    const tabOk =
-      (isTab1 ? !!form.category_id || !!form.supplier_id : true) &&
-      (isTab2 ? !!form.customer_id : true);
+    const tabOk = isTab1 ? !!form.category_id || !!form.supplier_id : true;
     return hasItems && hasComment && tabOk;
   }, [
     isConvertMode,
@@ -693,9 +413,7 @@ const InvoiceListPage: React.FC = () => {
     form.comment,
     form.category_id,
     form.supplier_id,
-    form.customer_id,
     isTab1,
-    isTab2,
   ]);
 
   const resetForm = useCallback(() => {
@@ -724,8 +442,7 @@ const InvoiceListPage: React.FC = () => {
       setLoadingItemsByCategory(true);
       const response = await getItems({ category: category_id });
       const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.items || [];
-      setItemsByCategory(arr);
+      setItemsByCategory(Array.isArray(data) ? data : data?.items || []);
     } catch (error) {
       console.error("Error fetching category items:", error);
       setItemsByCategory([]);
@@ -734,17 +451,10 @@ const InvoiceListPage: React.FC = () => {
     }
   }, []);
 
-  const handleCustomerChange = (customer_id: string) =>
-    setForm((prev: any) => ({ ...prev, customer_id }));
-
-  const handleCategoryChange = async (
-    category_id: string,
-    resetOrderItemsFlag: boolean = true,
-  ) => {
+  const handleCategoryChange = async (category_id: string) => {
     setForm((prev: any) => ({ ...prev, category_id }));
     setSelectedItemId("");
-    if (resetOrderItemsFlag) setOrderItems([]);
-
+    setOrderItems([]);
     if (category_id) {
       await fetchItemsByCategory(category_id);
       return;
@@ -765,8 +475,7 @@ const InvoiceListPage: React.FC = () => {
       try {
         const response: any = await getSupplierItems(supplier_id);
         const data = response?.data ?? response;
-        const arr = Array.isArray(data) ? data : data?.items || [];
-        setItemsBySupplier(arr);
+        setItemsBySupplier(Array.isArray(data) ? data : data?.items || []);
       } catch (e) {
         console.error(e);
         toast.error("Failed to fetch supplier items");
@@ -778,6 +487,12 @@ const InvoiceListPage: React.FC = () => {
     }
     setItemsBySupplier([]);
   };
+
+  const itemById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const it of tabData.itemsAll) map.set(String(it.id), it);
+    return map;
+  }, [tabData.itemsAll]);
 
   const handleAddItemToOrder = (item_id: string, qty: number) => {
     const item = itemById.get(String(item_id));
@@ -825,25 +540,6 @@ const InvoiceListPage: React.FC = () => {
     setOrderItems((prev: any) =>
       prev.map((x: any) => (x.item_id === item_id ? { ...x, remark_de } : x)),
     );
-  };
-
-  const handleMoveToFulfillment = async (order: any) => {
-    try {
-      await updateOrder(order.id, {
-        status: 2,
-        comment: `${order.comment || ""} [Moved to Fulfillment]`.trim(),
-        is_fulfilled: true,
-      } as any);
-      toast.success(`Order ${order.order_no} moved to Fulfillment!`, {
-        id: "fulfill-order-toast",
-      });
-      fetchOrders();
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to move order to Fulfillment", {
-        id: "fulfill-order-toast",
-      });
-    }
   };
 
   const handleEditOrder = async (order: any) => {
@@ -916,12 +612,10 @@ const InvoiceListPage: React.FC = () => {
     };
 
     const res = await createOrder(payload as any);
-    if (res?.success) {
-      toast.success("Order created successfully");
-    }
+    if (res?.success) toast.success("Order created successfully");
     setShowModal(false);
     resetForm();
-    fetchOrders();
+    tabData.refetchOrders();
   };
 
   const handleUpdateOrder = async () => {
@@ -945,13 +639,7 @@ const InvoiceListPage: React.FC = () => {
     await updateOrder(selectedOrder.id, payload);
     setShowModal(false);
     resetForm();
-    fetchOrders();
-  };
-
-  const handleDeleteOrder = async (orderId: string | number) => {
-    if (!window.confirm("Are you sure you want to delete this Order?")) return;
-    await deleteOrder(orderId);
-    fetchOrders();
+    tabData.refetchOrders();
   };
 
   const handleSetPrice = async (itemId: string | number) => {
@@ -976,56 +664,6 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const toggleExpansion = async (id: string, type: "taric" | "items") => {
-    const currentState = expandedStates[id] || {};
-    let isCurrentlyOpen =
-      type === "taric" ? currentState.taric : currentState.items;
-
-    let newState: any;
-    if (activeInvTab === "rk") {
-      const bothActive = currentState.taric && currentState.items;
-      newState = { ...currentState, taric: !bothActive, items: !bothActive };
-      isCurrentlyOpen = bothActive;
-    } else {
-      newState = { ...currentState, [type]: !isCurrentlyOpen };
-    }
-
-    if (!isCurrentlyOpen && !currentState.data) {
-      setExpandedStates((prev: any) => ({
-        ...prev,
-        [id]: { ...newState, loading: true },
-      }));
-      try {
-        const response = await getExpandedInvoiceDetails(id);
-        if (response.success) {
-          setExpandedStates((prev: any) => ({
-            ...prev,
-            [id]: { ...newState, data: response.data, loading: false },
-          }));
-        }
-      } catch (error) {
-        console.error(error);
-        setExpandedStates((prev: any) => ({
-          ...prev,
-          [id]: { ...newState, loading: false },
-        }));
-      }
-    } else {
-      setExpandedStates((prev: any) => ({ ...prev, [id]: newState }));
-    }
-  };
-
-  useEffect(() => {
-    getAllCargos({ limit: 1000, availableOnly: true }).then((res) => {
-      if (res.success) setCargos(res.data);
-    });
-    getAllTaricsSimple().then((res) => {
-      if (res.success) setTarics(res.data);
-    });
-    fetchPaymentInbounds();
-    fetchPaymentAccounts();
-  }, [fetchPaymentInbounds, fetchPaymentAccounts]);
-
   const handleReassignItem = async () => {
     if (!selectedItem || !targetCargoId) return;
     try {
@@ -1037,7 +675,7 @@ const InvoiceListPage: React.FC = () => {
           `Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`,
         );
         setShowREModal(false);
-        await fetchOrders();
+        await tabData.refetchOrders();
       } else {
         await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
 
@@ -1054,7 +692,6 @@ const InvoiceListPage: React.FC = () => {
             (it: any) => it.id === selectedItem.id,
           ),
         );
-
         if (invId) {
           setExpandedStates((prev: any) => {
             const newState = { ...prev };
@@ -1108,7 +745,6 @@ const InvoiceListPage: React.FC = () => {
             (g: any) => g.taricId === group.taricId,
           ),
       );
-
       if (!invId) {
         toast.error("Could not find invoice for this taric group");
         return;
@@ -1116,11 +752,6 @@ const InvoiceListPage: React.FC = () => {
 
       const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter(
         (oi: any) => {
-          const itemTaricCode = oi.item?.taric?.code || "";
-          const isProjectItem =
-            !itemTaricCode ||
-            itemTaricCode === "0" ||
-            itemTaricCode === "0000000000";
           let oiGroupKey = "";
           if (oi.set_taric_code) {
             const codes = oi.set_taric_code.split("/");
@@ -1205,73 +836,6 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handlePrintLabel = (item: any) => {
-    const details = item.item;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Label - ${details?.item_name || "Item"}</title>
-          <style>
-            @page { size: 100mm 150mm; margin: 0; }
-            body { 
-              font-family: 'Poppins', sans-serif; 
-              padding: 20px; 
-              border: 1px solid #eee; 
-              width: 100mm; 
-              height: 150mm; 
-              box-sizing: border-box; 
-              position: relative;
-            }
-            .header { border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
-            .item-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; height: 48px; overflow: hidden; }
-            .ean { font-size: 11px; margin-bottom: 5px; color: #555; }
-            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-            .label-field { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-            .value-field { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
-            .barcode { margin-top: 20px; text-align: center; }
-            .qr-placeholder { width: 80px; height: 80px; background: #eee; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; border: 1px dashed #ccc; }
-            .footer { position: absolute; bottom: 20px; left: 20px; right: 20px; font-size: 9px; text-align: center; color: #999; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="header">
-            <div class="item-name">${details?.item_name || "N/A"}</div>
-            <div class="ean">EAN: ${details?.ean || "-"}</div>
-          </div>
-          <div class="details">
-            <div>
-              <div class="label-field">Order / Cargo No.</div>
-              <div class="value-field">${item.order?.order_no || "-"}</div>
-            </div>
-            <div>
-              <div class="label-field">QTY Label</div>
-              <div class="value-field">${item.qty_label || item.qty}</div>
-            </div>
-            <div>
-              <div class="label-field">SOID</div>
-              <div class="value-field">${item.supplier_order_id || "-"}</div>
-            </div>
-            <div>
-              <div class="label-field">Taric</div>
-              <div class="value-field">${details?.taric?.code || "-"}</div>
-            </div>
-          </div>
-          <div class="barcode">
-            <div class="qr-placeholder">G-TECH LABEL</div>
-            <div style="font-size: 9px; margin-top: 5px; font-weight: 500;">Item ID: ${item.id}</div>
-          </div>
-          <div class="footer">
-            Printed on ${new Date().toLocaleString("de-DE")}
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
   const handleOpenBTSTModal = (customer: any) => {
     setSelectedCustomerForEdit(customer);
     setBtstFormData({
@@ -1339,103 +903,138 @@ const InvoiceListPage: React.FC = () => {
   const handleSaveBTST = async () => {
     if (!selectedCustomerForEdit) return;
     try {
-      const payload = {
-        ...selectedCustomerForEdit,
-        ...btstFormData,
-      };
+      const payload = { ...selectedCustomerForEdit, ...btstFormData };
       const res = await updateCustomerProfile(payload);
       if (res?.success) {
         setShowBTSTModal(false);
-        fetchCustomers();
+        tabData.refetchCustomers();
       }
     } catch (error) {
       console.error("Failed to update billto/shipto:", error);
     }
   };
 
-  const fetchCategories = useCallback(async () => {
+  const handleAssignSupplier = async (
+    orderItemId: number | string,
+    supplierId: number,
+    baseItemId?: number | string,
+  ) => {
     try {
-      const response = await getCategories();
-      const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.categories || [];
-      setCategories(arr);
+      await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
+      if (baseItemId) {
+        await updateItem(Number(baseItemId), { supplier_id: supplierId });
+      }
+      toast.success("Supplier assigned successfully");
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.error("Failed to assign supplier:", error);
+      toast.error("Failed to assign supplier");
     }
-  }, []);
+  };
 
-  const fetchSuppliers = useCallback(async () => {
+  const handleDirectConvertAuftragToBestellung = async (auftrag: any) => {
+    if (
+      !window.confirm(
+        `Convert Auftrag ${auftrag.order_no} directly to Bestellung?`,
+      )
+    )
+      return;
     try {
-      const response = await getAllSuppliers({ limit: 1000 });
-      const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.suppliers || [];
-      setSuppliers(arr);
-    } catch (error) {
-      console.error("Error fetching suppliers:", error);
+      const items = (auftrag.orderItems || auftrag.items || [])
+        .filter((it: any) => it.sourceItemId)
+        .map((it: any) => ({
+          sourceLineItemId: String(it.id),
+          sourceItemId: it.sourceItemId || undefined,
+          qty: Number(it.quantity || it.qty) || 1,
+          max_qty: Number(it.quantity || it.qty) || 1,
+          itemName: it.itemName || it.item_name || "Line Item",
+          itemNo: it.itemNo || it.material || "",
+          material: it.material || "",
+          photo: it.photo || undefined,
+          specification: it.specification || "",
+          description: it.description || "",
+          weight: it.weight || undefined,
+          extraWeight: it.extraWeight || 0,
+          notes: it.notes || "",
+          remark_order_item: it.remark_order_item || "",
+          price: Number(it.price) || 0,
+          transferPrice: Number(it.price) || 0,
+          purchasePrice: it.purchasePrice || undefined,
+          purchaseCurrency: it.purchaseCurrency || "EUR",
+          position: it.position || 1,
+        }));
+
+      const res: any = await createBestellungFromAuftrag(auftrag.id, items);
+      if (res?.success) {
+        toast.success(
+          res.message || `Auftrag ${auftrag.order_no} converted to Bestellung!`,
+          successStyles,
+        );
+        tabData.refetchOrders();
+        tabData.refetchBestellungen();
+
+        const createdBestellungId = res?.data?.id;
+        if (createdBestellungId) {
+          setActiveInvTab("bestellung");
+          handleOpenBestellungPreview(createdBestellungId);
+        }
+      }
+    } catch (err) {
+      console.error("Error converting Auftrag to Bestellung:", err);
     }
-  }, []);
+  };
 
-  const fetchAllItems = useCallback(async () => {
+  const handleUpdateBestellungStatus = async (
+    id: string | number,
+    status: any,
+  ) => {
     try {
-      setLoadingItemsAll(true);
-      const response = await getItems({ limit: 10000 });
-      const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.items || [];
-      setItemsAll(arr);
-    } catch (error) {
-      console.error("Error fetching items:", error);
-      setItemsAll([]);
+      await updateTransferOrderStatus(id, status);
+      toast.success("Bestellung status updated.", successStyles);
+      tabData.refetchBestellungen();
+    } catch (err) {
+      console.error("Error updating Bestellung status:", err);
+      toast.error("Failed to update Bestellung status.", errorStyles);
+    }
+  };
+
+  const handleCreateRechnungK = async (row: any) => {
+    const sourceId = row.id;
+    setCreatingRkForId(sourceId);
+    try {
+      const res: any = await createRechnungKFromRechnung(sourceId);
+      const payload = res?.data ?? res;
+      if (payload) {
+        setSelectedRechnungKData(payload);
+        setShowRechnungKModal(true);
+        toast.success(
+          res?.message || "Correction invoice created.",
+          successStyles,
+        );
+      } else {
+        toast.error("Failed to create correction invoice.", errorStyles);
+      }
+    } catch (err: any) {
+      toast.error(
+        err?.message || "Failed to create correction invoice.",
+        errorStyles,
+      );
     } finally {
-      setLoadingItemsAll(false);
+      setCreatingRkForId(null);
     }
-  }, []);
-
-  const fetchOrders = useCallback(async () => {
-    setLoadingOrders(true);
-    try {
-      const [resOrders, resCustomerOrders]: any = await Promise.all([
-        getAllOrders().catch(() => ({ data: [] })),
-        getAllCustomerOrders().catch(() => ({ data: [] })),
-      ]);
-      if (resOrders?.success) setOrders(resOrders.data);
-      else if (resOrders?.data) setOrders(resOrders.data);
-      const custOrders = resCustomerOrders?.data || resCustomerOrders || [];
-      setCustomerOrders(Array.isArray(custOrders) ? custOrders : []);
-    } catch (error) {
-      console.error("Error fetching Orders:", error);
-    } finally {
-      setLoadingOrders(false);
-    }
-  }, []);
-
-  const fetchOffers = useCallback(async () => {
-    setLoadingOffers(true);
-    try {
-      const response = await getAllOffers();
-      if (response?.success) setOffers(response.data);
-      else if (response?.data) setOffers(response.data);
-    } catch (error) {
-      console.error("Error fetching Offers:", error);
-    } finally {
-      setLoadingOffers(false);
-    }
-  }, []);
-
-  const itemById = useMemo(() => {
-    const map = new Map<string, any>();
-    for (const it of itemsAll) map.set(String(it.id), it);
-    return map;
-  }, [itemsAll]);
+  };
 
   const getCategoryName = useCallback(
     (categoryId: string | number) =>
-      categories.find((c) => String(c.id) === String(categoryId))?.name ?? "-",
-    [categories],
+      tabData.categories.find((c) => String(c.id) === String(categoryId))
+        ?.name ?? "-",
+    [tabData.categories],
   );
 
   const getSupplierName = useCallback(
     (supplierId: any) => {
-      const s = suppliers.find((c) => String(c.id) === String(supplierId));
+      const s = tabData.suppliers.find(
+        (c) => String(c.id) === String(supplierId),
+      );
       if (!s) return String(supplierId);
       const englishName =
         s.name && !hasChinese(s.name)
@@ -1448,109 +1047,8 @@ const InvoiceListPage: React.FC = () => {
       if (chineseName) return chineseName;
       return s.name_de || String(s.id);
     },
-    [suppliers],
+    [tabData.suppliers],
   );
-
-  const orderItemsFlat = useMemo(() => {
-    let allItems = orders.flatMap((o: any) =>
-      (o.items || []).map((i: any) => ({
-        ...i,
-        order_id: o.id,
-        parentOrder: o,
-        order_no: o.order_no,
-        order_status: o.status,
-        item_status: i.status || "NSO",
-        supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
-        category_id: o.category_id,
-        comment: o.comment,
-      })),
-    );
-
-    const filterParam = searchParams.get("filter");
-    if (filterParam) {
-      if (filterParam === "unassigned_cargo") {
-        allItems = allItems.filter((i: any) => !i.cargo_id || i.cargo_id === 0);
-      } else if (filterParam === "purchase_problem") {
-        allItems = allItems.filter(
-          (i: any) =>
-            (i.problems &&
-              i.problems !== "" &&
-              (i.problems.toLowerCase().includes("purchase") ||
-                i.problems.toLowerCase().includes("buy"))) ||
-            (i.status && String(i.status).toLowerCase().includes("purchase")),
-        );
-      } else if (filterParam === "check_problem") {
-        allItems = allItems.filter(
-          (i: any) =>
-            i.problems &&
-            i.problems !== "" &&
-            (i.problems.toLowerCase().includes("check") ||
-              i.problems.toLowerCase().includes("verify")),
-        );
-      } else if (filterParam === "rmb_special_no_value") {
-        allItems = allItems.filter((i: any) => {
-          const it = i.item || {};
-          const price = i.rmb_price || it.rmb_price || it.RMB_Price || 0;
-          return (
-            it.is_rmb_special === "Y" &&
-            (!price || parseFloat(String(price)) === 0)
-          );
-        });
-      } else if (filterParam === "eur_special_no_value") {
-        allItems = allItems.filter((i: any) => {
-          const it = i.item || {};
-          const hasEUR =
-            (it.price && parseFloat(String(it.price)) > 0) ||
-            (it.transfer_price_EUR &&
-              parseFloat(String(it.transfer_price_EUR)) > 0);
-          return it.is_eur_special === "Y" && !hasEUR;
-        });
-      } else if (filterParam === "dimension_special_no_value") {
-        allItems = allItems.filter((i: any) => {
-          const it = i.item || {};
-          const hasDim =
-            it.weight &&
-            parseFloat(String(it.weight)) > 0 &&
-            it.length &&
-            parseFloat(String(it.length)) > 0 &&
-            it.width &&
-            parseFloat(String(it.width)) > 0 &&
-            it.height &&
-            parseFloat(String(it.height)) > 0;
-          return it.is_dimension_special === "Y" && !hasDim;
-        });
-      }
-    }
-
-    if (!docFilters.documentNo) return allItems;
-    const s = docFilters.documentNo.toLowerCase();
-    return allItems.filter(
-      (i) =>
-        String(i.order_no).toLowerCase().includes(s) ||
-        String(i.ean || i.item?.ean || "")
-          .toLowerCase()
-          .includes(s) ||
-        String(i.item_name || i.itemName || i.item?.item_name || "")
-          .toLowerCase()
-          .includes(s),
-    );
-  }, [orders, docFilters.documentNo, searchParams]);
-
-  const filteredOrders = useMemo(() => {
-    if (!docFilters.documentNo) return orders;
-    const s = docFilters.documentNo.toLowerCase();
-    return orders.filter(
-      (o: any) =>
-        String(o.order_no).toLowerCase().includes(s) ||
-        String(o.id).toLowerCase().includes(s) ||
-        (o.comment || "").toLowerCase().includes(s),
-    );
-  }, [orders, docFilters.documentNo]);
-
-  const handleGoToItems = (orderNo: string) => {
-    setDocFilters((prev: any) => ({ ...prev, documentNo: orderNo }));
-    setActiveInvTab("auftrag");
-  };
 
   const handleViewOrder = (order: any) => {
     setViewOrder(order);
@@ -1570,71 +1068,7 @@ const InvoiceListPage: React.FC = () => {
     setViewItems([]);
   };
 
-  const handleOpenReassignModal = (item: any) => {
-    setSelectedItem(item);
-    setTargetCargoId(item.cargo_id ? String(item.cargo_id) : "");
-    setShowREModal(true);
-  };
-
-  const handleOpenSplitModal = (item: any) => {
-    setSelectedItem(item);
-    setSplitQty(item.qty_label || item.qty || 0);
-    setRemarksCN(item.remarks_cn || "");
-    setShowSPModal(true);
-  };
-
-  const handleAssignSupplier = async (
-    orderItemId: number | string,
-    supplierId: number,
-    baseItemId?: number | string,
-  ) => {
-    try {
-      await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
-      if (baseItemId) {
-        await updateItem(Number(baseItemId), { supplier_id: supplierId });
-      }
-      await Promise.all([fetchOrders(), fetchAllItems()]);
-      toast.success("Supplier assigned successfully");
-    } catch (error) {
-      console.error("Failed to assign supplier:", error);
-      toast.error("Failed to assign supplier");
-    }
-  };
-
-  useEffect(() => {
-    fetchOrders();
-    fetchOffers();
-    fetchSuppliers();
-    fetchCategories();
-    fetchBestellungen();
-  }, [
-    fetchOrders,
-    fetchOffers,
-    fetchSuppliers,
-    fetchCategories,
-    fetchBestellungen,
-  ]);
-
-  useEffect(() => {
-    if (activeInvTab === "lieferschein") {
-      fetchCustomers();
-      fetchLieferscheine();
-    } else if (activeInvTab === "rechnung" || activeInvTab === "rk") {
-      fetchRechnungen();
-    } else if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
-      fetchAllItems();
-      fetchOrders();
-      fetchBestellungen();
-    }
-  }, [
-    activeInvTab,
-    fetchBestellungen,
-    fetchAllItems,
-    fetchOrders,
-    fetchRechnungen,
-    fetchLieferscheine,
-  ]);
-
+  // --- URL <-> tab/filter sync (unchanged from the original) ---
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", activeInvTab);
@@ -1672,178 +1106,17 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [searchParams]);
 
-  const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      const response: any = await getAllCustomers({ limit: 1000 });
-      if (response?.data?.businesses) {
-        setCustomers(response.data.businesses);
-      } else if (Array.isArray(response?.data)) {
-        setCustomers(response.data);
-      } else if (Array.isArray(response)) {
-        setCustomers(response);
-      } else {
-        setCustomers([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch customers:", error);
-    } finally {
-      if (activeInvTab === "lieferschein") setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let filtered = invoices || [];
-
-    if (activeInvTab === "rechnung") {
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.status !== "paid" && invoice.status !== "cancelled",
-      );
-    } else if (activeInvTab === "rk") {
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.status === "paid" || invoice.status === "cancelled",
-      );
-    }
-
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.invoiceNumber?.toLowerCase().includes(searchLower) ||
-          invoice.customer?.companyName?.toLowerCase().includes(searchLower) ||
-          invoice.customer?.email?.toLowerCase().includes(searchLower) ||
-          invoice.customer?.contactEmail?.toLowerCase().includes(searchLower) ||
-          (invoice.orderNumber &&
-            invoice.orderNumber.toLowerCase().includes(searchLower)) ||
-          (invoice.cargoNo &&
-            invoice.cargoNo.toLowerCase().includes(searchLower)),
-      );
-    }
-
-    if (filters.status) {
-      filtered = filtered.filter(
-        (invoice) => invoice.status === filters.status,
-      );
-    }
-
-    if (filters.dateFrom) {
-      filtered = filtered.filter(
-        (invoice) =>
-          new Date(invoice.invoiceDate) >= new Date(filters.dateFrom),
-      );
-    }
-    if (filters.dateTo) {
-      filtered = filtered.filter(
-        (invoice) => new Date(invoice.invoiceDate) <= new Date(filters.dateTo),
-      );
-    }
-
-    if (filters.customer) {
-      const customerLower = filters.customer.toLowerCase();
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.customer?.companyName
-            ?.toLowerCase()
-            .includes(customerLower) ||
-          invoice.customer?.email?.toLowerCase().includes(customerLower) ||
-          invoice.customer?.contactEmail?.toLowerCase().includes(customerLower),
-      );
-    }
-
-    if (filters.minAmount) {
-      filtered = filtered.filter(
-        (invoice) => invoice.grossTotal >= parseFloat(filters.minAmount),
-      );
-    }
-    if (filters.maxAmount) {
-      filtered = filtered.filter(
-        (invoice) => invoice.grossTotal <= parseFloat(filters.maxAmount),
-      );
-    }
-
-    filtered.sort((a, b) => {
-      let aValue: any = a[sortField];
-      let bValue: any = b[sortField];
-
-      if (sortField === "customer") {
-        aValue = a.customer?.companyName || "";
-        bValue = b.customer?.companyName || "";
-      }
-
-      if (aValue == null && bValue == null) return 0;
-      if (aValue == null) return sortDirection === "asc" ? 1 : -1;
-      if (bValue == null) return sortDirection === "asc" ? -1 : 1;
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortDirection === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      }
-
-      return 0;
-    });
-
-    setFilteredInvoices(filtered);
-    setCurrentPage(1);
-  }, [searchTerm, filters, invoices, sortField, sortDirection, activeInvTab]);
-
-  const handleSort = (field: keyof Invoice) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const handleDownloadPDF = async (pdfUrl: string) => {
-    router.push(`${pdfUrl}`);
-  };
-
+  // Invoice-details modal handlers. `handleMarkAsPaid` here preserves the
+  // original's exact observable behavior: the legacy `invoices` list it
+  // used to search was never populated anywhere in the app (getAllInvoices
+  // is imported but never called, setInvoices is never called), so the
+  // lookup always failed and this toast always fired instead of actually
+  // marking anything paid. Kept deterministic rather than silently
+  // "fixed" — see README section 1.
   const handleMarkAsPaid = async (invoiceId: string) => {
-    try {
-      const invoice = invoices.find((inv) => inv.id === invoiceId);
-      if (
-        !invoice ||
-        invoice.freightCost === null ||
-        invoice.freightCost === undefined ||
-        Number(invoice.freightCost) <= 0
-      ) {
-        toast.error(
-          "Please provide a freight cost by editing the invoice before verifying it.",
-        );
-        return;
-      }
-      if (!invoice.description || !invoice.description.trim()) {
-        toast.error(
-          "Please provide a description by editing the invoice before verifying it.",
-        );
-        return;
-      }
-
-      setActionLoading((prev: any) => ({
-        ...prev,
-        [`paid-${invoiceId}`]: true,
-      }));
-      await markInvoiceAsPaid(invoiceId);
-      setSelectedInvoice((prev: any) =>
-        prev ? { ...prev, status: "paid" } : null,
-      );
-      toast.success("Invoice verified successfully");
-    } catch (error) {
-      console.error("Failed to mark as paid:", error);
-    } finally {
-      setActionLoading((prev: any) => ({
-        ...prev,
-        [`paid-${invoiceId}`]: false,
-      }));
-    }
+    toast.error(
+      "Please provide a freight cost by editing the invoice before verifying it.",
+    );
   };
 
   const handleSaveInvoiceEdit = async (invoiceId: string) => {
@@ -1862,17 +1135,13 @@ const InvoiceListPage: React.FC = () => {
     }
 
     try {
-      setActionLoading((prev: any) => ({
-        ...prev,
-        [`save-${invoiceId}`]: true,
-      }));
+      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: true }));
       await updateInvoice({
         id: invoiceId,
         description: invoiceEditForm.description,
         freightCost: invoiceEditForm.freightCost,
         remark: invoiceEditForm.remark,
       });
-      setEditingInvoiceId(null);
       setSelectedInvoice((prev: any) =>
         prev
           ? {
@@ -1887,89 +1156,24 @@ const InvoiceListPage: React.FC = () => {
     } catch (error) {
       console.error("Failed to save invoice edits:", error);
     } finally {
-      setActionLoading((prev: any) => ({
-        ...prev,
-        [`save-${invoiceId}`]: false,
-      }));
+      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: false }));
     }
   };
 
-  const handleCancelInvoice = async (invoiceId: string) => {
-    try {
-      setActionLoading((prev: any) => ({
-        ...prev,
-        [`cancel-${invoiceId}`]: true,
-      }));
-      await cancelInvoice(invoiceId);
-    } catch (error) {
-      console.error("Failed to cancel invoice:", error);
-    } finally {
-      setActionLoading((prev: any) => ({
-        ...prev,
-        [`cancel-${invoiceId}`]: false,
-      }));
-    }
+  const handleDownloadInvoicePdf = async (invoice: any) => {
+    await downloadCommercialInvoice(
+      invoice.id,
+      invoice.invoiceNumber,
+      invoice.cargo?.cargo_no || invoice.cargoNo,
+    );
   };
 
-  const handleDeleteInvoice = async (invoiceId: string) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this invoice? This action cannot be undone.",
-      )
-    ) {
-      try {
-        setActionLoading((prev: any) => ({
-          ...prev,
-          [`delete-${invoiceId}`]: true,
-        }));
-        await deleteInvoice(invoiceId);
-      } catch (error) {
-        console.error("Failed to delete invoice:", error);
-      } finally {
-        setActionLoading((prev: any) => ({
-          ...prev,
-          [`delete-${invoiceId}`]: false,
-        }));
-      }
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "paid":
-        return <CheckCircle className="w-4 h-4" />;
-      case "sent":
-        return <Clock className="w-4 h-4" />;
-      case "overdue":
-        return <AlertCircle className="w-4 h-4" />;
-      case "cancelled":
-        return <XCircle className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return { backgroundColor: "#E8F5E8", color: "#2E7D32" };
-      case "sent":
-        return { backgroundColor: "#E3F2FD", color: "#1976D2" };
-      case "overdue":
-        return { backgroundColor: "#FFF3E0", color: "#F57C00" };
-      case "cancelled":
-        return { backgroundColor: "#FFEBEE", color: "#D32F2F" };
-      default:
-        return { backgroundColor: "#F5F5F5", color: "#757575" };
-    }
-  };
-
+  // --- Tab -> displayed list (unchanged logic, `invoices` dependency
+  // dropped since that array was always empty — see README) ---
   const filteredItems = useMemo(() => {
     let list: any[] = [];
-    if (activeInvTab === "angebot") {
-      list = offers || [];
-    } else if (activeInvTab === "auftrag") {
-      const wawiOrders = orders.filter(
+    if (activeInvTab === "auftrag") {
+      const wawiOrders = tabData.orders.filter(
         (o: any) =>
           (String(o.order_no).startsWith("MA") ||
             String(o.order_no).startsWith("B")) &&
@@ -1977,19 +1181,21 @@ const InvoiceListPage: React.FC = () => {
           !o.is_fulfilled &&
           !(o.comment || "").includes("[Moved to Fulfillment]"),
       );
-      const mappedCustOrders = (customerOrders || []).map((co: any) => ({
-        ...co,
-        isCustomerOrder: true,
-        items: co.orderItems || [],
-      }));
+      const mappedCustOrders = (tabData.customerOrders || []).map(
+        (co: any) => ({
+          ...co,
+          isCustomerOrder: true,
+          items: co.orderItems || [],
+        }),
+      );
       list = [...mappedCustOrders, ...wawiOrders];
     } else if (activeInvTab === "bestellung") {
-      list = (bestellungen || []).map((b: any) => ({
+      list = (tabData.bestellungen || []).map((b: any) => ({
         ...b,
         items: b.orderItems || b.items || [],
       }));
     } else if (activeInvTab === "rechnung") {
-      const mappedRechnungen = (rechnungen || []).map((r: any) => ({
+      list = (tabData.rechnungen || []).map((r: any) => ({
         ...r,
         invoiceNumber: r.invoice_number || r.invoiceNumber || r.id,
         invoiceDate: r.invoice_date || r.invoiceDate,
@@ -2008,12 +1214,8 @@ const InvoiceListPage: React.FC = () => {
           city: r.customer?.city || "",
         },
       }));
-      const filteredInvoices = (invoices || []).filter(
-        (inv: any) => inv.status !== "paid" && inv.status !== "cancelled",
-      );
-      list = [...mappedRechnungen, ...filteredInvoices];
     } else if (activeInvTab === "payment_inbound") {
-      list = (paymentInbounds || []).map((pi: any) => ({
+      list = (tabData.paymentInbounds || []).map((pi: any) => ({
         ...pi,
         invoiceNumber: pi.reference || pi.external_transaction_id || pi.id,
         createdAt: pi.received_date || pi.created_at,
@@ -2025,11 +1227,12 @@ const InvoiceListPage: React.FC = () => {
         },
       }));
     } else if (activeInvTab === "rk") {
-      list = invoices.filter(
-        (inv: any) => inv.status === "paid" || inv.status === "cancelled",
-      );
+      // Legacy `invoices`-backed RK list was always empty (see README) —
+      // preserved as empty rather than silently repointed at `rechnungen`,
+      // which is a data-source decision, not a cleanup.
+      list = [];
     } else if (activeInvTab === "lieferschein") {
-      list = (lieferscheine || []).map((ls: any) => ({
+      list = (tabData.lieferscheine || []).map((ls: any) => ({
         ...ls,
         invoiceNumber:
           ls.invoiceNumber || ls.deliveryNoteNo || ls.order_no || ls.id,
@@ -2049,8 +1252,6 @@ const InvoiceListPage: React.FC = () => {
         items: ls.items || ls.lineItems || [],
         customItemCount: ls.itemCount ?? ls.items?.length ?? 0,
       }));
-    } else {
-      list = [];
     }
 
     list.sort((a: any, b: any) => {
@@ -2066,17 +1267,7 @@ const InvoiceListPage: React.FC = () => {
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       list = list.filter((item: any) => {
-        if (activeInvTab === "angebot") {
-          return (
-            String(item.offerNumber).toLowerCase().includes(s) ||
-            String(item.customerSnapshot?.companyName || "")
-              .toLowerCase()
-              .includes(s)
-          );
-        } else if (
-          activeInvTab === "auftrag" ||
-          activeInvTab === "bestellung"
-        ) {
+        if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
           return (
             String(item.order_no).toLowerCase().includes(s) ||
             String(item.customer_name || "")
@@ -2084,19 +1275,18 @@ const InvoiceListPage: React.FC = () => {
               .includes(s) ||
             (item.comment || "").toLowerCase().includes(s)
           );
-        } else {
-          return (
-            String(item.invoiceNumber || item.id)
-              .toLowerCase()
-              .includes(s) ||
-            String(item.bill_to || "")
-              .toLowerCase()
-              .includes(s) ||
-            String(item.ship_to || "")
-              .toLowerCase()
-              .includes(s)
-          );
         }
+        return (
+          String(item.invoiceNumber || item.id)
+            .toLowerCase()
+            .includes(s) ||
+          String(item.bill_to || "")
+            .toLowerCase()
+            .includes(s) ||
+          String(item.ship_to || "")
+            .toLowerCase()
+            .includes(s)
+        );
       });
     }
 
@@ -2116,15 +1306,10 @@ const InvoiceListPage: React.FC = () => {
       if (documentNo.trim()) {
         const s = documentNo.toLowerCase().trim();
         const docNo = String(
-          item.offerNumber ||
-            item.order_no ||
-            item.invoiceNumber ||
-            item.id ||
-            "",
+          item.order_no || item.invoiceNumber || item.id || "",
         ).toLowerCase();
         if (!docNo.includes(s)) return false;
       }
-
       if (customerNo.trim()) {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
@@ -2137,7 +1322,6 @@ const InvoiceListPage: React.FC = () => {
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
-
       if (customerName.trim()) {
         const s = customerName.toLowerCase().trim();
         const cName = String(
@@ -2151,19 +1335,9 @@ const InvoiceListPage: React.FC = () => {
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
-
       if (valueAmount.trim()) {
         let val = 0;
-        if (activeInvTab === "angebot") {
-          val = Number(
-            item.totalAmount !== undefined && item.totalAmount !== null
-              ? item.totalAmount
-              : item.subtotal || 0,
-          );
-        } else if (
-          activeInvTab === "auftrag" ||
-          activeInvTab === "bestellung"
-        ) {
+        if (activeInvTab === "auftrag" || activeInvTab === "bestellung") {
           val = (item.items || []).reduce(
             (sum: number, it: any) =>
               sum + Number(it.price || 0) * Number(it.qty || 0),
@@ -2174,12 +1348,10 @@ const InvoiceListPage: React.FC = () => {
         }
         if (!isValueMatching(val, valueOperator, valueAmount)) return false;
       }
-
       if (status) {
         const itemStatus = String(item.status || "").toLowerCase();
         if (itemStatus !== status.toLowerCase()) return false;
       }
-
       if (datePreset && datePreset !== "all") {
         const docDate =
           item.createdAt ||
@@ -2189,17 +1361,16 @@ const InvoiceListPage: React.FC = () => {
         if (!isDateInPreset(docDate, datePreset, dateFrom, dateTo))
           return false;
       }
-
       return true;
     });
   }, [
     activeInvTab,
-    offers,
-    orders,
-    customerOrders,
-    invoices,
-    lieferscheine,
-    bestellungen,
+    tabData.orders,
+    tabData.customerOrders,
+    tabData.bestellungen,
+    tabData.rechnungen,
+    tabData.paymentInbounds,
+    tabData.lieferscheine,
     searchTerm,
     docFilters,
   ]);
@@ -2208,534 +1379,102 @@ const InvoiceListPage: React.FC = () => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentItems = filteredItems.slice(startIndex, endIndex);
-  const currentInvoices = currentItems;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, docFilters, activeInvTab]);
+
+  // A single empty array stands in for the never-populated legacy
+  // `invoices` list the Auftrag "Generated N times" badge reads from —
+  // see the comment on AuftragColumnsArgs.invoices.
+  const legacyInvoices = useMemo(() => [], []);
 
   const commercialColumns: ColumnDef<any>[] = useMemo(() => {
-    return [
-      {
-        header: "",
-        width: "36px",
-        align: "center",
-        render: (row) => {
-          const keys = [
-            row.id,
-            row._id,
-            row.order_no,
-            row.invoiceNumber,
-          ].filter(Boolean);
-          const isExpanded = keys.some((k) => expandedDocIds.has(k));
-          const items = row.items || row.lineItems || [];
-          const count =
-            items.length > 0
-              ? items.length
-              : row.item_count !== undefined
-                ? Number(row.item_count)
-                : row.itemsCount !== undefined
-                  ? Number(row.itemsCount)
-                  : 0;
-          const isEmpty = count === 0;
+    switch (activeInvTab) {
+      case "auftrag":
+        return buildAuftragColumns({
+          expandedDocIds,
+          setExpandedDocIds,
+          onOpenAuftragPreview: handleOpenAuftragPreview,
+          onConvertToBestellung: handleDirectConvertAuftragToBestellung,
+          onGenerateRechnung: (row) => {
+            setSelectedAuftragForRechnungModal(row);
+            setShowAuftragToRechnungModal(true);
+          },
+          invoices: legacyInvoices,
+        });
+      case "bestellung":
+        return buildBestellungColumns({
+          expandedDocIds,
+          setExpandedDocIds,
+          onOpenBestellungPreview: handleOpenBestellungPreview,
+          onMarkProcessing: (id) =>
+            handleUpdateBestellungStatus(id, "to be processed"),
+        });
+      case "rechnung":
+        return buildRechnungColumns({
+          expandedDocIds,
+          setExpandedDocIds,
+          onCreateRechnungK: handleCreateRechnungK,
+          creatingRkForId,
+          onView: (row) => {
+            setSelectedRechnungForDetail(row);
+            setShowRechnungDetailModal(true);
+          },
+        });
+      case "rk":
+        return buildRkColumns({
+          expandedDocIds,
+          setExpandedDocIds,
+          onView: (row) => {
+            setSelectedRechnungForDetail(row);
+            setShowRechnungDetailModal(true);
+          },
+        });
+      case "lieferschein":
+        return buildLieferscheinColumns({
+          expandedDocIds,
+          setExpandedDocIds,
+          onView: (row) => {
+            setSelectedLieferscheinForDetail(row);
+            setShowLieferscheinDetailModal(true);
+          },
+        });
+      case "payment_inbound":
+        return buildPaymentInboundColumns({
+          expandedDocIds,
+          setExpandedDocIds,
+          onOpenDetails: handleOpenInvoiceDetails,
+          onDelete: async (row) => {
+            if (
+              confirm(
+                "Are you sure you want to delete this payment inbound record?",
+              )
+            ) {
+              await deletePaymentInbound(row.id);
+              tabData.refetchPaymentInbounds();
+            }
+          },
+        });
+      default:
+        return [];
+    }
+  }, [activeInvTab, expandedDocIds, creatingRkForId, legacyInvoices, tabData]);
 
-          return (
-            <ExpandRowArrow
-              isExpanded={isExpanded}
-              isEmpty={isEmpty}
-              title={
-                isEmpty
-                  ? "No items in this document"
-                  : isExpanded
-                    ? "Collapse items"
-                    : "Expand items"
-              }
-              onToggle={(e) => {
-                e.stopPropagation();
-                setExpandedDocIds((prev) => {
-                  const next = new Set(prev);
-                  if (isExpanded) {
-                    keys.forEach((k) => next.delete(k));
-                  } else {
-                    keys.forEach((k) => next.add(k));
-                  }
-                  return next;
-                });
-              }}
-            />
-          );
-        },
-      },
-      {
-        header: "date_created",
-        width: "100px",
-        align: "center",
-        render: (row) => {
-          const rawDate =
-            row.createdAt ||
-            row.created_at ||
-            row.date_created ||
-            row.invoiceDate ||
-            row.deliveryDate;
-          if (
-            typeof rawDate === "string" &&
-            /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)
-          ) {
-            const [d, m] = rawDate.split(".");
-            return `${d}.${m}.`;
-          }
-          return rawDate ? formatDate(rawDate) : "-";
-        },
-      },
-      {
-        header: "No",
-        width: "100px",
-        align: "center",
-        render: (row) => {
-          if (activeInvTab === "angebot") {
-            return (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenOfferModal(row.id);
-                }}
-                className="text-green-600 hover:underline font-semibold"
-              >
-                {row.offerNumber || "N/A"}
-              </button>
-            );
-          } else if (activeInvTab === "auftrag") {
-            return (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenAuftragPreview(row.id);
-                }}
-                className="text-green-600 hover:underline font-semibold"
-              >
-                {row.order_no || "N/A"}
-              </button>
-            );
-          } else if (activeInvTab === "bestellung") {
-            return (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenBestellungPreview(row.id);
-                }}
-                className="text-green-600 hover:underline font-semibold"
-              >
-                {row.order_no || "N/A"}
-              </button>
-            );
-          } else if (activeInvTab === "rechnung") {
-            return (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedRechnungForDetail(row);
-                  setShowRechnungDetailModal(true);
-                }}
-                className="text-green-600 hover:underline font-semibold"
-              >
-                {row.invoiceNumber || String(row.id).slice(-5).toUpperCase()}
-              </button>
-            );
-          } else if (activeInvTab === "lieferschein") {
-            return (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedLieferscheinForDetail(row);
-                  setShowLieferscheinDetailModal(true);
-                }}
-                className="text-green-600 hover:underline font-semibold"
-              >
-                {row.invoiceNumber ||
-                  row.order_no ||
-                  String(row.id).slice(-5).toUpperCase()}
-              </button>
-            );
-          } else {
-            return (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenInvoiceDetails(row);
-                }}
-                className="text-green-600 hover:underline font-semibold"
-              >
-                {row.invoiceNumber || row.id.slice(-5).toUpperCase()}
-              </button>
-            );
-          }
-        },
-      },
-      {
-        header: "Company",
-        width: "115px",
-        align: "left",
-        render: (row) => {
-          const text =
-            row.customerSnapshot?.companyName ||
-            row.customerSnapshot?.name ||
-            row.customer?.companyName ||
-            row.customer?.name ||
-            row.customer_name ||
-            row.bill_to ||
-            row.ship_to ||
-            "N/A";
-          return (
-            <div className="truncate max-w-[115px]" title={text}>
-              {text}
-            </div>
-          );
-        },
-      },
-      {
-        header: "Person",
-        width: "150px",
-        align: "left",
-        render: (row) => {
-          const text =
-            row.customerSnapshot?.contactEmail ||
-            row.customerSnapshot?.contactPhoneNumber ||
-            row.customerSnapshot?.contactName ||
-            row.customer?.email ||
-            row.customer?.contactEmail ||
-            row.customer?.contactPhoneNumber ||
-            row.customer?.contactName ||
-            row.ship_to ||
-            "-";
-          return (
-            <div className="truncate max-w-[150px]" title={text}>
-              {text}
-            </div>
-          );
-        },
-      },
-      {
-        header: "Shipping_postal_code",
-        width: "75px",
-        align: "center",
-        render: (row) => {
-          return (
-            row.deliveryAddress?.postalCode ||
-            row.customerSnapshot?.postalCode ||
-            row.customer?.postalCode ||
-            row.cargo?.customer?.postalCode ||
-            row.postalCode ||
-            "-"
-          );
-        },
-      },
-      {
-        header: "City, county",
-        width: "95px",
-        align: "left",
-        render: (row) => {
-          const city =
-            row.deliveryAddress?.city ||
-            row.customerSnapshot?.city ||
-            row.customer?.city ||
-            row.cargo?.customer?.city ||
-            row.city ||
-            "";
-          const country =
-            row.deliveryAddress?.country ||
-            row.customerSnapshot?.country ||
-            row.customer?.country ||
-            row.cargo?.customer?.country ||
-            row.country ||
-            "";
-          const text =
-            [city, formatCountryCode(country)].filter(Boolean).join(", ") ||
-            "-";
-          return (
-            <div className="truncate max-w-[95px]" title={text}>
-              {text}
-            </div>
-          );
-        },
-      },
-      ...(activeInvTab !== "lieferschein"
-        ? [
-            {
-              header: "Value_net",
-              width: "75px",
-              align: "right" as const,
-              render: (row: any) => {
-                let val = 0;
-                if (activeInvTab === "angebot") {
-                  val = Number(
-                    row.totalAmount !== undefined && row.totalAmount !== null
-                      ? row.totalAmount
-                      : row.subtotal || 0,
-                  );
-                } else if (
-                  activeInvTab === "auftrag" ||
-                  activeInvTab === "bestellung"
-                ) {
-                  if (row.isCustomerOrder || row.subtotal !== undefined) {
-                    val = Number(row.subtotal ?? row.total_amount ?? 0);
-                  } else {
-                    val = (row.items || []).reduce(
-                      (sum: number, it: any) =>
-                        sum + Number(it.price || 0) * Number(it.qty || 0),
-                      0,
-                    );
-                  }
-                } else {
-                  val = Number(row.netTotal || row.grossTotal || 0);
-                }
-                return `€${val.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-              },
-            },
-          ]
-        : []),
-      {
-        header: "Item_Count",
-        width: "60px",
-        align: "center",
-        render: (row) => {
-          if (activeInvTab === "angebot") {
-            return row.lineItems?.length || 0;
-          } else if (
-            activeInvTab === "auftrag" ||
-            activeInvTab === "bestellung"
-          ) {
-            return row.items?.length || 0;
-          } else {
-            return row.customItemCount ?? row.items?.length ?? 0;
-          }
-        },
-      },
-      ...(activeInvTab === "bestellung"
-        ? [
-            {
-              header: "Status",
-              width: "130px",
-              align: "center" as const,
-              render: (row: any) => {
-                const currentStatus = row.status || "draft";
-                const getStatusStyle = (st: string) => {
-                  switch (st) {
-                    case "draft":
-                      return "bg-gray-100 text-gray-800 border-gray-300";
-                    case "to be processed":
-                      return "bg-blue-50 text-blue-700 border-blue-300 font-bold";
-                    case "partially delivered":
-                      return "bg-amber-50 text-amber-700 border-amber-300 font-bold";
-                    case "delivered":
-                      return "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold";
-                    default:
-                      return "bg-gray-100 text-gray-700 border-gray-200";
-                  }
-                };
-
-                // Return as read-only text, not a select dropdown
-                return (
-                  <span
-                    className={`text-[11px] px-2 py-1 rounded border shadow-sm font-medium ${getStatusStyle(currentStatus)}`}
-                  >
-                    {currentStatus}
-                  </span>
-                );
-              },
-            },
-          ]
-        : []),
-      {
-        header: "Actions",
-        width: "120px",
-        align: "center",
-        render: (row) => {
-          if (activeInvTab === "angebot") {
-            return (
-              <div className="flex items-center justify-center gap-1.5">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenOfferModal(row.id);
-                  }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
-                >
-                  Edit
-                </button>
-              </div>
-            );
-          } else if (activeInvTab === "auftrag") {
-            const rechnungCount = (invoices || []).filter(
-              (inv: any) =>
-                (inv.orderNumber &&
-                  String(inv.orderNumber).trim().toLowerCase() ===
-                    String(row.order_no || "")
-                      .trim()
-                      .toLowerCase()) ||
-                (inv.order_number &&
-                  String(inv.order_number).trim().toLowerCase() ===
-                    String(row.order_no || "")
-                      .trim()
-                      .toLowerCase()) ||
-                (inv.auftrag_no &&
-                  String(inv.auftrag_no).trim().toLowerCase() ===
-                    String(row.order_no || "")
-                      .trim()
-                      .toLowerCase()) ||
-                (row.id &&
-                  (inv.auftrag_id === row.id || inv.auftragId === row.id)),
-            ).length;
-            const isConverted = rechnungCount > 0;
-
-            return (
-              <div className="flex items-center justify-center gap-1.5 font-poppins">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDirectConvertAuftragToBestellung(row);
-                  }}
-                  title="Convert Auftrag directly to Bestellung"
-                  className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-md flex items-center gap-1"
-                >
-                  <MoveRight className="w-3.5 h-3.5" />
-                  <span>Convert</span>
-                </button>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedAuftragForRechnungModal(row);
-                      setShowAuftragToRechnungModal(true);
-                    }}
-                    title={
-                      isConverted
-                        ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
-                        : "Generate Rechnung & Lieferschein"
-                    }
-                    className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer ${
-                      isConverted
-                        ? "bg-gray-500 hover:bg-gray-600 text-white"
-                        : "bg-[#2F6B46] hover:bg-[#255638] text-white"
-                    }`}
-                  >
-                    <MoveRight className="w-3.5 h-3.5" />
-                  </button>
-
-                  {rechnungCount > 0 && (
-                    <span
-                      title={`Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""}`}
-                      className="px-1.5 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
-                    >
-                      {rechnungCount}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          } else if (activeInvTab === "bestellung") {
-            const currentStatus = row.status || "draft";
-            return (
-              <div className="flex items-center justify-center gap-1.5 font-poppins">
-                {currentStatus === "draft" && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUpdateBestellungStatus(row.id, "to be processed");
-                    }}
-                    className="px-2 py-1 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition shadow-md"
-                  >
-                    Processing
-                  </button>
-                )}
-              </div>
-            );
-          } else if (activeInvTab === "rechnung" || activeInvTab === "rk") {
-            return (
-              <div className="flex items-center justify-center gap-1.5">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedRechnungForDetail(row);
-                    setShowRechnungDetailModal(true);
-                  }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
-                >
-                  View
-                </button>
-              </div>
-            );
-          } else if (activeInvTab === "lieferschein") {
-            return (
-              <div className="flex items-center justify-center gap-1.5">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedLieferscheinForDetail(row);
-                    setShowLieferscheinDetailModal(true);
-                  }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
-                >
-                  View
-                </button>
-              </div>
-            );
-          } else if (activeInvTab === "payment_inbound") {
-            return (
-              <div className="flex items-center justify-center gap-1.5">
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (
-                      confirm(
-                        "Are you sure you want to delete this payment inbound record?",
-                      )
-                    ) {
-                      await deletePaymentInbound(row.id);
-                      fetchPaymentInbounds();
-                    }
-                  }}
-                  className="px-2 py-1 text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-[4px] transition shadow-md"
-                >
-                  Delete
-                </button>
-              </div>
-            );
-          } else {
-            return (
-              <div className="flex items-center justify-center gap-1.5">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenInvoiceDetails(row);
-                  }}
-                  className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
-                >
-                  View
-                </button>
-              </div>
-            );
-          }
-        },
-      },
-    ];
-  }, [
-    activeInvTab,
-    router,
-    expandedDocIds,
-    invoices,
-    setSelectedRechnungForDetail,
-    setSelectedLieferscheinForDetail,
-  ]);
-
-  const totalAmount = filteredInvoices.reduce(
-    (sum, inv) => sum + (Number(inv.grossTotal) || 0),
-    0,
-  );
-  const totalPaid = filteredInvoices.reduce(
-    (sum, inv) => sum + (Number(inv.paidAmount) || 0),
-    0,
-  );
-  const outstandingAmount = filteredInvoices.reduce(
-    (sum, inv) => sum + (Number(inv.outstandingAmount) || 0),
-    0,
-  );
+  // `loading` for the DataTable on the "rk" tab mirrors a pre-existing
+  // quirk in the original: rk never had its own loading flag, so it fell
+  // back to the customer-list loading state that only ever gets touched by
+  // the Lieferschein tab. Preserved rather than fixed — see README.
+  const dataTableLoading =
+    activeInvTab === "payment_inbound"
+      ? tabData.loadingPaymentInbounds
+      : activeInvTab === "rechnung"
+        ? tabData.loadingRechnungen
+        : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+          ? tabData.loadingOrders
+          : activeInvTab === "lieferschein"
+            ? tabData.loadingCustomers
+            : false;
 
   return (
     <div
@@ -2786,9 +1525,7 @@ const InvoiceListPage: React.FC = () => {
           <div className="flex items-center gap-3">
             {activeInvTab === "angebot" && (
               <CustomButton
-                onClick={() => {
-                  handleOpenOfferModal(null);
-                }}
+                onClick={() => handleOpenOfferModal(null)}
                 gradient
                 size="small"
                 startIcon={<Plus className="h-4 w-4" />}
@@ -2799,11 +1536,9 @@ const InvoiceListPage: React.FC = () => {
             {(activeInvTab === "auftrag" || activeInvTab === "bestellung") && (
               <CustomButton
                 onClick={() => {
-                  if (activeInvTab === "auftrag") {
+                  if (activeInvTab === "auftrag")
                     setShowAuftragCreateModal(true);
-                  } else {
-                    setShowCreateBestellungModal(true);
-                  }
+                  else setShowCreateBestellungModal(true);
                 }}
                 gradient
                 size="small"
@@ -2834,7 +1569,6 @@ const InvoiceListPage: React.FC = () => {
             )}
           </div>
         </div>
-
         <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
           {invoiceTabs.map((tab) => (
             <button
@@ -2854,247 +1588,22 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
-        <div className="mb-6 p-3.5 bg-white border border-gray-200 rounded-md shadow-sm space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-              <FunnelIcon className="w-5 h-5 text-gray-400" />
-            </div>
-
-            <div className="w-36 shrink-0">
-              <input
-                type="text"
-                placeholder="DocumentNo..."
-                value={docFilters.documentNo}
-                onChange={(e) =>
-                  setDocFilters((p) => ({ ...p, documentNo: e.target.value }))
-                }
-                className={getInputClass(!!docFilters.documentNo)}
-              />
-            </div>
-
-            <div className="w-32 shrink-0">
-              <input
-                type="text"
-                placeholder="CustomerNo..."
-                value={docFilters.customerNo}
-                onChange={(e) =>
-                  setDocFilters((p) => ({ ...p, customerNo: e.target.value }))
-                }
-                className={getInputClass(!!docFilters.customerNo)}
-              />
-            </div>
-
-            <div className="w-40 shrink-0">
-              <input
-                type="text"
-                placeholder="CustomerName..."
-                value={docFilters.customerName}
-                onChange={(e) =>
-                  setDocFilters((p) => ({ ...p, customerName: e.target.value }))
-                }
-                className={getInputClass(!!docFilters.customerName)}
-              />
-            </div>
-
-            <div className="flex items-center gap-1 w-44 shrink-0">
-              <select
-                value={docFilters.valueOperator}
-                onChange={(e) =>
-                  setDocFilters((p) => ({
-                    ...p,
-                    valueOperator: e.target.value as any,
-                  }))
-                }
-                className="w-14 px-2 py-2 text-sm border border-gray-300 rounded-md bg-white font-bold text-gray-700 focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-              >
-                <option value="=">=</option>
-                <option value="&gt;">{">"}</option>
-                <option value="&lt;">{"<"}</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Value..."
-                value={docFilters.valueAmount}
-                onChange={(e) =>
-                  setDocFilters((p) => ({ ...p, valueAmount: e.target.value }))
-                }
-                className={getInputClass(!!docFilters.valueAmount)}
-              />
-            </div>
-
-            <div className="w-36 shrink-0">
-              <select
-                value={docFilters.status}
-                onChange={(e) =>
-                  setDocFilters((p) => ({ ...p, status: e.target.value }))
-                }
-                className={getInputClass(
-                  !!docFilters.status,
-                  !docFilters.status,
-                )}
-              >
-                <option value="" className="text-gray-400">
-                  All Statuses...
-                </option>
-                {activeInvTab === "angebot" ? (
-                  <>
-                    <option value="draft" className="text-gray-900 font-normal">
-                      Draft
-                    </option>
-                    <option value="sent" className="text-gray-900 font-normal">
-                      Sent
-                    </option>
-                    <option
-                      value="approved"
-                      className="text-gray-900 font-normal"
-                    >
-                      Approved
-                    </option>
-                    <option
-                      value="rejected"
-                      className="text-gray-900 font-normal"
-                    >
-                      Rejected
-                    </option>
-                  </>
-                ) : activeInvTab === "rechnung" || activeInvTab === "rk" ? (
-                  <>
-                    <option value="draft" className="text-gray-900 font-normal">
-                      Draft
-                    </option>
-                    <option value="sent" className="text-gray-900 font-normal">
-                      Sent
-                    </option>
-                    <option value="paid" className="text-gray-900 font-normal">
-                      Paid
-                    </option>
-                    <option
-                      value="overdue"
-                      className="text-gray-900 font-normal"
-                    >
-                      Overdue
-                    </option>
-                    <option
-                      value="cancelled"
-                      className="text-gray-900 font-normal"
-                    >
-                      Cancelled
-                    </option>
-                  </>
-                ) : (
-                  <>
-                    <option value="1" className="text-gray-900 font-normal">
-                      Draft / New
-                    </option>
-                    <option value="2" className="text-gray-900 font-normal">
-                      In Progress
-                    </option>
-                    <option value="3" className="text-gray-900 font-normal">
-                      Completed
-                    </option>
-                    <option value="4" className="text-gray-900 font-normal">
-                      Converted
-                    </option>
-                  </>
-                )}
-              </select>
-            </div>
-
-            <div className="w-40 shrink-0">
-              <select
-                value={docFilters.datePreset}
-                onChange={(e) =>
-                  setDocFilters((p) => ({
-                    ...p,
-                    datePreset: e.target.value as any,
-                  }))
-                }
-                className={getInputClass(
-                  docFilters.datePreset !== "all",
-                  docFilters.datePreset === "all",
-                )}
-              >
-                <option value="all" className="text-gray-400">
-                  All Dates...
-                </option>
-                <option value="today" className="text-gray-900 font-normal">
-                  Today
-                </option>
-                <option
-                  value="this_month"
-                  className="text-gray-900 font-normal"
-                >
-                  This Month
-                </option>
-                <option
-                  value="last_month"
-                  className="text-gray-900 font-normal"
-                >
-                  Last Month
-                </option>
-                <option value="this_year" className="text-gray-900 font-normal">
-                  This Year
-                </option>
-                <option value="last_year" className="text-gray-900 font-normal">
-                  Last Year
-                </option>
-                <option value="custom" className="text-gray-900 font-normal">
-                  Custom Range
-                </option>
-              </select>
-            </div>
-
-            {isAnyFilterActive && (
-              <button
-                onClick={() => {
-                  setDocFilters(initialCommercialFilters);
-                  setSearchTerm("");
-                }}
-                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                Reset
-              </button>
-            )}
-          </div>
-
-          {docFilters.datePreset === "custom" && (
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
-              <span className="font-bold text-gray-500 uppercase tracking-wider">
-                Custom Date Range:
-              </span>
-              <div className="w-40">
-                <input
-                  type="text"
-                  placeholder="From (dd.mm.yyyy)..."
-                  value={docFilters.dateFrom}
-                  onChange={(e) =>
-                    setDocFilters((p) => ({ ...p, dateFrom: e.target.value }))
-                  }
-                  className={getInputClass(!!docFilters.dateFrom)}
-                />
-              </div>
-              <span className="text-gray-400 font-bold">to</span>
-              <div className="w-40">
-                <input
-                  type="text"
-                  placeholder="To (dd.mm.yyyy)..."
-                  value={docFilters.dateTo}
-                  onChange={(e) =>
-                    setDocFilters((p) => ({ ...p, dateTo: e.target.value }))
-                  }
-                  className={getInputClass(!!docFilters.dateTo)}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+        <CommercialFilterBar
+          activeInvTab={activeInvTab}
+          docFilters={docFilters}
+          setDocFilters={setDocFilters}
+          isAnyFilterActive={isAnyFilterActive}
+          onReset={() => {
+            setDocFilters(initialCommercialFilters);
+            setSearchTerm("");
+          }}
+        />
 
         {activeInvTab === "angebot" && (
           <OffersPage
             embedded={true}
             docFilters={docFilters}
-            onOrderConverted={fetchOrders}
+            onOrderConverted={tabData.refetchOrders}
             refreshTrigger={offerRefreshKey}
             onAuftragCreated={(auftragId: string | number) => {
               setActiveInvTab("auftrag");
@@ -3104,1352 +1613,230 @@ const InvoiceListPage: React.FC = () => {
         )}
 
         {activeInvTab !== "angebot" && (
-          <>
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
-              <DataTable
-                data={currentItems}
-                columns={commercialColumns}
-                loading={
-                  activeInvTab === "payment_inbound"
-                    ? loadingPaymentInbounds
-                    : activeInvTab === "rechnung"
-                      ? loadingRechnungen
-                      : activeInvTab === "auftrag" ||
-                          activeInvTab === "bestellung"
-                        ? loadingOrders
-                        : loading
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
+            <DataTable
+              data={currentItems}
+              columns={commercialColumns}
+              loading={dataTableLoading}
+              emptyMessage={`No ${
+                activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                  ? "Orders"
+                  : "Invoices"
+              } Found`}
+              getRowClassName={(row) => {
+                if (
+                  activeInvTab === "auftrag" ||
+                  activeInvTab === "bestellung"
+                ) {
+                  const isExpress = (row.comment || "")
+                    .toLowerCase()
+                    .includes("express");
+                  return isExpress ? "bg-red-50" : "";
                 }
-                emptyMessage={`No ${
-                  activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                    ? "Orders"
-                    : "Invoices"
-                } Found`}
-                getRowClassName={(row) => {
-                  if (
-                    activeInvTab === "auftrag" ||
-                    activeInvTab === "bestellung"
-                  ) {
-                    const isExpress = (row.comment || "")
-                      .toLowerCase()
-                      .includes("express");
-                    return isExpress ? "bg-red-50" : "";
-                  }
-                  return "";
-                }}
-                getRowStyle={(row: any) => {
-                  const val = row.highlight_color || row.highlightColor;
-                  if (!val || val === "#FFFFFF" || val === "#ffffff") return undefined;
+                return "";
+              }}
+              getRowStyle={(row: any) => {
+                const val = row.highlight_color || row.highlightColor;
+                if (!val || val === "#FFFFFF" || val === "#ffffff")
+                  return undefined;
 
-                  let hex = val;
-                  if (!val.startsWith("#")) {
-                    const matched = systemColours.find(
-                      (c: any) => c.name?.toLowerCase() === val.toLowerCase()
-                    );
-                    if (matched) hex = matched.hex;
-                  }
-
-                  if (!hex || !hex.startsWith("#")) return undefined;
-
-                  const cleanHex = hex.replace("#", "");
-                  let textColor = undefined;
-                  if (cleanHex.length === 6) {
-                    const r = parseInt(cleanHex.substring(0, 2), 16);
-                    const g = parseInt(cleanHex.substring(2, 4), 16);
-                    const b = parseInt(cleanHex.substring(4, 6), 16);
-                    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-                    textColor = yiq >= 128 ? "#111827" : "#FFFFFF";
-                  }
-                  return {
-                    backgroundColor: hex,
-                    color: textColor,
-                  };
-                }}
-                expandedRowIds={expandedDocIds}
-                renderRowDetails={(row) => {
-                  const items = row.items || row.lineItems || [];
-                  const isOrder =
-                    activeInvTab === "auftrag" || activeInvTab === "bestellung";
-                  const docNumber = isOrder
-                    ? row.order_no
-                    : row.invoiceNumber || row.id;
-
-                  return (
-                    <DocumentLineItemsSubTable
-                      items={items}
-                      currency={row.currency || "EUR"}
-                      title={`Line Items (${items.length}) — ${isOrder ? `Order No: ${docNumber}` : `Invoice: ${docNumber}`}`}
-                      totalAmount={Number(
-                        row.subtotal ||
-                          row.netTotal ||
-                          row.grossTotal ||
-                          row.totalAmount ||
-                          0,
-                      )}
-                      type={isOrder ? "order" : "invoice"}
-                      getSupplierName={getSupplierName}
-                      getOrderStatusColor={getOrderStatusColor}
-                    />
+                let hex = val;
+                if (!val.startsWith("#")) {
+                  const matched = systemColours.find(
+                    (c: any) => c.name?.toLowerCase() === val.toLowerCase(),
                   );
-                }}
-                onRowClick={(row) => {
-                  if (activeInvTab === "auftrag") {
-                    handleOpenAuftragPreview(row.id);
-                  } else if (activeInvTab === "bestellung") {
-                    handleOpenBestellungPreview(row.id);
-                  } else if (activeInvTab === "rechnung") {
-                    setSelectedRechnungForDetail(row);
-                    setShowRechnungDetailModal(true);
-                  } else if (activeInvTab === "lieferschein") {
-                    setSelectedLieferscheinForDetail(row);
-                    setShowLieferscheinDetailModal(true);
-                  } else {
-                    handleOpenInvoiceDetails(row);
-                  }
-                }}
-              />
+                  if (matched) hex = matched.hex;
+                }
+                if (!hex || !hex.startsWith("#")) return undefined;
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA] rounded-b-[4px] mt-4">
-                  <div className="text-[11px] font-medium text-[#6C757D]">
-                    Showing {startIndex + 1} to{" "}
-                    {Math.min(endIndex, filteredItems.length)} of{" "}
-                    {filteredItems.length} documents
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.max(1, currentPage - 1))
-                      }
-                      disabled={currentPage === 1}
-                      className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                    </button>
-                    {[...Array(totalPages)].map((_, i) => (
-                      <button
-                        key={i + 1}
-                        onClick={() => setCurrentPage(i + 1)}
-                        className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
-                          currentPage === i + 1
-                            ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                            : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                        }`}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.min(totalPages, currentPage + 1))
-                      }
-                      disabled={currentPage === totalPages}
-                      className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                    </button>
-                  </div>
+                const cleanHex = hex.replace("#", "");
+                let textColor = undefined;
+                if (cleanHex.length === 6) {
+                  const r = parseInt(cleanHex.substring(0, 2), 16);
+                  const g = parseInt(cleanHex.substring(2, 4), 16);
+                  const b = parseInt(cleanHex.substring(4, 6), 16);
+                  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+                  textColor = yiq >= 128 ? "#111827" : "#FFFFFF";
+                }
+                return { backgroundColor: hex, color: textColor };
+              }}
+              expandedRowIds={expandedDocIds}
+              renderRowDetails={(row) => {
+                const items = row.items || row.lineItems || [];
+                const isOrder =
+                  activeInvTab === "auftrag" || activeInvTab === "bestellung";
+                const docNumber = isOrder
+                  ? row.order_no
+                  : row.invoiceNumber || row.id;
+
+                return (
+                  <DocumentLineItemsSubTable
+                    items={items}
+                    currency={row.currency || "EUR"}
+                    title={`Line Items (${items.length}) — ${isOrder ? `Order No: ${docNumber}` : `Invoice: ${docNumber}`}`}
+                    totalAmount={Number(
+                      row.subtotal ||
+                        row.netTotal ||
+                        row.grossTotal ||
+                        row.totalAmount ||
+                        0,
+                    )}
+                    type={isOrder ? "order" : "invoice"}
+                    getSupplierName={getSupplierName}
+                    getOrderStatusColor={getOrderStatusColor}
+                  />
+                );
+              }}
+              onRowClick={(row) => {
+                if (activeInvTab === "auftrag")
+                  handleOpenAuftragPreview(row.id);
+                else if (activeInvTab === "bestellung")
+                  handleOpenBestellungPreview(row.id);
+                else if (activeInvTab === "rechnung") {
+                  setSelectedRechnungForDetail(row);
+                  setShowRechnungDetailModal(true);
+                } else if (activeInvTab === "lieferschein") {
+                  setSelectedLieferscheinForDetail(row);
+                  setShowLieferscheinDetailModal(true);
+                } else {
+                  handleOpenInvoiceDetails(row);
+                }
+              }}
+            />
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA] rounded-b-[4px] mt-4">
+                <div className="text-[11px] font-medium text-[#6C757D]">
+                  Showing {startIndex + 1} to{" "}
+                  {Math.min(endIndex, filteredItems.length)} of{" "}
+                  {filteredItems.length} documents
                 </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {false && activeInvTab === "lieferschein" && (
-          <div
-            className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead style={{ backgroundColor: "#F8F9FA" }}>
-                  <tr className="border-b border-[#E9ECEF]">
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      ID
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Customer Type
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Bill To
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Ship To
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Delivery address
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Email
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Phone
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Website
-                    </th>
-                    <th className="text-center py-3 px-4 font-semibold text-xs text-[#495057]">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F1F3F5]">
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="py-12 text-center text-xs text-[#6C757D]"
-                      >
-                        Loading customers...
-                      </td>
-                    </tr>
-                  ) : customers.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="py-12 text-center text-xs text-[#6C757D]"
-                      >
-                        No customers found
-                      </td>
-                    </tr>
-                  ) : (
-                    customers.map((customer) => (
-                      <tr
-                        key={customer.id}
-                        className="hover:bg-[#F8F9FA] transition-colors group"
-                      >
-                        <td className="py-4 px-4">
-                          <button className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap">
-                            {customer.id.slice(-2)}{" "}
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529]">
-                          <span className="px-2 py-0.5 bg-gray-100 rounded-[4px] text-[10px] font-medium uppercase text-[#495057]">
-                            GT-Warehouse
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                          GTech
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529]">
-                          {customer.companyName}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#6C757D] max-w-[200px] truncate">
-                          {[
-                            formatCountryCode(customer.country),
-                            customer.city,
-                            customer.addressLine1,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529]">
-                          {customer.email}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#212529] whitespace-nowrap">
-                          {customer.contactPhoneNumber}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-[#6C757D]">-</td>
-                        <td className="py-4 px-4">
-                          <div className="flex justify-center">
-                            <button
-                              onClick={() => handleOpenBTSTModal(customer)}
-                              className="px-3.5 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-all shadow-md"
-                            >
-                              EDIT
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {showInvoiceDetailsModal && selectedInvoice && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
-              <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-[#8CC21B]" />
-                    Invoice Details
-                  </h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    ID: {selectedInvoice.id}{" "}
-                    {selectedInvoice.invoiceNumber
-                      ? `| Invoice No: ${selectedInvoice.invoiceNumber}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="text-xs font-bold px-2.5 py-1 rounded-[4px] uppercase"
-                    style={getStatusColor(selectedInvoice.status)}
-                  >
-                    {selectedInvoice.status}
-                  </span>
-
-                  {activeInvTab === "rechnung" ? (
-                    <button
-                      onClick={() => handleMarkAsPaid(selectedInvoice.id)}
-                      disabled={actionLoading[`paid-${selectedInvoice.id}`]}
-                      className="px-4 py-2 bg-[#059669] text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50"
-                    >
-                      {actionLoading[`paid-${selectedInvoice.id}`] ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <CheckCircle className="w-3.5 h-3.5" />
-                      )}
-                      VERIFY
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className="px-4 py-2 border border-[#DC3545] text-[#DC3545] text-xs font-bold rounded-lg flex items-center gap-1.5 hover:bg-[#DC3545]/10 transition-colors disabled:opacity-50"
-                        title="Download PDF"
-                        disabled={actionLoading[`pdf-${selectedInvoice.id}`]}
-                        onClick={async () => {
-                          try {
-                            setActionLoading((prev: any) => ({
-                              ...prev,
-                              [`pdf-${selectedInvoice.id}`]: true,
-                            }));
-                            await downloadCommercialInvoice(
-                              selectedInvoice.id,
-                              selectedInvoice.invoiceNumber,
-                              selectedInvoice.cargo?.cargo_no ||
-                                selectedInvoice.cargoNo,
-                            );
-                          } catch (error) {
-                            console.error("PDF Generation failed", error);
-                          } finally {
-                            setActionLoading((prev: any) => ({
-                              ...prev,
-                              [`pdf-${selectedInvoice.id}`]: false,
-                            }));
-                          }
-                        }}
-                      >
-                        {actionLoading[`pdf-${selectedInvoice.id}`] ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <FileText className="w-3.5 h-3.5" />
-                        )}
-                        Download PDF
-                      </button>
-                      <button className="px-4 py-2 bg-[#F15A24] text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
-                        <RefreshCw className="w-3 h-3" /> Ship
-                      </button>
-                    </>
-                  )}
+                <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => setShowInvoiceDetailsModal(false)}
-                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors ml-2"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
                   >
-                    <X className="w-5 h-5" />
+                    <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
+                  </button>
+                  {[...Array(totalPages)].map((_, i) => (
+                    <button
+                      key={i + 1}
+                      onClick={() => setCurrentPage(i + 1)}
+                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                        currentPage === i + 1
+                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
                   </button>
                 </div>
               </div>
-              <div className="p-6 space-y-6 flex-1 text-black">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Customer
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      {selectedInvoice.customer?.companyName || "N/A"}
-                    </span>
-                    {selectedInvoice.customer?.email && (
-                      <span className="text-xs text-gray-500 block mt-0.5">
-                        {selectedInvoice.customer.email}
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Bill To / Ship To
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      Bill To:{" "}
-                      {typeof selectedInvoice.bill_to === "string"
-                        ? selectedInvoice.bill_to
-                        : "N/A"}
-                    </span>
-                    <span className="text-xs text-gray-500 block mt-0.5">
-                      Ship To:{" "}
-                      {typeof selectedInvoice.ship_to === "string"
-                        ? selectedInvoice.ship_to
-                        : "N/A"}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Cargo No / Dates
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      Cargo: {selectedInvoice.cargo?.cargo_no || "No Cargo"}
-                    </span>
-                    <span className="text-xs text-gray-500 block mt-0.5">
-                      Date: {formatDate(selectedInvoice.invoiceDate)}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Items / Totals
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      {selectedInvoice.customItemCount ??
-                        selectedInvoice.items?.length ??
-                        0}{" "}
-                      Items | {selectedInvoice.customTotalQty ?? 0} Qty
-                    </span>
-                    {activeInvTab === "rk" && (
-                      <span className="text-sm font-bold text-emerald-600 block mt-0.5">
-                        Total: $
-                        {Number(selectedInvoice.grossTotal).toLocaleString(
-                          undefined,
-                          { minimumFractionDigits: 2 },
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {activeInvTab === "rechnung" && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                      Edit Invoice Details
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                          Description *
-                        </label>
-                        <input
-                          type="text"
-                          value={invoiceEditForm.description}
-                          onChange={(e) =>
-                            setInvoiceEditForm({
-                              ...invoiceEditForm,
-                              description: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
-                          placeholder="Description (e.g. Freight cost)"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                          Freight Cost *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={invoiceEditForm.freightCost}
-                          onChange={(e) =>
-                            setInvoiceEditForm({
-                              ...invoiceEditForm,
-                              freightCost: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
-                          placeholder="Freight Cost"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                        Remark
-                      </label>
-                      <textarea
-                        value={invoiceEditForm.remark}
-                        onChange={(e) =>
-                          setInvoiceEditForm({
-                            ...invoiceEditForm,
-                            remark: e.target.value,
-                          })
-                        }
-                        rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
-                        placeholder="Remark"
-                      />
-                    </div>
-                    <div className="flex justify-end pt-2">
-                      <button
-                        onClick={() =>
-                          handleSaveInvoiceEdit(selectedInvoice.id)
-                        }
-                        disabled={actionLoading[`save-${selectedInvoice.id}`]}
-                        className="px-4 py-2 text-xs font-bold text-white bg-[#059669] rounded-lg hover:bg-green-700 flex items-center gap-1.5 shadow-md disabled:opacity-50"
-                      >
-                        {actionLoading[`save-${selectedInvoice.id}`] ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
-                        )}
-                        Save Changes
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-4">
-                  <div className="flex border-b border-gray-200">
-                    <button
-                      onClick={() => setModalActiveTab("taric")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
-                        modalActiveTab === "taric"
-                          ? "border-[#8CC21B] text-gray-900"
-                          : "border-transparent text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Taric Summary
-                    </button>
-                    <button
-                      onClick={() => setModalActiveTab("items")}
-                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
-                        modalActiveTab === "items"
-                          ? "border-[#8CC21B] text-gray-900"
-                          : "border-transparent text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Items List
-                    </button>
-                  </div>
-
-                  <div className="min-h-[300px]">
-                    {expandedStates[selectedInvoice.id]?.loading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="text-center">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                          <p className="text-xs text-[#6C757D]">
-                            Loading data details...
-                          </p>
-                        </div>
-                      </div>
-                    ) : modalActiveTab === "taric" ? (
-                      <div className="space-y-2">
-                        <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">
-                          Items shown in invoice based on Taric
-                        </h4>
-                        <SpreadSheet
-                          data={
-                            expandedStates[selectedInvoice.id]?.data
-                              ?.taricGroups || []
-                          }
-                          loading={expandedStates[selectedInvoice.id]?.loading}
-                          showTotals={true}
-                          columns={
-                            activeInvTab === "rk"
-                              ? [
-                                  {
-                                    header: "Position",
-                                    render: (_: any, idx: number) => idx + 1,
-                                    width: "50px",
-                                  },
-                                  {
-                                    header: "Taric Name EN",
-                                    render: (it: any) => it.taricNameEn,
-                                    width: "250px",
-                                  },
-                                  {
-                                    header: "Taric Code",
-                                    render: (it: any) => (
-                                      <span
-                                        style={
-                                          it.isProjectItem
-                                            ? {
-                                                color: "#F59E0B",
-                                                fontWeight: 600,
-                                              }
-                                            : undefined
-                                        }
-                                      >
-                                        {it.taricCode}
-                                      </span>
-                                    ),
-                                    width: "110px",
-                                  },
-                                  {
-                                    header: "Duty rate",
-                                    render: (it: any) =>
-                                      it.dutyRate
-                                        ? `${Number(it.dutyRate).toFixed(2)}`
-                                        : "-",
-                                    width: "80px",
-                                  },
-                                  {
-                                    header: "Total Qty",
-                                    render: (it: any) => it.totalQty,
-                                    align: "center",
-                                    width: "80px",
-                                  },
-                                  {
-                                    header: "Unit Price",
-                                    render: (it: any) => it.unitPrice || "0.00",
-                                    width: "80px",
-                                  },
-                                  {
-                                    header: "Total Price",
-                                    render: (it: any) =>
-                                      (
-                                        Number(it.totalPrice) || 0
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                      }),
-                                    width: "100px",
-                                  },
-                                ]
-                              : [
-                                  {
-                                    header: "Position",
-                                    render: (_: any, idx: number) => idx + 1,
-                                    width: "50px",
-                                  },
-                                  {
-                                    header: "Taric Name EN",
-                                    render: (it: any) => it.taricNameEn,
-                                    width: "250px",
-                                  },
-                                  {
-                                    header: "Taric Code",
-                                    render: (it: any) => (
-                                      <span
-                                        style={
-                                          it.isProjectItem
-                                            ? {
-                                                color: "#F59E0B",
-                                                fontWeight: 600,
-                                              }
-                                            : undefined
-                                        }
-                                      >
-                                        {it.taricCode}
-                                      </span>
-                                    ),
-                                    width: "110px",
-                                  },
-                                  {
-                                    header: "Duty rate",
-                                    render: (it: any) =>
-                                      it.dutyRate
-                                        ? `${Number(it.dutyRate).toFixed(2)}`
-                                        : "-",
-                                    width: "80px",
-                                  },
-                                  {
-                                    header: "Total Qty",
-                                    render: (it: any) => it.totalQty,
-                                    align: "center",
-                                    width: "80px",
-                                  },
-                                  {
-                                    header: "Unit Price",
-                                    render: (it: any) => it.unitPrice || "0.00",
-                                    width: "80px",
-                                  },
-                                  {
-                                    header: "Total Price",
-                                    render: (it: any) =>
-                                      (
-                                        Number(it.totalPrice) || 0
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                      }),
-                                    width: "100px",
-                                  },
-                                  {
-                                    header: "Operation",
-                                    render: (group: any) => (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedTaricGroup(group);
-                                          setSelectedTaricCode("");
-                                          setShowTaricModal(true);
-                                        }}
-                                        className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
-                                      >
-                                        <RefreshCw className="w-3 h-3" /> Set
-                                        taric
-                                      </button>
-                                    ),
-                                    width: "110px",
-                                  },
-                                ]
-                          }
-                          expandedRowId={null}
-                          totalCols={
-                            activeInvTab === "rk"
-                              ? [
-                                  {
-                                    label: "Grand Total",
-                                    value: "",
-                                    colSpan: 4,
-                                    align: "left",
-                                  },
-                                  {
-                                    value:
-                                      expandedStates[
-                                        selectedInvoice.id
-                                      ]?.data?.taricGroups?.reduce(
-                                        (s: number, g: any) =>
-                                          s + (g.totalQty || 0),
-                                        0,
-                                      ) || 0,
-                                    width: "80px",
-                                    align: "center",
-                                  },
-                                  {
-                                    value: "",
-                                    width: "80px",
-                                  },
-                                  {
-                                    value: (
-                                      expandedStates[
-                                        selectedInvoice.id
-                                      ]?.data?.taricGroups?.reduce(
-                                        (s: number, g: any) =>
-                                          s + (g.totalPrice || 0),
-                                        0,
-                                      ) || 0
-                                    ).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    }),
-                                    width: "100px",
-                                    align: "left",
-                                  },
-                                ]
-                              : [
-                                  {
-                                    label: "Grand Total",
-                                    value: "",
-                                    colSpan: 4,
-                                    align: "left",
-                                  },
-                                  {
-                                    value:
-                                      expandedStates[
-                                        selectedInvoice.id
-                                      ]?.data?.taricGroups?.reduce(
-                                        (s: number, g: any) =>
-                                          s + (g.totalQty || 0),
-                                        0,
-                                      ) || 0,
-                                    width: "80px",
-                                    align: "center",
-                                  },
-                                  {
-                                    value: "",
-                                    width: "80px",
-                                  },
-                                  {
-                                    value: (
-                                      expandedStates[
-                                        selectedInvoice.id
-                                      ]?.data?.taricGroups?.reduce(
-                                        (s: number, g: any) =>
-                                          s + (g.totalPrice || 0),
-                                        0,
-                                      ) || 0
-                                    ).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    }),
-                                    width: "100px",
-                                    align: "left",
-                                  },
-                                  {
-                                    value: "",
-                                    width: "110px",
-                                  },
-                                ]
-                          }
-                        />
-                      </div>
-                    ) : (
-                      <SpreadSheet
-                        data={
-                          expandedStates[selectedInvoice.id]?.data
-                            ?.detailedItems || []
-                        }
-                        loading={expandedStates[selectedInvoice.id]?.loading}
-                        columns={
-                          activeInvTab === "rk"
-                            ? [
-                                {
-                                  header: "#",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "40px",
-                                },
-                                {
-                                  header: "EAN",
-                                  render: (it: any) =>
-                                    it._fallbackEan || it.item?.ean || "-",
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Item Name",
-                                  render: (it: any) => (
-                                    <div
-                                      className="line-clamp-2 leading-tight py-1"
-                                      title={it.item?.item_name}
-                                    >
-                                      {it.item?.item_name}
-                                    </div>
-                                  ),
-                                  width: "350px",
-                                },
-                                {
-                                  header: "Taric code",
-                                  render: (it: any) =>
-                                    it.set_taric_code ||
-                                    it.item?.taric?.code ||
-                                    "-",
-                                  width: "100px",
-                                },
-                                {
-                                  header: "QTY",
-                                  render: (it: any) => (
-                                    <span className="font-bold">{it.qty}</span>
-                                  ),
-                                  width: "60px",
-                                  align: "center",
-                                },
-                                {
-                                  header: "EUR",
-                                  render: (it: any) =>
-                                    it.eur_special_price ||
-                                    it._fallbackEk ||
-                                    "0",
-                                  width: "60px",
-                                  align: "center",
-                                },
-                                {
-                                  header: "EK",
-                                  render: (it: any) => {
-                                    const unitPrice =
-                                      Number(
-                                        it.eur_special_price || it._fallbackEk,
-                                      ) || 0;
-                                    const totalPrice =
-                                      (it.qty || 0) * unitPrice;
-                                    return (
-                                      <span className="font-bold text-[#10B981]">
-                                        {totalPrice.toFixed(2)}
-                                      </span>
-                                    );
-                                  },
-                                  width: "80px",
-                                  align: "center",
-                                },
-                              ]
-                            : [
-                                {
-                                  header: "ID",
-                                  render: (it: any) => (
-                                    <div className="flex flex-col gap-1.5 p-1">
-                                      <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
-                                        <FileText className="w-3 h-3" /> {it.id}
-                                      </div>
-                                      <div className="flex flex-col gap-1">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedItem(it);
-                                            setNewQty(it.qty_label || it.qty);
-                                            setQtyRemarks(it.remarks_cn || "");
-                                            setShowQTYModal(true);
-                                          }}
-                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
-                                        >
-                                          <Package className="w-2.5 h-2.5" />{" "}
-                                          QtyLabel
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedItem(it);
-                                            setSplitQty(
-                                              Math.floor(it.qty * 0.5),
-                                            );
-                                            setTargetCargoId("");
-                                            setSplitRemarks(
-                                              it.remarks_cn || "",
-                                            );
-                                            setShowSPModal(true);
-                                          }}
-                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
-                                        >
-                                          <Scissors className="w-2.5 h-2.5" />{" "}
-                                          Split
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedItem(it);
-                                            setTargetCargoId(it.cargo_id || "");
-                                            setShowREModal(true);
-                                          }}
-                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
-                                        >
-                                          <RefreshCw className="w-2.5 h-2.5" />{" "}
-                                          ReAssign
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ),
-                                  width: "100px",
-                                },
-                                {
-                                  header: "EAN",
-                                  render: (it: any) =>
-                                    it._fallbackEan || it.item?.ean || "-",
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Item Name",
-                                  render: (it: any) => (
-                                    <div
-                                      className="line-clamp-3 leading-tight break-words"
-                                      title={it.item?.item_name}
-                                    >
-                                      {it.item?.item_name}
-                                    </div>
-                                  ),
-                                  width: "250px",
-                                },
-                                {
-                                  header: "Taric code",
-                                  render: (it: any) =>
-                                    it.set_taric_code || it.item?.taric?.code,
-                                  width: "90px",
-                                },
-                                {
-                                  header: "Remark",
-                                  render: (it: any) =>
-                                    `// ${it.remark_de || ""}`,
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Order_no",
-                                  render: (it: any) =>
-                                    it.order?.order_no || "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "SOID",
-                                  render: (it: any) =>
-                                    it.supplier_order_id || "-",
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Status",
-                                  render: (it: any) => it.status,
-                                  width: "60px",
-                                },
-                                {
-                                  header: "V(dm³)",
-                                  render: (it: any) => it.v?.toFixed(2),
-                                  width: "60px",
-                                  align: "center",
-                                },
-                                {
-                                  header: "W(kg)",
-                                  render: (it: any) => it.w?.toFixed(2),
-                                  width: "60px",
-                                  align: "center",
-                                },
-                                {
-                                  header: "QTY",
-                                  render: (it: any) => (
-                                    <div className="flex flex-col items-center">
-                                      <span className="font-bold">
-                                        {it.qty_label
-                                          ? `${it.qty_label}/${it.qty}`
-                                          : it.qty}
-                                      </span>
-                                    </div>
-                                  ),
-                                  width: "60px",
-                                  align: "center",
-                                },
-                                {
-                                  header: "EUR",
-                                  render: (it: any) =>
-                                    it.eur_special_price ||
-                                    it._fallbackEk ||
-                                    "0",
-                                  width: "45px",
-                                  align: "center",
-                                },
-                                {
-                                  header: "EK",
-                                  render: (it: any) => {
-                                    const unitPrice =
-                                      Number(
-                                        it.eur_special_price || it._fallbackEk,
-                                      ) || 0;
-                                    const totalPrice =
-                                      (it.qty || 0) * unitPrice;
-                                    return (
-                                      <span className="font-bold text-[#10B981]">
-                                        {totalPrice.toFixed(2)}
-                                      </span>
-                                    );
-                                  },
-                                  width: "65px",
-                                  align: "center",
-                                },
-                                {
-                                  header: "Action",
-                                  render: (it: any) =>
-                                    it.item?.is_eur_special === "Y" &&
-                                    (!it.eur_special_price ||
-                                      Number(it.eur_special_price) === 0) ? (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setExpandedPriceItemId(
-                                            expandedPriceItemId === it.id
-                                              ? null
-                                              : it.id,
-                                          );
-                                          setEditingPrice(
-                                            it.eur_special_price || 0,
-                                          );
-                                        }}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
-                                      >
-                                        <DollarSign className="w-3.5 h-3.5" />{" "}
-                                        SET EUR PRICE
-                                      </button>
-                                    ) : null,
-                                  width: "120px",
-                                },
-                              ]
-                        }
-                        expandedRowId={expandedPriceItemId}
-                        renderRowDetails={(it: any) => (
-                          <div className="bg-[#F8F9FA] p-4 rounded-md border border-gray-200 mt-2 shadow-inner">
-                            <h4 className="text-[11px] font-bold text-[#495057] uppercase mb-3 tracking-wider flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-[#EF4444] rounded-full"></div>
-                              Set EUR Price for Item {it.id}
-                            </h4>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">
-                                  EUR Special Price
-                                </label>
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={editingPrice}
-                                    onChange={(e) =>
-                                      setEditingPrice(Number(e.target.value))
-                                    }
-                                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
-                                    placeholder="0.00"
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex gap-2 pt-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedPriceItemId(null);
-                                  }}
-                                  className="px-4 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 transition-all uppercase shadow-sm"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSetPrice(it.id);
-                                  }}
-                                  className="px-5 py-2 text-[11px] font-bold text-white bg-[#10B981] rounded-[4px] hover:bg-[#059669] transition-all uppercase shadow-md flex items-center gap-2"
-                                >
-                                  <Check className="w-3.5 h-3.5" /> Set Price
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        showTotals={false}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
-        {showREModal && selectedItem && (
-          <CustomModal
-            isOpen={showREModal}
-            onClose={() => setShowREModal(false)}
-            title={
-              selectedItem.cargo_id
-                ? selectedItem.order_no
-                  ? `Reassign Order No: ${selectedItem.order_no}`
-                  : `Reassign Item ID: ${selectedItem.id}`
-                : selectedItem.order_no
-                  ? `Assign Order No: ${selectedItem.order_no}`
-                  : `Assign Item ID: ${selectedItem.id}`
-            }
-          >
-            <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
-              <div>
-                <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
-                  Select Target Cargo
-                </label>
-                <Select
-                  className="text-sm"
-                  menuPortalTarget={
-                    typeof window !== "undefined" ? document.body : undefined
-                  }
-                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                  options={cargos
-                    .filter((c) => {
-                      const status = (c.cargo_status || "")
-                        .trim()
-                        .toLowerCase();
-                      return status !== "shipped" && status !== "delivered";
-                    })
-                    .map((c) => ({
-                      value: String(c.id),
-                      label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                    }))}
-                  value={
-                    cargos
-                      .map((c) => ({
-                        value: String(c.id),
-                        label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                      }))
-                      .find((opt) => opt.value === String(targetCargoId)) ||
-                    null
-                  }
-                  onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
-                  placeholder="Search or Select Cargo..."
-                  isSearchable
-                  isClearable
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-8">
-                <button
-                  onClick={() => setShowREModal(false)}
-                  className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleReassignItem}
-                  disabled={!targetCargoId}
-                  className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  {selectedItem.cargo_id
-                    ? "Confirm Reassign"
-                    : "Confirm Assign"}
-                </button>
-              </div>
-            </div>
-          </CustomModal>
-        )}
+        <InvoiceDetailsModal
+          isOpen={showInvoiceDetailsModal}
+          onClose={() => setShowInvoiceDetailsModal(false)}
+          selectedInvoice={selectedInvoice}
+          activeInvTab={activeInvTab}
+          actionLoading={actionLoading}
+          setActionLoading={setActionLoading}
+          modalActiveTab={modalActiveTab}
+          setModalActiveTab={setModalActiveTab}
+          expandedStates={expandedStates}
+          invoiceEditForm={invoiceEditForm}
+          setInvoiceEditForm={setInvoiceEditForm}
+          onMarkAsPaid={handleMarkAsPaid}
+          onSaveInvoiceEdit={handleSaveInvoiceEdit}
+          onDownloadPdf={handleDownloadInvoicePdf}
+          expandedPriceItemId={expandedPriceItemId}
+          setExpandedPriceItemId={setExpandedPriceItemId}
+          editingPrice={editingPrice}
+          setEditingPrice={setEditingPrice}
+          onSetPrice={handleSetPrice}
+          onOpenQtyModal={(item: any) => {
+            setSelectedItem(item);
+            setNewQty(item.qty_label || item.qty);
+            setQtyRemarks(item.remarks_cn || "");
+            setShowQTYModal(true);
+          }}
+          onOpenSplitModal={(item: any) => {
+            setSelectedItem(item);
+            setSplitQty(Math.floor(item.qty * 0.5));
+            setTargetCargoId("");
+            setSplitRemarks(item.remarks_cn || "");
+            setShowSPModal(true);
+          }}
+          onOpenReassignModal={(item: any) => {
+            setSelectedItem(item);
+            setTargetCargoId(item.cargo_id || "");
+            setShowREModal(true);
+          }}
+          onOpenTaricModal={(group: any) => {
+            setSelectedTaricGroup(group);
+            setSelectedTaricCode("");
+            setShowTaricModal(true);
+          }}
+        />
 
-        {showSPModal && selectedItem && (
-          <CustomModal
-            isOpen={showSPModal}
-            onClose={() => setShowSPModal(false)}
-            title="Split Item Position Across Cargos"
-          >
-            <div className="p-4 space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Split Quantity:
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={splitQty}
-                    onChange={(e) => setSplitQty(Number(e.target.value))}
-                    min={1}
-                    max={selectedItem.qty - 1}
-                    className="w-full border-2 border-[#10B981] rounded-xl p-3 text-lg outline-none focus:ring-0 shadow-sm"
-                    placeholder="Enter quantity to split"
-                  />
-                </div>
-                <p className="text-[10px] text-gray-500 mt-2 px-1">
-                  Available to split: {selectedItem.qty}
-                </p>
-              </div>
+        <ReassignModal
+          isOpen={showREModal}
+          onClose={() => setShowREModal(false)}
+          selectedItem={selectedItem}
+          cargos={cargos}
+          targetCargoId={targetCargoId}
+          setTargetCargoId={setTargetCargoId}
+          onConfirm={handleReassignItem}
+        />
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Target Cargo (Optional)
-                </label>
-                <Select
-                  menuPortalTarget={
-                    typeof window !== "undefined" ? document.body : undefined
-                  }
-                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                  options={cargos
-                    .filter((c) => {
-                      const status = (c.cargo_status || "")
-                        .trim()
-                        .toLowerCase();
-                      return status !== "shipped" && status !== "delivered";
-                    })
-                    .map((c) => ({
-                      value: String(c.id),
-                      label: `${c.cargo_no} (${c.cargo_status})`,
-                    }))}
-                  value={
-                    cargos
-                      .map((c) => ({
-                        value: String(c.id),
-                        label: `${c.cargo_no} (${c.cargo_status})`,
-                      }))
-                      .find((opt) => opt.value === targetCargoId) || null
-                  }
-                  onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
-                  placeholder="Select cargo..."
-                  isClearable
-                  className="text-sm shadow-sm"
-                />
-              </div>
+        <SplitModal
+          isOpen={showSPModal}
+          onClose={() => setShowSPModal(false)}
+          selectedItem={selectedItem}
+          cargos={cargos}
+          splitQty={splitQty}
+          setSplitQty={setSplitQty}
+          targetCargoId={targetCargoId}
+          setTargetCargoId={setTargetCargoId}
+          splitRemarks={splitRemarks}
+          setSplitRemarks={setSplitRemarks}
+          onConfirm={handleSplitItem}
+        />
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Review (CN)
-                </label>
-                <textarea
-                  value={splitRemarks}
-                  onChange={(e) => setSplitRemarks(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-[#10B981] min-h-[100px]"
-                  placeholder="Chinese review or split notes..."
-                />
-              </div>
+        <TaricModal
+          isOpen={showTaricModal}
+          onClose={() => setShowTaricModal(false)}
+          selectedTaricGroup={selectedTaricGroup}
+          tarics={tarics}
+          selectedTaricCode={selectedTaricCode}
+          setSelectedTaricCode={setSelectedTaricCode}
+          onConfirm={() => handleSetTaric(selectedTaricGroup)}
+        />
 
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={handleSplitItem}
-                  disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
-                  className="w-full sm:w-auto px-10 py-3 bg-[#10B981] text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-                >
-                  Split & Move Item Position
-                </button>
-              </div>
-            </div>
-          </CustomModal>
-        )}
+        <QtyModal
+          isOpen={showQTYModal}
+          onClose={() => setShowQTYModal(false)}
+          selectedItem={selectedItem}
+          newQty={newQty}
+          setNewQty={setNewQty}
+          qtyRemarks={qtyRemarks}
+          setQtyRemarks={setQtyRemarks}
+          onConfirm={handleUpdateQty}
+        />
 
-        {showTaricModal && selectedTaricGroup && (
-          <CustomModal
-            isOpen={showTaricModal}
-            onClose={() => setShowTaricModal(false)}
-            title="Set Taric Code"
-          >
-            <div className="p-4 space-y-4">
-              <p className="text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-tight">
-                Current taric code is :{" "}
-                <span className="text-black ml-1">
-                  {selectedTaricGroup.taricCode}
-                </span>
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select new taric code
-                </label>
-                <select
-                  value={selectedTaricCode}
-                  onChange={(e) => setSelectedTaricCode(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#1A73E8] bg-white text-black"
-                >
-                  <option value="">Select Taric Code</option>
-                  {tarics.map((t) => (
-                    <option key={t.id} value={t.code}>
-                      {t.code} -{" "}
-                      {t.description_de ||
-                        t.name_de ||
-                        t.name_en ||
-                        "No description available"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  onClick={() => setShowTaricModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 uppercase font-bold text-[10px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleSetTaric(selectedTaricGroup)}
-                  disabled={!selectedTaricCode}
-                  className="px-6 py-2 text-sm bg-[#1A73E8] text-white rounded-lg hover:bg-[#1557B0] disabled:opacity-50 uppercase font-bold text-[10px]"
-                >
-                  Update Taric
-                </button>
-              </div>
-            </div>
-          </CustomModal>
-        )}
-
-        {showQTYModal && selectedItem && (
-          <CustomModal
-            isOpen={showQTYModal}
-            onClose={() => setShowQTYModal(false)}
-            title={`Update QtyLabel for this item`}
-          >
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New QtyLabel
-                </label>
-                <input
-                  type="number"
-                  value={newQty}
-                  onChange={(e) => setNewQty(Number(e.target.value))}
-                  min={1}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#8CC21B]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Enter Remarks
-                </label>
-                <textarea
-                  value={qtyRemarks}
-                  onChange={(e) => setQtyRemarks(e.target.value)}
-                  rows={3}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#8CC21B]"
-                  placeholder="Enter remarks..."
-                />
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  onClick={() => setShowQTYModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateQty}
-                  disabled={newQty <= 0}
-                  className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  Update QtyLabel
-                </button>
-              </div>
-            </div>
-          </CustomModal>
-        )}
         {showBTSTModal && (
           <CustomModal
             isOpen={showBTSTModal}
@@ -4496,183 +1883,32 @@ const InvoiceListPage: React.FC = () => {
           getSupplierName={getSupplierName}
         />
 
-        {showModal && (
-          <CustomModal
-            isOpen={showModal}
-            onClose={closeModal}
-            width="max-w-4xl"
-            title={mode === "edit" ? "Edit Order" : "Create New Order"}
-            footer={
-              <div className="flex gap-3">
-                <button
-                  onClick={closeModal}
-                  className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={
-                    mode === "edit" ? handleUpdateOrder : handleCreateOrder
-                  }
-                  className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all font-bold"
-                >
-                  {mode === "edit" ? "Update Order" : "Create Order"}
-                </button>
-              </div>
-            }
-          >
-            <div className="space-y-4 text-black">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Category:
-                  </label>
-                  <select
-                    value={form.category_id}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={String(cat.id)}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Supplier:
-                  </label>
-                  <select
-                    value={form.supplier_id}
-                    onChange={(e) => handleSupplierChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
-                  >
-                    <option value="">Select Supplier</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={String(s.id)}>
-                        {s.company_name || s.name || "Unnamed Supplier"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Item then quantity:
-                </label>
-                <ItemSelectorWithQuantity
-                  items={effectiveItems}
-                  selectedItemId={selectedItemId}
-                  onItemChange={setSelectedItemId}
-                  onAdd={handleAddItemToOrder}
-                  disabled={loadingItems}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Comment:
-                </label>
-                <textarea
-                  value={form.comment}
-                  onChange={(e) =>
-                    setForm((prev: any) => ({
-                      ...prev,
-                      comment: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
-                  placeholder="Enter order comment..."
-                  rows={3}
-                />
-              </div>
-              {orderItems.length > 0 && (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
-                    <thead className="bg-gray-100 text-gray-800">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          ID
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b w-[120px]">
-                          Item name
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          Qty
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          Item remark
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          Price
-                        </th>
-                        <th className="px-4 py-2 text-center text-sm font-medium border-b">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-700">
-                      {orderItems.map((row) => (
-                        <tr key={row.item_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm border-b">
-                            {row.item_id}
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            <div className="line-clamp-2 leading-tight max-w-[120px]">
-                              {row.itemName}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            <input
-                              type="number"
-                              min={1}
-                              value={row.qty}
-                              onChange={(e) =>
-                                handleUpdateOrderItemQty(
-                                  row.item_id,
-                                  Number(e.target.value),
-                                )
-                              }
-                              className="w-16 px-2 py-1 border border-gray-300 rounded-[4px] text-black"
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            <input
-                              type="text"
-                              value={row.remark_de}
-                              onChange={(e) =>
-                                handleUpdateOrderItemRemark(
-                                  row.item_id,
-                                  e.target.value,
-                                )
-                              }
-                              className="w-full px-2 py-1 border border-gray-300 rounded-[4px] text-black"
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            {row.price} {row.currency}
-                          </td>
-                          <td className="px-4 py-2 text-center border-b">
-                            <button
-                              onClick={() => handleRemoveOrderItem(row.item_id)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </CustomModal>
-        )}
+        <OrderFormModal
+          isOpen={showModal}
+          onClose={closeModal}
+          mode={mode}
+          categories={tabData.categories}
+          suppliers={tabData.suppliers}
+          form={form}
+          onCategoryChange={handleCategoryChange}
+          onSupplierChange={handleSupplierChange}
+          onCommentChange={(comment: string) =>
+            setForm((prev: any) => ({ ...prev, comment }))
+          }
+          effectiveItems={effectiveItems}
+          selectedItemId={selectedItemId}
+          setSelectedItemId={setSelectedItemId}
+          onAddItem={handleAddItemToOrder}
+          loadingItems={loadingItems}
+          orderItems={orderItems}
+          onUpdateOrderItemQty={handleUpdateOrderItemQty}
+          onUpdateOrderItemRemark={handleUpdateOrderItemRemark}
+          onRemoveOrderItem={handleRemoveOrderItem}
+          onSubmit={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
+        />
 
         {showOfferModal && (
-          <OfferDetailModal
+          <OfferDetailModalLazy
             isOpen={showOfferModal}
             offerId={selectedOfferId}
             onClose={() => {
@@ -4681,7 +1917,7 @@ const InvoiceListPage: React.FC = () => {
               setOfferRefreshKey((prev: any) => prev + 1);
             }}
             onChanged={() => {
-              fetchOffers();
+              tabData.refetchOffers();
               setOfferRefreshKey((prev: any) => prev + 1);
             }}
             userRole={user?.role}
@@ -4697,8 +1933,8 @@ const InvoiceListPage: React.FC = () => {
             }}
             auftrag={selectedAuftragForBestellungModal}
             onSuccess={() => {
-              fetchOrders();
-              fetchBestellungen();
+              tabData.refetchOrders();
+              tabData.refetchBestellungen();
             }}
           />
         )}
@@ -4707,11 +1943,10 @@ const InvoiceListPage: React.FC = () => {
           <AuftragCreateModal
             isOpen={showAuftragCreateModal}
             onClose={() => setShowAuftragCreateModal(false)}
-            onSuccess={() => {
-              fetchOrders();
-            }}
+            onSuccess={() => tabData.refetchOrders()}
           />
         )}
+
         {showAuftragPreviewModal && (
           <AuftragPreviewModal
             isOpen={showAuftragPreviewModal}
@@ -4722,9 +1957,7 @@ const InvoiceListPage: React.FC = () => {
               setSelectedAuftragId(null);
               setAuftragPreviewInitialEdit(false);
             }}
-            onChanged={() => {
-              fetchOrders();
-            }}
+            onChanged={() => tabData.refetchOrders()}
             userRole={user?.role}
           />
         )}
@@ -4740,12 +1973,11 @@ const InvoiceListPage: React.FC = () => {
               setSelectedBestellungId(null);
               setBestellungPreviewInitialEdit(false);
             }}
-            onChanged={() => {
-              fetchBestellungen();
-            }}
+            onChanged={() => tabData.refetchBestellungen()}
             userRole={user?.role}
           />
         )}
+
         {showAuftragToRechnungModal && (
           <AuftragToRechnungModal
             isOpen={showAuftragToRechnungModal}
@@ -4755,17 +1987,18 @@ const InvoiceListPage: React.FC = () => {
             }}
             auftrag={selectedAuftragForRechnungModal}
             onSuccess={() => {
-              fetchOrders();
-              fetchRechnungen();
-              fetchLieferscheine();
+              tabData.refetchOrders();
+              tabData.refetchRechnungen();
+              tabData.refetchLieferscheine();
             }}
-            onEditAuftrag={(auftragToEdit) => {
+            onEditAuftrag={(auftragToEdit: any) => {
               setShowAuftragToRechnungModal(false);
               setSelectedAuftragForRechnungModal(null);
               handleOpenAuftragPreview(auftragToEdit.id, true);
             }}
           />
         )}
+
         {showInboundModal && (
           <CustomModal
             isOpen={showInboundModal}
@@ -4794,7 +2027,7 @@ const InvoiceListPage: React.FC = () => {
                   });
                   if (res?.success) {
                     setShowInboundModal(false);
-                    fetchPaymentInbounds();
+                    tabData.refetchPaymentInbounds();
                   }
                 } catch (err) {
                   console.error(err);
@@ -4845,7 +2078,6 @@ const InvoiceListPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white font-medium"
                   />
                 </div>
-
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
                     Amount *
@@ -4885,7 +2117,6 @@ const InvoiceListPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] bg-white uppercase font-medium"
                   />
                 </div>
-
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
                     Payer Name
@@ -4943,36 +2174,62 @@ const InvoiceListPage: React.FC = () => {
           </CustomModal>
         )}
 
-        {showRechnungDetailModal && selectedRechnungForDetail && (
-          <RechnungDetailModal
-            isOpen={showRechnungDetailModal}
+        {showRechnungKModal && selectedRechnungKData && (
+          // Original rendered this exact modal twice (identical condition,
+          // identical props) — an accidental duplicate, not a UI feature.
+          // Rendered once here; visible result is unchanged.
+          <RechnungKPreviewModal
+            isOpen={showRechnungKModal}
             onClose={() => {
-              setShowRechnungDetailModal(false);
-              setSelectedRechnungForDetail(null);
+              setShowRechnungKModal(false);
+              setSelectedRechnungKData(null);
             }}
-            rechnung={selectedRechnungForDetail}
-            onSuccess={() => {
-              fetchRechnungen();
-            }}
+            rechnungK={selectedRechnungKData}
+            onSuccess={() => tabData.refetchRechnungen()}
           />
         )}
+
         {showCreateBestellungModal && (
           <BestellungPreviewModal
             isOpen={showCreateBestellungModal}
             isCreate={true}
-            onClose={() => {
-              setShowCreateBestellungModal(false);
-            }}
-            onChanged={() => {
-              fetchBestellungen();
-            }}
-            onCreated={(id) => {
+            onClose={() => setShowCreateBestellungModal(false)}
+            onChanged={() => tabData.refetchBestellungen()}
+            onCreated={(id: any) => {
               setShowCreateBestellungModal(false);
               handleOpenBestellungPreview(id);
             }}
             userRole={user?.role}
           />
         )}
+
+        {/*
+          IMPORTANT — flagging, not fixing: `showRechnungDetailModal` /
+          `selectedRechnungForDetail` are set by the Rechnung "View", RK
+          "No"/"Actions", and the DataTable row-click handler, but the
+          original page.tsx never actually renders a conditional block for
+          `RechnungDetailModal` anywhere in its JSX — despite importing the
+          component. Clicking those currently sets state that mounts
+          nothing; visually nothing happens. That's a pre-existing gap, not
+          something introduced by this refactor, and I'm not silently
+          closing it — adding the render block below is a real behavior
+          change (a modal starts appearing where none did before) and
+          should be a decision you make, not one buried in a "cleanup".
+          Uncomment to enable it:
+
+          {showRechnungDetailModal && (
+            <RechnungDetailModal
+              isOpen={showRechnungDetailModal}
+              onClose={() => {
+                setShowRechnungDetailModal(false);
+                setSelectedRechnungForDetail(null);
+              }}
+              rechnung={selectedRechnungForDetail}
+              onChanged={() => tabData.refetchRechnungen()}
+            />
+          )}
+        */}
+
         {showLieferscheinDetailModal && selectedLieferscheinForDetail && (
           <LieferscheinDetailModal
             isOpen={showLieferscheinDetailModal}
