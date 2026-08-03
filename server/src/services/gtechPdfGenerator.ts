@@ -461,10 +461,10 @@ export async function generateGtechDocumentPdf(
       { header: "Netto gesamt €", width: 68, align: "right" },
     ]
     : [
-      { header: "Pos", width: 30, align: "left" },
-      { header: "Art.-Nr.", width: 100, align: "left" },
-      { header: "Bezeichnung", width: 270, align: "left" },
-      { header: "Menge", width: 93, align: "right" },
+      { header: "Pos", width: 25, align: "left" },
+      { header: "Art.-Nr.", width: 85, align: "left" },
+      { header: "Bezeichnung", width: 300, align: "left" },
+      { header: "Menge", width: 83, align: "right" },
     ];
 
   const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
@@ -477,7 +477,7 @@ export async function generateGtechDocumentPdf(
   columns.forEach((col) => {
     const headerYOffset = col.header.includes("\n") ? 3 : 7;
     doc.text(col.header, currentX + 1, tableY + headerYOffset, {
-      width: col.width - 2,
+      width: col.width - 6,
       align: col.align as any,
       lineBreak: col.header.includes("\n") ? true : false,
     });

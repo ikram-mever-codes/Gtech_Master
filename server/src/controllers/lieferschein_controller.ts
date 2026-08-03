@@ -346,6 +346,16 @@ export const downloadLieferscheinPdf = async (
       quantity: Number(it.quantity || 1),
     }));
 
+    const formatDateStr = (dateVal: any): string => {
+      if (!dateVal) return "—";
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return String(dateVal);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}.${month}.${year}`;
+    };
+
     await generateGtechDocumentPdf({
       documentType: "Lieferschein",
       documentNumber: lieferschein.delivery_note_number,
@@ -355,7 +365,8 @@ export const downloadLieferscheinPdf = async (
       metadataItems: [
         ["Ansprechpartner", contactName],
         ["Kunde", kundeCombined],
-        ["Datum", lieferschein.date_created || lieferschein.created_at || lieferschein.delivery_date],
+        ["Datum", formatDateStr(lieferschein.date_created || lieferschein.created_at)],
+        ["Lieferdatum", formatDateStr(lieferschein.delivery_date || rechnung?.date_delivery || rechnung?.delivery_date)],
       ],
       lineItems: items,
       showPrices: false,
