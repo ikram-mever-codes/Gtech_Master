@@ -14,11 +14,6 @@ import dynamic from "next/dynamic";
  * loaded later. Swap the static imports in the page for these.
  */
 
-export const RechnungKPreviewModal = dynamic(
-  () => import("@/components/orders/RechnungDetailModal"),
-  { ssr: false },
-);
-
 export const OfferDetailModalLazy = dynamic(
   () =>
     import("@/components/Offers/OfferDetailModal").then(

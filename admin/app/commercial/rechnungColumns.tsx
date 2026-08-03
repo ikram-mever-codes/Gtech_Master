@@ -12,7 +12,6 @@ import {
   cityColumn,
   buildValueNetColumn,
   buildItemCountColumn,
-  buildViewActionColumn,
 } from "./sharedColumns";
 
 interface RechnungColumnsArgs {
@@ -20,7 +19,7 @@ interface RechnungColumnsArgs {
   setExpandedDocIds: React.Dispatch<React.SetStateAction<Set<string | number>>>;
   onCreateRechnungK: (row: any) => void;
   creatingRkForId: string | null;
-  onView: (row: any) => void;
+  onViewRechnung: (row: any) => void; // New: view handler for Rechnung
 }
 
 const valueNetCalc = (row: any) => Number(row.netTotal || row.grossTotal || 0);
@@ -32,13 +31,37 @@ export function buildRechnungColumns({
   setExpandedDocIds,
   onCreateRechnungK,
   creatingRkForId,
-  onView,
+  onViewRechnung,
 }: RechnungColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
     dateCreatedColumn,
     {
+      // Clickable invoice number that opens the Rechnung detail
       header: "No",
+      width: "110px",
+      align: "center",
+      render: (row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewRechnung(row);
+          }}
+          className="truncate max-w-[110px] text-[#8CC21B] font-semibold hover:underline cursor-pointer"
+          title={row.invoiceNumber || row.id}
+        >
+          {row.invoiceNumber || row.id}
+        </button>
+      ),
+    },
+    companyColumn,
+    personColumn,
+    postalCodeColumn,
+    cityColumn,
+    buildValueNetColumn(valueNetCalc),
+    buildItemCountColumn(itemCountCalc),
+    {
+      header: "Actions",
       width: "100px",
       align: "center",
       render: (row) => {
@@ -63,12 +86,5 @@ export function buildRechnungColumns({
         );
       },
     },
-    companyColumn,
-    personColumn,
-    postalCodeColumn,
-    cityColumn,
-    buildValueNetColumn(valueNetCalc),
-    buildItemCountColumn(itemCountCalc),
-    buildViewActionColumn(onView),
   ];
 }

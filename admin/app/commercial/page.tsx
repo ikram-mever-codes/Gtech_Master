@@ -38,7 +38,11 @@ import BillToShipToForm, {
 import { toast } from "react-hot-toast";
 import { successStyles, errorStyles } from "@/utils/constants";
 import CustomModal from "@/components/UI/CustomModal";
-import { createRechnungKFromRechnung } from "@/api/rechnungen_k";
+import {
+  createRechnungKFromRechnung,
+  getRechnungKById,
+  deleteRechnungK,
+} from "@/api/rechnungen_k";
 import OffersPage from "../offers/page";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
@@ -82,13 +86,13 @@ import {
   LieferscheinDetailModal,
   AuftragPreviewModal,
   BestellungPreviewModal,
-  RechnungKPreviewModal,
   InvoiceDetailsModal,
   OrderFormModal,
   ReassignModal,
   SplitModal,
   TaricModal,
   QtyModal,
+  RechnungDetailModal,
 } from "./LazyModals";
 
 import { buildAuftragColumns } from "./auftragColumns";
@@ -97,6 +101,7 @@ import { buildRechnungColumns } from "./rechnungColumns";
 import { buildRkColumns } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
 import { buildPaymentInboundColumns } from "./paymentInboundColumns";
+import { AnyAaaaRecord } from "dns";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -105,8 +110,8 @@ const invoiceTabs = [
   { id: "auftrag", label: "Auftrag" },
   { id: "bestellung", label: "Bestellung" },
   { id: "rechnung", label: "Rechnung" },
-  { id: "payment_inbound", label: "Payment Inbounds" },
   { id: "rk", label: "RK" },
+  { id: "payment_inbound", label: "Payment Inbounds" },
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
 
@@ -998,18 +1003,30 @@ const InvoiceListPage: React.FC = () => {
   };
 
   const handleCreateRechnungK = async (row: any) => {
+    const prompt = window.confirm(
+      "Are you sure you want to create a correction invoice (Rechnung K) for this invoice?",
+    );
+    if (!prompt) return;
     const sourceId = row.id;
     setCreatingRkForId(sourceId);
     try {
       const res: any = await createRechnungKFromRechnung(sourceId);
       const payload = res?.data ?? res;
       if (payload) {
+        // Switch to RK tab
+        setActiveInvTab("rk");
+
+        // Set the data and open modal
         setSelectedRechnungKData(payload);
         setShowRechnungKModal(true);
+
         toast.success(
           res?.message || "Correction invoice created.",
           successStyles,
         );
+
+        // Refresh the RK list
+        tabData.refetchRechnungenK();
       } else {
         toast.error("Failed to create correction invoice.", errorStyles);
       }
@@ -1020,6 +1037,52 @@ const InvoiceListPage: React.FC = () => {
       );
     } finally {
       setCreatingRkForId(null);
+    }
+  };
+
+  // `RechnungKPreviewModal` used above (create flow) and the
+  // `RechnungDetailModal` alias I flagged as never-rendered last time are
+  // the exact same imported component — `@/components/orders/RechnungDetailModal`,
+  // just aliased twice. So RK's "View" doesn't need a new modal, it needs
+  // the full record (the row from the DataTable is the trimmed
+  // filteredItems mapping, not the full detail payload) and to open the
+  // same, already-working modal instance via `showRechnungKModal` /
+  // `selectedRechnungKData` — the RK-specific `showRechnungDetailModal`
+  // state is no longer used for this tab.
+  const handleOpenRechnungKDetail = async (row: any) => {
+    try {
+      const res: any = await getRechnungKById(row.id);
+      const payload = res?.data ?? res;
+      if (payload) {
+        setSelectedRechnungKData(payload);
+        setShowRechnungKModal(true);
+      } else {
+        toast.error("Failed to load correction invoice.", errorStyles);
+      }
+    } catch (err: any) {
+      toast.error(
+        err?.message || "Failed to load correction invoice.",
+        errorStyles,
+      );
+    }
+  };
+
+  const handleDeleteRechnungK = async (row: any) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this correction invoice? This action cannot be undone.",
+      )
+    )
+      return;
+    try {
+      await deleteRechnungK(row.id);
+      toast.success("Correction invoice deleted.", successStyles);
+      tabData.refetchRechnungenK();
+    } catch (err: any) {
+      toast.error(
+        err?.message || "Failed to delete correction invoice.",
+        errorStyles,
+      );
     }
   };
 
@@ -1227,10 +1290,35 @@ const InvoiceListPage: React.FC = () => {
         },
       }));
     } else if (activeInvTab === "rk") {
-      // Legacy `invoices`-backed RK list was always empty (see README) —
-      // preserved as empty rather than silently repointed at `rechnungen`,
-      // which is a data-source decision, not a cleanup.
-      list = [];
+      // Field names below mirror the "rechnung" mapping's fallback-chain
+      // style since RechnungK (correction invoices) are created from a
+      // Rechnung via createRechnungKFromRechnung and likely share most of
+      // its shape. I can't see the actual RechnungK model or
+      // RechnungKPreviewModal's prop usage in this conversation, so verify
+      // these field names (rk_number, rk_date, total_amount, customer)
+      // against your backend response and adjust if any don't match —
+      // same spirit as the getAllRechnungenK import note in the hook.
+      list = (tabData.rechnungenK || []).map((rk: any) => ({
+        ...rk,
+        invoiceNumber:
+          rk.rk_number || rk.invoice_number || rk.invoiceNumber || rk.id,
+        invoiceDate: rk.rk_date || rk.invoice_date || rk.invoiceDate,
+        createdAt:
+          rk.created_at || rk.createdAt || rk.rk_date || rk.invoice_date,
+        netTotal: rk.subtotal,
+        grossTotal: rk.total_amount || rk.grossTotal,
+        customer_name:
+          rk.customer?.company_name ||
+          rk.customer?.name ||
+          rk.customer_name ||
+          "—",
+        customerSnapshot: {
+          companyName: rk.customer?.company_name || rk.customer?.name || "—",
+          email: rk.customer?.email || "—",
+          country: rk.customer?.country || "",
+          city: rk.customer?.city || "",
+        },
+      }));
     } else if (activeInvTab === "lieferschein") {
       list = (tabData.lieferscheine || []).map((ls: any) => ({
         ...ls,
@@ -1369,6 +1457,7 @@ const InvoiceListPage: React.FC = () => {
     tabData.customerOrders,
     tabData.bestellungen,
     tabData.rechnungen,
+    tabData.rechnungenK,
     tabData.paymentInbounds,
     tabData.lieferscheine,
     searchTerm,
@@ -1397,7 +1486,7 @@ const InvoiceListPage: React.FC = () => {
           setExpandedDocIds,
           onOpenAuftragPreview: handleOpenAuftragPreview,
           onConvertToBestellung: handleDirectConvertAuftragToBestellung,
-          onGenerateRechnung: (row) => {
+          onGenerateRechnung: (row: any) => {
             setSelectedAuftragForRechnungModal(row);
             setShowAuftragToRechnungModal(true);
           },
@@ -1408,7 +1497,7 @@ const InvoiceListPage: React.FC = () => {
           expandedDocIds,
           setExpandedDocIds,
           onOpenBestellungPreview: handleOpenBestellungPreview,
-          onMarkProcessing: (id) =>
+          onMarkProcessing: (id: any) =>
             handleUpdateBestellungStatus(id, "to be processed"),
         });
       case "rechnung":
@@ -1417,7 +1506,7 @@ const InvoiceListPage: React.FC = () => {
           setExpandedDocIds,
           onCreateRechnungK: handleCreateRechnungK,
           creatingRkForId,
-          onView: (row) => {
+          onViewRechnung: (row: any) => {
             setSelectedRechnungForDetail(row);
             setShowRechnungDetailModal(true);
           },
@@ -1426,16 +1515,14 @@ const InvoiceListPage: React.FC = () => {
         return buildRkColumns({
           expandedDocIds,
           setExpandedDocIds,
-          onView: (row) => {
-            setSelectedRechnungForDetail(row);
-            setShowRechnungDetailModal(true);
-          },
+          onView: handleOpenRechnungKDetail,
+          onDelete: handleDeleteRechnungK,
         });
       case "lieferschein":
         return buildLieferscheinColumns({
           expandedDocIds,
           setExpandedDocIds,
-          onView: (row) => {
+          onView: (row: any) => {
             setSelectedLieferscheinForDetail(row);
             setShowLieferscheinDetailModal(true);
           },
@@ -1445,7 +1532,7 @@ const InvoiceListPage: React.FC = () => {
           expandedDocIds,
           setExpandedDocIds,
           onOpenDetails: handleOpenInvoiceDetails,
-          onDelete: async (row) => {
+          onDelete: async (row: any) => {
             if (
               confirm(
                 "Are you sure you want to delete this payment inbound record?",
@@ -1460,21 +1547,22 @@ const InvoiceListPage: React.FC = () => {
         return [];
     }
   }, [activeInvTab, expandedDocIds, creatingRkForId, legacyInvoices, tabData]);
-
-  // `loading` for the DataTable on the "rk" tab mirrors a pre-existing
-  // quirk in the original: rk never had its own loading flag, so it fell
-  // back to the customer-list loading state that only ever gets touched by
-  // the Lieferschein tab. Preserved rather than fixed — see README.
+  // RK now has its own loading flag (tabData.loadingRechnungenK) since it
+  // fetches real RechnungK data — no longer borrowing Lieferschein's
+  // loading state the way the original implicitly did. See README history
+  // for the quirk this replaces.
   const dataTableLoading =
     activeInvTab === "payment_inbound"
       ? tabData.loadingPaymentInbounds
       : activeInvTab === "rechnung"
         ? tabData.loadingRechnungen
-        : activeInvTab === "auftrag" || activeInvTab === "bestellung"
-          ? tabData.loadingOrders
-          : activeInvTab === "lieferschein"
-            ? tabData.loadingCustomers
-            : false;
+        : activeInvTab === "rk"
+          ? tabData.loadingRechnungenK
+          : activeInvTab === "auftrag" || activeInvTab === "bestellung"
+            ? tabData.loadingOrders
+            : activeInvTab === "lieferschein"
+              ? tabData.loadingCustomers
+              : false;
 
   return (
     <div
@@ -1695,6 +1783,8 @@ const InvoiceListPage: React.FC = () => {
                 else if (activeInvTab === "rechnung") {
                   setSelectedRechnungForDetail(row);
                   setShowRechnungDetailModal(true);
+                } else if (activeInvTab === "rk") {
+                  handleOpenRechnungKDetail(row);
                 } else if (activeInvTab === "lieferschein") {
                   setSelectedLieferscheinForDetail(row);
                   setShowLieferscheinDetailModal(true);
@@ -1892,7 +1982,7 @@ const InvoiceListPage: React.FC = () => {
           form={form}
           onCategoryChange={handleCategoryChange}
           onSupplierChange={handleSupplierChange}
-          onCommentChange={(comment: string) =>
+          onCommentChange={(comment: any) =>
             setForm((prev: any) => ({ ...prev, comment }))
           }
           effectiveItems={effectiveItems}
@@ -2174,21 +2264,6 @@ const InvoiceListPage: React.FC = () => {
           </CustomModal>
         )}
 
-        {showRechnungKModal && selectedRechnungKData && (
-          // Original rendered this exact modal twice (identical condition,
-          // identical props) — an accidental duplicate, not a UI feature.
-          // Rendered once here; visible result is unchanged.
-          <RechnungKPreviewModal
-            isOpen={showRechnungKModal}
-            onClose={() => {
-              setShowRechnungKModal(false);
-              setSelectedRechnungKData(null);
-            }}
-            rechnungK={selectedRechnungKData}
-            onSuccess={() => tabData.refetchRechnungen()}
-          />
-        )}
-
         {showCreateBestellungModal && (
           <BestellungPreviewModal
             isOpen={showCreateBestellungModal}
@@ -2203,33 +2278,37 @@ const InvoiceListPage: React.FC = () => {
           />
         )}
 
-        {/*
-          IMPORTANT — flagging, not fixing: `showRechnungDetailModal` /
-          `selectedRechnungForDetail` are set by the Rechnung "View", RK
-          "No"/"Actions", and the DataTable row-click handler, but the
-          original page.tsx never actually renders a conditional block for
-          `RechnungDetailModal` anywhere in its JSX — despite importing the
-          component. Clicking those currently sets state that mounts
-          nothing; visually nothing happens. That's a pre-existing gap, not
-          something introduced by this refactor, and I'm not silently
-          closing it — adding the render block below is a real behavior
-          change (a modal starts appearing where none did before) and
-          should be a decision you make, not one buried in a "cleanup".
-          Uncomment to enable it:
+        {/* Unified Rechnung/RechnungK Detail Modal */}
+        {showRechnungDetailModal && selectedRechnungForDetail && (
+          <RechnungDetailModal
+            isOpen={showRechnungDetailModal}
+            onClose={() => {
+              setShowRechnungDetailModal(false);
+              setSelectedRechnungForDetail(null);
+            }}
+            rechnung={selectedRechnungForDetail}
+            isCorrection={false}
+            onChanged={() => {
+              tabData.refetchRechnungen();
+            }}
+          />
+        )}
 
-          {showRechnungDetailModal && (
-            <RechnungDetailModal
-              isOpen={showRechnungDetailModal}
-              onClose={() => {
-                setShowRechnungDetailModal(false);
-                setSelectedRechnungForDetail(null);
-              }}
-              rechnung={selectedRechnungForDetail}
-              onChanged={() => tabData.refetchRechnungen()}
-            />
-          )}
-        */}
-
+        {showRechnungKModal && selectedRechnungKData && (
+          <RechnungDetailModal
+            isOpen={showRechnungKModal}
+            onClose={() => {
+              setShowRechnungKModal(false);
+              setSelectedRechnungKData(null);
+            }}
+            rechnung={selectedRechnungKData}
+            isCorrection={true}
+            onChanged={() => {
+              tabData.refetchRechnungenK();
+              tabData.refetchRechnungen();
+            }}
+          />
+        )}
         {showLieferscheinDetailModal && selectedLieferscheinForDetail && (
           <LieferscheinDetailModal
             isOpen={showLieferscheinDetailModal}

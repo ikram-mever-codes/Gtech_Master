@@ -6,6 +6,7 @@ import { getAllCustomerOrders } from "@/api/customer_orders";
 import { getAllOffers } from "@/api/offers";
 import { getAllTransferOrders } from "@/api/transfer_orders";
 import { getAllRechnungen, getLieferscheine } from "@/api/rechnungen";
+import { getAllRechnungenK } from "@/api/rechnungen_k";
 import { getAllPaymentInbounds } from "@/api/payment_inbounds";
 import {
   getAllCustomers,
@@ -51,6 +52,9 @@ export function useCommercialTabData() {
 
   const [rechnungen, setRechnungen] = useState<any[]>([]);
   const [loadingRechnungen, setLoadingRechnungen] = useState(false);
+
+  const [rechnungenK, setRechnungenK] = useState<any[]>([]);
+  const [loadingRechnungenK, setLoadingRechnungenK] = useState(false);
 
   const [lieferscheine, setLieferscheine] = useState<any[]>([]);
   const [loadingLieferscheine, setLoadingLieferscheine] = useState(false);
@@ -122,6 +126,19 @@ export function useCommercialTabData() {
     } finally {
       setLoadingRechnungen(false);
       loadedRef.current.add("rechnungen");
+    }
+  }, []);
+
+  const fetchRechnungenK = useCallback(async () => {
+    setLoadingRechnungenK(true);
+    try {
+      const res: any = await getAllRechnungenK();
+      if (res?.success) setRechnungenK(res.data || []);
+      else if (Array.isArray(res?.data)) setRechnungenK(res.data);
+      else if (Array.isArray(res)) setRechnungenK(res);
+    } finally {
+      setLoadingRechnungenK(false);
+      loadedRef.current.add("rechnungenK");
     }
   }, []);
 
@@ -214,8 +231,12 @@ export function useCommercialTabData() {
         if (!has("items")) fetchAllItems();
       }
 
-      if (tab === "rechnung" || tab === "rk") {
+      if (tab === "rechnung") {
         if (!has("rechnungen")) fetchRechnungen();
+      }
+
+      if (tab === "rk") {
+        if (!has("rechnungenK")) fetchRechnungenK();
       }
 
       if (tab === "payment_inbound") {
@@ -234,6 +255,7 @@ export function useCommercialTabData() {
       fetchCategoriesAndSuppliers,
       fetchBestellungen,
       fetchRechnungen,
+      fetchRechnungenK,
       fetchPaymentInbounds,
       fetchCustomers,
       fetchLieferscheine,
@@ -247,6 +269,7 @@ export function useCommercialTabData() {
     offers,
     bestellungen,
     rechnungen,
+    rechnungenK,
     lieferscheine,
     paymentInbounds,
     customers,
@@ -258,6 +281,7 @@ export function useCommercialTabData() {
     loadingOffers,
     loadingBestellungen,
     loadingRechnungen,
+    loadingRechnungenK,
     loadingLieferscheine,
     loadingPaymentInbounds,
     loadingCustomers,
@@ -269,6 +293,7 @@ export function useCommercialTabData() {
     refetchOffers: fetchOffers,
     refetchBestellungen: fetchBestellungen,
     refetchRechnungen: fetchRechnungen,
+    refetchRechnungenK: fetchRechnungenK,
     refetchLieferscheine: fetchLieferscheine,
     refetchPaymentInbounds: fetchPaymentInbounds,
     refetchCustomers: fetchCustomers,
