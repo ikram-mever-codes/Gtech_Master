@@ -1529,6 +1529,7 @@ export class OfferController {
             offer: savedOffer,
             offerId: savedOffer.id,
             sourceItemId: snap.id,
+            notes: snap.notes,
             itemName: snap.itemName,
             specification: snap.specification,
             description: snap.description,
@@ -4564,7 +4565,7 @@ export class OfferController {
   private buildItemSnapshot(item: any): ItemSnapshot {
     return {
       id: item.id,
-      itemName: item.item_name,
+      itemName: item.item_name_de,
       itemNameCn: item.item_name_cn,
       ean: item.ean ? String(item.ean) : undefined,
       model: item.model,
@@ -4576,6 +4577,7 @@ export class OfferController {
       length: item.length,
       purchasePrice: item.RMB_Price || 0,
       purchaseCurrency: "RMB",
+      notes: item.remark_ex,
       photo: item.photo || "",
     };
   }
