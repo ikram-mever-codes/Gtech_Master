@@ -200,10 +200,8 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
 
       const newPage = mergedPdf.addPage([width, height]);
 
-      // 1. Draw template as background (full page)
       newPage.drawPage(embeddedTemplate, { x: 0, y: 0, width, height });
 
-      // 2. Cover placeholder "x_Document_Title" from template background with a clean white rectangle
       newPage.drawRectangle({
         x: 300,
         y: 670,
@@ -948,6 +946,7 @@ export class OfferController {
   }
 
   private buildCustomerSnapshot(customer: Customer | any): CustomerSnapshot {
+    const custAny = customer as any;
     return {
       id: customer.id,
       customerNumber: customer.customerNumber,
@@ -957,13 +956,17 @@ export class OfferController {
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       vatId: customer.vatTaxId || customer.taxNumber || "",
-      address: customer.businessDetails?.address || "",
-      city: customer.businessDetails?.city || "",
-      postalCode: customer.businessDetails?.postalCode || "",
-      country: customer.businessDetails?.country || customer.country || "",
-      street: customer.businessDetails?.street,
+      address: customer.addressLine1 || customer.businessDetails?.address || "",
+      city: customer.city || customer.businessDetails?.city || "",
+      postalCode: customer.postalCode || customer.businessDetails?.postalCode || "",
+      country: customer.country || customer.businessDetails?.country || "",
+      street: customer.addressLine1 || customer.businessDetails?.street,
       additionalInfo:
-        customer.businessDetails?.additionalInfo || "Additional Info",
+        custAny.additionalInfo ||
+        custAny.addressAdditionalLine ||
+        custAny.addressLine2 ||
+        customer.businessDetails?.description ||
+        "",
     };
   }
 
@@ -1573,7 +1576,7 @@ export class OfferController {
   private buildDeliveryAddress(customer: any): Offer["deliveryAddress"] {
     const defaultAddress = (customer.shippingAddresses || []).find(
       (addr: any) => addr.is_default,
-    );
+    ) || customer.shippingAddresses?.[0];
 
     if (defaultAddress) {
       return {
@@ -1581,22 +1584,25 @@ export class OfferController {
         street: defaultAddress.street,
         city: defaultAddress.city,
         postalCode: defaultAddress.postal_code,
-        country: defaultAddress.country?.name || "",
-        additionalInfo: defaultAddress.address_additional_line || undefined,
+        country: defaultAddress.country?.name || defaultAddress.country || "",
+        additionalInfo: defaultAddress.address_additional_line || defaultAddress.additionalInfo || undefined,
         contactName: customer.legalName || customer.companyName,
         contactPhone: customer.contactPhoneNumber,
       };
     }
 
+    const custAny = customer as any;
     return {
-      street: customer.businessDetails?.street,
-      city: customer.businessDetails?.city,
-      postalCode: customer.businessDetails?.postalCode,
-      country: customer.businessDetails?.country,
+      street: custAny.street || custAny.addressLine1 || custAny.businessDetails?.street,
+      city: custAny.city || custAny.businessDetails?.city,
+      postalCode: custAny.postalCode || custAny.businessDetails?.postalCode,
+      country: custAny.country || custAny.businessDetails?.country,
+      additionalInfo: custAny.additionalInfo || custAny.addressAdditionalLine || custAny.addressLine2,
       contactName: customer.legalName || customer.companyName,
       contactPhone: customer.contactPhoneNumber,
     };
   }
+
   async getCustomerShippingAddresses(request: Request, response: Response) {
     try {
       const { customerId } = request.params;
@@ -2800,10 +2806,6 @@ export class OfferController {
     }
   }
 
-  // ==========================================================================
-  // Add a single price tier to a line item's matrix. Price may be omitted
-  // (or ".") to add an "not calculated yet" tier.
-  // ==========================================================================
   async addPriceMatrixEntry(request: Request, response: Response) {
     try {
       const { lineItemId } = request.params;
@@ -3491,6 +3493,18 @@ export class OfferController {
         });
       }
 
+      let customerEntity: any = null;
+      if (offer.customerId) {
+        try {
+          customerEntity = await AppDataSource.getRepository(Customer).findOne({
+            where: { id: offer.customerId },
+            relations: ["shippingAddresses"],
+          });
+        } catch (e) {
+          console.warn("Could not fetch customer shipping addresses:", e);
+        }
+      }
+
       const formatDate = (dateValue: any): string => {
         if (!dateValue) return "N/A";
         const date =
@@ -3612,137 +3626,213 @@ export class OfferController {
         }
       }
 
-      let addrY = MM(55);
+      let addrY = MM(53);
       doc.fillColor("#3F4446");
 
-      const companyDisplayName = customer.legalName || customer.companyName;
-      if (companyDisplayName) {
-        doc
-          .font(M)
-          .fontSize(10)
-          .text(companyDisplayName, MM(25), addrY, {
-            width: MM(80),
-          });
-        addrY += doc.heightOfString(companyDisplayName, { width: MM(80) }) + 2;
-      }
+      const legalName = (customer.legalName || customerEntity?.legalName || "").trim();
+      const companyName = (customer.companyName || customerEntity?.companyName || "").trim();
+      const primaryName = companyName || legalName;
+      const mainCityStr = (customer.city || customerEntity?.city || "").trim();
+      const mainPostalStr = (customer.postalCode || customerEntity?.postalCode || "").trim();
+      const mainStreetStr = (customer.address || customer.street || customerEntity?.addressLine1 || "").trim();
+      const mainAddInfo = (
+        customer.additionalInfo ||
+        customer.addressAdditionalLine ||
+        customer.addressLine2 ||
+        customerEntity?.addressLine2 ||
+        customerEntity?.additionalInfo ||
+        ""
+      ).trim();
 
-      doc.font(R).fontSize(10);
-      if (
-        customer.additionalInfo &&
-        customer.additionalInfo !== "Additional Info" &&
-        customer.additionalInfo !== customer.companyName &&
-        customer.additionalInfo !== customer.legalName
-      ) {
-        doc.text(customer.additionalInfo, MM(25), addrY, {
-          width: MM(80),
-        });
-        addrY += doc.heightOfString(customer.additionalInfo, { width: MM(80) }) + 2;
-      }
+      const formatAddressBlockLines = (
+        cName: string,
+        addLine: string,
+        street: string,
+        pCode: string,
+        city: string,
+        countryVal: any
+      ): string[] => {
+        const rawC = typeof countryVal === "string" ? countryVal.trim() : (countryVal?.code || countryVal?.name || "").trim();
+        const dispC = formatCountry(rawC);
+        const isGer = !rawC || ["DE", "GERMANY", "DEUTSCHLAND"].includes(rawC.toUpperCase());
 
-      const streetAddress = customer.address || customer.street || "";
-      if (streetAddress) {
-        doc.text(streetAddress, MM(25), addrY, {
-          width: MM(80),
-        });
-        addrY += doc.heightOfString(streetAddress, { width: MM(80) }) + 2;
-      }
+        const pStr = (pCode || "").trim();
+        const cStr = (city || "").trim();
 
-      const cityLine =
-        `${customer.postalCode || ""} ${customer.city || ""}`.trim();
-      if (cityLine && !streetAddress.includes(cityLine)) {
-        doc.text(cityLine, MM(25), addrY, { width: MM(80) });
-        addrY += doc.heightOfString(cityLine, { width: MM(80) }) + 2;
-      }
+        let cityLineVal = `${pStr} ${cStr}`.trim();
+        if (!isGer && rawC) {
+          const cCode = rawC.length <= 3 ? rawC.toUpperCase() : dispC.substring(0, 2).toUpperCase();
+          cityLineVal = `${cCode} - ${pStr} ${cStr}`.trim();
+        }
 
-      const displayCountry = formatCountry(customer.country);
-      if (
-        displayCountry &&
-        displayCountry.toUpperCase() !== "DE" &&
-        displayCountry.toUpperCase() !== "GERMANY" &&
-        displayCountry.toUpperCase() !== "DEUTSCHLAND"
-      ) {
-        doc.text(displayCountry, MM(25), addrY, {
-          width: MM(80),
-        });
-        addrY += doc.heightOfString(displayCountry, { width: MM(80) }) + 2;
-      }
+        const lines: string[] = [];
+        if (cName && cName.trim()) lines.push(cName.trim());
 
-      const customerVatId =
-        customer.vatId || customer.vatTaxId || customer.taxNumber || "";
-      if (
-        customerVatId &&
-        displayCountry &&
-        displayCountry.toUpperCase() !== "DE" &&
-        displayCountry.toUpperCase() !== "GERMANY" &&
-        displayCountry.toUpperCase() !== "DEUTSCHLAND"
-      ) {
-        doc.text(`VAT ID: ${customerVatId}`, MM(25), addrY, {
-          width: MM(80),
-        });
+        if (addLine && addLine.trim() && addLine.trim() !== "Additional Info" && addLine.trim() !== cName.trim()) {
+          lines.push(addLine.trim());
+        }
+
+        if (street && street.trim()) lines.push(street.trim());
+        if (cityLineVal) lines.push(cityLineVal);
+
+        return lines;
+      };
+
+      const mainAddrLines = formatAddressBlockLines(
+        primaryName,
+        mainAddInfo,
+        mainStreetStr,
+        mainPostalStr,
+        mainCityStr,
+        customer.country
+      );
+
+      const ADDR_X = MM(23.5);
+
+      mainAddrLines.forEach((lineText, idx) => {
+        if (idx === 0) {
+          doc.font(M).fontSize(9.5).text(lineText, ADDR_X, addrY, { width: MM(80) });
+          addrY += doc.heightOfString(lineText, { width: MM(80) }) + 3;
+          doc.font(R).fontSize(9);
+        } else {
+          doc.text(lineText, ADDR_X, addrY, { width: MM(80) });
+          addrY += doc.heightOfString(lineText, { width: MM(80) }) + 3;
+        }
+      });
+
+      const customerVatId = customer.vatId || customer.vatTaxId || customer.taxNumber || "";
+      const rawCMain = (customer.country || "").trim();
+      const isGermanyMain = !rawCMain || ["DE", "GERMANY", "DEUTSCHLAND"].includes(rawCMain.toUpperCase());
+
+      if (customerVatId && !isGermanyMain) {
+        doc.text(`VAT ID: ${customerVatId}`, ADDR_X, addrY, { width: MM(80) });
         addrY += 12;
       }
 
-      // --- Grey Banner Box (Top Right) ---
-      const bannerX = MM(120);
-      const bannerY = MM(38);
-      const bannerW = MM(72);
-      const bannerH = 30;
+      let shipLinesToRender: string[] = [];
+      let isExplicitOnOffer = false;
 
-      doc.rect(bannerX, bannerY, bannerW, bannerH).fill("#D9E1E8");
+      const offerDelivery = offer.deliveryAddress || offer.shippingAddress;
+      if (offerDelivery) {
+        if (typeof offerDelivery === "string" && offerDelivery.trim()) {
+          shipLinesToRender = [primaryName, offerDelivery.trim()].filter(Boolean);
+          isExplicitOnOffer = true;
+        } else if (typeof offerDelivery === "object") {
+          const sAddLine =
+            offerDelivery.additionalInfo ||
+            offerDelivery.address_additional_line ||
+            offerDelivery.addressLine2 ||
+            offerDelivery.additionalLine ||
+            "";
+          shipLinesToRender = formatAddressBlockLines(
+            offerDelivery.companyName || offerDelivery.name || primaryName,
+            sAddLine,
+            offerDelivery.street || offerDelivery.addressLine1 || "",
+            offerDelivery.postal_code || offerDelivery.postalCode || "",
+            offerDelivery.city || "",
+            offerDelivery.country || customer.country || customerEntity?.country
+          );
+          if (shipLinesToRender.length > 0) isExplicitOnOffer = true;
+        }
+      }
 
+      if (shipLinesToRender.length === 0 && customerEntity?.shippingAddresses?.length) {
+        const mainStreetCityNorm = `${mainStreetStr} ${mainPostalStr} ${mainCityStr}`.toLowerCase().replace(/[^a-z0-9]/gi, "").trim();
+        const diffAddr = customerEntity.shippingAddresses.find((sa: any) => {
+          const saStreetCity = `${sa.street || ""} ${sa.postal_code || ""} ${sa.city || ""}`.toLowerCase().replace(/[^a-z0-9]/gi, "").trim();
+          return saStreetCity && saStreetCity !== mainStreetCityNorm;
+        }) || customerEntity.shippingAddresses.find((sa: any) => sa.is_default) || customerEntity.shippingAddresses[0];
+
+        if (diffAddr) {
+          const sName = diffAddr.name && diffAddr.name !== primaryName ? `${primaryName}\n${diffAddr.name}` : primaryName;
+          const sAddLine =
+            diffAddr.address_additional_line ||
+            diffAddr.additionalInfo ||
+            diffAddr.addressLine2 ||
+            "";
+          shipLinesToRender = formatAddressBlockLines(
+            sName,
+            sAddLine,
+            diffAddr.street || "",
+            diffAddr.postal_code || "",
+            diffAddr.city || "",
+            diffAddr.country || customer.country || customerEntity?.country
+          );
+        }
+      }
+
+      const shipTextToRender = shipLinesToRender.join("\n").trim();
+
+      if (shipTextToRender) {
+        const shipNorm = shipTextToRender.toLowerCase().replace(/[^a-z0-9]/gi, "").trim();
+        const mainNorm = `${mainStreetStr} ${mainPostalStr} ${mainCityStr}`.toLowerCase().replace(/[^a-z0-9]/gi, "").trim();
+
+        if (isExplicitOnOffer || (shipNorm && shipNorm !== mainNorm)) {
+          addrY += 6;
+          doc.font(SB).fontSize(8.5).fillColor("#2D3748").text("Lieferadresse:", ADDR_X, addrY, { width: MM(80) });
+          addrY += 11;
+          doc.font(R).fontSize(8.5).fillColor("#3F4446");
+          doc.text(shipTextToRender, ADDR_X, addrY, { width: MM(80) });
+          addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
+        }
+      }
+
+      const bannerW = MM(67);
+      const bannerX = TABLE_END_X - bannerW;
+      const primaryNameHeight = primaryName ? doc.fontSize(9.5).heightOfString(primaryName, { width: MM(80) }) : 12;
+      const bannerY = MM(52) + primaryNameHeight;
+      const bannerH = 16;
+
+      doc.rect(bannerX, bannerY - 4, bannerW, bannerH).fill("#ECEAE6");
+      const bannerTextY = bannerY - 1;
+      const BANNER_PAD = 6;
       doc
         .font(SB)
-        .fontSize(15)
-        .fillColor("#2D3748")
-        .text("Angebot", bannerX + 10, bannerY + 7, {
+        .fontSize(10)
+        .fillColor("#1A202C")
+        .text("Angebot", bannerX + BANNER_PAD, bannerTextY, {
           lineBreak: false,
         });
 
-      const offerTitleText =
-        offer.title ||
-        offer.inquiry?.name ||
-        offer.inquirySnapshot?.name ||
-        "";
-      if (offerTitleText) {
+      const numStr = offer.offerNumber || "";
+      if (numStr) {
         doc
-          .font(R)
-          .fontSize(8)
-          .fillColor("#4A5568")
-          .text(offerTitleText, bannerX + MM(26), bannerY + 5, {
+          .font(SB)
+          .fontSize(10)
+          .fillColor("#1A202C")
+          .text(numStr, bannerX + BANNER_PAD, bannerTextY, {
             align: "right",
-            width: bannerW - MM(28),
-            lineBreak: true,
+            width: bannerW - BANNER_PAD * 2,
+            lineBreak: false,
           });
       }
 
-      // --- Metadata list below Grey Banner Box ---
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
         : "Alexander";
 
-      const validUntilDateStr = offer.validUntil
-        ? formatDate(offer.validUntil)
-        : formatDate(
-            new Date(
-              new Date(offer.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000,
-            ),
-          );
+      const customerCompName =
+        (customer.companyName || customer.legalName || "").trim();
+      const customerNum =
+        (offer.inquiry?.customer?.customerNumber || customer.customerNumber || "").trim();
+
+      let kundeCombined = "—";
+      if (customerCompName && customerNum) {
+        kundeCombined = `${customerCompName}· ${customerNum}`;
+      } else if (customerCompName) {
+        kundeCombined = customerCompName;
+      } else if (customerNum) {
+        kundeCombined = customerNum;
+      }
 
       const infoItems = [
-        ["Angebotsnr.", offer.offerNumber || "—"],
-        ["Datum", formatDate(offer.createdAt)],
-        ["Gültig bis", validUntilDateStr],
         ["Ansprechpartner", contactName],
-        [
-          "Kundennr.",
-          offer.inquiry?.customer?.customerNumber ||
-            customer.customerNumber ||
-            "—",
-        ],
+        ["Kunde", kundeCombined],
+        ["Datum", formatDate(offer.createdAt)],
       ];
 
       const titleBoxX = bannerX;
-      let infoY = bannerY + bannerH + 8;
+      let infoY = bannerY + bannerH + 2;
       const LABEL_W = MM(30);
       const VALUE_X = titleBoxX + LABEL_W + 4;
       const VALUE_W = bannerW - LABEL_W - 4;
@@ -3758,40 +3848,32 @@ export class OfferController {
           .text(value, VALUE_X, infoY, { width: VALUE_W, lineBreak: false });
         infoY += 12;
       });
-
-      let yPos = Math.max(addrY + 12, infoY + 12);
-
-      // --- Shipping method above table ---
-      const shippingText = offer.shippingMethod || "angeliefert durch GTech";
-      doc.font(R).fontSize(9).fillColor("#3F4446");
-      doc.text(`Versandart: ${shippingText}`, MM(25), yPos);
-      yPos += 20;
-
+      let yPos = Math.max(addrY + 25, infoY + 25);
       const tableY = yPos;
       const columns = [
         { header: "Pos", width: 25, align: "left" },
-        { header: "Art. Nr.", width: 60, align: "left" },
-        { header: "Menge", width: 40, align: "left" },
-        { header: "Bezeichnung", width: 155, align: "left" },
-        { header: "Gesamt\n(Netto)", width: 60, align: "right" },
-        { header: "MwSt", width: 40, align: "center" },
-        { header: "E-Preis", width: 55, align: "right" },
-        { header: "Gesamt\n(Brutto)", width: 59, align: "right" },
+        { header: "Art.-Nr.", width: 75, align: "left" },
+        { header: "Bezeichnung", width: 140, align: "left" },
+        { header: "RemarkEx", width: 68, align: "left" },
+        { header: "MwSt.", width: 38, align: "center" },
+        { header: "Menge", width: 40, align: "right" },
+        { header: "Netto-Preis", width: 52, align: "right" },
+        { header: "Netto\ngesamt", width: 55, align: "right" },
       ];
 
       const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
       const headerHeight = 24;
 
-      // Grey table header background matching banner box
-      doc.rect(LEFT_X, tableY, tableWidth, headerHeight).fill("#D9E1E8");
-      doc.font(SB).fontSize(8.5).fillColor("#2D3748");
+      doc.rect(LEFT_X, tableY, tableWidth, headerHeight).fill("#ECEAE6");
+      doc.font(SB).fontSize(8.5).fillColor("#1A202C");
 
       let currentX = LEFT_X;
       columns.forEach((col) => {
         const headerYOffset = col.header.includes("\n") ? 3 : 7;
-        doc.text(col.header, currentX + 2, tableY + headerYOffset, {
-          width: col.width - 4,
+        doc.text(col.header, currentX + 1, tableY + headerYOffset, {
+          width: col.width - 2,
           align: col.align as any,
+          lineBreak: col.header.includes("\n") ? true : false,
         });
         currentX += col.width;
       });
@@ -3815,29 +3897,18 @@ export class OfferController {
 
       doc.font(R).fontSize(8.5).fillColor("#3F4446");
 
-      const getActivePrice = (lineItem: any, offerUsesUnitPrices: boolean) => {
-        if (
-          offerUsesUnitPrices &&
-          lineItem.unitPrices &&
-          lineItem.unitPrices.length > 0
-        ) {
-          return lineItem.unitPrices.find((up: any) => up.isActive) || null;
-        } else if (
-          lineItem.quantityPrices &&
-          lineItem.quantityPrices.length > 0
-        ) {
-          return lineItem.quantityPrices.find((qp: any) => qp.isActive) || null;
-        }
-        return null;
-      };
-
       let currentY = tableY + headerHeight;
       const vatRatePercent = getSafeNumber(offer.taxRate ?? 19);
 
       if (offer.lineItems && Array.isArray(offer.lineItems)) {
-        const customerItems = offer.lineItems.filter(
-          (item: any) => !item.isComponent,
-        );
+        const customerItems = offer.lineItems
+          .filter((item: any) => !item.isComponent)
+          .slice()
+          .sort((a: any, b: any) => {
+            const orderA = a.sortOrder ?? a.position ?? a.index ?? 0;
+            const orderB = b.sortOrder ?? b.position ?? b.index ?? 0;
+            return orderA - orderB;
+          });
 
         customerItems.forEach((item: any, rowIndex: number) => {
           let qtyStr = "1";
@@ -3860,31 +3931,20 @@ export class OfferController {
               (getSafeNumber(item.baseQuantity) || 1) * unitPriceNum;
           }
 
-          const grossTotalNum = netTotalNum * (1 + vatRatePercent / 100);
+          const isFreizeile = item.itemType === "freizeile" || item.isFreizeile || (!item.material && (item.description || item.itemName));
+          const itemNameStr = item.itemName || item.description || (isFreizeile ? "Freizeile" : "Item");
+          const artNrStr = isFreizeile ? (item.material || "—") : (item.material || item.id?.substring(0, 8) || "—");
+          const remarksStr = (item.remarks && item.remarks.trim()) ? item.remarks.trim() : "-";
 
-          let nameText = item.itemName || "Item";
-          if (item.description) {
-            nameText += `\n${item.description}`;
-          }
+          const nameWidth = columns[2].width - 6;
+          const remarksWidth = columns[3].width - 6;
 
-          if (offer.pricingMode === "matrix" && item.priceMatrix?.length > 1) {
-            nameText += "\nStaffelpreise:";
-            item.priceMatrix.slice(0, 4).forEach((p: PriceMatrixEntry) => {
-              const activeMark = p.isActive ? " (*)" : "";
-              const priceLabel =
-                p.price === null
-                  ? "."
-                  : `€ ${formatNumber(p.price, offer.unitPriceDecimalPlaces || 3)}`;
-              nameText += `\n  - ${p.quantity} Stk: ${priceLabel} / Stk${activeMark}`;
-            });
-          }
-
-          const designationWidth = columns[3].width - 6;
           doc.font(R).fontSize(8.5);
-          const textHeight = doc.heightOfString(nameText, {
-            width: designationWidth,
-          });
-          const computedRowHeight = Math.max(36, textHeight + 12);
+          const nameHeight = doc.heightOfString(itemNameStr, { width: nameWidth });
+          const remarksHeight = doc.heightOfString(remarksStr, { width: remarksWidth });
+
+          const totalTextHeight = Math.max(nameHeight, remarksHeight);
+          const computedRowHeight = Math.max(28, totalTextHeight + 10);
 
           if (currentY + computedRowHeight > MM(265)) {
             doc
@@ -3898,21 +3958,23 @@ export class OfferController {
             drawCustomerSvgBackground(doc);
 
             const newTableY = MM(30);
-            doc.font(SB).fontSize(8).fillColor("#3F4446");
+            doc.rect(LEFT_X, newTableY, tableWidth, headerHeight).fill("#ECEAE6");
+            doc.font(SB).fontSize(8.5).fillColor("#1A202C");
             let tempX = LEFT_X;
             columns.forEach((col) => {
-              doc.text(col.header, tempX + 3, newTableY + 6, {
-                width: col.width - 6,
+              const headerYOffset = col.header.includes("\n") ? 3 : 7;
+              doc.text(col.header, tempX + 1, newTableY + headerYOffset, {
+                width: col.width - 2,
                 align: col.align as any,
-                lineBreak: false,
+                lineBreak: col.header.includes("\n") ? true : false,
               });
               tempX += col.width;
             });
             doc
               .moveTo(LEFT_X, newTableY + headerHeight)
               .lineTo(LEFT_X + tableWidth, newTableY + headerHeight)
-              .lineWidth(0.75)
-              .strokeColor("#D9E1E8")
+              .lineWidth(0.8)
+              .strokeColor("#A0AEC0")
               .stroke();
 
             doc.font(R).fontSize(8.5).fillColor("#3F4446");
@@ -3920,39 +3982,40 @@ export class OfferController {
           }
 
           if (rowIndex % 2 === 1) {
-            doc
-              .rect(LEFT_X, currentY, tableWidth, computedRowHeight)
-              .fill("#FAFAFA");
+            doc.rect(LEFT_X, currentY, tableWidth, computedRowHeight).fill("#F8FAFC");
+          } else {
+            doc.rect(LEFT_X, currentY, tableWidth, computedRowHeight).fill("#FFFFFF");
           }
 
           const rowData = [
             (rowIndex + 1).toString(),
-            item.material || item.id.substring(0, 8),
-            qtyStr,
-            nameText,
-            `${formatNumber(netTotalNum, 2)} ${offer.currency || "EUR"}`,
+            artNrStr,
+            itemNameStr,
+            remarksStr,
             `${vatRatePercent}%`,
-            `${formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3)} ${offer.currency || "EUR"}`,
-            `${formatNumber(grossTotalNum, 2)} ${offer.currency || "EUR"}`,
+            qtyStr,
+            formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3),
+            formatNumber(netTotalNum, 2),
           ];
 
           currentX = LEFT_X;
           rowData.forEach((data, colIndex) => {
-            doc.font(R).fontSize(8.5).fillColor("#3F4446");
-            doc.text(data, currentX + 3, currentY + 5, {
-              width: columns[colIndex].width - 6,
-              align: columns[colIndex].align as any,
-              lineBreak: false,
+            doc.font(R).fontSize(8.5).fillColor("#2D3748");
+            const col = columns[colIndex];
+            doc.text(data, currentX + 2, currentY + 6, {
+              width: col.width - 4,
+              align: col.align as any,
+              lineBreak: true,
             });
-            currentX += columns[colIndex].width;
+            currentX += col.width;
           });
 
           if (rowIndex < customerItems.length - 1) {
             doc
               .moveTo(LEFT_X, currentY + computedRowHeight)
               .lineTo(LEFT_X + tableWidth, currentY + computedRowHeight)
-              .lineWidth(0.3)
-              .strokeColor("#DEDEDE")
+              .lineWidth(0.5)
+              .strokeColor("#E2E8F0")
               .stroke();
           }
 
@@ -3960,103 +4023,112 @@ export class OfferController {
         });
       }
 
+      const shippingMethod = (offer.shippingMethod || "").trim();
+
+      if (shippingMethod) {
+        const rowH = 22;
+        const totalItemCount = offer.lineItems
+          ? offer.lineItems.filter((item: any) => !item.isComponent).length
+          : 0;
+        const shipRowNum = totalItemCount + 1;
+        const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+
+        if (currentY + rowH > MM(265)) {
+          doc.addPage();
+          drawCustomerSvgBackground(doc);
+          currentY = MM(30);
+        }
+
+        doc.rect(LEFT_X, currentY, tableWidth, rowH).fill(shipRowBg);
+
+        // Row number in Pos column
+        doc.font(R).fontSize(8.5).fillColor("#2D3748");
+        doc.text(String(shipRowNum), LEFT_X + 2, currentY + 6, { width: columns[0].width - 4, lineBreak: false });
+
+        // Shipping method name in Bezeichnung column
+        const posW = columns[0].width;
+        const artW = columns[1].width;
+        const bezX = LEFT_X + posW + artW;
+        const bezW = columns[2].width;
+        doc.font(R).fontSize(8.5).fillColor("#2D3748");
+        doc.text(shippingMethod, bezX + 2, currentY + 6, { width: bezW - 4, lineBreak: false });
+
+        currentY += rowH;
+      }
+
       doc
         .moveTo(LEFT_X, currentY)
         .lineTo(LEFT_X + tableWidth, currentY)
-        .lineWidth(0.5)
-        .strokeColor("#DEDEDE")
+        .lineWidth(0.6)
+        .strokeColor("#CBD5E0")
         .stroke();
 
-      yPos = currentY + 20;
-
+      yPos = currentY + 15;
       if (yPos + 120 > MM(265)) {
         doc.addPage();
         drawCustomerSvgBackground(doc);
         yPos = MM(30);
       }
 
-      const TOTALS_LABEL_X = MM(115);
-      const TOTALS_VAL_X = MM(158);
-      const TOTALS_VAL_W = MM(34);
+      const TOTALS_RIGHT_PAD = 6;
+      const TOTALS_VAL_W = MM(42);
+      const TOTALS_VAL_X = TABLE_END_X - TOTALS_VAL_W;
+      const TOTALS_LABEL_W = MM(55);
+      const TOTALS_LABEL_X = TOTALS_VAL_X - TOTALS_LABEL_W;
 
-      doc.font(R).fontSize(9.5).fillColor("#3F4446");
-
-      doc.font(M).text("Gesamtpreis Netto", TOTALS_LABEL_X, yPos);
-      doc
-        .font(M)
-        .text(
-          `${formatGermanNum(totals.subtotal, 2)} ${offer.currency || "EUR"}`,
-          TOTALS_VAL_X,
-          yPos,
-          { align: "right", width: TOTALS_VAL_W },
-        );
+      doc.font(R).fontSize(9).fillColor("#3F4446");
+      doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
+      doc.text(
+        `${formatGermanNum(totals.subtotal, 2)} ${offer.currency || "EUR"}`,
+        TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+        yPos,
+        { align: "right", width: TOTALS_VAL_W },
+      );
 
       if (Number(totals.discountAmount || 0) > 0) {
         yPos += 16;
-        doc
-          .font(R)
-          .text(
-            `Rabatt (${offer.discountPercentage || 0}%)`,
-            TOTALS_LABEL_X,
-            yPos,
-          );
-        doc
-          .font(R)
-          .text(
-            `-${formatGermanNum(totals.discountAmount, 2)} ${offer.currency || "EUR"}`,
-            TOTALS_VAL_X,
-            yPos,
-            { align: "right", width: TOTALS_VAL_W },
-          );
+        doc.font(R).text(`Rabatt (${offer.discountPercentage || 0}%)`, TOTALS_LABEL_X, yPos);
+        doc.font(R).text(
+          `-${formatGermanNum(totals.discountAmount, 2)} ${offer.currency || "EUR"}`,
+          TOTALS_VAL_X - TOTALS_RIGHT_PAD, yPos,
+          { align: "right", width: TOTALS_VAL_W },
+        );
       }
 
       if (Number(totals.shippingCost || 0) > 0) {
         yPos += 16;
         doc.font(R).text("Versandkosten", TOTALS_LABEL_X, yPos);
-        doc
-          .font(R)
-          .text(
-            `${formatGermanNum(totals.shippingCost, 2)} ${offer.currency || "EUR"}`,
-            TOTALS_VAL_X,
-            yPos,
-            { align: "right", width: TOTALS_VAL_W },
-          );
+        doc.font(R).text(
+          `${formatGermanNum(totals.shippingCost, 2)} ${offer.currency || "EUR"}`,
+          TOTALS_VAL_X - TOTALS_RIGHT_PAD, yPos,
+          { align: "right", width: TOTALS_VAL_W },
+        );
       }
 
       const taxRatePercent = offer.taxRate ? Number(offer.taxRate) : 19;
       yPos += 16;
-      doc
-        .font(R)
-        .text(
-          `MwSt. ${formatGermanNum(taxRatePercent, 2)}%`,
-          TOTALS_LABEL_X,
-          yPos,
-        );
-      doc
-        .font(R)
-        .text(
-          `${formatGermanNum(totals.taxAmount, 2)} ${offer.currency || "EUR"}`,
-          TOTALS_VAL_X,
-          yPos,
-          { align: "right", width: TOTALS_VAL_W },
-        );
+      doc.font(R).text(`MwSt. ${formatGermanNum(taxRatePercent, 2)}%`, TOTALS_LABEL_X, yPos);
+      doc.font(R).text(
+        `${formatGermanNum(totals.taxAmount, 2)} ${offer.currency || "EUR"}`,
+        TOTALS_VAL_X - TOTALS_RIGHT_PAD, yPos,
+        { align: "right", width: TOTALS_VAL_W },
+      );
 
       yPos += 22;
       const bruttoBoxX = TOTALS_LABEL_X - 6;
-      const bruttoBoxW = TOTALS_VAL_X + TOTALS_VAL_W - bruttoBoxX + 4;
-      doc.rect(bruttoBoxX, yPos - 4, bruttoBoxW, 20).fill("#D9E1E8");
+      const bruttoBoxW = TABLE_END_X - bruttoBoxX;
+      doc.rect(bruttoBoxX, yPos - 4, bruttoBoxW, 20).fill("#ECEAE6");
 
-      doc.font(SB).fontSize(10).fillColor("#2D3748");
+      doc.font(SB).fontSize(10).fillColor("#1A202C");
       doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
       doc.text(
-        `${formatGermanNum(totals.totalAmount, 2)} ${offer.currency || "EUR"}`,
-        TOTALS_VAL_X,
-        yPos,
+        `${formatGermanNum(totals.totalAmount, 2)} ${offer.currency}`,
+        TOTALS_VAL_X - TOTALS_RIGHT_PAD, yPos,
         { align: "right", width: TOTALS_VAL_W },
       );
 
       yPos += 30;
-      let notesHeight = 30;
+      let notesHeight = 15;
       if (offer.deliveryTime) notesHeight += 15;
       if (offer.deliveryTerms) notesHeight += 15;
       if (offer.paymentTerms) notesHeight += 15;
@@ -4074,9 +4146,12 @@ export class OfferController {
       }
 
       doc.font(R).fontSize(9).fillColor("#3F4446");
-      doc.text("All prices are net prices.", LEFT_X, yPos);
-      yPos += 14;
 
+      const payMethodText = (offer.paymentMethod || "").trim();
+      if (payMethodText) {
+        doc.text(`Zahlungsart: ${payMethodText}`, LEFT_X, yPos);
+        yPos += 14;
+      }
       if (offer.deliveryTime) {
         doc.text(`Lieferzeit: ${offer.deliveryTime}`, LEFT_X, yPos);
         yPos += 14;
@@ -4085,10 +4160,6 @@ export class OfferController {
         doc.text(`Lieferbedingungen: ${offer.deliveryTerms}`, LEFT_X, yPos);
         yPos += 14;
       }
-      const payMethod = offer.paymentMethod || "Kauf auf Rechnung";
-      doc.text(`Zahlungsart: ${payMethod}`, LEFT_X, yPos);
-      yPos += 14;
-
       if (offer.paymentTerms) {
         doc.text(`Zahlungsbedingungen: ${offer.paymentTerms}`, LEFT_X, yPos);
         yPos += 14;
@@ -4116,8 +4187,6 @@ export class OfferController {
 
       doc.end();
       await pdfWritePromise;
-
-      // If template is a PDF file, merge it as background via pdf-lib
       await mergePdfTemplate(pdfPath);
 
       try {
@@ -4187,9 +4256,6 @@ export class OfferController {
           .json({ success: false, message: "Offer not found" });
       }
 
-      // TODO: replace with real queries once Order / Invoice / DeliveryNote
-      // repositories are available, e.g. filtering by offer.id or
-      // offer.offerNumber.
       return response.status(200).json({
         success: true,
         data: {
