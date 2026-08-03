@@ -161,7 +161,6 @@ export class Rechnung {
   @Column({ type: "text", nullable: true })
   terms_conditions?: string;
 
-  // --- Status & Notes ---
   @Column({ type: "varchar", length: 50, default: "open" })
   status!: string;
 
@@ -171,11 +170,15 @@ export class Rechnung {
   @Column({ type: "text", nullable: true })
   internal_notes?: string;
 
-  // --- UI ---
   @Column({ type: "varchar", length: 20, nullable: true })
   highlight_color?: string;
 
-  // --- Customer Data ---
+  @Column({ type: "varchar", length: 500, nullable: true })
+  gelangenheitsbestaetigung_doc?: string;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  tax_profile_case?: string;
+
   @Column({ type: "uuid", nullable: true })
   rechnung_customer_id?: string;
 
@@ -194,7 +197,6 @@ export class Rechnung {
     contactPhone?: string;
   };
 
-  // --- Relations ---
   @ManyToOne(
     () => RechnungCustomer,
     (customer: RechnungCustomer) => customer.rechnungen,

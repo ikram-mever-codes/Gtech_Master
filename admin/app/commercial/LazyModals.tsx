@@ -66,7 +66,7 @@ export const BestellungPreviewModal = dynamic(
 );
 
 export const InvoiceDetailsModal = dynamic(
-  () => import("./invoicedetailsmodal"),
+  () => import("./InvoiceDetailsModal"),
   { ssr: false },
 );
 
@@ -91,5 +91,10 @@ export const TaricModal = dynamic(
 
 export const QtyModal = dynamic(
   () => import("./orderitemactionsmodal").then((m) => m.QtyModal),
+  { ssr: false },
+);
+
+export const PaymentInboundModal = dynamic(
+  () => import("./PaymentInboundModal"),
   { ssr: false },
 );

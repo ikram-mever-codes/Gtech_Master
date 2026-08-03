@@ -11,23 +11,23 @@ export const SETTINGS_TABS = [
   },
   {
     id: "payment-methods",
-    label: "PaymentMethods",
+    label: "Pay-Methods",
     href: "/payment-methods",
   },
   {
     id: "payment-accounts",
-    label: "PaymentAccounts",
+    label: "Pay-Accounts",
     href: "/payment-accounts",
   },
   {
     id: "shipping-methods",
-    label: "Shipmentmethods",
+    label: "Ship-Methods",
     href: "/shipping-methods",
   },
 
   {
     id: "tax-profiles",
-    label: "TaxProfiles",
+    label: "Tax",
     href: "/tax-profiles",
   },
   {
@@ -47,12 +47,12 @@ export const SETTINGS_TABS = [
   },
   {
     id: "gtech-companies",
-    label: "GTech Companies",
+    label: "GTech",
     href: "/gtech-companies",
   },
   {
     id: "parameters-templates",
-    label: "Parameters & Templates",
+    label: "Param & Temp",
     href: "/parameters-templates",
   },
   {

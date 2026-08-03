@@ -5,6 +5,7 @@ export interface CommercialFilters {
   valueOperator: "=" | ">" | "<";
   valueAmount: string;
   status: string;
+  rechnungFilter: "all" | "with_rechnung" | "without_rechnung";
   datePreset: "all" | "today" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
   dateFrom: string;
   dateTo: string;
@@ -17,6 +18,7 @@ export const initialCommercialFilters: CommercialFilters = {
   valueOperator: "=",
   valueAmount: "",
   status: "",
+  rechnungFilter: "all",
   datePreset: "all",
   dateFrom: "",
   dateTo: "",
