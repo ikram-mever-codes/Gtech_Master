@@ -19,6 +19,7 @@ import { getRMBPriceFromSupplier } from "./items_controller";
 import { WarehouseItem } from "../models/warehouse_items";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
 import { NumberSequenceService } from "../services/number_sequence_service";
+import { generateInvoicesForOrders } from "./cargo_controller";
 
 const calculateDueDate = (
   deliveryDate: Date | string,
@@ -766,6 +767,44 @@ export class InvoiceController {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
 
     try {
+      try {
+        const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+        const orderItemRepo = AppDataSource.getRepository(OrderItem);
+
+        const [cargoOrders, itemsWithCargo] = await Promise.all([
+          cargoOrderRepo.find({ select: ["cargo_id", "order_id"] }),
+          orderItemRepo
+            .createQueryBuilder("oi")
+            .select(["oi.cargo_id", "oi.order_id"])
+            .where("oi.cargo_id IS NOT NULL")
+            .getMany(),
+        ]);
+
+        const cIds = [
+          ...new Set([
+            ...cargoOrders.map((co) => co.cargo_id),
+            ...itemsWithCargo.map((oi) => oi.cargo_id!),
+          ]),
+        ].filter(Boolean);
+
+        const oIds = [
+          ...new Set([
+            ...cargoOrders.map((co) => co.order_id),
+            ...itemsWithCargo.map((oi) => oi.order_id!),
+          ]),
+        ].filter(Boolean);
+
+        if (cIds.length > 0 || oIds.length > 0) {
+          console.log(`[InvoiceSync] Triggering auto-sync for ${cIds.length} cargos (${cIds.join(", ")}) and ${oIds.length} orders...`);
+          await generateInvoicesForOrders(oIds, cIds);
+        }
+      } catch (syncErr) {
+        console.warn(
+          "[InvoiceSync] Auto-syncing cargo invoices on getAllInvoices encountered warning:",
+          syncErr,
+        );
+      }
+
       const invoices = await invoiceRepository.find({
         relations: [
           "customer",
@@ -775,6 +814,8 @@ export class InvoiceController {
         ],
         order: { invoiceDate: "DESC" },
       });
+
+      console.log(`[InvoiceController.getAllInvoices] Fetched ${invoices.length} total invoice records from DB.`);
 
       const orderNumbers = invoices.map((i) => i.orderNumber).filter(Boolean);
       const orders = await AppDataSource.getRepository(Order).find({

@@ -3682,44 +3682,74 @@ export class OfferController {
         addrY += 12;
       }
 
-      const docTitleText = `Angebot ${offer.offerNumber || ""}`;
+      // --- Grey Banner Box (Top Right) ---
+      const bannerX = MM(120);
+      const bannerY = MM(38);
+      const bannerW = MM(72);
+      const bannerH = 30;
+
+      doc.rect(bannerX, bannerY, bannerW, bannerH).fill("#D9E1E8");
+
       doc
         .font(SB)
-        .fontSize(13)
-        .fillColor("#2F6B46")
-        .text(docTitleText, MM(100), MM(36), {
-          align: "right",
-          width: MM(92),
+        .fontSize(15)
+        .fillColor("#2D3748")
+        .text("Angebot", bannerX + 10, bannerY + 7, {
           lineBreak: false,
         });
 
+      const offerTitleText =
+        offer.title ||
+        offer.inquiry?.name ||
+        offer.inquirySnapshot?.name ||
+        "";
+      if (offerTitleText) {
+        doc
+          .font(R)
+          .fontSize(8)
+          .fillColor("#4A5568")
+          .text(offerTitleText, bannerX + MM(26), bannerY + 5, {
+            align: "right",
+            width: bannerW - MM(28),
+            lineBreak: true,
+          });
+      }
+
+      // --- Metadata list below Grey Banner Box ---
       const contactName = offer.inquiry?.contactPerson
         ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
         : "Alexander";
 
+      const validUntilDateStr = offer.validUntil
+        ? formatDate(offer.validUntil)
+        : formatDate(
+            new Date(
+              new Date(offer.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000,
+            ),
+          );
+
       const infoItems = [
+        ["Angebotsnr.", offer.offerNumber || "—"],
+        ["Datum", formatDate(offer.createdAt)],
+        ["Gültig bis", validUntilDateStr],
         ["Ansprechpartner", contactName],
         [
           "Kundennr.",
           offer.inquiry?.customer?.customerNumber ||
-          customer.customerNumber ||
-          "—",
+            customer.customerNumber ||
+            "—",
         ],
-        ["Datum", formatDate(offer.createdAt)],
       ];
 
-      const titleBoxX = MM(125);
-      let infoY = MM(48);
-      const LABEL_W = MM(32);
+      const titleBoxX = bannerX;
+      let infoY = bannerY + bannerH + 8;
+      const LABEL_W = MM(30);
       const VALUE_X = titleBoxX + LABEL_W + 4;
-      const VALUE_W = MM(67) - LABEL_W - 4;
+      const VALUE_W = bannerW - LABEL_W - 4;
 
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
-        if (!label && !value) {
-          infoY += 6;
-          return;
-        }
+        if (!label && !value) return;
         doc
           .font(R)
           .text(label, titleBoxX, infoY, { width: LABEL_W, lineBreak: false });
@@ -3729,7 +3759,14 @@ export class OfferController {
         infoY += 12;
       });
 
-      let yPos = Math.max(addrY + 15, MM(100));
+      let yPos = Math.max(addrY + 12, infoY + 12);
+
+      // --- Shipping method above table ---
+      const shippingText = offer.shippingMethod || "angeliefert durch GTech";
+      doc.font(R).fontSize(9).fillColor("#3F4446");
+      doc.text(`Versandart: ${shippingText}`, MM(25), yPos);
+      yPos += 20;
+
       const tableY = yPos;
       const columns = [
         { header: "Pos", width: 25, align: "left" },
@@ -3745,8 +3782,9 @@ export class OfferController {
       const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
       const headerHeight = 24;
 
-      doc.rect(LEFT_X, tableY, tableWidth, headerHeight).fill("#D1D5DB");
-      doc.font(SB).fontSize(8.5).fillColor("#3F4446");
+      // Grey table header background matching banner box
+      doc.rect(LEFT_X, tableY, tableWidth, headerHeight).fill("#D9E1E8");
+      doc.font(SB).fontSize(8.5).fillColor("#2D3748");
 
       let currentX = LEFT_X;
       columns.forEach((col) => {
@@ -3762,7 +3800,7 @@ export class OfferController {
         .moveTo(LEFT_X, tableY + headerHeight)
         .lineTo(LEFT_X + tableWidth, tableY + headerHeight)
         .lineWidth(0.8)
-        .strokeColor("#3F4446")
+        .strokeColor("#A0AEC0")
         .stroke();
 
       const formatGermanNum = (numVal: any, decimals: number = 2): string => {
@@ -3874,7 +3912,7 @@ export class OfferController {
               .moveTo(LEFT_X, newTableY + headerHeight)
               .lineTo(LEFT_X + tableWidth, newTableY + headerHeight)
               .lineWidth(0.75)
-              .strokeColor("#2F6B46")
+              .strokeColor("#D9E1E8")
               .stroke();
 
             doc.font(R).fontSize(8.5).fillColor("#3F4446");
@@ -4006,9 +4044,9 @@ export class OfferController {
       yPos += 22;
       const bruttoBoxX = TOTALS_LABEL_X - 6;
       const bruttoBoxW = TOTALS_VAL_X + TOTALS_VAL_W - bruttoBoxX + 4;
-      doc.rect(bruttoBoxX, yPos - 4, bruttoBoxW, 20).fill("#D1D5DB");
+      doc.rect(bruttoBoxX, yPos - 4, bruttoBoxW, 20).fill("#D9E1E8");
 
-      doc.font(SB).fontSize(10).fillColor("#3F4446");
+      doc.font(SB).fontSize(10).fillColor("#2D3748");
       doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
       doc.text(
         `${formatGermanNum(totals.totalAmount, 2)} ${offer.currency || "EUR"}`,
@@ -4017,13 +4055,11 @@ export class OfferController {
         { align: "right", width: TOTALS_VAL_W },
       );
 
-      yPos += 35;
-      let notesHeight = 0;
-      if (offer.shippingMethod) notesHeight += 15;
+      yPos += 30;
+      let notesHeight = 30;
       if (offer.deliveryTime) notesHeight += 15;
       if (offer.deliveryTerms) notesHeight += 15;
       if (offer.paymentTerms) notesHeight += 15;
-      if (offer.paymentMethod) notesHeight += 15;
       if (offer.notes) {
         notesHeight +=
           doc.heightOfString(`Hinweise: ${offer.notes}`, {
@@ -4038,11 +4074,9 @@ export class OfferController {
       }
 
       doc.font(R).fontSize(9).fillColor("#3F4446");
+      doc.text("All prices are net prices.", LEFT_X, yPos);
+      yPos += 14;
 
-      if (offer.shippingMethod) {
-        doc.text(`Versandart: ${offer.shippingMethod}`, LEFT_X, yPos);
-        yPos += 14;
-      }
       if (offer.deliveryTime) {
         doc.text(`Lieferzeit: ${offer.deliveryTime}`, LEFT_X, yPos);
         yPos += 14;
@@ -4051,10 +4085,10 @@ export class OfferController {
         doc.text(`Lieferbedingungen: ${offer.deliveryTerms}`, LEFT_X, yPos);
         yPos += 14;
       }
-      if (offer.paymentMethod) {
-        doc.text(`Zahlungsart: ${offer.paymentMethod}`, LEFT_X, yPos);
-        yPos += 14;
-      }
+      const payMethod = offer.paymentMethod || "Kauf auf Rechnung";
+      doc.text(`Zahlungsart: ${payMethod}`, LEFT_X, yPos);
+      yPos += 14;
+
       if (offer.paymentTerms) {
         doc.text(`Zahlungsbedingungen: ${offer.paymentTerms}`, LEFT_X, yPos);
         yPos += 14;
