@@ -11,6 +11,7 @@ import { CCICustomer } from "../models/cci_customer";
 import { CCIItem } from "../models/cci_items";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { createLieferscheinFromRechnung } from "./lieferschein_controller";
+import { Lieferschein } from "../models/lieferscheine";
 
 export const createRechnungFromAuftrag = async (
   req: Request,
@@ -378,40 +379,55 @@ export const getAllRechnungen = async (
 };
 
 export const getLieferscheine = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const rechnungRepo = AppDataSource.getRepository(Rechnung);
-    const rechnungen = await rechnungRepo.find({
+    const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
+    const lieferscheine = await lieferscheinRepo.find({
       order: { created_at: "DESC" },
-      relations: ["items", "customer"],
+      relations: ["rechnung", "rechnung.items", "rechnung.customer"],
     });
-    const lieferscheine = rechnungen.map((rec) => ({
-      id: rec.id,
-      deliveryNoteNo: rec.invoice_number.replace(/^R/, "LS"),
-      invoiceNumber: rec.invoice_number,
-      orderNumber: rec.auftrag_no,
-      date: rec.invoice_date,
-      customerName: rec.customer?.company_name || "—",
-      city: rec.customer?.city || "—",
-      country: rec.customer?.country || "—",
-      itemCount: rec.items?.length || 0,
-      items: (rec.items || []).map((it) => ({
-        id: it.id,
-        itemName: it.item_name,
-        itemNo: it.itemNo || "—",
-        quantity: it.quantity,
-        remark: it.remark || it.notes,
-      })),
-    }));
+
+    // Transform to frontend-friendly format
+    const formattedLieferscheine = lieferscheine.map((ls) => {
+      const rechnung = ls.rechnung;
+      const customer = rechnung?.customer;
+      const items = rechnung?.items || [];
+
+      return {
+        id: ls.id,
+        deliveryNoteNo: ls.delivery_note_number,
+        invoiceNumber: ls.invoice_number,
+        orderNumber: ls.auftrag_no || ls.order_number,
+        date: ls.delivery_date,
+        status: ls.status,
+        customerName: customer?.company_name || "—",
+        city: customer?.city || "",
+        country: customer?.country || "",
+        itemCount: items.length,
+        items: items.map((item) => ({
+          id: item.id,
+          itemName: item.item_name || "—",
+          itemNo: item.itemNo || "—",
+          quantity: item.quantity,
+          remark: item.remark || item.notes,
+          weight: item.weight,
+          photo: item.photo,
+        })),
+        highlightColor: ls.highlight_color,
+        createdAt: ls.created_at,
+        rechnungId: rechnung?.id,
+      };
+    });
 
     res.json({
       success: true,
-      data: lieferscheine,
+      data: formattedLieferscheine,
     });
   } catch (error) {
+    console.error("Error fetching Lieferscheine:", error);
     next(error);
   }
 };

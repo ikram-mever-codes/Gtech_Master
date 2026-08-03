@@ -1,8 +1,6 @@
+// src/api/lieferscheine.ts
 import { api, handleApiError } from "@/utils/api";
 
-/**
- * Get all Lieferscheine (Delivery Notes)
- */
 export const getAllLieferscheine = async () => {
   try {
     const response: any = await api.get("/lieferscheine");
@@ -13,9 +11,6 @@ export const getAllLieferscheine = async () => {
   }
 };
 
-/**
- * Get Lieferschein by ID
- */
 export const getLieferscheinById = async (id: string | number) => {
   try {
     const response: any = await api.get(`/lieferscheine/${id}`);
@@ -26,9 +21,6 @@ export const getLieferscheinById = async (id: string | number) => {
   }
 };
 
-/**
- * Update Lieferschein status
- */
 export const updateLieferscheinStatus = async (
   id: string | number,
   status: string,
@@ -44,9 +36,24 @@ export const updateLieferscheinStatus = async (
   }
 };
 
-/**
- * Delete Lieferschein
- */
+export const updateLieferscheinDeliveryDate = async (
+  id: string | number,
+  deliveryDate: string,
+) => {
+  try {
+    const response: any = await api.patch(
+      `/lieferscheine/${id}/delivery-date`,
+      {
+        deliveryDate,
+      },
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to update delivery date");
+    throw error;
+  }
+};
+
 export const deleteLieferschein = async (id: string | number) => {
   try {
     const response: any = await api.delete(`/lieferscheine/${id}`);

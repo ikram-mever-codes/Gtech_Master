@@ -41,6 +41,7 @@ export const createLieferscheinFromRechnung = async (
 
 /**
  * Get all Lieferscheine with Rechnung data
+ * Fetches from Lieferschein table and joins Rechnung for items and customer data
  */
 export const getAllLieferscheine = async (
   req: Request,
@@ -66,10 +67,10 @@ export const getAllLieferscheine = async (
         invoiceNumber: ls.invoice_number,
         orderNumber: ls.auftrag_no || ls.order_number,
         date: ls.delivery_date,
+        status: ls.status,
         customerName: customer?.company_name || "—",
         city: customer?.city || "",
         country: customer?.country || "",
-        status: ls.status,
         itemCount: items.length,
         items: items.map((item: any) => ({
           id: item.id,
@@ -145,7 +146,7 @@ export const getLieferscheinById = async (
         country: customer?.country || "",
         phone: customer?.phone || "",
       },
-      items: items.map((item: any) => ({
+      items: items.map((item) => ({
         id: item.id,
         itemName: item.item_name || "—",
         itemNo: item.itemNo || "—",
@@ -216,6 +217,52 @@ export const updateLieferscheinStatus = async (
     res.json({
       success: true,
       message: "Lieferschein status updated successfully",
+      data: lieferschein,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update Lieferschein delivery date
+ */
+export const updateLieferscheinDeliveryDate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { deliveryDate } = req.body;
+
+    if (!deliveryDate) {
+      res.status(400).json({
+        success: false,
+        message: "Delivery date is required",
+      });
+      return;
+    }
+
+    const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
+    const lieferschein = await lieferscheinRepo.findOne({
+      where: { id },
+    });
+
+    if (!lieferschein) {
+      res.status(404).json({
+        success: false,
+        message: "Lieferschein not found",
+      });
+      return;
+    }
+
+    lieferschein.delivery_date = new Date(deliveryDate);
+    await lieferscheinRepo.save(lieferschein);
+
+    res.json({
+      success: true,
+      message: "Delivery date updated successfully",
       data: lieferschein,
     });
   } catch (error) {

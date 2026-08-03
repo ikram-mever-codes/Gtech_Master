@@ -68,6 +68,7 @@ import { RechnungCustomer } from "../models/rechnung_customer";
 import { RechnungItem } from "../models/rechnung_items";
 import { Rechnung_k } from "../models/rechnung_k";
 import { RechnungKItem } from "../models/rechnung_k_items";
+import { Lieferschein } from "../models/lieferscheine";
 
 dotenv.config();
 
@@ -130,6 +131,7 @@ export const AppDataSource = new DataSource({
     SupplierOrder,
     Tag,
     TaxProfile,
+    Lieferschein,
     Country,
     CompanyShippingAddress,
     PaymentMethod,
