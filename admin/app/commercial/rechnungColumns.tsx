@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileDown } from "lucide-react";
+import { downloadRechnungPdf } from "@/api/rechnungen";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -81,6 +82,19 @@ export function buildRechnungColumns({
               ) : (
                 "+RK"
               )}
+            </button>
+
+            <button
+              title="Download Rechnung PDF"
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  await downloadRechnungPdf(row.id, row.invoiceNumber || row.invoice_number);
+                } catch (_) {}
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+            >
+              <FileDown className="h-3.5 w-3.5" /> PDF
             </button>
           </div>
         );

@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { MoveRight } from "lucide-react";
+import { MoveRight, FileDown } from "lucide-react";
+import { downloadCustomerOrderPdf } from "@/api/customer_orders";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -146,6 +147,19 @@ export function buildAuftragColumns({
                 </span>
               )}
             </div>
+
+            <button
+              title="Download Auftrag PDF"
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  await downloadCustomerOrderPdf(row.id, row.order_no);
+                } catch (_) {}
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+            >
+              <FileDown className="h-3.5 w-3.5" /> PDF
+            </button>
           </div>
         );
       },

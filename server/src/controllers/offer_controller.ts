@@ -3873,12 +3873,12 @@ export class OfferController {
 
       doc.rect(bannerX, bannerY - 4, bannerW, bannerH).fill("#ECEAE6");
       const bannerTextY = bannerY - 1;
-      const BANNER_PAD = 6;
+      const BANNER_LEFT_PAD = 2;
       doc
         .font(SB)
         .fontSize(10)
         .fillColor("#1A202C")
-        .text("Angebot", bannerX + BANNER_PAD, bannerTextY, {
+        .text("Angebot", bannerX + BANNER_LEFT_PAD, bannerTextY, {
           lineBreak: false,
         });
 
@@ -3888,16 +3888,19 @@ export class OfferController {
           .font(SB)
           .fontSize(10)
           .fillColor("#1A202C")
-          .text(numStr, bannerX + BANNER_PAD, bannerTextY, {
+          .text(numStr, bannerX + BANNER_LEFT_PAD, bannerTextY, {
             align: "right",
-            width: bannerW - BANNER_PAD * 2,
+            width: bannerW - BANNER_LEFT_PAD * 2 - 2,
             lineBreak: false,
           });
       }
 
-      const contactName = offer.inquiry?.contactPerson
-        ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
-        : "Alexander";
+      const contactName =
+        (request as any).user?.name ||
+        (request as any).user?.username ||
+        (offer.inquiry?.contactPerson
+          ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
+          : "Admin");
 
       const customerCompName = (
         customer.companyName ||
@@ -3912,7 +3915,7 @@ export class OfferController {
 
       let kundeCombined = "—";
       if (customerCompName && customerNum) {
-        kundeCombined = `${customerCompName}· ${customerNum}`;
+        kundeCombined = `${customerCompName} · ${customerNum}`;
       } else if (customerCompName) {
         kundeCombined = customerCompName;
       } else if (customerNum) {
@@ -3927,32 +3930,41 @@ export class OfferController {
 
       const titleBoxX = bannerX;
       let infoY = bannerY + bannerH + 2;
-      const LABEL_W = MM(30);
-      const VALUE_X = titleBoxX + LABEL_W + 4;
-      const VALUE_W = bannerW - LABEL_W - 4;
+      const LABEL_W = MM(28);
+      const VALUE_X = titleBoxX + LABEL_W + 2;
+      const VALUE_W = bannerW - LABEL_W - 2;
 
       doc.fontSize(8.5).fillColor("#3F4446");
       infoItems.forEach(([label, value]) => {
         if (!label && !value) return;
-        doc
-          .font(R)
-          .text(label, titleBoxX, infoY, { width: LABEL_W, lineBreak: false });
-        doc
-          .font(M)
-          .text(value, VALUE_X, infoY, { width: VALUE_W, lineBreak: false });
-        infoY += 12;
+        const lblStr = String(label || "");
+        const valStr = String(value || "");
+        const hLbl = doc.font(R).fontSize(8.5).heightOfString(lblStr, { width: LABEL_W });
+        const hVal = doc.font(M).fontSize(8.5).heightOfString(valStr, { width: VALUE_W });
+        const rowH = Math.max(11, hLbl, hVal);
+
+        doc.font(R).fontSize(8.5).text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
+        doc.font(M).fontSize(8.5).text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+        infoY += rowH + 2;
       });
+      const cleanPdfText = (text?: string | null): string => {
+        if (!text) return "";
+        return String(text)
+          .replace(/[^\x20-\x7E\xA0-\xFF\u20AC]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      };
+
       let yPos = Math.max(addrY + 25, infoY + 25);
       const tableY = yPos;
       const columns = [
-        { header: "Pos", width: 25, align: "left" },
-        { header: "Art.-Nr.", width: 75, align: "left" },
-        { header: "Bezeichnung", width: 140, align: "left" },
-        { header: "RemarkEx", width: 68, align: "left" },
-        { header: "MwSt.", width: 38, align: "center" },
-        { header: "Menge", width: 40, align: "right" },
-        { header: "Netto-Preis", width: 52, align: "right" },
-        { header: "Netto\ngesamt", width: 55, align: "right" },
+        { header: "Pos", width: 22, align: "left" },
+        { header: "Art.-Nr.", width: 70, align: "left" },
+        { header: "Bezeichnung", width: 195, align: "left" },
+        { header: "MwSt.", width: 34, align: "center" },
+        { header: "Menge", width: 36, align: "right" },
+        { header: "Netto-Preis €", width: 68, align: "right" },
+        { header: "Netto gesamt €", width: 68, align: "right" },
       ];
 
       const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
@@ -4030,28 +4042,22 @@ export class OfferController {
             item.isFreizeile ||
             (!item.material && (item.description || item.itemName));
           const itemNameStr =
-            item.itemName ||
-            item.description ||
+            cleanPdfText(item.itemName || item.description) ||
             (isFreizeile ? "Freizeile" : "Item");
           const artNrStr = isFreizeile
-            ? item.material || "—"
-            : item.material || item.id?.substring(0, 8) || "—";
-          const remarksStr =
-            item.remarks && item.remarks.trim() ? item.remarks.trim() : "-";
+            ? cleanPdfText(item.material) || "—"
+            : cleanPdfText(item.material) || item.id?.substring(0, 8) || "—";
+          const rawRemarks = cleanPdfText(item.remarks);
+          const fullBezText = (rawRemarks && rawRemarks !== "-") ? `${itemNameStr}\n${rawRemarks}` : itemNameStr;
 
-          const nameWidth = columns[2].width - 6;
-          const remarksWidth = columns[3].width - 6;
+          const bezWidth = columns[2].width - 4;
 
           doc.font(R).fontSize(8.5);
-          const nameHeight = doc.heightOfString(itemNameStr, {
-            width: nameWidth,
-          });
-          const remarksHeight = doc.heightOfString(remarksStr, {
-            width: remarksWidth,
+          const textHeight = doc.heightOfString(fullBezText, {
+            width: bezWidth,
           });
 
-          const totalTextHeight = Math.max(nameHeight, remarksHeight);
-          const computedRowHeight = Math.max(28, totalTextHeight + 10);
+          const computedRowHeight = Math.max(26, textHeight + 10);
 
           if (currentY + computedRowHeight > MM(265)) {
             doc
@@ -4103,8 +4109,7 @@ export class OfferController {
           const rowData = [
             (rowIndex + 1).toString(),
             artNrStr,
-            itemNameStr,
-            remarksStr,
+            fullBezText,
             `${vatRatePercent}%`,
             qtyStr,
             formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3),
@@ -4115,7 +4120,7 @@ export class OfferController {
           rowData.forEach((data, colIndex) => {
             doc.font(R).fontSize(8.5).fillColor("#2D3748");
             const col = columns[colIndex];
-            doc.text(data, currentX + 2, currentY + 6, {
+            doc.text(data, currentX + 2, currentY + 5, {
               width: col.width - 4,
               align: col.align as any,
               lineBreak: true,
@@ -4270,9 +4275,9 @@ export class OfferController {
 
       yPos += 30;
       let notesHeight = 15;
+      if (offer.paymentMethod || offer.paymentTerms) notesHeight += 15;
       if (offer.deliveryTime) notesHeight += 15;
       if (offer.deliveryTerms) notesHeight += 15;
-      if (offer.paymentTerms) notesHeight += 15;
       if (offer.notes) {
         notesHeight +=
           doc.heightOfString(`Hinweise: ${offer.notes}`, {
@@ -4288,9 +4293,29 @@ export class OfferController {
 
       doc.font(R).fontSize(9).fillColor("#3F4446");
 
-      const payMethodText = (offer.paymentMethod || "").trim();
-      if (payMethodText) {
-        doc.text(`Zahlungsart: ${payMethodText}`, LEFT_X, yPos);
+      let rawPayMethod = (offer.paymentMethod || "").trim();
+      let rawPayTerms = (offer.paymentTerms || "").trim();
+      if (rawPayTerms.toLowerCase().startsWith("zahlungsziel:")) {
+        rawPayTerms = rawPayTerms.replace(/^zahlungsziel:\s*/i, "").trim();
+      }
+
+      let combinedPaymentStr = rawPayMethod;
+      if (rawPayTerms) {
+        let termsSuffix = rawPayTerms;
+        if (/^\d+$/.test(termsSuffix)) {
+          termsSuffix = `${termsSuffix} Tage`;
+        }
+        if (combinedPaymentStr) {
+          if (!combinedPaymentStr.toLowerCase().includes(termsSuffix.toLowerCase())) {
+            combinedPaymentStr = `${combinedPaymentStr}, ${termsSuffix}`;
+          }
+        } else {
+          combinedPaymentStr = termsSuffix;
+        }
+      }
+
+      if (combinedPaymentStr) {
+        doc.text(`Zahlungsart: ${combinedPaymentStr}`, LEFT_X, yPos);
         yPos += 14;
       }
       if (offer.deliveryTime) {
@@ -4299,10 +4324,6 @@ export class OfferController {
       }
       if (offer.deliveryTerms) {
         doc.text(`Lieferbedingungen: ${offer.deliveryTerms}`, LEFT_X, yPos);
-        yPos += 14;
-      }
-      if (offer.paymentTerms) {
-        doc.text(`Zahlungsbedingungen: ${offer.paymentTerms}`, LEFT_X, yPos);
         yPos += 14;
       }
       if (offer.notes) {

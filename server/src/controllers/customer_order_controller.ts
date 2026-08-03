@@ -14,6 +14,9 @@ import {
   parseFlexibleNumberOrZero,
 } from "../utils/decimal";
 import { WarehouseItem } from "../models/warehouse_items";
+import path from "path";
+import fs from "fs";
+import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { Rechnung } from "../models/rechnung";
 import { Rechnung_k } from "../models/rechnung_k";
 import { TransferOrder } from "../models/transfer_order";
@@ -140,9 +143,9 @@ async function getLinkedDocumentsForAuftrag(
   const [offer, rechnungen, rechnungenK, bestellungen] = await Promise.all([
     safeOfferId
       ? offerRepo.findOne({
-          where: { id: safeOfferId },
-          select: ["id", "offerNumber", "createdAt"],
-        })
+        where: { id: safeOfferId },
+        select: ["id", "offerNumber", "createdAt"],
+      })
       : Promise.resolve(null),
     rechnungRepo.find({
       where: { auftrag_id: auftragId },
@@ -200,9 +203,9 @@ async function getLinkedDocumentsForAuftraege(
   const [offers, rechnungen, rechnungenK, bestellungen] = await Promise.all([
     offerIds.length
       ? offerRepo.find({
-          where: { id: In(offerIds) },
-          select: ["id", "offerNumber", "createdAt"],
-        })
+        where: { id: In(offerIds) },
+        select: ["id", "offerNumber", "createdAt"],
+      })
       : Promise.resolve([]),
     rechnungRepo.find({
       where: { auftrag_id: In(auftragIds) },
@@ -356,9 +359,9 @@ export const createAuftragFromOffer = async (
         warehouseItems = await warehouseRepository.find({
           where: itemIdDEs.length
             ? [
-                { ItemID_DE: In(itemIdDEs) },
-                { item_id: In(sourceItems.map((it: any) => it.id)) },
-              ]
+              { ItemID_DE: In(itemIdDEs) },
+              { item_id: In(sourceItems.map((it: any) => it.id)) },
+            ]
             : { item_id: In(sourceItems.map((it: any) => it.id)) },
         });
       } catch (e: any) {
@@ -1328,3 +1331,82 @@ async function attachStockInfoToOrders(orders: CustomerOrder[]): Promise<void> {
     }
   }
 }
+
+export const downloadCustomerOrderPdf = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const order = await customerOrderRepo.findOne({
+      where: [{ id: Number(id) || 0 }, { order_no: String(id) }],
+      relations: ["orderItems", "customer"],
+    });
+
+    if (!order) {
+      res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+
+    const customerSnap = order.customerSnapshot || order.customer || {};
+    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (customerSnap.companyName || customerSnap.legalName || "").trim();
+    const customerNum = (customerSnap.customerNumber || "").trim();
+    let kundeCombined = "—";
+    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    else if (customerCompName) kundeCombined = customerCompName;
+    else if (customerNum) kundeCombined = customerNum;
+
+    const uploadsDir = path.join(__dirname, "../../uploads/customer_orders");
+    const filePath = path.join(uploadsDir, `auftrag_${order.order_no || order.id}.pdf`);
+
+    const items = (order.orderItems || []).map((it: any, idx: number) => ({
+      position: it.position || idx + 1,
+      artNr: it.itemNo || it.material || "—",
+      bezeichnung: it.itemName || it.description || "Item",
+      remarks: it.notes || it.specification || "-",
+      vatRate: it.taxRate ?? order.tax_rate ?? 19,
+      quantity: Number(it.quantity || 1),
+      unitPrice: Number(it.price || 0),
+      lineTotal: Number(it.lineTotal || (Number(it.quantity || 1) * Number(it.price || 0))),
+    }));
+
+    await generateGtechDocumentPdf({
+      documentType: "Auftrag" as any,
+      documentNumber: order.order_no,
+      customerSnapshot: customerSnap,
+      customerEntity: order.customer,
+      deliveryAddress: order.deliveryAddress,
+      metadataItems: [
+        ["Ansprechpartner", contactName],
+        ["Kunde", kundeCombined],
+        ["Datum", order.date_created || order.created_at],
+      ],
+      lineItems: items,
+      showPrices: true,
+      shippingMethod: order.shipping_method,
+      shippingCost: Number(order.shipping_cost || 0),
+      discountPercentage: Number(order.discount_percentage || 0),
+      discountAmount: Number(order.discount_amount || 0),
+      subtotal: Number(order.subtotal || 0),
+      taxAmount: Number(order.tax_amount || 0),
+      totalAmount: Number(order.total_amount || 0),
+      taxRate: Number(order.tax_rate || 19),
+      currency: order.currency || "EUR",
+      notes: order.notes,
+      deliveryTime: order.date_delivery || order.delivery_terms,
+      deliveryTerms: order.delivery_terms,
+      paymentTerms: order.payment_terms ? `Zahlungsziel: ${order.payment_terms} Tage` : undefined,
+      paymentMethod: order.payment_method,
+      outputFilePath: filePath,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=auftrag_${order.order_no}.pdf`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    next(err);
+  }
+};

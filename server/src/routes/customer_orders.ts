@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { authenticateUser } from "../middlewares/authorized";
 import {
   createAuftragFromOffer,
   createAuftragFromItems,
@@ -10,13 +11,16 @@ import {
   updateOrderLineItem,
   deleteOrderLineItem,
   previewOrderLineItemPrice,
+  downloadCustomerOrderPdf,
 } from "../controllers/customer_order_controller";
 
 const router = Router();
+router.use(authenticateUser);
 
 router.post("/from-offer/:offerId", createAuftragFromOffer);
 router.post("/from-items", createAuftragFromItems);
 router.get("/", getAllCustomerOrders);
+router.get("/:id/download-pdf", downloadCustomerOrderPdf);
 router.get("/:id", getCustomerOrderById);
 router.put("/:id", updateCustomerOrder);
 router.delete("/:id", deleteCustomerOrder);

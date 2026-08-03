@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { FileDown } from "lucide-react";
+import { downloadLieferscheinPdf } from "@/api/lieferscheine";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -88,15 +90,30 @@ export function buildLieferscheinColumns({
       width: "90px",
       align: "center",
       render: (row) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onView(row);
-          }}
-          className="px-2 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-[4px] transition shadow-md"
-        >
-          View
-        </button>
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onView(row);
+            }}
+            className="px-2 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-[4px] transition shadow-md"
+          >
+            View
+          </button>
+
+          <button
+            title="Download Lieferschein PDF"
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                await downloadLieferscheinPdf(row.id, row.deliveryNoteNo || row.delivery_note_number);
+              } catch (_) { }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+          >
+            <FileDown className="h-3.5 w-3.5" /> PDF
+          </button>
+        </div>
       ),
     },
   ];

@@ -1,4 +1,6 @@
 import { api, handleApiError } from "@/utils/api";
+import { toast } from "react-hot-toast";
+import { loadingStyles } from "@/utils/constants";
 
 export const createRechnungKFromRechnung = async (
   rechnungId: string | number,
@@ -72,6 +74,32 @@ export const getRechnungOpenQuantities = async (
     return response;
   } catch (error: any) {
     handleApiError(error, "Failed to fetch open quantities");
+    throw error;
+  }
+};
+
+export const downloadRechnungKPdf = async (
+  id: string | number,
+  rkNo?: string,
+) => {
+  try {
+    toast.loading("Preparing download...", loadingStyles);
+    const response: any = await api.get(`/rechnungen-k/${id}/download-pdf`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([response.data], { type: "application/pdf" });
+    if (blob.size === 0) throw new Error("The downloaded PDF is empty.");
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      toast.dismiss();
+    }, 1000);
+    return true;
+  } catch (error) {
+    toast.dismiss();
+    console.error("Error downloading PDF:", error);
+    toast.error("Failed to download PDF");
     throw error;
   }
 };

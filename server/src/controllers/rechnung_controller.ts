@@ -6,6 +6,9 @@ import { RechnungItem } from "../models/rechnung_items";
 import { CustomerOrder } from "../models/customer_orders";
 import { CustomerOrderItem } from "../models/customer_order_items";
 import { Customer } from "../models/customers";
+import path from "path";
+import fs from "fs";
+import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { CCIInvoice } from "../models/cci_invoice";
 import { CCICustomer } from "../models/cci_customer";
 import { CCIItem } from "../models/cci_items";
@@ -724,5 +727,84 @@ export const deleteGelangenheitsbestaetigung = async (
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const downloadRechnungPdf = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const rechnungRepo = AppDataSource.getRepository(Rechnung);
+    const rechnung = await rechnungRepo.findOne({
+      where: [{ id: String(id) }, { invoice_number: String(id) }],
+      relations: ["items", "customer"],
+    });
+
+    if (!rechnung) {
+      res.status(404).json({ success: false, message: "Rechnung not found" });
+      return;
+    }
+
+    const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
+    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || "").trim();
+    const customerNum = (customerSnap.customerNumber || "").trim();
+    let kundeCombined = "—";
+    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    else if (customerCompName) kundeCombined = customerCompName;
+    else if (customerNum) kundeCombined = customerNum;
+
+    const uploadsDir = path.join(__dirname, "../../uploads/rechnungen");
+    const filePath = path.join(uploadsDir, `rechnung_${rechnung.invoice_number || rechnung.id}.pdf`);
+
+    const items = (rechnung.items || []).map((it: any, idx: number) => ({
+      position: it.position || idx + 1,
+      artNr: it.itemNo || it.material || "—",
+      bezeichnung: it.item_name || it.description || "Item",
+      remarks: it.remark || it.notes || "-",
+      vatRate: it.taxRate ?? rechnung.tax_rate ?? 19,
+      quantity: Number(it.quantity || 1),
+      unitPrice: Number(it.unit_price_eur || it.price || 0),
+      lineTotal: Number(it.total_price || it.lineTotal || (Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0))),
+    }));
+
+    await generateGtechDocumentPdf({
+      documentType: "Rechnung",
+      documentNumber: rechnung.invoice_number,
+      customerSnapshot: customerSnap,
+      customerEntity: rechnung.customer,
+      deliveryAddress: rechnung.deliveryAddress,
+      metadataItems: [
+        ["Ansprechpartner", contactName],
+        ["Kunde", kundeCombined],
+        ["Datum", rechnung.date_created || rechnung.created_at || rechnung.invoice_date],
+      ],
+      lineItems: items,
+      showPrices: true,
+      shippingMethod: rechnung.shipping_method,
+      shippingCost: Number(rechnung.shipping_cost || 0),
+      discountPercentage: Number(rechnung.discount_percentage || 0),
+      discountAmount: Number(rechnung.discount_amount || 0),
+      subtotal: Number(rechnung.subtotal || 0),
+      taxAmount: Number(rechnung.tax_amount || 0),
+      totalAmount: Number(rechnung.total_amount || 0),
+      taxRate: Number(rechnung.tax_rate || 19),
+      currency: rechnung.currency || "EUR",
+      notes: rechnung.notes,
+      deliveryTime: rechnung.date_delivery,
+      deliveryTerms: rechnung.delivery_terms,
+      paymentTerms: rechnung.payment_terms ? `Zahlungsziel: ${rechnung.payment_terms} Tage` : undefined,
+      paymentMethod: rechnung.payment_method,
+      outputFilePath: filePath,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=rechnung_${rechnung.invoice_number}.pdf`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    next(err);
   }
 };
