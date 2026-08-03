@@ -43,6 +43,8 @@ import rechnungRoutes from "./routes/rechnung_routes";
 import gtechCompanyRoutes from "./routes/gtech_company_routes";
 import systemParameterRoutes from "./routes/system_parameter_routes";
 import weiterversandServiceRoutes from "./routes/weiterversand_service_provider_routes";
+// Add Lieferschein routes
+import lieferscheinRoutes from "./routes/lieferschein_routes";
 
 const app: any = express();
 
@@ -117,6 +119,9 @@ app.use("/api/v1/rechnungen", rechnungRoutes);
 app.use("/api/v1/gtech-companies", gtechCompanyRoutes);
 app.use("/api/v1/system-parameters", systemParameterRoutes);
 app.use("/api/v1/weiterversand-service-providers", weiterversandServiceRoutes);
+
+// Add Lieferschein routes
+app.use("/api/v1/lieferscheine", lieferscheinRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));

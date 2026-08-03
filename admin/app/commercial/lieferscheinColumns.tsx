@@ -10,7 +10,6 @@ import {
   postalCodeColumn,
   cityColumn,
   buildItemCountColumn,
-  buildViewActionColumn,
 } from "./sharedColumns";
 
 interface LieferscheinColumnsArgs {
@@ -18,9 +17,6 @@ interface LieferscheinColumnsArgs {
   setExpandedDocIds: React.Dispatch<React.SetStateAction<Set<string | number>>>;
   onView: (row: any) => void;
 }
-
-const itemCountCalc = (row: any) =>
-  row.customItemCount ?? row.items?.length ?? 0;
 
 export function buildLieferscheinColumns({
   expandedDocIds,
@@ -32,7 +28,7 @@ export function buildLieferscheinColumns({
     dateCreatedColumn,
     {
       header: "No",
-      width: "100px",
+      width: "110px",
       align: "center",
       render: (row) => (
         <button
@@ -40,11 +36,10 @@ export function buildLieferscheinColumns({
             e.stopPropagation();
             onView(row);
           }}
-          className="text-green-600 hover:underline font-semibold"
+          className="truncate max-w-[110px] text-[#8CC21B] font-semibold hover:underline cursor-pointer"
+          title={row.deliveryNoteNo || row.id}
         >
-          {row.invoiceNumber ||
-            row.order_no ||
-            String(row.id).slice(-5).toUpperCase()}
+          {row.deliveryNoteNo || row.id}
         </button>
       ),
     },
@@ -52,9 +47,57 @@ export function buildLieferscheinColumns({
     personColumn,
     postalCodeColumn,
     cityColumn,
-    // No Value_net column here — the original explicitly excludes it for
-    // activeInvTab === "lieferschein" (`...(activeInvTab !== "lieferschein" ? [...] : [])`).
-    buildItemCountColumn(itemCountCalc),
-    buildViewActionColumn(onView),
+    buildItemCountColumn(
+      (row) => row.customItemCount ?? row.items?.length ?? 0,
+    ),
+    {
+      header: "Status",
+      width: "100px",
+      align: "center",
+      render: (row) => {
+        const status = row.status || "open";
+        const getStatusColor = (status: string) => {
+          switch (status?.toLowerCase()) {
+            case "open":
+              return "bg-blue-100 text-blue-700";
+            case "in progress":
+            case "processing":
+              return "bg-yellow-100 text-yellow-700";
+            case "completed":
+            case "delivered":
+              return "bg-green-100 text-green-700";
+            case "cancelled":
+              return "bg-red-100 text-red-700";
+            default:
+              return "bg-gray-100 text-gray-700";
+          }
+        };
+        return (
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${getStatusColor(
+              status,
+            )}`}
+          >
+            {status}
+          </span>
+        );
+      },
+    },
+    {
+      header: "Actions",
+      width: "90px",
+      align: "center",
+      render: (row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onView(row);
+          }}
+          className="px-2 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-[4px] transition shadow-md"
+        >
+          View
+        </button>
+      ),
+    },
   ];
 }

@@ -69,7 +69,8 @@ export default function OrderDetailsModal({
               Supplier
             </label>
             <p className="text-gray-900 font-bold">
-              {viewOrder.supplier_name && viewOrder.supplier_name !== "Unassigned"
+              {viewOrder.supplier_name &&
+              viewOrder.supplier_name !== "Unassigned"
                 ? viewOrder.supplier_name
                 : viewOrder.supplier_id
                   ? getSupplierName(viewOrder.supplier_id)
@@ -99,11 +100,7 @@ export default function OrderDetailsModal({
                 render: (row) => {
                   const ean = row.ean || row.item?.ean || "-";
                   if (!ean || ean === "-") return "-";
-                  return (
-                    <span className="text-gray-900 font-bold">
-                      {ean}
-                    </span>
-                  );
+                  return <span className="text-gray-900 font-bold">{ean}</span>;
                 },
                 align: "center",
               },
@@ -121,25 +118,17 @@ export default function OrderDetailsModal({
                 render: (row) => (
                   <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
                     {row.remark_de && (
-                      <div className="text-blue-600">
-                        DE: {row.remark_de}
-                      </div>
+                      <div className="text-blue-600">DE: {row.remark_de}</div>
                     )}
                     {row.remarks_cn && (
-                      <div className="text-red-600">
-                        CN: {row.remarks_cn}
-                      </div>
+                      <div className="text-red-600">CN: {row.remarks_cn}</div>
                     )}
                     {row.remark_en && (
-                      <div className="text-green-600">
-                        EN: {row.remark_en}
-                      </div>
+                      <div className="text-green-600">EN: {row.remark_en}</div>
                     )}
-                    {!row.remark_de &&
-                      !row.remarks_cn &&
-                      !row.remark_en && (
-                        <span className="text-gray-300">-</span>
-                      )}
+                    {!row.remark_de && !row.remarks_cn && !row.remark_en && (
+                      <span className="text-gray-300">-</span>
+                    )}
                   </div>
                 ),
               },
@@ -148,12 +137,13 @@ export default function OrderDetailsModal({
                 width: "120px",
                 render: (row) => (
                   <span
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === "NSO"
-                      ? "bg-amber-100 text-amber-700"
-                      : row.status === "SO"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-green-100 text-green-700"
-                      }`}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      row.status === "NSO"
+                        ? "bg-amber-100 text-amber-700"
+                        : row.status === "SO"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-green-100 text-green-700"
+                    }`}
                   >
                     {row.status || "NSO"}
                   </span>
@@ -163,8 +153,7 @@ export default function OrderDetailsModal({
               {
                 header: "Taric",
                 width: "100px",
-                render: (row) =>
-                  row.taric_code || row.item?.taric?.code || "-",
+                render: (row) => row.taric_code || row.item?.taric?.code || "-",
                 align: "center",
               },
               {
@@ -172,10 +161,15 @@ export default function OrderDetailsModal({
                 width: "120px",
                 render: (row) => {
                   const nameFromBackend = (row as any).supplier_name;
-                  if (nameFromBackend && nameFromBackend !== "-" && nameFromBackend !== "Unassigned") {
+                  if (
+                    nameFromBackend &&
+                    nameFromBackend !== "-" &&
+                    nameFromBackend !== "Unassigned"
+                  ) {
                     return nameFromBackend;
                   }
-                  const sid = (row as any).supplier_id || (row as any).item?.supplier_id;
+                  const sid =
+                    (row as any).supplier_id || (row as any).item?.supplier_id;
                   const name = sid ? getSupplierName(sid) : null;
                   return name && name !== "-" ? name : "-";
                 },

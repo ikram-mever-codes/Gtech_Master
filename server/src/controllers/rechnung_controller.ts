@@ -10,6 +10,7 @@ import { CCIInvoice } from "../models/cci_invoice";
 import { CCICustomer } from "../models/cci_customer";
 import { CCIItem } from "../models/cci_items";
 import { NumberSequenceService } from "../services/number_sequence_service";
+import { createLieferscheinFromRechnung } from "./lieferschein_controller";
 
 export const createRechnungFromAuftrag = async (
   req: Request,
@@ -43,6 +44,7 @@ export const createRechnungFromAuftrag = async (
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
 
+    // Generate invoice number
     let invoiceNo = "";
     try {
       invoiceNo = await NumberSequenceService.getNextNumber("invoice");
@@ -51,6 +53,7 @@ export const createRechnungFromAuftrag = async (
       invoiceNo = `R${yy}${mm}-${Date.now().toString().slice(-4)}`;
     }
 
+    // Generate delivery note number (for Lieferschein)
     let deliveryNoteNo = "";
     try {
       deliveryNoteNo =
@@ -60,7 +63,7 @@ export const createRechnungFromAuftrag = async (
         "Could not generate sequence number for delivery note:",
         err,
       );
-      deliveryNoteNo = `L${yy}${mm}-${Date.now().toString().slice(-4)}`;
+      deliveryNoteNo = `LS${yy}${mm}-${Date.now().toString().slice(-4)}`;
     }
 
     const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
@@ -136,10 +139,8 @@ export const createRechnungFromAuftrag = async (
 
       const itemName = selItem.itemName || sourceLine?.itemName || "Item";
 
-      // Use the entity field names that exist in RechnungItem
       const itemData: Partial<RechnungItem> = {
         item_name: itemName,
-        // Use itemNo field (not item_no_de)
         itemNo:
           selItem.itemNo ||
           sourceLine?.itemNo ||
@@ -157,7 +158,6 @@ export const createRechnungFromAuftrag = async (
         sourceItemId: sourceLine?.sourceItemId || undefined,
         notes: sourceLine?.notes || undefined,
         remark_order_item: selItem.remark_order_item || undefined,
-        // Use the entity field names
         quantity: qty,
         price: price,
         unit_price_eur: price,
@@ -199,12 +199,14 @@ export const createRechnungFromAuftrag = async (
     const taxAmount = (subtotal * taxRate) / 100;
     const totalAmount = subtotal + taxAmount;
 
-    // Calculate discount if present
     const discountPercentage = Number(auftrag.discount_percentage ?? 0);
     const discountAmount = Number(auftrag.discount_amount ?? 0);
     const shippingCost = Number(auftrag.shipping_cost ?? 0);
     const shippingQuantity = Number(auftrag.shipping_quantity ?? 1);
 
+    // ============================================
+    // CREATE RECHNUNG
+    // ============================================
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = rechnungRepo.create({
       invoice_number: invoiceNo,
@@ -222,7 +224,6 @@ export const createRechnungFromAuftrag = async (
       status: "open",
       customer: savedCustomerSnapshot,
       rechnung_customer_id: savedCustomerSnapshot.id,
-      // NEW: Copy all fields from Auftrag
       date_created: dateCreatedStr,
       date_emailed: auftrag.date_emailed || undefined,
       date_delivery: auftrag.date_delivery || undefined,
@@ -244,16 +245,39 @@ export const createRechnungFromAuftrag = async (
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
 
-    // Now save the items with the correct relations
+    // ============================================
+    // SAVE RECHNUNG ITEMS
+    // ============================================
     const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
     const itemEntities = itemsToCreate.map((item) =>
       rechnungItemRepo.create({
         ...item,
-        rechnungId: savedRechnung.id, // Use rechnungId instead of rechnung_id
+        rechnungId: savedRechnung.id,
       }),
     );
     await rechnungItemRepo.save(itemEntities);
 
+    // Get full Rechnung with relations
+    const fullRechnung = await rechnungRepo.findOne({
+      where: { id: savedRechnung.id },
+      relations: ["items", "customer"],
+    });
+
+    // ============================================
+    // CREATE LIEFERSCHEIN FROM THE SAME AUFTRAG DATA
+    // ============================================
+    if (fullRechnung) {
+      try {
+        await createLieferscheinFromRechnung(fullRechnung, deliveryNoteNo);
+      } catch (err) {
+        console.warn("Could not create Lieferschein:", err);
+        // Don't fail the Rechnung creation if Lieferschein creation fails
+      }
+    }
+
+    // ============================================
+    // CREATE CCI INVOICE (Mirror to CCI tables)
+    // ============================================
     try {
       const cciCustRepo = AppDataSource.getRepository(CCICustomer);
       const cciCust = cciCustRepo.create({
@@ -305,7 +329,6 @@ export const createRechnungFromAuftrag = async (
           total_price: it.total_price || 0,
           order_no: auftrag.order_no,
           remark: it.remark || it.notes,
-          // Additional fields
           itemNo: it.itemNo,
           material: it.material,
           specification: it.specification,
@@ -321,11 +344,6 @@ export const createRechnungFromAuftrag = async (
     } catch (cciErr) {
       console.warn("Could not mirror to CCI tables:", cciErr);
     }
-
-    const fullRechnung = await rechnungRepo.findOne({
-      where: { id: savedRechnung.id },
-      relations: ["items", "customer"],
-    });
 
     res.status(201).json({
       success: true,
