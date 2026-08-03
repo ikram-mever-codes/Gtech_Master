@@ -544,14 +544,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       } else {
         toast.error(
           res.message ||
-          `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
+            `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
           errorStyles,
         );
       }
     } catch (e: any) {
       toast.error(
         e.message ||
-        `An error occurred while ${isCreate ? "creating" : "saving"}.`,
+          `An error occurred while ${isCreate ? "creating" : "saving"}.`,
         errorStyles,
       );
     } finally {
@@ -717,8 +717,8 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
   const visibleLineItems = order?.orderItems
     ? [...order.orderItems].sort(
-      (a: any, b: any) => (a.position || 0) - (b.position || 0),
-    )
+        (a: any, b: any) => (a.position || 0) - (b.position || 0),
+      )
     : [];
 
   // Loading state for existing order
@@ -1152,7 +1152,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     <PlusIcon className="h-3.5 w-3.5" />
                     Add existing item
                   </button>
-                  <div className="flex-1 min-w-[200px]">
+                  {/* <div className="flex-1 min-w-[200px]">
                     <div className="flex items-end gap-2">
                       <div className="flex-1">
                         <input
@@ -1175,7 +1175,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                         Add Freizeile
                       </button>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
 
                 {showItemPicker && (
@@ -1255,7 +1255,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                      visibleLineItems[0]?.extraWeight === undefined
+                    visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : String(visibleLineItems[0].extraWeight)
                   }

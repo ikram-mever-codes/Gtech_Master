@@ -216,13 +216,13 @@ export default function LieferscheinDetailModal({
               <p className="text-lg font-bold text-gray-900 truncate">
                 Lieferschein {deliveryNoteNo}
               </p>
-              <span
+              {/* <span
                 className={`text-xs px-2 py-0.5 rounded-full font-semibold ${getStatusColor(
                   status,
                 )}`}
               >
                 {status}
-              </span>
+              </span> */}
               {highlightColor && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full font-semibold text-white"
@@ -436,7 +436,7 @@ export default function LieferscheinDetailModal({
               <Field label="Total weight" value={formatWeight(totalWeightKg)} />
             </div>
             <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
-              <div className="flex justify-between">
+              {/* <div className="flex justify-between">
                 <span className="text-gray-600">Status</span>
                 <span
                   className={`font-semibold px-2 py-0.5 rounded-full text-xs ${getStatusColor(
@@ -445,7 +445,7 @@ export default function LieferscheinDetailModal({
                 >
                   {status}
                 </span>
-              </div>
+              </div> */}
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Items</span>
                 <span className="font-medium">{items.length}</span>

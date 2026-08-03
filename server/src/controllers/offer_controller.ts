@@ -1460,11 +1460,7 @@ export class OfferController {
       const offer = this.offerRepository.create({
         offerNumber,
         sourceType: "item",
-        title:
-          body.title ||
-          (orderedItems.length > 1
-            ? `${primarySnapshot.itemName} +${orderedItems.length - 1} more`
-            : `${primarySnapshot.itemName}`),
+        title: primarySnapshot.itemName,
         inquiry: null,
         inquiryId: null,
         inquirySnapshot: null,
@@ -3940,12 +3936,24 @@ export class OfferController {
         if (!label && !value) return;
         const lblStr = String(label || "");
         const valStr = String(value || "");
-        const hLbl = doc.font(R).fontSize(8.5).heightOfString(lblStr, { width: LABEL_W });
-        const hVal = doc.font(M).fontSize(8.5).heightOfString(valStr, { width: VALUE_W });
+        const hLbl = doc
+          .font(R)
+          .fontSize(8.5)
+          .heightOfString(lblStr, { width: LABEL_W });
+        const hVal = doc
+          .font(M)
+          .fontSize(8.5)
+          .heightOfString(valStr, { width: VALUE_W });
         const rowH = Math.max(11, hLbl, hVal);
 
-        doc.font(R).fontSize(8.5).text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
-        doc.font(M).fontSize(8.5).text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+        doc
+          .font(R)
+          .fontSize(8.5)
+          .text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
+        doc
+          .font(M)
+          .fontSize(8.5)
+          .text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
         infoY += rowH + 2;
       });
       const cleanPdfText = (text?: string | null): string => {
@@ -4049,7 +4057,10 @@ export class OfferController {
             ? cleanPdfText(item.material) || "—"
             : cleanPdfText(item.material) || item.id?.substring(0, 8) || "—";
           const rawRemarks = cleanPdfText(item.remarks);
-          const fullBezText = (rawRemarks && rawRemarks !== "-") ? `${itemNameStr}\n${rawRemarks}` : itemNameStr;
+          const fullBezText =
+            rawRemarks && rawRemarks !== "-"
+              ? `${itemNameStr}\n${rawRemarks}`
+              : itemNameStr;
 
           const bezWidth = columns[2].width - 4;
 
@@ -4307,7 +4318,11 @@ export class OfferController {
           termsSuffix = `${termsSuffix} Tage`;
         }
         if (combinedPaymentStr) {
-          if (!combinedPaymentStr.toLowerCase().includes(termsSuffix.toLowerCase())) {
+          if (
+            !combinedPaymentStr
+              .toLowerCase()
+              .includes(termsSuffix.toLowerCase())
+          ) {
             combinedPaymentStr = `${combinedPaymentStr}, ${termsSuffix}`;
           }
         } else {
