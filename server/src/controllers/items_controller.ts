@@ -28,6 +28,8 @@ import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
 import { Customer } from "../models/customers";
+import fs from "fs";
+import path from "path";
 
 export const getRMBPriceFromSupplier = async (
   itemId: number,
@@ -757,7 +759,6 @@ export const getItemById = async (
         height: item.height?.toString() || "0",
       },
 
-
       variationsDE: {
         variations: [
           item.parent?.var_de_1,
@@ -865,31 +866,31 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-            id: defaultSi.id,
-            supplierId: defaultSi.supplier_id,
-            supplierName:
-              defaultSi.supplier?.company_name ||
-              defaultSi.supplier?.name ||
-              "Unknown",
-            priceRMB: defaultSi.price_rmb?.toString() || "0",
-            currency: defaultSi.currency || "RMB",
-            isPO: defaultSi.is_po || "No",
-            moq: defaultSi.moq?.toString() || "0",
-            interval: defaultSi.oi?.toString() || "0",
-            leadTime: defaultSi.lead_time || "",
-            noteCN: defaultSi.note_cn || "",
-            url: defaultSi.url || "",
-          }
+              id: defaultSi.id,
+              supplierId: defaultSi.supplier_id,
+              supplierName:
+                defaultSi.supplier?.company_name ||
+                defaultSi.supplier?.name ||
+                "Unknown",
+              priceRMB: defaultSi.price_rmb?.toString() || "0",
+              currency: defaultSi.currency || "RMB",
+              isPO: defaultSi.is_po || "No",
+              moq: defaultSi.moq?.toString() || "0",
+              interval: defaultSi.oi?.toString() || "0",
+              leadTime: defaultSi.lead_time || "",
+              noteCN: defaultSi.note_cn || "",
+              url: defaultSi.url || "",
+            }
           : {
-            priceRMB: "0",
-            currency: "RMB",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          };
+              priceRMB: "0",
+              currency: "RMB",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -1289,8 +1290,12 @@ export const updateItem = async (
 
     let hasChanges = false;
 
-    if (req.body.dimensions && req.body.dimensions.is_dim_weight_estimated !== undefined) {
-      item.is_dim_weight_estimated = !!req.body.dimensions.is_dim_weight_estimated;
+    if (
+      req.body.dimensions &&
+      req.body.dimensions.is_dim_weight_estimated !== undefined
+    ) {
+      item.is_dim_weight_estimated =
+        !!req.body.dimensions.is_dim_weight_estimated;
       hasChanges = true;
     } else if (req.body.is_dim_weight_estimated !== undefined) {
       item.is_dim_weight_estimated = !!req.body.is_dim_weight_estimated;
@@ -2093,9 +2098,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2171,17 +2176,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3740,23 +3745,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-            where: { id: item.parent_id },
-            select: ["id", "de_no", "name_de", "name_en"],
-          })
+              where: { id: item.parent_id },
+              select: ["id", "de_no", "name_de", "name_en"],
+            })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-            where: { id: item.cat_id },
-            select: ["id", "name"],
-          })
+              where: { id: item.cat_id },
+              select: ["id", "name"],
+            })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-            where: { id: item.supplier_id },
-            select: ["id", "name", "company_name"],
-          })
+              where: { id: item.supplier_id },
+              select: ["id", "name", "company_name"],
+            })
           : null;
 
         let warehouseData: any = null;
@@ -3983,8 +3988,8 @@ export const exportNewItemsToCSV = async (
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
           warehouseData?.item_no_de ||
-          item.ItemID_DE?.toString() ||
-          item.id.toString(),
+            item.ItemID_DE?.toString() ||
+            item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",
@@ -4131,5 +4136,279 @@ export const syncSuppCatWithCategoryName = async (
   } catch (error) {
     console.error("Error during category sync:", error);
     return next(error);
+  }
+};
+
+interface ItemCsvRow {
+  itemIdDe: string;
+  itemNoDe: string;
+  ean: string;
+  parentNo: string; // not used, per instructions
+  itemNameDe: string;
+  remark: string;
+  salesPriceEur: string;
+  isStockItem: string;
+  stockQtyEu: string;
+  msqEu: string;
+  isDimWeightEstimated: string;
+  weightG: string;
+  lengthMm: string;
+  widthMm: string;
+  heightMm: string;
+  isActive: string;
+  // Remaining columns are intentionally never read (per instructions):
+  // Überverkäufe möglich, Stückzahl teilbar, Versandgewicht(kg), Length,
+  // Breite, Höhe, TARIC-Code.
+}
+
+const CSV_COLUMN_ORDER: (keyof ItemCsvRow)[] = [
+  "itemIdDe",
+  "itemNoDe",
+  "ean",
+  "parentNo",
+  "itemNameDe",
+  "remark",
+  "salesPriceEur",
+  "isStockItem",
+  "stockQtyEu",
+  "msqEu",
+  "isDimWeightEstimated",
+  "weightG",
+  "lengthMm",
+  "widthMm",
+  "heightMm",
+  "isActive",
+];
+
+/** Splits one semicolon-delimited CSV line into fields, honoring
+ * double-quote-wrapped values (with "" as an escaped quote). */
+function parseSemicolonLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ";") {
+        fields.push(current);
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+  }
+  fields.push(current);
+  return fields.map((f) => f.trim());
+}
+
+/** Reads /public/items.csv, strips the BOM, and returns typed rows. Blank
+ * lines are skipped; rows without an ItemID_DE are skipped since that's
+ * the key used to find the existing item to update. */
+function parseItemCsv(filePath: string): ItemCsvRow[] {
+  const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+  const lines = raw.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
+
+  if (lines.length === 0) return [];
+
+  const dataLines = lines.slice(1); // skip header row
+
+  const rows: ItemCsvRow[] = [];
+  for (const line of dataLines) {
+    const fields = parseSemicolonLine(line);
+    while (fields.length < CSV_COLUMN_ORDER.length) fields.push("");
+
+    const row = {} as ItemCsvRow;
+    CSV_COLUMN_ORDER.forEach((key, idx) => {
+      (row as any)[key] = fields[idx] ?? "";
+    });
+
+    if (!row.itemIdDe) continue; // no key to match against
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+/** Parses a number that may use either "," or "." as the decimal
+ * separator (European CSV exports mix both). Returns null for empty or
+ * unparsable values rather than 0, so a blank cell doesn't silently zero
+ * out a field. */
+function parseFlexibleNumber(raw: string): number | null {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(",", ".");
+  const n = parseFloat(normalized);
+  return isNaN(n) ? null : n;
+}
+
+/** "0"/"1" -> boolean; anything else (blank, unrecognized) -> false. */
+function parseBooleanFlag(raw: string): boolean {
+  return (raw || "").trim() === "1";
+}
+
+interface SyncSummary {
+  totalRows: number;
+  updated: number;
+  notFound: number;
+  skipped: number;
+  errors: { itemIdDe: string; message: string }[];
+}
+
+export const syncItemData = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const csvPath = path.join(process.cwd(), "public", "items.csv");
+
+    if (!fs.existsSync(csvPath)) {
+      res.status(400).json({
+        success: false,
+        message: `items.csv not found at ${csvPath}`,
+      });
+      return;
+    }
+
+    const rows = parseItemCsv(csvPath);
+
+    const itemRepo = AppDataSource.getRepository(Item);
+    const warehouseRepo: any = AppDataSource.getRepository(WarehouseItem);
+
+    const summary: SyncSummary = {
+      totalRows: rows.length,
+      updated: 0,
+      notFound: 0,
+      skipped: 0,
+      errors: [],
+    };
+
+    for (const row of rows) {
+      try {
+        const itemIdDe = parseInt(row.itemIdDe, 10);
+        if (isNaN(itemIdDe)) {
+          summary.skipped++;
+          summary.errors.push({
+            itemIdDe: row.itemIdDe,
+            message: "ItemID_DE is not a valid number",
+          });
+          continue;
+        }
+
+        // Update-only migration — a row whose ItemID_DE doesn't match an
+        // existing Item is counted as "notFound" and skipped. No new
+        // Item or WarehouseItem is ever created by this sync.
+        const item = await itemRepo.findOne({ where: { ItemID_DE: itemIdDe } });
+        if (!item) {
+          summary.notFound++;
+          continue;
+        }
+
+        // --- Direct field matches ---
+        if (row.ean) item.ean = row.ean;
+        if (row.itemNameDe) item.item_name_de = row.itemNameDe;
+        if (row.isActive) item.isActive = row.isActive.toUpperCase();
+        if (row.isStockItem) item.is_stock_item = row.isStockItem.toUpperCase();
+
+        const stockQty = parseFlexibleNumber(row.stockQtyEu);
+        if (stockQty !== null) item.stockEU = Math.round(stockQty);
+
+        const msqEu = parseFlexibleNumber(row.msqEu);
+        if (msqEu !== null) item.MSQ_EU = Math.round(msqEu);
+
+        const weight = parseFlexibleNumber(row.weightG);
+        if (weight !== null) item.weight = weight;
+
+        const length = parseFlexibleNumber(row.lengthMm);
+        if (length !== null) item.length = length;
+
+        const width = parseFlexibleNumber(row.widthMm);
+        if (width !== null) item.width = width;
+
+        const height = parseFlexibleNumber(row.heightMm);
+        if (height !== null) item.height = height;
+
+        item.is_dim_weight_estimated = parseBooleanFlag(
+          row.isDimWeightEstimated,
+        );
+
+        // Sales price EUR -> item.sales_price
+        const salesPrice = parseFlexibleNumber(row.salesPriceEur);
+        if (salesPrice !== null) {
+          item.sales_price = Math.round(salesPrice * 100) / 100;
+        }
+
+        // RemarkDE/EN -> appended to item.remark, never overwriting
+        // existing content.
+        if (row.remark) {
+          item.remark = item.remark
+            ? `${item.remark} ${row.remark}`.trim()
+            : row.remark;
+        }
+
+        item.is_updated = true;
+        item.updated_at = new Date();
+        await itemRepo.save(item);
+
+        // ItemNoDE (and ItemNameDE, mirrored) -> WarehouseItem, matched
+        // by ItemID_DE (falling back to item_id). Update-only, same as
+        // Item above — if no WarehouseItem row exists yet, it is skipped
+        // rather than created. Only item_no_de and item_name_de are
+        // touched here — stock quantity lives solely on Item.stockEU
+        // (never copied to WarehouseItem.stock_qty), and
+        // WarehouseItem.is_active is left alone entirely.
+        if (row.itemNoDe) {
+          let warehouseItem = await warehouseRepo.findOne({
+            where: { ItemID_DE: itemIdDe },
+          });
+          if (!warehouseItem) {
+            warehouseItem = await warehouseRepo.findOne({
+              where: { item_id: item.id },
+            });
+          }
+
+          if (warehouseItem) {
+            warehouseItem.item_no_de = row.itemNoDe;
+            if (row.itemNameDe) {
+              warehouseItem.item_name_de = row.itemNameDe;
+            }
+            await warehouseRepo.save(warehouseItem);
+          }
+        }
+
+        summary.updated++;
+      } catch (rowError: any) {
+        summary.skipped++;
+        summary.errors.push({
+          itemIdDe: row.itemIdDe,
+          message: rowError?.message || "Unknown error",
+        });
+        console.error(`Error syncing item ${row.itemIdDe}:`, rowError);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Processed ${summary.totalRows} rows: ${summary.updated} updated, ${summary.notFound} not found, ${summary.skipped} skipped.`,
+      data: summary,
+    });
+  } catch (error) {
+    console.error("Item sync error:", error);
+    return next(new ErrorHandler("Failed to sync item data", 500));
   }
 };
