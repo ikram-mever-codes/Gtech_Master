@@ -17,9 +17,9 @@ import {
 interface RechnungColumnsArgs {
   expandedDocIds: Set<string | number>;
   setExpandedDocIds: React.Dispatch<React.SetStateAction<Set<string | number>>>;
-  onCreateRechnungK: (row: any) => void;
+  onViewRechnung: (row: any) => void;
+  onCreateRechnungK: (row: any) => void; // This will open the modal with correction form
   creatingRkForId: string | null;
-  onViewRechnung: (row: any) => void; // New: view handler for Rechnung
 }
 
 const valueNetCalc = (row: any) => Number(row.netTotal || row.grossTotal || 0);
@@ -29,15 +29,14 @@ const itemCountCalc = (row: any) =>
 export function buildRechnungColumns({
   expandedDocIds,
   setExpandedDocIds,
+  onViewRechnung,
   onCreateRechnungK,
   creatingRkForId,
-  onViewRechnung,
 }: RechnungColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
     dateCreatedColumn,
     {
-      // Clickable invoice number that opens the Rechnung detail
       header: "No",
       width: "110px",
       align: "center",
@@ -71,6 +70,7 @@ export function buildRechnungColumns({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                // This opens the Rechnung detail modal with the correction form
                 onCreateRechnungK(row);
               }}
               disabled={isCreatingRk}

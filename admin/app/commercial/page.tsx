@@ -42,7 +42,10 @@ import {
   createRechnungKFromRechnung,
   getRechnungKById,
   deleteRechnungK,
+  getRechnungOpenQuantities,
+  getAllRechnungenK,
 } from "@/api/rechnungen_k";
+
 import OffersPage from "../offers/page";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
@@ -80,9 +83,6 @@ import {
   AuftragToBestellungModal,
   AuftragCreateModal,
   AuftragToRechnungModal,
-  // RechnungDetailModal intentionally not imported here — see the comment
-  // above the commented-out render block near the end of this file. It's
-  // still exported from LazyModals.ts for when that decision is made.
   LieferscheinDetailModal,
   AuftragPreviewModal,
   BestellungPreviewModal,
@@ -119,6 +119,10 @@ const InvoiceListPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useSelector((state: RootState) => state.user);
+  const [openQuantities, setOpenQuantities] = useState<Record<string, any>>({});
+  const [allOpenQuantities, setAllOpenQuantities] = useState<
+    Record<string, Record<string, number>>
+  >({});
 
   const tabData = useCommercialTabData();
 
@@ -146,16 +150,51 @@ const InvoiceListPage: React.FC = () => {
     () => (searchParams.get("tab") as InvoiceTab) || "angebot",
   );
 
-  // Fetch each tab's data lazily, the first time it becomes active — this
-  // is the fix for the original page fetching every tab's data on mount
-  // regardless of which one was showing.
+  // Fetch each tab's data lazily
   useEffect(() => {
     tabData.ensureLoaded(activeInvTab);
   }, [activeInvTab, tabData]);
 
-  // cargos / tarics / payment accounts: cheap single-collection reads used
-  // by several modals across tabs (reassign/split/taric, payment inbound
-  // form) — left eager on mount rather than tab-gated, same as before.
+  // Fetch open quantities for all Rechnungen when Rechnung tab is active
+  const fetchAllOpenQuantities = useCallback(async () => {
+    if (activeInvTab !== "rechnung") return;
+
+    try {
+      const rechnungen = tabData.rechnungen || [];
+      const qtyMap: Record<string, Record<string, number>> = {};
+
+      for (const rechnung of rechnungen) {
+        try {
+          const res: any = await getRechnungOpenQuantities(rechnung.id);
+          if (res?.success) {
+            const itemMap: Record<string, number> = {};
+            res.data.items.forEach((item: any) => {
+              itemMap[item.id] = item.openQuantity;
+            });
+            qtyMap[rechnung.id] = itemMap;
+          }
+        } catch (error) {
+          console.error(
+            `Failed to fetch open quantities for ${rechnung.id}:`,
+            error,
+          );
+        }
+      }
+
+      setAllOpenQuantities(qtyMap);
+    } catch (error) {
+      console.error("Failed to fetch all open quantities:", error);
+    }
+  }, [activeInvTab, tabData.rechnungen]);
+
+  // Trigger fetching when Rechnung tab becomes active
+  useEffect(() => {
+    if (activeInvTab === "rechnung") {
+      fetchAllOpenQuantities();
+    }
+  }, [activeInvTab, fetchAllOpenQuantities]);
+
+  // cargos / tarics / payment accounts
   const [cargos, setCargos] = useState<CargoType[]>([]);
   const [tarics, setTarics] = useState<any[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>(
@@ -437,6 +476,21 @@ const InvoiceListPage: React.FC = () => {
     setSelectedOrder(null);
     setMode("create");
   }, []);
+
+  const fetchOpenQuantities = async (rechnungId: string) => {
+    try {
+      const res: any = await getRechnungOpenQuantities(rechnungId);
+      if (res?.success) {
+        const qtyMap: Record<string, number> = {};
+        res.data.items.forEach((item: any) => {
+          qtyMap[item.id] = item.openQuantity;
+        });
+        setOpenQuantities(qtyMap);
+      }
+    } catch (error) {
+      console.error("Failed to fetch open quantities:", error);
+    }
+  };
 
   const fetchItemsByCategory = useCallback(async (category_id: string) => {
     if (!category_id) {
@@ -1002,53 +1056,15 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handleCreateRechnungK = async (row: any) => {
-    const prompt = window.confirm(
-      "Are you sure you want to create a correction invoice (Rechnung K) for this invoice?",
-    );
-    if (!prompt) return;
-    const sourceId = row.id;
-    setCreatingRkForId(sourceId);
-    try {
-      const res: any = await createRechnungKFromRechnung(sourceId);
-      const payload = res?.data ?? res;
-      if (payload) {
-        // Switch to RK tab
-        setActiveInvTab("rk");
-
-        // Set the data and open modal
-        setSelectedRechnungKData(payload);
-        setShowRechnungKModal(true);
-
-        toast.success(
-          res?.message || "Correction invoice created.",
-          successStyles,
-        );
-
-        // Refresh the RK list
-        tabData.refetchRechnungenK();
-      } else {
-        toast.error("Failed to create correction invoice.", errorStyles);
-      }
-    } catch (err: any) {
-      toast.error(
-        err?.message || "Failed to create correction invoice.",
-        errorStyles,
-      );
-    } finally {
-      setCreatingRkForId(null);
-    }
+  // Replace the handleCreateRechnungK function with this:
+  const handleCreateRechnungK = (row: any) => {
+    setSelectedRechnungForDetail(row);
+    setShowRechnungDetailModal(true);
+    // Use the already fetched open quantities for this Rechnung
+    const rowOpenQuantities = allOpenQuantities[row.id] || {};
+    setOpenQuantities(rowOpenQuantities);
   };
 
-  // `RechnungKPreviewModal` used above (create flow) and the
-  // `RechnungDetailModal` alias I flagged as never-rendered last time are
-  // the exact same imported component — `@/components/orders/RechnungDetailModal`,
-  // just aliased twice. So RK's "View" doesn't need a new modal, it needs
-  // the full record (the row from the DataTable is the trimmed
-  // filteredItems mapping, not the full detail payload) and to open the
-  // same, already-working modal instance via `showRechnungKModal` /
-  // `selectedRechnungKData` — the RK-specific `showRechnungDetailModal`
-  // state is no longer used for this tab.
   const handleOpenRechnungKDetail = async (row: any) => {
     try {
       const res: any = await getRechnungKById(row.id);
@@ -1131,7 +1147,7 @@ const InvoiceListPage: React.FC = () => {
     setViewItems([]);
   };
 
-  // --- URL <-> tab/filter sync (unchanged from the original) ---
+  // --- URL <-> tab/filter sync ---
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", activeInvTab);
@@ -1169,13 +1185,6 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [searchParams]);
 
-  // Invoice-details modal handlers. `handleMarkAsPaid` here preserves the
-  // original's exact observable behavior: the legacy `invoices` list it
-  // used to search was never populated anywhere in the app (getAllInvoices
-  // is imported but never called, setInvoices is never called), so the
-  // lookup always failed and this toast always fired instead of actually
-  // marking anything paid. Kept deterministic rather than silently
-  // "fixed" — see README section 1.
   const handleMarkAsPaid = async (invoiceId: string) => {
     toast.error(
       "Please provide a freight cost by editing the invoice before verifying it.",
@@ -1231,8 +1240,7 @@ const InvoiceListPage: React.FC = () => {
     );
   };
 
-  // --- Tab -> displayed list (unchanged logic, `invoices` dependency
-  // dropped since that array was always empty — see README) ---
+  // --- Tab -> displayed list ---
   const filteredItems = useMemo(() => {
     let list: any[] = [];
     if (activeInvTab === "auftrag") {
@@ -1290,14 +1298,6 @@ const InvoiceListPage: React.FC = () => {
         },
       }));
     } else if (activeInvTab === "rk") {
-      // Field names below mirror the "rechnung" mapping's fallback-chain
-      // style since RechnungK (correction invoices) are created from a
-      // Rechnung via createRechnungKFromRechnung and likely share most of
-      // its shape. I can't see the actual RechnungK model or
-      // RechnungKPreviewModal's prop usage in this conversation, so verify
-      // these field names (rk_number, rk_date, total_amount, customer)
-      // against your backend response and adjust if any don't match —
-      // same spirit as the getAllRechnungenK import note in the hook.
       list = (tabData.rechnungenK || []).map((rk: any) => ({
         ...rk,
         invoiceNumber:
@@ -1473,9 +1473,6 @@ const InvoiceListPage: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, docFilters, activeInvTab]);
 
-  // A single empty array stands in for the never-populated legacy
-  // `invoices` list the Auftrag "Generated N times" badge reads from —
-  // see the comment on AuftragColumnsArgs.invoices.
   const legacyInvoices = useMemo(() => [], []);
 
   const commercialColumns: ColumnDef<any>[] = useMemo(() => {
@@ -1509,6 +1506,9 @@ const InvoiceListPage: React.FC = () => {
           onViewRechnung: (row: any) => {
             setSelectedRechnungForDetail(row);
             setShowRechnungDetailModal(true);
+            // Use the already fetched open quantities for this Rechnung
+            const rowOpenQuantities = allOpenQuantities[row.id] || {};
+            setOpenQuantities(rowOpenQuantities);
           },
         });
       case "rk":
@@ -1547,10 +1547,7 @@ const InvoiceListPage: React.FC = () => {
         return [];
     }
   }, [activeInvTab, expandedDocIds, creatingRkForId, legacyInvoices, tabData]);
-  // RK now has its own loading flag (tabData.loadingRechnungenK) since it
-  // fetches real RechnungK data — no longer borrowing Lieferschein's
-  // loading state the way the original implicitly did. See README history
-  // for the quirk this replaces.
+
   const dataTableLoading =
     activeInvTab === "payment_inbound"
       ? tabData.loadingPaymentInbounds
@@ -1675,7 +1672,6 @@ const InvoiceListPage: React.FC = () => {
             </button>
           ))}
         </div>
-
         <CommercialFilterBar
           activeInvTab={activeInvTab}
           docFilters={docFilters}
@@ -1686,7 +1682,6 @@ const InvoiceListPage: React.FC = () => {
             setSearchTerm("");
           }}
         />
-
         {activeInvTab === "angebot" && (
           <OffersPage
             embedded={true}
@@ -1699,7 +1694,6 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
-
         {activeInvTab !== "angebot" && (
           <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
             <DataTable
@@ -1712,6 +1706,17 @@ const InvoiceListPage: React.FC = () => {
                   : "Invoices"
               } Found`}
               getRowClassName={(row) => {
+                if (activeInvTab === "rechnung") {
+                  const rowOpenQuantities = allOpenQuantities[row.id] || {};
+                  const isFullyCorrected =
+                    row.items?.every((item: any) => {
+                      const itemOpenQty = rowOpenQuantities[item.id] || 0;
+                      return itemOpenQty <= 0;
+                    }) ?? false;
+
+                  return isFullyCorrected ? "bg-gray-100 opacity-60" : "";
+                }
+
                 if (
                   activeInvTab === "auftrag" ||
                   activeInvTab === "bestellung"
@@ -1724,6 +1729,23 @@ const InvoiceListPage: React.FC = () => {
                 return "";
               }}
               getRowStyle={(row: any) => {
+                if (activeInvTab === "rechnung") {
+                  const rowOpenQuantities = allOpenQuantities[row.id] || {};
+                  const isFullyCorrected =
+                    row.items?.every((item: any) => {
+                      const itemOpenQty = rowOpenQuantities[item.id] || 0;
+                      return itemOpenQty <= 0;
+                    }) ?? false;
+
+                  if (isFullyCorrected) {
+                    return {
+                      backgroundColor: "#f3f4f6",
+                      color: "#9ca3af",
+                      opacity: 0.6,
+                    };
+                  }
+                }
+
                 const val = row.highlight_color || row.highlightColor;
                 if (!val || val === "#FFFFFF" || val === "#ffffff")
                   return undefined;
@@ -1748,33 +1770,6 @@ const InvoiceListPage: React.FC = () => {
                 }
                 return { backgroundColor: hex, color: textColor };
               }}
-              expandedRowIds={expandedDocIds}
-              renderRowDetails={(row) => {
-                const items = row.items || row.lineItems || [];
-                const isOrder =
-                  activeInvTab === "auftrag" || activeInvTab === "bestellung";
-                const docNumber = isOrder
-                  ? row.order_no
-                  : row.invoiceNumber || row.id;
-
-                return (
-                  <DocumentLineItemsSubTable
-                    items={items}
-                    currency={row.currency || "EUR"}
-                    title={`Line Items (${items.length}) — ${isOrder ? `Order No: ${docNumber}` : `Invoice: ${docNumber}`}`}
-                    totalAmount={Number(
-                      row.subtotal ||
-                        row.netTotal ||
-                        row.grossTotal ||
-                        row.totalAmount ||
-                        0,
-                    )}
-                    type={isOrder ? "order" : "invoice"}
-                    getSupplierName={getSupplierName}
-                    getOrderStatusColor={getOrderStatusColor}
-                  />
-                );
-              }}
               onRowClick={(row) => {
                 if (activeInvTab === "auftrag")
                   handleOpenAuftragPreview(row.id);
@@ -1783,6 +1778,8 @@ const InvoiceListPage: React.FC = () => {
                 else if (activeInvTab === "rechnung") {
                   setSelectedRechnungForDetail(row);
                   setShowRechnungDetailModal(true);
+                  const rowOpenQuantities = allOpenQuantities[row.id] || {};
+                  setOpenQuantities(rowOpenQuantities);
                 } else if (activeInvTab === "rk") {
                   handleOpenRechnungKDetail(row);
                 } else if (activeInvTab === "lieferschein") {
@@ -1836,7 +1833,6 @@ const InvoiceListPage: React.FC = () => {
             )}
           </div>
         )}
-
         <InvoiceDetailsModal
           isOpen={showInvoiceDetailsModal}
           onClose={() => setShowInvoiceDetailsModal(false)}
@@ -1881,7 +1877,6 @@ const InvoiceListPage: React.FC = () => {
             setShowTaricModal(true);
           }}
         />
-
         <ReassignModal
           isOpen={showREModal}
           onClose={() => setShowREModal(false)}
@@ -1891,7 +1886,6 @@ const InvoiceListPage: React.FC = () => {
           setTargetCargoId={setTargetCargoId}
           onConfirm={handleReassignItem}
         />
-
         <SplitModal
           isOpen={showSPModal}
           onClose={() => setShowSPModal(false)}
@@ -1905,7 +1899,6 @@ const InvoiceListPage: React.FC = () => {
           setSplitRemarks={setSplitRemarks}
           onConfirm={handleSplitItem}
         />
-
         <TaricModal
           isOpen={showTaricModal}
           onClose={() => setShowTaricModal(false)}
@@ -1915,7 +1908,6 @@ const InvoiceListPage: React.FC = () => {
           setSelectedTaricCode={setSelectedTaricCode}
           onConfirm={() => handleSetTaric(selectedTaricGroup)}
         />
-
         <QtyModal
           isOpen={showQTYModal}
           onClose={() => setShowQTYModal(false)}
@@ -1926,7 +1918,6 @@ const InvoiceListPage: React.FC = () => {
           setQtyRemarks={setQtyRemarks}
           onConfirm={handleUpdateQty}
         />
-
         {showBTSTModal && (
           <CustomModal
             isOpen={showBTSTModal}
@@ -1963,7 +1954,6 @@ const InvoiceListPage: React.FC = () => {
             />
           </CustomModal>
         )}
-
         <OrderDetailsModal
           isOpen={showViewModal}
           onClose={closeView}
@@ -1972,7 +1962,6 @@ const InvoiceListPage: React.FC = () => {
           getCategoryName={getCategoryName}
           getSupplierName={getSupplierName}
         />
-
         <OrderFormModal
           isOpen={showModal}
           onClose={closeModal}
@@ -1996,7 +1985,6 @@ const InvoiceListPage: React.FC = () => {
           onRemoveOrderItem={handleRemoveOrderItem}
           onSubmit={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
         />
-
         {showOfferModal && (
           <OfferDetailModalLazy
             isOpen={showOfferModal}
@@ -2013,7 +2001,6 @@ const InvoiceListPage: React.FC = () => {
             userRole={user?.role}
           />
         )}
-
         {showAuftragToBestellungModal && (
           <AuftragToBestellungModal
             isOpen={showAuftragToBestellungModal}
@@ -2028,7 +2015,6 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
-
         {showAuftragCreateModal && (
           <AuftragCreateModal
             isOpen={showAuftragCreateModal}
@@ -2036,7 +2022,6 @@ const InvoiceListPage: React.FC = () => {
             onSuccess={() => tabData.refetchOrders()}
           />
         )}
-
         {showAuftragPreviewModal && (
           <AuftragPreviewModal
             isOpen={showAuftragPreviewModal}
@@ -2051,7 +2036,6 @@ const InvoiceListPage: React.FC = () => {
             userRole={user?.role}
           />
         )}
-
         {showBestellungPreviewModal && selectedBestellungId && (
           <BestellungPreviewModal
             isOpen={showBestellungPreviewModal}
@@ -2067,7 +2051,6 @@ const InvoiceListPage: React.FC = () => {
             userRole={user?.role}
           />
         )}
-
         {showAuftragToRechnungModal && (
           <AuftragToRechnungModal
             isOpen={showAuftragToRechnungModal}
@@ -2088,7 +2071,6 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
-
         {showInboundModal && (
           <CustomModal
             isOpen={showInboundModal}
@@ -2263,7 +2245,6 @@ const InvoiceListPage: React.FC = () => {
             </form>
           </CustomModal>
         )}
-
         {showCreateBestellungModal && (
           <BestellungPreviewModal
             isOpen={showCreateBestellungModal}
@@ -2277,23 +2258,41 @@ const InvoiceListPage: React.FC = () => {
             userRole={user?.role}
           />
         )}
-
-        {/* Unified Rechnung/RechnungK Detail Modal */}
         {showRechnungDetailModal && selectedRechnungForDetail && (
           <RechnungDetailModal
             isOpen={showRechnungDetailModal}
             onClose={() => {
               setShowRechnungDetailModal(false);
               setSelectedRechnungForDetail(null);
+              setOpenQuantities({});
             }}
             rechnung={selectedRechnungForDetail}
             isCorrection={false}
-            onChanged={() => {
-              tabData.refetchRechnungen();
+            openQuantities={openQuantities}
+            onChanged={() => tabData.refetchRechnungen()}
+            onCorrectionCreated={async () => {
+              await tabData.refetchRechnungenK();
+              await tabData.refetchRechnungen();
+
+              try {
+                const rksRes: any = await getAllRechnungenK();
+                if (rksRes?.success && rksRes.data.length > 0) {
+                  const latestRK = rksRes.data[0];
+                  if (latestRK) {
+                    const detailRes: any = await getRechnungKById(latestRK.id);
+                    if (detailRes?.success) {
+                      setSelectedRechnungKData(detailRes.data);
+                      setShowRechnungKModal(true);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error("Failed to fetch latest RK:", error);
+              }
             }}
+            onSwitchTab={(tab) => setActiveInvTab(tab as InvoiceTab)}
           />
         )}
-
         {showRechnungKModal && selectedRechnungKData && (
           <RechnungDetailModal
             isOpen={showRechnungKModal}

@@ -4,8 +4,11 @@ import React, { useState, useEffect } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, FileText, Pencil, Save, X } from "lucide-react";
-import { updateRechnungKItem } from "@/api/rechnungen_k";
+import { Loader2, FileText, Pencil, Save, X, AlertCircle } from "lucide-react";
+import {
+  updateRechnungKItem,
+  createRechnungKFromRechnung,
+} from "@/api/rechnungen_k";
 import { formatDate } from "@/utils/date";
 
 const formatDeCurrency = (val: number) => {
@@ -97,8 +100,11 @@ interface RechnungDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   rechnung: any;
-  isCorrection?: boolean; // Flag to indicate if this is a correction invoice (RK)
+  isCorrection?: boolean;
+  openQuantities?: Record<string, number>;
   onChanged?: () => void;
+  onCorrectionCreated?: () => void;
+  onSwitchTab?: (tab: string) => void;
 }
 
 const EditableCell: React.FC<{
@@ -128,16 +134,40 @@ export default function RechnungDetailModal({
   onClose,
   rechnung,
   isCorrection = false,
+  openQuantities = {},
   onChanged,
+  onCorrectionCreated,
+  onSwitchTab,
 }: RechnungDetailModalProps) {
   const [data, setData] = useState<any>(rechnung);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [corrections, setCorrections] = useState<
+    Record<string, { quantity: number; price: number }>
+  >({});
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     setData(rechnung);
     setIsEditMode(false);
-  }, [rechnung]);
+    // Initialize corrections with default values for items that have open quantity
+    if (rechnung?.items) {
+      const initialCorrections: Record<
+        string,
+        { quantity: number; price: number }
+      > = {};
+      rechnung.items.forEach((item: any) => {
+        const openQty = openQuantities[item.id] || 0;
+        if (openQty > 0) {
+          initialCorrections[item.id] = {
+            quantity: openQty,
+            price: Number(item.price) || 0,
+          };
+        }
+      });
+      setCorrections(initialCorrections);
+    }
+  }, [rechnung, openQuantities]);
 
   if (!isOpen || !data) return null;
 
@@ -147,14 +177,12 @@ export default function RechnungDetailModal({
   const grossTotal = Number(data.total_amount ?? 0);
   const taxRate = Number(data.tax_rate ?? 19);
 
-  // Handle both regular invoice and correction invoice field names
   const invoiceNumber = data.invoice_number || data.rk_number || data.id;
   const companyName =
     data.customer?.company_name || data.customerSnapshot?.companyName || "—";
   const auftragNo = data.auftrag_no || "—";
   const deliveryDate = data.delivery_date || "";
 
-  // Calculate weights for correction invoices
   const netWeightKg = items.reduce((sum: number, it: any) => {
     const qty = Number(it.quantity) || 1;
     return sum + (Number(it.weight) || 0) * qty;
@@ -186,6 +214,104 @@ export default function RechnungDetailModal({
     (rechnungCustomer.ship_to_address
       ? { street: rechnungCustomer.ship_to_address }
       : null);
+
+  const handleCorrectionChange = (
+    itemId: string,
+    field: "quantity" | "price",
+    value: number,
+  ) => {
+    setCorrections((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleCreateCorrections = async () => {
+    // Build corrections array from the corrections state
+    const correctionsArray = Object.entries(corrections)
+      .filter(([itemId, corr]) => {
+        const openQty = openQuantities[itemId] || 0;
+        // Only include if quantity > 0 and doesn't exceed open quantity
+        return corr.quantity > 0 && corr.quantity <= openQty;
+      })
+      .map(([itemId, corr]) => ({
+        itemId,
+        quantity: corr.quantity,
+        price: corr.price,
+      }));
+
+    if (correctionsArray.length === 0) {
+      toast.error(
+        "No valid corrections to create. Please set quantity > 0 for at least one item.",
+        errorStyles,
+      );
+      return;
+    }
+
+    // Validate all corrections
+    const validationErrors: string[] = [];
+    for (const corr of correctionsArray) {
+      const openQty = openQuantities[corr.itemId] || 0;
+      if (corr.quantity > openQty) {
+        const item = items.find((i: any) => i.id === corr.itemId);
+        validationErrors.push(
+          `Item "${item?.item_name || corr.itemId}": Cannot correct ${corr.quantity} units. Only ${openQty} units remain uncorrected.`,
+        );
+      }
+      if (corr.price < 0) {
+        validationErrors.push(
+          `Item "${corr.itemId}": Price cannot be negative.`,
+        );
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      toast.error(validationErrors.join("\n"), errorStyles);
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const res: any = await createRechnungKFromRechnung(
+        data.id,
+        correctionsArray,
+      );
+
+      if (res?.success) {
+        toast.success(
+          `Correction invoice created successfully with ${correctionsArray.length} item(s)!`,
+          successStyles,
+        );
+
+        // Close the modal
+        onClose();
+
+        // Switch to RK tab
+        if (onSwitchTab) {
+          onSwitchTab("rk");
+        }
+
+        // Notify parent to refresh data
+        if (onCorrectionCreated) {
+          onCorrectionCreated();
+        }
+        if (onChanged) {
+          onChanged();
+        }
+      } else {
+        const errorMsg = res?.message || "Failed to create correction invoice.";
+        toast.error(errorMsg, errorStyles);
+      }
+    } catch (error: any) {
+      const errorMsg = error?.message || "Failed to create correction invoice.";
+      toast.error(errorMsg, errorStyles);
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   const commitItemChange = async (
     item: any,
@@ -240,6 +366,22 @@ export default function RechnungDetailModal({
     }
   };
 
+  // Check if all items are fully corrected (no open quantity)
+  const allItemsFullyCorrected = items.every((item: any) => {
+    const openQty = openQuantities[item.id] || 0;
+    return openQty <= 0;
+  });
+
+  // Check if any item has corrections
+  const hasCorrections = Object.values(corrections).some(
+    (corr) => corr.quantity > 0,
+  );
+
+  // Get total items being corrected
+  const totalItemsToCorrect = Object.values(corrections).filter(
+    (corr) => corr.quantity > 0,
+  ).length;
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -257,13 +399,22 @@ export default function RechnungDetailModal({
                   Correction Invoice
                 </span>
               )}
+              {!isCorrection && allItemsFullyCorrected && (
+                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">
+                  Fully Corrected
+                </span>
+              )}
+              {!isCorrection && !allItemsFullyCorrected && hasCorrections && (
+                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-semibold">
+                  {totalItemsToCorrect} item(s) to correct
+                </span>
+              )}
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
               {companyName}
             </h2>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
-            {/* Edit Mode Toggle - Only for correction invoices */}
             {isCorrection && (
               <button
                 type="button"
@@ -298,16 +449,7 @@ export default function RechnungDetailModal({
         </div>
 
         <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
-          {/* Edit Mode Banner - Only for correction invoices */}
-          {isCorrection && isEditMode && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-2 text-sm text-blue-700">
-              <Save className="w-4 h-4" />
-              <span>
-                <strong>Edit Mode Enabled:</strong> You can now modify Quantity
-                and Price. Click "Exit Edit" to lock changes.
-              </span>
-            </div>
-          )}
+          {/* Bulk Correction Actions */}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
             <div className="md:col-span-1 flex flex-col gap-3">
@@ -344,13 +486,14 @@ export default function RechnungDetailModal({
           </div>
 
           <div className="space-y-2">
-            {isCorrection && (
+            {/* {isCorrection && (
               <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
                 Only Quantity and Price can be changed on a correction invoice.
                 All other fields are copied from the original Rechnung and are
                 fixed.
               </p>
-            )}
+            )} */}
+
             <div className="overflow-x-auto border border-gray-200 rounded-lg">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 border-b border-gray-200">
@@ -358,6 +501,7 @@ export default function RechnungDetailModal({
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
                       Pos
                     </th>
+
                     {isCorrection && (
                       <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
                         Pic
@@ -372,12 +516,28 @@ export default function RechnungDetailModal({
                     <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
                       MwSt.
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-                      Menge
-                    </th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-32">
-                      Netto-Preis
-                    </th>
+                    {!isCorrection ? (
+                      <>
+                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
+                          Open Qty
+                        </th>
+                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-28">
+                          Qty
+                        </th>
+                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-32">
+                          Price
+                        </th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                          Menge
+                        </th>
+                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-32">
+                          Netto-Preis
+                        </th>
+                      </>
+                    )}
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                       Netto gesamt
                     </th>
@@ -387,7 +547,7 @@ export default function RechnungDetailModal({
                   {items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={isCorrection ? 8 : 7}
+                        colSpan={isCorrection ? 8 : 8}
                         className="text-center py-6 text-sm text-gray-500"
                       >
                         No line items found.
@@ -401,10 +561,25 @@ export default function RechnungDetailModal({
                       Number(item.total_price) || qty * unitPrice;
                     const lineTaxRate = Number(item.taxRate ?? taxRate);
                     const isSaving = savingItemId === item.id;
+                    const openQty = openQuantities[item.id] || 0;
+                    const isFullyCorrected = openQty <= 0;
+                    const correction = corrections[item.id] || {
+                      quantity: 0,
+                      price: unitPrice,
+                    };
+                    const isRowDisabled = isFullyCorrected;
 
                     return (
-                      <tr key={item.id || idx}>
+                      <tr
+                        key={item.id || idx}
+                        className={
+                          isRowDisabled && !isCorrection
+                            ? "bg-gray-50 opacity-60"
+                            : ""
+                        }
+                      >
                         <td className="px-2 py-2 text-gray-500">{idx + 1}</td>
+
                         {isCorrection && (
                           <td className="px-2 py-2">
                             <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
@@ -431,43 +606,104 @@ export default function RechnungDetailModal({
                         <td className="px-2 py-2 text-center text-gray-600">
                           {lineTaxRate}%
                         </td>
-                        <td className="px-2 py-2">
-                          <div className="flex justify-end items-center gap-1">
-                            {isSaving && (
-                              <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                        {!isCorrection ? (
+                          <>
+                            {!isCorrection && (
+                              <td className="px-2 py-2 text-center">
+                                <span
+                                  className={`font-semibold ${
+                                    isFullyCorrected
+                                      ? "text-green-600"
+                                      : "text-amber-600"
+                                  }`}
+                                >
+                                  {openQty}
+                                </span>
+                              </td>
                             )}
-                            {isCorrection && isEditMode ? (
-                              <EditableCell
-                                value={qty}
-                                disabled={isSaving}
-                                onCommit={(raw) =>
-                                  commitItemChange(item, "quantity", raw)
-                                }
-                              />
-                            ) : (
-                              <span className="text-right font-medium">
-                                {qty}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="flex justify-end">
-                            {isCorrection && isEditMode ? (
-                              <EditableCell
-                                value={unitPrice}
-                                disabled={isSaving}
-                                onCommit={(raw) =>
-                                  commitItemChange(item, "price", raw)
-                                }
-                              />
-                            ) : (
-                              <span className="font-medium">
-                                {formatDeCurrency(unitPrice)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
+                            <td className="px-2 py-2 text-center">
+                              {!isFullyCorrected ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={openQty}
+                                  step="1"
+                                  value={correction.quantity}
+                                  onChange={(e) =>
+                                    handleCorrectionChange(
+                                      item.id,
+                                      "quantity",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-center"
+                                />
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              {!isFullyCorrected ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={correction.price}
+                                  onChange={(e) =>
+                                    handleCorrectionChange(
+                                      item.id,
+                                      "price",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className="w-28 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-right"
+                                />
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-2 py-2">
+                              <div className="flex justify-end items-center gap-1">
+                                {isSaving && (
+                                  <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                                )}
+                                {isCorrection && isEditMode ? (
+                                  <EditableCell
+                                    value={qty}
+                                    disabled={isSaving}
+                                    onCommit={(raw) =>
+                                      commitItemChange(item, "quantity", raw)
+                                    }
+                                  />
+                                ) : (
+                                  <span className="text-right font-medium">
+                                    {qty}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-2 py-2">
+                              <div className="flex justify-end">
+                                {isCorrection && isEditMode ? (
+                                  <EditableCell
+                                    value={unitPrice}
+                                    disabled={isSaving}
+                                    onCommit={(raw) =>
+                                      commitItemChange(item, "price", raw)
+                                    }
+                                  />
+                                ) : (
+                                  <span className="font-medium">
+                                    {formatDeCurrency(unitPrice)}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </>
+                        )}
                         <td className="px-2 py-2 text-right font-medium">
                           {formatDeCurrency(lineTotal)}
                         </td>
@@ -509,7 +745,25 @@ export default function RechnungDetailModal({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end items-center flex-shrink-0">
+        <div className="px-6 py-4 border-t gap-3 border-gray-200 flex justify-end items-center flex-shrink-0">
+          <button
+            onClick={handleCreateCorrections}
+            disabled={isCreating || !hasCorrections}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+              hasCorrections && !isCreating
+                ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create RK"
+            )}
+          </button>
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
