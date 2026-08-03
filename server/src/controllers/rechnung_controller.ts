@@ -6,6 +6,9 @@ import { RechnungItem } from "../models/rechnung_items";
 import { CustomerOrder } from "../models/customer_orders";
 import { CustomerOrderItem } from "../models/customer_order_items";
 import { Customer } from "../models/customers";
+import path from "path";
+import fs from "fs";
+import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { CCIInvoice } from "../models/cci_invoice";
 import { CCICustomer } from "../models/cci_customer";
 import { CCIItem } from "../models/cci_items";
@@ -595,7 +598,15 @@ export const updateRechnung = async (
 ) => {
   try {
     const { id } = req.params;
-    const { customerSnapshot, deliveryAddress } = req.body;
+    const {
+      customerSnapshot,
+      deliveryAddress,
+      gelangenheitsbestaetigung_doc,
+      tax_profile_case,
+      notes,
+      internal_notes,
+      highlight_color,
+    } = req.body;
 
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = await rechnungRepo.findOne({
@@ -608,27 +619,14 @@ export const updateRechnung = async (
       return;
     }
 
-    // Rechnung is a frozen commercial document once created — only the
-    // billing/delivery address snapshot may ever be corrected, and only
-    // within the editable window. Payment method, payment terms, shipping
-    // method, and notes are set at creation time and are never editable.
-    if (customerSnapshot === undefined && deliveryAddress === undefined) {
-      res.status(400).json({
-        success: false,
-        message:
-          "Nothing to update — only customerSnapshot/deliveryAddress may be changed.",
-      });
-      return;
-    }
-
-    if (!isWithinEditableWindow(rechnung.invoice_date)) {
-      res.status(403).json({
-        success: false,
-        message:
-          "This Rechnung is older than 3 months — the billing/delivery address can no longer be edited.",
-      });
-      return;
-    }
+    if (gelangenheitsbestaetigung_doc !== undefined)
+      rechnung.gelangenheitsbestaetigung_doc = gelangenheitsbestaetigung_doc;
+    if (tax_profile_case !== undefined)
+      rechnung.tax_profile_case = tax_profile_case;
+    if (notes !== undefined) rechnung.notes = notes;
+    if (internal_notes !== undefined) rechnung.internal_notes = internal_notes;
+    if (highlight_color !== undefined)
+      rechnung.highlight_color = highlight_color;
 
     const addressPatch: Record<string, any> = {};
     if (customerSnapshot !== undefined) {
@@ -642,14 +640,14 @@ export const updateRechnung = async (
 
     await rechnungRepo.save(rechnung);
 
-    // Fallback direct UPDATE, in case the entity-based save silently skips
-    // the json columns on some driver/version combos.
-    await rechnungRepo
-      .createQueryBuilder()
-      .update(Rechnung)
-      .set(addressPatch)
-      .where("id = :id", { id })
-      .execute();
+    if (Object.keys(addressPatch).length > 0) {
+      await rechnungRepo
+        .createQueryBuilder()
+        .update(Rechnung)
+        .set(addressPatch)
+        .where("id = :id", { id })
+        .execute();
+    }
 
     const fullRechnung = await rechnungRepo.findOne({
       where: { id: rechnung.id },
@@ -659,10 +657,154 @@ export const updateRechnung = async (
     res.json({
       success: true,
       message: "Rechnung updated successfully",
-      data: fullRechnung,
+      data: fullRechnung || rechnung,
     });
   } catch (error) {
     console.error("[updateRechnung] error:", error);
     next(error);
+  }
+};
+
+export const uploadGelangenheitsbestaetigung = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      res.status(400).json({ success: false, message: "No file uploaded" });
+      return;
+    }
+
+    const rechnungRepo = AppDataSource.getRepository(Rechnung);
+    const rechnung = await rechnungRepo.findOne({ where: { id } });
+
+    if (!rechnung) {
+      res.status(404).json({ success: false, message: "Rechnung not found" });
+      return;
+    }
+
+    const docPath = `/uploads/${file.filename}`;
+    rechnung.gelangenheitsbestaetigung_doc = docPath;
+    await rechnungRepo.save(rechnung);
+
+    res.json({
+      success: true,
+      message: "Gelangenheitsbestätigung uploaded successfully",
+      data: {
+        gelangenheitsbestaetigung_doc: docPath,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteGelangenheitsbestaetigung = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const rechnungRepo = AppDataSource.getRepository(Rechnung);
+    const rechnung = await rechnungRepo.findOne({ where: { id } });
+
+    if (!rechnung) {
+      res.status(404).json({ success: false, message: "Rechnung not found" });
+      return;
+    }
+
+    rechnung.gelangenheitsbestaetigung_doc = null as any;
+    await rechnungRepo.save(rechnung);
+
+    res.json({
+      success: true,
+      message: "Gelangenheitsbestätigung removed successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadRechnungPdf = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const rechnungRepo = AppDataSource.getRepository(Rechnung);
+    const rechnung = await rechnungRepo.findOne({
+      where: [{ id: String(id) }, { invoice_number: String(id) }],
+      relations: ["items", "customer"],
+    });
+
+    if (!rechnung) {
+      res.status(404).json({ success: false, message: "Rechnung not found" });
+      return;
+    }
+
+    const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
+    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || "").trim();
+    const customerNum = (customerSnap.customerNumber || "").trim();
+    let kundeCombined = "—";
+    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    else if (customerCompName) kundeCombined = customerCompName;
+    else if (customerNum) kundeCombined = customerNum;
+
+    const uploadsDir = path.join(__dirname, "../../uploads/rechnungen");
+    const filePath = path.join(uploadsDir, `rechnung_${rechnung.invoice_number || rechnung.id}.pdf`);
+
+    const items = (rechnung.items || []).map((it: any, idx: number) => ({
+      position: it.position || idx + 1,
+      artNr: it.itemNo || it.material || "—",
+      bezeichnung: it.item_name || it.description || "Item",
+      remarks: it.remark || it.notes || "-",
+      vatRate: it.taxRate ?? rechnung.tax_rate ?? 19,
+      quantity: Number(it.quantity || 1),
+      unitPrice: Number(it.unit_price_eur || it.price || 0),
+      lineTotal: Number(it.total_price || it.lineTotal || (Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0))),
+    }));
+
+    await generateGtechDocumentPdf({
+      documentType: "Rechnung",
+      documentNumber: rechnung.invoice_number,
+      customerSnapshot: customerSnap,
+      customerEntity: rechnung.customer,
+      deliveryAddress: rechnung.deliveryAddress,
+      metadataItems: [
+        ["Ansprechpartner", contactName],
+        ["Kunde", kundeCombined],
+        ["Datum", rechnung.date_created || rechnung.created_at || rechnung.invoice_date],
+      ],
+      lineItems: items,
+      showPrices: true,
+      shippingMethod: rechnung.shipping_method,
+      shippingCost: Number(rechnung.shipping_cost || 0),
+      discountPercentage: Number(rechnung.discount_percentage || 0),
+      discountAmount: Number(rechnung.discount_amount || 0),
+      subtotal: Number(rechnung.subtotal || 0),
+      taxAmount: Number(rechnung.tax_amount || 0),
+      totalAmount: Number(rechnung.total_amount || 0),
+      taxRate: Number(rechnung.tax_rate || 19),
+      currency: rechnung.currency || "EUR",
+      notes: rechnung.notes,
+      deliveryTime: rechnung.date_delivery,
+      deliveryTerms: rechnung.delivery_terms,
+      paymentTerms: rechnung.payment_terms ? `Zahlungsziel: ${rechnung.payment_terms} Tage` : undefined,
+      paymentMethod: rechnung.payment_method,
+      outputFilePath: filePath,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=rechnung_${rechnung.invoice_number}.pdf`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    next(err);
   }
 };

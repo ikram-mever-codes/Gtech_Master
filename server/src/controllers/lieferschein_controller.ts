@@ -3,6 +3,9 @@ import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { Lieferschein } from "../models/lieferscheine";
 import { Rechnung } from "../models/rechnung";
+import path from "path";
+import fs from "fs";
+import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { NumberSequenceService } from "../services/number_sequence_service";
 
 /**
@@ -301,5 +304,83 @@ export const deleteLieferschein = async (
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const downloadLieferscheinPdf = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
+    const lieferschein = await lieferscheinRepo.findOne({
+      where: [{ id: String(id) }, { delivery_note_number: String(id) }],
+      relations: ["rechnung", "rechnung.items", "rechnung.customer"],
+    });
+
+    if (!lieferschein) {
+      res.status(404).json({ success: false, message: "Lieferschein not found" });
+      return;
+    }
+
+    const rechnung = lieferschein.rechnung;
+    const customerSnap = rechnung?.customerSnapshot || rechnung?.customer || {};
+    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || "").trim();
+    const customerNum = (customerSnap.customerNumber || "").trim();
+    let kundeCombined = "—";
+    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    else if (customerCompName) kundeCombined = customerCompName;
+    else if (customerNum) kundeCombined = customerNum;
+
+    const uploadsDir = path.join(__dirname, "../../uploads/lieferscheine");
+    const filePath = path.join(uploadsDir, `ls_${lieferschein.delivery_note_number || lieferschein.id}.pdf`);
+
+    const items = (rechnung?.items || []).map((it: any, idx: number) => ({
+      position: it.position || idx + 1,
+      artNr: it.itemNo || it.material || "—",
+      bezeichnung: it.item_name || it.description || "Item",
+      remarks: it.remark || it.notes || "-",
+      quantity: Number(it.quantity || 1),
+    }));
+
+    const formatDateStr = (dateVal: any): string => {
+      if (!dateVal) return "—";
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return String(dateVal);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}.${month}.${year}`;
+    };
+
+    await generateGtechDocumentPdf({
+      documentType: "Lieferschein",
+      documentNumber: lieferschein.delivery_note_number,
+      customerSnapshot: customerSnap,
+      customerEntity: rechnung?.customer,
+      deliveryAddress: rechnung?.deliveryAddress,
+      metadataItems: [
+        ["Ansprechpartner", contactName],
+        ["Kunde", kundeCombined],
+        ["Datum", formatDateStr(lieferschein.date_created || lieferschein.created_at)],
+        ["Lieferdatum", formatDateStr(lieferschein.delivery_date || rechnung?.date_delivery || rechnung?.delivery_date)],
+      ],
+      lineItems: items,
+      showPrices: false,
+      shippingMethod: rechnung?.shipping_method,
+      notes: lieferschein.notes || rechnung?.notes,
+      deliveryTime: rechnung?.date_delivery,
+      deliveryTerms: rechnung?.delivery_terms,
+      outputFilePath: filePath,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=lieferschein_${lieferschein.delivery_note_number}.pdf`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    next(err);
   }
 };

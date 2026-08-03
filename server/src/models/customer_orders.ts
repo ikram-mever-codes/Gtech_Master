@@ -22,6 +22,7 @@ export enum AuftragStatus {
   OPEN = "open",
   PARTIALLY_DELIVERED = "partially_delivered",
   DELIVERED = "delivered",
+  CLOSED = "closed",
 }
 
 @Entity({ name: "customer_orders" })

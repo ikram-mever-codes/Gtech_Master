@@ -5,6 +5,7 @@ import { OrderItem } from "../models/order_items";
 import { WarehouseItem } from "../models/warehouse_items";
 import { SupplierItem } from "../models/supplier_items";
 import { VariationValue } from "../models/variation_values";
+import { Rechnung } from "../models/rechnung";
 import fs from "fs";
 import path from "path";
 
@@ -112,6 +113,7 @@ export const getAuditReports = async (req: Request, res: Response) => {
       newPictureRequiredCount,
       itemsWithoutPictureCount,
       multipleParentsPicturesRaw,
+      missingGelangenheitsCount,
     ] = await Promise.all([
       AppDataSource.getRepository(OrderItem)
         .createQueryBuilder("oi")
@@ -258,6 +260,17 @@ export const getAuditReports = async (req: Request, res: Response) => {
           return `item.photo IN ${subQuery.getQuery()}`;
         })
         .getCount(),
+
+      AppDataSource.getRepository(Rechnung)
+        .createQueryBuilder("r")
+        .leftJoin("r.customer", "c")
+        .where(
+          "(r.tax_profile_case IN ('EU_IGL', 'third_country') OR (c.country IS NOT NULL AND c.country != '' AND c.country NOT IN ('DE', 'Deutschland', 'DEU')))",
+        )
+        .andWhere(
+          "(r.gelangenheitsbestaetigung_doc IS NULL OR r.gelangenheitsbestaetigung_doc = '' OR r.gelangenheitsbestaetigung_doc = 'null')",
+        )
+        .getCount(),
     ]);
 
     const multipleParentsPicturesCount = multipleParentsPicturesRaw;
@@ -314,6 +327,7 @@ export const getAuditReports = async (req: Request, res: Response) => {
             { label: "RMB Special SET with no value", count: rmbSpecialNoValueCount, type: "rmb_special_no_value" },
             { label: "EUR Special SET with no value", count: eurSpecialNoValueCount, type: "eur_special_no_value" },
             { label: "Dimention Special SET with no value", count: dimensionSpecialNoValueCount, type: "dimension_special_no_value" },
+            { label: "Auslandslieferungen OHNE Gelangenheitsbestätigung/Ausfuhrnachweis", count: missingGelangenheitsCount, type: "missing_gelangenheitsbestaetigung" },
           ],
           items: [
             { label: "Missing Var Values EN", count: missingVarValuesEnCount, type: "missing_var_values_en" },

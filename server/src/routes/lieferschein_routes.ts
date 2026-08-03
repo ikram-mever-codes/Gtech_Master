@@ -1,28 +1,27 @@
-// src/routes/lieferschein_routes.ts
 import { Router } from "express";
+import { authenticateUser } from "../middlewares/authorized";
 import {
   getAllLieferscheine,
   getLieferscheinById,
   updateLieferscheinStatus,
   updateLieferscheinDeliveryDate,
   deleteLieferschein,
+  downloadLieferscheinPdf,
 } from "../controllers/lieferschein_controller";
 
 const router = Router();
+router.use(authenticateUser);
 
-// Get all Lieferscheine
 router.get("/", getAllLieferscheine);
 
-// Get Lieferschein by ID
+router.get("/:id/download-pdf", downloadLieferscheinPdf);
+
 router.get("/:id", getLieferscheinById);
 
-// Update Lieferschein status
 router.patch("/:id/status", updateLieferscheinStatus);
 
-// Update Lieferschein delivery date
 router.patch("/:id/delivery-date", updateLieferscheinDeliveryDate);
 
-// Delete Lieferschein
 router.delete("/:id", deleteLieferschein);
 
 export default router;

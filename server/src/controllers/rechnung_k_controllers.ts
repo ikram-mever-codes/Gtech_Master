@@ -6,6 +6,9 @@ import { Rechnung_k } from "../models/rechnung_k";
 import { RechnungKItem } from "../models/rechnung_k_items";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { numericTransformer } from "../utils/numeric-transformer";
+import path from "path";
+import fs from "fs";
+import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
 
@@ -696,5 +699,84 @@ export const deleteRechnungK = async (
     res.json({ success: true, message: "Correction invoice deleted" });
   } catch (error) {
     next(error);
+  }
+};
+
+export const downloadRechnungKPdf = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
+    const rechnungK = await rechnungKRepo.findOne({
+      where: [{ id: String(id) }, { invoice_number: String(id) }],
+      relations: ["items", "customer"],
+    });
+
+    if (!rechnungK) {
+      res.status(404).json({ success: false, message: "Correction invoice not found" });
+      return;
+    }
+
+    const customerSnap = rechnungK.customerSnapshot || rechnungK.customer || {};
+    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || "").trim();
+    const customerNum = (customerSnap.customerNumber || "").trim();
+    let kundeCombined = "—";
+    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    else if (customerCompName) kundeCombined = customerCompName;
+    else if (customerNum) kundeCombined = customerNum;
+
+    const uploadsDir = path.join(__dirname, "../../uploads/rechnungen_k");
+    const filePath = path.join(uploadsDir, `rk_${rechnungK.invoice_number || rechnungK.id}.pdf`);
+
+    const items = (rechnungK.items || []).map((it: any, idx: number) => ({
+      position: it.position || idx + 1,
+      artNr: it.itemNo || it.material || "—",
+      bezeichnung: it.item_name || it.description || "Item",
+      remarks: it.remark || it.notes || "-",
+      vatRate: it.taxRate ?? rechnungK.tax_rate ?? 19,
+      quantity: Number(it.quantity || 1),
+      unitPrice: Number(it.unit_price_eur || it.price || 0),
+      lineTotal: Number(it.total_price || it.lineTotal || (Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0))),
+    }));
+
+    await generateGtechDocumentPdf({
+      documentType: "RK" as any,
+      documentNumber: rechnungK.invoice_number,
+      customerSnapshot: customerSnap,
+      customerEntity: rechnungK.customer,
+      deliveryAddress: rechnungK.deliveryAddress,
+      metadataItems: [
+        ["Ansprechpartner", contactName],
+        ["Kunde", kundeCombined],
+        ["Datum", rechnungK.date_created || rechnungK.created_at || rechnungK.invoice_date],
+      ],
+      lineItems: items,
+      showPrices: true,
+      shippingMethod: rechnungK.shipping_method,
+      shippingCost: Number(rechnungK.shipping_cost || 0),
+      discountPercentage: Number(rechnungK.discount_percentage || 0),
+      discountAmount: Number(rechnungK.discount_amount || 0),
+      subtotal: Number(rechnungK.subtotal || 0),
+      taxAmount: Number(rechnungK.tax_amount || 0),
+      totalAmount: Number(rechnungK.total_amount || 0),
+      taxRate: Number(rechnungK.tax_rate || 19),
+      currency: rechnungK.currency || "EUR",
+      notes: rechnungK.notes,
+      deliveryTime: rechnungK.date_delivery,
+      deliveryTerms: rechnungK.delivery_terms,
+      paymentTerms: rechnungK.payment_terms ? `Zahlungsziel: ${rechnungK.payment_terms} Tage` : undefined,
+      paymentMethod: rechnungK.payment_method,
+      outputFilePath: filePath,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=rk_${rechnungK.invoice_number}.pdf`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    next(err);
   }
 };

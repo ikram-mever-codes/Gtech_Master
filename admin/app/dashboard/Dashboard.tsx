@@ -106,6 +106,8 @@ export default function Dashboard() {
         type === "dimension_special_no_value"
       ) {
         router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
+      } else if (type === "missing_gelangenheitsbestaetigung") {
+        router.push(`/commercial?tab=rechnung&filter=${type}&hide_banner=true`);
       } else {
         router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
       }

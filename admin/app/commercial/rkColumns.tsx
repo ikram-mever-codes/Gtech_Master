@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { FileDown } from "lucide-react";
+import { downloadRechnungKPdf } from "@/api/rechnungen_k";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -34,7 +36,6 @@ export function buildRkColumns({
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
     dateCreatedColumn,
     {
-      // Clickable RK number that opens the RK detail
       header: "No",
       width: "110px",
       align: "center",
@@ -71,6 +72,19 @@ export function buildRkColumns({
             className="px-2 py-1 text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-[4px] transition shadow-md"
           >
             Delete
+          </button>
+
+          <button
+            title="Download Rechnungskorrektur PDF"
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                await downloadRechnungKPdf(row.id, row.invoiceNumber || row.invoice_number);
+              } catch (_) { }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+          >
+            <FileDown className="h-3.5 w-3.5" /> PDF
           </button>
         </div>
       ),
