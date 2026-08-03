@@ -32,6 +32,16 @@ const calculateDueDate = (
   return due;
 };
 
+const isStreetAddress = (str?: string | null): boolean => {
+  if (!str) return false;
+  const s = str.trim().toLowerCase();
+  return (
+    /\b(stra[ßs]e|str\.|street|st\.|weg|platz|road|rd\.|avenue|ave|gasse|hof|allee|damm|ring|pfad)\b/i.test(s) ||
+    (/\d+/.test(s) &&
+      /\b(stra[ßs]e|str|weg|platz|road|avenue|gasse|hof|allee|damm|ring)\b/i.test(s))
+  );
+};
+
 export class InvoiceController {
   static createInvoice = async (
     req: Request,
@@ -838,7 +848,9 @@ export class InvoiceController {
         });
       }
 
-      const allCargos = await AppDataSource.getRepository(Cargo).find();
+      const allCargos = await AppDataSource.getRepository(Cargo).find({
+        relations: ["customer"],
+      });
       allCargos.forEach((c) => {
         if (c.cargo_no) {
           orderToCargoMap.set(c.cargo_no, c);
@@ -969,17 +981,23 @@ export class InvoiceController {
 
           const rawBillTo = "GTech Industries GmbH";
 
-          const rawShipTo =
+          const shipCompanyCandidate =
             typeof cargo?.ship_to_company_name === "string" &&
-              cargo.ship_to_company_name.trim().length > 1
+              cargo.ship_to_company_name.trim().length > 1 &&
+              !isStreetAddress(cargo.ship_to_company_name)
               ? cargo.ship_to_company_name.trim()
               : typeof cargo?.ship_to_display_name === "string" &&
-                cargo.ship_to_display_name.trim().length > 1
+                cargo.ship_to_display_name.trim().length > 1 &&
+                !isStreetAddress(cargo.ship_to_display_name)
                 ? cargo.ship_to_display_name.trim()
-                : typeof inv.customer?.companyName === "string" &&
-                  inv.customer.companyName.trim()
-                  ? inv.customer.companyName.trim()
-                  : "-";
+                : undefined;
+
+          const rawShipTo =
+            shipCompanyCandidate ||
+            inv.customer?.companyName ||
+            cargo?.customer?.companyName ||
+            inv.customer?.legalName ||
+            "-";
 
           return {
             ...inv,
@@ -1030,7 +1048,10 @@ export class InvoiceController {
           status: cci.status || "closed",
           bill_to: "GTech Industries GmbH",
           ship_to:
-            cci.customer?.ship_to_address || cci.customer?.company_name || "-",
+            cci.customer?.company_name ||
+            (cci.customer?.ship_to_address && !isStreetAddress(cci.customer.ship_to_address)
+              ? cci.customer.ship_to_address
+              : "-"),
           customItemCount,
           customTotalQty,
           cargoNo: cargoNo,
@@ -1191,7 +1212,7 @@ export class InvoiceController {
           ? {
             id: cciInvoice.cargo_no,
             cargo_no: cciInvoice.cargo_no,
-            ship_to: cciInvoice.customer?.ship_to_address || null,
+            ship_to: cciInvoice.customer?.company_name || cciInvoice.customer?.ship_to_address || null,
             bill_to: "GTech Industries GmbH",
           }
           : null,
