@@ -120,11 +120,12 @@ async function getEffectiveUnitPrice(
 const isFreetextLine = (li: CustomerOrderItem) =>
   !li.sourceItemId && !li.sourceLineItemId;
 
-/** Recomputes subtotal/tax/total from the order's line items, discount,
- * and shipping — mirrors Offer.calculateOfferTotals, including the
- * per-line effective tax rate (line.taxRate for Freizeile lines, the
- * order's own tax_rate for everything else, shipping always taxed at the
- * order's tax_rate). */
+const isValidUuid = (value: any): value is string =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+
 async function getLinkedDocumentsForAuftrag(
   auftragId: number,
   offerId?: string | null,
@@ -134,10 +135,12 @@ async function getLinkedDocumentsForAuftrag(
   const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
   const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
 
+  const safeOfferId = isValidUuid(offerId) ? offerId : null;
+
   const [offer, rechnungen, rechnungenK, bestellungen] = await Promise.all([
-    offerId
+    safeOfferId
       ? offerRepo.findOne({
-          where: { id: offerId },
+          where: { id: safeOfferId },
           select: ["id", "offerNumber", "createdAt"],
         })
       : Promise.resolve(null),
@@ -166,9 +169,6 @@ async function getLinkedDocumentsForAuftrag(
   };
 }
 
-/** Same as above, batched for many Auftrag ids at once — used by
- * getAllCustomerOrders so listing a page doesn't run N queries. Returns a
- * Map keyed by auftrag id, each value already grouped by document type. */
 async function getLinkedDocumentsForAuftraege(
   auftragIds: number[],
   offerIdByAuftragId: Map<number, string | null | undefined>,
@@ -190,10 +190,11 @@ async function getLinkedDocumentsForAuftraege(
   const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
   const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
 
+  // Only well-formed UUIDs go into the Offer query — anything else in
+  // offer_id is stray data and is silently skipped rather than crashing
+  // the whole request.
   const offerIds = Array.from(
-    new Set(
-      Array.from(offerIdByAuftragId.values()).filter((v): v is string => !!v),
-    ),
+    new Set(Array.from(offerIdByAuftragId.values()).filter(isValidUuid)),
   );
 
   const [offers, rechnungen, rechnungenK, bestellungen] = await Promise.all([
@@ -223,7 +224,7 @@ async function getLinkedDocumentsForAuftraege(
   const offerById = new Map(offers.map((o: any) => [o.id, o]));
 
   for (const [auftragId, offerId] of offerIdByAuftragId.entries()) {
-    if (!offerId) continue;
+    if (!isValidUuid(offerId)) continue;
     const bucket = result.get(auftragId);
     const offer = offerById.get(offerId);
     if (bucket && offer) bucket.offers.push(offer);
