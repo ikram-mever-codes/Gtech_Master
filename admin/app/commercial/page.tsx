@@ -2036,6 +2036,7 @@ const InvoiceListPage: React.FC = () => {
             onSuccess={() => tabData.refetchOrders()}
           />
         )}
+
         {showAuftragPreviewModal && (
           <AuftragPreviewModal
             isOpen={showAuftragPreviewModal}
@@ -2048,6 +2049,37 @@ const InvoiceListPage: React.FC = () => {
             }}
             onChanged={() => tabData.refetchOrders()}
             userRole={user?.role}
+            onSwitchToOffer={(offerId: string) => {
+              handleOpenOfferModal(offerId);
+            }}
+            onSwitchToBestellung={(bestellungId: string | number) => {
+              setActiveInvTab("bestellung");
+              setTimeout(() => {
+                handleOpenBestellungPreview(bestellungId);
+              }, 100);
+            }}
+            onSwitchToRechnung={(rechnungId: string) => {
+              setActiveInvTab("rechnung");
+              tabData.ensureLoaded("rechnung");
+              setTimeout(() => {
+                const found = (tabData.rechnungen || []).find(
+                  (r: any) => r.id === rechnungId,
+                );
+                if (found) {
+                  setSelectedRechnungForDetail(found);
+                  setShowRechnungDetailModal(true);
+                  setOpenQuantities(allOpenQuantities[found.id] || {});
+                } else {
+                  console.warn(
+                    "Couldn't find Rechnung in loaded tab data:",
+                    rechnungId,
+                  );
+                }
+              }, 300);
+            }}
+            onSwitchToRechnungK={(rechnungKId: string) => {
+              handleOpenRechnungKDetail({ id: rechnungKId });
+            }}
           />
         )}
         {showBestellungPreviewModal && selectedBestellungId && (

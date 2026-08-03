@@ -14,6 +14,9 @@ import {
   parseFlexibleNumberOrZero,
 } from "../utils/decimal";
 import { WarehouseItem } from "../models/warehouse_items";
+import { Rechnung } from "../models/rechnung";
+import { Rechnung_k } from "../models/rechnung_k";
+import { TransferOrder } from "../models/transfer_order";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
 
@@ -122,6 +125,127 @@ const isFreetextLine = (li: CustomerOrderItem) =>
  * per-line effective tax rate (line.taxRate for Freizeile lines, the
  * order's own tax_rate for everything else, shipping always taxed at the
  * order's tax_rate). */
+async function getLinkedDocumentsForAuftrag(
+  auftragId: number,
+  offerId?: string | null,
+) {
+  const offerRepo = AppDataSource.getRepository(Offer);
+  const rechnungRepo = AppDataSource.getRepository(Rechnung);
+  const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
+  const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+
+  const [offer, rechnungen, rechnungenK, bestellungen] = await Promise.all([
+    offerId
+      ? offerRepo.findOne({
+          where: { id: offerId },
+          select: ["id", "offerNumber", "createdAt"],
+        })
+      : Promise.resolve(null),
+    rechnungRepo.find({
+      where: { auftrag_id: auftragId },
+      select: ["id", "invoice_number", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+    rechnungKRepo.find({
+      where: { auftrag_id: auftragId },
+      select: ["id", "invoice_number", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+    transferOrderRepo.find({
+      where: { auftrag_id: auftragId },
+      select: ["id", "order_no", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+  ]);
+
+  return {
+    offers: offer ? [offer] : [],
+    rechnungen,
+    rechnungenK,
+    bestellungen,
+  };
+}
+
+/** Same as above, batched for many Auftrag ids at once — used by
+ * getAllCustomerOrders so listing a page doesn't run N queries. Returns a
+ * Map keyed by auftrag id, each value already grouped by document type. */
+async function getLinkedDocumentsForAuftraege(
+  auftragIds: number[],
+  offerIdByAuftragId: Map<number, string | null | undefined>,
+) {
+  const empty = () => ({
+    offers: [] as any[],
+    rechnungen: [] as any[],
+    rechnungenK: [] as any[],
+    bestellungen: [] as any[],
+  });
+
+  const result = new Map<number, ReturnType<typeof empty>>();
+  auftragIds.forEach((id) => result.set(id, empty()));
+
+  if (auftragIds.length === 0) return result;
+
+  const offerRepo = AppDataSource.getRepository(Offer);
+  const rechnungRepo = AppDataSource.getRepository(Rechnung);
+  const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
+  const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+
+  const offerIds = Array.from(
+    new Set(
+      Array.from(offerIdByAuftragId.values()).filter((v): v is string => !!v),
+    ),
+  );
+
+  const [offers, rechnungen, rechnungenK, bestellungen] = await Promise.all([
+    offerIds.length
+      ? offerRepo.find({
+          where: { id: In(offerIds) },
+          select: ["id", "offerNumber", "createdAt"],
+        })
+      : Promise.resolve([]),
+    rechnungRepo.find({
+      where: { auftrag_id: In(auftragIds) },
+      select: ["id", "invoice_number", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+    rechnungKRepo.find({
+      where: { auftrag_id: In(auftragIds) },
+      select: ["id", "invoice_number", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+    transferOrderRepo.find({
+      where: { auftrag_id: In(auftragIds) },
+      select: ["id", "order_no", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+  ]);
+
+  const offerById = new Map(offers.map((o: any) => [o.id, o]));
+
+  for (const [auftragId, offerId] of offerIdByAuftragId.entries()) {
+    if (!offerId) continue;
+    const bucket = result.get(auftragId);
+    const offer = offerById.get(offerId);
+    if (bucket && offer) bucket.offers.push(offer);
+  }
+
+  const push = (
+    key: "rechnungen" | "rechnungenK" | "bestellungen",
+    rows: any[],
+  ) => {
+    for (const row of rows) {
+      const bucket = result.get(row.auftrag_id);
+      if (bucket) bucket[key].push(row);
+    }
+  };
+
+  push("rechnungen", rechnungen);
+  push("rechnungenK", rechnungenK);
+  push("bestellungen", bestellungen);
+
+  return result;
+}
+
 async function calculateOrderTotals(orderId: number): Promise<void> {
   const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
   const order = await customerOrderRepo.findOne({
@@ -231,9 +355,9 @@ export const createAuftragFromOffer = async (
         warehouseItems = await warehouseRepository.find({
           where: itemIdDEs.length
             ? [
-              { ItemID_DE: In(itemIdDEs) },
-              { item_id: In(sourceItems.map((it: any) => it.id)) },
-            ]
+                { ItemID_DE: In(itemIdDEs) },
+                { item_id: In(sourceItems.map((it: any) => it.id)) },
+              ]
             : { item_id: In(sourceItems.map((it: any) => it.id)) },
         });
       } catch (e: any) {
@@ -420,7 +544,24 @@ export const getAllCustomerOrders = async (
 
     await attachStockInfoToOrders(orders);
 
-    res.json({ success: true, data: orders });
+    const auftragIds = orders.map((o) => o.id);
+    const offerIdByAuftragId = new Map(orders.map((o) => [o.id, o.offer_id]));
+    const linkedDocumentsByAuftragId = await getLinkedDocumentsForAuftraege(
+      auftragIds,
+      offerIdByAuftragId,
+    );
+
+    const ordersWithLinkedDocuments = orders.map((order: any) => ({
+      ...order,
+      linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
+        offers: [],
+        rechnungen: [],
+        rechnungenK: [],
+        bestellungen: [],
+      },
+    }));
+
+    res.json({ success: true, data: ordersWithLinkedDocuments });
   } catch (error) {
     next(error);
   }
@@ -458,12 +599,16 @@ export const getCustomerOrderById = async (
 
     await attachStockInfoToOrders([order]);
 
-    res.json({ success: true, data: order });
+    const linkedDocuments = await getLinkedDocumentsForAuftrag(
+      order.id,
+      order.offer_id,
+    );
+
+    res.json({ success: true, data: { ...order, linkedDocuments } });
   } catch (error) {
     next(error);
   }
 };
-
 export const deleteCustomerOrder = async (
   req: Request,
   res: Response,
@@ -764,23 +909,42 @@ export const updateCustomerOrder = async (
         parseFlexibleNumberOrZero(discountPercentage);
 
     // Extra fields mapping
-    const finalAuftragStatus = auftrag_status !== undefined ? auftrag_status : auftragStatus;
-    if (finalAuftragStatus !== undefined) auftrag.auftrag_status = finalAuftragStatus;
+    const finalAuftragStatus =
+      auftrag_status !== undefined ? auftrag_status : auftragStatus;
+    if (finalAuftragStatus !== undefined)
+      auftrag.auftrag_status = finalAuftragStatus;
 
-    const finalRealDeliveryDate = real_delivery_date !== undefined ? real_delivery_date : realDeliveryDate;
-    if (finalRealDeliveryDate !== undefined) auftrag.real_delivery_date = finalRealDeliveryDate || null as any;
+    const finalRealDeliveryDate =
+      real_delivery_date !== undefined ? real_delivery_date : realDeliveryDate;
+    if (finalRealDeliveryDate !== undefined)
+      auftrag.real_delivery_date = finalRealDeliveryDate || (null as any);
 
-    const finalIsWeiterversand = is_weiterversand !== undefined ? is_weiterversand : isWeiterversand;
-    if (finalIsWeiterversand !== undefined) auftrag.is_weiterversand = Boolean(finalIsWeiterversand);
+    const finalIsWeiterversand =
+      is_weiterversand !== undefined ? is_weiterversand : isWeiterversand;
+    if (finalIsWeiterversand !== undefined)
+      auftrag.is_weiterversand = Boolean(finalIsWeiterversand);
 
-    const finalProviderId = weiterversand_service_provider_id !== undefined ? weiterversand_service_provider_id : weiterversandServiceProviderId;
-    if (finalProviderId !== undefined) auftrag.weiterversand_service_provider_id = finalProviderId ? Number(finalProviderId) : null as any;
+    const finalProviderId =
+      weiterversand_service_provider_id !== undefined
+        ? weiterversand_service_provider_id
+        : weiterversandServiceProviderId;
+    if (finalProviderId !== undefined)
+      auftrag.weiterversand_service_provider_id = finalProviderId
+        ? Number(finalProviderId)
+        : (null as any);
 
-    const finalLabels = weiterversand_labels !== undefined ? weiterversand_labels : weiterversandLabels;
+    const finalLabels =
+      weiterversand_labels !== undefined
+        ? weiterversand_labels
+        : weiterversandLabels;
     if (finalLabels !== undefined) auftrag.weiterversand_labels = finalLabels;
 
-    const finalTracking = weiterversand_tracking !== undefined ? weiterversand_tracking : weiterversandTracking;
-    if (finalTracking !== undefined) auftrag.weiterversand_tracking = finalTracking;
+    const finalTracking =
+      weiterversand_tracking !== undefined
+        ? weiterversand_tracking
+        : weiterversandTracking;
+    if (finalTracking !== undefined)
+      auftrag.weiterversand_tracking = finalTracking;
 
     // Only update stock_where if the order has stock items
     if (stock_where !== undefined) {

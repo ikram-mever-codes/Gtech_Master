@@ -42,12 +42,18 @@ interface AuftragPreviewModalProps {
   onChanged?: () => void;
   userRole?: UserRole;
   initialEdit?: boolean;
+  onSwitchToOffer?: (offerId: string) => void;
+  onSwitchToBestellung?: (bestellungId: string | number) => void;
+  onSwitchToRechnung?: (rechnungId: string) => void;
+  onSwitchToRechnungK?: (rechnungKId: string) => void;
 }
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 
-const parseLabels = (raw?: string | null): Array<{ name: string; url: string }> => {
+const parseLabels = (
+  raw?: string | null,
+): Array<{ name: string; url: string }> => {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -294,6 +300,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   onChanged,
   userRole,
   initialEdit = false,
+  onSwitchToOffer,
+  onSwitchToBestellung,
+  onSwitchToRechnung,
+  onSwitchToRechnungK,
 }) => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -311,7 +321,46 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     taxRate: "",
   });
 
-  const [dbServiceProviders, setDbServiceProviders] = useState<WeiterversandServiceProvider[]>([]);
+  const [dbServiceProviders, setDbServiceProviders] = useState<
+    WeiterversandServiceProvider[]
+  >([]);
+
+  /** Sorts an array of linked-document records by created_at, newest first. */
+  const sortByCreatedAtDesc = (docs: any[]): any[] =>
+    [...(docs || [])].sort((a, b) => {
+      const timeA = new Date(a?.created_at || a?.createdAt || 0).getTime();
+      const timeB = new Date(b?.created_at || b?.createdAt || 0).getTime();
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
+
+  const LINKED_DOC_LABELS: Record<string, string> = {
+    offers: "Angebot",
+    rechnungen: "Rechnung",
+    rechnungenK: "RK",
+    bestellungen: "Bestellung",
+  };
+
+  const linkedDocumentsByType = order?.linkedDocuments || {
+    offers: [],
+    rechnungen: [],
+    rechnungenK: [],
+    bestellungen: [],
+  };
+  const linkedDocsCount = (
+    Object.keys(LINKED_DOC_LABELS) as (keyof typeof linkedDocumentsByType)[]
+  ).reduce(
+    (sum: any, key) => sum + (linkedDocumentsByType[key]?.length || 0),
+    0,
+  );
+
+  const getLinkedDocDisplayNumber = (kind: string, doc: any): string => {
+    if (kind === "offers") return doc.offerNumber || doc.id;
+    if (kind === "bestellungen") return doc.order_no || doc.id;
+    return doc.invoice_number || doc.id;
+  };
+
+  const getLinkedDocDate = (doc: any): string =>
+    doc.created_at || doc.createdAt || "";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -411,7 +460,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         o.is_weiterversand === "true" ||
         o.is_weiterversand === "1" ||
         o.is_weiterversand === "Yes",
-      weiterversandServiceProviderId: o.weiterversand_service_provider_id || o.weiterversandServiceProvider?.id || "",
+      weiterversandServiceProviderId:
+        o.weiterversand_service_provider_id ||
+        o.weiterversandServiceProvider?.id ||
+        "",
       weiterversandLabels: o.weiterversand_labels || "",
       weiterversandTracking: o.weiterversand_tracking || "",
     };
@@ -462,7 +514,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         auftragStatus: form.auftragStatus,
         realDeliveryDate: form.realDeliveryDate || null,
         isWeiterversand: form.isWeiterversand,
-        weiterversandServiceProviderId: form.weiterversandServiceProviderId ? Number(form.weiterversandServiceProviderId) : null,
+        weiterversandServiceProviderId: form.weiterversandServiceProviderId
+          ? Number(form.weiterversandServiceProviderId)
+          : null,
         weiterversandLabels: form.weiterversandLabels,
         weiterversandTracking: form.weiterversandTracking,
       });
@@ -706,15 +760,22 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               <p className="text-lg font-bold text-gray-900 truncate">
                 Auftrag {order.order_no}
               </p>
-              <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.auftrag_status === "delivered" || order.status === "Completed"
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : order.auftrag_status === "partially_delivered" || order.status === "In Progress"
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : "bg-blue-50 text-blue-700 border-blue-200"
-                }`}>
-                {order.auftrag_status === "delivered" || order.status === "Completed"
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                  order.auftrag_status === "delivered" ||
+                  order.status === "Completed"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : order.auftrag_status === "partially_delivered" ||
+                        order.status === "In Progress"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
+              >
+                {order.auftrag_status === "delivered" ||
+                order.status === "Completed"
                   ? "Delivered"
-                  : order.auftrag_status === "partially_delivered" || order.status === "In Progress"
+                  : order.auftrag_status === "partially_delivered" ||
+                      order.status === "In Progress"
                     ? "Partially Delivered"
                     : "Open"}
               </span>
@@ -1019,7 +1080,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <select
                         className={inputCls}
                         value={form.isWeiterversand ? "Yes" : "No"}
-                        onChange={(e) => patch({ isWeiterversand: e.target.value === "Yes" })}
+                        onChange={(e) =>
+                          patch({ isWeiterversand: e.target.value === "Yes" })
+                        }
                       >
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
@@ -1034,99 +1097,110 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   {(edit
                     ? form.isWeiterversand
                     : order.is_weiterversand === true ||
-                    order.is_weiterversand === 1 ||
-                    order.is_weiterversand === "true" ||
-                    order.is_weiterversand === "1" ||
-                    order.is_weiterversand === "Yes") && (
-                      <>
-                        <div className="w-48 shrink-0">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Service Provider
-                          </label>
-                          {edit ? (
-                            <select
-                              className={inputCls}
-                              value={form.weiterversandServiceProviderId || ""}
-                              onChange={(e) =>
-                                patch({ weiterversandServiceProviderId: e.target.value })
-                              }
-                            >
-                              <option value="">Select Provider…</option>
-                              {dbServiceProviders.map((sp) => (
-                                <option key={sp.id} value={sp.id}>
-                                  {sp.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="text-sm font-medium text-gray-800 py-1.5">
-                              {order.weiterversandServiceProvider?.name || "—"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="w-40 shrink-0">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Tracking No.
-                          </label>
-                          {edit ? (
-                            <input
-                              type="text"
-                              className={inputCls}
-                              placeholder="Tracking No."
-                              value={form.weiterversandTracking || ""}
-                              onChange={(e) =>
-                                patch({ weiterversandTracking: e.target.value })
-                              }
-                            />
-                          ) : (
-                            <div className="text-sm font-medium text-gray-800 py-1.5">
-                              {order.weiterversand_tracking || "—"}
-                            </div>
-                          )}
-                        </div>
-
-                        {edit && (
-                          <div className="shrink-0 self-end">
-                            <label
-                              htmlFor="weiterversand-label-file"
-                              className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
-                            >
-                              <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
-                              Upload Label(s)
-                            </label>
-                            <input
-                              id="weiterversand-label-file"
-                              type="file"
-                              multiple
-                              className="hidden"
-                              accept="application/pdf,image/*"
-                              onChange={(e) => {
-                                const files = Array.from(e.target.files || []);
-                                if (files.length === 0) return;
-                                const currentList = parseLabels(
-                                  form.weiterversandLabels || order.weiterversand_labels
-                                );
-                                let count = 0;
-                                files.forEach((file) => {
-                                  const reader = new FileReader();
-                                  reader.onload = (evt) => {
-                                    const dataUrl = evt.target?.result as string;
-                                    currentList.push({ name: file.name, url: dataUrl });
-                                    count++;
-                                    if (count === files.length) {
-                                      patch({ weiterversandLabels: JSON.stringify(currentList) });
-                                      toast.success(`Attached ${files.length} document(s)`);
-                                    }
-                                  };
-                                  reader.readAsDataURL(file);
-                                });
-                              }}
-                            />
+                      order.is_weiterversand === 1 ||
+                      order.is_weiterversand === "true" ||
+                      order.is_weiterversand === "1" ||
+                      order.is_weiterversand === "Yes") && (
+                    <>
+                      <div className="w-48 shrink-0">
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Service Provider
+                        </label>
+                        {edit ? (
+                          <select
+                            className={inputCls}
+                            value={form.weiterversandServiceProviderId || ""}
+                            onChange={(e) =>
+                              patch({
+                                weiterversandServiceProviderId: e.target.value,
+                              })
+                            }
+                          >
+                            <option value="">Select Provider…</option>
+                            {dbServiceProviders.map((sp) => (
+                              <option key={sp.id} value={sp.id}>
+                                {sp.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-800 py-1.5">
+                            {order.weiterversandServiceProvider?.name || "—"}
                           </div>
                         )}
-                      </>
-                    )}
+                      </div>
+
+                      <div className="w-40 shrink-0">
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Tracking No.
+                        </label>
+                        {edit ? (
+                          <input
+                            type="text"
+                            className={inputCls}
+                            placeholder="Tracking No."
+                            value={form.weiterversandTracking || ""}
+                            onChange={(e) =>
+                              patch({ weiterversandTracking: e.target.value })
+                            }
+                          />
+                        ) : (
+                          <div className="text-sm font-medium text-gray-800 py-1.5">
+                            {order.weiterversand_tracking || "—"}
+                          </div>
+                        )}
+                      </div>
+
+                      {edit && (
+                        <div className="shrink-0 self-end">
+                          <label
+                            htmlFor="weiterversand-label-file"
+                            className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
+                          >
+                            <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
+                            Upload Label(s)
+                          </label>
+                          <input
+                            id="weiterversand-label-file"
+                            type="file"
+                            multiple
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length === 0) return;
+                              const currentList = parseLabels(
+                                form.weiterversandLabels ||
+                                  order.weiterversand_labels,
+                              );
+                              let count = 0;
+                              files.forEach((file) => {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  const dataUrl = evt.target?.result as string;
+                                  currentList.push({
+                                    name: file.name,
+                                    url: dataUrl,
+                                  });
+                                  count++;
+                                  if (count === files.length) {
+                                    patch({
+                                      weiterversandLabels:
+                                        JSON.stringify(currentList),
+                                    });
+                                    toast.success(
+                                      `Attached ${files.length} document(s)`,
+                                    );
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              });
+                            }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1303,7 +1377,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                             />
                           ) : (
                             <div className="text-right">
-                              {formatCurrency(item.price || 0, order?.currency || "EUR")}
+                              {formatCurrency(
+                                item.price || 0,
+                                order?.currency || "EUR",
+                              )}
                             </div>
                           )}
                         </td>
@@ -1392,7 +1469,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-right font-bold text-gray-800">
                         {formatCurrency(
                           (form.shippingCost || 0) *
-                          (form.shippingQuantity || 1),
+                            (form.shippingQuantity || 1),
                           order?.currency || "EUR",
                         )}
                       </td>
@@ -1504,7 +1581,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                      visibleLineItems[0]?.extraWeight === undefined
+                    visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : String(visibleLineItems[0].extraWeight)
                   }
@@ -1529,14 +1606,21 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium">
-                  {formatCurrency(order.subtotal || 0, order?.currency || "EUR")}
+                  {formatCurrency(
+                    order.subtotal || 0,
+                    order?.currency || "EUR",
+                  )}
                 </span>
               </div>
               {order.discount_amount > 0 && (
                 <div className="flex justify-between text-rose-600">
                   <span>Discount</span>
                   <span>
-                    −{formatCurrency(order.discount_amount, order?.currency || "EUR")}
+                    −
+                    {formatCurrency(
+                      order.discount_amount,
+                      order?.currency || "EUR",
+                    )}
                   </span>
                 </div>
               )}
@@ -1553,65 +1637,112 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 ))}
               <div className="border-t pt-2 flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>{formatCurrency(displayTotal, order?.currency || "EUR")}</span>
+                <span>
+                  {formatCurrency(displayTotal, order?.currency || "EUR")}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
             <div className="bg-white rounded-lg p-4 px-3 border border-gray-100">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <LinkIcon className="h-4 w-4 text-gray-500" />
-                  <h3 className="text-sm font-bold text-gray-900">
-                    Linked documents
-                  </h3>
-                </div>
-                {parseLabels(form.weiterversandLabels || order.weiterversand_labels).length > 0 && (
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-                    {parseLabels(form.weiterversandLabels || order.weiterversand_labels).length}
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Linked documents
+                </h3>
+                {linkedDocsCount > 0 && (
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                    {linkedDocsCount}
                   </span>
                 )}
               </div>
-              {parseLabels(form.weiterversandLabels || order.weiterversand_labels).length > 0 ? (
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                  {parseLabels(form.weiterversandLabels || order.weiterversand_labels).map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between gap-2 bg-blue-50/70 border border-blue-200/80 px-2.5 py-1.5 rounded-lg text-xs"
-                    >
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-700 hover:underline flex items-center gap-1.5 font-medium truncate flex-1"
-                        title={doc.name}
-                      >
-                        <LinkIcon className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-                        <span className="truncate">{doc.name || `Document ${idx + 1}`}</span>
-                      </a>
-                      {edit && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const list = parseLabels(
-                              form.weiterversandLabels || order.weiterversand_labels
+              {linkedDocsCount > 0 ? (
+                <div className="space-y-3">
+                  {(
+                    Object.keys(
+                      LINKED_DOC_LABELS,
+                    ) as (keyof typeof linkedDocumentsByType)[]
+                  ).map((key: any) => {
+                    const docs = sortByCreatedAtDesc(
+                      linkedDocumentsByType[key] || [],
+                    );
+                    if (docs.length === 0) return null;
+                    return (
+                      <div key={key}>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                          {LINKED_DOC_LABELS[key]}
+                        </p>
+                        <div className="space-y-1.5 text-sm">
+                          {docs.map((doc: any, index: number) => {
+                            const displayNumber = getLinkedDocDisplayNumber(
+                              key,
+                              doc,
                             );
-                            list.splice(idx, 1);
-                            patch({ weiterversandLabels: JSON.stringify(list) });
-                            toast.success("Document removed");
-                          }}
-                          className="text-rose-500 hover:text-rose-700 p-0.5 rounded hover:bg-rose-100 shrink-0"
-                          title="Remove document"
-                        >
-                          <XMarkIcon className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                            const displayDate = getLinkedDocDate(doc);
+                            const handleClick = () => {
+                              if (key === "offers" && onSwitchToOffer) {
+                                onClose();
+                                onSwitchToOffer(doc.id);
+                              } else if (
+                                key === "bestellungen" &&
+                                onSwitchToBestellung
+                              ) {
+                                onClose();
+                                onSwitchToBestellung(doc.id);
+                              } else if (
+                                key === "rechnungen" &&
+                                onSwitchToRechnung
+                              ) {
+                                onClose();
+                                onSwitchToRechnung(doc.id);
+                              } else if (
+                                key === "rechnungenK" &&
+                                onSwitchToRechnungK
+                              ) {
+                                onClose();
+                                onSwitchToRechnungK(doc.id);
+                              } else {
+                                console.warn(
+                                  `AuftragPreviewModal: no navigation callback provided for "${key}"`,
+                                  doc,
+                                );
+                              }
+                            };
+                            return (
+                              <div
+                                key={doc.id ?? index}
+                                className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClick();
+                                  }}
+                                  className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline cursor-pointer flex items-center gap-1"
+                                >
+                                  {displayNumber}
+                                  <span className="text-xs text-gray-400">
+                                    →
+                                  </span>
+                                </button>
+                                {displayDate && (
+                                  <span className="text-gray-400 text-xs">
+                                    {formatDate(displayDate)}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No linked documents yet.</p>
+                <p className="text-sm text-gray-500">
+                  No linked documents yet.
+                </p>
               )}
             </div>
 
