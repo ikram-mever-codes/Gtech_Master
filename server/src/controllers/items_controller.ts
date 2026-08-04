@@ -4492,14 +4492,12 @@ export const syncCustomerPrices = async (
 
     const customerRepo = AppDataSource.getRepository(Customer);
     const itemRepo = AppDataSource.getRepository(Item);
-    const warehouseRepo: any = AppDataSource.getRepository(WarehouseItem);
     const salesPriceRepo = AppDataSource.getRepository(SalesPrice);
 
     const summary: any = {
       totalRows: rows.length,
       itemsNotFound: 0,
       customersNotFound: 0,
-      itemRestricted: 0,
       pricesCreated: 0,
       pricesUpdated: 0,
       skipped: 0,
@@ -4507,53 +4505,29 @@ export const syncCustomerPrices = async (
     };
 
     // Caches — the same item/customer repeats across many rows.
-    interface ItemInfo {
-      itemId: number;
-      assignedCustomerId: string | null;
-    }
-
-    const itemInfoByItemNo = new Map<string, ItemInfo | null>();
+    const itemIdByItemIdDe = new Map<string, number | null>();
     const customerIdByCustomerNo = new Map<string, string | null>();
 
-    /** ItemNo -> WarehouseItem.item_no_de -> item_id, per the requested
-     * lookup ("query the item using item no"). Item itself has no field
-     * matching this format — ItemNo is the WarehouseItem field used
-     * everywhere else in this codebase for the "item number" shown to
-     * users, so that's the join used here. Also returns the item's
-     * assigned customer (if any), to enforce the same restriction
-     * SalesPriceController.create already applies. */
-    const resolveItem = async (
-      itemNo: string,
-    ): Promise<{
-      itemId: number;
-      assignedCustomerId: string | null;
-    } | null> => {
-      if (itemInfoByItemNo.has(itemNo)) return itemInfoByItemNo.get(itemNo)!;
+    /** ItemID_DE -> Item.id, matched directly on Item.ItemID_DE — more
+     * reliable than the WarehouseItem/ItemNo join, since ItemID_DE is the
+     * stable numeric key rather than a formatted item number that can
+     * vary or go missing. */
+    const resolveItemId = async (itemIdDe: string): Promise<number | null> => {
+      if (itemIdByItemIdDe.has(itemIdDe))
+        return itemIdByItemIdDe.get(itemIdDe)!;
 
-      const warehouseItem = await warehouseRepo.findOne({
-        where: { item_no_de: itemNo },
-      });
+      const parsedItemIdDe = parseInt(itemIdDe, 10);
+      let resolvedId: number | null = null;
 
-      let result: { itemId: number; assignedCustomerId: string | null } | null =
-        null;
-
-      if (warehouseItem?.item_id) {
+      if (!isNaN(parsedItemIdDe)) {
         const item = await itemRepo.findOne({
-          where: { id: warehouseItem.item_id },
-          relations: ["customer"],
+          where: { ItemID_DE: parsedItemIdDe },
         });
-        if (item) {
-          result = {
-            itemId: item.id,
-            assignedCustomerId: item.customer?.id
-              ? String(item.customer.id)
-              : null,
-          };
-        }
+        resolvedId = item?.id ?? null;
       }
 
-      itemInfoByItemNo.set(itemNo, result);
-      return result;
+      itemIdByItemIdDe.set(itemIdDe, resolvedId);
+      return resolvedId;
     };
 
     const resolveCustomerId = async (
@@ -4609,13 +4583,13 @@ export const syncCustomerPrices = async (
 
     for (const row of rows) {
       try {
-        const itemInfo = await resolveItem(row.itemNo);
-        if (!itemInfo) {
+        const itemId = await resolveItemId(row.itemIdDe);
+        if (itemId === null) {
           summary.itemsNotFound++;
           summary.errors.push({
             customerNo: row.customerNo,
             itemNo: row.itemNo,
-            message: `No item found for ItemNo "${row.itemNo}"`,
+            message: `No item found for ItemID_DE "${row.itemIdDe}"`,
           });
           continue;
         }
@@ -4631,27 +4605,11 @@ export const syncCustomerPrices = async (
           continue;
         }
 
-        // If this item is assigned to a specific customer, sales prices
-        // can only be set for that same customer — same rule as
-        // SalesPriceController.assertCustomerAllowed.
-        if (
-          itemInfo.assignedCustomerId !== null &&
-          itemInfo.assignedCustomerId !== customerId
-        ) {
-          summary.itemRestricted++;
-          summary.errors.push({
-            customerNo: row.customerNo,
-            itemNo: row.itemNo,
-            message: `Item "${row.itemNo}" is assigned to a different customer — skipped.`,
-          });
-          continue;
-        }
-
         // --- Default (individual) price for this customer ---
         const individualPrice = parseFlexibleNumber(row.salesPriceCustomer);
         if (individualPrice !== null) {
           const result = await upsertPrice(
-            itemInfo.itemId,
+            itemId,
             customerId,
             true,
             1,
@@ -4668,7 +4626,7 @@ export const syncCustomerPrices = async (
           if (qty === null || price === null) continue; // tier not set
 
           const result = await upsertPrice(
-            itemInfo.itemId,
+            itemId,
             customerId,
             false,
             qty,
@@ -4693,7 +4651,7 @@ export const syncCustomerPrices = async (
 
     res.json({
       success: true,
-      message: `Processed ${summary.totalRows} rows: ${summary.pricesCreated} prices created, ${summary.pricesUpdated} updated, ${summary.itemsNotFound} items not found, ${summary.customersNotFound} customers not found, ${summary.itemRestricted} restricted, ${summary.skipped} skipped.`,
+      message: `Processed ${summary.totalRows} rows: ${summary.pricesCreated} prices created, ${summary.pricesUpdated} updated, ${summary.itemsNotFound} items not found, ${summary.customersNotFound} customers not found, ${summary.skipped} skipped.`,
       data: summary,
     });
   } catch (error) {
