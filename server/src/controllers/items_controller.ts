@@ -1,5 +1,6 @@
 // src/controllers/itemManagementController.ts
 import { Request, Response, NextFunction } from "express";
+import { SalesPrice } from "../models/sales_prices";
 import { AppDataSource } from "../config/database";
 import { Item } from "../models/items";
 import { Parent } from "../models/parents";
@@ -4244,18 +4245,6 @@ function parseItemCsv(filePath: string): ItemCsvRow[] {
   return rows;
 }
 
-/** Parses a number that may use either "," or "." as the decimal
- * separator (European CSV exports mix both). Returns null for empty or
- * unparsable values rather than 0, so a blank cell doesn't silently zero
- * out a field. */
-function parseFlexibleNumber(raw: string): number | null {
-  const trimmed = (raw || "").trim();
-  if (!trimmed) return null;
-  const normalized = trimmed.replace(",", ".");
-  const n = parseFloat(normalized);
-  return isNaN(n) ? null : n;
-}
-
 /** "0"/"1" -> boolean; anything else (blank, unrecognized) -> false. */
 function parseBooleanFlag(raw: string): boolean {
   return (raw || "").trim() === "1";
@@ -4290,7 +4279,7 @@ export const syncItemData = async (
     const itemRepo = AppDataSource.getRepository(Item);
     const warehouseRepo: any = AppDataSource.getRepository(WarehouseItem);
 
-    const summary: SyncSummary = {
+    const summary: any = {
       totalRows: rows.length,
       updated: 0,
       notFound: 0,
@@ -4410,5 +4399,305 @@ export const syncItemData = async (
   } catch (error) {
     console.error("Item sync error:", error);
     return next(new ErrorHandler("Failed to sync item data", 500));
+  }
+};
+
+interface CustomerPriceCsvRow {
+  customerNo: string;
+  itemIdDe: string;
+  ean: string;
+  itemNo: string;
+  itemNameDe: string;
+  salesPriceCustomer: string;
+  tiers: [string, string][]; // 10 raw [ab Menge, Netto-VK] pairs
+}
+
+const FIXED_COLUMN_COUNT = 6;
+const TIER_COUNT = 10;
+const CSV_COLUMN_COUNT = FIXED_COLUMN_COUNT + TIER_COUNT * 2;
+
+/** Reads /public/customer_prices.csv, strips the BOM, and returns typed
+ * rows. Blank lines are skipped; rows missing either key (CustomerNo or
+ * ItemNo) are skipped since there's nothing to match against. */
+function parseCustomerPriceCsv(filePath: string): CustomerPriceCsvRow[] {
+  const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+  const lines = raw.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return [];
+
+  const dataLines = lines.slice(1); // skip header row
+
+  const rows: CustomerPriceCsvRow[] = [];
+  for (const line of dataLines) {
+    const fields = parseSemicolonLine(line);
+    while (fields.length < CSV_COLUMN_COUNT) fields.push("");
+
+    const customerNo = fields[0];
+    const itemIdDe = fields[1];
+    const ean = fields[2];
+    const itemNo = fields[3];
+    const itemNameDe = fields[4];
+    const salesPriceCustomer = fields[5];
+
+    if (!customerNo || !itemNo) continue;
+
+    const tiers: [string, string][] = [];
+    for (let i = 0; i < TIER_COUNT; i++) {
+      const qtyIdx = FIXED_COLUMN_COUNT + i * 2;
+      const priceIdx = qtyIdx + 1;
+      tiers.push([fields[qtyIdx], fields[priceIdx]]);
+    }
+
+    rows.push({
+      customerNo,
+      itemIdDe,
+      ean,
+      itemNo,
+      itemNameDe,
+      salesPriceCustomer,
+      tiers,
+    });
+  }
+
+  return rows;
+}
+
+/** Parses a number that may use either "," or "." as the decimal
+ * separator. Returns null for empty/unparsable values so a blank cell
+ * (an unset tier) is distinguishable from an explicit 0. */
+function parseFlexibleNumber(raw: string): number | null {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(",", ".");
+  const n = parseFloat(normalized);
+  return isNaN(n) ? null : n;
+}
+
+export const syncCustomerPrices = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const csvPath = path.join(process.cwd(), "public", "customer_prices.csv");
+
+    if (!fs.existsSync(csvPath)) {
+      res.status(400).json({
+        success: false,
+        message: `customer_prices.csv not found at ${csvPath}`,
+      });
+      return;
+    }
+
+    const rows = parseCustomerPriceCsv(csvPath);
+
+    const customerRepo = AppDataSource.getRepository(Customer);
+    const itemRepo = AppDataSource.getRepository(Item);
+    const warehouseRepo: any = AppDataSource.getRepository(WarehouseItem);
+    const salesPriceRepo = AppDataSource.getRepository(SalesPrice);
+
+    const summary: any = {
+      totalRows: rows.length,
+      itemsNotFound: 0,
+      customersNotFound: 0,
+      itemRestricted: 0,
+      pricesCreated: 0,
+      pricesUpdated: 0,
+      skipped: 0,
+      errors: [],
+    };
+
+    // Caches — the same item/customer repeats across many rows.
+    interface ItemInfo {
+      itemId: number;
+      assignedCustomerId: string | null;
+    }
+
+    const itemInfoByItemNo = new Map<string, ItemInfo | null>();
+    const customerIdByCustomerNo = new Map<string, string | null>();
+
+    /** ItemNo -> WarehouseItem.item_no_de -> item_id, per the requested
+     * lookup ("query the item using item no"). Item itself has no field
+     * matching this format — ItemNo is the WarehouseItem field used
+     * everywhere else in this codebase for the "item number" shown to
+     * users, so that's the join used here. Also returns the item's
+     * assigned customer (if any), to enforce the same restriction
+     * SalesPriceController.create already applies. */
+    const resolveItem = async (
+      itemNo: string,
+    ): Promise<{
+      itemId: number;
+      assignedCustomerId: string | null;
+    } | null> => {
+      if (itemInfoByItemNo.has(itemNo)) return itemInfoByItemNo.get(itemNo)!;
+
+      const warehouseItem = await warehouseRepo.findOne({
+        where: { item_no_de: itemNo },
+      });
+
+      let result: { itemId: number; assignedCustomerId: string | null } | null =
+        null;
+
+      if (warehouseItem?.item_id) {
+        const item = await itemRepo.findOne({
+          where: { id: warehouseItem.item_id },
+          relations: ["customer"],
+        });
+        if (item) {
+          result = {
+            itemId: item.id,
+            assignedCustomerId: item.customer?.id
+              ? String(item.customer.id)
+              : null,
+          };
+        }
+      }
+
+      itemInfoByItemNo.set(itemNo, result);
+      return result;
+    };
+
+    const resolveCustomerId = async (
+      customerNo: string,
+    ): Promise<string | null> => {
+      if (customerIdByCustomerNo.has(customerNo))
+        return customerIdByCustomerNo.get(customerNo)!;
+
+      const customer = await customerRepo.findOne({
+        where: { customerNumber: customerNo },
+      });
+      const resolvedId = customer?.id ?? null;
+      customerIdByCustomerNo.set(customerNo, resolvedId);
+      return resolvedId;
+    };
+
+    /** Finds an existing SalesPrice row for this item/customer/individual
+     * flag (+ min_quantity, for tiers) and updates it, or creates a new
+     * one — same rule as SalesPriceController.create's upsert logic. */
+    const upsertPrice = async (
+      itemId: number,
+      customerId: string,
+      isIndividual: boolean,
+      minQuantity: number,
+      unitPriceEur: number,
+    ): Promise<"created" | "updated"> => {
+      const existing = await salesPriceRepo.findOne({
+        where: {
+          item_id: itemId,
+          customer_id: customerId as any,
+          is_individual: isIndividual,
+          ...(isIndividual ? {} : { min_quantity: minQuantity }),
+        },
+      });
+
+      if (existing) {
+        existing.unit_price_eur = unitPriceEur;
+        if (!isIndividual) existing.min_quantity = minQuantity;
+        await salesPriceRepo.save(existing);
+        return "updated";
+      }
+
+      const created = salesPriceRepo.create({
+        item_id: itemId,
+        customer_id: customerId,
+        is_individual: isIndividual,
+        min_quantity: isIndividual ? 1 : minQuantity,
+        unit_price_eur: unitPriceEur,
+      });
+      await salesPriceRepo.save(created);
+      return "created";
+    };
+
+    for (const row of rows) {
+      try {
+        const itemInfo = await resolveItem(row.itemNo);
+        if (!itemInfo) {
+          summary.itemsNotFound++;
+          summary.errors.push({
+            customerNo: row.customerNo,
+            itemNo: row.itemNo,
+            message: `No item found for ItemNo "${row.itemNo}"`,
+          });
+          continue;
+        }
+
+        const customerId = await resolveCustomerId(row.customerNo);
+        if (customerId === null) {
+          summary.customersNotFound++;
+          summary.errors.push({
+            customerNo: row.customerNo,
+            itemNo: row.itemNo,
+            message: `No customer found for CustomerNo "${row.customerNo}"`,
+          });
+          continue;
+        }
+
+        // If this item is assigned to a specific customer, sales prices
+        // can only be set for that same customer — same rule as
+        // SalesPriceController.assertCustomerAllowed.
+        if (
+          itemInfo.assignedCustomerId !== null &&
+          itemInfo.assignedCustomerId !== customerId
+        ) {
+          summary.itemRestricted++;
+          summary.errors.push({
+            customerNo: row.customerNo,
+            itemNo: row.itemNo,
+            message: `Item "${row.itemNo}" is assigned to a different customer — skipped.`,
+          });
+          continue;
+        }
+
+        // --- Default (individual) price for this customer ---
+        const individualPrice = parseFlexibleNumber(row.salesPriceCustomer);
+        if (individualPrice !== null) {
+          const result = await upsertPrice(
+            itemInfo.itemId,
+            customerId,
+            true,
+            1,
+            individualPrice,
+          );
+          if (result === "created") summary.pricesCreated++;
+          else summary.pricesUpdated++;
+        }
+
+        // --- Quantity tiers (Staffel 1-10) ---
+        for (const [rawQty, rawPrice] of row.tiers) {
+          const qty = parseFlexibleNumber(rawQty);
+          const price = parseFlexibleNumber(rawPrice);
+          if (qty === null || price === null) continue; // tier not set
+
+          const result = await upsertPrice(
+            itemInfo.itemId,
+            customerId,
+            false,
+            qty,
+            price,
+          );
+          if (result === "created") summary.pricesCreated++;
+          else summary.pricesUpdated++;
+        }
+      } catch (rowError: any) {
+        summary.skipped++;
+        summary.errors.push({
+          customerNo: row.customerNo,
+          itemNo: row.itemNo,
+          message: rowError?.message || "Unknown error",
+        });
+        console.error(
+          `Error syncing price for customer ${row.customerNo} / item ${row.itemNo}:`,
+          rowError,
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Processed ${summary.totalRows} rows: ${summary.pricesCreated} prices created, ${summary.pricesUpdated} updated, ${summary.itemsNotFound} items not found, ${summary.customersNotFound} customers not found, ${summary.itemRestricted} restricted, ${summary.skipped} skipped.`,
+      data: summary,
+    });
+  } catch (error) {
+    console.error("Customer price sync error:", error);
+    return next(new ErrorHandler("Failed to sync customer prices", 500));
   }
 };

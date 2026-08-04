@@ -39,6 +39,7 @@ import {
   exportNewItemsToCSV,
   syncSuppCatWithCategoryName,
   syncItemData,
+  syncCustomerPrices,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -59,6 +60,8 @@ router.get(
   authorize(UserRole.SALES, UserRole.PURCHASING),
   syncItemData,
 );
+
+router.get("/sync/prices", syncCustomerPrices);
 
 router.get("/", getItems);
 router.post("/", createItem);
