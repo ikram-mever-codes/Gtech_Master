@@ -6,8 +6,6 @@ import { Invoice } from "../models/invoice";
 import { Offer } from "../models/offer";
 import { Order } from "../models/orders";
 import { Inquiry } from "../models/inquiry";
-import { CCIInvoice } from "../models/cci_invoice";
-import { Rechnung } from "../models/rechnung";
 
 const entityMapping: Record<string, { entity: any; column: string }> = {
   customer: { entity: Customer, column: "customerNumber" },
@@ -15,6 +13,7 @@ const entityMapping: Record<string, { entity: any; column: string }> = {
   closed_ci: { entity: Invoice, column: "invoiceNumber" },
   offer: { entity: Offer, column: "offerNumber" },
   order: { entity: Order, column: "order_no" },
+  customer_order: { entity: Order, column: "order_no" },
   transfer_order: { entity: Order, column: "order_no" },
   invoice: { entity: Invoice, column: "invoiceNumber" },
   invoice_correction: { entity: Invoice, column: "invoiceNumber" },
@@ -37,159 +36,9 @@ export class NumberSequenceService {
       if (!sequence.isActive) {
         throw new Error(`Number sequence "${sequenceKey}" is not active`);
       }
-      if (sequenceKey === "customer") {
-        sequence.minDigits = 1;
-      }
 
-      let runningNo = sequence.nextRunningNo;
+      let runningNo = sequence.nextRunningNo || 1;
       const mapping = entityMapping[sequenceKey];
-
-      if (mapping) {
-        const defaultStart = sequenceKey === "customer" ? 83777 : 1;
-
-        if (sequenceKey === "customer") {
-          const customers = await manager
-            .getRepository(Customer)
-            .createQueryBuilder("c")
-            .select(["c.customerNumber"])
-            .where("c.customerNumber LIKE 'K%'")
-            .getMany();
-
-          let maxNum = 0;
-          for (const cust of customers) {
-            if (cust.customerNumber) {
-              const match = cust.customerNumber.match(/\d+/);
-              if (match) {
-                const n = parseInt(match[0], 10);
-                if (!isNaN(n) && n > maxNum) {
-                  maxNum = n;
-                }
-              }
-            }
-          }
-          runningNo = Math.max(defaultStart, maxNum + 1);
-        } else if (sequenceKey === "order" || sequenceKey === "transfer_order") {
-          const prefixToMatch = sequenceKey === "transfer_order" ? "DE" : "B";
-          const orders = await manager
-            .getRepository(Order)
-            .createQueryBuilder("o")
-            .select(["o.order_no"])
-            .where("o.order_no LIKE :pfx", { pfx: `${prefixToMatch}%` })
-            .getMany();
-
-          let maxNum = 0;
-          for (const ord of orders) {
-            if (ord.order_no) {
-              const parts = String(ord.order_no).split("-");
-              const lastPart = parts[parts.length - 1];
-              const parsed = parseInt(lastPart, 10);
-              if (!isNaN(parsed) && parsed > maxNum) {
-                maxNum = parsed;
-              }
-            }
-          }
-          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
-        } else if (sequenceKey === "cargo") {
-          const cargos = await manager
-            .getRepository(Cargo)
-            .createQueryBuilder("c")
-            .select(["c.cargo_no"])
-            .where("c.cargo_no LIKE 'C%'")
-            .getMany();
-
-          let maxNum = 0;
-          for (const car of cargos) {
-            if (car.cargo_no) {
-              const val = String(car.cargo_no).trim();
-              const match = val.match(/^C\d{4,6}-(\d+)$/i);
-              if (match) {
-                const parsed = parseInt(match[1], 10);
-                if (!isNaN(parsed) && parsed < 1000 && parsed > maxNum) {
-                  maxNum = parsed;
-                }
-              }
-            }
-          }
-          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
-        } else if (sequenceKey === "invoice") {
-
-          const [rechnungen, cciInvoices, legacyInvoices] = await Promise.all([
-            manager.getRepository(Rechnung).find({ select: ["invoice_number"] }),
-            manager.getRepository(CCIInvoice).find({ select: ["invoice_number"] }),
-            manager.getRepository(Invoice).find({ select: ["invoiceNumber"] }),
-          ]);
-
-          let maxNum = 0;
-          const checkNum = (invNo?: string) => {
-            if (!invNo) return;
-            const str = String(invNo).trim();
-            if (str.toUpperCase().startsWith("R")) {
-              const parts = str.split("-");
-              const lastPart = parts[parts.length - 1];
-              const parsed = parseInt(lastPart, 10);
-              if (!isNaN(parsed) && parsed > maxNum) {
-                maxNum = parsed;
-              }
-            }
-          };
-
-          rechnungen.forEach((r) => checkNum(r.invoice_number));
-          cciInvoices.forEach((c) => checkNum(c.invoice_number));
-          legacyInvoices.forEach((i) => checkNum(i.invoiceNumber));
-
-          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
-        } else if (sequenceKey === "delivery_note") {
-          const cciInvoices = await manager
-            .getRepository(CCIInvoice)
-            .createQueryBuilder("inv")
-            .select(["inv.cargo_no", "inv.invoice_number"])
-            .where("inv.cargo_no LIKE 'L%' OR inv.invoice_number LIKE 'L%'")
-            .getMany();
-
-          let maxNum = 0;
-          for (const inv of cciInvoices) {
-            const val = inv.cargo_no || inv.invoice_number;
-            if (val) {
-              const parts = String(val).split("-");
-              const lastPart = parts[parts.length - 1];
-              const parsed = parseInt(lastPart, 10);
-              if (!isNaN(parsed) && parsed > maxNum) {
-                maxNum = parsed;
-              }
-            }
-          }
-          runningNo = Math.max(sequence.nextRunningNo || 1, maxNum + 1);
-        } else {
-          const allRecords = await manager
-            .getRepository(mapping.entity)
-            .createQueryBuilder("entity")
-            .select([`entity.${mapping.column}`])
-            .getMany();
-
-          let maxNum = 0;
-          for (const rec of allRecords) {
-            const val = (rec as any)[mapping.column];
-            if (val) {
-              const parts = String(val).split("-");
-              const lastPart = parts[parts.length - 1];
-              const parsed = parseInt(lastPart, 10);
-              if (!isNaN(parsed) && parsed > maxNum) {
-                maxNum = parsed;
-              } else {
-                const numMatch = String(val).match(/\d+$/);
-                if (numMatch) {
-                  const parsedMatch = parseInt(numMatch[0], 10);
-                  if (!isNaN(parsedMatch) && parsedMatch > maxNum) {
-                    maxNum = parsedMatch;
-                  }
-                }
-              }
-            }
-          }
-          const nextAligned = maxNum + 1;
-          runningNo = Math.max(sequence.nextRunningNo || 1, nextAligned);
-        }
-      }
 
       let generatedNumber = "";
       let isDuplicate = true;
@@ -198,7 +47,8 @@ export class NumberSequenceService {
         generatedNumber = this.formatNumber(sequence, runningNo);
 
         if (mapping) {
-          const existing = await manager.getRepository(mapping.entity)
+          const existing = await manager
+            .getRepository(mapping.entity)
             .createQueryBuilder("entity")
             .where(`entity.${mapping.column} = :val`, { val: generatedNumber })
             .getOne();
@@ -220,7 +70,6 @@ export class NumberSequenceService {
     });
   }
 
-
   private static formatNumber(
     sequence: NumberSequence,
     runningNo: number,
@@ -229,10 +78,10 @@ export class NumberSequenceService {
     const yyyy = String(now.getFullYear());
     const yy = yyyy.slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const number = String(runningNo).padStart(sequence.minDigits, "0");
+    const number = String(runningNo).padStart(sequence.minDigits || 1, "0");
 
     return sequence.formatPattern
-      .replace("{prefix}", sequence.prefix)
+      .replace("{prefix}", sequence.prefix || "")
       .replace("{yyyy}", yyyy)
       .replace("{yy}", yy)
       .replace("{mm}", mm)
@@ -244,44 +93,15 @@ export class NumberSequenceService {
     const defaults = [
       { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "order", name: "Auftrag", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "customer_order", name: "Customer Order (Auftrag)", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
-      {
-        sequenceKey: "invoice_correction",
-        name: "Rechnungskorrektur",
-        prefix: "RK",
-        formatPattern: "{prefix}{yy}{mm}-{number}",
-        minDigits: 1,
-      },
+      { sequenceKey: "invoice_correction", name: "Rechnungskorrektur", prefix: "RK", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "delivery_note", name: "Lieferschein", prefix: "L", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
-      {
-        sequenceKey: "customer",
-        name: "Kunde",
-        prefix: "K",
-        formatPattern: "{prefix}{number}",
-        minDigits: 1,
-      },
-      {
-        sequenceKey: "cargo",
-        name: "Cargo",
-        prefix: "C",
-        formatPattern: "{prefix}{yy}{mm}-{number}",
-        minDigits: 1,
-      },
-      {
-        sequenceKey: "closed_ci",
-        name: "Commercial Invoice",
-        prefix: "CI",
-        formatPattern: "{prefix}{yy}{mm}-{number}",
-        minDigits: 1,
-      },
-      {
-        sequenceKey: "inquiry",
-        name: "Anfrage",
-        prefix: "AF",
-        formatPattern: "{prefix}{yy}{mm}-{number}",
-        minDigits: 1,
-      },
+      { sequenceKey: "customer", name: "Kunde", prefix: "K", formatPattern: "{prefix}{number}", minDigits: 1 },
+      { sequenceKey: "cargo", name: "Cargo", prefix: "C", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "closed_ci", name: "Commercial Invoice", prefix: "CI", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "inquiry", name: "Anfrage", prefix: "AF", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
     ];
 
     for (const def of defaults) {
@@ -293,17 +113,6 @@ export class NumberSequenceService {
         await repo.save(
           repo.create({ ...def, nextRunningNo: startNo }),
         );
-      } else {
-        exists.prefix = def.prefix;
-        exists.formatPattern = def.formatPattern;
-        exists.minDigits = 1;
-        if (def.sequenceKey === "customer" && exists.nextRunningNo < 83777) {
-          exists.nextRunningNo = 83777;
-        }
-        if (def.sequenceKey === "cargo" && exists.nextRunningNo > 10000) {
-          exists.nextRunningNo = 11;
-        }
-        await repo.save(exists);
       }
     }
   }
