@@ -4505,28 +4505,23 @@ export const syncCustomerPrices = async (
     };
 
     // Caches — the same item/customer repeats across many rows.
-    const itemIdByItemIdDe = new Map<string, number | null>();
+    const itemIdByEan = new Map<string, number | null>();
     const customerIdByCustomerNo = new Map<string, string | null>();
 
-    /** ItemID_DE -> Item.id, matched directly on Item.ItemID_DE — more
-     * reliable than the WarehouseItem/ItemNo join, since ItemID_DE is the
-     * stable numeric key rather than a formatted item number that can
-     * vary or go missing. */
-    const resolveItemId = async (itemIdDe: string): Promise<number | null> => {
-      if (itemIdByItemIdDe.has(itemIdDe))
-        return itemIdByItemIdDe.get(itemIdDe)!;
+    /** EAN -> Item.id, matched directly on Item.ean. ItemID_DE is empty
+     * in this export, so EAN is the reliable key here instead. */
+    const resolveItemId = async (ean: string): Promise<number | null> => {
+      const trimmedEan = (ean || "").trim();
+      if (!trimmedEan) return null;
 
-      const parsedItemIdDe = parseInt(itemIdDe, 10);
-      let resolvedId: number | null = null;
+      if (itemIdByEan.has(trimmedEan)) return itemIdByEan.get(trimmedEan)!;
 
-      if (!isNaN(parsedItemIdDe)) {
-        const item = await itemRepo.findOne({
-          where: { ItemID_DE: parsedItemIdDe },
-        });
-        resolvedId = item?.id ?? null;
-      }
+      const item = await itemRepo.findOne({
+        where: { ean: trimmedEan },
+      });
+      const resolvedId = item?.id ?? null;
 
-      itemIdByItemIdDe.set(itemIdDe, resolvedId);
+      itemIdByEan.set(trimmedEan, resolvedId);
       return resolvedId;
     };
 
@@ -4583,13 +4578,13 @@ export const syncCustomerPrices = async (
 
     for (const row of rows) {
       try {
-        const itemId = await resolveItemId(row.itemIdDe);
+        const itemId = await resolveItemId(row.ean);
         if (itemId === null) {
           summary.itemsNotFound++;
           summary.errors.push({
             customerNo: row.customerNo,
             itemNo: row.itemNo,
-            message: `No item found for ItemID_DE "${row.itemIdDe}"`,
+            message: `No item found for EAN "${row.ean}"`,
           });
           continue;
         }
