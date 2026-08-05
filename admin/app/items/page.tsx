@@ -1707,9 +1707,9 @@ const ItemsManagementPage: React.FC = () => {
         ) : (
           <>
             {activeTab !== "warehouse" && (
-              <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+              <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm overflow-visible">
                 {activeTab === "items" ? (
-                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full overflow-x-auto py-0.5">
+                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full py-0.5 relative z-10">
                     <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
                       <FunnelIcon className="w-4 h-4 text-primary" />
                     </div>
@@ -1722,7 +1722,7 @@ const ItemsManagementPage: React.FC = () => {
                           onChange={(e) =>
                             setFilters({ ...filters, search: e.target.value })
                           }
-                          className={`w-full px-2.5 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
+                          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
                             ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                             : "text-gray-900 border-gray-300 bg-white"
                             }`}
@@ -1751,7 +1751,7 @@ const ItemsManagementPage: React.FC = () => {
                               eanSearch: e.target.value,
                             })
                           }
-                          className={`w-full px-2.5 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
+                          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
                             ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                             : "text-gray-900 border-gray-300 bg-white"
                             }`}
@@ -1798,7 +1798,7 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, isLabel: e.target.value })
                         }
-                        className={`w-full px-2 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
                           ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                           : "text-gray-400 border-gray-300 bg-white"
                           }`}
@@ -1815,7 +1815,7 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, isStock: e.target.value })
                         }
-                        className={`w-full px-2 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isStock
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isStock
                           ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                           : "text-gray-400 border-gray-300 bg-white"
                           }`}
@@ -1852,7 +1852,7 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, category: e.target.value })
                         }
-                        className={`w-full px-2 py-1.5 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
                           ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
                           : "text-gray-400 border-gray-300 bg-white"
                           }`}
@@ -1875,7 +1875,7 @@ const ItemsManagementPage: React.FC = () => {
                     <div className="shrink-0">
                       <button
                         onClick={resetFilters}
-                        className="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1 whitespace-nowrap"
+                        className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1 whitespace-nowrap"
                       >
                         <ArrowPathIcon className="w-3.5 h-3.5" />
                         Reset

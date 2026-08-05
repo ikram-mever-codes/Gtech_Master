@@ -6,6 +6,11 @@ import { Invoice } from "../models/invoice";
 import { Offer } from "../models/offer";
 import { Order } from "../models/orders";
 import { Inquiry } from "../models/inquiry";
+import { Rechnung } from "../models/rechnung";
+import { Rechnung_k as RechnungK } from "../models/rechnung_k";
+import { Lieferschein } from "../models/lieferscheine";
+import { CCIInvoice } from "../models/cci_invoice";
+import { CustomerOrder } from "../models/customer_orders";
 
 const entityMapping: Record<string, { entity: any; column: string }> = {
   customer: { entity: Customer, column: "customerNumber" },
@@ -13,13 +18,59 @@ const entityMapping: Record<string, { entity: any; column: string }> = {
   closed_ci: { entity: Invoice, column: "invoiceNumber" },
   offer: { entity: Offer, column: "offerNumber" },
   order: { entity: Order, column: "order_no" },
-  customer_order: { entity: Order, column: "order_no" },
+  customer_order: { entity: CustomerOrder, column: "order_no" },
   transfer_order: { entity: Order, column: "order_no" },
-  invoice: { entity: Invoice, column: "invoiceNumber" },
-  invoice_correction: { entity: Invoice, column: "invoiceNumber" },
-  delivery_note: { entity: Invoice, column: "invoiceNumber" },
+  invoice: { entity: Rechnung, column: "invoice_number" },
+  invoice_correction: { entity: RechnungK, column: "invoice_number" },
+  delivery_note: { entity: Lieferschein, column: "delivery_note_number" },
   inquiry: { entity: Inquiry, column: "inquiryNo" },
 };
+
+async function checkIsDuplicate(manager: any, sequenceKey: string, formattedVal: string): Promise<boolean> {
+  if (sequenceKey === "invoice") {
+    const [r, c, i] = await Promise.all([
+      manager.getRepository(Rechnung).findOne({ where: { invoice_number: formattedVal } }),
+      manager.getRepository(CCIInvoice).findOne({ where: { invoice_number: formattedVal } }),
+      manager.getRepository(Invoice).findOne({ where: { invoiceNumber: formattedVal } }),
+    ]);
+    return !!(r || c || i);
+  }
+
+  if (sequenceKey === "invoice_correction") {
+    const [rk, i] = await Promise.all([
+      manager.getRepository(RechnungK).findOne({ where: { invoice_number: formattedVal } }),
+      manager.getRepository(Invoice).findOne({ where: { invoiceNumber: formattedVal } }),
+    ]);
+    return !!(rk || i);
+  }
+
+  if (sequenceKey === "delivery_note") {
+    const [ls, c, i] = await Promise.all([
+      manager.getRepository(Lieferschein).findOne({ where: { delivery_note_number: formattedVal } }),
+      manager.getRepository(CCIInvoice).findOne({ where: { cargo_no: formattedVal } }),
+      manager.getRepository(Invoice).findOne({ where: { invoiceNumber: formattedVal } }),
+    ]);
+    return !!(ls || c || i);
+  }
+
+  if (sequenceKey === "order" || sequenceKey === "customer_order") {
+    const [co, o] = await Promise.all([
+      manager.getRepository(CustomerOrder).findOne({ where: { order_no: formattedVal } }),
+      manager.getRepository(Order).findOne({ where: { order_no: formattedVal } }),
+    ]);
+    return !!(co || o);
+  }
+
+  const mapping = entityMapping[sequenceKey];
+  if (!mapping) return false;
+
+  const existing = await manager.getRepository(mapping.entity)
+    .createQueryBuilder("entity")
+    .where(`entity.${mapping.column} = :val`, { val: formattedVal })
+    .getOne();
+
+  return !!existing;
+}
 
 export class NumberSequenceService {
   static async getNextNumber(sequenceKey: string): Promise<string> {
@@ -38,26 +89,15 @@ export class NumberSequenceService {
       }
 
       let runningNo = sequence.nextRunningNo || 1;
-      const mapping = entityMapping[sequenceKey];
 
       let generatedNumber = "";
       let isDuplicate = true;
 
       while (isDuplicate) {
         generatedNumber = this.formatNumber(sequence, runningNo);
-
-        if (mapping) {
-          const existing = await manager
-            .getRepository(mapping.entity)
-            .createQueryBuilder("entity")
-            .where(`entity.${mapping.column} = :val`, { val: generatedNumber })
-            .getOne();
-
-          if (existing) {
-            runningNo++;
-          } else {
-            isDuplicate = false;
-          }
+        const dup = await checkIsDuplicate(manager, sequenceKey, generatedNumber);
+        if (dup) {
+          runningNo++;
         } else {
           isDuplicate = false;
         }
@@ -115,5 +155,33 @@ export class NumberSequenceService {
         );
       }
     }
+  }
+
+  static async checkIfNumberExists(
+    sequenceKey: string,
+    nextRunningNo: number,
+    prefix?: string,
+    formatPattern?: string,
+    minDigits?: number,
+  ): Promise<{ isDuplicate: boolean; formattedNumber: string }> {
+    const sequenceRepo = AppDataSource.getRepository(NumberSequence);
+    const sequence = await sequenceRepo.findOne({ where: { sequenceKey } });
+    if (!sequence) return { isDuplicate: false, formattedNumber: "" };
+
+    const testSeq = {
+      ...sequence,
+      prefix: prefix ?? sequence.prefix,
+      formatPattern: formatPattern ?? sequence.formatPattern,
+      minDigits: minDigits ?? sequence.minDigits,
+    };
+
+    const formattedNumber = this.formatNumber(testSeq, nextRunningNo);
+    const manager = AppDataSource.manager;
+    const isDuplicate = await checkIsDuplicate(manager, sequenceKey, formattedNumber);
+
+    return {
+      isDuplicate,
+      formattedNumber,
+    };
   }
 }
