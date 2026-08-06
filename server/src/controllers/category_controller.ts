@@ -19,9 +19,17 @@ export const getCategories = async (req: Request, res: Response, next: NextFunct
       order: { id: "ASC" },
     });
 
+    const uniqueCategories = Array.from(
+      new Map(
+        categories
+          .filter((c) => c && c.name && c.name.trim())
+          .map((c) => [(c.name || "").trim(), c])
+      ).values()
+    );
+
     return res.status(200).json({
       success: true,
-      data: categories,
+      data: uniqueCategories,
     });
   } catch (error) {
     return next(error);

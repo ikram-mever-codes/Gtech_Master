@@ -1041,22 +1041,25 @@ const ItemsManagementPage: React.FC = () => {
       case "items":
         return (
           <>
-            <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[6%]">
+            <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[5%]">
               Pic
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[40%]">
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[28%]">
               Name
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[24%]">
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[20%]">
               Name DE / CN
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[12%]">
-              Category
+            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[7%]">
+              CAT
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[18%]">
-              Remark
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[22%]">
+              RemarkEX / DE-EN / CN
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[18%]">
+            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[12%]">
+              Qty EU/CN
+            </th>
+            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[6%]">
               Actions
             </th>
           </>
@@ -1237,20 +1240,48 @@ const ItemsManagementPage: React.FC = () => {
                   <span className="text-gray-400">—</span>
                 )}
               </td>
-              <td className="px-4 py-3">
-                <div className="text-xs text-gray-600">
+              <td className="px-3 py-3">
+                <div className="text-xs font-semibold text-gray-700">
                   {item.category || "—"}
                 </div>
               </td>
               <td className="px-4 py-3">
-                <div
-                  className="text-xs text-gray-500 max-w-[250px] break-words"
-                  title={item.remark || ""}
-                >
-                  {item.remark || "—"}
+                <div className="text-xs text-gray-700 space-y-0.5 max-w-[250px] break-words">
+                  {item.remark_ex || item.remark ? (
+                    <div className="font-medium text-gray-800" title={item.remark_ex || item.remark || ""}>
+                      {item.remark_ex || item.remark}
+                    </div>
+                  ) : null}
+                  {(item.name_en || item.item_name_en) && (
+                    <div className="text-[11px] text-gray-500">
+                      EN: {item.name_en || item.item_name_en}
+                    </div>
+                  )}
+                  {(item.name_cn || item.item_name_cn) && (
+                    <div className="text-[11px] text-gray-400">
+                      CN: {item.name_cn || item.item_name_cn}
+                    </div>
+                  )}
+                  {!item.remark_ex && !item.remark && !item.name_en && !item.item_name_en && !item.name_cn && !item.item_name_cn && (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </div>
               </td>
-              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+              <td className="px-3 py-3 whitespace-nowrap text-xs font-medium">
+                {item.is_stock_item === "Y" || item.isStockItem === "Y" || item.is_stock === "Y" || item.isStock ? (
+                  <div className="flex flex-col text-[11px]">
+                    <span className="text-emerald-700 font-bold">
+                      EU: {item.stockEU ?? item.stock_qty ?? item.stockQty ?? 0}
+                    </span>
+                    <span className="text-blue-600 font-bold">
+                      CN: {item.stockCN ?? item.cn_stock_qty ?? 0}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
+              </td>
+              <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -1961,7 +1992,7 @@ const ItemsManagementPage: React.FC = () => {
                         {pageData.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={activeTab === "items" ? 6 : 10}
+                              colSpan={activeTab === "items" ? 7 : 10}
                               className="px-4 py-8 text-center text-gray-500"
                             >
                               No {activeTab} found matching your criteria.

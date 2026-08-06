@@ -877,7 +877,13 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       }
                     >
                       <option value="">—</option>
-                      {categories.map((c) => (
+                      {Array.from(
+                        new Map(
+                          (categories || [])
+                            .filter((c: any) => c && c.name?.toString().trim())
+                            .map((c: any) => [c.name.toString().trim(), c]),
+                        ).values(),
+                      ).map((c: any) => (
                         <option key={c.id} value={c.id.toString()}>
                           {c.name}
                         </option>

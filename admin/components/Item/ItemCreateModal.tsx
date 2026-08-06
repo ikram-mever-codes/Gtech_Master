@@ -456,21 +456,26 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   Category
                 </label>
                 <ReactSelect
-                  options={
-                    categories?.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                    })) || []
-                  }
+                  options={Array.from(
+                    new Map(
+                      (categories || [])
+                        .filter((c: any) => c && c.name?.toString().trim())
+                        .map((c: any) => [
+                          c.name.toString().trim(),
+                          { value: c.id, label: c.name.toString().trim() },
+                        ]),
+                    ).values(),
+                  )}
                   value={
                     itemFormData.cat_id
-                      ? {
-                          value: itemFormData.cat_id,
-                          label:
-                            categories?.find(
-                              (x) => x.id === itemFormData.cat_id,
-                            )?.name || "Unknown",
-                        }
+                      ? (() => {
+                          const catObj = categories?.find(
+                            (x) => x.id === itemFormData.cat_id,
+                          );
+                          return catObj
+                            ? { value: catObj.id, label: catObj.name }
+                            : null;
+                        })()
                       : null
                   }
                   onChange={(opt: any) =>
