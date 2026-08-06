@@ -25,13 +25,6 @@ interface UpdateNumberSequenceBody {
 
 export class NumberSequenceController {
   private repository = AppDataSource.getRepository(NumberSequence);
-
-  // ==========================================================================
-  // CREATE
-  // POST /number-sequences
-  // sequenceKey is fixed at creation and never changes afterwards, since
-  // other code (offer/invoice/order controllers) references it by string.
-  // ==========================================================================
   async createSequence(request: Request, response: Response) {
     try {
       const body: CreateNumberSequenceBody = request.body || {};
@@ -80,11 +73,6 @@ export class NumberSequenceController {
       });
     }
   }
-
-  // ==========================================================================
-  // READ - list all
-  // GET /number-sequences
-  // ==========================================================================
   async getAllSequences(request: Request, response: Response) {
     try {
       const sequences = await this.repository.find({
@@ -99,11 +87,6 @@ export class NumberSequenceController {
         .json({ success: false, message: "Internal server error" });
     }
   }
-
-  // ==========================================================================
-  // READ - single, by sequenceKey (not id, since that's what callers know)
-  // GET /number-sequences/:sequenceKey
-  // ==========================================================================
   async getSequenceByKey(request: Request, response: Response) {
     try {
       const { sequenceKey } = request.params;
@@ -126,15 +109,6 @@ export class NumberSequenceController {
         .json({ success: false, message: "Internal server error" });
     }
   }
-
-  // ==========================================================================
-  // UPDATE
-  // PUT /number-sequences/:sequenceKey
-  // sequenceKey and nextRunningNo are intentionally not editable here.
-  // Changing sequenceKey would break every entity that references it, and
-  // nextRunningNo must only ever move forward through getNextNumber, never
-  // via manual edit, or two people could get the same number.
-  // ==========================================================================
   async updateSequence(request: Request, response: Response) {
     try {
       const { sequenceKey } = request.params;
@@ -160,6 +134,30 @@ export class NumberSequenceController {
         "isActive",
       ];
 
+      const targetNextNo = body.nextRunningNo !== undefined ? Number(body.nextRunningNo) : sequence.nextRunningNo;
+      const targetPrefix = body.prefix !== undefined ? body.prefix : sequence.prefix;
+      const targetPattern = body.formatPattern !== undefined ? body.formatPattern : sequence.formatPattern;
+      const targetMinDigits = body.minDigits !== undefined ? Number(body.minDigits) : sequence.minDigits;
+
+      try {
+        const { NumberSequenceService } = await import("../services/number_sequence_service");
+        const check = await NumberSequenceService.checkIfNumberExists(
+          sequenceKey,
+          targetNextNo,
+          targetPrefix,
+          targetPattern,
+          targetMinDigits
+        );
+        if (check.isDuplicate) {
+          return response.status(400).json({
+            success: false,
+            message: `Number "${check.formattedNumber}" already exists in existing records. Please set a different number.`,
+          });
+        }
+      } catch (err) {
+        console.error("Duplicate check error:", err);
+      }
+
       updatableFields.forEach((field) => {
         if (body[field] !== undefined) {
           (sequence as any)[field] = body[field];
@@ -181,13 +179,6 @@ export class NumberSequenceController {
     }
   }
 
-  // ==========================================================================
-  // DEACTIVATE (soft delete)
-  // DELETE /number-sequences/:sequenceKey
-  // A sequence is never hard-deleted: entities created under it still
-  // reference its key/prefix, and reusing a running number would break
-  // uniqueness. Deactivating just stops getNextNumber from issuing new ones.
-  // ==========================================================================
   async deactivateSequence(request: Request, response: Response) {
     try {
       const { sequenceKey } = request.params;

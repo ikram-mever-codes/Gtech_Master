@@ -937,10 +937,14 @@ const ItemDetailsPage = () => {
 
         if (suppliersRes?.data) setAllSuppliers(suppliersRes.data);
         if (catsRes?.data) {
-          const regularCategories = catsRes.data.filter(
-            (cat: any) => !cat.name?.toString().trim().startsWith("Imported"),
+          const uniqueCats = Array.from(
+            new Map(
+              catsRes.data
+                .filter((cat: any) => cat && cat.name?.toString().trim() && !cat.name?.toString().trim().startsWith("Imported"))
+                .map((cat: any) => [cat.name.toString().trim(), cat])
+            ).values()
           );
-          setCategories(regularCategories);
+          setCategories(uniqueCats);
         }
         console.log("Fetched customers:", customersRes);
         if (customersRes?.data) setAllCustomers(customersRes.data.customers);
@@ -1627,7 +1631,7 @@ const ItemDetailsPage = () => {
                     setItemData={setItemData}
                   />
                   <EditableInfoRow
-                    label="Weight (kg)"
+                    label="Weight (g)"
                     value={itemData.dimensions.weight}
                     field="dimensions.weight"
                     editMode={editMode}

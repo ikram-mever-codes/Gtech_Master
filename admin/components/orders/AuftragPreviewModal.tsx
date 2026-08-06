@@ -761,21 +761,20 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 Auftrag {order.order_no}
               </p>
               <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                  order.auftrag_status === "delivered" ||
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.auftrag_status === "delivered" ||
                   order.status === "Completed"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : order.auftrag_status === "partially_delivered" ||
-                        order.status === "In Progress"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
-                }`}
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : order.auftrag_status === "partially_delivered" ||
+                    order.status === "In Progress"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}
               >
                 {order.auftrag_status === "delivered" ||
-                order.status === "Completed"
+                  order.status === "Completed"
                   ? "Delivered"
                   : order.auftrag_status === "partially_delivered" ||
-                      order.status === "In Progress"
+                    order.status === "In Progress"
                     ? "Partially Delivered"
                     : "Open"}
               </span>
@@ -1097,110 +1096,110 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   {(edit
                     ? form.isWeiterversand
                     : order.is_weiterversand === true ||
-                      order.is_weiterversand === 1 ||
-                      order.is_weiterversand === "true" ||
-                      order.is_weiterversand === "1" ||
-                      order.is_weiterversand === "Yes") && (
-                    <>
-                      <div className="w-48 shrink-0">
-                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                          Service Provider
-                        </label>
-                        {edit ? (
-                          <select
-                            className={inputCls}
-                            value={form.weiterversandServiceProviderId || ""}
-                            onChange={(e) =>
-                              patch({
-                                weiterversandServiceProviderId: e.target.value,
-                              })
-                            }
-                          >
-                            <option value="">Select Provider…</option>
-                            {dbServiceProviders.map((sp) => (
-                              <option key={sp.id} value={sp.id}>
-                                {sp.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="text-sm font-medium text-gray-800 py-1.5">
-                            {order.weiterversandServiceProvider?.name || "—"}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="w-40 shrink-0">
-                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                          Tracking No.
-                        </label>
-                        {edit ? (
-                          <input
-                            type="text"
-                            className={inputCls}
-                            placeholder="Tracking No."
-                            value={form.weiterversandTracking || ""}
-                            onChange={(e) =>
-                              patch({ weiterversandTracking: e.target.value })
-                            }
-                          />
-                        ) : (
-                          <div className="text-sm font-medium text-gray-800 py-1.5">
-                            {order.weiterversand_tracking || "—"}
-                          </div>
-                        )}
-                      </div>
-
-                      {edit && (
-                        <div className="shrink-0 self-end">
-                          <label
-                            htmlFor="weiterversand-label-file"
-                            className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
-                          >
-                            <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
-                            Upload Label(s)
+                    order.is_weiterversand === 1 ||
+                    order.is_weiterversand === "true" ||
+                    order.is_weiterversand === "1" ||
+                    order.is_weiterversand === "Yes") && (
+                      <>
+                        <div className="w-48 shrink-0">
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Service Provider
                           </label>
-                          <input
-                            id="weiterversand-label-file"
-                            type="file"
-                            multiple
-                            className="hidden"
-                            accept="application/pdf,image/*"
-                            onChange={(e) => {
-                              const files = Array.from(e.target.files || []);
-                              if (files.length === 0) return;
-                              const currentList = parseLabels(
-                                form.weiterversandLabels ||
-                                  order.weiterversand_labels,
-                              );
-                              let count = 0;
-                              files.forEach((file) => {
-                                const reader = new FileReader();
-                                reader.onload = (evt) => {
-                                  const dataUrl = evt.target?.result as string;
-                                  currentList.push({
-                                    name: file.name,
-                                    url: dataUrl,
-                                  });
-                                  count++;
-                                  if (count === files.length) {
-                                    patch({
-                                      weiterversandLabels:
-                                        JSON.stringify(currentList),
-                                    });
-                                    toast.success(
-                                      `Attached ${files.length} document(s)`,
-                                    );
-                                  }
-                                };
-                                reader.readAsDataURL(file);
-                              });
-                            }}
-                          />
+                          {edit ? (
+                            <select
+                              className={inputCls}
+                              value={form.weiterversandServiceProviderId || ""}
+                              onChange={(e) =>
+                                patch({
+                                  weiterversandServiceProviderId: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="">Select Provider…</option>
+                              {dbServiceProviders.map((sp) => (
+                                <option key={sp.id} value={sp.id}>
+                                  {sp.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="text-sm font-medium text-gray-800 py-1.5">
+                              {order.weiterversandServiceProvider?.name || "—"}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </>
-                  )}
+
+                        <div className="w-40 shrink-0">
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Tracking No.
+                          </label>
+                          {edit ? (
+                            <input
+                              type="text"
+                              className={inputCls}
+                              placeholder="Tracking No."
+                              value={form.weiterversandTracking || ""}
+                              onChange={(e) =>
+                                patch({ weiterversandTracking: e.target.value })
+                              }
+                            />
+                          ) : (
+                            <div className="text-sm font-medium text-gray-800 py-1.5">
+                              {order.weiterversand_tracking || "—"}
+                            </div>
+                          )}
+                        </div>
+
+                        {edit && (
+                          <div className="shrink-0 self-end">
+                            <label
+                              htmlFor="weiterversand-label-file"
+                              className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
+                            >
+                              <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
+                              Upload Label(s)
+                            </label>
+                            <input
+                              id="weiterversand-label-file"
+                              type="file"
+                              multiple
+                              className="hidden"
+                              accept="application/pdf,image/*"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                if (files.length === 0) return;
+                                const currentList = parseLabels(
+                                  form.weiterversandLabels ||
+                                  order.weiterversand_labels,
+                                );
+                                let count = 0;
+                                files.forEach((file) => {
+                                  const reader = new FileReader();
+                                  reader.onload = (evt) => {
+                                    const dataUrl = evt.target?.result as string;
+                                    currentList.push({
+                                      name: file.name,
+                                      url: dataUrl,
+                                    });
+                                    count++;
+                                    if (count === files.length) {
+                                      patch({
+                                        weiterversandLabels:
+                                          JSON.stringify(currentList),
+                                      });
+                                      toast.success(
+                                        `Attached ${files.length} document(s)`,
+                                      );
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                });
+                              }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
                 </div>
               </div>
             </div>
@@ -1232,11 +1231,11 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
                       Menge
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-                      Netto-Preis
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28 whitespace-nowrap">
+                      Netto-Preis €
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-                      Netto gesamt
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28 whitespace-nowrap">
+                      Netto gesamt €
                     </th>
                     {edit && <th className="w-10" />}
                   </tr>
@@ -1469,7 +1468,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-right font-bold text-gray-800">
                         {formatCurrency(
                           (form.shippingCost || 0) *
-                            (form.shippingQuantity || 1),
+                          (form.shippingQuantity || 1),
                           order?.currency || "EUR",
                         )}
                       </td>
@@ -1581,7 +1580,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                    visibleLineItems[0]?.extraWeight === undefined
+                      visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : String(visibleLineItems[0].extraWeight)
                   }

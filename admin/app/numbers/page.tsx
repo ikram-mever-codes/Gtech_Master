@@ -184,8 +184,6 @@ export default function NumberSequencesPage() {
       }
     } catch (err: any) {
       console.error(err);
-      const errMsg = err?.response?.data?.message || "Failed to update sequence";
-      toast.error(errMsg);
     } finally {
       setSubmitting(false);
     }

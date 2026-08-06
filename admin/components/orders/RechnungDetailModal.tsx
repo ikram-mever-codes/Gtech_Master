@@ -790,13 +790,13 @@ export default function RechnungDetailModal({
                         <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                           Menge
                         </th>
-                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-32">
-                          Netto-Preis
+                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-32 whitespace-nowrap">
+                          Netto-Preis €
                         </th>
                       </>
                     )}
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
-                      Netto gesamt
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28 whitespace-nowrap">
+                      Netto gesamt €
                     </th>
                   </tr>
                 </thead>

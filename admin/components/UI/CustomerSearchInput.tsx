@@ -166,21 +166,21 @@ export const CustomerSearchInput: React.FC<CustomerSearchInputProps> = ({
           value={searchTerm}
           onFocus={handleFocus}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed bg-white/70"
+          className="w-full pl-8 pr-7 h-8 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed bg-white"
         />
         {(value || searchTerm) && !disabled && (
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
           >
-            <XMarkIcon className="h-4 w-4" />
+            <XMarkIcon className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg scrollbar-thin">
+        <div className="absolute z-50 mt-1 min-w-[260px] max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl scrollbar-thin left-0">
           {loading && list.length === 0 ? (
             <div className="px-3.5 py-4 text-center text-xs text-gray-400">
               Loading options...

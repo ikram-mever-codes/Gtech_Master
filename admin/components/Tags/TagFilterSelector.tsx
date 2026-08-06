@@ -16,12 +16,12 @@ interface TagFilter {
 
 interface TagFilterSelectorProps {
   category:
-    | "company"
-    | "contact"
-    | "inquiry"
-    | "request_item"
-    | "item"
-    | "supplier";
+  | "company"
+  | "contact"
+  | "inquiry"
+  | "request_item"
+  | "item"
+  | "supplier";
   onChange: (filterString: string) => void;
   onReset?: () => void;
   compact?: boolean;
@@ -146,16 +146,15 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
           onClick={() => setIsDropdownOpen(true)}
           className={
             compact
-              ? `min-h-[38px] w-full px-3 py-1.5 border rounded-md focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-1 ${
-                  selectedFilters.length > 0
-                    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                    : "border-gray-300 bg-white"
-                }`
+              ? `h-8 w-full px-2.5 py-0.5 border rounded-md focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-1 ${selectedFilters.length > 0
+                ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                : "border-gray-300 bg-white"
+              }`
               : "min-h-[46px] w-full px-3 py-2 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-2"
           }
         >
           {selectedFilters.length === 0 && (
-            <span className="text-gray-400 text-sm">
+            <span className="text-gray-400 text-xs leading-none">
               {placeholder || "Tags..."}
             </span>
           )}
@@ -170,16 +169,14 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
                 onClick={(e) => e.stopPropagation()}
                 className={
                   compact
-                    ? `inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold select-none border transition-all ${
-                        isInclude
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
-                          : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
-                      }`
-                    : `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold select-none border transition-all ${
-                        isInclude
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
-                          : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
-                      }`
+                    ? `inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold select-none border transition-all ${isInclude
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
+                      : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
+                    }`
+                    : `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold select-none border transition-all ${isInclude
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
+                      : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
+                    }`
                 }
               >
                 <button
@@ -187,16 +184,14 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
                   onClick={() => handleToggleMode(filter.tag.id)}
                   className={
                     compact
-                      ? `px-1 py-0.2 rounded font-black text-[8px] uppercase tracking-wider transition-all ${
-                          isInclude
-                            ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
-                            : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
-                        }`
-                      : `px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider transition-all ${
-                          isInclude
-                            ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
-                            : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
-                        }`
+                      ? `px-1 py-0.2 rounded font-black text-[8px] uppercase tracking-wider transition-all ${isInclude
+                        ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
+                        : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
+                      }`
+                      : `px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider transition-all ${isInclude
+                        ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
+                        : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
+                      }`
                   }
                   title="Click to toggle Include/Exclude"
                 >
@@ -247,19 +242,17 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
                       key={tag.id}
                       type="button"
                       onClick={() => handleToggleTag(tag)}
-                      className={`w-full text-left px-3 py-2 text-xs rounded-lg flex items-center justify-between text-gray-700 transition-colors ${
-                        isSelected
-                          ? "bg-[#8CC21B]/10 hover:bg-[#8CC21B]/15"
-                          : "hover:bg-gray-50"
-                      }`}
+                      className={`w-full text-left px-3 py-2 text-xs rounded-lg flex items-center justify-between text-gray-700 transition-colors ${isSelected
+                        ? "bg-[#8CC21B]/10 hover:bg-[#8CC21B]/15"
+                        : "hover:bg-gray-50"
+                        }`}
                     >
                       <div className="flex items-center gap-2.5">
                         <div
-                          className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                            isSelected
-                              ? "bg-[#8CC21B] border-[#8CC21B] text-white scale-100"
-                              : "border-gray-300 bg-white"
-                          }`}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isSelected
+                            ? "bg-[#8CC21B] border-[#8CC21B] text-white scale-100"
+                            : "border-gray-300 bg-white"
+                            }`}
                         >
                           {isSelected && (
                             <svg
