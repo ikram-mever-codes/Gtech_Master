@@ -34,7 +34,6 @@ export class Rechnung {
   @Column({ type: "varchar", length: 100, nullable: true })
   order_number?: string;
 
-  // --- Dates ---
   @Column({ type: "date" })
   invoice_date!: Date;
 
@@ -53,7 +52,6 @@ export class Rechnung {
   @Column({ type: "varchar", length: 255, nullable: true })
   date_delivery?: string;
 
-  // --- Warehouse & Stock ---
   @Column({ type: "varchar", length: 50, nullable: true })
   warehouse?: string;
 
@@ -64,7 +62,6 @@ export class Rechnung {
   })
   stock_where!: StockWhere;
 
-  // --- Financials ---
   @Column({
     type: "decimal",
     precision: 12,
@@ -141,11 +138,9 @@ export class Rechnung {
   })
   shipping_quantity!: number;
 
-  // --- Currency ---
   @Column({ type: "varchar", length: 10, default: "EUR" })
   currency!: string;
 
-  // --- Payment & Shipping ---
   @Column({ type: "varchar", length: 255, nullable: true })
   payment_method?: string;
 
@@ -214,7 +209,6 @@ export class Rechnung {
   })
   items!: RechnungItem[];
 
-  // --- Timestamps ---
   @CreateDateColumn()
   created_at!: Date;
 

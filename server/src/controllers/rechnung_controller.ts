@@ -9,6 +9,7 @@ import { Customer } from "../models/customers";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
+import { generateRechnungLieferscheinEml } from "../services/emlGenerator";
 import { CCIInvoice } from "../models/cci_invoice";
 import { CCICustomer } from "../models/cci_customer";
 import { CCIItem } from "../models/cci_items";
@@ -805,6 +806,28 @@ export const downloadRechnungPdf = async (
     res.setHeader("Content-Disposition", `attachment; filename=rechnung_${rechnung.invoice_number}.pdf`);
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
+    next(err);
+  }
+};
+
+export const downloadRechnungEml = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    console.log("Generating EML for rechnung ID:", id);
+    const emlData = await generateRechnungLieferscheinEml(id);
+
+    res.setHeader("Content-Type", "message/rfc822");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${emlData.filename}"`,
+    );
+    fs.createReadStream(emlData.emlFilePath).pipe(res);
+  } catch (err) {
+    console.error("Error in downloadRechnungEml:", err);
     next(err);
   }
 };
