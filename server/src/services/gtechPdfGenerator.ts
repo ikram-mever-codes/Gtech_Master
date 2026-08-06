@@ -594,9 +594,8 @@ export async function generateGtechDocumentPdf(
       rowData.forEach((data, colIndex) => {
         doc.font(R).fontSize(8.5).fillColor("#2D3748");
         const col = columns[colIndex];
-        
+
         if (colIndex === 2) {
-          // Render item name with bezWidth
           doc.text(data, currentX + 2, currentY + 5, {
             width: bezWidth,
             align: "left",
@@ -604,7 +603,6 @@ export async function generateGtechDocumentPdf(
             lineGap: 2,
           });
 
-          // Render item remark under item name with expanded remarkWidth (extending across MwSt column)
           if (hasRemark) {
             doc.font(R).fontSize(8).fillColor("#4A5568");
             doc.text(rawRemarks, currentX + 2, currentY + 5 + nameHeight + 2, {
@@ -693,7 +691,8 @@ export async function generateGtechDocumentPdf(
     const TOTALS_VAL_X = TABLE_END_X - TOTALS_VAL_W;
     const TOTALS_LABEL_W = MM(55);
     const TOTALS_LABEL_X = TOTALS_VAL_X - TOTALS_LABEL_W;
-    const currency = opts.currency || "EUR";
+    const rawCurrency = opts.currency || "EUR";
+    const currency = (rawCurrency.toUpperCase() === "EUR" || rawCurrency === "€") ? "€" : rawCurrency;
 
     doc.font(R).fontSize(9).fillColor("#3F4446");
     doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
@@ -827,11 +826,11 @@ export async function generateGtechDocumentPdf(
   const pageRange = doc.bufferedPageRange();
   for (let i = pageRange.start; i < pageRange.start + pageRange.count; i++) {
     doc.switchToPage(i);
-    doc.font(R).fontSize(8).fillColor("#718096");
+    doc.font(R).fontSize(7.5).fillColor("#3F4446");
     doc.text(
-      `Seite ${i + 1} von ${pageRange.count}`,
+      `${i + 1}/${pageRange.count}`,
       LEFT_X,
-      MM(277),
+      MM(282),
       {
         width: CONTENT_WIDTH,
         align: "right",

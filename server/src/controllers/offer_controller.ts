@@ -4212,10 +4212,13 @@ export class OfferController {
       const TOTALS_LABEL_W = MM(55);
       const TOTALS_LABEL_X = TOTALS_VAL_X - TOTALS_LABEL_W;
 
+      const rawOfferCurr = offer.currency || "EUR";
+      const offerCurr = (rawOfferCurr.toUpperCase() === "EUR" || rawOfferCurr === "€") ? "€" : rawOfferCurr;
+
       doc.font(R).fontSize(9).fillColor("#3F4446");
       doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
       doc.text(
-        `${formatGermanNum(totals.subtotal, 2)} ${offer.currency || "EUR"}`,
+        `${formatGermanNum(totals.subtotal, 2)} ${offerCurr}`,
         TOTALS_VAL_X - TOTALS_RIGHT_PAD,
         yPos,
         { align: "right", width: TOTALS_VAL_W },
@@ -4233,7 +4236,7 @@ export class OfferController {
         doc
           .font(R)
           .text(
-            `-${formatGermanNum(totals.discountAmount, 2)} ${offer.currency || "EUR"}`,
+            `-${formatGermanNum(totals.discountAmount, 2)} ${offerCurr}`,
             TOTALS_VAL_X - TOTALS_RIGHT_PAD,
             yPos,
             { align: "right", width: TOTALS_VAL_W },
@@ -4246,7 +4249,7 @@ export class OfferController {
         doc
           .font(R)
           .text(
-            `${formatGermanNum(totals.shippingCost, 2)} ${offer.currency || "EUR"}`,
+            `${formatGermanNum(totals.shippingCost, 2)} ${offerCurr}`,
             TOTALS_VAL_X - TOTALS_RIGHT_PAD,
             yPos,
             { align: "right", width: TOTALS_VAL_W },
@@ -4265,7 +4268,7 @@ export class OfferController {
       doc
         .font(R)
         .text(
-          `${formatGermanNum(totals.taxAmount, 2)} ${offer.currency || "EUR"}`,
+          `${formatGermanNum(totals.taxAmount, 2)} ${offerCurr}`,
           TOTALS_VAL_X - TOTALS_RIGHT_PAD,
           yPos,
           { align: "right", width: TOTALS_VAL_W },
@@ -4279,7 +4282,7 @@ export class OfferController {
       doc.font(SB).fontSize(10).fillColor("#1A202C");
       doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
       doc.text(
-        `${formatGermanNum(totals.totalAmount, 2)} ${offer.currency}`,
+        `${formatGermanNum(totals.totalAmount, 2)} ${offerCurr}`,
         TOTALS_VAL_X - TOTALS_RIGHT_PAD,
         yPos,
         { align: "right", width: TOTALS_VAL_W },
