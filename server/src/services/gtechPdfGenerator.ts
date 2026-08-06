@@ -524,7 +524,7 @@ export async function generateGtechDocumentPdf(
 
       const bezWidth = columns[2].width - 4;
       const remarkWidth = showPrices ? (columns[2].width + columns[3].width - 4) : bezWidth;
-      const halfRowGap = 6;
+      const halfRowGap = 4;
 
       doc.font(R).fontSize(8.5);
       const nameHeight = doc.heightOfString(itemNameStr, { width: bezWidth, lineGap: 2 });
