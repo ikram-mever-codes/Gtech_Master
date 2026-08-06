@@ -965,6 +965,17 @@ export class InvoiceController {
               0,
             );
           }
+          if (calculatedGrossTotal === 0 && inv.items && inv.items.length > 0) {
+            const itemsSum = inv.items.reduce(
+              (sum, item) =>
+                sum +
+                Number(item.quantity || 0) *
+                  Number(item.unitPrice || item.netPrice || 0),
+              0,
+            );
+            const freight = Number(inv.freightCost || 0);
+            calculatedGrossTotal = itemsSum + freight;
+          }
 
           const cargoNo =
             cargo?.cargo_no ||
@@ -1032,6 +1043,17 @@ export class InvoiceController {
           cci.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0;
         const cargoNo = cci.cargo_no || cci.order_number || "";
 
+        let cciGrossTotal = Number(cci.gross_total || 0);
+        if (cciGrossTotal === 0 && cci.items && cci.items.length > 0) {
+          const itemsSum = cci.items.reduce(
+            (s, it) =>
+              s + Number(it.quantity || 0) * Number(it.unit_price || 0),
+            0,
+          );
+          const freight = Number(cci.freight_cost || 0);
+          cciGrossTotal = itemsSum + freight;
+        }
+
         finalDataMap.set(cci.id, {
           id: cci.id,
           invoiceNumber: cci.invoice_number,
@@ -1041,7 +1063,7 @@ export class InvoiceController {
           dueDate: cci.due_date,
           netTotal: Number(cci.net_total || 0),
           taxAmount: Number(cci.tax_amount || 0),
-          grossTotal: Number(cci.gross_total || 0),
+          grossTotal: cciGrossTotal,
           freightCost: Number(cci.freight_cost || 0),
           description: cci.description || "",
           remark: cci.remark || "",

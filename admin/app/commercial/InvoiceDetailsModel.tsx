@@ -254,13 +254,33 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                   0}{" "}
                 Items | {selectedInvoice.customTotalQty ?? 0} Qty
               </span>
-              {activeInvTab === "rk" && (
+              {(activeInvTab === "rk" || activeInvTab === "closed_invoices" || activeInvTab === "rechnung" || activeInvTab === "closed") && (
                 <span className="text-sm font-bold text-emerald-600 block mt-0.5">
-                  Total: $
-                  {Number(selectedInvoice.grossTotal).toLocaleString(
-                    undefined,
-                    { minimumFractionDigits: 2 },
-                  )}
+                  Total: €
+                  {(
+                    Number(selectedInvoice.grossTotal || 0) ||
+                    Number(selectedInvoice.netTotal || 0) ||
+                    (selectedInvoice.items || []).reduce(
+                      (s: number, it: any) =>
+                        s +
+                        Number(it.quantity || it.qty || 0) *
+                          Number(
+                            it.unit_price ||
+                              it.unitPrice ||
+                              it.price ||
+                              0,
+                          ),
+                      0,
+                    ) +
+                    Number(
+                      selectedInvoice.freightCost ||
+                        selectedInvoice.freight_cost ||
+                        0,
+                    )
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
               )}
             </div>
