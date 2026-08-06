@@ -450,7 +450,13 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                             },
                             {
                               header: "Unit Price",
-                              render: (it: any) => it.unitPrice || "0.00",
+                              render: (it: any) =>
+                                (
+                                  Number(it.unitPrice || 0) ||
+                                  (it.totalQty > 0
+                                    ? Number(it.totalPrice || 0) / it.totalQty
+                                    : 0)
+                                ).toFixed(2),
                               width: "80px",
                             },
                             {
@@ -505,7 +511,13 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                             },
                             {
                               header: "Unit Price",
-                              render: (it: any) => it.unitPrice || "0.00",
+                              render: (it: any) =>
+                                (
+                                  Number(it.unitPrice || 0) ||
+                                  (it.totalQty > 0
+                                    ? Number(it.totalPrice || 0) / it.totalQty
+                                    : 0)
+                                ).toFixed(2),
                               width: "80px",
                             },
                             {

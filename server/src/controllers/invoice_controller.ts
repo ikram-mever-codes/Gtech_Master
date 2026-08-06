@@ -1160,26 +1160,41 @@ export class InvoiceController {
     });
 
     if (cciInvoice) {
-      const detailedItems = (cciInvoice.items || []).map((ci) => ({
-        id: ci.id,
-        qty: ci.quantity,
-        quantity: ci.quantity,
-        eur_special_price: Number(ci.unit_price || 0),
-        price: Number(ci.unit_price || 0),
-        _fallbackEan: ci.ean || "-",
-        _fallbackEk: Number(ci.unit_price || 0),
-        set_taric_code: ci.taric_code || null,
-        remark_de: ci.remark || "",
-        item: {
-          id: ci.item_id,
-          item_name: ci.item_name,
-          ean: ci.ean,
-          taric: ci.taric_code
-            ? { code: ci.taric_code, name_en: ci.taric_name_en, duty_rate: Number(ci.duty_rate || 0) }
-            : null,
-        },
-        order: { order_no: ci.order_no || cciInvoice.order_number },
-      }));
+      const detailedItems = (cciInvoice.items || []).map((ci) => {
+        const itemPrice =
+          Number(ci.unit_price || 0) ||
+          Number((ci as any).price || 0) ||
+          Number((ci as any).unitPrice || 0) ||
+          Number((ci as any).net_price || 0) ||
+          Number((ci as any).netPrice || 0);
+
+        return {
+          id: ci.id,
+          qty: Number(ci.quantity || 0),
+          quantity: Number(ci.quantity || 0),
+          eur_special_price: itemPrice,
+          price: itemPrice,
+          unit_price: itemPrice,
+          unitPrice: itemPrice,
+          _fallbackEan: ci.ean || "-",
+          _fallbackEk: itemPrice,
+          set_taric_code: ci.taric_code || null,
+          remark_de: ci.remark || "",
+          item: {
+            id: ci.item_id,
+            item_name: ci.item_name,
+            ean: ci.ean,
+            taric: ci.taric_code
+              ? {
+                  code: ci.taric_code,
+                  name_en: ci.taric_name_en,
+                  duty_rate: Number(ci.duty_rate || 0),
+                }
+              : null,
+          },
+          order: { order_no: ci.order_no || cciInvoice.order_number },
+        };
+      });
 
       const taricGroupsMap = new Map();
       detailedItems.forEach((oi: any) => {
@@ -1188,7 +1203,8 @@ export class InvoiceController {
         if (!taricGroupsMap.has(groupKey)) {
           taricGroupsMap.set(groupKey, {
             taricId: groupKey,
-            taricNameEn: oi.item?.taric?.name_en || oi.item?.item_name || "Project Item",
+            taricNameEn:
+              oi.item?.taric?.name_en || oi.item?.item_name || "Project Item",
             taricCode: code,
             dutyRate: Number(oi.item?.taric?.duty_rate ?? 0),
             totalQty: 0,
@@ -1199,11 +1215,32 @@ export class InvoiceController {
         }
         const group = taricGroupsMap.get(groupKey);
         group.totalQty += Number(oi.qty || 0);
-        group.totalPrice += Number(oi.qty || 0) * Number(oi.eur_special_price || 0);
+        group.totalPrice +=
+          Number(oi.qty || 0) * Number(oi._fallbackEk || oi.eur_special_price || 0);
       });
 
-      const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
-        g.unitPrice = g.totalQty > 0 ? g.totalPrice / g.totalQty : 0;
+      let cciTotalGross = Number(cciInvoice.gross_total || cciInvoice.net_total || 0);
+      if (cciTotalGross === 0 && detailedItems.length > 0) {
+        cciTotalGross = detailedItems.reduce(
+          (s, it) => s + Number(it.qty || 0) * Number(it.eur_special_price || 0),
+          0,
+        ) + Number(cciInvoice.freight_cost || 0);
+      }
+
+      let taricGroups = Array.from(taricGroupsMap.values());
+      const sumTaricPrice = taricGroups.reduce((s, g) => s + (g.totalPrice || 0), 0);
+      const sumTaricQty = taricGroups.reduce((s, g) => s + (g.totalQty || 0), 0);
+
+      if (sumTaricPrice === 0 && cciTotalGross > 0 && sumTaricQty > 0) {
+        const netForTaric = Math.max(0, cciTotalGross - Number(cciInvoice.freight_cost || 0));
+        const targetAmount = netForTaric > 0 ? netForTaric : cciTotalGross;
+        taricGroups.forEach((g) => {
+          g.totalPrice = (g.totalQty / sumTaricQty) * targetAmount;
+        });
+      }
+
+      taricGroups = taricGroups.map((g: any) => {
+        g.unitPrice = g.totalQty > 0 ? (g.totalPrice / g.totalQty).toFixed(2) : "0.00";
         return g;
       });
 
@@ -1333,19 +1370,33 @@ export class InvoiceController {
     }
 
     if (orderItems.length === 0 && invoice.items && invoice.items.length > 0) {
-      orderItems = invoice.items.map((invItem: any) => ({
-        id: invItem.id,
-        qty: Number(invItem.quantity || 0),
-        price: Number(invItem.unitPrice || 0),
-        eur_special_price: Number(invItem.unitPrice || 0),
-        item: invItem.item || {
-          id: invItem.item_id && !isNaN(Number(invItem.item_id)) ? Number(invItem.item_id) : null,
-          item_name: invItem.description || "Invoice Item",
-          ean: invItem.articleNumber || "-",
-          taric: null,
-        },
-        set_taric_code: null,
-      }));
+      orderItems = invoice.items.map((invItem: any) => {
+        const p = Number(
+          invItem.unitPrice ||
+            invItem.netPrice ||
+            invItem.unit_price ||
+            invItem.price ||
+            0,
+        );
+        return {
+          id: invItem.id,
+          qty: Number(invItem.quantity || 0),
+          price: p,
+          eur_special_price: p,
+          unit_price: p,
+          unitPrice: p,
+          item: invItem.item || {
+            id:
+              invItem.item_id && !isNaN(Number(invItem.item_id))
+                ? Number(invItem.item_id)
+                : null,
+            item_name: invItem.description || "Invoice Item",
+            ean: invItem.articleNumber || "-",
+            taric: null,
+          },
+          set_taric_code: null,
+        };
+      });
     }
 
     const getEffectiveTaricCode = (oi: any): string => {
@@ -1415,10 +1466,13 @@ export class InvoiceController {
           rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
         }
         let eurPrice =
-          oi.eur_special_price ||
-          oi.price ||
-          item?.transfer_price_EUR ||
-          item?.price ||
+          Number(oi.eur_special_price || 0) ||
+          Number(oi.price || 0) ||
+          Number(oi.unit_price || 0) ||
+          Number(oi.unitPrice || 0) ||
+          Number(oi.netPrice || 0) ||
+          Number(item?.transfer_price_EUR || 0) ||
+          Number(item?.price || 0) ||
           0;
         if (!eurPrice && rmbPrice) {
           eurPrice = Number(rmbPrice) * 0.13;
@@ -1485,8 +1539,28 @@ export class InvoiceController {
       group.totalPrice += (Number(oi.qty) || 0) * currentPrice;
     });
 
-    const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
-      g.unitPrice = g.totalQty > 0 ? g.totalPrice / g.totalQty : 0;
+    let invoiceGross = Number(invoice.grossTotal || invoice.netTotal || 0);
+    if (invoiceGross === 0 && itemsWithFallbacks.length > 0) {
+      invoiceGross = itemsWithFallbacks.reduce(
+        (s, it) => s + Number(it.qty || 0) * Number(it._fallbackEk || 0),
+        0,
+      ) + Number(invoice.freightCost || 0);
+    }
+
+    let taricGroups = Array.from(taricGroupsMap.values());
+    const sumTaricPrice = taricGroups.reduce((s, g) => s + (g.totalPrice || 0), 0);
+    const sumTaricQty = taricGroups.reduce((s, g) => s + (g.totalQty || 0), 0);
+
+    if (sumTaricPrice === 0 && invoiceGross > 0 && sumTaricQty > 0) {
+      const netForTaric = Math.max(0, invoiceGross - Number(invoice.freightCost || 0));
+      const targetAmount = netForTaric > 0 ? netForTaric : invoiceGross;
+      taricGroups.forEach((g) => {
+        g.totalPrice = (g.totalQty / sumTaricQty) * targetAmount;
+      });
+    }
+
+    taricGroups = taricGroups.map((g: any) => {
+      g.unitPrice = g.totalQty > 0 ? (g.totalPrice / g.totalQty).toFixed(2) : "0.00";
       return g;
     });
 
