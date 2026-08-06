@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { LinkIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  LinkIcon,
+  XMarkIcon,
+  TrashIcon,
+  PencilIcon,
+} from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, FileText, Pencil, Save, X, AlertCircle, Mail } from "lucide-react";
@@ -9,8 +14,11 @@ import { downloadRechnungEml } from "@/api/rechnungen";
 import {
   updateRechnungKItem,
   createRechnungKFromRechnung,
+  deleteRechnungK,
 } from "@/api/rechnungen_k";
+import { updateRechnung } from "@/api/rechnungen";
 import { formatDate } from "@/utils/date";
+import ViewEditToggle from "@/components/UI/ViewEditToggle";
 
 const formatDeCurrency = (val: number) => {
   const num = isNaN(val) || !isFinite(val) ? 0 : val;
@@ -97,11 +105,20 @@ const Field: React.FC<{ label: string; value: any }> = ({ label, value }) => (
 const inputCls =
   "w-24 px-2 py-1 text-sm border border-gray-300/80 bg-white rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all text-right";
 
+const addressInputCls =
+  "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all";
+
 interface RechnungDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   rechnung: any;
   isCorrection?: boolean;
+  /** Only meaningful when isCorrection is false. "view" (default) shows a
+   * plain read-only line items table with a Hinweis column and no
+   * correction-related controls. "correction" — entered only via the
+   * table's "+RK" button — shows the Open Qty / editable Qty & Price
+   * inputs plus the "Create RK" footer button. */
+  mode?: "view" | "correction";
   openQuantities?: Record<string, number>;
   onChanged?: () => void;
   onCorrectionCreated?: () => void;
@@ -145,6 +162,7 @@ export default function RechnungDetailModal({
   onClose,
   rechnung,
   isCorrection = false,
+  mode = "view",
   openQuantities = {},
   onChanged,
   onCorrectionCreated,
@@ -156,10 +174,21 @@ export default function RechnungDetailModal({
   const [data, setData] = useState<any>(rechnung);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [corrections, setCorrections] = useState<
-    Record<string, { quantity: number; price: number }>
-  >({});
+  const [corrections, setCorrections] = useState<{
+    [key: string]: { quantity: number; price: number };
+  }>({});
+
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- Address-only edit mode (Rechnung window) ---------------------------
+  const [addressEdit, setAddressEdit] = useState(false);
+  const [addressForm, setAddressForm] = useState<{
+    customerSnapshot: any;
+    deliveryAddress: any;
+  }>({ customerSnapshot: {}, deliveryAddress: {} });
+  const [savingAddress, setSavingAddress] = useState(false);
+
   const linkedDocs = rechnung?.linkedDocuments || {};
   const auftragDocs = sortByCreatedAtDesc(linkedDocs.auftrag || []);
   const rechnungenKDocs = sortByCreatedAtDesc(linkedDocs.rechnungenK || []);
@@ -168,7 +197,9 @@ export default function RechnungDetailModal({
   useEffect(() => {
     setData(rechnung);
     setIsEditMode(false);
+    setAddressEdit(false);
     // Initialize corrections with default values for items that have open quantity
+
     if (rechnung?.items) {
       const initialCorrections: Record<
         string,
@@ -233,12 +264,16 @@ export default function RechnungDetailModal({
       ? { street: rechnungCustomer.ship_to_address }
       : null);
 
+  // --- Mode flags ----------------------------------------------------------
+  const showCorrectionUI = !isCorrection && mode === "correction";
+  const showViewOnly = !isCorrection && mode === "view";
+
   const handleCorrectionChange = (
     itemId: string,
     field: "quantity" | "price",
     value: number,
   ) => {
-    setCorrections((prev) => ({
+    setCorrections((prev: any) => ({
       ...prev,
       [itemId]: {
         ...prev[itemId],
@@ -248,14 +283,12 @@ export default function RechnungDetailModal({
   };
 
   const handleCreateCorrections = async () => {
-    // Build corrections array from the corrections state
     const correctionsArray = Object.entries(corrections)
-      .filter(([itemId, corr]) => {
+      .filter(([itemId, corr]: any) => {
         const openQty = openQuantities[itemId] || 0;
-        // Only include if quantity > 0 and doesn't exceed open quantity
         return corr.quantity > 0 && corr.quantity <= openQty;
       })
-      .map(([itemId, corr]) => ({
+      .map(([itemId, corr]: any) => ({
         itemId,
         quantity: corr.quantity,
         price: corr.price,
@@ -269,7 +302,6 @@ export default function RechnungDetailModal({
       return;
     }
 
-    // Validate all corrections
     const validationErrors: string[] = [];
     for (const corr of correctionsArray) {
       const openQty = openQuantities[corr.itemId] || 0;
@@ -303,29 +335,21 @@ export default function RechnungDetailModal({
           `Correction invoice created successfully with ${correctionsArray.length} item(s)!`,
           successStyles,
         );
-
-        // Close the modal
         onClose();
-
-        // Switch to RK tab
-        if (onSwitchTab) {
-          onSwitchTab("rk");
-        }
-
-        // Notify parent to refresh data
-        if (onCorrectionCreated) {
-          onCorrectionCreated();
-        }
-        if (onChanged) {
-          onChanged();
-        }
+        if (onSwitchTab) onSwitchTab("rk");
+        onCorrectionCreated?.();
+        onChanged?.();
       } else {
-        const errorMsg = res?.message || "Failed to create correction invoice.";
-        toast.error(errorMsg, errorStyles);
+        toast.error(
+          res?.message || "Failed to create correction invoice.",
+          errorStyles,
+        );
       }
     } catch (error: any) {
-      const errorMsg = error?.message || "Failed to create correction invoice.";
-      toast.error(errorMsg, errorStyles);
+      toast.error(
+        error?.message || "Failed to create correction invoice.",
+        errorStyles,
+      );
     } finally {
       setIsCreating(false);
     }
@@ -384,21 +408,104 @@ export default function RechnungDetailModal({
     }
   };
 
-  // Check if all items are fully corrected (no open quantity)
+  // --- Address edit handlers ------------------------------------------------
+  const startAddressEdit = () => {
+    setAddressForm({
+      customerSnapshot: { ...(data.customerSnapshot || {}) },
+      deliveryAddress: { ...(data.deliveryAddress || {}) },
+    });
+    setAddressEdit(true);
+  };
+
+  const cancelAddressEdit = () => {
+    setAddressEdit(false);
+  };
+
+  const patchBilling = (p: any) =>
+    setAddressForm((f) => ({
+      ...f,
+      customerSnapshot: { ...f.customerSnapshot, ...p },
+    }));
+
+  const patchDelivery = (p: any) =>
+    setAddressForm((f) => ({
+      ...f,
+      deliveryAddress: { ...f.deliveryAddress, ...p },
+    }));
+
+  const handleSaveAddress = async () => {
+    setSavingAddress(true);
+    try {
+      const res: any = await updateRechnung(data.id, {
+        customerSnapshot: addressForm.customerSnapshot,
+        deliveryAddress: addressForm.deliveryAddress,
+      });
+      const payload = res?.data ?? res;
+      if (res?.success && payload) {
+        setData(payload);
+        toast.success("Address updated.", successStyles);
+        setAddressEdit(false);
+        onChanged?.();
+      } else {
+        toast.error(res?.message || "Failed to update address.", errorStyles);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update address.", errorStyles);
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  // --- Delete RK (correction invoice) ---------------------------------------
+  const handleDeleteRk = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this correction invoice (RK)? This action cannot be undone.",
+      )
+    )
+      return;
+
+    setIsDeleting(true);
+    try {
+      await deleteRechnungK(data.id);
+      toast.success("Correction invoice deleted.", successStyles);
+      onChanged?.();
+      onClose();
+    } catch (err: any) {
+      toast.error(
+        err?.message || "Failed to delete correction invoice.",
+        errorStyles,
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const allItemsFullyCorrected = items.every((item: any) => {
     const openQty = openQuantities[item.id] || 0;
     return openQty <= 0;
   });
 
-  // Check if any item has corrections
   const hasCorrections = Object.values(corrections).some(
-    (corr) => corr.quantity > 0,
+    (corr: any) => corr.quantity > 0,
   );
 
-  // Get total items being corrected
   const totalItemsToCorrect = Object.values(corrections).filter(
-    (corr) => corr.quantity > 0,
+    (corr: any) => corr.quantity > 0,
   ).length;
+
+  // --- Table column count (for empty-state colSpan) -------------------------
+  const columnCount =
+    1 + // Pos
+    (isCorrection ? 1 : 0) + // Pic
+    1 + // Art.-Nr.
+    1 + // Bezeichnung
+    (showViewOnly ? 1 : 0) + // Hinweis
+    1 + // MwSt.
+    (showCorrectionUI ? 3 : 0) + // Open Qty, Qty, Price
+    (showViewOnly ? 2 : 0) + // Menge, Preis
+    (isCorrection ? 2 : 0) + // Menge, Netto-Preis
+    1; // Netto gesamt
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -417,21 +524,22 @@ export default function RechnungDetailModal({
                   Correction Invoice
                 </span>
               )}
-              {!isCorrection && allItemsFullyCorrected && (
+              {showCorrectionUI && allItemsFullyCorrected && (
                 <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">
                   Fully Corrected
                 </span>
               )}
-              {!isCorrection && !allItemsFullyCorrected && hasCorrections && (
-                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-semibold">
-                  {totalItemsToCorrect} item(s) to correct
-                </span>
-              )}
+              {showCorrectionUI &&
+                !allItemsFullyCorrected &&
+                hasCorrections && (
+                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-semibold">
+                    {totalItemsToCorrect} item(s) to correct
+                  </span>
+                )}
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
               {companyName}
             </h2>
-          </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <button
               type="button"
@@ -442,6 +550,16 @@ export default function RechnungDetailModal({
               <Mail className="w-4 h-4 text-blue-600" />
               Outlook (.eml)
             </button>
+            {!isCorrection && (
+              <ViewEditToggle
+                isEditEnabled={addressEdit}
+                onToggle={() =>
+                  addressEdit ? cancelAddressEdit() : startAddressEdit()
+                }
+                disabled={savingAddress}
+              />
+            )}
+>>>>>>> 1ed706d90dc970bb2bec327c4a0964ebfe6fc4af
             {isCorrection && (
               <button
                 type="button"
@@ -476,25 +594,140 @@ export default function RechnungDetailModal({
         </div>
 
         <div className="flex-1 bg-white overflow-y-auto p-6 space-y-5">
-          {/* Bulk Correction Actions */}
-
           <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
             <div className="md:col-span-1 flex flex-col gap-3">
               <div className="block mb-1">
-                <AddressBlock
-                  addr={billingAddr}
-                  emptyText="No customer snapshot."
-                />
-              </div>
-              {deliveryAddr && (
-                <div className="block mb-1">
-                  <span className="text-sm font-bold text-gray-900">
-                    Delivery:
-                  </span>
+                {addressEdit ? (
+                  <div className="space-y-1.5">
+                    <input
+                      className={addressInputCls}
+                      placeholder="Legal name"
+                      value={addressForm.customerSnapshot?.legalName || ""}
+                      onChange={(e) =>
+                        patchBilling({ legalName: e.target.value })
+                      }
+                    />
+                    <input
+                      className={addressInputCls}
+                      placeholder="Street"
+                      value={
+                        addressForm.customerSnapshot?.address ||
+                        addressForm.customerSnapshot?.street ||
+                        ""
+                      }
+                      onChange={(e) =>
+                        patchBilling({ address: e.target.value })
+                      }
+                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        className={addressInputCls}
+                        placeholder="Postal code"
+                        value={addressForm.customerSnapshot?.postalCode || ""}
+                        onChange={(e) =>
+                          patchBilling({ postalCode: e.target.value })
+                        }
+                      />
+                      <input
+                        className={addressInputCls}
+                        placeholder="City"
+                        value={addressForm.customerSnapshot?.city || ""}
+                        onChange={(e) => patchBilling({ city: e.target.value })}
+                      />
+                    </div>
+                    <input
+                      className={addressInputCls}
+                      placeholder="Country"
+                      value={addressForm.customerSnapshot?.country || ""}
+                      onChange={(e) =>
+                        patchBilling({ country: e.target.value })
+                      }
+                    />
+                    <input
+                      className={addressInputCls}
+                      placeholder="VAT ID"
+                      value={addressForm.customerSnapshot?.vatId || ""}
+                      onChange={(e) => patchBilling({ vatId: e.target.value })}
+                    />
+                  </div>
+                ) : (
                   <AddressBlock
-                    addr={deliveryAddr}
-                    emptyText="No delivery address set."
+                    addr={billingAddr}
+                    emptyText="No customer snapshot."
                   />
+                )}
+              </div>
+              <div className="block mb-1">
+                {addressEdit ? (
+                  <div className="space-y-1.5 mt-1">
+                    <span className="text-sm font-bold text-gray-900">
+                      Delivery:
+                    </span>
+                    <input
+                      className={addressInputCls}
+                      placeholder="Street"
+                      value={addressForm.deliveryAddress?.street || ""}
+                      onChange={(e) =>
+                        patchDelivery({ street: e.target.value })
+                      }
+                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        className={addressInputCls}
+                        placeholder="Postal code"
+                        value={addressForm.deliveryAddress?.postalCode || ""}
+                        onChange={(e) =>
+                          patchDelivery({ postalCode: e.target.value })
+                        }
+                      />
+                      <input
+                        className={addressInputCls}
+                        placeholder="City"
+                        value={addressForm.deliveryAddress?.city || ""}
+                        onChange={(e) =>
+                          patchDelivery({ city: e.target.value })
+                        }
+                      />
+                    </div>
+                    <input
+                      className={addressInputCls}
+                      placeholder="Country"
+                      value={addressForm.deliveryAddress?.country || ""}
+                      onChange={(e) =>
+                        patchDelivery({ country: e.target.value })
+                      }
+                    />
+                  </div>
+                ) : (
+                  deliveryAddr && (
+                    <>
+                      <span className="text-sm font-bold text-gray-900">
+                        Delivery:
+                      </span>
+                      <AddressBlock
+                        addr={deliveryAddr}
+                        emptyText="No delivery address set."
+                      />
+                    </>
+                  )
+                )}
+              </div>
+              {addressEdit && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveAddress}
+                    disabled={savingAddress}
+                    className="px-3 py-1.5 text-xs bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 font-semibold"
+                  >
+                    {savingAddress ? "Saving…" : "Save address"}
+                  </button>
+                  <button
+                    onClick={cancelAddressEdit}
+                    disabled={savingAddress}
+                    className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
+                  >
+                    Cancel
+                  </button>
                 </div>
               )}
             </div>
@@ -513,14 +746,6 @@ export default function RechnungDetailModal({
           </div>
 
           <div className="space-y-2">
-            {/* {isCorrection && (
-              <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                Only Quantity and Price can be changed on a correction invoice.
-                All other fields are copied from the original Rechnung and are
-                fixed.
-              </p>
-            )} */}
-
             <div className="overflow-x-auto border border-gray-200 rounded-lg">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 border-b border-gray-200">
@@ -528,7 +753,6 @@ export default function RechnungDetailModal({
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
                       Pos
                     </th>
-
                     {isCorrection && (
                       <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
                         Pic
@@ -540,10 +764,15 @@ export default function RechnungDetailModal({
                     <th className="px-2 py-2 text-left font-semibold text-gray-600">
                       Bezeichnung
                     </th>
+                    {showViewOnly && (
+                      <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                        Hinweis
+                      </th>
+                    )}
                     <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
                       MwSt.
                     </th>
-                    {!isCorrection ? (
+                    {showCorrectionUI && (
                       <>
                         <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
                           Open Qty
@@ -555,7 +784,18 @@ export default function RechnungDetailModal({
                           Price
                         </th>
                       </>
-                    ) : (
+                    )}
+                    {showViewOnly && (
+                      <>
+                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                          Menge
+                        </th>
+                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
+                          Preis
+                        </th>
+                      </>
+                    )}
+                    {isCorrection && (
                       <>
                         <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">
                           Menge
@@ -574,7 +814,7 @@ export default function RechnungDetailModal({
                   {items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={isCorrection ? 8 : 8}
+                        colSpan={columnCount}
                         className="text-center py-6 text-sm text-gray-500"
                       >
                         No line items found.
@@ -600,7 +840,7 @@ export default function RechnungDetailModal({
                       <tr
                         key={item.id || idx}
                         className={
-                          isRowDisabled && !isCorrection
+                          isRowDisabled && showCorrectionUI
                             ? "bg-gray-50 opacity-60"
                             : ""
                         }
@@ -630,23 +870,27 @@ export default function RechnungDetailModal({
                         <td className="px-2 py-2">
                           {item.item_name || "Line Item"}
                         </td>
+                        {showViewOnly && (
+                          <td className="px-2 py-2 text-gray-600">
+                            {item.notes || item.remark || "—"}
+                          </td>
+                        )}
                         <td className="px-2 py-2 text-center text-gray-600">
                           {lineTaxRate}%
                         </td>
-                        {!isCorrection ? (
+                        {showCorrectionUI && (
                           <>
-                            {!isCorrection && (
-                              <td className="px-2 py-2 text-center">
-                                <span
-                                  className={`font-semibold ${isFullyCorrected
+                            <td className="px-2 py-2 text-center">
+                              <span
+                                className={`font-semibold ${
+                                  isFullyCorrected
                                     ? "text-green-600"
                                     : "text-amber-600"
-                                    }`}
-                                >
-                                  {openQty}
-                                </span>
-                              </td>
-                            )}
+                                }`}
+                              >
+                                {openQty}
+                              </span>
+                            </td>
                             <td className="px-2 py-2 text-center">
                               {!isFullyCorrected ? (
                                 <input
@@ -689,14 +933,23 @@ export default function RechnungDetailModal({
                               )}
                             </td>
                           </>
-                        ) : (
+                        )}
+                        {showViewOnly && (
+                          <>
+                            <td className="px-2 py-2 text-right">{qty}</td>
+                            <td className="px-2 py-2 text-right">
+                              {formatDeCurrency(unitPrice)}
+                            </td>
+                          </>
+                        )}
+                        {isCorrection && (
                           <>
                             <td className="px-2 py-2">
                               <div className="flex justify-end items-center gap-1">
                                 {isSaving && (
                                   <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
                                 )}
-                                {isCorrection && isEditMode ? (
+                                {isEditMode ? (
                                   <EditableCell
                                     value={qty}
                                     disabled={isSaving}
@@ -713,7 +966,7 @@ export default function RechnungDetailModal({
                             </td>
                             <td className="px-2 py-2">
                               <div className="flex justify-end">
-                                {isCorrection && isEditMode ? (
+                                {isEditMode ? (
                                   <EditableCell
                                     value={unitPrice}
                                     disabled={isSaving}
@@ -900,30 +1153,47 @@ export default function RechnungDetailModal({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t gap-3 border-gray-200 flex justify-end items-center flex-shrink-0">
-          <button
-            onClick={handleCreateCorrections}
-            disabled={isCreating || !hasCorrections}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
-              ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-              }`}
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              "Create RK"
+        <div className="px-6 py-4 border-t gap-3 border-gray-200 flex justify-between items-center flex-shrink-0">
+          <div>
+            {isCorrection && (
+              <button
+                onClick={handleDeleteRk}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold disabled:opacity-50"
+              >
+                <TrashIcon className="h-4 w-4" />
+                {isDeleting ? "Deleting…" : "Delete RK"}
+              </button>
             )}
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Close
-          </button>
+          </div>
+          <div className="flex gap-2">
+            {showCorrectionUI && (
+              <button
+                onClick={handleCreateCorrections}
+                disabled={isCreating || !hasCorrections}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+                  hasCorrections && !isCreating
+                    ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create RK"
+                )}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

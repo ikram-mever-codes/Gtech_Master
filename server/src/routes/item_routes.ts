@@ -38,6 +38,8 @@ import {
   getNewItems,
   exportNewItemsToCSV,
   syncSuppCatWithCategoryName,
+  syncItemData,
+  syncCustomerPrices,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -51,6 +53,16 @@ const router: any = express.Router();
 router.get("/pricing/transfer-prices", feedTransferPrices);
 router.get("/cat/fix", syncSuppCatWithCategoryName);
 
+// Bulk import/sync items from /public/items.csv
+router.get(
+  "/sync/csv",
+  authenticateUser,
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  syncItemData,
+);
+
+router.get("/sync/prices", syncCustomerPrices);
+
 router.get("/", getItems);
 router.post("/", createItem);
 router.get("/export/csv", exportItemsToCSV);
@@ -59,7 +71,9 @@ router.get("/new-items", getNewItems);
 router.get("/new-items/count", async (req: Request, res: Response) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
-    const count = await itemRepository.count({ where: { is_new: In(["Y", "y"]) } });
+    const count = await itemRepository.count({
+      where: { is_new: In(["Y", "y"]) },
+    });
     res.json({ success: true, data: { count } });
   } catch (error) {
     res

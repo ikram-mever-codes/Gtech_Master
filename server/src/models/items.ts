@@ -84,7 +84,6 @@ export class Item {
   @Column({ type: "boolean", default: false })
   is_dim_weight_estimated!: boolean;
 
-
   @Column({ nullable: true })
   cat_id?: number;
 

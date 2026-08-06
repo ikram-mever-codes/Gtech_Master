@@ -19,7 +19,6 @@ interface RkColumnsArgs {
   expandedDocIds: Set<string | number>;
   setExpandedDocIds: React.Dispatch<React.SetStateAction<Set<string | number>>>;
   onView: (row: any) => void;
-  onDelete: (row: any) => void;
 }
 
 const valueNetCalc = (row: any) => Number(row.netTotal || row.grossTotal || 0);
@@ -30,7 +29,6 @@ export function buildRkColumns({
   expandedDocIds,
   setExpandedDocIds,
   onView,
-  onDelete,
 }: RkColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
@@ -65,22 +63,15 @@ export function buildRkColumns({
       render: (row) => (
         <div className="flex items-center justify-center gap-1.5">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(row);
-            }}
-            className="px-2 py-1 text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-[4px] transition shadow-md"
-          >
-            Delete
-          </button>
-
-          <button
             title="Download Rechnungskorrektur PDF"
             onClick={async (e) => {
               e.stopPropagation();
               try {
-                await downloadRechnungKPdf(row.id, row.invoiceNumber || row.invoice_number);
-              } catch (_) { }
+                await downloadRechnungKPdf(
+                  row.id,
+                  row.invoiceNumber || row.invoice_number,
+                );
+              } catch (_) {}
             }}
             className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
           >

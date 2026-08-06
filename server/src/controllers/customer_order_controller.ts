@@ -31,16 +31,30 @@ async function hasStockItems(orderId: number): Promise<boolean> {
   const orderItemRepo = AppDataSource.getRepository(CustomerOrderItem);
   const orderItems = await orderItemRepo.find({
     where: { customerOrderId: orderId },
-    relations: ["sourceItem"],
   });
+
+  const sourceItemIds = Array.from(
+    new Set(
+      orderItems
+        .filter((li: any) => li.sourceItemId)
+        .map((li: any) => parseInt(li.sourceItemId, 10))
+        .filter((id: number) => !isNaN(id)),
+    ),
+  );
+
+  let itemById = new Map<string, any>();
+  if (sourceItemIds.length > 0) {
+    const itemRepo = AppDataSource.getRepository(Item);
+    const items = await itemRepo.find({
+      where: { id: In(sourceItemIds) },
+      select: ["id", "is_stock_item"],
+    });
+    itemById = new Map(items.map((it: any) => [String(it.id), it]));
+  }
 
   for (const item of orderItems) {
     if (item.sourceItemId) {
-      // Check if the source item has is_stock_item = "Y"
-      const itemRepo = AppDataSource.getRepository(Item);
-      const sourceItem = await itemRepo.findOne({
-        where: { id: parseInt(item.sourceItemId, 10) },
-      });
+      const sourceItem = itemById.get(String(item.sourceItemId));
       if (sourceItem && sourceItem.is_stock_item === "Y") {
         return true;
       }
@@ -52,7 +66,6 @@ async function hasStockItems(orderId: number): Promise<boolean> {
   }
   return false;
 }
-
 /**
  * Helper function to determine if stock_where should be set
  * Only sets stock_where if there's at least one stock item in the order
@@ -1024,8 +1037,8 @@ export const createOrderLineItem = async (
 
     const quantity = parseFlexibleNumber(body.quantity) || 1;
     let price = parseFlexibleNumber(body.price) ?? 0;
-
     let isStockItem = false;
+
     if (body.sourceItemId) {
       const itemRepository = AppDataSource.getRepository(Item);
       const sourceItem = await itemRepository.findOne({
@@ -1047,9 +1060,10 @@ export const createOrderLineItem = async (
         : undefined;
 
     const orderItemRepo = AppDataSource.getRepository(CustomerOrderItem);
-    const lineItem = orderItemRepo.create({
-      customerOrder: order,
-      customerOrderId: order.id,
+
+    // Build the line item data WITHOUT the relation
+    const lineItemData: any = {
+      customerOrderId: order.id, // Set the foreign key directly
       itemName: String(body.itemName).trim(),
       itemNo: body.itemNo,
       material: body.material,
@@ -1059,40 +1073,63 @@ export const createOrderLineItem = async (
         body.weight !== undefined
           ? (parseFlexibleNumber(body.weight) ?? undefined)
           : undefined,
-      quantity,
-      price,
-      taxRate,
+      quantity: quantity,
+      price: price,
+      taxRate: taxRate,
       lineTotal: quantity * price,
       position: nextPosition,
       sourceItemId: body.sourceItemId || undefined,
       notes: body.notes,
-    });
+    };
 
-    const saved = await orderItemRepo.save(lineItem);
+    // Create and save the line item
+    const lineItem = orderItemRepo.create(lineItemData);
+    const saved: any = await orderItemRepo.save(lineItem);
+
+    // Recalculate totals WITHOUT fetching the order again
     await calculateOrderTotals(order.id);
 
     // After adding a line item, check if we need to update stock_where on the order
-    if (isStockItem && !order.stock_where) {
-      order.stock_where = StockWhere.CN; // ← was StockWhere.EU
-      await customerOrderRepo.save(order);
+    if (isStockItem) {
+      if (!order.stock_where) {
+        // Fetch the order fresh to avoid stale data issues
+        const freshOrder = await customerOrderRepo.findOne({
+          where: { id: order.id },
+        });
+        if (freshOrder) {
+          freshOrder.stock_where = StockWhere.CN;
+          await customerOrderRepo.save(freshOrder);
+        }
+      }
     } else if (!isStockItem && order.stock_where) {
-      // Check if there are any other stock items in the order
       const hasOtherStock = await hasStockItems(order.id);
       if (!hasOtherStock) {
-        // If no stock items remain, remove stock_where
-        order.stock_where = undefined as any;
-        await customerOrderRepo.save(order);
+        const freshOrder = await customerOrderRepo.findOne({
+          where: { id: order.id },
+        });
+        if (freshOrder) {
+          freshOrder.stock_where = undefined as any;
+          await customerOrderRepo.save(freshOrder);
+        }
       }
     }
 
-    res
-      .status(201)
-      .json({ success: true, message: "Line item added", data: saved });
+    // Fetch the complete line item with relations for the response
+    const completeLineItem = await orderItemRepo.findOne({
+      where: { id: saved.id },
+      relations: ["customerOrder"],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Line item added",
+      data: completeLineItem || saved,
+    });
   } catch (error) {
+    console.error("Error creating order line item:", error);
     next(error);
   }
 };
-
 export const updateOrderLineItem = async (
   req: Request,
   res: Response,

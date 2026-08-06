@@ -80,6 +80,7 @@ export interface ItemSnapshot {
   width?: number;
   height?: number;
   length?: number;
+  notes?: string;
   purchasePrice?: number;
   purchaseCurrency?: string;
   photo?: string;

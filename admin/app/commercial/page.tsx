@@ -6,7 +6,14 @@ import React, {
   useCallback,
   Suspense,
 } from "react";
-import { FunnelIcon } from "@heroicons/react/24/outline";
+import {
+  createRechnungKFromRechnung,
+  getRechnungKById,
+  getRechnungOpenQuantities,
+  getAllRechnungenK,
+  deleteRechnungK,
+} from "@/api/rechnungen_k";
+
 import { Plus, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
 
 import { getExpandedInvoiceDetails, updateInvoice } from "@/api/invoice";
@@ -38,14 +45,6 @@ import BillToShipToForm, {
 import { toast } from "react-hot-toast";
 import { successStyles, errorStyles } from "@/utils/constants";
 import CustomModal from "@/components/UI/CustomModal";
-import {
-  createRechnungKFromRechnung,
-  getRechnungKById,
-  deleteRechnungK,
-  getRechnungOpenQuantities,
-  getAllRechnungenK,
-} from "@/api/rechnungen_k";
-
 import OffersPage from "../offers/page";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
@@ -123,12 +122,23 @@ const InvoiceListPage: React.FC = () => {
   const [allOpenQuantities, setAllOpenQuantities] = useState<
     Record<string, Record<string, number>>
   >({});
+  const [rechnungModalMode, setRechnungModalMode] = useState<
+    "view" | "correction"
+  >("view");
 
   const tabData = useCommercialTabData();
 
   const [systemColours, setSystemColours] = useState<any[]>(
     DEFAULT_DYNAMIC_COLOURS,
   );
+
+  const handleOpenRechnungView = (row: any) => {
+    setRechnungModalMode("view");
+    setSelectedRechnungForDetail(row);
+    setShowRechnungDetailModal(true);
+    const rowOpenQuantities = allOpenQuantities[row.id] || {};
+    setOpenQuantities(rowOpenQuantities);
+  };
 
   useEffect(() => {
     (async () => {
@@ -1056,11 +1066,10 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  // Replace the handleCreateRechnungK function with this:
   const handleCreateRechnungK = (row: any) => {
+    setRechnungModalMode("correction");
     setSelectedRechnungForDetail(row);
     setShowRechnungDetailModal(true);
-    // Use the already fetched open quantities for this Rechnung
     const rowOpenQuantities = allOpenQuantities[row.id] || {};
     setOpenQuantities(rowOpenQuantities);
   };
@@ -1217,11 +1226,11 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev: any) =>
         prev
           ? {
-            ...prev,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1402,11 +1411,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-          item.customer?.id ||
-          item.customer_id ||
-          item.customerSnapshot?.customerNumber ||
-          item.customerSnapshot?.id ||
-          "",
+            item.customer?.id ||
+            item.customer_id ||
+            item.customerSnapshot?.customerNumber ||
+            item.customerSnapshot?.id ||
+            "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1414,12 +1423,12 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-          item.customer_name ||
-          item.bill_to ||
-          item.ship_to ||
-          item.customerSnapshot?.companyName ||
-          item.customerSnapshot?.name ||
-          "",
+            item.customer_name ||
+            item.bill_to ||
+            item.ship_to ||
+            item.customerSnapshot?.companyName ||
+            item.customerSnapshot?.name ||
+            "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -1503,20 +1512,15 @@ const InvoiceListPage: React.FC = () => {
           setExpandedDocIds,
           onCreateRechnungK: handleCreateRechnungK,
           creatingRkForId,
-          onViewRechnung: (row: any) => {
-            setSelectedRechnungForDetail(row);
-            setShowRechnungDetailModal(true);
-            // Use the already fetched open quantities for this Rechnung
-            const rowOpenQuantities = allOpenQuantities[row.id] || {};
-            setOpenQuantities(rowOpenQuantities);
-          },
+          onViewRechnung: handleOpenRechnungView,
         });
+
+      // 7. In the "rk" case, drop onDelete:
       case "rk":
         return buildRkColumns({
           expandedDocIds,
           setExpandedDocIds,
           onView: handleOpenRechnungKDetail,
-          onDelete: handleDeleteRechnungK,
         });
       case "lieferschein":
         return buildLieferscheinColumns({
@@ -1660,10 +1664,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
                   ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
                   : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              }`}
             >
               {tab.label}
             </button>
@@ -1704,10 +1709,11 @@ const InvoiceListPage: React.FC = () => {
               data={currentItems}
               columns={commercialColumns}
               loading={dataTableLoading}
-              emptyMessage={`No ${activeInvTab === "auftrag" || activeInvTab === "bestellung"
+              emptyMessage={`No ${
+                activeInvTab === "auftrag" || activeInvTab === "bestellung"
                   ? "Orders"
                   : "Invoices"
-                } Found`}
+              } Found`}
               getRowClassName={(row) => {
                 if (activeInvTab === "rechnung") {
                   const rowOpenQuantities = allOpenQuantities[row.id] || {};
@@ -1813,10 +1819,11 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
+                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                        currentPage === i + 1
                           ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
                           : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                        }`}
+                      }`}
                     >
                       {i + 1}
                     </button>
@@ -2310,6 +2317,7 @@ const InvoiceListPage: React.FC = () => {
             }}
             rechnung={selectedRechnungForDetail}
             isCorrection={false}
+            mode={rechnungModalMode}
             openQuantities={openQuantities}
             onChanged={() => tabData.refetchRechnungen()}
             onCorrectionCreated={async () => {
@@ -2341,6 +2349,7 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
+
         {showRechnungKModal && selectedRechnungKData && (
           <RechnungDetailModal
             isOpen={showRechnungKModal}
