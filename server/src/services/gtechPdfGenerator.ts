@@ -239,15 +239,18 @@ export async function generateGtechDocumentPdf(
 
   const legalName = (
     customer.legalName ||
+    customer.legal_name ||
+    customer.legalCompany ||
     opts.customerEntity?.legalName ||
     ""
   ).trim();
   const companyName = (
     customer.companyName ||
+    customer.company_name ||
     opts.customerEntity?.companyName ||
     ""
   ).trim();
-  const primaryName = companyName || legalName;
+  const primaryName = legalName || companyName;
   const mainCityStr = (customer.city || opts.customerEntity?.city || "").trim();
   const mainPostalStr = (
     customer.postalCode ||
@@ -381,7 +384,9 @@ export async function generateGtechDocumentPdf(
 
   const shipTextToRender = shipLinesToRender.join("\n").trim();
   if (shipTextToRender) {
-    const shipNorm = shipTextToRender
+    const shipNorm = shipLinesToRender
+      .filter((l) => l && l.trim() !== primaryName.trim())
+      .join(" ")
       .toLowerCase()
       .replace(/[^a-z0-9]/gi, "")
       .trim();
@@ -390,7 +395,9 @@ export async function generateGtechDocumentPdf(
       .replace(/[^a-z0-9]/gi, "")
       .trim();
 
-    if (isExplicitOnOffer || (shipNorm && shipNorm !== mainNorm)) {
+    const hasRealDifferentAddress = shipNorm && shipNorm.length > 3 && shipNorm !== mainNorm;
+
+    if (hasRealDifferentAddress) {
       addrY += 6;
       doc
         .font(SB)
@@ -517,8 +524,8 @@ export async function generateGtechDocumentPdf(
 
       const bezWidth = columns[2].width - 4;
       doc.font(R).fontSize(8.5);
-      const textHeight = doc.heightOfString(fullBezText, { width: bezWidth });
-      const computedRowHeight = Math.max(26, textHeight + 10);
+      const textHeight = doc.heightOfString(fullBezText, { width: bezWidth, lineGap: 2 });
+      const computedRowHeight = Math.max(26, textHeight + 14);
 
       if (currentY + computedRowHeight > MM(265)) {
         doc
@@ -586,6 +593,7 @@ export async function generateGtechDocumentPdf(
           width: col.width - 4,
           align: col.align as any,
           lineBreak: true,
+          lineGap: 2,
         });
         currentX += col.width;
       });
