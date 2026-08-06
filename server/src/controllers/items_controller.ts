@@ -177,7 +177,7 @@ export const getItems = async (
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const isStock = ((req.query.isStock as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
-    const idsStr = ((req.query.ids as string) || "").trim(); // NEW: Comma-separated item IDs
+    const idsStr = ((req.query.ids as string) || "").trim();
 
     const tagIds = tagStr
       .split(",")
@@ -192,6 +192,7 @@ export const getItems = async (
       .map((t) => parseInt(t.slice(1), 10))
       .filter((n) => !isNaN(n));
 
+    // Build the main query
     const idQb = itemRepository
       .createQueryBuilder("item")
       .select("item.id")
@@ -199,7 +200,7 @@ export const getItems = async (
       .leftJoin("item.parent", "parent")
       .leftJoin("item.category", "category");
 
-    // NEW: Filter by specific item IDs
+    // Filter by specific item IDs
     if (idsStr) {
       const itemIds = idsStr
         .split(",")
@@ -212,52 +213,66 @@ export const getItems = async (
       }
     }
 
-    // Name search — case-insensitive
-    if (search) {
-      idQb.andWhere(
-        "(LOWER(item.item_name) LIKE :search OR LOWER(item.item_name_cn) LIKE :search OR LOWER(item.model) LIKE :search)",
-        { search: `%${search.toLowerCase()}%` },
-      );
-    }
+    // ---- SEARCH LOGIC ----
+    // Combine search and eanSearch into a single search
+    const searchTerm = search || eanSearch;
 
-    if (eanSearch) {
-      const cleanSearch = eanSearch.trim();
+    if (searchTerm) {
+      const cleanSearch = searchTerm.trim();
       const isNumeric = /^\d+$/.test(cleanSearch);
+      const searchPattern = `%${cleanSearch.toLowerCase()}%`;
 
+      // Build search conditions with proper subquery for warehouse
+      const searchConditions: string[] = [
+        "LOWER(item.item_name) LIKE :searchPattern",
+        "LOWER(item.item_name_cn) LIKE :searchPattern",
+        "LOWER(item.item_name_de) LIKE :searchPattern",
+        "LOWER(item.model) LIKE :searchPattern",
+        "LOWER(item.ean) LIKE :searchPattern",
+        "LOWER(parent.de_no) LIKE :searchPattern",
+        "LOWER(parent.name_de) LIKE :searchPattern",
+        "LOWER(parent.name_en) LIKE :searchPattern",
+      ];
+
+      // Add warehouse search via subquery
+      const warehouseSubquery = idQb
+        .subQuery()
+        .select("wi.id")
+        .from(WarehouseItem, "wi")
+        .where("wi.item_id = item.id")
+        .andWhere(
+          "(LOWER(wi.item_no_de) LIKE :searchPattern OR LOWER(wi.ean) LIKE :searchPattern)",
+        )
+        .getQuery();
+
+      searchConditions.push(`EXISTS ${warehouseSubquery}`);
+
+      // For numeric searches, add exact match conditions
       if (isNumeric) {
-        idQb.andWhere((qb2) => {
-          const whSub = qb2
-            .subQuery()
-            .select("wi_ean.id")
-            .from(WarehouseItem, "wi_ean")
-            .where(
-              "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
-            )
-            .andWhere("wi_ean.ean LIKE :ean")
-            .getQuery();
-          return `(item.ean LIKE :ean OR EXISTS ${whSub})`;
-        });
-        idQb.setParameter("ean", `%${cleanSearch}%`);
-      } else {
-        idQb.andWhere((qb2) => {
-          const whSub = qb2
-            .subQuery()
-            .select("wi_ean.id")
-            .from(WarehouseItem, "wi_ean")
-            .where(
-              "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
-            )
-            .andWhere("LOWER(wi_ean.item_no_de) LIKE :ean")
-            .getQuery();
-          return `(LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR LOWER(item.ean) LIKE :ean OR EXISTS ${whSub})`;
-        });
-        idQb.setParameter("ean", `%${cleanSearch.toLowerCase()}%`);
+        searchConditions.push("item.ean = :exactMatch");
+        // Also search warehouse via subquery for exact EAN match
+        const warehouseExactSubquery = idQb
+          .subQuery()
+          .select("wi2.id")
+          .from(WarehouseItem, "wi2")
+          .where("wi2.item_id = item.id")
+          .andWhere("wi2.ean = :exactMatch")
+          .getQuery();
+        searchConditions.push(`EXISTS ${warehouseExactSubquery}`);
       }
+
+      // Apply all search conditions with OR
+      const whereClause = searchConditions
+        .map((cond) => `(${cond})`)
+        .join(" OR ");
+      idQb.andWhere(`(${whereClause})`, {
+        searchPattern: searchPattern,
+        exactMatch: isNumeric ? cleanSearch : undefined,
+      });
     }
 
-    // Active status — skipped when searching by Item No, so inactive items
-    // (e.g. a deactivated 0013-1080) still surface on an exact-number lookup
-    if (isActive && !eanSearch) {
+    // Active status filter - skip when searching
+    if (isActive && !search && !eanSearch) {
       idQb.andWhere("item.isActive = :isActive", { isActive });
     }
 
@@ -305,9 +320,7 @@ export const getItems = async (
           .subQuery()
           .select("wi_stock.id")
           .from(WarehouseItem, "wi_stock")
-          .where(
-            "(wi_stock.item_id = item.id OR wi_stock.ItemID_DE = item.ItemID_DE)",
-          )
+          .where("wi_stock.item_id = item.id")
           .andWhere("wi_stock.stock_qty > 0")
           .getQuery();
         return `(item.stockEU > 0 OR item.stockCN > 0 OR item.is_stock_item = 'Y' OR EXISTS ${whSub})`;
@@ -318,9 +331,7 @@ export const getItems = async (
           .subQuery()
           .select("wi_stock.id")
           .from(WarehouseItem, "wi_stock")
-          .where(
-            "(wi_stock.item_id = item.id OR wi_stock.ItemID_DE = item.ItemID_DE)",
-          )
+          .where("wi_stock.item_id = item.id")
           .andWhere("wi_stock.stock_qty > 0")
           .getQuery();
         return `((item.stockEU IS NULL OR item.stockEU <= 0) AND (item.stockCN IS NULL OR item.stockCN <= 0) AND (item.is_stock_item IS NULL OR item.is_stock_item IN ('N', '0', '')) AND NOT EXISTS ${whSub})`;
@@ -437,41 +448,31 @@ export const getItems = async (
       .orderBy("item.created_at", "DESC")
       .getMany();
 
-    // STEP 3: Warehouse metrics (only for warehouse-specific data)
-    const targetItemIDsDE = items
-      .map((i) => i.ItemID_DE)
-      .filter(Boolean) as number[];
-
+    // STEP 3: Get warehouse data separately (since the relation is broken)
     const warehouseItems = await warehouseRepository
       .createQueryBuilder("wi")
       .select([
         "wi.id",
         "wi.item_id",
-        "wi.ItemID_DE",
         "wi.item_no_de",
         "wi.ean",
         "wi.is_active",
+        "wi.stock_qty",
       ])
       .where("wi.item_id IN (:...targetIds)", { targetIds })
-      .orWhere(
-        targetItemIDsDE.length > 0
-          ? "wi.ItemID_DE IN (:...targetItemIDsDE)"
-          : "1=0",
-        { targetItemIDsDE },
-      )
       .getMany();
+
+    // Create a map for quick lookup
+    const warehouseMap = new Map<number, any>();
+    warehouseItems.forEach((wi) => {
+      warehouseMap.set(wi.item_id, wi);
+    });
 
     // STEP 4: Format
     const formattedItems = items.map((item: any) => {
       const parentData = item.parent || null;
       const customerData = item.customer || null;
-
-      const warehouseData =
-        warehouseItems.find(
-          (wi: any) =>
-            wi.item_id === item.id ||
-            (item.ItemID_DE && wi.ItemID_DE === item.ItemID_DE),
-        ) || null;
+      const warehouseData = warehouseMap.get(item.id) || null;
 
       return {
         id: item.id,
@@ -521,7 +522,7 @@ export const getItems = async (
         MSQ_EU: item.MSQ_EU || 0,
         stockCN: item.stockCN || 0,
         MSQ_CN: item.MSQ_CN || 0,
-        // NEW: Add supplierItems relation for frontend to access supplier pricing
+        stock_qty: warehouseData?.stock_qty || 0,
         supplierItems: item.supplierItems || [],
       };
     });

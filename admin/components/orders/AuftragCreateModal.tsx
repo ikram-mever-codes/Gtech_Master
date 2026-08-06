@@ -12,7 +12,6 @@ import { Loader2 } from "lucide-react";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 
-
 const PAYMENT_METHODS = [
   "Prepayment (Vorkasse)",
   "Bank Transfer (Rechnung)",
@@ -43,10 +42,11 @@ const ItemRow: React.FC<{
     <div
       ref={rowRef}
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
-        ? "border-primary bg-primary/5 shadow-sm"
-        : "border-gray-200 bg-white hover:bg-gray-50"
-        }`}
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
+          ? "border-primary bg-primary/5 shadow-sm"
+          : "border-gray-200 bg-white hover:bg-gray-50"
+      }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -54,7 +54,9 @@ const ItemRow: React.FC<{
             src={thumb}
             alt="thumb"
             className="w-full h-full object-cover"
-            onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+            onError={(e) =>
+              ((e.target as HTMLImageElement).style.display = "none")
+            }
           />
         ) : (
           <span className="text-gray-300 text-xs">—</span>
@@ -99,20 +101,128 @@ export default function AuftragCreateModal({
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null);
 
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
 
   const [filterCustomerId, setFilterCustomerId] = useState<string>("");
   const [sourceSearch, setSourceSearch] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
 
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
-  const [itemQuantities, setItemQuantities] = useState<Record<string, string>>({});
+  const [itemQuantities, setItemQuantities] = useState<Record<string, string>>(
+    {},
+  );
 
   const [title, setTitle] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Search function that makes API call
+  const performSearch = async (searchTerm: string, companyId?: string) => {
+    if (!searchTerm || searchTerm.length < 1) {
+      // If search is empty, load all items
+      await loadInitialItems(companyId);
+      return;
+    }
+
+    setSearchLoading(true);
+    setHasSearched(true);
+
+    try {
+      const params: any = {
+        limit: 1000,
+        isActive: "Y",
+        // Always pass search parameter for all searches
+        // The backend will handle EAN vs text search
+        search: searchTerm,
+      };
+
+      // If company is selected, filter by company
+      if (companyId) {
+        params.company = companyId;
+      }
+
+      // Also pass eanSearch for numeric EAN searches as a hint
+      // But keep search for broader matching
+      if (/^\d+$/.test(searchTerm)) {
+        params.eanSearch = searchTerm;
+      }
+
+      const response = await getItems(params, { refresh: true });
+      const itemData = response?.data ?? response;
+      setItems(Array.isArray(itemData) ? itemData : []);
+    } catch (err) {
+      console.error("Error searching items:", err);
+      toast.error("Failed to search items", errorStyles);
+      setItems([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const loadInitialItems = async (companyId?: string) => {
+    setLoading(true);
+    setHasSearched(false);
+    try {
+      const params: any = {
+        limit: 1000,
+        isActive: "Y",
+      };
+
+      if (companyId) {
+        params.company = companyId;
+      }
+
+      const response = await getItems(params, { refresh: true });
+      const itemData = response?.data ?? response;
+      setItems(Array.isArray(itemData) ? itemData : []);
+    } catch (err) {
+      console.error("Error loading items:", err);
+      toast.error("Failed to load items", errorStyles);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle search input with debounce
+  const handleSearchChange = (value: string) => {
+    setSourceSearch(value);
+
+    // Clear existing timer
+    if (searchTimer) {
+      clearTimeout(searchTimer);
+    }
+
+    // If search is empty, load all items immediately
+    if (!value.trim()) {
+      loadInitialItems(filterCustomerId || undefined);
+      setHasSearched(false);
+      return;
+    }
+
+    // Debounce search by 400ms to avoid too many API calls
+    const timer = setTimeout(() => {
+      performSearch(value.trim(), filterCustomerId || undefined);
+    }, 400);
+
+    setSearchTimer(timer);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Cleanup timer on unmount
+    return () => {
+      if (searchTimer) {
+        clearTimeout(searchTimer);
+      }
+    };
+  }, [isOpen, searchTimer]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -122,31 +232,41 @@ export default function AuftragCreateModal({
     setItemQuantities(itemKey ? { [itemKey]: "" } : {});
     setFilterCustomerId(initialCustomerId ? String(initialCustomerId) : "");
     setSourceSearch("");
-    setTitle(initialItem ? (initialItem.name_de || initialItem.item_name || initialItem.name || "") : "");
+    setHasSearched(false);
+    setTitle(
+      initialItem
+        ? initialItem.name_de || initialItem.item_name || initialItem.name || ""
+        : "",
+    );
     setPaymentMethod("");
     setShippingMethod("");
     setNotes("");
 
     Promise.all([
       getAllCustomers({ limit: 1000 }).catch(() => ({ data: [] })),
-      getItems({ limit: 1000 }).catch(() => ({ data: [] })),
       getAllPaymentMethods(true).catch(() => ({ data: [] })),
       getAllShippingMethods(true).catch(() => ({ data: [] })),
     ])
-      .then(([custRes, itemRes, pmRes, smRes]: any) => {
+      .then(([custRes, pmRes, smRes]: any) => {
         const custData = custRes?.data?.businesses ?? custRes?.data ?? custRes;
-        const itemData = itemRes?.data ?? itemRes;
         setCustomers(Array.isArray(custData) ? custData : []);
-        setItems(Array.isArray(itemData) ? itemData : []);
         if (pmRes?.data) setDbPaymentMethods(pmRes.data);
         if (smRes?.data) setDbShippingMethods(smRes.data);
       })
-      .catch((err) => console.error("Error loading customers/items:", err))
+      .catch((err) =>
+        console.error("Error loading customers/payment methods:", err),
+      )
       .finally(() => {
-        setLoading(false);
+        // Load initial items after customers are loaded
+        loadInitialItems(
+          initialCustomerId ? String(initialCustomerId) : undefined,
+        );
         if (initialItem) {
           setTimeout(() => {
-            selectedSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            selectedSectionRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
             qtyInputRef.current?.focus();
           }, 300);
         }
@@ -154,7 +274,9 @@ export default function AuftragCreateModal({
   }, [isOpen]);
 
   const selectedCustomer = useMemo(() => {
-    return customers.find((c: any) => String(c.id) === String(filterCustomerId));
+    return customers.find(
+      (c: any) => String(c.id) === String(filterCustomerId),
+    );
   }, [customers, filterCustomerId]);
 
   useEffect(() => {
@@ -192,23 +314,6 @@ export default function AuftragCreateModal({
     setItemQuantities((prev) => ({ ...prev, [String(itemId)]: qty }));
   };
 
-  const visibleItems = useMemo(() => {
-    return items.filter((it) => {
-      if (!sourceSearch.trim()) return true;
-      const q = sourceSearch.toLowerCase().trim();
-      const name = String(it.item_name || it.itemName || "").toLowerCase();
-      const ean = String(it.ean || "");
-      const model = String(it.model || "").toLowerCase();
-      const deNo = String(it.de_no || it.ItemID_DE || "").toLowerCase();
-      return (
-        name.includes(q) ||
-        ean.includes(q) ||
-        model.includes(q) ||
-        deNo.includes(q)
-      );
-    });
-  }, [items, sourceSearch]);
-
   const canCreate = () => {
     return !!filterCustomerId && selectedItems.length > 0;
   };
@@ -243,12 +348,16 @@ export default function AuftragCreateModal({
 
       const res = await createAuftragFromItems(payload);
       if (res?.success) {
-        toast.success(res.message || "Auftrag created successfully!", successStyles);
+        toast.success(
+          res.message || "Auftrag created successfully!",
+          successStyles,
+        );
         onSuccess();
         onClose();
       }
     } catch (err: any) {
       console.error(err);
+      toast.error(err?.message || "Failed to create Auftrag", errorStyles);
     } finally {
       setCreating(false);
     }
@@ -256,11 +365,15 @@ export default function AuftragCreateModal({
 
   if (!isOpen) return null;
 
+  const isLoading = loading || searchLoading;
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-900">Create new Auftrag</h2>
+          <h2 className="text-lg font-bold text-gray-900">
+            Create new Auftrag
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -278,7 +391,15 @@ export default function AuftragCreateModal({
               </label>
               <CustomerSearchInput
                 value={filterCustomerId}
-                onChange={(id: string) => setFilterCustomerId(id)}
+                onChange={(id: string) => {
+                  setFilterCustomerId(id);
+                  // Reload items when company changes
+                  if (sourceSearch.trim()) {
+                    performSearch(sourceSearch.trim(), id);
+                  } else {
+                    loadInitialItems(id || undefined);
+                  }
+                }}
                 placeholder="Select a customer..."
                 mode="customers"
                 className="w-full"
@@ -286,12 +407,12 @@ export default function AuftragCreateModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Search items
+                Search items (Item No, EAN, Name)
               </label>
               <input
                 value={sourceSearch}
-                onChange={(e) => setSourceSearch(e.target.value)}
-                placeholder="Search items or EAN…"
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search by item no, EAN, or name..."
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
               />
             </div>
@@ -307,9 +428,17 @@ export default function AuftragCreateModal({
                   <p className="font-semibold text-gray-900">
                     {selectedCustomer.companyName || selectedCustomer.legalName}
                   </p>
-                  <p>{selectedCustomer.addressLine1 || selectedCustomer.businessDetails?.address || "No address on file"}</p>
                   <p>
-                    {[selectedCustomer.postalCode, selectedCustomer.city, selectedCustomer.country]
+                    {selectedCustomer.addressLine1 ||
+                      selectedCustomer.businessDetails?.address ||
+                      "No address on file"}
+                  </p>
+                  <p>
+                    {[
+                      selectedCustomer.postalCode,
+                      selectedCustomer.city,
+                      selectedCustomer.country,
+                    ]
                       .filter(Boolean)
                       .join(", ")}
                   </p>
@@ -329,7 +458,11 @@ export default function AuftragCreateModal({
                     <>
                       <p>{selectedCustomer.deliveryAddressLine1}</p>
                       <p>
-                        {[selectedCustomer.deliveryPostalCode, selectedCustomer.deliveryCity, selectedCustomer.deliveryCountry]
+                        {[
+                          selectedCustomer.deliveryPostalCode,
+                          selectedCustomer.deliveryCity,
+                          selectedCustomer.deliveryCountry,
+                        ]
                           .filter(Boolean)
                           .join(", ")}
                       </p>
@@ -341,21 +474,35 @@ export default function AuftragCreateModal({
           )}
 
           <div className="space-y-2 max-h-56 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50/50">
-            {loading ? (
+            {isLoading ? (
               <div className="text-center py-6 text-gray-400 text-sm flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                Loading items…
+                {searchLoading ? "Searching items..." : "Loading items..."}
               </div>
-            ) : visibleItems.length === 0 ? (
+            ) : items.length === 0 ? (
               <div className="text-center py-6 text-gray-500 text-sm">
-                {sourceSearch ? "No items match your search." : "No items found."}
+                {sourceSearch && hasSearched ? (
+                  <span>
+                    No items match your search.
+                    {sourceSearch.length > 0 && /^\d+$/.test(sourceSearch) && (
+                      <span className="block text-xs text-gray-400 mt-1">
+                        Tip: Try searching by item number or name instead of
+                        EAN.
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  "No items found."
+                )}
               </div>
             ) : (
-              visibleItems.map((it) => (
+              items.map((it) => (
                 <ItemRow
                   key={it.id}
                   item={it}
-                  selected={selectedItems.some((p) => String(p.id) === String(it.id))}
+                  selected={selectedItems.some(
+                    (p) => String(p.id) === String(it.id),
+                  )}
                   onClick={() => toggleItem(it)}
                 />
               ))
@@ -363,7 +510,10 @@ export default function AuftragCreateModal({
           </div>
 
           {selectedItems.length > 0 && (
-            <div ref={selectedSectionRef} className="space-y-2 border border-gray-200 rounded-lg p-3 bg-white scroll-mt-6">
+            <div
+              ref={selectedSectionRef}
+              className="space-y-2 border border-gray-200 rounded-lg p-3 bg-white scroll-mt-6"
+            >
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                 Selected items ({selectedItems.length})
               </p>
@@ -371,7 +521,11 @@ export default function AuftragCreateModal({
                 {selectedItems.map((it, idx) => (
                   <div key={it.id} className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
-                      <ItemRow item={it} selected onClick={() => toggleItem(it)} />
+                      <ItemRow
+                        item={it}
+                        selected
+                        onClick={() => toggleItem(it)}
+                      />
                     </div>
                     <div className="w-24 shrink-0">
                       <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
