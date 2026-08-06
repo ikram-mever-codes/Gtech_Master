@@ -72,6 +72,85 @@ async function checkIsDuplicate(manager: any, sequenceKey: string, formattedVal:
   return !!existing;
 }
 
+async function findLastUsedNumber(
+  manager: any,
+  sequenceKey: string,
+  testSeq: any,
+  nextRunningNo: number,
+): Promise<string | null> {
+  const dummyPattern = (testSeq.formatPattern || "").replace("{number}", "___NUMBER___");
+  const dummySeq = { ...testSeq, formatPattern: dummyPattern };
+  const dummyFormatted = NumberSequenceService.formatNumber(dummySeq, 1);
+  const numberMarkerIdx = dummyFormatted.indexOf("___NUMBER___");
+  const prefixPart = numberMarkerIdx > -1 ? dummyFormatted.substring(0, numberMarkerIdx) : "";
+
+  let candidateRecords: string[] = [];
+
+  const addFromRepo = async (repo: any, col: string) => {
+    try {
+      let qb = repo.createQueryBuilder("e").select(`e.${col}`, "val");
+      if (prefixPart) {
+        qb = qb.where(`e.${col} LIKE :p`, { p: `${prefixPart}%` });
+      }
+      const rows = await qb.getRawMany();
+      rows.forEach((r: any) => {
+        if (r && r.val) candidateRecords.push(String(r.val).trim());
+      });
+    } catch (err) {
+    }
+  };
+
+  if (sequenceKey === "invoice") {
+    await addFromRepo(manager.getRepository(Rechnung), "invoice_number");
+    await addFromRepo(manager.getRepository(CCIInvoice), "invoice_number");
+    await addFromRepo(manager.getRepository(Invoice), "invoiceNumber");
+  } else if (sequenceKey === "invoice_correction") {
+    await addFromRepo(manager.getRepository(RechnungK), "invoice_number");
+    await addFromRepo(manager.getRepository(Invoice), "invoiceNumber");
+  } else if (sequenceKey === "delivery_note") {
+    await addFromRepo(manager.getRepository(Lieferschein), "delivery_note_number");
+    await addFromRepo(manager.getRepository(CCIInvoice), "cargo_no");
+    await addFromRepo(manager.getRepository(Invoice), "invoiceNumber");
+  } else if (sequenceKey === "order" || sequenceKey === "customer_order") {
+    await addFromRepo(manager.getRepository(CustomerOrder), "order_no");
+    await addFromRepo(manager.getRepository(Order), "order_no");
+  } else {
+    const mapping = entityMapping[sequenceKey];
+    if (mapping) {
+      await addFromRepo(manager.getRepository(mapping.entity), mapping.column);
+    }
+  }
+
+  if (candidateRecords.length > 0) {
+    let maxNum = -1;
+    let maxStr = "";
+
+    candidateRecords.forEach((str) => {
+      const numPart = prefixPart && str.startsWith(prefixPart)
+        ? str.substring(prefixPart.length)
+        : str;
+      const match = numPart.match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > maxNum) {
+          maxNum = num;
+          maxStr = str;
+        }
+      }
+    });
+
+    if (maxStr) return maxStr;
+  }
+
+  for (let num = nextRunningNo; num >= 1; num--) {
+    const f = NumberSequenceService.formatNumber(testSeq, num);
+    const dup = await checkIsDuplicate(manager, sequenceKey, f);
+    if (dup) return f;
+  }
+
+  return null;
+}
+
 export class NumberSequenceService {
   static async getNextNumber(sequenceKey: string): Promise<string> {
     return AppDataSource.transaction(async (manager) => {
@@ -110,7 +189,7 @@ export class NumberSequenceService {
     });
   }
 
-  private static formatNumber(
+  public static formatNumber(
     sequence: NumberSequence,
     runningNo: number,
   ): string {
@@ -163,7 +242,7 @@ export class NumberSequenceService {
     prefix?: string,
     formatPattern?: string,
     minDigits?: number,
-  ): Promise<{ isDuplicate: boolean; formattedNumber: string }> {
+  ): Promise<{ isDuplicate: boolean; formattedNumber: string; lastUsedNumber?: string }> {
     const sequenceRepo = AppDataSource.getRepository(NumberSequence);
     const sequence = await sequenceRepo.findOne({ where: { sequenceKey } });
     if (!sequence) return { isDuplicate: false, formattedNumber: "" };
@@ -179,9 +258,18 @@ export class NumberSequenceService {
     const manager = AppDataSource.manager;
     const isDuplicate = await checkIsDuplicate(manager, sequenceKey, formattedNumber);
 
+    let lastUsedNumber: string | undefined = undefined;
+    if (isDuplicate) {
+      const foundLast = await findLastUsedNumber(manager, sequenceKey, testSeq, nextRunningNo);
+      if (foundLast) {
+        lastUsedNumber = foundLast;
+      }
+    }
+
     return {
       isDuplicate,
       formattedNumber,
+      lastUsedNumber,
     };
   }
 }
