@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { XMarkIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { createRechnungFromAuftrag } from "@/api/rechnungen";
+import { createRechnungFromAuftrag, downloadRechnungEml } from "@/api/rechnungen";
 import {
   updateCustomerOrder,
   deleteCustomerOrder,
@@ -480,6 +480,14 @@ export default function AuftragToRechnungModal({
             `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
           successStyles,
         );
+        const newRechnungId = res?.data?.id;
+        if (newRechnungId) {
+          try {
+            await downloadRechnungEml(newRechnungId, res?.data?.invoice_number);
+          } catch (emlErr) {
+            console.warn("Could not auto-download EML:", emlErr);
+          }
+        }
         onSuccess();
         onClose();
       }

@@ -113,3 +113,34 @@ export const downloadRechnungPdf = async (
     throw error;
   }
 };
+
+export const downloadRechnungEml = async (
+  id: string | number,
+  invoiceNo?: string,
+) => {
+  try {
+    toast.loading("Preparing Outlook email (.eml)...", loadingStyles);
+    const response: any = await api.get(`/rechnungen/${id}/download-eml`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([response.data], { type: "message/rfc822" });
+    if (blob.size === 0) throw new Error("The downloaded EML file is empty.");
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Rechnung_Lieferschein_${invoiceNo || id}.eml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      toast.dismiss();
+    }, 1000);
+    return true;
+  } catch (error) {
+    toast.dismiss();
+    console.error("Error downloading EML:", error);
+    toast.error("Failed to download EML for Outlook");
+    throw error;
+  }
+};

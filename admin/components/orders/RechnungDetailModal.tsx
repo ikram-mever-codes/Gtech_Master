@@ -9,7 +9,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, FileText, Pencil, Save, X, AlertCircle } from "lucide-react";
+import { Loader2, FileText, Pencil, Save, X, AlertCircle, Mail } from "lucide-react";
+import { downloadRechnungEml } from "@/api/rechnungen";
 import {
   updateRechnungKItem,
   createRechnungKFromRechnung,
@@ -540,7 +541,16 @@ export default function RechnungDetailModal({
               {companyName}
             </h2>
           </div>
-          <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => downloadRechnungEml(data.id, invoiceNumber)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-semibold border border-blue-200 transition-all shadow-2xs"
+              title="Open Outlook Draft (.eml)"
+            >
+              <Mail className="w-4 h-4 text-blue-600" />
+              Outlook (.eml)
+            </button>
             {!isCorrection && (
               <ViewEditToggle
                 isEditEnabled={addressEdit}
@@ -1021,8 +1031,8 @@ export default function RechnungDetailModal({
               </h3>
             </div>
             {auftragDocs.length === 0 &&
-            rechnungenKDocs.length === 0 &&
-            rechnungDocs.length === 0 ? (
+              rechnungenKDocs.length === 0 &&
+              rechnungDocs.length === 0 ? (
               <p className="text-sm text-gray-500">No linked documents yet.</p>
             ) : (
               <div className="space-y-3">

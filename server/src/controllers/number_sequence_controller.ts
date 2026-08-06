@@ -149,9 +149,13 @@ export class NumberSequenceController {
           targetMinDigits
         );
         if (check.isDuplicate) {
+          let message = `Number "${check.formattedNumber}" already exists in existing records. Please set a different number.`;
+          if (check.lastUsedNumber) {
+            message += ` Last number used is ${check.lastUsedNumber}`;
+          }
           return response.status(400).json({
             success: false,
-            message: `Number "${check.formattedNumber}" already exists in existing records. Please set a different number.`,
+            message,
           });
         }
       } catch (err) {
