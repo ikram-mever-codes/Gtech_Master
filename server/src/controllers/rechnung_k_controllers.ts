@@ -716,21 +716,33 @@ export const downloadRechnungKPdf = async (
     });
 
     if (!rechnungK) {
-      res.status(404).json({ success: false, message: "Correction invoice not found" });
+      res
+        .status(404)
+        .json({ success: false, message: "Correction invoice not found" });
       return;
     }
 
     const customerSnap = rechnungK.customerSnapshot || rechnungK.customer || {};
-    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
-    const customerCompName = (customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || "").trim();
+    const contactName =
+      (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (
+      customerSnap.company_name ||
+      customerSnap.companyName ||
+      customerSnap.legalName ||
+      ""
+    ).trim();
     const customerNum = (customerSnap.customerNumber || "").trim();
     let kundeCombined = "—";
-    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    if (customerCompName && customerNum)
+      kundeCombined = `${customerCompName} · ${customerNum}`;
     else if (customerCompName) kundeCombined = customerCompName;
     else if (customerNum) kundeCombined = customerNum;
 
     const uploadsDir = path.join(__dirname, "../../uploads/rechnungen_k");
-    const filePath = path.join(uploadsDir, `rk_${rechnungK.invoice_number || rechnungK.id}.pdf`);
+    const filePath = path.join(
+      uploadsDir,
+      `rk_${rechnungK.invoice_number || rechnungK.id}.pdf`,
+    );
 
     const items = (rechnungK.items || []).map((it: any, idx: number) => ({
       position: it.position || idx + 1,
@@ -740,7 +752,11 @@ export const downloadRechnungKPdf = async (
       vatRate: it.taxRate ?? rechnungK.tax_rate ?? 19,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
-      lineTotal: Number(it.total_price || it.lineTotal || (Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0))),
+      lineTotal: Number(
+        it.total_price ||
+          it.lineTotal ||
+          Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
+      ),
     }));
 
     await generateGtechDocumentPdf({
@@ -752,7 +768,12 @@ export const downloadRechnungKPdf = async (
       metadataItems: [
         ["Ansprechpartner", contactName],
         ["Kunde", kundeCombined],
-        ["Datum", rechnungK.date_created || rechnungK.created_at || rechnungK.invoice_date],
+        [
+          "Datum",
+          rechnungK.date_created ||
+            rechnungK.created_at ||
+            rechnungK.invoice_date,
+        ],
       ],
       lineItems: items,
       showPrices: true,
@@ -768,13 +789,18 @@ export const downloadRechnungKPdf = async (
       notes: rechnungK.notes,
       deliveryTime: rechnungK.date_delivery,
       deliveryTerms: rechnungK.delivery_terms,
-      paymentTerms: rechnungK.payment_terms ? `Zahlungsziel: ${rechnungK.payment_terms} Tage` : undefined,
+      paymentTerms: rechnungK.payment_terms
+        ? `Zahlungsziel: ${rechnungK.payment_terms} Tage`
+        : undefined,
       paymentMethod: rechnungK.payment_method,
       outputFilePath: filePath,
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=rk_${rechnungK.invoice_number}.pdf`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=rk_${rechnungK.invoice_number}.pdf`,
+    );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);

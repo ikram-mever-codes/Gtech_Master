@@ -583,6 +583,11 @@ export class UpdateLineItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // NEW — extra weight (kg), editable directly on the offer's weight
+  // summary. Accepted as number or string (frontend sends a string).
+  @IsOptional()
+  extraWeight?: number | string;
 }
 
 export class BulkUpdateLineItemsDto {
@@ -2679,7 +2684,7 @@ export class OfferController {
           message: "Line item not found",
         });
       }
-
+      console.log(updateLineItemDto);
       if (updateLineItemDto.priceMatrix && offer.pricingMode === "matrix") {
         (updateLineItemDto as any).priceMatrix = this.processPriceMatrix(
           updateLineItemDto.priceMatrix,
@@ -2704,6 +2709,13 @@ export class OfferController {
       if (updateLineItemDto.taxRate !== undefined) {
         (updateLineItemDto as any).taxRate =
           parseFlexibleNumber(updateLineItemDto.taxRate) ?? offer.taxRate ?? 19;
+      }
+
+      // NEW: extraWeight arrives as a string from the frontend (kg) —
+      // parse to a number before assigning, same pattern as basePrice.
+      if (updateLineItemDto.extraWeight !== undefined) {
+        (updateLineItemDto as any).extraWeight =
+          parseFlexibleNumber(updateLineItemDto.extraWeight) ?? 0;
       }
 
       // NEW: if the quantity is changing on a catalog-sourced line and the

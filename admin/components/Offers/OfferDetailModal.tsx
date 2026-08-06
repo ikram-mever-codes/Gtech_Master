@@ -87,10 +87,9 @@ const SHIPPING_METHODS = [
 
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   })} kg`;
-
 /** Converts any date-ish value to the "yyyy-MM-dd" shape a native
  * <input type="date"> expects; returns "" when there's nothing valid. */
 const toDateInputValue = (value: any): string => {
@@ -1359,7 +1358,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       pricingMode === "matrix"
         ? (parseFlexibleNumber(getActiveMatrixEntry(li)?.quantity) ?? 1)
         : (parseFlexibleNumber(li.baseQuantity) ?? 1);
-    return sum + (parseFlexibleNumber(li.weight) ?? 0) * qty;
+    const weightGrams = parseFlexibleNumber(li.weight) ?? 0;
+    return sum + (weightGrams * qty) / 1000;
   }, 0);
   const extraWeightKg = visibleLineItems.reduce(
     (sum: number, li: any) => sum + (parseFlexibleNumber(li.extraWeight) ?? 0),
@@ -1367,16 +1367,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
 
-  // --- Tax profile (live, resolved fresh from the customer's relation) ---
   const taxProfile = offer?.taxProfile || null;
 
-  // --- Per-rate VAT breakdown ---------------------------------------------
-  // Each visible line item's effective rate (getLineTaxRate) determines
-  // which group its net total falls into; shipping is grouped under the
-  // tax profile's rate. Each group's VAT is computed independently, so a
-  // mixed offer (e.g. two catalog lines at the profile's 19% and one
-  // Freizeile at 7%) shows two separate VAT rows rather than one flat
-  // rate applied to everything.
   const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
     const byRate = new Map<number, number>();
     visibleLineItems.forEach((li: any) => {
@@ -2969,9 +2961,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       disabled={visibleLineItems.length === 0}
                       onBlur={(e) => {
                         if (!visibleLineItems[0]) return;
+                        const raw = e.target.value.trim();
+                        const kgValue =
+                          raw === ""
+                            ? 0
+                            : (parseFlexibleNumber(raw.replace(",", ".")) ?? 0);
                         persistLine(visibleLineItems[0].id, {
-                          extraWeight:
-                            e.target.value.trim() === "" ? "0" : e.target.value,
+                          extraWeight: String(kgValue),
                         });
                       }}
                     />

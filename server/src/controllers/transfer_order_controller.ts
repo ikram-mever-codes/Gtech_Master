@@ -18,11 +18,6 @@ import { Customer } from "../models/customers";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 
-/** Recomputes subtotal/tax/total AND the stored weight columns from the
- * order's line items — TransferOrder persists net/extra/total weight
- * directly on the order row (unlike Offer/Auftrag, which derive them on
- * read), so this keeps those columns in sync whenever a line item
- * changes. */
 async function calculateTransferOrderTotals(orderId: number): Promise<void> {
   const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
   const order = await transferOrderRepo.findOne({
@@ -47,7 +42,11 @@ async function calculateTransferOrderTotals(orderId: number): Promise<void> {
     it.lineTotal = lineTotal;
 
     subtotal += lineTotal;
-    netWeight += (Number(it.weight) || 0) * qty;
+    // it.weight is copied from Item.weight, which is stored in grams —
+    // convert to kg here, same as every other weight calculation in
+    // this codebase (order_controller, Offer/Auftrag totals).
+    netWeight += ((Number(it.weight) || 0) / 1000) * qty;
+    // extraWeight is entered directly in kg by the user — no conversion.
     extraWeight += Number(it.extraWeight) || 0;
 
     // Save each line item to persist the lineTotal
@@ -67,7 +66,6 @@ async function calculateTransferOrderTotals(orderId: number): Promise<void> {
 
   await transferOrderRepo.save(order);
 }
-
 // ---------------------------------------------------------------------
 // Create from Auftrag (customer_order)
 // ---------------------------------------------------------------------

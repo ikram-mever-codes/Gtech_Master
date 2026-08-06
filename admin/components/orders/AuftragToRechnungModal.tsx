@@ -3,7 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { XMarkIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { createRechnungFromAuftrag, downloadRechnungEml } from "@/api/rechnungen";
+import {
+  createRechnungFromAuftrag,
+  downloadRechnungEml,
+} from "@/api/rechnungen";
 import {
   updateCustomerOrder,
   deleteCustomerOrder,
@@ -27,6 +30,8 @@ interface SelectedItemState {
   is_stock_item?: "Y" | "N" | string;
   stock_eu?: number | null;
   stock_cn?: number | null;
+  weight?: number;
+  extraWeight?: number;
 }
 
 interface AuftragToRechnungModalProps {
@@ -117,8 +122,8 @@ const formatDeCurrency = (val: number) => {
 
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   })} kg`;
 
 export default function AuftragToRechnungModal({
@@ -161,6 +166,7 @@ export default function AuftragToRechnungModal({
     if (!isOpen || !auftrag) return;
 
     const sourceItems = auftrag.orderItems || auftrag.items || [];
+
     const mapped: SelectedItemState[] = sourceItems.map(
       (it: any, index: number) => {
         const origQty = Number(it.quantity || it.qty) || 1;
@@ -195,10 +201,14 @@ export default function AuftragToRechnungModal({
           is_stock_item: isStock,
           stock_eu: stockEu,
           stock_cn: stockCn,
+          // weight is stored in grams on the source (Item/CustomerOrderItem),
+          // extraWeight is stored directly in kg — kept as-is here, converted
+          // at the point of calculation below.
+          weight: Number(it.weight) || 0,
+          extraWeight: Number(it.extraWeight) || 0,
         };
       },
     );
-
     setItems(mapped);
     setNotes(auftrag.notes || auftrag.comment || "");
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
@@ -345,6 +355,17 @@ export default function AuftragToRechnungModal({
   const taxRate = Number(auftrag.tax_rate ?? 19);
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
+
+  const netWeightKg = selectedItems.reduce((sum, it) => {
+    // it.weight is in grams — convert to kg here.
+    return sum + ((it.weight || 0) / 1000) * it.qty;
+  }, 0);
+  const extraWeightKg = selectedItems.reduce(
+    // extraWeight is already stored in kg — no conv  ersion.
+    (sum, it) => sum + (it.extraWeight || 0),
+    0,
+  );
+  const totalWeightKg = netWeightKg + extraWeightKg;
 
   // Whether any currently-selected line would block generation because it
   // requests more stock than is available at the chosen warehouse.
@@ -993,9 +1014,12 @@ export default function AuftragToRechnungModal({
           {/* ── Weights & Totals Section ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field label="NET WEIGHT (ITEMS)" value={formatWeight(10)} />
-              <Field label="EXTRA WEIGHT" value={formatWeight(0)} />
-              <Field label="TOTAL WEIGHT" value={formatWeight(10)} />
+              <Field
+                label="NET WEIGHT (ITEMS)"
+                value={formatWeight(netWeightKg)}
+              />
+              <Field label="EXTRA WEIGHT" value={formatWeight(extraWeightKg)} />
+              <Field label="TOTAL WEIGHT" value={formatWeight(totalWeightKg)} />
             </div>
 
             <div className="max-w-sm ml-auto w-full space-y-1.5 text-sm">
