@@ -540,6 +540,7 @@ export default function RechnungDetailModal({
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
               {companyName}
             </h2>
+          </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <button
               type="button"
@@ -559,7 +560,6 @@ export default function RechnungDetailModal({
                 disabled={savingAddress}
               />
             )}
->>>>>>> 1ed706d90dc970bb2bec327c4a0964ebfe6fc4af
             {isCorrection && (
               <button
                 type="button"
