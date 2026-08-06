@@ -762,12 +762,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </p>
               <span
                 className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.auftrag_status === "delivered" ||
-                    order.status === "Completed"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : order.auftrag_status === "partially_delivered" ||
-                      order.status === "In Progress"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
+                  order.status === "Completed"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : order.auftrag_status === "partially_delivered" ||
+                    order.status === "In Progress"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
                   }`}
               >
                 {order.auftrag_status === "delivered" ||

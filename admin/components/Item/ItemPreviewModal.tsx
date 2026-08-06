@@ -1000,24 +1000,36 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
 
               <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4">
                 {(["length", "width", "height", "weight"] as const).map(
-                  (dim) => (
-                    <Field
-                      key={dim}
-                      label={dim[0].toUpperCase() + dim.slice(1)}
-                    >
-                      {previewEdit ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          className={inputCls}
-                          value={previewItem.dimensions?.[dim] ?? ""}
-                          onChange={(e) => patchPreviewDim(dim, e.target.value)}
-                        />
-                      ) : (
-                        (previewItem.dimensions?.[dim] ?? "—")
-                      )}
-                    </Field>
-                  ),
+                  (dim) => {
+                    const unit = dim === "weight" ? "g" : "mm";
+                    const val = previewItem.dimensions?.[dim];
+                    return (
+                      <Field
+                        key={dim}
+                        label={dim[0].toUpperCase() + dim.slice(1)}
+                      >
+                        {previewEdit ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className={inputCls}
+                              value={val ?? ""}
+                              onChange={(e) => patchPreviewDim(dim, e.target.value)}
+                            />
+                            <span className="text-xs font-semibold text-gray-700 shrink-0">
+                              {unit}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-medium text-gray-900">
+                            {val !== null && val !== undefined && val !== "" ? val : "0"}{" "}
+                            <span className="font-semibold text-gray-700">{unit}</span>
+                          </span>
+                        )}
+                      </Field>
+                    );
+                  },
                 )}
                 <Field label="estimated?">
                   {previewEdit ? (
@@ -1171,49 +1183,76 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
 
                 <Field label="Purchase Price">
                   {previewEdit ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputCls}
-                      value={previewItem.supplierItem?.priceRMB ?? previewItem.priceRMB ?? ""}
-                      onChange={(e) => patchPreviewSupplierItem({ priceRMB: e.target.value })}
-                    />
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className={inputCls}
+                        value={previewItem.supplierItem?.priceRMB ?? previewItem.priceRMB ?? ""}
+                        onChange={(e) => patchPreviewSupplierItem({ priceRMB: e.target.value })}
+                      />
+                      <span className="text-xs font-semibold text-gray-700 shrink-0">
+                        {previewItem.supplierItem?.currency || "RMB"}
+                      </span>
+                    </div>
                   ) : (
-                    previewItem.supplierItem?.priceRMB || previewItem.priceRMB
-                      ? `${previewItem.supplierItem?.priceRMB || previewItem.priceRMB} ${previewItem.supplierItem?.currency || "RMB"}`
-                      : "—"
+                    <span className="font-medium text-gray-900">
+                      {previewItem.supplierItem?.priceRMB || previewItem.priceRMB || "0.00"}{" "}
+                      <span className="font-semibold text-gray-700">
+                        {previewItem.supplierItem?.currency || "RMB"}
+                      </span>
+                    </span>
                   )}
                 </Field>
                 <Field label="Transfer Price">
                   {previewEdit ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputCls}
-                      value={previewItem.price ?? ""}
-                      onChange={(e) => patchPreview({ price: e.target.value })}
-                    />
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className={inputCls}
+                        value={previewItem.price ?? ""}
+                        onChange={(e) => patchPreview({ price: e.target.value })}
+                      />
+                      <span className="text-xs font-semibold text-gray-700 shrink-0">
+                        {previewItem.currency || "EUR"}
+                      </span>
+                    </div>
                   ) : (
-                    `${previewItem.price || "0.00"} ${previewItem.currency || "EUR"}`
+                    <span className="font-medium text-gray-900">
+                      {previewItem.price || "0.00"}{" "}
+                      <span className="font-semibold text-gray-700">
+                        {previewItem.currency || "EUR"}
+                      </span>
+                    </span>
                   )}
                 </Field>
 
                 <Field label="Sales Price">
                   {previewEdit ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputCls}
-                      value={previewItem.sales_price ?? ""}
-                      onChange={(e) =>
-                        patchPreview({ sales_price: e.target.value })
-                      }
-                    />
-                  ) : previewItem.sales_price !== null &&
-                    previewItem.sales_price !== undefined ? (
-                    `${Number(previewItem.sales_price).toFixed(2)} ${previewItem.currency || "EUR"}`
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className={inputCls}
+                        value={previewItem.sales_price ?? ""}
+                        onChange={(e) =>
+                          patchPreview({ sales_price: e.target.value })
+                        }
+                      />
+                      <span className="text-xs font-semibold text-gray-700 shrink-0">
+                        {previewItem.currency || "EUR"}
+                      </span>
+                    </div>
                   ) : (
-                    "—"
+                    <span className="font-medium text-gray-900">
+                      {previewItem.sales_price !== null && previewItem.sales_price !== undefined
+                        ? Number(previewItem.sales_price).toFixed(2)
+                        : "0.00"}{" "}
+                      <span className="font-semibold text-gray-700">
+                        {previewItem.currency || "EUR"}
+                      </span>
+                    </span>
                   )}
                 </Field>
               </div>

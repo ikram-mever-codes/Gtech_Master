@@ -1631,7 +1631,7 @@ const ItemDetailsPage = () => {
                     setItemData={setItemData}
                   />
                   <EditableInfoRow
-                    label="Weight (kg)"
+                    label="Weight (g)"
                     value={itemData.dimensions.weight}
                     field="dimensions.weight"
                     editMode={editMode}

@@ -526,26 +526,33 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   className="text-sm"
                 />
               </div>
-              {(["weight", "length", "width", "height"] as const).map((dim) => (
-                <div key={dim}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {dim[0].toUpperCase() + dim.slice(1)} (
-                    {dim === "weight" ? "kg" : "cm"})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={(itemFormData as any)[dim]}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        [dim]: Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-              ))}
+              {(["length", "width", "height", "weight"] as const).map((dim) => {
+                const unit = dim === "weight" ? "g" : "mm";
+                return (
+                  <div key={dim}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {dim[0].toUpperCase() + dim.slice(1)} ({unit})
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={(itemFormData as any)[dim]}
+                        onChange={(e) =>
+                          setItemFormData({
+                            ...itemFormData,
+                            [dim]: Number(e.target.value),
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                      <span className="text-xs font-semibold text-gray-700 shrink-0">
+                        {unit}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Model
