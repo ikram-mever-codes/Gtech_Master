@@ -3959,12 +3959,12 @@ export class OfferController {
       const tableY = yPos;
       const columns = [
         { header: "Pos", width: 22, align: "left" },
-        { header: "Art.-Nr.", width: 70, align: "left" },
-        { header: "Bezeichnung", width: 195, align: "left" },
+        { header: "Art.-Nr.", width: 65, align: "left" },
+        { header: "Bezeichnung", width: 185, align: "left" },
         { header: "MwSt.", width: 34, align: "center" },
         { header: "Menge", width: 36, align: "right" },
-        { header: "Netto-Preis €", width: 68, align: "right" },
-        { header: "Netto gesamt €", width: 68, align: "right" },
+        { header: "Netto-Preis €", width: 73, align: "right" },
+        { header: "Netto gesamt €", width: 78, align: "right" },
       ];
 
       const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
@@ -3979,7 +3979,7 @@ export class OfferController {
         doc.text(col.header, currentX + 1, tableY + headerYOffset, {
           width: col.width - 2,
           align: col.align as any,
-          lineBreak: col.header.includes("\n") ? true : false,
+          lineBreak: false,
         });
         currentX += col.width;
       });
