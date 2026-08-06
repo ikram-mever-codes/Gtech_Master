@@ -520,12 +520,17 @@ export async function generateGtechDocumentPdf(
       const itemNameStr = cleanPdfText(item.bezeichnung) || (isFreizeile ? "Freizeile" : "Item");
       const artNrStr = cleanPdfText(item.artNr) || "—";
       const rawRemarks = cleanPdfText(item.remarks);
-      const fullBezText = (rawRemarks && rawRemarks !== "-") ? `${itemNameStr}\n${rawRemarks}` : itemNameStr;
+      const hasRemark = !!(rawRemarks && rawRemarks !== "-");
 
       const bezWidth = columns[2].width - 4;
+      const remarkWidth = showPrices ? (columns[2].width + columns[3].width - 4) : bezWidth;
+
       doc.font(R).fontSize(8.5);
-      const textHeight = doc.heightOfString(fullBezText, { width: bezWidth, lineGap: 2 });
-      const computedRowHeight = Math.max(26, textHeight + 14);
+      const nameHeight = doc.heightOfString(itemNameStr, { width: bezWidth, lineGap: 2 });
+      const remarkHeight = hasRemark
+        ? doc.heightOfString(rawRemarks, { width: remarkWidth, lineGap: 2 }) + 3
+        : 0;
+      const computedRowHeight = Math.max(26, nameHeight + remarkHeight + 12);
 
       if (currentY + computedRowHeight > MM(265)) {
         doc
@@ -572,7 +577,7 @@ export async function generateGtechDocumentPdf(
         ? [
           (rowIndex + 1).toString(),
           artNrStr,
-          fullBezText,
+          itemNameStr,
           `${item.vatRate ?? opts.taxRate ?? 19}%`,
           String(item.quantity ?? 1),
           formatGermanNum(item.unitPrice, 3),
@@ -581,7 +586,7 @@ export async function generateGtechDocumentPdf(
         : [
           (rowIndex + 1).toString(),
           artNrStr,
-          fullBezText,
+          itemNameStr,
           String(item.quantity ?? 1),
         ];
 
@@ -589,12 +594,34 @@ export async function generateGtechDocumentPdf(
       rowData.forEach((data, colIndex) => {
         doc.font(R).fontSize(8.5).fillColor("#2D3748");
         const col = columns[colIndex];
-        doc.text(data, currentX + 2, currentY + 5, {
-          width: col.width - 4,
-          align: col.align as any,
-          lineBreak: true,
-          lineGap: 2,
-        });
+        
+        if (colIndex === 2) {
+          // Render item name with bezWidth
+          doc.text(data, currentX + 2, currentY + 5, {
+            width: bezWidth,
+            align: "left",
+            lineBreak: true,
+            lineGap: 2,
+          });
+
+          // Render item remark under item name with expanded remarkWidth (extending across MwSt column)
+          if (hasRemark) {
+            doc.font(R).fontSize(8).fillColor("#4A5568");
+            doc.text(rawRemarks, currentX + 2, currentY + 5 + nameHeight + 2, {
+              width: remarkWidth,
+              align: "left",
+              lineBreak: true,
+              lineGap: 2,
+            });
+          }
+        } else {
+          doc.text(data, currentX + 2, currentY + 5, {
+            width: col.width - 4,
+            align: col.align as any,
+            lineBreak: true,
+            lineGap: 2,
+          });
+        }
         currentX += col.width;
       });
 
