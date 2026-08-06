@@ -524,11 +524,12 @@ export async function generateGtechDocumentPdf(
 
       const bezWidth = columns[2].width - 4;
       const remarkWidth = showPrices ? (columns[2].width + columns[3].width - 4) : bezWidth;
+      const halfRowGap = 6;
 
       doc.font(R).fontSize(8.5);
       const nameHeight = doc.heightOfString(itemNameStr, { width: bezWidth, lineGap: 2 });
       const remarkHeight = hasRemark
-        ? doc.heightOfString(rawRemarks, { width: remarkWidth, lineGap: 2 }) + 3
+        ? doc.heightOfString(rawRemarks, { width: remarkWidth, lineGap: 2 }) + halfRowGap + 3
         : 0;
       const computedRowHeight = Math.max(26, nameHeight + remarkHeight + 12);
 
@@ -605,7 +606,7 @@ export async function generateGtechDocumentPdf(
 
           if (hasRemark) {
             doc.font(R).fontSize(8).fillColor("#4A5568");
-            doc.text(rawRemarks, currentX + 2, currentY + 5 + nameHeight + 2, {
+            doc.text(rawRemarks, currentX + 2, currentY + 5 + nameHeight + halfRowGap, {
               width: remarkWidth,
               align: "left",
               lineBreak: true,
