@@ -9,6 +9,7 @@ import {
   PrimaryGeneratedColumn,
   ManyToMany,
   JoinTable,
+  Index,
 } from "typeorm";
 import { Parent } from "./parents";
 import { Taric } from "./tarics";
@@ -59,6 +60,10 @@ export class Item {
 
   @Column({ type: "float", nullable: true })
   height?: number;
+
+  @Index()
+  @Column({ type: "varchar", length: 100, nullable: true })
+  item_no_de?: string;
 
   @Column({ type: "float", nullable: true })
   length?: number;

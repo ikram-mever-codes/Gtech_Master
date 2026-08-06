@@ -16,7 +16,6 @@ import { Taric } from "../models/tarics";
 import { CargoOrder } from "../models/cargo_orders";
 import { In, Like } from "typeorm";
 import { getRMBPriceFromSupplier } from "./items_controller";
-import { WarehouseItem } from "../models/warehouse_items";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { generateInvoicesForOrders } from "./cargo_controller";
@@ -36,9 +35,13 @@ const isStreetAddress = (str?: string | null): boolean => {
   if (!str) return false;
   const s = str.trim().toLowerCase();
   return (
-    /\b(stra[ßs]e|str\.|street|st\.|weg|platz|road|rd\.|avenue|ave|gasse|hof|allee|damm|ring|pfad)\b/i.test(s) ||
+    /\b(stra[ßs]e|str\.|street|st\.|weg|platz|road|rd\.|avenue|ave|gasse|hof|allee|damm|ring|pfad)\b/i.test(
+      s,
+    ) ||
     (/\d+/.test(s) &&
-      /\b(stra[ßs]e|str|weg|platz|road|avenue|gasse|hof|allee|damm|ring)\b/i.test(s))
+      /\b(stra[ßs]e|str|weg|platz|road|avenue|gasse|hof|allee|damm|ring)\b/i.test(
+        s,
+      ))
   );
 };
 
@@ -95,7 +98,7 @@ export class InvoiceController {
 
       const dueDays =
         customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+        customer.defaultPaymentDueDays !== null
           ? customer.defaultPaymentDueDays
           : 7;
 
@@ -211,7 +214,7 @@ export class InvoiceController {
                   .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
                   .fontSize(8)
                   .text("中国安徽...", leftAlignX + 220, yPos);
-              } catch (e) { }
+              } catch (e) {}
             }
             doc.font("Helvetica");
           }
@@ -280,8 +283,9 @@ export class InvoiceController {
         doc.text(invoice.customer?.addressLine1 || "", leftAlignX, yPos);
         yPos += 12;
         doc.text(
-          `${invoice.customer?.postalCode || ""} ${invoice.customer?.city || ""
-            }`.trim(),
+          `${invoice.customer?.postalCode || ""} ${
+            invoice.customer?.city || ""
+          }`.trim(),
           leftAlignX,
           yPos,
         );
@@ -515,14 +519,16 @@ export class InvoiceController {
         }
 
         doc.text(
-          `Zahlungsart: ${invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
+          `Zahlungsart: ${
+            invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
           }`,
           leftAlignX,
           yPos,
         );
         yPos += 15;
         doc.text(
-          `Versandart: ${invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
+          `Versandart: ${
+            invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
           }`,
           leftAlignX,
           yPos,
@@ -530,7 +536,7 @@ export class InvoiceController {
         yPos += 15;
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-            invoice.customer?.defaultPaymentDueDays !== null
+          invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         const dueDateLabel = invoice.dueDate
@@ -690,7 +696,7 @@ export class InvoiceController {
       if (invoiceData.deliveryDate) {
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-            invoice.customer?.defaultPaymentDueDays !== null
+          invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         invoiceData.dueDate = calculateDueDate(
@@ -805,7 +811,9 @@ export class InvoiceController {
         ].filter(Boolean);
 
         if (cIds.length > 0 || oIds.length > 0) {
-          console.log(`[InvoiceSync] Triggering auto-sync for ${cIds.length} cargos (${cIds.join(", ")}) and ${oIds.length} orders...`);
+          console.log(
+            `[InvoiceSync] Triggering auto-sync for ${cIds.length} cargos (${cIds.join(", ")}) and ${oIds.length} orders...`,
+          );
           await generateInvoicesForOrders(oIds, cIds);
         }
       } catch (syncErr) {
@@ -825,7 +833,9 @@ export class InvoiceController {
         order: { invoiceDate: "DESC" },
       });
 
-      console.log(`[InvoiceController.getAllInvoices] Fetched ${invoices.length} total invoice records from DB.`);
+      console.log(
+        `[InvoiceController.getAllInvoices] Fetched ${invoices.length} total invoice records from DB.`,
+      );
 
       const orderNumbers = invoices.map((i) => i.orderNumber).filter(Boolean);
       const orders = await AppDataSource.getRepository(Order).find({
@@ -983,12 +993,12 @@ export class InvoiceController {
 
           const shipCompanyCandidate =
             typeof cargo?.ship_to_company_name === "string" &&
-              cargo.ship_to_company_name.trim().length > 1 &&
-              !isStreetAddress(cargo.ship_to_company_name)
+            cargo.ship_to_company_name.trim().length > 1 &&
+            !isStreetAddress(cargo.ship_to_company_name)
               ? cargo.ship_to_company_name.trim()
               : typeof cargo?.ship_to_display_name === "string" &&
-                cargo.ship_to_display_name.trim().length > 1 &&
-                !isStreetAddress(cargo.ship_to_display_name)
+                  cargo.ship_to_display_name.trim().length > 1 &&
+                  !isStreetAddress(cargo.ship_to_display_name)
                 ? cargo.ship_to_display_name.trim()
                 : undefined;
 
@@ -1049,7 +1059,8 @@ export class InvoiceController {
           bill_to: "GTech Industries GmbH",
           ship_to:
             cci.customer?.company_name ||
-            (cci.customer?.ship_to_address && !isStreetAddress(cci.customer.ship_to_address)
+            (cci.customer?.ship_to_address &&
+            !isStreetAddress(cci.customer.ship_to_address)
               ? cci.customer.ship_to_address
               : "-"),
           customItemCount,
@@ -1060,10 +1071,10 @@ export class InvoiceController {
           cargo: cargoNo ? { id: cargoNo, cargo_no: cargoNo } : null,
           customer: cci.customer
             ? {
-              id: cci.customer.original_customer_id || cci.customer.id,
-              companyName: cci.customer.company_name,
-              email: cci.customer.email,
-            }
+                id: cci.customer.original_customer_id || cci.customer.id,
+                companyName: cci.customer.company_name,
+                email: cci.customer.email,
+              }
             : null,
           items: cci.items,
         });
@@ -1153,7 +1164,11 @@ export class InvoiceController {
           item_name: ci.item_name,
           ean: ci.ean,
           taric: ci.taric_code
-            ? { code: ci.taric_code, name_en: ci.taric_name_en, duty_rate: Number(ci.duty_rate || 0) }
+            ? {
+                code: ci.taric_code,
+                name_en: ci.taric_name_en,
+                duty_rate: Number(ci.duty_rate || 0),
+              }
             : null,
         },
         order: { order_no: ci.order_no || cciInvoice.order_number },
@@ -1166,7 +1181,8 @@ export class InvoiceController {
         if (!taricGroupsMap.has(groupKey)) {
           taricGroupsMap.set(groupKey, {
             taricId: groupKey,
-            taricNameEn: oi.item?.taric?.name_en || oi.item?.item_name || "Project Item",
+            taricNameEn:
+              oi.item?.taric?.name_en || oi.item?.item_name || "Project Item",
             taricCode: code,
             dutyRate: Number(oi.item?.taric?.duty_rate ?? 0),
             totalQty: 0,
@@ -1177,7 +1193,8 @@ export class InvoiceController {
         }
         const group = taricGroupsMap.get(groupKey);
         group.totalQty += Number(oi.qty || 0);
-        group.totalPrice += Number(oi.qty || 0) * Number(oi.eur_special_price || 0);
+        group.totalPrice +=
+          Number(oi.qty || 0) * Number(oi.eur_special_price || 0);
       });
 
       const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
@@ -1202,19 +1219,24 @@ export class InvoiceController {
           status: cciInvoice.status,
           customer: cciInvoice.customer
             ? {
-              id: cciInvoice.customer.original_customer_id || cciInvoice.customer.id,
-              companyName: cciInvoice.customer.company_name,
-              email: cciInvoice.customer.email,
-            }
+                id:
+                  cciInvoice.customer.original_customer_id ||
+                  cciInvoice.customer.id,
+                companyName: cciInvoice.customer.company_name,
+                email: cciInvoice.customer.email,
+              }
             : null,
         },
         cargo: cciInvoice.cargo_no
           ? {
-            id: cciInvoice.cargo_no,
-            cargo_no: cciInvoice.cargo_no,
-            ship_to: cciInvoice.customer?.company_name || cciInvoice.customer?.ship_to_address || null,
-            bill_to: "GTech Industries GmbH",
-          }
+              id: cciInvoice.cargo_no,
+              cargo_no: cciInvoice.cargo_no,
+              ship_to:
+                cciInvoice.customer?.company_name ||
+                cciInvoice.customer?.ship_to_address ||
+                null,
+              bill_to: "GTech Industries GmbH",
+            }
           : null,
         orderNosInCargo: [cciInvoice.order_number].filter(Boolean),
         detailedItems,
@@ -1245,7 +1267,9 @@ export class InvoiceController {
       }
 
       if (!cargo) {
-        const tokens = orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2);
+        const tokens = orderNumber
+          .split(/[\s\-\/]+/)
+          .filter((t: string) => t.length > 2);
         for (const token of tokens) {
           cargo = await cargoRepository.findOne({
             where: [{ cargo_no: token }, { cargo_no: Like(`%${token}%`) }],
@@ -1259,14 +1283,18 @@ export class InvoiceController {
       const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
         where: { cargo_id: cargo.id },
       });
-      const orderIdsFromCargoOrders = cargoOrders.map((co) => co.order_id).filter(Boolean);
+      const orderIdsFromCargoOrders = cargoOrders
+        .map((co) => co.order_id)
+        .filter(Boolean);
 
       const ordersInCargo = await orderRepository.find({
         where: [{ cargo_id: cargo.id }],
       });
       const orderIdsFromOrders = ordersInCargo.map((o) => o.id).filter(Boolean);
 
-      const allOrderIds = [...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders])];
+      const allOrderIds = [
+        ...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders]),
+      ];
 
       const whereConditions: any[] = [{ cargo_id: cargo.id }];
       if (allOrderIds.length > 0) {
@@ -1280,7 +1308,10 @@ export class InvoiceController {
     }
 
     if (orderItems.length === 0 && orderNumber) {
-      const tokens = [orderNumber, ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2)];
+      const tokens = [
+        orderNumber,
+        ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2),
+      ];
       const uniqueTokens = [...new Set(tokens)];
 
       const matchingOrders = await orderRepository.find({
@@ -1289,7 +1320,9 @@ export class InvoiceController {
 
       if (matchingOrders.length > 0) {
         const matchingOrderIds = matchingOrders.map((o) => o.id);
-        const foundCargoOrder = await AppDataSource.getRepository(CargoOrder).findOne({
+        const foundCargoOrder = await AppDataSource.getRepository(
+          CargoOrder,
+        ).findOne({
           where: { order_id: In(matchingOrderIds) },
           relations: ["cargo"],
         });
@@ -1317,7 +1350,10 @@ export class InvoiceController {
         price: Number(invItem.unitPrice || 0),
         eur_special_price: Number(invItem.unitPrice || 0),
         item: invItem.item || {
-          id: invItem.item_id && !isNaN(Number(invItem.item_id)) ? Number(invItem.item_id) : null,
+          id:
+            invItem.item_id && !isNaN(Number(invItem.item_id))
+              ? Number(invItem.item_id)
+              : null,
           item_name: invItem.description || "Invoice Item",
           ean: invItem.articleNumber || "-",
           taric: null,
@@ -1371,8 +1407,8 @@ export class InvoiceController {
     const manualTarics =
       uniqueManualCodes.length > 0
         ? await AppDataSource.getRepository(Taric).find({
-          where: { code: In(uniqueManualCodes) },
-        })
+            where: { code: In(uniqueManualCodes) },
+          })
         : [];
     const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -1380,13 +1416,7 @@ export class InvoiceController {
       [...orderItems].map(async (oi: any) => {
         const item = oi.item;
 
-        let ean = item?.ean || "-";
-        if (ean === "-" && item?.id) {
-          const wi = await AppDataSource.getRepository(WarehouseItem).findOne(
-            { where: { item_id: item.id } },
-          );
-          if (wi?.ean) ean = wi.ean;
-        }
+        const ean = item?.ean || "-";
 
         let rmbPrice = oi.rmb_special_price || 0;
         if (!rmbPrice && item?.id) {
@@ -1441,7 +1471,9 @@ export class InvoiceController {
           if (mTaric) {
             displayName = mTaric.name_en || displayName;
             displayRate =
-              mTaric.duty_rate !== undefined ? Number(mTaric.duty_rate) : displayRate;
+              mTaric.duty_rate !== undefined
+                ? Number(mTaric.duty_rate)
+                : displayRate;
           }
         }
 
@@ -1476,7 +1508,6 @@ export class InvoiceController {
       taricGroups,
     };
   };
-
   static getInvoiceExpandedDetails = async (
     req: Request,
     res: Response,
@@ -1580,10 +1611,14 @@ export class InvoiceController {
         }
 
         if (cargo) {
-          const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
+          const cargoOrders = await AppDataSource.getRepository(
+            CargoOrder,
+          ).find({
             where: { cargo_id: cargo.id },
           });
-          const orderIdsFromCargo = cargoOrders.map((co) => co.order_id).filter(Boolean);
+          const orderIdsFromCargo = cargoOrders
+            .map((co) => co.order_id)
+            .filter(Boolean);
 
           const whereConditions: any[] = [{ cargo_id: cargo.id }];
           if (orderIdsFromCargo.length > 0) {
@@ -2250,7 +2285,8 @@ export class InvoiceController {
         const cargoRepo = AppDataSource.getRepository(Cargo);
         const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
 
-        const targetCargoNo = (invoice as any).cargoNo || invoice.orderNumber || "";
+        const targetCargoNo =
+          (invoice as any).cargoNo || invoice.orderNumber || "";
         let finalCargoNo = targetCargoNo;
         let linkedCargos: Cargo[] = [];
 
@@ -2269,7 +2305,9 @@ export class InvoiceController {
             const matchingOrder = await orderRepo.findOne({
               where: [
                 { order_no: targetCargoNo },
-                { id: isNaN(Number(targetCargoNo)) ? -1 : Number(targetCargoNo) },
+                {
+                  id: isNaN(Number(targetCargoNo)) ? -1 : Number(targetCargoNo),
+                },
               ],
             });
 
@@ -2278,7 +2316,9 @@ export class InvoiceController {
                 where: { order_id: matchingOrder.id },
                 relations: ["cargo"],
               });
-              linkedCargos.push(...cargoOrders.map((co) => co.cargo).filter(Boolean));
+              linkedCargos.push(
+                ...cargoOrders.map((co) => co.cargo).filter(Boolean),
+              );
             }
           }
 
@@ -2302,11 +2342,15 @@ export class InvoiceController {
               cargo.note = cargo.remark;
 
               try {
-                const officialCargoNo = await NumberSequenceService.getNextNumber("cargo");
+                const officialCargoNo =
+                  await NumberSequenceService.getNextNumber("cargo");
                 cargo.cargo_no = officialCargoNo;
                 finalCargoNo = officialCargoNo;
               } catch (err) {
-                console.warn("Could not generate sequence cargo_no on invoice close:", err);
+                console.warn(
+                  "Could not generate sequence cargo_no on invoice close:",
+                  err,
+                );
               }
 
               await cargoRepo.save(cargo);
@@ -2315,7 +2359,10 @@ export class InvoiceController {
             }
           }
         } catch (err) {
-          console.warn("Error processing cargo transition on invoice closure:", err);
+          console.warn(
+            "Error processing cargo transition on invoice closure:",
+            err,
+          );
         }
 
         const cciInvoice = cciInvoiceRepo.create({
@@ -2342,7 +2389,9 @@ export class InvoiceController {
         const itemsToSave: any[] = [];
         let expandedData: any = null;
         try {
-          expandedData = await InvoiceController.fetchExpandedDetailsData(invoice.id);
+          expandedData = await InvoiceController.fetchExpandedDetailsData(
+            invoice.id,
+          );
         } catch (e) {
           console.warn("Could not fetch expanded data for dynamic freeze:", e);
         }
@@ -2352,14 +2401,23 @@ export class InvoiceController {
           detailedItems.forEach((it: any) => {
             const item = it.item;
             const ean = it._fallbackEan || item?.ean || "-";
-            const itemName = item?.item_name || item?.name || it.description || "Invoice Item";
+            const itemName =
+              item?.item_name || item?.name || it.description || "Invoice Item";
             const taricCode = it.set_taric_code || item?.taric?.code || "";
-            const taricName = item?.taric?.name_en || item?.taric?.description_en || "";
+            const taricName =
+              item?.taric?.name_en || item?.taric?.description_en || "";
             const dutyRate = Number(item?.taric?.duty_rate ?? 0);
             const qty = Number(it.qty || it.quantity || 1);
-            const unitPrice = Number(it.eur_special_price || it._fallbackEk || it.unitPrice || 0);
+            const unitPrice = Number(
+              it.eur_special_price || it._fallbackEk || it.unitPrice || 0,
+            );
             const totalPrice = qty * unitPrice;
-            const validItemId = item?.id && !isNaN(Number(item.id)) && Number.isInteger(Number(item.id)) ? Number(item.id) : null;
+            const validItemId =
+              item?.id &&
+              !isNaN(Number(item.id)) &&
+              Number.isInteger(Number(item.id))
+                ? Number(item.id)
+                : null;
 
             itemsToSave.push(
               cciItemRepo.create({
@@ -2383,8 +2441,8 @@ export class InvoiceController {
           invoice.items.forEach((invItem: any) => {
             const validItemId =
               invItem.item_id &&
-                !isNaN(Number(invItem.item_id)) &&
-                Number.isInteger(Number(invItem.item_id))
+              !isNaN(Number(invItem.item_id)) &&
+              Number.isInteger(Number(invItem.item_id))
                 ? Number(invItem.item_id)
                 : null;
             itemsToSave.push(
@@ -2405,7 +2463,9 @@ export class InvoiceController {
         if (itemsToSave.length > 0) {
           await cciItemRepo.save(itemsToSave);
         }
-        console.log(`🔒 [CCI_VERIFY_LOG] Invoice "${invoice.invoiceNumber}" frozen into CCI snapshot tables with ${itemsToSave.length} items!`);
+        console.log(
+          `🔒 [CCI_VERIFY_LOG] Invoice "${invoice.invoiceNumber}" frozen into CCI snapshot tables with ${itemsToSave.length} items!`,
+        );
       } catch (cciErr) {
         console.error("⚠️ Failed to freeze CCI snapshot:", cciErr);
       }

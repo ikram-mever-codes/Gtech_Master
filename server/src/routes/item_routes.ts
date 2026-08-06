@@ -40,6 +40,7 @@ import {
   syncSuppCatWithCategoryName,
   syncItemData,
   syncCustomerPrices,
+  migrateItemNoDeFromWarehouse,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -54,14 +55,16 @@ router.get("/pricing/transfer-prices", feedTransferPrices);
 router.get("/cat/fix", syncSuppCatWithCategoryName);
 
 // Bulk import/sync items from /public/items.csv
-router.get(
-  "/sync/csv",
-  authenticateUser,
-  authorize(UserRole.SALES, UserRole.PURCHASING),
-  syncItemData,
-);
+// router.get(
+//   "/sync/csv",
+//   authenticateUser,
+//   authorize(UserRole.SALES, UserRole.PURCHASING),
+//   syncItemData,
+// );
 
-router.get("/sync/prices", syncCustomerPrices);
+// router.get("/sync/prices", syncCustomerPrices);
+
+router.get("/sync/item-no-de", migrateItemNoDeFromWarehouse);
 
 router.get("/", getItems);
 router.post("/", createItem);
