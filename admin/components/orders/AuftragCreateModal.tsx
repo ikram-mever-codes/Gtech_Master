@@ -407,7 +407,7 @@ export default function AuftragCreateModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Search items (Item No, EAN, Name)
+                Search Item nameEN DE, EAN, itemNo
               </label>
               <input
                 value={sourceSearch}
