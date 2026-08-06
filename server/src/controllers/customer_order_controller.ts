@@ -127,12 +127,13 @@ async function getEffectiveUnitPrice(
 ): Promise<number> {
   const tiered = await resolveSalesPrice(Number(item.id), customerId, quantity);
   if (tiered !== null) return tiered;
+
+  const ownSalesPrice = parseFloat(String(item.sales_price ?? ""));
+  if (!isNaN(ownSalesPrice) && ownSalesPrice > 0) return ownSalesPrice;
+
   return Number(item.price) || 0;
 }
 
-/** A line item is "Freizeile" (freetext) if it wasn't sourced from a
- * catalog item or an offer line — same rule as isFreetextLine on the
- * frontend. Only these lines may carry their own taxRate override. */
 const isFreetextLine = (li: CustomerOrderItem) =>
   !li.sourceItemId && !li.sourceLineItemId;
 
