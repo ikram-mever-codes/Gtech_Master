@@ -23,7 +23,12 @@ async function drawCustomerSvgBackground(doc: InstanceType<typeof PDFDocument>):
     if (!isSvg || !fs.existsSync(activePath)) return;
 
     if (!cachedCustomerSvg || cachedTemplatePath !== activePath) {
-      cachedCustomerSvg = fs.readFileSync(activePath, "utf8");
+      let rawSvg = fs.readFileSync(activePath, "utf8");
+      rawSvg = rawSvg
+        .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
+        .replace(/x_Document_Title/gi, "")
+        .replace(/Document_Title/gi, "");
+      cachedCustomerSvg = rawSvg;
       cachedTemplatePath = activePath;
     }
 
@@ -74,6 +79,14 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
         y: 0,
         width,
         height,
+      });
+
+      newPage.drawRectangle({
+        x: 300,
+        y: 670,
+        width: 270,
+        height: 70,
+        color: pdfLib.rgb(1, 1, 1),
       });
 
       newPage.drawPage(embeddedContent, {
@@ -754,8 +767,17 @@ export async function generateGtechDocumentPdf(
     yPos += 14;
   }
   if (opts.deliveryTime) {
-    doc.text(`Lieferzeit: ${opts.deliveryTime}`, LEFT_X, yPos);
-    yPos += 14;
+    let rawDelivery = opts.deliveryTime.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(rawDelivery)) {
+      rawDelivery = formatDate(rawDelivery);
+    }
+    const hasLieferdatumInMetadata = (opts.metadataItems || []).some(([k]) => k.toLowerCase().includes("lieferdatum"));
+    const isFormattedDate = /^\d{2}\.\d{2}\.\d{4}$/.test(rawDelivery);
+
+    if (!hasLieferdatumInMetadata || !isFormattedDate) {
+      doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
+      yPos += 14;
+    }
   }
   if (opts.deliveryTerms) {
     doc.text(`Lieferbedingungen: ${opts.deliveryTerms}`, LEFT_X, yPos);
@@ -765,6 +787,21 @@ export async function generateGtechDocumentPdf(
     doc.text(`Hinweise: ${opts.notes}`, LEFT_X, yPos, {
       width: CONTENT_WIDTH,
     });
+  }
+
+  const pageRange = doc.bufferedPageRange();
+  for (let i = pageRange.start; i < pageRange.start + pageRange.count; i++) {
+    doc.switchToPage(i);
+    doc.font(R).fontSize(8).fillColor("#718096");
+    doc.text(
+      `Seite ${i + 1} von ${pageRange.count}`,
+      LEFT_X,
+      MM(277),
+      {
+        width: CONTENT_WIDTH,
+        align: "right",
+      }
+    );
   }
 
   doc.end();
