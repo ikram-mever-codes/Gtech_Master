@@ -277,7 +277,7 @@ const ItemRow: React.FC<{
   onClick: () => void;
 }> = ({ item, selected, onClick }) => {
   const thumb = item.photo;
-  const name = item.item_name || item.itemName || "Unnamed item";
+  const name = item.item_name_de || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   const company = getItemCompany(item);
   const isLabel = item.isLabelPrint || item.isLabel === "Y";
@@ -888,7 +888,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   });
 
   const visibleItems = items.filter((it) => {
-    const name = it.item_name || it.itemName || "";
+    const name = it.item_name_de || "";
     if (!sourceSearch) return true;
     const q = sourceSearch.toLowerCase();
     return (
@@ -906,7 +906,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const itemPickerList = items.filter((it) => {
     if (!itemPickerSearch) return true;
     const q = itemPickerSearch.toLowerCase();
-    const name = it.item_name || it.itemName || "";
+    const name = it.item_name_de || "";
     return (
       name.toLowerCase().includes(q) ||
       String(it.ean || "").includes(itemPickerSearch) ||
@@ -945,9 +945,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       setCreateForm((f: any) => {
         if (f.title?.trim()) return f;
         const first = next[0];
-        return first
-          ? { ...f, title: `${first.item_name || first.itemName}` }
-          : f;
+        return first ? { ...f, title: `${first.item_name_de || ""}` } : f;
       });
       return next;
     });
@@ -963,7 +961,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       return { ...prev, [key]: "1" };
     });
   };
-
   const setItemQuantity = (itemId: string | number, qty: string) =>
     setItemQuantities((prev) => ({ ...prev, [String(itemId)]: qty }));
 
@@ -1251,7 +1248,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const addExistingItem = async (it: any) => {
     try {
       await createOfferLineItem(offer.id, {
-        itemName: it.item_name || it.itemName || "Item",
+        itemName: it.item_name_de || "Item",
         material: it.model || (it.ean ? String(it.ean) : undefined),
         basePrice: 0,
         weight: it.weight,

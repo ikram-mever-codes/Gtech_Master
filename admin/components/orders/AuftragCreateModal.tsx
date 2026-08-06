@@ -34,10 +34,10 @@ const ItemRow: React.FC<{
   rowRef?: React.Ref<HTMLDivElement>;
 }> = ({ item, selected, onClick, rowRef }) => {
   const thumb = item.photo || item.pix_path;
-  const name = item.item_name || item.itemName || "Unnamed item";
+  const name = item.item_name_de || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   const model = item.model || "";
-
+  console.log(item);
   return (
     <div
       ref={rowRef}
@@ -66,14 +66,6 @@ const ItemRow: React.FC<{
         <div className="text-sm font-medium text-gray-900 truncate">{name}</div>
         <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold text-gray-700">{itemNo || "—"}</span>
-          {model && (
-            <>
-              <span>-</span>
-              <span className="text-blue-600 font-medium truncate max-w-[10rem]">
-                {model}
-              </span>
-            </>
-          )}
         </div>
       </div>
     </div>
@@ -141,10 +133,10 @@ export default function AuftragCreateModal({
         search: searchTerm,
       };
 
-      // If company is selected, filter by company
-      if (companyId) {
-        params.company = companyId;
-      }
+      // // If company is selected, filter by company
+      // if (companyId) {
+      //   params.company = companyId;
+      // }
 
       // Also pass eanSearch for numeric EAN searches as a hint
       // But keep search for broader matching
@@ -233,11 +225,7 @@ export default function AuftragCreateModal({
     setFilterCustomerId(initialCustomerId ? String(initialCustomerId) : "");
     setSourceSearch("");
     setHasSearched(false);
-    setTitle(
-      initialItem
-        ? initialItem.name_de || initialItem.item_name || initialItem.name || ""
-        : "",
-    );
+    setTitle(initialItem ? initialItem.item_name_de || "" : "");
     setPaymentMethod("");
     setShippingMethod("");
     setNotes("");
@@ -295,7 +283,7 @@ export default function AuftragCreateModal({
 
       if (!title.trim() && next.length > 0) {
         const first = next[0];
-        setTitle(first.item_name || first.itemName || "");
+        setTitle(first.item_name_de || "");
       }
       return next;
     });
@@ -334,7 +322,7 @@ export default function AuftragCreateModal({
         itemId: it.id,
         qty: Number(itemQuantities[String(it.id)]) || 1,
         price: Number(it.sales_price || it.price || 0),
-        itemName: it.item_name || it.itemName || "Item",
+        itemName: it.item_name_de || "Item",
       }));
 
       const payload = {
