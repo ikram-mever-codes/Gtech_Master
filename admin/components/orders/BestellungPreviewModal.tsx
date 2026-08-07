@@ -52,8 +52,8 @@ const ORDER_STATUSES = [
 
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   })} kg`;
 
 const toDateInputValue = (value: any): string => {
@@ -1257,7 +1257,11 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     visibleLineItems[0]?.extraWeight === null ||
                     visibleLineItems[0]?.extraWeight === undefined
                       ? ""
-                      : String(visibleLineItems[0].extraWeight)
+                      : (
+                          parseFlexibleNumber(
+                            visibleLineItems[0].extraWeight,
+                          ) ?? 0
+                        ).toFixed(1)
                   }
                   placeholder="0"
                   disabled={visibleLineItems.length === 0 || isCreate}

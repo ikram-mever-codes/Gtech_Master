@@ -58,7 +58,6 @@ export const getAllLieferscheine = async (
       relations: ["rechnung", "rechnung.items", "rechnung.customer"],
     });
 
-    // Transform to frontend-friendly format
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
       const customer = rechnung?.customer;
@@ -321,22 +320,34 @@ export const downloadLieferscheinPdf = async (
     });
 
     if (!lieferschein) {
-      res.status(404).json({ success: false, message: "Lieferschein not found" });
+      res
+        .status(404)
+        .json({ success: false, message: "Lieferschein not found" });
       return;
     }
 
     const rechnung = lieferschein.rechnung;
     const customerSnap = rechnung?.customerSnapshot || rechnung?.customer || {};
-    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
-    const customerCompName = (customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || "").trim();
+    const contactName =
+      (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (
+      customerSnap.company_name ||
+      customerSnap.companyName ||
+      customerSnap.legalName ||
+      ""
+    ).trim();
     const customerNum = (customerSnap.customerNumber || "").trim();
     let kundeCombined = "—";
-    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    if (customerCompName && customerNum)
+      kundeCombined = `${customerCompName} · ${customerNum}`;
     else if (customerCompName) kundeCombined = customerCompName;
     else if (customerNum) kundeCombined = customerNum;
 
     const uploadsDir = path.join(__dirname, "../../uploads/lieferscheine");
-    const filePath = path.join(uploadsDir, `ls_${lieferschein.delivery_note_number || lieferschein.id}.pdf`);
+    const filePath = path.join(
+      uploadsDir,
+      `ls_${lieferschein.delivery_note_number || lieferschein.id}.pdf`,
+    );
 
     const items = (rechnung?.items || []).map((it: any, idx: number) => ({
       position: it.position || idx + 1,
@@ -365,8 +376,18 @@ export const downloadLieferscheinPdf = async (
       metadataItems: [
         ["Ansprechpartner", contactName],
         ["Kunde", kundeCombined],
-        ["Datum", formatDateStr(lieferschein.date_created || lieferschein.created_at)],
-        ["Lieferdatum", formatDateStr(lieferschein.delivery_date || rechnung?.date_delivery || rechnung?.delivery_date)],
+        [
+          "Datum",
+          formatDateStr(lieferschein.date_created || lieferschein.created_at),
+        ],
+        [
+          "Lieferdatum",
+          formatDateStr(
+            lieferschein.delivery_date ||
+              rechnung?.date_delivery ||
+              rechnung?.delivery_date,
+          ),
+        ],
       ],
       lineItems: items,
       showPrices: false,
@@ -378,7 +399,10 @@ export const downloadLieferscheinPdf = async (
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=lieferschein_${lieferschein.delivery_note_number}.pdf`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=lieferschein_${lieferschein.delivery_note_number}.pdf`,
+    );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);

@@ -110,9 +110,8 @@ export const personColumn: ColumnDef<any> = {
   align: "left",
   render: (row) => {
     const text =
-      row.customerSnapshot?.contactEmail ||
-      row.customerSnapshot?.contactPhoneNumber ||
-      row.customerSnapshot?.contactName ||
+      row.customer?.contactName ||
+      row.customer?.contactPhoneNumber ||
       row.customer?.email ||
       row.customer?.contactEmail ||
       row.customer?.contactPhoneNumber ||

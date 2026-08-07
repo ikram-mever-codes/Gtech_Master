@@ -9,7 +9,15 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, FileText, Pencil, Save, X, AlertCircle, Mail } from "lucide-react";
+import {
+  Loader2,
+  FileText,
+  Pencil,
+  Save,
+  X,
+  AlertCircle,
+  Mail,
+} from "lucide-react";
 import { downloadRechnungEml } from "@/api/rechnungen";
 import {
   updateRechnungKItem,
@@ -30,8 +38,8 @@ const formatDeCurrency = (val: number) => {
 
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   })} kg`;
 
 const COUNTRY_CODES: Record<string, string> = {
@@ -234,14 +242,16 @@ export default function RechnungDetailModal({
 
   const netWeightKg = items.reduce((sum: number, it: any) => {
     const qty = Number(it.quantity) || 1;
-    return sum + (Number(it.weight) || 0) * qty;
+    // it.weight is copied from Item.weight, stored in grams — convert to kg.
+    const weightGrams = Number(it.weight) || 0;
+    return sum + (weightGrams / 1000) * qty;
   }, 0);
   const extraWeightKg = items.reduce(
+    // extraWeight is entered/stored directly in kg — no conversion.
     (sum: number, it: any) => sum + (Number(it.extraWeight) || 0),
     0,
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
-
   const rechnungCustomer = data.customer || {};
   const snapshot = data.customerSnapshot || null;
 
@@ -1031,8 +1041,8 @@ export default function RechnungDetailModal({
               </h3>
             </div>
             {auftragDocs.length === 0 &&
-              rechnungenKDocs.length === 0 &&
-              rechnungDocs.length === 0 ? (
+            rechnungenKDocs.length === 0 &&
+            rechnungDocs.length === 0 ? (
               <p className="text-sm text-gray-500">No linked documents yet.</p>
             ) : (
               <div className="space-y-3">

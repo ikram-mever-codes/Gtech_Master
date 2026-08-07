@@ -177,7 +177,7 @@ export const getItems = async (
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const isStock = ((req.query.isStock as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
-    const idsStr = ((req.query.ids as string) || "").trim(); // NEW: Comma-separated item IDs
+    const idsStr = ((req.query.ids as string) || "").trim();
 
     const tagIds = tagStr
       .split(",")
@@ -192,6 +192,7 @@ export const getItems = async (
       .map((t) => parseInt(t.slice(1), 10))
       .filter((n) => !isNaN(n));
 
+    // Build the main query
     const idQb = itemRepository
       .createQueryBuilder("item")
       .select("item.id")
@@ -199,7 +200,7 @@ export const getItems = async (
       .leftJoin("item.parent", "parent")
       .leftJoin("item.category", "category");
 
-    // NEW: Filter by specific item IDs
+    // Filter by specific item IDs
     if (idsStr) {
       const itemIds = idsStr
         .split(",")
@@ -212,52 +213,46 @@ export const getItems = async (
       }
     }
 
-    // Name search — case-insensitive
-    if (search) {
-      idQb.andWhere(
-        "(LOWER(item.item_name) LIKE :search OR LOWER(item.item_name_cn) LIKE :search OR LOWER(item.model) LIKE :search)",
-        { search: `%${search.toLowerCase()}%` },
-      );
-    }
+    // ---- SEARCH LOGIC ----
+    // Combine search and eanSearch into a single search
+    const searchTerm = search || eanSearch;
 
-    if (eanSearch) {
-      const cleanSearch = eanSearch.trim();
+    if (searchTerm) {
+      const cleanSearch = searchTerm.trim();
       const isNumeric = /^\d+$/.test(cleanSearch);
+      const searchPattern = `%${cleanSearch.toLowerCase()}%`;
 
+      // item.item_no_de and item.ean now live on Item directly — no more
+      // WarehouseItem subquery needed for these two fields.
+      const searchConditions: string[] = [
+        "LOWER(item.item_name) LIKE :searchPattern",
+        "LOWER(item.item_name_cn) LIKE :searchPattern",
+        "LOWER(item.item_name_de) LIKE :searchPattern",
+        "LOWER(item.model) LIKE :searchPattern",
+        "LOWER(item.ean) LIKE :searchPattern",
+        "LOWER(item.item_no_de) LIKE :searchPattern",
+        "LOWER(parent.de_no) LIKE :searchPattern",
+        "LOWER(parent.name_de) LIKE :searchPattern",
+        "LOWER(parent.name_en) LIKE :searchPattern",
+      ];
+
+      // For numeric searches, add an exact EAN match condition
       if (isNumeric) {
-        idQb.andWhere((qb2) => {
-          const whSub = qb2
-            .subQuery()
-            .select("wi_ean.id")
-            .from(WarehouseItem, "wi_ean")
-            .where(
-              "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
-            )
-            .andWhere("wi_ean.ean LIKE :ean")
-            .getQuery();
-          return `(item.ean LIKE :ean OR EXISTS ${whSub})`;
-        });
-        idQb.setParameter("ean", `%${cleanSearch}%`);
-      } else {
-        idQb.andWhere((qb2) => {
-          const whSub = qb2
-            .subQuery()
-            .select("wi_ean.id")
-            .from(WarehouseItem, "wi_ean")
-            .where(
-              "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
-            )
-            .andWhere("LOWER(wi_ean.item_no_de) LIKE :ean")
-            .getQuery();
-          return `(LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR LOWER(item.ean) LIKE :ean OR EXISTS ${whSub})`;
-        });
-        idQb.setParameter("ean", `%${cleanSearch.toLowerCase()}%`);
+        searchConditions.push("item.ean = :exactMatch");
       }
+
+      // Apply all search conditions with OR
+      const whereClause = searchConditions
+        .map((cond) => `(${cond})`)
+        .join(" OR ");
+      idQb.andWhere(`(${whereClause})`, {
+        searchPattern: searchPattern,
+        exactMatch: isNumeric ? cleanSearch : undefined,
+      });
     }
 
-    // Active status — skipped when searching by Item No, so inactive items
-    // (e.g. a deactivated 0013-1080) still surface on an exact-number lookup
-    if (isActive && !eanSearch) {
+    // Active status filter - skip when searching
+    if (isActive && !search && !eanSearch) {
       idQb.andWhere("item.isActive = :isActive", { isActive });
     }
 
@@ -305,9 +300,7 @@ export const getItems = async (
           .subQuery()
           .select("wi_stock.id")
           .from(WarehouseItem, "wi_stock")
-          .where(
-            "(wi_stock.item_id = item.id OR wi_stock.ItemID_DE = item.ItemID_DE)",
-          )
+          .where("wi_stock.item_id = item.id")
           .andWhere("wi_stock.stock_qty > 0")
           .getQuery();
         return `(item.stockEU > 0 OR item.stockCN > 0 OR item.is_stock_item = 'Y' OR EXISTS ${whSub})`;
@@ -318,9 +311,7 @@ export const getItems = async (
           .subQuery()
           .select("wi_stock.id")
           .from(WarehouseItem, "wi_stock")
-          .where(
-            "(wi_stock.item_id = item.id OR wi_stock.ItemID_DE = item.ItemID_DE)",
-          )
+          .where("wi_stock.item_id = item.id")
           .andWhere("wi_stock.stock_qty > 0")
           .getQuery();
         return `((item.stockEU IS NULL OR item.stockEU <= 0) AND (item.stockCN IS NULL OR item.stockCN <= 0) AND (item.is_stock_item IS NULL OR item.is_stock_item IN ('N', '0', '')) AND NOT EXISTS ${whSub})`;
@@ -386,6 +377,7 @@ export const getItems = async (
         "item.item_name_de",
         "item.ean",
         "item.ItemID_DE",
+        "item.item_no_de",
         "item.isActive",
         "item.parent_id",
         "item.taric_id",
@@ -437,52 +429,36 @@ export const getItems = async (
       .orderBy("item.created_at", "DESC")
       .getMany();
 
-    // STEP 3: Warehouse metrics (only for warehouse-specific data)
-    const targetItemIDsDE = items
-      .map((i) => i.ItemID_DE)
-      .filter(Boolean) as number[];
-
+    // STEP 3: Warehouse data still needed here for is_active / stock_qty
+    // (genuinely warehouse-owned fields) — item_no_de is no longer
+    // selected from here since it now lives on Item directly.
     const warehouseItems = await warehouseRepository
       .createQueryBuilder("wi")
-      .select([
-        "wi.id",
-        "wi.item_id",
-        "wi.ItemID_DE",
-        "wi.item_no_de",
-        "wi.ean",
-        "wi.is_active",
-      ])
+      .select(["wi.id", "wi.item_id", "wi.is_active", "wi.stock_qty"])
       .where("wi.item_id IN (:...targetIds)", { targetIds })
-      .orWhere(
-        targetItemIDsDE.length > 0
-          ? "wi.ItemID_DE IN (:...targetItemIDsDE)"
-          : "1=0",
-        { targetItemIDsDE },
-      )
       .getMany();
+
+    const warehouseMap = new Map<number, any>();
+    warehouseItems.forEach((wi) => {
+      warehouseMap.set(wi.item_id, wi);
+    });
 
     // STEP 4: Format
     const formattedItems = items.map((item: any) => {
       const parentData = item.parent || null;
       const customerData = item.customer || null;
-
-      const warehouseData =
-        warehouseItems.find(
-          (wi: any) =>
-            wi.item_id === item.id ||
-            (item.ItemID_DE && wi.ItemID_DE === item.ItemID_DE),
-        ) || null;
+      const warehouseData = warehouseMap.get(item.id) || null;
 
       return {
         id: item.id,
-        de_no: warehouseData?.item_no_de || parentData?.de_no || null,
+        de_no: item.item_no_de || parentData?.de_no || null,
         name_de: parentData?.name_de || null,
         name_en: parentData?.name_en || null,
         name_cn: parentData?.name_cn || null,
         item_name: item.item_name,
         item_name_cn: item.item_name_cn,
         item_name_de: item.item_name_de || null,
-        ean: item.ean || warehouseData?.ean || null,
+        ean: item.ean || null,
         ItemID_DE: item.ItemID_DE || null,
         is_active: warehouseData
           ? warehouseData.is_active
@@ -521,7 +497,7 @@ export const getItems = async (
         MSQ_EU: item.MSQ_EU || 0,
         stockCN: item.stockCN || 0,
         MSQ_CN: item.MSQ_CN || 0,
-        // NEW: Add supplierItems relation for frontend to access supplier pricing
+        stock_qty: warehouseData?.stock_qty || 0,
         supplierItems: item.supplierItems || [],
       };
     });
@@ -596,6 +572,9 @@ export const getItemById = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
+    // Warehouse rows are still fetched, but only for genuinely
+    // warehouse-owned data (stock qty, msq, buffer, ship class, active
+    // flag) — item_no_de and ItemID_DE now come from Item itself.
     let warehouseItems: any[] = [];
     try {
       if (item.ItemID_DE) {
@@ -686,9 +665,8 @@ export const getItemById = async (
       console.warn("library_files table not available:", e.message);
     }
 
-    // de_no comes from warehouse (fallback to parent)
-    const de_no = primaryWarehouseItem?.item_no_de || item.parent?.de_no || "";
-    const ean = item.ean || primaryWarehouseItem?.ean || "";
+    const de_no = item.item_no_de;
+    const ean = item.ean;
 
     const rmbPrice = await getRMBPriceFromSupplier(
       parseInt(id),
@@ -733,7 +711,6 @@ export const getItemById = async (
       transfer_price: item.transfer_price_EUR
         ? Number(item.transfer_price_EUR).toFixed(2)
         : "null",
-      // NEW: Stock and MSQ fields
       is_stock_item: item.is_stock_item || "N",
       stockEU: item.stockEU || 0,
       MSQ_EU: item.MSQ_EU || 0,
@@ -787,9 +764,8 @@ export const getItemById = async (
         isNPR: item.is_npr || "N",
         isNew: item.is_new || "N",
         warehouseItem: primaryWarehouseItem?.id?.toString() || "",
-        // FIX: Use item.ItemID_DE from items table
         idDE: item.ItemID_DE?.toString() || "",
-        noDE: primaryWarehouseItem?.item_no_de || item.parent_no_de || "",
+        noDE: item.item_no_de || item.parent_no_de || "",
         nameDE:
           primaryWarehouseItem?.item_name_de || item.parent?.name_de || "",
         nameEN:
@@ -951,7 +927,6 @@ export const createItem = async (
       painPoints = [],
       item_no_de,
       isLabelPrint = false,
-      // NEW fields
       is_stock_item = "N",
       stockEU = 0,
       MSQ_EU = 0,
@@ -1044,12 +1019,17 @@ export const createItem = async (
       finalPrice = calculateTransferPrice(finalRMB, category?.name || "STD");
     }
 
+    // item_no_de now written directly onto Item as well, not just onto
+    // the mirrored WarehouseItem row below.
+    const resolvedItemNoDe = item_no_de || parent.de_no;
+
     const newItem = itemRepository.create({
       item_name,
       item_name_cn,
-      item_name_de, // NEW
+      item_name_de,
       ean: ean ? ean.toString() : null,
       parent_id,
+      item_no_de: resolvedItemNoDe,
       sales_price:
         sales_price !== undefined && sales_price !== null && sales_price !== ""
           ? Math.round(parseFloat(sales_price) * 100) / 100
@@ -1076,7 +1056,6 @@ export const createItem = async (
       is_new: "Y",
       is_updated: false,
       isLabelPrint,
-      // NEW fields
       is_stock_item: is_stock_item || "N",
       stockEU: parseInt(stockEU) || 0,
       MSQ_EU: parseInt(MSQ_EU) || 0,
@@ -1111,7 +1090,7 @@ export const createItem = async (
       const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
       const warehouseItem = warehouseRepository.create({
         item_id: newItem.id,
-        item_no_de: item_no_de || parent.de_no,
+        item_no_de: resolvedItemNoDe,
         item_name_de: item_name_de || item_name,
         item_name_en: item_name,
         stock_qty: 0,
@@ -1238,7 +1217,7 @@ export const updateItem = async (
     const updatableFields = [
       "item_name",
       "item_name_cn",
-      "item_name_de", // NEW
+      "item_name_de",
       "ean",
       "parent_id",
       "taric_id",
@@ -1275,13 +1254,13 @@ export const updateItem = async (
       "is_new",
       "supp_cat",
       "ItemID_DE",
+      "item_no_de", // NEW — directly editable on Item now
       "painPoints",
       "price",
       "sales_price",
       "currency",
       "isLabelPrint",
       "transfer_price_EUR",
-      // NEW fields
       "is_stock_item",
       "stockEU",
       "MSQ_EU",
@@ -1533,6 +1512,20 @@ export const updateItem = async (
             warehouseItem.is_no_auto_order,
           is_SnSI: warehouseItemData.is_SnSI ?? warehouseItem.is_SnSI,
         });
+
+        // Keep Item.item_no_de in sync when the warehouse-panel form is
+        // what actually changed it (rather than a direct item_no_de field
+        // in the top-level payload, already handled by updatableFields
+        // above).
+        if (
+          warehouseItemData.item_no_de !== undefined &&
+          req.body.item_no_de === undefined &&
+          item.item_no_de !== warehouseItemData.item_no_de
+        ) {
+          item.item_no_de = warehouseItemData.item_no_de;
+          item.is_updated = true;
+          await itemRepository.save(item);
+        }
       }
       const newEnglishName =
         req.body.item_name || warehouseItemData?.item_name_en;
@@ -3714,7 +3707,6 @@ export const getNewItems = async (
     const parentRepository = AppDataSource.getRepository(Parent);
     const categoryRepository = AppDataSource.getRepository(Category);
     const supplierRepository = AppDataSource.getRepository(Supplier);
-    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
     const { page = "1", limit = "50", search = "" } = req.query;
 
@@ -3742,6 +3734,8 @@ export const getNewItems = async (
     const totalRecords = await queryBuilder.getCount();
     const items = await queryBuilder.getMany();
 
+    // No more WarehouseItem lookup needed here — de_no and ean now come
+    // straight off Item.
     const formattedItems = await Promise.all(
       items.map(async (item) => {
         const parentData = item.parent_id
@@ -3765,30 +3759,14 @@ export const getNewItems = async (
             })
           : null;
 
-        let warehouseData: any = null;
-        if (item.ItemID_DE) {
-          const wdList = await warehouseRepository.find({
-            where: { ItemID_DE: item.ItemID_DE },
-          });
-          warehouseData = wdList[0] || null;
-        }
-        if (!warehouseData) {
-          const wdList = await warehouseRepository.find({
-            where: { item_id: item.id },
-          });
-          warehouseData = wdList[0] || null;
-        }
-
-        const ean = item.ean || warehouseData?.ean || null;
-
         return {
           id: item.id,
-          de_no: warehouseData?.item_no_de || parentData?.de_no || null,
+          de_no: item.item_no_de || parentData?.de_no || null,
           name_de: parentData?.name_de || null,
           name_en: parentData?.name_en || null,
           item_name: item.item_name,
           item_name_cn: item.item_name_cn,
-          ean,
+          ean: item.ean || null,
           is_active: item.isActive,
           is_new: item.is_new,
           is_updated: item.is_updated,
@@ -3857,6 +3835,9 @@ export const exportNewItemsToCSV = async (
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
     };
 
+    // item_no_de is no longer pulled from here — only the fields still
+    // genuinely owned by WarehouseItem (ship_class, is_stock_item, msq,
+    // buffer, item_name_de) remain.
     const getWarehouseData = async (itemId: number, itemIdDE?: number) => {
       let wItems: any[] = [];
       if (itemIdDE) {
@@ -3988,9 +3969,7 @@ export const exportNewItemsToCSV = async (
           formatDate(item.created_at || new Date()),
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
-          warehouseData?.item_no_de ||
-            item.ItemID_DE?.toString() ||
-            item.id.toString(),
+          item.item_no_de || item.ItemID_DE?.toString() || item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",
@@ -4277,7 +4256,6 @@ export const syncItemData = async (
     const rows = parseItemCsv(csvPath);
 
     const itemRepo = AppDataSource.getRepository(Item);
-    const warehouseRepo: any = AppDataSource.getRepository(WarehouseItem);
 
     const summary: any = {
       totalRows: rows.length,
@@ -4299,9 +4277,6 @@ export const syncItemData = async (
           continue;
         }
 
-        // Update-only migration — a row whose ItemID_DE doesn't match an
-        // existing Item is counted as "notFound" and skipped. No new
-        // Item or WarehouseItem is ever created by this sync.
         const item = await itemRepo.findOne({ where: { ItemID_DE: itemIdDe } });
         if (!item) {
           summary.notFound++;
@@ -4350,35 +4325,15 @@ export const syncItemData = async (
             : row.remark;
         }
 
+        // ItemNoDE now written directly onto Item — the WarehouseItem
+        // mirror write has been removed entirely.
+        if (row.itemNoDe) {
+          item.item_no_de = row.itemNoDe;
+        }
+
         item.is_updated = true;
         item.updated_at = new Date();
         await itemRepo.save(item);
-
-        // ItemNoDE (and ItemNameDE, mirrored) -> WarehouseItem, matched
-        // by ItemID_DE (falling back to item_id). Update-only, same as
-        // Item above — if no WarehouseItem row exists yet, it is skipped
-        // rather than created. Only item_no_de and item_name_de are
-        // touched here — stock quantity lives solely on Item.stockEU
-        // (never copied to WarehouseItem.stock_qty), and
-        // WarehouseItem.is_active is left alone entirely.
-        if (row.itemNoDe) {
-          let warehouseItem = await warehouseRepo.findOne({
-            where: { ItemID_DE: itemIdDe },
-          });
-          if (!warehouseItem) {
-            warehouseItem = await warehouseRepo.findOne({
-              where: { item_id: item.id },
-            });
-          }
-
-          if (warehouseItem) {
-            warehouseItem.item_no_de = row.itemNoDe;
-            if (row.itemNameDe) {
-              warehouseItem.item_name_de = row.itemNameDe;
-            }
-            await warehouseRepo.save(warehouseItem);
-          }
-        }
 
         summary.updated++;
       } catch (rowError: any) {
@@ -4652,5 +4607,108 @@ export const syncCustomerPrices = async (
   } catch (error) {
     console.error("Customer price sync error:", error);
     return next(new ErrorHandler("Failed to sync customer prices", 500));
+  }
+};
+
+interface MigrationSummary {
+  totalWarehouseRows: number;
+  updated: number;
+  skippedNoValue: number;
+  itemNotFound: number;
+  errors: { warehouseItemId: number; message: string }[];
+}
+
+export const migrateItemNoDeFromWarehouse = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const itemRepo = AppDataSource.getRepository(Item);
+    const warehouseRepo = AppDataSource.getRepository(WarehouseItem);
+
+    const warehouseItems = await warehouseRepo.find({
+      select: ["id", "item_id", "ItemID_DE", "item_no_de"],
+    });
+
+    const summary: MigrationSummary = {
+      totalWarehouseRows: warehouseItems.length,
+      updated: 0,
+      skippedNoValue: 0,
+      itemNotFound: 0,
+      errors: [],
+    };
+
+    // Preload every Item's id and ItemID_DE up front so the fallback
+    // lookup doesn't need a query per miss.
+    const allItems = await itemRepo.find({
+      select: ["id", "ItemID_DE"],
+    });
+    const itemIdSet = new Set(allItems.map((it) => it.id));
+    const itemIdByItemIdDe = new Map<number, number>();
+    for (const it of allItems) {
+      if (it.ItemID_DE !== undefined && it.ItemID_DE !== null) {
+        itemIdByItemIdDe.set(it.ItemID_DE, it.id);
+      }
+    }
+
+    for (const wi of warehouseItems) {
+      try {
+        const itemNoDeValue = (wi.item_no_de || "").trim();
+        const hasItemIdDe = wi.ItemID_DE !== undefined && wi.ItemID_DE !== null;
+
+        if (!itemNoDeValue && !hasItemIdDe) {
+          summary.skippedNoValue++;
+          continue;
+        }
+
+        let targetItemId: number | null = null;
+
+        if (wi.item_id && itemIdSet.has(wi.item_id)) {
+          targetItemId = wi.item_id;
+        } else if (hasItemIdDe && itemIdByItemIdDe.has(wi.ItemID_DE!)) {
+          targetItemId = itemIdByItemIdDe.get(wi.ItemID_DE!)!;
+        }
+
+        if (targetItemId === null) {
+          summary.itemNotFound++;
+          summary.errors.push({
+            warehouseItemId: wi.id,
+            message: `No Item found for item_id ${wi.item_id} or ItemID_DE ${wi.ItemID_DE}`,
+          });
+          continue;
+        }
+
+        const updatePayload: Partial<Item> = {};
+        if (itemNoDeValue) updatePayload.item_no_de = itemNoDeValue;
+        if (hasItemIdDe) updatePayload.ItemID_DE = wi.ItemID_DE;
+
+        if (Object.keys(updatePayload).length === 0) {
+          summary.skippedNoValue++;
+          continue;
+        }
+
+        await itemRepo.update({ id: targetItemId }, updatePayload);
+        summary.updated++;
+      } catch (rowError: any) {
+        summary.errors.push({
+          warehouseItemId: wi.id,
+          message: rowError?.message || "Unknown error",
+        });
+        console.error(
+          `Error migrating item_no_de/ItemID_DE for warehouse item ${wi.id}:`,
+          rowError,
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Processed ${summary.totalWarehouseRows} warehouse rows: ${summary.updated} items updated, ${summary.skippedNoValue} had no value, ${summary.itemNotFound} had no matching item.`,
+      data: summary,
+    });
+  } catch (error) {
+    console.error("item_no_de/ItemID_DE migration error:", error);
+    return next(new ErrorHandler("Failed to migrate item_no_de", 500));
   }
 };

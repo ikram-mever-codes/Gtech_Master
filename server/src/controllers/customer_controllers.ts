@@ -1396,6 +1396,19 @@ export const syncCustomerData = async (
         if (row.phone) customer.contactPhoneNumber = row.phone;
         if (row.email) customer.email = row.email;
 
+        // --- Set contactName by combining name and familyName ---
+        const contactName = [row.name, row.familyName]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        if (contactName) {
+          customer.contactName = contactName;
+        } else if (row.name) {
+          customer.contactName = row.name;
+        } else if (row.familyName) {
+          customer.contactName = row.familyName;
+        }
+
         if (country) {
           customer.countryEntity = country;
           customer.country_id = country.id;

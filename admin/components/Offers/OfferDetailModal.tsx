@@ -87,10 +87,9 @@ const SHIPPING_METHODS = [
 
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   })} kg`;
-
 /** Converts any date-ish value to the "yyyy-MM-dd" shape a native
  * <input type="date"> expects; returns "" when there's nothing valid. */
 const toDateInputValue = (value: any): string => {
@@ -277,7 +276,7 @@ const ItemRow: React.FC<{
   onClick: () => void;
 }> = ({ item, selected, onClick }) => {
   const thumb = item.photo;
-  const name = item.item_name || item.itemName || "Unnamed item";
+  const name = item.item_name_de || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   const company = getItemCompany(item);
   const isLabel = item.isLabelPrint || item.isLabel === "Y";
@@ -888,7 +887,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   });
 
   const visibleItems = items.filter((it) => {
-    const name = it.item_name || it.itemName || "";
+    const name = it.item_name_de || "";
     if (!sourceSearch) return true;
     const q = sourceSearch.toLowerCase();
     return (
@@ -906,7 +905,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const itemPickerList = items.filter((it) => {
     if (!itemPickerSearch) return true;
     const q = itemPickerSearch.toLowerCase();
-    const name = it.item_name || it.itemName || "";
+    const name = it.item_name_de || "";
     return (
       name.toLowerCase().includes(q) ||
       String(it.ean || "").includes(itemPickerSearch) ||
@@ -945,9 +944,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       setCreateForm((f: any) => {
         if (f.title?.trim()) return f;
         const first = next[0];
-        return first
-          ? { ...f, title: `${first.item_name || first.itemName}` }
-          : f;
+        return first ? { ...f, title: `${first.item_name_de || ""}` } : f;
       });
       return next;
     });
@@ -963,7 +960,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       return { ...prev, [key]: "1" };
     });
   };
-
   const setItemQuantity = (itemId: string | number, qty: string) =>
     setItemQuantities((prev) => ({ ...prev, [String(itemId)]: qty }));
 
@@ -1251,7 +1247,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const addExistingItem = async (it: any) => {
     try {
       await createOfferLineItem(offer.id, {
-        itemName: it.item_name || it.itemName || "Item",
+        itemName: it.item_name_de || "Item",
         material: it.model || (it.ean ? String(it.ean) : undefined),
         basePrice: 0,
         weight: it.weight,
@@ -1362,7 +1358,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       pricingMode === "matrix"
         ? (parseFlexibleNumber(getActiveMatrixEntry(li)?.quantity) ?? 1)
         : (parseFlexibleNumber(li.baseQuantity) ?? 1);
-    return sum + (parseFlexibleNumber(li.weight) ?? 0) * qty;
+    const weightGrams = parseFlexibleNumber(li.weight) ?? 0;
+    return sum + (weightGrams * qty) / 1000;
   }, 0);
   const extraWeightKg = visibleLineItems.reduce(
     (sum: number, li: any) => sum + (parseFlexibleNumber(li.extraWeight) ?? 0),
@@ -1370,16 +1367,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
 
-  // --- Tax profile (live, resolved fresh from the customer's relation) ---
   const taxProfile = offer?.taxProfile || null;
 
-  // --- Per-rate VAT breakdown ---------------------------------------------
-  // Each visible line item's effective rate (getLineTaxRate) determines
-  // which group its net total falls into; shipping is grouped under the
-  // tax profile's rate. Each group's VAT is computed independently, so a
-  // mixed offer (e.g. two catalog lines at the profile's 19% and one
-  // Freizeile at 7%) shows two separate VAT rows rather than one flat
-  // rate applied to everything.
   const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
     const byRate = new Map<number, number>();
     visibleLineItems.forEach((li: any) => {
@@ -2972,9 +2961,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       disabled={visibleLineItems.length === 0}
                       onBlur={(e) => {
                         if (!visibleLineItems[0]) return;
+                        const raw = e.target.value.trim();
+                        const kgValue =
+                          raw === ""
+                            ? 0
+                            : (parseFlexibleNumber(raw.replace(",", ".")) ?? 0);
                         persistLine(visibleLineItems[0].id, {
-                          extraWeight:
-                            e.target.value.trim() === "" ? "0" : e.target.value,
+                          extraWeight: String(kgValue),
                         });
                       }}
                     />

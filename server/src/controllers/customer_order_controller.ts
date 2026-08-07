@@ -127,12 +127,13 @@ async function getEffectiveUnitPrice(
 ): Promise<number> {
   const tiered = await resolveSalesPrice(Number(item.id), customerId, quantity);
   if (tiered !== null) return tiered;
+
+  const ownSalesPrice = parseFloat(String(item.sales_price ?? ""));
+  if (!isNaN(ownSalesPrice) && ownSalesPrice > 0) return ownSalesPrice;
+
   return Number(item.price) || 0;
 }
 
-/** A line item is "Freizeile" (freetext) if it wasn't sourced from a
- * catalog item or an offer line — same rule as isFreetextLine on the
- * frontend. Only these lines may carry their own taxRate override. */
 const isFreetextLine = (li: CustomerOrderItem) =>
   !li.sourceItemId && !li.sourceLineItemId;
 
@@ -156,9 +157,9 @@ async function getLinkedDocumentsForAuftrag(
   const [offer, rechnungen, rechnungenK, bestellungen] = await Promise.all([
     safeOfferId
       ? offerRepo.findOne({
-        where: { id: safeOfferId },
-        select: ["id", "offerNumber", "createdAt"],
-      })
+          where: { id: safeOfferId },
+          select: ["id", "offerNumber", "createdAt"],
+        })
       : Promise.resolve(null),
     rechnungRepo.find({
       where: { auftrag_id: auftragId },
@@ -216,9 +217,9 @@ async function getLinkedDocumentsForAuftraege(
   const [offers, rechnungen, rechnungenK, bestellungen] = await Promise.all([
     offerIds.length
       ? offerRepo.find({
-        where: { id: In(offerIds) },
-        select: ["id", "offerNumber", "createdAt"],
-      })
+          where: { id: In(offerIds) },
+          select: ["id", "offerNumber", "createdAt"],
+        })
       : Promise.resolve([]),
     rechnungRepo.find({
       where: { auftrag_id: In(auftragIds) },
@@ -343,7 +344,6 @@ export const createAuftragFromOffer = async (
     }
 
     const itemRepository = AppDataSource.getRepository(Item);
-    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
     const sourceItemIds = Array.from(
       new Set(
@@ -355,7 +355,6 @@ export const createAuftragFromOffer = async (
     );
 
     let sourceItemById = new Map<string, any>();
-    let warehouseItems: any[] = [];
     if (sourceItemIds.length > 0) {
       const sourceItems = await itemRepository.find({
         where: { id: In(sourceItemIds) },
@@ -364,34 +363,12 @@ export const createAuftragFromOffer = async (
       sourceItemById = new Map(
         sourceItems.map((it: any) => [String(it.id), it]),
       );
-
-      const itemIdDEs = sourceItems
-        .map((it: any) => it.ItemID_DE)
-        .filter((v: any): v is number => !!v);
-      try {
-        warehouseItems = await warehouseRepository.find({
-          where: itemIdDEs.length
-            ? [
-              { ItemID_DE: In(itemIdDEs) },
-              { item_id: In(sourceItems.map((it: any) => it.id)) },
-            ]
-            : { item_id: In(sourceItems.map((it: any) => it.id)) },
-        });
-      } catch (e: any) {
-        console.warn(
-          "warehouse_items table not available while creating Auftrag from offer:",
-          e?.message,
-        );
-      }
     }
 
-    const getDeNo = (it: any): string => {
-      const warehouseMatch =
-        warehouseItems.find(
-          (wi) => it.ItemID_DE && wi.ItemID_DE === it.ItemID_DE,
-        ) || warehouseItems.find((wi) => wi.item_id === it.id);
-      return warehouseMatch?.item_no_de || it.parent?.de_no || "";
-    };
+    // item_no_de and ItemID_DE now live on Item directly — no more
+    // WarehouseItem lookup needed here.
+    const getDeNo = (it: any): string =>
+      it.item_no_de || it.parent?.de_no || "";
 
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
@@ -432,7 +409,8 @@ export const createAuftragFromOffer = async (
 
       // Seed material/itemNo/photo from the source Item whenever the
       // line's own stored values are missing — same fallback order as
-      // OfferController's backfill (material -> de_no, photo -> Item.photo).
+      // OfferController's backfill (material -> item_no_de, photo ->
+      // Item.photo).
       const src = lineItem?.sourceItemId
         ? sourceItemById.get(String(lineItem.sourceItemId))
         : undefined;
@@ -485,9 +463,8 @@ export const createAuftragFromOffer = async (
     if (hasStockItem && stock_where) {
       finalStockWhere = stock_where;
     } else if (hasStockItem && !stock_where) {
-      finalStockWhere = StockWhere.CN; // ← was StockWhere.EU
+      finalStockWhere = StockWhere.CN;
     }
-    // If no stock items, stock_where remains undefined (won't be set)
 
     const customerOrder = customerOrderRepo.create({
       order_no: auftragNo,
@@ -546,7 +523,6 @@ export const createAuftragFromOffer = async (
     next(error);
   }
 };
-
 export const getAllCustomerOrders = async (
   _req: Request,
   res: Response,
@@ -744,12 +720,17 @@ export const createAuftragFromItems = async (
         (matchedItem as any)?.itemName ||
         "Item";
 
+      // material/itemNo now sourced from Item.item_no_de directly, with
+      // the model/EAN fallback kept as before.
+      const material =
+        matchedItem?.item_no_de ||
+        matchedItem?.model ||
+        (matchedItem?.ean ? String(matchedItem.ean) : undefined);
+
       orderItemsToCreate.push({
         itemName: itemName,
-        material:
-          matchedItem?.model ||
-          (matchedItem?.ean ? String(matchedItem.ean) : undefined),
-        itemNo: matchedItem?.model || undefined,
+        material,
+        itemNo: matchedItem?.item_no_de || undefined,
         photo: matchedItem?.photo || matchedItem?.pix_path || undefined,
         specification: matchedItem?.remark || undefined,
         description: selItem.notes || matchedItem?.remark || undefined,
@@ -795,12 +776,11 @@ export const createAuftragFromItems = async (
 
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
 
-    // Only set stock_where if there's at least one stock item
     let finalStockWhere = null;
     if (hasStockItem && stock_where) {
       finalStockWhere = stock_where;
     } else if (hasStockItem && !stock_where) {
-      finalStockWhere = StockWhere.CN; // ← was StockWhere.EU
+      finalStockWhere = StockWhere.CN;
     }
 
     const customerOrder = customerOrderRepo.create({
@@ -846,7 +826,6 @@ export const createAuftragFromItems = async (
     next(error);
   }
 };
-
 export const updateCustomerOrder = async (
   req: Request,
   res: Response,
@@ -1388,16 +1367,25 @@ export const downloadCustomerOrderPdf = async (
     }
 
     const customerSnap = order.customerSnapshot || order.customer || {};
-    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
-    const customerCompName = (customerSnap.companyName || customerSnap.legalName || "").trim();
+    const contactName =
+      (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (
+      customerSnap.companyName ||
+      customerSnap.legalName ||
+      ""
+    ).trim();
     const customerNum = (customerSnap.customerNumber || "").trim();
     let kundeCombined = "—";
-    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    if (customerCompName && customerNum)
+      kundeCombined = `${customerCompName} · ${customerNum}`;
     else if (customerCompName) kundeCombined = customerCompName;
     else if (customerNum) kundeCombined = customerNum;
 
     const uploadsDir = path.join(__dirname, "../../uploads/customer_orders");
-    const filePath = path.join(uploadsDir, `auftrag_${order.order_no || order.id}.pdf`);
+    const filePath = path.join(
+      uploadsDir,
+      `auftrag_${order.order_no || order.id}.pdf`,
+    );
 
     const items = (order.orderItems || []).map((it: any, idx: number) => ({
       position: it.position || idx + 1,
@@ -1407,7 +1395,9 @@ export const downloadCustomerOrderPdf = async (
       vatRate: it.taxRate ?? order.tax_rate ?? 19,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.price || 0),
-      lineTotal: Number(it.lineTotal || (Number(it.quantity || 1) * Number(it.price || 0))),
+      lineTotal: Number(
+        it.lineTotal || Number(it.quantity || 1) * Number(it.price || 0),
+      ),
     }));
 
     await generateGtechDocumentPdf({
@@ -1435,13 +1425,18 @@ export const downloadCustomerOrderPdf = async (
       notes: order.notes,
       deliveryTime: order.date_delivery || order.delivery_terms,
       deliveryTerms: order.delivery_terms,
-      paymentTerms: order.payment_terms ? `Zahlungsziel: ${order.payment_terms} Tage` : undefined,
+      paymentTerms: order.payment_terms
+        ? `Zahlungsziel: ${order.payment_terms} Tage`
+        : undefined,
       paymentMethod: order.payment_method,
       outputFilePath: filePath,
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=auftrag_${order.order_no}.pdf`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=auftrag_${order.order_no}.pdf`,
+    );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);
