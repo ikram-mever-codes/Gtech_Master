@@ -1475,14 +1475,35 @@ export class InvoiceController {
 
     const itemsWithFallbacks = await Promise.all(
       [...orderItems].map(async (oi: any) => {
-        const item = oi.item;
+        let item = oi.item;
+        const itemId = item?.id || oi.item_id;
 
-        const ean = item?.ean || "-";
+        if (!item && itemId) {
+          try {
+            item = await AppDataSource.getRepository(Item).findOne({
+              where: { id: Number(itemId) },
+              relations: ["taric", "purchasePrices"],
+            });
+          } catch (e) {}
+        }
+
+        const ean = item?.ean || oi._fallbackEan || "-";
 
         let rmbPrice = oi.rmb_special_price || 0;
-        if (!rmbPrice && item?.id) {
-          rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
+        if (!rmbPrice && itemId) {
+          rmbPrice =
+            (await getRMBPriceFromSupplier(
+              Number(itemId),
+              oi.supplier_id || item?.supplier_id,
+            )) || 0;
         }
+        if (!rmbPrice && item?.purchasePrices && item.purchasePrices.length > 0) {
+          const pp = item.purchasePrices.find(
+            (p: any) => Number(p.unit_price_cny) > 0,
+          );
+          if (pp) rmbPrice = Number(pp.unit_price_cny);
+        }
+
         let eurPrice =
           Number(oi.eur_special_price || 0) ||
           Number(oi.price || 0) ||
@@ -1490,7 +1511,9 @@ export class InvoiceController {
           Number(oi.unitPrice || 0) ||
           Number(oi.netPrice || 0) ||
           Number(item?.transfer_price_EUR || 0) ||
+          Number((item as any)?.["transfer_price (EUR)"] || 0) ||
           Number(item?.price || 0) ||
+          Number(item?.sales_price || 0) ||
           0;
         if (!eurPrice && rmbPrice) {
           eurPrice = Number(rmbPrice) * 0.13;
@@ -1498,7 +1521,10 @@ export class InvoiceController {
 
         return {
           ...oi,
-          v: (item?.length * item?.width * item?.height) / 1000 || 0,
+          item: item || oi.item,
+          v:
+            ((item?.length || 0) * (item?.width || 0) * (item?.height || 0)) /
+              1000 || 0,
           w: item?.weight || 0,
           _effectiveTaricCode: getEffectiveTaricCode(oi),
           _fallbackEan: ean,
