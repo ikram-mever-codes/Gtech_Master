@@ -114,6 +114,15 @@ const invoiceTabs = [
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
 
+// Status sorting order: partially_delivered first, then open, then delivered, then closed
+export const STATUS_ORDER: Record<string, number> = {
+  partially_delivered: 0,
+  open: 1,
+  delivered: 2,
+  closed: 3,
+  default: 4,
+};
+
 const InvoiceListPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1478,6 +1487,21 @@ const InvoiceListPage: React.FC = () => {
   const endIndex = startIndex + itemsPerPage;
   const currentItems = filteredItems.slice(startIndex, endIndex);
 
+  // Sort items by status priority for Auftrag tab
+  const sortedItems = useMemo(() => {
+    if (activeInvTab !== "auftrag") return currentItems;
+
+    const sorted = [...currentItems];
+    sorted.sort((a, b) => {
+      const statusA = a.auftrag_status || a.status || "open";
+      const statusB = b.auftrag_status || b.status || "open";
+      const orderA = STATUS_ORDER[statusA] ?? STATUS_ORDER.default;
+      const orderB = STATUS_ORDER[statusB] ?? STATUS_ORDER.default;
+      return orderA - orderB;
+    });
+    return sorted;
+  }, [currentItems, activeInvTab]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, docFilters, activeInvTab]);
@@ -1706,7 +1730,7 @@ const InvoiceListPage: React.FC = () => {
         {activeInvTab !== "angebot" && (
           <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
             <DataTable
-              data={currentItems}
+              data={sortedItems}
               columns={commercialColumns}
               loading={dataTableLoading}
               emptyMessage={`No ${
@@ -2399,7 +2423,6 @@ const InvoiceListPage: React.FC = () => {
     </div>
   );
 };
-
 const InvoiceListPageWrapper: React.FC = () => (
   <Suspense
     fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}

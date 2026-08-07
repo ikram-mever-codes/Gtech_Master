@@ -223,3 +223,20 @@ export const downloadCustomerOrderPdf = async (
     throw error;
   }
 };
+
+export const closeCustomerOrder = async (
+  id: number | string,
+  real_delivery_date?: string,
+) => {
+  try {
+    const payload = real_delivery_date ? { real_delivery_date } : {};
+    const response: any = await api.put(
+      `/customer-orders/${id}/close`,
+      payload,
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to close customer order");
+    throw error;
+  }
+};

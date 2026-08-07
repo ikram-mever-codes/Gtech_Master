@@ -12,6 +12,7 @@ import {
   deleteOrderLineItem,
   previewOrderLineItemPrice,
   downloadCustomerOrderPdf,
+  closeCustomerOrder,
 } from "../controllers/customer_order_controller";
 
 const router = Router();
@@ -32,5 +33,7 @@ router.get(
   "/:orderId/line-items/:lineItemId/price-preview",
   previewOrderLineItemPrice,
 );
+
+router.put("/:id/close", authenticateUser, closeCustomerOrder);
 
 export default router;

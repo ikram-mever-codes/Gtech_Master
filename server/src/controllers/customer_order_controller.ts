@@ -1,7 +1,11 @@
 import { In, IsNull } from "typeorm";
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
-import { CustomerOrder, StockWhere } from "../models/customer_orders";
+import {
+  AuftragStatus,
+  CustomerOrder,
+  StockWhere,
+} from "../models/customer_orders";
 import { CustomerOrderItem } from "../models/customer_order_items";
 import { Customer } from "../models/customers";
 import { Item } from "../models/items";
@@ -1440,5 +1444,66 @@ export const downloadCustomerOrderPdf = async (
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);
+  }
+};
+
+export const closeCustomerOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { real_delivery_date } = req.body;
+
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const order = await customerOrderRepo.findOne({
+      where: { id: Number(id) },
+      relations: ["orderItems", "customer"],
+    });
+
+    if (!order) {
+      res.status(404).json({
+        success: false,
+        message: "Auftrag not found",
+      });
+      return;
+    }
+
+    // Check if order is already closed
+    if (order.auftrag_status === AuftragStatus.CLOSED) {
+      res.status(400).json({
+        success: false,
+        message: "Order is already closed",
+      });
+      return;
+    }
+
+    order.auftrag_status = AuftragStatus.CLOSED;
+
+    if (real_delivery_date) {
+      order.real_delivery_date = real_delivery_date;
+    } else {
+      const today = new Date();
+      order.real_delivery_date = today.toISOString().split("T")[0];
+    }
+
+    order.status = "Closed";
+
+    await customerOrderRepo.save(order);
+
+    const updatedOrder = await customerOrderRepo.findOne({
+      where: { id: Number(id) },
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
+    });
+
+    res.json({
+      success: true,
+      message: `Order ${order.order_no} closed successfully`,
+      data: updatedOrder,
+    });
+  } catch (error) {
+    console.error("Error closing customer order:", error);
+    next(error);
   }
 };

@@ -45,6 +45,27 @@ const valueNetCalc = (row: any) => {
 
 const itemCountCalc = (row: any) => row.items?.length || 0;
 
+export const getStatusBackgroundColor = (status: string): string => {
+  if (status === "partially_delivered") {
+    return "#E5B080";
+  }
+  if (status === "open") {
+    return "#FFFFFF";
+  }
+  if (status === "delivered") {
+    return "#F3F4F6";
+  }
+  if (status === "closed") {
+    return "#6C757D";
+  }
+  return "#FFFFFF";
+};
+
+// Get status for a row
+const getRowStatus = (row: any): string => {
+  return row.auftrag_status || row.status || "open";
+};
+
 export function buildAuftragColumns({
   expandedDocIds,
   setExpandedDocIds,
@@ -80,7 +101,7 @@ export function buildAuftragColumns({
     buildItemCountColumn(itemCountCalc),
     {
       header: "Actions",
-      width: "120px",
+      width: "160px",
       align: "center",
       render: (row) => {
         const rechnungCount = (invoices || []).filter(
@@ -103,6 +124,8 @@ export function buildAuftragColumns({
             (row.id && (inv.auftrag_id === row.id || inv.auftragId === row.id)),
         ).length;
         const isConverted = rechnungCount > 0;
+        const status = getRowStatus(row);
+        const isClosed = status === "closed";
 
         return (
           <div className="flex items-center justify-center gap-1.5 font-poppins">
@@ -160,6 +183,23 @@ export function buildAuftragColumns({
             >
               <FileDown className="h-3.5 w-3.5" /> PDF
             </button>
+
+            {!isClosed && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // This will trigger the close action in the parent
+                  const event = new CustomEvent("closeAuftrag", {
+                    detail: row,
+                  });
+                  document.dispatchEvent(event);
+                }}
+                title="Close Auftrag"
+                className="px-2 py-1 text-[10px] font-bold bg-gray-600 hover:bg-gray-700 text-white rounded-[4px] transition shadow-md flex items-center gap-1"
+              >
+                Close
+              </button>
+            )}
           </div>
         );
       },
