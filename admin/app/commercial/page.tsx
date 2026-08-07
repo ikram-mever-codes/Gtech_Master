@@ -114,8 +114,7 @@ const invoiceTabs = [
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
 
-// Status sorting order: partially_delivered first, then open, then delivered, then closed
-export const STATUS_ORDER: Record<string, number> = {
+const STATUS_ORDER: Record<string, number> = {
   partially_delivered: 0,
   open: 1,
   delivered: 2,
