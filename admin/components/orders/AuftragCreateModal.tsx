@@ -37,7 +37,7 @@ const ItemRow: React.FC<{
   const name = item.item_name_de || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   const model = item.model || "";
-  console.log(item);
+
   return (
     <div
       ref={rowRef}
@@ -100,9 +100,10 @@ export default function AuftragCreateModal({
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
 
   const [filterCustomerId, setFilterCustomerId] = useState<string>("");
-  const [sourceSearch, setSourceSearch] = useState("");
+  const [searchEan, setSearchEan] = useState("");
+  const [searchItemNo, setSearchItemNo] = useState("");
+  const [searchName, setSearchName] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
-
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, string>>(
     {},
@@ -113,10 +114,14 @@ export default function AuftragCreateModal({
   const [shippingMethod, setShippingMethod] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Search function that makes API call
-  const performSearch = async (searchTerm: string, companyId?: string) => {
-    if (!searchTerm || searchTerm.length < 1) {
-      // If search is empty, load all items
+  const performSearch = async (
+    fields: { ean: string; itemNo: string; name: string },
+    companyId?: string,
+  ) => {
+    const { ean, itemNo, name } = fields;
+    const hasAnyTerm = !!(ean.trim() || itemNo.trim() || name.trim());
+
+    if (!hasAnyTerm) {
       await loadInitialItems(companyId);
       return;
     }
@@ -128,21 +133,11 @@ export default function AuftragCreateModal({
       const params: any = {
         limit: 1000,
         isActive: "Y",
-        // Always pass search parameter for all searches
-        // The backend will handle EAN vs text search
-        search: searchTerm,
       };
 
-      // // If company is selected, filter by company
-      // if (companyId) {
-      //   params.company = companyId;
-      // }
-
-      // Also pass eanSearch for numeric EAN searches as a hint
-      // But keep search for broader matching
-      if (/^\d+$/.test(searchTerm)) {
-        params.eanSearch = searchTerm;
-      }
+      if (ean.trim()) params.eanSearch = ean.trim();
+      if (itemNo.trim()) params.itemNoSearch = itemNo.trim();
+      if (name.trim()) params.nameSearch = name.trim();
 
       const response = await getItems(params, { refresh: true });
       const itemData = response?.data ?? response;
@@ -181,25 +176,38 @@ export default function AuftragCreateModal({
     }
   };
 
-  // Handle search input with debounce
-  const handleSearchChange = (value: string) => {
-    setSourceSearch(value);
+  const handleFieldSearchChange = (
+    field: "ean" | "itemNo" | "name",
+    value: string,
+  ) => {
+    const next = {
+      ean: field === "ean" ? value : searchEan,
+      itemNo: field === "itemNo" ? value : searchItemNo,
+      name: field === "name" ? value : searchName,
+    };
 
-    // Clear existing timer
+    if (field === "ean") setSearchEan(value);
+    if (field === "itemNo") setSearchItemNo(value);
+    if (field === "name") setSearchName(value);
+
     if (searchTimer) {
       clearTimeout(searchTimer);
     }
 
-    // If search is empty, load all items immediately
-    if (!value.trim()) {
+    const hasAnyTerm = !!(
+      next.ean.trim() ||
+      next.itemNo.trim() ||
+      next.name.trim()
+    );
+
+    if (!hasAnyTerm) {
       loadInitialItems(filterCustomerId || undefined);
       setHasSearched(false);
       return;
     }
 
-    // Debounce search by 400ms to avoid too many API calls
     const timer = setTimeout(() => {
-      performSearch(value.trim(), filterCustomerId || undefined);
+      performSearch(next, filterCustomerId || undefined);
     }, 400);
 
     setSearchTimer(timer);
@@ -208,7 +216,6 @@ export default function AuftragCreateModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Cleanup timer on unmount
     return () => {
       if (searchTimer) {
         clearTimeout(searchTimer);
@@ -223,7 +230,9 @@ export default function AuftragCreateModal({
     setSelectedItems(initialItem ? [initialItem] : []);
     setItemQuantities(itemKey ? { [itemKey]: "" } : {});
     setFilterCustomerId(initialCustomerId ? String(initialCustomerId) : "");
-    setSourceSearch("");
+    setSearchEan("");
+    setSearchItemNo("");
+    setSearchName("");
     setHasSearched(false);
     setTitle(initialItem ? initialItem.item_name_de || "" : "");
     setPaymentMethod("");
@@ -245,7 +254,6 @@ export default function AuftragCreateModal({
         console.error("Error loading customers/payment methods:", err),
       )
       .finally(() => {
-        // Load initial items after customers are loaded
         loadInitialItems(
           initialCustomerId ? String(initialCustomerId) : undefined,
         );
@@ -371,9 +379,9 @@ export default function AuftragCreateModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+        <div className="overflow-y-auto p-6 space-y-4">
+          <div className="flex justify-between items-start gap-3">
+            <div className="w-[30%]">
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Recipient customer * (required)
               </label>
@@ -382,8 +390,19 @@ export default function AuftragCreateModal({
                 onChange={(id: string) => {
                   setFilterCustomerId(id);
                   // Reload items when company changes
-                  if (sourceSearch.trim()) {
-                    performSearch(sourceSearch.trim(), id);
+                  const hasAnySearch =
+                    searchEan.trim() ||
+                    searchItemNo.trim() ||
+                    searchName.trim();
+                  if (hasAnySearch) {
+                    performSearch(
+                      {
+                        ean: searchEan,
+                        itemNo: searchItemNo,
+                        name: searchName,
+                      },
+                      id,
+                    );
                   } else {
                     loadInitialItems(id || undefined);
                   }
@@ -393,16 +412,46 @@ export default function AuftragCreateModal({
                 className="w-full"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Search Item nameEN DE, EAN, itemNo
-              </label>
-              <input
-                value={sourceSearch}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search by item no, EAN, or name..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
-              />
+            <div className="w-[70%] flex justify-between items-start gap-2">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  EAN
+                </label>
+                <input
+                  value={searchEan}
+                  onChange={(e) =>
+                    handleFieldSearchChange("ean", e.target.value)
+                  }
+                  placeholder="Exact EAN..."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Item No.
+                </label>
+                <input
+                  value={searchItemNo}
+                  onChange={(e) =>
+                    handleFieldSearchChange("itemNo", e.target.value)
+                  }
+                  placeholder="Exact item no..."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Item Name (EN/DE)
+                </label>
+                <input
+                  value={searchName}
+                  onChange={(e) =>
+                    handleFieldSearchChange("name", e.target.value)
+                  }
+                  placeholder="Item name..."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
 
@@ -469,15 +518,16 @@ export default function AuftragCreateModal({
               </div>
             ) : items.length === 0 ? (
               <div className="text-center py-6 text-gray-500 text-sm">
-                {sourceSearch && hasSearched ? (
+                {hasSearched ? (
                   <span>
                     No items match your search.
-                    {sourceSearch.length > 0 && /^\d+$/.test(sourceSearch) && (
-                      <span className="block text-xs text-gray-400 mt-1">
-                        Tip: Try searching by item number or name instead of
-                        EAN.
-                      </span>
-                    )}
+                    {(searchEan.length > 0 || searchItemNo.length > 0) &&
+                      /^\d+$/.test(searchEan || searchItemNo) && (
+                        <span className="block text-xs text-gray-400 mt-1">
+                          Tip: Try searching by item number or name instead of
+                          EAN.
+                        </span>
+                      )}
                   </span>
                 ) : (
                   "No items found."

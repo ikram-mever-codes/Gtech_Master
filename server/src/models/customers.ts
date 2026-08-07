@@ -171,6 +171,9 @@ export class Customer {
   @JoinTable({ name: "customer_tags" })
   tags!: Tag[];
 
+  @Column({ nullable: true })
+  contactName?: string;
+
   @Column({ type: "text", nullable: true })
   tagOrder?: string;
 
