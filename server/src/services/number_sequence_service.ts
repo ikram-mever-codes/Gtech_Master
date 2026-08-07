@@ -209,10 +209,20 @@ export class NumberSequenceService {
 
   static async seedDefaultSequences(): Promise<void> {
     const repo = AppDataSource.getRepository(NumberSequence);
+
+    try {
+      await repo.delete({ sequenceKey: "order" });
+      await repo.update(
+        { sequenceKey: "customer_order" },
+        { name: "Auftrag" },
+      );
+    } catch (err) {
+      console.warn("[NumberSequence] Migration warning:", err);
+    }
+
     const defaults = [
       { sequenceKey: "offer", name: "Angebot", prefix: "A", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
-      { sequenceKey: "order", name: "Auftrag", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
-      { sequenceKey: "customer_order", name: "Customer Order (Auftrag)", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
+      { sequenceKey: "customer_order", name: "Auftrag", prefix: "B", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "transfer_order", name: "Bestellung", prefix: "DE", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "invoice", name: "Rechnung", prefix: "R", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
       { sequenceKey: "invoice_correction", name: "Rechnungskorrektur", prefix: "RK", formatPattern: "{prefix}{yy}{mm}-{number}", minDigits: 1 },
@@ -232,6 +242,9 @@ export class NumberSequenceService {
         await repo.save(
           repo.create({ ...def, nextRunningNo: startNo }),
         );
+      } else if (exists.name !== def.name) {
+        exists.name = def.name;
+        await repo.save(exists);
       }
     }
   }
