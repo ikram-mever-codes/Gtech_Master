@@ -135,9 +135,29 @@ export default function AuftragCreateModal({
         isActive: "Y",
       };
 
-      if (ean.trim()) params.eanSearch = ean.trim();
-      if (itemNo.trim()) params.itemNoSearch = itemNo.trim();
-      if (name.trim()) params.nameSearch = name.trim();
+      // Search parameters - try different possible parameter names
+      if (ean.trim()) {
+        params.eanSearch = ean.trim();
+        // Also try alternative parameter names
+        params.ean = ean.trim();
+      }
+
+      if (itemNo.trim()) {
+        params.itemNoSearch = itemNo.trim();
+        params.itemNo = itemNo.trim();
+        params.de_no = itemNo.trim();
+      }
+
+      if (name.trim()) {
+        // Try multiple possible parameter names for name search
+        params.nameSearch = name.trim();
+        params.name = name.trim();
+        params.itemName = name.trim();
+        params.item_name = name.trim();
+        params.search = name.trim(); // Generic search fallback
+      }
+
+      console.log("Search params:", params); // Debug log to see what's being sent
 
       const response = await getItems(params, { refresh: true });
       const itemData = response?.data ?? response;
