@@ -4213,23 +4213,62 @@ export class OfferController {
           );
       }
 
-      const taxRatePercent = offer.taxRate ? Number(offer.taxRate) : 19;
-      yPos += 16;
-      doc
-        .font(R)
-        .text(
-          `MwSt. ${formatGermanNum(taxRatePercent, 2)}%`,
-          TOTALS_LABEL_X,
-          yPos,
-        );
-      doc
-        .font(R)
-        .text(
-          `${formatGermanNum(totals.taxAmount, 2)} ${offerCurr}`,
-          TOTALS_VAL_X - TOTALS_RIGHT_PAD,
-          yPos,
-          { align: "right", width: TOTALS_VAL_W },
-        );
+      const vatMap = new Map<number, number>();
+      (offer.lineItems || (offer as any).items || []).forEach((it: any) => {
+        if (it.isFreizeile) return;
+        const rate =
+          it.taxRate !== undefined
+            ? Number(it.taxRate)
+            : offer.taxRate !== undefined
+              ? Number(offer.taxRate)
+              : 19;
+        const lineNet = Number(it.lineTotal || (Number(it.quantity || 1) * Number(it.price || 0)));
+        const vatAmt = lineNet * (rate / 100);
+        vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
+      });
+
+      const vatEntries = Array.from(vatMap.entries())
+        .map(([rate, amount]) => ({ rate, amount }))
+        .sort((a, b) => b.rate - a.rate);
+
+      if (vatEntries.length > 0) {
+        for (const entry of vatEntries) {
+          yPos += 16;
+          doc
+            .font(R)
+            .text(
+              `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
+              TOTALS_LABEL_X,
+              yPos,
+            );
+          doc
+            .font(R)
+            .text(
+              `${formatGermanNum(entry.amount, 2)} ${offerCurr}`,
+              TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+              yPos,
+              { align: "right", width: TOTALS_VAL_W },
+            );
+        }
+      } else {
+        const taxRatePercent = offer.taxRate ? Number(offer.taxRate) : 19;
+        yPos += 16;
+        doc
+          .font(R)
+          .text(
+            `MwSt. ${formatGermanNum(taxRatePercent, 2)}%`,
+            TOTALS_LABEL_X,
+            yPos,
+          );
+        doc
+          .font(R)
+          .text(
+            `${formatGermanNum(totals.taxAmount, 2)} ${offerCurr}`,
+            TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+            yPos,
+            { align: "right", width: TOTALS_VAL_W },
+          );
+      }
 
       yPos += 22;
       const bruttoBoxX = TOTALS_LABEL_X - 6;

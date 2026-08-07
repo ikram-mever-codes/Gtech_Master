@@ -2855,10 +2855,12 @@ const ItemDetailsPage = () => {
 
         <div className="mt-8 flex flex-wrap gap-3 justify-between items-center">
           <div className="flex gap-3">
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              Export Details
-            </button>
+            {(activeTab === "pictures" || activeTab === "attachments") && (
+              <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                Export Details
+              </button>
+            )}
             <input
               type="file"
               ref={fileInputRef}
@@ -2874,22 +2876,27 @@ const ItemDetailsPage = () => {
               multiple
               onChange={(e) => handleAttachmentUpload(e)}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+            {activeTab === "pictures" && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPictures}
+                className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
+                  uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
                 }`}
-            >
-              <PhotoIcon className="h-4 w-4" />
-              {uploadingPictures ? "Uploading..." : "Add Pictures"}
-            </button>
-            <button
-              onClick={() => attachmentInputRef.current?.click()}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
-            >
-              <DocumentIcon className="h-4 w-4" />
-              Add Documents
-            </button>
+              >
+                <PhotoIcon className="h-4 w-4" />
+                {uploadingPictures ? "Uploading..." : "Add Pictures"}
+              </button>
+            )}
+            {activeTab === "attachments" && (
+              <button
+                onClick={() => attachmentInputRef.current?.click()}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
+              >
+                <DocumentIcon className="h-4 w-4" />
+                Add Documents
+              </button>
+            )}
           </div>
 
           <div className="text-sm text-gray-500">
