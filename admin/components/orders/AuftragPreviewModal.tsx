@@ -434,7 +434,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       o.items?.[0]?.item_name;
 
     return {
-      title: item1Title || o.title || "",
+      title: o.title || item1Title || "",
       status: o.status || "Draft",
       currency: o.currency || "EUR",
       taxRate: o.tax_rate ?? 19,
@@ -743,12 +743,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   );
 
   const item1Title =
+    order.title ||
     visibleLineItems[0]?.itemName ||
     visibleLineItems[0]?.item_name ||
     visibleLineItems[0]?.description ||
     order.orderItems?.[0]?.itemName ||
     order.orderItems?.[0]?.item_name ||
-    order.title ||
     "—";
 
   return (
