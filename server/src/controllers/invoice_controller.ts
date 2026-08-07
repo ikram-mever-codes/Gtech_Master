@@ -98,7 +98,7 @@ export class InvoiceController {
 
       const dueDays =
         customer.defaultPaymentDueDays !== undefined &&
-        customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
           ? customer.defaultPaymentDueDays
           : 7;
 
@@ -214,7 +214,7 @@ export class InvoiceController {
                   .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
                   .fontSize(8)
                   .text("中国安徽...", leftAlignX + 220, yPos);
-              } catch (e) {}
+              } catch (e) { }
             }
             doc.font("Helvetica");
           }
@@ -283,9 +283,8 @@ export class InvoiceController {
         doc.text(invoice.customer?.addressLine1 || "", leftAlignX, yPos);
         yPos += 12;
         doc.text(
-          `${invoice.customer?.postalCode || ""} ${
-            invoice.customer?.city || ""
-          }`.trim(),
+          `${invoice.customer?.postalCode || ""} ${invoice.customer?.city || ""
+            }`.trim(),
           leftAlignX,
           yPos,
         );
@@ -519,16 +518,14 @@ export class InvoiceController {
         }
 
         doc.text(
-          `Zahlungsart: ${
-            invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
+          `Zahlungsart: ${invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
           }`,
           leftAlignX,
           yPos,
         );
         yPos += 15;
         doc.text(
-          `Versandart: ${
-            invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
+          `Versandart: ${invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
           }`,
           leftAlignX,
           yPos,
@@ -536,7 +533,7 @@ export class InvoiceController {
         yPos += 15;
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-          invoice.customer?.defaultPaymentDueDays !== null
+            invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         const dueDateLabel = invoice.dueDate
@@ -696,7 +693,7 @@ export class InvoiceController {
       if (invoiceData.deliveryDate) {
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-          invoice.customer?.defaultPaymentDueDays !== null
+            invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         invoiceData.dueDate = calculateDueDate(
@@ -980,7 +977,7 @@ export class InvoiceController {
               (sum, item) =>
                 sum +
                 Number(item.quantity || 0) *
-                  Number(item.unitPrice || item.netPrice || 0),
+                Number(item.unitPrice || item.netPrice || 0),
               0,
             );
             const freight = Number(inv.freightCost || 0);
@@ -1004,12 +1001,12 @@ export class InvoiceController {
 
           const shipCompanyCandidate =
             typeof cargo?.ship_to_company_name === "string" &&
-            cargo.ship_to_company_name.trim().length > 1 &&
-            !isStreetAddress(cargo.ship_to_company_name)
+              cargo.ship_to_company_name.trim().length > 1 &&
+              !isStreetAddress(cargo.ship_to_company_name)
               ? cargo.ship_to_company_name.trim()
               : typeof cargo?.ship_to_display_name === "string" &&
-                  cargo.ship_to_display_name.trim().length > 1 &&
-                  !isStreetAddress(cargo.ship_to_display_name)
+                cargo.ship_to_display_name.trim().length > 1 &&
+                !isStreetAddress(cargo.ship_to_display_name)
                 ? cargo.ship_to_display_name.trim()
                 : undefined;
 
@@ -1082,7 +1079,7 @@ export class InvoiceController {
           ship_to:
             cci.customer?.company_name ||
             (cci.customer?.ship_to_address &&
-            !isStreetAddress(cci.customer.ship_to_address)
+              !isStreetAddress(cci.customer.ship_to_address)
               ? cci.customer.ship_to_address
               : "-"),
           customItemCount,
@@ -1093,10 +1090,10 @@ export class InvoiceController {
           cargo: cargoNo ? { id: cargoNo, cargo_no: cargoNo } : null,
           customer: cci.customer
             ? {
-                id: cci.customer.original_customer_id || cci.customer.id,
-                companyName: cci.customer.company_name,
-                email: cci.customer.email,
-              }
+              id: cci.customer.original_customer_id || cci.customer.id,
+              companyName: cci.customer.company_name,
+              email: cci.customer.email,
+            }
             : null,
           items: cci.items,
         });
@@ -1197,10 +1194,10 @@ export class InvoiceController {
             ean: ci.ean,
             taric: ci.taric_code
               ? {
-                  code: ci.taric_code,
-                  name_en: ci.taric_name_en,
-                  duty_rate: Number(ci.duty_rate || 0),
-                }
+                code: ci.taric_code,
+                name_en: ci.taric_name_en,
+                duty_rate: Number(ci.duty_rate || 0),
+              }
               : null,
           },
           order: { order_no: ci.order_no || cciInvoice.order_number },
@@ -1272,24 +1269,24 @@ export class InvoiceController {
           status: cciInvoice.status,
           customer: cciInvoice.customer
             ? {
-                id:
-                  cciInvoice.customer.original_customer_id ||
-                  cciInvoice.customer.id,
-                companyName: cciInvoice.customer.company_name,
-                email: cciInvoice.customer.email,
-              }
+              id:
+                cciInvoice.customer.original_customer_id ||
+                cciInvoice.customer.id,
+              companyName: cciInvoice.customer.company_name,
+              email: cciInvoice.customer.email,
+            }
             : null,
         },
         cargo: cciInvoice.cargo_no
           ? {
-              id: cciInvoice.cargo_no,
-              cargo_no: cciInvoice.cargo_no,
-              ship_to:
-                cciInvoice.customer?.company_name ||
-                cciInvoice.customer?.ship_to_address ||
-                null,
-              bill_to: "GTech Industries GmbH",
-            }
+            id: cciInvoice.cargo_no,
+            cargo_no: cciInvoice.cargo_no,
+            ship_to:
+              cciInvoice.customer?.company_name ||
+              cciInvoice.customer?.ship_to_address ||
+              null,
+            bill_to: "GTech Industries GmbH",
+          }
           : null,
         orderNosInCargo: [cciInvoice.order_number].filter(Boolean),
         detailedItems,
@@ -1400,10 +1397,10 @@ export class InvoiceController {
       orderItems = invoice.items.map((invItem: any) => {
         const p = Number(
           invItem.unitPrice ||
-            invItem.netPrice ||
-            invItem.unit_price ||
-            invItem.price ||
-            0,
+          invItem.netPrice ||
+          invItem.unit_price ||
+          invItem.price ||
+          0,
         );
         return {
           id: invItem.id,
@@ -1471,8 +1468,8 @@ export class InvoiceController {
     const manualTarics =
       uniqueManualCodes.length > 0
         ? await AppDataSource.getRepository(Taric).find({
-            where: { code: In(uniqueManualCodes) },
-          })
+          where: { code: In(uniqueManualCodes) },
+        })
         : [];
     const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -2501,8 +2498,8 @@ export class InvoiceController {
             const totalPrice = qty * unitPrice;
             const validItemId =
               item?.id &&
-              !isNaN(Number(item.id)) &&
-              Number.isInteger(Number(item.id))
+                !isNaN(Number(item.id)) &&
+                Number.isInteger(Number(item.id))
                 ? Number(item.id)
                 : null;
 
@@ -2528,8 +2525,8 @@ export class InvoiceController {
           invoice.items.forEach((invItem: any) => {
             const validItemId =
               invItem.item_id &&
-              !isNaN(Number(invItem.item_id)) &&
-              Number.isInteger(Number(invItem.item_id))
+                !isNaN(Number(invItem.item_id)) &&
+                Number.isInteger(Number(invItem.item_id))
                 ? Number(invItem.item_id)
                 : null;
             itemsToSave.push(
