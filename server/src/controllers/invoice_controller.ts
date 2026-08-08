@@ -1050,16 +1050,21 @@ export class InvoiceController {
           cci.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0;
         const cargoNo = cci.cargo_no || cci.order_number || "";
 
-        let cciGrossTotal = Number(cci.gross_total || 0);
-        if (cciGrossTotal === 0 && cci.items && cci.items.length > 0) {
-          const itemsSum = cci.items.reduce(
-            (s, it) =>
-              s + Number(it.quantity || 0) * Number(it.unit_price || 0),
-            0,
-          );
-          const freight = Number(cci.freight_cost || 0);
-          cciGrossTotal = itemsSum + freight;
-        }
+        const itemsSum = (cci.items || []).reduce(
+          (s, it) =>
+            s +
+            Number(it.quantity || 0) *
+            (Number(it.unit_price || 0) ||
+              Number((it as any).price || 0) ||
+              Number((it as any).unitPrice || 0) ||
+              Number((it as any).net_price || 0)),
+          0,
+        );
+        const freight = Number(cci.freight_cost || 0);
+        let cciGrossTotal =
+          itemsSum > 0
+            ? itemsSum + freight
+            : Number(cci.gross_total || 0) || freight;
 
         finalDataMap.set(cci.id, {
           id: cci.id,
@@ -1484,7 +1489,7 @@ export class InvoiceController {
               where: { id: Number(itemId) },
               relations: ["taric", "purchasePrices"],
             });
-          } catch (e) {}
+          } catch (e) { }
         }
 
         const ean = item?.ean || oi._fallbackEan || "-";
@@ -1524,7 +1529,7 @@ export class InvoiceController {
           item: item || oi.item,
           v:
             ((item?.length || 0) * (item?.width || 0) * (item?.height || 0)) /
-              1000 || 0,
+            1000 || 0,
           w: item?.weight || 0,
           _effectiveTaricCode: getEffectiveTaricCode(oi),
           _fallbackEan: ean,

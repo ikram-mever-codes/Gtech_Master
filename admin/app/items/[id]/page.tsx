@@ -61,9 +61,8 @@ const StatusIndicator = ({
   label?: string;
 }) => (
   <span
-    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-      value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-    }`}
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+      }`}
   >
     {value ? (
       <CheckCircleIcon className="h-3 w-3" />
@@ -432,25 +431,25 @@ const ItemDetailsPage = () => {
         rawItem.supplierItem ||
         (defaultSupplierItem
           ? {
-              priceRMB: defaultSupplierItem.priceRMB || "0",
-              currency: defaultSupplierItem.currency || "RMB",
-              isPO: defaultSupplierItem.isPO || "No",
-              moq: defaultSupplierItem.moq || "0",
-              interval: defaultSupplierItem.interval || "0",
-              leadTime: defaultSupplierItem.leadTime || "",
-              noteCN: defaultSupplierItem.noteCN || "",
-              url: defaultSupplierItem.url || "",
-            }
+            priceRMB: defaultSupplierItem.priceRMB || "0",
+            currency: defaultSupplierItem.currency || "RMB",
+            isPO: defaultSupplierItem.isPO || "No",
+            moq: defaultSupplierItem.moq || "0",
+            interval: defaultSupplierItem.interval || "0",
+            leadTime: defaultSupplierItem.leadTime || "",
+            noteCN: defaultSupplierItem.noteCN || "",
+            url: defaultSupplierItem.url || "",
+          }
           : {
-              priceRMB: "0",
-              currency: "RMB",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            }),
+            priceRMB: "0",
+            currency: "RMB",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          }),
       isLabelPrint:
         rawItem.isLabelPrint !== undefined
           ? toBool(rawItem.isLabelPrint)
@@ -537,8 +536,8 @@ const ItemDetailsPage = () => {
     const term = customerSearch.trim().toLowerCase();
     const list = term
       ? allCustomers.filter((c) =>
-          (c.companyName || "").toLowerCase().includes(term),
-        )
+        (c.companyName || "").toLowerCase().includes(term),
+      )
       : allCustomers;
     return list.slice(0, 50);
   })();
@@ -1175,11 +1174,10 @@ const ItemDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
                     ? "text-gray-900 border-b-2 border-gray-600"
                     : "text-gray-500 hover:text-gray-700"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -1688,40 +1686,8 @@ const ItemDetailsPage = () => {
           {activeTab === "others" && (
             <div>
               <div className="mb-10">
-                <SectionHeader title="Dimensions / Others" />
+                <SectionHeader title="Others" />
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <EditableInfoRow
-                    label="Weight"
-                    value={itemData.dimensions.weight}
-                    field="dimensions.weight"
-                    editMode={editMode}
-                    itemData={itemData}
-                    setItemData={setItemData}
-                  />
-                  <EditableInfoRow
-                    label="Length"
-                    value={itemData.dimensions.length}
-                    field="dimensions.length"
-                    editMode={editMode}
-                    itemData={itemData}
-                    setItemData={setItemData}
-                  />
-                  <EditableInfoRow
-                    label="Width"
-                    value={itemData.dimensions.width}
-                    field="dimensions.width"
-                    editMode={editMode}
-                    itemData={itemData}
-                    setItemData={setItemData}
-                  />
-                  <EditableInfoRow
-                    label="Height"
-                    value={itemData.dimensions.height}
-                    field="dimensions.height"
-                    editMode={editMode}
-                    itemData={itemData}
-                    setItemData={setItemData}
-                  />
                   <SelectInfoRow
                     label="Is QTY Dividable"
                     value={itemData.others.isQTYdiv ? "Y" : "N"}
@@ -1960,20 +1926,18 @@ const ItemDetailsPage = () => {
                     return (
                       <div
                         key={si.id}
-                        className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${
-                          si.isDefault
+                        className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${si.isDefault
                             ? "bg-blue-50/20 border-blue-200 shadow-sm"
                             : "bg-white border-gray-100 hover:border-gray-200"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between flex-wrap gap-3">
                           <div className="flex items-center gap-4">
                             <div
-                              className={`p-2 rounded-lg ${
-                                si.isDefault
+                              className={`p-2 rounded-lg ${si.isDefault
                                   ? "bg-blue-100 text-blue-600"
                                   : "bg-gray-100 text-gray-400"
-                              }`}
+                                }`}
                             >
                               <Package className="h-5 w-5" />
                             </div>
@@ -2015,11 +1979,10 @@ const ItemDetailsPage = () => {
                             <button
                               onClick={() => window.open(si.url, "_blank")}
                               disabled={!si.url}
-                              className={`p-2 rounded-lg transition-all ${
-                                si.url
+                              className={`p-2 rounded-lg transition-all ${si.url
                                   ? "text-blue-500 hover:bg-blue-50"
                                   : "text-gray-300 cursor-not-allowed"
-                              }`}
+                                }`}
                             >
                               <LinkIcon className="h-5 w-5" />
                             </button>
@@ -2056,11 +2019,10 @@ const ItemDetailsPage = () => {
                                       successStyles,
                                     );
                                   }}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                    si.isDefault
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
                                       ? "bg-blue-600 text-white"
                                       : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
-                                  }`}
+                                    }`}
                                 >
                                   {si.isDefault ? "Default" : "Set Default"}
                                 </button>
@@ -2374,11 +2336,11 @@ const ItemDetailsPage = () => {
                                 (() => {
                                   const items =
                                     supplierRelatedItems[
-                                      Number(si.supplierId)
+                                    Number(si.supplierId)
                                     ] || [];
                                   const term = (
                                     supplierSearchTerms[
-                                      Number(si.supplierId)
+                                    Number(si.supplierId)
                                     ] || ""
                                   ).toLowerCase();
                                   const filtered = items.filter(
@@ -2411,11 +2373,10 @@ const ItemDetailsPage = () => {
                                         onClick={() =>
                                           router.push(`/items/${item.id}`)
                                         }
-                                        className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${
-                                          isCurrent
+                                        className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${isCurrent
                                             ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
                                             : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
-                                        }`}
+                                          }`}
                                       >
                                         <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
                                           <span className="font-semibold line-clamp-1 group-hover/item:text-[#8CC21B] transition-colors">
@@ -2702,11 +2663,11 @@ const ItemDetailsPage = () => {
                                   <a
                                     href={
                                       finalUrl.includes("cloudinary") &&
-                                      !finalUrl.includes("/raw/")
+                                        !finalUrl.includes("/raw/")
                                         ? finalUrl.replace(
-                                            "/upload/",
-                                            "/upload/fl_attachment/",
-                                          )
+                                          "/upload/",
+                                          "/upload/fl_attachment/",
+                                        )
                                         : finalUrl
                                     }
                                     download={
@@ -2764,11 +2725,11 @@ const ItemDetailsPage = () => {
               </div>
 
               {itemData.pictures &&
-              [
-                itemData.pictures.shopPicture,
-                itemData.pictures.ebayPictures,
-                ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
-              ].filter(Boolean).length > 0 ? (
+                [
+                  itemData.pictures.shopPicture,
+                  itemData.pictures.ebayPictures,
+                  ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
+                ].filter(Boolean).length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {[
                     {
@@ -2879,10 +2840,10 @@ const ItemDetailsPage = () => {
                     setItemData((prev: any) =>
                       prev
                         ? {
-                            ...prev,
-                            tags: newTags,
-                            tagOrder: newTags.map((t: any) => t.id).join(","),
-                          }
+                          ...prev,
+                          tags: newTags,
+                          tagOrder: newTags.map((t: any) => t.id).join(","),
+                        }
                         : null,
                     );
                   }}
@@ -2894,10 +2855,12 @@ const ItemDetailsPage = () => {
 
         <div className="mt-8 flex flex-wrap gap-3 justify-between items-center">
           <div className="flex gap-3">
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              Export Details
-            </button>
+            {(activeTab === "pictures" || activeTab === "attachments") && (
+              <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                Export Details
+              </button>
+            )}
             <input
               type="file"
               ref={fileInputRef}
@@ -2913,23 +2876,27 @@ const ItemDetailsPage = () => {
               multiple
               onChange={(e) => handleAttachmentUpload(e)}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
-                uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-            >
-              <PhotoIcon className="h-4 w-4" />
-              {uploadingPictures ? "Uploading..." : "Add Pictures"}
-            </button>
-            <button
-              onClick={() => attachmentInputRef.current?.click()}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
-            >
-              <DocumentIcon className="h-4 w-4" />
-              Add Documents
-            </button>
+            {activeTab === "pictures" && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPictures}
+                className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
+                  uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                <PhotoIcon className="h-4 w-4" />
+                {uploadingPictures ? "Uploading..." : "Add Pictures"}
+              </button>
+            )}
+            {activeTab === "attachments" && (
+              <button
+                onClick={() => attachmentInputRef.current?.click()}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
+              >
+                <DocumentIcon className="h-4 w-4" />
+                Add Documents
+              </button>
+            )}
           </div>
 
           <div className="text-sm text-gray-500">

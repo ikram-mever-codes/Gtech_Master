@@ -183,6 +183,7 @@ export interface PdfDocumentOptions {
   paymentTerms?: string;
   paymentMethod?: string;
   outputFilePath: string;
+  vatBreakdown?: Array<{ rate: number; amount: number }>;
 }
 
 export async function generateGtechDocumentPdf(
@@ -728,17 +729,66 @@ export async function generateGtechDocumentPdf(
       );
     }
 
-    const taxRatePercent = opts.taxRate ? Number(opts.taxRate) : 19;
-    yPos += 16;
-    doc
-      .font(R)
-      .text(`MwSt. ${formatGermanNum(taxRatePercent, 2)}%`, TOTALS_LABEL_X, yPos);
-    doc.font(R).text(
-      `${formatGermanNum(opts.taxAmount, 2)} ${currency}`,
-      TOTALS_VAL_X - TOTALS_RIGHT_PAD,
-      yPos,
-      { align: "right", width: TOTALS_VAL_W },
-    );
+    let vatEntries: Array<{ rate: number; amount: number }> = [];
+
+    if (opts.vatBreakdown && opts.vatBreakdown.length > 0) {
+      vatEntries = opts.vatBreakdown;
+    } else {
+      const vatMap = new Map<number, number>();
+      (opts.lineItems || []).forEach((it) => {
+        if (it.isFreizeile) return;
+        const rate =
+          it.vatRate !== undefined
+            ? Number(it.vatRate)
+            : opts.taxRate !== undefined
+              ? Number(opts.taxRate)
+              : 19;
+        const lineNet = Number(it.lineTotal || 0);
+        const vatAmt = lineNet * (rate / 100);
+        vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
+      });
+
+      if (vatMap.size > 0) {
+        vatEntries = Array.from(vatMap.entries())
+          .map(([rate, amount]) => ({ rate, amount }))
+          .sort((a, b) => b.rate - a.rate);
+      }
+    }
+
+    if (vatEntries.length > 0) {
+      for (const entry of vatEntries) {
+        yPos += 16;
+        doc
+          .font(R)
+          .text(
+            `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
+            TOTALS_LABEL_X,
+            yPos,
+          );
+        doc.font(R).text(
+          `${formatGermanNum(entry.amount, 2)} ${currency}`,
+          TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+          yPos,
+          { align: "right", width: TOTALS_VAL_W },
+        );
+      }
+    } else {
+      const taxRatePercent = opts.taxRate ? Number(opts.taxRate) : 19;
+      yPos += 16;
+      doc
+        .font(R)
+        .text(
+          `MwSt. ${formatGermanNum(taxRatePercent, 2)}%`,
+          TOTALS_LABEL_X,
+          yPos,
+        );
+      doc.font(R).text(
+        `${formatGermanNum(opts.taxAmount, 2)} ${currency}`,
+        TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+        yPos,
+        { align: "right", width: TOTALS_VAL_W },
+      );
+    }
 
     yPos += 22;
     const bruttoBoxX = TOTALS_LABEL_X - 6;
