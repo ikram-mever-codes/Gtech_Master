@@ -61,7 +61,6 @@ export const getStatusBackgroundColor = (status: string): string => {
   return "#FFFFFF";
 };
 
-// Get status for a row
 const getRowStatus = (row: any): string => {
   return row.auftrag_status || row.status || "open";
 };

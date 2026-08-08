@@ -9,7 +9,6 @@ import {
   LinkIcon,
   CubeIcon,
   ArrowUpTrayIcon,
-  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
@@ -23,7 +22,6 @@ import {
   deleteOrderLineItem,
   previewOrderLineItemPrice,
   formatCurrency,
-  closeCustomerOrder,
 } from "@/api/customer_orders";
 import { getItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
@@ -310,7 +308,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [closing, setClosing] = useState(false);
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState<any>({});
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
@@ -355,18 +352,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     (sum: any, key) => sum + (linkedDocumentsByType[key]?.length || 0),
     0,
   );
-
-  // Check if order has Rechnung (invoice) or RechnungK documents
-  const hasRechnungOrLieferschein = () => {
-    const rechnungen = linkedDocumentsByType.rechnungen || [];
-    const rechnungenK = linkedDocumentsByType.rechnungenK || [];
-    return rechnungen.length > 0 || rechnungenK.length > 0;
-  };
-
-  // Check if order is already closed
-  const isOrderClosed = () => {
-    return order?.auftrag_status === "closed" || order?.status === "Closed";
-  };
 
   const getLinkedDocDisplayNumber = (kind: string, doc: any): string => {
     if (kind === "offers") return doc.offerNumber || doc.id;
@@ -559,56 +544,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       onChanged?.();
     } catch (e) {
       console.error("Error deleting Auftrag:", e);
-    }
-  };
-
-  const handleCloseOrder = async () => {
-    if (!order) return;
-
-    // Check if order already has Rechnung or Lieferschein
-    if (!hasRechnungOrLieferschein()) {
-      toast.error(
-        "Cannot close order: No Rechnung or Lieferschein exists.",
-        errorStyles,
-      );
-      return;
-    }
-
-    if (isOrderClosed()) {
-      toast.error("Order is already closed.", errorStyles);
-      return;
-    }
-
-    if (
-      !window.confirm(
-        `Close Auftrag ${order.order_no}? This will set the status to "Closed".`,
-      )
-    ) {
-      return;
-    }
-
-    setClosing(true);
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const res = await closeCustomerOrder(order.id, today);
-
-      if (res.success) {
-        toast.success(
-          `Auftrag ${order.order_no} closed successfully.`,
-          successStyles,
-        );
-        await refreshLocal();
-        onChanged?.();
-        // Exit edit mode if it was active
-        setEdit(false);
-      } else {
-        toast.error(res.message || "Failed to close order.", errorStyles);
-      }
-    } catch (e: any) {
-      console.error("Error closing order:", e);
-      toast.error(e.message || "An error occurred while closing.", errorStyles);
-    } finally {
-      setClosing(false);
     }
   };
 
@@ -816,9 +751,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     order.orderItems?.[0]?.item_name ||
     "—";
 
-  const canDelete = !hasRechnungOrLieferschein();
-  const canClose = hasRechnungOrLieferschein() && !isOrderClosed();
-
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -830,26 +762,22 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </p>
               <span
                 className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                  isOrderClosed()
-                    ? "bg-gray-100 text-gray-600 border-gray-200"
-                    : order.auftrag_status === "delivered" ||
-                        order.status === "Completed"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : order.auftrag_status === "partially_delivered" ||
-                          order.status === "In Progress"
-                        ? "bg-amber-50 text-amber-700 border-amber-200"
-                        : "bg-blue-50 text-blue-700 border-blue-200"
-                }`}
-              >
-                {isOrderClosed()
-                  ? "Closed"
-                  : order.auftrag_status === "delivered" ||
-                      order.status === "Completed"
-                    ? "Delivered"
+                  order.auftrag_status === "delivered" ||
+                  order.status === "Completed"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                     : order.auftrag_status === "partially_delivered" ||
                         order.status === "In Progress"
-                      ? "Partially Delivered"
-                      : "Open"}
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
+              >
+                {order.auftrag_status === "delivered" ||
+                order.status === "Completed"
+                  ? "Delivered"
+                  : order.auftrag_status === "partially_delivered" ||
+                      order.status === "In Progress"
+                    ? "Partially Delivered"
+                    : "Open"}
               </span>
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
@@ -1060,6 +988,19 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   onChange={(e) => patch({ title: e.target.value })}
                 />
               </Field>
+              {/* <Field label="Status" edit={edit} value={order.status}>
+                <select
+                  className={inputCls}
+                  value={form.status}
+                  onChange={(e) => patch({ status: e.target.value })}
+                >
+                  {ORDER_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </Field> */}
               <Field
                 label="Delivery Date"
                 edit={edit}
@@ -1853,53 +1794,15 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
-          <div className="flex items-center gap-2">
+          <div>
             {edit && userRole === UserRole.ADMIN && (
-              <>
-                {canDelete ? (
-                  <button
-                    onClick={handleDelete}
-                    className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    Delete Auftrag
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    className="px-4 py-2 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-lg flex items-center gap-1 font-semibold cursor-not-allowed"
-                    title="Cannot delete: Rechnung or Lieferschein exists"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    Delete Auftrag
-                  </button>
-                )}
-              </>
-            )}
-            {edit && userRole === UserRole.ADMIN && canClose && (
               <button
-                onClick={handleCloseOrder}
-                disabled={closing}
-                className="px-4 py-2 text-sm text-green-700 bg-white border border-green-300/80 rounded-lg hover:bg-green-50 flex items-center gap-1 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
               >
-                {closing ? (
-                  <>
-                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-green-700 border-t-transparent" />
-                    Closing…
-                  </>
-                ) : (
-                  <>
-                    <CheckCircleIcon className="h-4 w-4" />
-                    Close Auftrag
-                  </>
-                )}
+                <TrashIcon className="h-4 w-4" />
+                Delete Auftrag
               </button>
-            )}
-            {isOrderClosed() && (
-              <span className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg flex items-center gap-1">
-                <CheckCircleIcon className="h-4 w-4" />
-                Closed
-              </span>
             )}
           </div>
           <div className="flex gap-2">
