@@ -17,6 +17,7 @@ import {
   getCustomerOrderById,
   updateCustomerOrder,
   deleteCustomerOrder,
+  closeCustomerOrder,
   createOrderLineItem,
   updateOrderLineItem,
   deleteOrderLineItem,
@@ -287,6 +288,25 @@ const getLineTaxRate = (item: any, order: any): number => {
 const getShippingTaxRate = (order: any): number =>
   parseFlexibleNumber(order?.tax_rate) ?? 19;
 
+/** Distinct VAT rates currently in use on the Auftrag (line items + shipping).
+ * Pass excludeItemId when checking an edit to an existing line, so that
+ * line's own (about-to-change) rate isn't counted against itself. */
+const getDistinctVatRates = (
+  order: any,
+  excludeItemId?: string,
+): Set<number> => {
+  const items = (order?.orderItems || []) as any[];
+  const rates = new Set<number>();
+  items.forEach((li: any) => {
+    if (excludeItemId && String(li.id) === String(excludeItemId)) return;
+    rates.add(getLineTaxRate(li, order));
+  });
+  if (order?.shipping_method) rates.add(getShippingTaxRate(order));
+  return rates;
+};
+
+const MAX_DISTINCT_VAT_RATES = 3;
+
 const getLineItemTotal = (item: any): number => {
   const qty = parseFlexibleNumber(item?.quantity) ?? 1;
   const price = parseFlexibleNumber(item?.price) ?? 0;
@@ -308,6 +328,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState<any>({});
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
@@ -352,6 +373,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     (sum: any, key) => sum + (linkedDocumentsByType[key]?.length || 0),
     0,
   );
+
+  // Once a Rechnung or Lieferschein has been generated off this Auftrag,
+  // it can no longer be deleted — it can only be closed from here on.
+  const hasRechnungOrLieferschein =
+    (linkedDocumentsByType.rechnungen?.length || 0) > 0;
+  const isAuftragClosed = order?.auftrag_status === "closed";
 
   const getLinkedDocDisplayNumber = (kind: string, doc: any): string => {
     if (kind === "offers") return doc.offerNumber || doc.id;
@@ -547,6 +574,31 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     }
   };
 
+  const handleCloseAuftrag = async () => {
+    if (!order) return;
+    if (
+      !window.confirm(`Close Auftrag ${order.order_no}? This can't be undone.`)
+    )
+      return;
+    setClosing(true);
+    try {
+      const res: any = await closeCustomerOrder(order.id);
+      if (res?.success === false) {
+        toast.error(res?.message || "Couldn't close the Auftrag.", errorStyles);
+        return;
+      }
+      toast.success("Auftrag closed successfully.", successStyles);
+      await refreshLocal();
+      setEdit(false);
+      onChanged?.();
+    } catch (e: any) {
+      console.error("Error closing Auftrag:", e);
+      toast.error(e.message || "Couldn't close the Auftrag.", errorStyles);
+    } finally {
+      setClosing(false);
+    }
+  };
+
   const setHighlightColor = async (color: string) => {
     if (!order) return;
     try {
@@ -628,6 +680,18 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       newLine.taxRate.trim() === ""
         ? orderRate
         : (parseFlexibleNumber(newLine.taxRate) ?? orderRate);
+
+    const currentRates = getDistinctVatRates(order);
+    if (
+      currentRates.size >= MAX_DISTINCT_VAT_RATES &&
+      !currentRates.has(requestedRate)
+    ) {
+      toast.error(
+        `Auftrag darf nicht mehr als ${MAX_DISTINCT_VAT_RATES} unterschiedliche MwSt.-Sätze gleichzeitig haben.`,
+        errorStyles,
+      );
+      return;
+    }
 
     try {
       await createOrderLineItem(order.id, {
@@ -768,16 +832,20 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     : order.auftrag_status === "partially_delivered" ||
                         order.status === "In Progress"
                       ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
+                      : order.auftrag_status === "closed"
+                        ? "bg-gray-200 text-gray-700 border-gray-300"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
                 }`}
               >
-                {order.auftrag_status === "delivered" ||
-                order.status === "Completed"
-                  ? "Delivered"
-                  : order.auftrag_status === "partially_delivered" ||
-                      order.status === "In Progress"
-                    ? "Partially Delivered"
-                    : "Open"}
+                {order.auftrag_status === "closed"
+                  ? "Closed"
+                  : order.auftrag_status === "delivered" ||
+                      order.status === "Completed"
+                    ? "Delivered"
+                    : order.auftrag_status === "partially_delivered" ||
+                        order.status === "In Progress"
+                      ? "Partially Delivered"
+                      : "Open"}
               </span>
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
@@ -1338,9 +1406,24 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                                   const parsed = parseFlexibleNumber(raw);
                                   const orderRate =
                                     parseFlexibleNumber(order?.tax_rate) ?? 19;
+                                  const newRate =
+                                    parsed === null ? orderRate : parsed;
+                                  const otherRates = getDistinctVatRates(
+                                    order,
+                                    item.id,
+                                  );
+                                  if (
+                                    otherRates.size >= MAX_DISTINCT_VAT_RATES &&
+                                    !otherRates.has(newRate)
+                                  ) {
+                                    toast.error(
+                                      `Auftrag darf nicht mehr als ${MAX_DISTINCT_VAT_RATES} unterschiedliche MwSt.-Sätze gleichzeitig haben.`,
+                                      errorStyles,
+                                    );
+                                    return;
+                                  }
                                   persistLine(item.id, {
-                                    taxRate:
-                                      parsed === null ? orderRate : parsed,
+                                    taxRate: newRate,
                                   });
                                 }}
                               />
@@ -1795,13 +1878,25 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
           <div>
-            {edit && userRole === UserRole.ADMIN && (
+            {edit &&
+              userRole === UserRole.ADMIN &&
+              !hasRechnungOrLieferschein && (
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete Auftrag
+                </button>
+              )}
+            {edit && !isAuftragClosed && hasRechnungOrLieferschein && (
               <button
-                onClick={handleDelete}
-                className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
+                onClick={handleCloseAuftrag}
+                disabled={closing}
+                className="px-4 py-2 text-sm text-white bg-gray-600 rounded-lg hover:bg-gray-700 flex items-center gap-1 font-semibold disabled:opacity-50"
               >
-                <TrashIcon className="h-4 w-4" />
-                Delete Auftrag
+                <XMarkIcon className="h-4 w-4" />
+                {closing ? "Closing…" : "Close Auftrag"}
               </button>
             )}
           </div>

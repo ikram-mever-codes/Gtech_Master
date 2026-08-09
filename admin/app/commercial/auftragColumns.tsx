@@ -65,6 +65,51 @@ const getRowStatus = (row: any): string => {
   return row.auftrag_status || row.status || "open";
 };
 
+/**
+ * Sort priority for Auftrag rows: partially delivered first, then open,
+ * then delivered, then closed. Unrecognized/missing statuses sort with
+ * "open" so new or malformed rows don't silently jump to the top/bottom.
+ */
+const STATUS_SORT_PRIORITY: Record<string, number> = {
+  partially_delivered: 0,
+  open: 1,
+  delivered: 2,
+  closed: 3,
+};
+
+export function getAuftragStatusSortPriority(row: any): number {
+  const status = getRowStatus(row);
+  return status in STATUS_SORT_PRIORITY ? STATUS_SORT_PRIORITY[status] : 1;
+}
+
+/**
+ * Returns a new array of Auftrag rows sorted by status: Partially
+ * Delivered -> Open -> Delivered -> Closed. Stable for rows sharing the
+ * same status (preserves their existing relative order, e.g. by date).
+ */
+export function sortAuftraegeByStatus<
+  T extends { auftrag_status?: string; status?: string },
+>(rows: T[]): T[] {
+  return [...rows]
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const diff =
+        getAuftragStatusSortPriority(a.row) -
+        getAuftragStatusSortPriority(b.row);
+      return diff !== 0 ? diff : a.index - b.index;
+    })
+    .map(({ row }) => row);
+}
+
+/**
+ * Once an Auftrag is Delivered or Closed, it can no longer be converted
+ * to a Bestellung or have a Rechnung/Lieferschein generated from it.
+ */
+const isAuftragActionLocked = (row: any): boolean => {
+  const status = getRowStatus(row);
+  return status === "delivered" || status === "closed";
+};
+
 export function buildAuftragColumns({
   expandedDocIds,
   setExpandedDocIds,
@@ -125,16 +170,23 @@ export function buildAuftragColumns({
         const isConverted = rechnungCount > 0;
         const status = getRowStatus(row);
         const isClosed = status === "closed";
+        const isLocked = isAuftragActionLocked(row);
 
         return (
           <div className="flex items-center justify-center gap-1.5 font-poppins">
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                if (isLocked) return;
                 onConvertToBestellung(row);
               }}
-              title="Convert Auftrag directly to Bestellung"
-              className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-md flex items-center gap-1"
+              disabled={isLocked}
+              title={
+                isLocked
+                  ? "Auftrag is delivered/closed and can no longer be converted"
+                  : "Convert Auftrag directly to Bestellung"
+              }
+              className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-md flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#8CC21B]"
             >
               <MoveRight className="w-3.5 h-3.5" />
               <span>Convert</span>
@@ -144,14 +196,18 @@ export function buildAuftragColumns({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (isLocked) return;
                   onGenerateRechnung(row);
                 }}
+                disabled={isLocked}
                 title={
-                  isConverted
-                    ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
-                    : "Generate Rechnung & Lieferschein"
+                  isLocked
+                    ? "Auftrag is delivered/closed and can no longer generate Rechnung/Lieferschein"
+                    : isConverted
+                      ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
+                      : "Generate Rechnung & Lieferschein"
                 }
-                className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer ${
+                className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isConverted
                     ? "bg-gray-500 hover:bg-gray-600 text-white"
                     : "bg-[#2F6B46] hover:bg-[#255638] text-white"
