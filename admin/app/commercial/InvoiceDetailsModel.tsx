@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import SpreadSheet from "@/components/UI/SpreadSheet";
 import { formatDate } from "@/utils/date";
+import { calculateInvoiceTotal } from "@/utils/invoice";
 
 // Same shape as the `Invoice` interface in the original page.tsx.
 export interface Invoice {
@@ -257,27 +258,7 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               {(activeInvTab === "rk" || activeInvTab === "closed_invoices" || activeInvTab === "rechnung" || activeInvTab === "closed") && (
                 <span className="text-sm font-bold text-emerald-600 block mt-0.5">
                   Total: €
-                  {(
-                    Number(selectedInvoice.grossTotal || 0) ||
-                    Number(selectedInvoice.netTotal || 0) ||
-                    (selectedInvoice.items || []).reduce(
-                      (s: number, it: any) =>
-                        s +
-                        Number(it.quantity || it.qty || 0) *
-                          Number(
-                            it.unit_price ||
-                              it.unitPrice ||
-                              it.price ||
-                              0,
-                          ),
-                      0,
-                    ) +
-                    Number(
-                      selectedInvoice.freightCost ||
-                        selectedInvoice.freight_cost ||
-                        0,
-                    )
-                  ).toLocaleString(undefined, {
+                  {calculateInvoiceTotal(selectedInvoice).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
