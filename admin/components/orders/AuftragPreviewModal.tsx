@@ -313,6 +313,12 @@ const getLineItemTotal = (item: any): number => {
   return qty * price;
 };
 
+/** Mirrors the "QTY Open" calculation in AuftragToRechnungModal
+ * (`Number(it.quantity || it.qty) || 1`) so both views agree on what's
+ * still open to deliver for a line. */
+const getQtyOpen = (item: any): number =>
+  Number(item?.quantity ?? item?.qty) || 1;
+
 export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   isOpen,
   orderId,
@@ -1298,6 +1304,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       MwSt.
                     </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                      Qty Open
+                    </th>
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
                       Menge
                     </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28 whitespace-nowrap">
@@ -1313,7 +1322,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   {visibleLineItems.length === 0 && (
                     <tr>
                       <td
-                        colSpan={edit ? 10 : 9}
+                        colSpan={edit ? 11 : 10}
                         className="text-center py-6 text-sm text-gray-500"
                       >
                         No line items yet.
@@ -1433,6 +1442,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                             `${lineTaxRate}%`
                           )}
                         </td>
+                        <td className="px-2 py-2 text-right text-gray-600">
+                          {getQtyOpen(item)}
+                        </td>
                         <td className="px-2 py-2">
                           {edit ? (
                             <DecimalInput
@@ -1512,6 +1524,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-center text-gray-600">
                         {getShippingTaxRate(order)}%
                       </td>
+                      <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2">
                         {edit ? (
                           <DecimalInput
@@ -1880,7 +1893,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
           <div>
             {edit &&
               userRole === UserRole.ADMIN &&
-              !hasRechnungOrLieferschein && (
+              !hasRechnungOrLieferschein &&
+              !isAuftragClosed && (
                 <button
                   onClick={handleDelete}
                   className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
@@ -1889,7 +1903,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   Delete Auftrag
                 </button>
               )}
-            {edit && !isAuftragClosed && hasRechnungOrLieferschein && (
+            {edit && !isAuftragClosed && (
               <button
                 onClick={handleCloseAuftrag}
                 disabled={closing}

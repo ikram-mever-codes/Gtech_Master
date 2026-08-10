@@ -94,7 +94,10 @@ import {
   RechnungDetailModal,
 } from "./LazyModals";
 
-import { buildAuftragColumns } from "./auftragColumns";
+import {
+  buildAuftragColumns,
+  getStatusBackgroundColor,
+} from "./auftragColumns";
 import { buildBestellungColumns } from "./bestellungColumns";
 import { buildRechnungColumns } from "./rechnungColumns";
 import { buildRkColumns } from "./rkColumns";
@@ -1454,7 +1457,14 @@ const InvoiceListPage: React.FC = () => {
         if (!isValueMatching(val, valueOperator, valueAmount)) return false;
       }
       if (status) {
-        const itemStatus = String(item.status || "").toLowerCase();
+        // Auftrag rows are keyed by the delivery lifecycle
+        // (open/partially_delivered/delivered/closed) via auftrag_status,
+        // not by the generic `status` field other document types use —
+        // match against the right field per tab.
+        const itemStatus =
+          activeInvTab === "auftrag"
+            ? String(item.auftrag_status || item.status || "open").toLowerCase()
+            : String(item.status || "").toLowerCase();
         if (itemStatus !== status.toLowerCase()) return false;
       }
       if (datePreset && datePreset !== "all") {
@@ -1778,17 +1788,35 @@ const InvoiceListPage: React.FC = () => {
                   }
                 }
 
-                const val = row.highlight_color || row.highlightColor;
-                if (!val || val === "#FFFFFF" || val === "#ffffff")
-                  return undefined;
+                // A manually chosen highlight_color (SystemColourSelect on
+                // the order) always wins over the automatic status colour
+                // below — it's an explicit per-order choice.
+                const customVal = row.highlight_color || row.highlightColor;
+                const hasCustomColor =
+                  !!customVal &&
+                  customVal !== "#FFFFFF" &&
+                  customVal !== "#ffffff";
 
-                let hex = val;
-                if (!val.startsWith("#")) {
-                  const matched = systemColours.find(
-                    (c: any) => c.name?.toLowerCase() === val.toLowerCase(),
-                  );
-                  if (matched) hex = matched.hex;
+                let hex: string | undefined;
+                if (hasCustomColor) {
+                  hex = customVal;
+                  if (!hex!.startsWith("#")) {
+                    const matched = systemColours.find(
+                      (c: any) => c.name?.toLowerCase() === hex!.toLowerCase(),
+                    );
+                    if (matched) hex = matched.hex;
+                  }
+                } else if (activeInvTab === "auftrag") {
+                  // No manual override — fall back to the status-driven
+                  // background: partially delivered / open / delivered /
+                  // closed, matching the Auftrag sort order above.
+                  const status = row.auftrag_status || row.status || "open";
+                  const statusColor = getStatusBackgroundColor(status);
+                  if (statusColor && statusColor !== "#FFFFFF") {
+                    hex = statusColor;
+                  }
                 }
+
                 if (!hex || !hex.startsWith("#")) return undefined;
 
                 const cleanHex = hex.replace("#", "");
@@ -2430,7 +2458,3 @@ const InvoiceListPageWrapper: React.FC = () => (
   </Suspense>
 );
 export default InvoiceListPageWrapper;
-
-// 02132796651
-
-// 02132795327

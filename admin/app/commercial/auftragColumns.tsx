@@ -45,9 +45,14 @@ const valueNetCalc = (row: any) => {
 
 const itemCountCalc = (row: any) => row.items?.length || 0;
 
+/**
+ * Row-background color per Auftrag status, used for the status highlighting
+ * in the Auftrag table. Kept in one place so the table color and any
+ * legend/filter UI can't drift out of sync.
+ */
 export const getStatusBackgroundColor = (status: string): string => {
   if (status === "partially_delivered") {
-    return "#E5B080";
+    return "#D8964A";
   }
   if (status === "open") {
     return "#FFFFFF";
@@ -64,6 +69,23 @@ export const getStatusBackgroundColor = (status: string): string => {
 const getRowStatus = (row: any): string => {
   return row.auftrag_status || row.status || "open";
 };
+
+/** Human-readable labels for the four Auftrag statuses, for filter
+ * dropdowns and any other UI that needs to present them to a user. */
+export const AUFTRAG_STATUS_LABELS: Record<string, string> = {
+  partially_delivered: "Partially Delivered",
+  open: "Open",
+  delivered: "Delivered",
+  closed: "Closed",
+};
+
+/** Options list (in table sort order) for an Auftrag-status filter dropdown. */
+export const AUFTRAG_STATUS_FILTER_OPTIONS = [
+  "partially_delivered",
+  "open",
+  "delivered",
+  "closed",
+].map((value) => ({ value, label: AUFTRAG_STATUS_LABELS[value] }));
 
 /**
  * Sort priority for Auftrag rows: partially delivered first, then open,

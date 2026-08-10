@@ -3,7 +3,7 @@ import { AppDataSource } from "../config/database";
 import { Rechnung, StockWhere } from "../models/rechnung";
 import { RechnungCustomer } from "../models/rechnung_customer";
 import { RechnungItem } from "../models/rechnung_items";
-import { CustomerOrder } from "../models/customer_orders";
+import { AuftragStatus, CustomerOrder } from "../models/customer_orders";
 import { CustomerOrderItem } from "../models/customer_order_items";
 import { Customer } from "../models/customers";
 import path from "path";
@@ -275,7 +275,24 @@ export const createRechnungFromAuftrag = async (
       (sum, li) => sum + Number(li.quantity || 0),
       0,
     );
-    if (totalRemainingQty <= 0) {
+
+    // Advance both the legacy `status` field and the delivery-lifecycle
+    // `auftrag_status` field together. `auftrag_status` is what drives the
+    // Auftrag-tab sort order and row background highlighting, so it must
+    // stay in sync with every Rechnung generated off this Auftrag.
+    // A manually CLOSED Auftrag is never reopened by a later Rechnung —
+    // closing is a deliberate, final action ("we're done even though
+    // qty open > 0"), so `status` still tracks fulfillment but
+    // `auftrag_status` is left as CLOSED.
+    if (auftrag.auftrag_status !== AuftragStatus.CLOSED) {
+      if (totalRemainingQty <= 0) {
+        auftrag.status = "Completed";
+        auftrag.auftrag_status = AuftragStatus.DELIVERED;
+      } else {
+        auftrag.status = "In Progress";
+        auftrag.auftrag_status = AuftragStatus.PARTIALLY_DELIVERED;
+      }
+    } else if (totalRemainingQty <= 0) {
       auftrag.status = "Completed";
     } else {
       auftrag.status = "In Progress";
@@ -442,7 +459,6 @@ export const createRechnungFromAuftrag = async (
     next(error);
   }
 };
-
 export const getAllRechnungen = async (
   _req: Request,
   res: Response,
@@ -750,16 +766,26 @@ export const downloadRechnungPdf = async (
     }
 
     const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
-    const contactName = (req as any).user?.name || (req as any).user?.username || "Admin";
-    const customerCompName = (customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || "").trim();
+    const contactName =
+      (req as any).user?.name || (req as any).user?.username || "Admin";
+    const customerCompName = (
+      customerSnap.company_name ||
+      customerSnap.companyName ||
+      customerSnap.legalName ||
+      ""
+    ).trim();
     const customerNum = (customerSnap.customerNumber || "").trim();
     let kundeCombined = "—";
-    if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+    if (customerCompName && customerNum)
+      kundeCombined = `${customerCompName} · ${customerNum}`;
     else if (customerCompName) kundeCombined = customerCompName;
     else if (customerNum) kundeCombined = customerNum;
 
     const uploadsDir = path.join(__dirname, "../../uploads/rechnungen");
-    const filePath = path.join(uploadsDir, `rechnung_${rechnung.invoice_number || rechnung.id}.pdf`);
+    const filePath = path.join(
+      uploadsDir,
+      `rechnung_${rechnung.invoice_number || rechnung.id}.pdf`,
+    );
 
     const items = (rechnung.items || []).map((it: any, idx: number) => ({
       position: it.position || idx + 1,
@@ -769,7 +795,11 @@ export const downloadRechnungPdf = async (
       vatRate: it.taxRate ?? rechnung.tax_rate ?? 19,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
-      lineTotal: Number(it.total_price || it.lineTotal || (Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0))),
+      lineTotal: Number(
+        it.total_price ||
+          it.lineTotal ||
+          Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
+      ),
     }));
 
     await generateGtechDocumentPdf({
@@ -781,7 +811,10 @@ export const downloadRechnungPdf = async (
       metadataItems: [
         ["Ansprechpartner", contactName],
         ["Kunde", kundeCombined],
-        ["Datum", rechnung.date_created || rechnung.created_at || rechnung.invoice_date],
+        [
+          "Datum",
+          rechnung.date_created || rechnung.created_at || rechnung.invoice_date,
+        ],
       ],
       lineItems: items,
       showPrices: true,
@@ -797,13 +830,18 @@ export const downloadRechnungPdf = async (
       notes: rechnung.notes,
       deliveryTime: rechnung.date_delivery,
       deliveryTerms: rechnung.delivery_terms,
-      paymentTerms: rechnung.payment_terms ? `Zahlungsziel: ${rechnung.payment_terms} Tage` : undefined,
+      paymentTerms: rechnung.payment_terms
+        ? `Zahlungsziel: ${rechnung.payment_terms} Tage`
+        : undefined,
       paymentMethod: rechnung.payment_method,
       outputFilePath: filePath,
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=rechnung_${rechnung.invoice_number}.pdf`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=rechnung_${rechnung.invoice_number}.pdf`,
+    );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);
