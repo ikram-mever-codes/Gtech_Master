@@ -1055,6 +1055,33 @@ export class InvoiceController {
         order: { invoice_date: "DESC" },
       });
 
+      const zeroItemIds = new Set<number>();
+      cciInvoices.forEach((cci) => {
+        (cci.items || []).forEach((it) => {
+          if (Number(it.unit_price || 0) === 0 && it.item_id) {
+            zeroItemIds.add(Number(it.item_id));
+          }
+        });
+      });
+      const masterItemPriceMap = new Map<number, number>();
+      if (zeroItemIds.size > 0) {
+        try {
+          const masterItems = await AppDataSource.getRepository(Item).find({
+            where: { id: In([...zeroItemIds]) },
+            select: ["id", "transfer_price_EUR", "price", "sales_price"],
+          });
+          masterItems.forEach((m) => {
+            const p =
+              Number(m.transfer_price_EUR || 0) ||
+              Number(m.price || 0) ||
+              Number(m.sales_price || 0);
+            masterItemPriceMap.set(m.id, p);
+          });
+        } catch (e) {
+          console.warn("Could not batch-fetch item master prices for CCI display:", e);
+        }
+      }
+
       cciInvoices.forEach((cci) => {
         const customItemCount = cci.items?.length || 0;
         const customTotalQty =
@@ -1062,14 +1089,20 @@ export class InvoiceController {
         const cargoNo = cci.cargo_no || cci.order_number || "";
 
         const itemsSum = (cci.items || []).reduce(
-          (s, it) =>
-            s +
-            Number(it.quantity || 0) *
-            (Number(it.unit_price || 0) ||
+          (s, it) => {
+            const qty = Number(it.quantity || 0);
+            let unitPrice =
+              Number(it.unit_price || 0) ||
               Number((it as any).price || 0) ||
               Number((it as any).unitPrice || 0) ||
               Number((it as any).net_price || 0) ||
-              Number((it as any).total_price || 0)),
+              Number((it as any).total_price || 0);
+            // For old invoices where price was saved as 0, use Item Master transfer price
+            if (unitPrice === 0 && it.item_id && masterItemPriceMap.has(Number(it.item_id))) {
+              unitPrice = masterItemPriceMap.get(Number(it.item_id))!;
+            }
+            return s + qty * unitPrice;
+          },
           0,
         );
         const freight = Number(cci.freight_cost || 0);
@@ -2595,8 +2628,7 @@ export class InvoiceController {
           customer: cciCustomer,
         });
 
-        await cciInvoiceRepo.save(cciInvoice);
-
+        // ── Fetch expanded data FIRST so we can compute the correct gross_total ──
         const itemsToSave: any[] = [];
         let expandedData: any = null;
         try {
@@ -2608,6 +2640,28 @@ export class InvoiceController {
         }
 
         const detailedItems = expandedData?.detailedItems || [];
+
+        // Compute the correct gross_total: sum of actual item prices + freight
+        const freezeFreight = Number(invoice.freightCost || 0);
+        let correctGrossTotal: number;
+        if (detailedItems.length > 0) {
+          const freezeItemsSum = detailedItems.reduce((s: number, it: any) => {
+            const qty = Number(it.qty || it.quantity || 0);
+            const unitPrice = Number(
+              it.eur_special_price || it._fallbackEk || it.unitPrice || 0,
+            );
+            return s + qty * unitPrice;
+          }, 0);
+          correctGrossTotal = freezeItemsSum + freezeFreight;
+        } else {
+          // No expanded items available — keep invoice's own grossTotal as fallback
+          correctGrossTotal = Number(invoice.grossTotal || 0);
+        }
+
+        // Update the already-saved CCI record with the correct gross_total
+        cciInvoice.gross_total = correctGrossTotal;
+        await cciInvoiceRepo.save(cciInvoice);
+
         if (detailedItems.length > 0) {
           detailedItems.forEach((it: any) => {
             const item = it.item;
