@@ -86,6 +86,7 @@ import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
+import { calculateInvoiceTotal } from "@/utils/invoice";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -1907,45 +1908,13 @@ const InvoiceListPage: React.FC = () => {
                                   </td>
                                   {activeInvTab === "closed_invoices" && (
                                     <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                      {(() => {
-                                        const itemsSum = (
-                                          invoice.items || []
-                                        ).reduce(
-                                          (s: number, it: any) =>
-                                            s +
-                                            Number(
-                                              it.quantity || it.qty || 0,
-                                            ) *
-                                              Number(
-                                                it.unit_price ||
-                                                  it.unitPrice ||
-                                                  it.price ||
-                                                  0,
-                                              ),
-                                          0,
-                                        );
-                                        const freight = Number(
-                                          invoice.freightCost ||
-                                            (invoice as any).freight_cost ||
-                                            0,
-                                        );
-                                        const gross = Number(
-                                          invoice.grossTotal || 0,
-                                        );
-                                        const totalVal =
-                                          itemsSum > 0
-                                            ? itemsSum + freight
-                                            : gross > 0
-                                              ? gross
-                                              : freight;
-                                        return totalVal.toLocaleString(
-                                          undefined,
-                                          {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                          },
-                                        );
-                                      })()}
+                                      {calculateInvoiceTotal(invoice).toLocaleString(
+                                        undefined,
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        },
+                                      )}
                                     </td>
                                   )}
                                 </tr>
@@ -2024,27 +1993,7 @@ const InvoiceListPage: React.FC = () => {
                                 </span>
                                 <span className="text-[#212529]">
                                   €
-                                  {(
-                                    Number(invoice.grossTotal || 0) ||
-                                    Number(invoice.netTotal || 0) ||
-                                    (invoice.items || []).reduce(
-                                      (s: number, it: any) =>
-                                        s +
-                                        Number(it.quantity || it.qty || 0) *
-                                        Number(
-                                          it.unit_price ||
-                                          it.unitPrice ||
-                                          it.price ||
-                                          0,
-                                        ),
-                                      0,
-                                    ) +
-                                    Number(
-                                      invoice.freightCost ||
-                                      (invoice as any).freight_cost ||
-                                      0,
-                                    )
-                                  ).toFixed(2)}
+                                  {calculateInvoiceTotal(invoice).toFixed(2)}
                                 </span>
                               </div>
                             )}
@@ -2283,45 +2232,13 @@ const InvoiceListPage: React.FC = () => {
                     {activeInvTab === "closed_invoices" && (
                       <span className="text-sm font-bold text-emerald-600 block mt-0.5">
                         Total: €
-                        {(() => {
-                          const itemsSum = (
-                            selectedInvoice.items || []
-                          ).reduce(
-                            (s: number, it: any) =>
-                              s +
-                              Number(
-                                it.quantity || it.qty || 0,
-                              ) *
-                                Number(
-                                  it.unit_price ||
-                                    it.unitPrice ||
-                                    it.price ||
-                                    0,
-                                ),
-                            0,
-                          );
-                          const freight = Number(
-                            selectedInvoice.freightCost ||
-                              (selectedInvoice as any).freight_cost ||
-                              0,
-                          );
-                          const gross = Number(
-                            selectedInvoice.grossTotal || 0,
-                          );
-                          const totalVal =
-                            itemsSum > 0
-                              ? itemsSum + freight
-                              : gross > 0
-                                ? gross
-                                : freight;
-                          return totalVal.toLocaleString(
-                            undefined,
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            },
-                          );
-                        })()}
+                        {calculateInvoiceTotal(selectedInvoice).toLocaleString(
+                          undefined,
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          },
+                        )}
                       </span>
                     )}
                   </div>

@@ -947,22 +947,20 @@ export class InvoiceController {
 
           let customItemCount = 0;
           let customTotalQty = 0;
-          let calculatedGrossTotal = Number(inv.grossTotal) || 0;
+          let itemsTotalPrice = 0;
 
           if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
             const stats = orderItemSummaryByCargoId.get(cargo.id);
             customItemCount = stats.count_items;
             customTotalQty = stats.total_qty;
-            if (calculatedGrossTotal === 0)
-              calculatedGrossTotal = stats.total_price;
+            itemsTotalPrice = Number(stats.total_price || 0);
           } else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
             const orderId = orderIdMap.get(inv.orderNumber);
             if (orderItemSummaryByOrderId.has(orderId)) {
               const stats = orderItemSummaryByOrderId.get(orderId);
               customItemCount = stats.count_items;
               customTotalQty = stats.total_qty;
-              if (calculatedGrossTotal === 0)
-                calculatedGrossTotal = stats.total_price;
+              itemsTotalPrice = Number(stats.total_price || 0);
             }
           }
           if (customItemCount === 0 && inv.items) {
@@ -972,16 +970,29 @@ export class InvoiceController {
               0,
             );
           }
-          if (calculatedGrossTotal === 0 && inv.items && inv.items.length > 0) {
-            const itemsSum = inv.items.reduce(
+          if (itemsTotalPrice === 0 && inv.items && inv.items.length > 0) {
+            itemsTotalPrice = inv.items.reduce(
               (sum, item) =>
                 sum +
                 Number(item.quantity || 0) *
-                Number(item.unitPrice || item.netPrice || 0),
+                Number(item.unitPrice || item.netPrice || (item as any).price || 0),
               0,
             );
-            const freight = Number(inv.freightCost || 0);
-            calculatedGrossTotal = itemsSum + freight;
+          }
+
+          const freight = Number(inv.freightCost || 0);
+          let calculatedGrossTotal = 0;
+          if (itemsTotalPrice > 0) {
+            calculatedGrossTotal = itemsTotalPrice + freight;
+          } else {
+            const dbGross = Number(inv.grossTotal || 0);
+            if (dbGross > freight) {
+              calculatedGrossTotal = dbGross;
+            } else if (dbGross > 0 && freight > 0) {
+              calculatedGrossTotal = dbGross + freight;
+            } else {
+              calculatedGrossTotal = Math.max(dbGross, freight);
+            }
           }
 
           const cargoNo =
@@ -1057,14 +1068,24 @@ export class InvoiceController {
             (Number(it.unit_price || 0) ||
               Number((it as any).price || 0) ||
               Number((it as any).unitPrice || 0) ||
-              Number((it as any).net_price || 0)),
+              Number((it as any).net_price || 0) ||
+              Number((it as any).total_price || 0)),
           0,
         );
         const freight = Number(cci.freight_cost || 0);
-        let cciGrossTotal =
-          itemsSum > 0
-            ? itemsSum + freight
-            : Number(cci.gross_total || 0) || freight;
+        let cciGrossTotal = 0;
+        if (itemsSum > 0) {
+          cciGrossTotal = itemsSum + freight;
+        } else {
+          const dbGross = Number(cci.gross_total || 0);
+          if (dbGross > freight) {
+            cciGrossTotal = dbGross;
+          } else if (dbGross > 0 && freight > 0) {
+            cciGrossTotal = dbGross + freight;
+          } else {
+            cciGrossTotal = Math.max(dbGross, freight);
+          }
+        }
 
         finalDataMap.set(cci.id, {
           id: cci.id,
@@ -1173,41 +1194,96 @@ export class InvoiceController {
     });
 
     if (cciInvoice) {
-      const detailedItems = (cciInvoice.items || []).map((ci) => {
-        const itemPrice =
-          Number(ci.unit_price || 0) ||
-          Number((ci as any).price || 0) ||
-          Number((ci as any).unitPrice || 0) ||
-          Number((ci as any).net_price || 0) ||
-          Number((ci as any).netPrice || 0);
+      const detailedItems = await Promise.all(
+        (cciInvoice.items || []).map(async (ci) => {
+          let itemPrice =
+            Number(ci.unit_price || 0) ||
+            Number((ci as any).price || 0) ||
+            Number((ci as any).unitPrice || 0) ||
+            Number((ci as any).net_price || 0) ||
+            Number((ci as any).netPrice || 0);
 
-        return {
-          id: ci.id,
-          qty: Number(ci.quantity || 0),
-          quantity: Number(ci.quantity || 0),
-          eur_special_price: itemPrice,
-          price: itemPrice,
-          unit_price: itemPrice,
-          unitPrice: itemPrice,
-          _fallbackEan: ci.ean || "-",
-          _fallbackEk: itemPrice,
-          set_taric_code: ci.taric_code || null,
-          remark_de: ci.remark || "",
-          item: {
-            id: ci.item_id,
-            item_name: ci.item_name,
-            ean: ci.ean,
-            taric: ci.taric_code
-              ? {
-                code: ci.taric_code,
-                name_en: ci.taric_name_en,
-                duty_rate: Number(ci.duty_rate || 0),
-              }
-              : null,
-          },
-          order: { order_no: ci.order_no || cciInvoice.order_number },
-        };
-      });
+          let masterItem: any = null;
+          if (ci.item_id) {
+            try {
+              masterItem = await AppDataSource.getRepository(Item).findOne({
+                where: { id: Number(ci.item_id) },
+                relations: ["taric", "purchasePrices"],
+              });
+            } catch (e) { }
+          }
+          if (!masterItem && ci.item_name) {
+            try {
+              masterItem = await AppDataSource.getRepository(Item).findOne({
+                where: { item_name: ci.item_name.trim() },
+                relations: ["taric", "purchasePrices"],
+              });
+            } catch (e) { }
+          }
+          if (!masterItem && ci.ean && ci.ean !== "-" && ci.ean !== "Unknown") {
+            try {
+              masterItem = await AppDataSource.getRepository(Item).findOne({
+                where: { ean: ci.ean.trim() },
+                relations: ["taric", "purchasePrices"],
+              });
+            } catch (e) { }
+          }
+
+          if (itemPrice === 0 && masterItem) {
+            let rmbPrice = 0;
+            if (masterItem.purchasePrices && masterItem.purchasePrices.length > 0) {
+              const pp = masterItem.purchasePrices.find(
+                (p: any) => Number(p.unit_price_cny) > 0,
+              );
+              if (pp) rmbPrice = Number(pp.unit_price_cny);
+            }
+            itemPrice =
+              Number(masterItem.transfer_price_EUR || 0) ||
+              Number(masterItem["transfer_price (EUR)"] || 0) ||
+              Number(masterItem.price || 0) ||
+              Number(masterItem.sales_price || 0) ||
+              (rmbPrice > 0 ? rmbPrice * 0.13 : 0);
+          }
+
+          const finalEan =
+            ci.ean && ci.ean !== "-" && ci.ean !== "Unknown"
+              ? ci.ean
+              : masterItem?.ean || "-";
+
+          return {
+            id: ci.id,
+            qty: Number(ci.quantity || 0),
+            quantity: Number(ci.quantity || 0),
+            eur_special_price: itemPrice,
+            price: itemPrice,
+            unit_price: itemPrice,
+            unitPrice: itemPrice,
+            _fallbackEan: finalEan,
+            _fallbackEk: itemPrice,
+            set_taric_code: ci.taric_code || masterItem?.taric?.code || null,
+            remark_de: ci.remark || "",
+            item: {
+              id: masterItem?.id || ci.item_id,
+              item_name: masterItem?.item_name || ci.item_name,
+              ean: finalEan,
+              taric: ci.taric_code || masterItem?.taric?.code
+                ? {
+                  code: ci.taric_code || masterItem?.taric?.code,
+                  name_en:
+                    ci.taric_name_en ||
+                    masterItem?.taric?.name_en ||
+                    masterItem?.item_name ||
+                    ci.item_name,
+                  duty_rate: Number(
+                    ci.duty_rate || masterItem?.taric?.duty_rate || 0,
+                  ),
+                }
+                : null,
+            },
+            order: { order_no: ci.order_no || cciInvoice.order_number },
+          };
+        }),
+      );
 
       const taricGroupsMap = new Map();
       detailedItems.forEach((oi: any) => {
@@ -1245,8 +1321,9 @@ export class InvoiceController {
       const sumTaricQty = taricGroups.reduce((s, g) => s + (g.totalQty || 0), 0);
 
       if (sumTaricPrice === 0 && cciTotalGross > 0 && sumTaricQty > 0) {
-        const netForTaric = Math.max(0, cciTotalGross - Number(cciInvoice.freight_cost || 0));
-        const targetAmount = netForTaric > 0 ? netForTaric : cciTotalGross;
+        const freight = Number(cciInvoice.freight_cost || 0);
+        const netForTaric = Math.max(0, cciTotalGross - freight);
+        const targetAmount = netForTaric;
         taricGroups.forEach((g) => {
           g.totalPrice = (g.totalQty / sumTaricQty) * targetAmount;
         });
@@ -1483,13 +1560,31 @@ export class InvoiceController {
         let item = oi.item;
         const itemId = item?.id || oi.item_id;
 
-        if (!item && itemId) {
-          try {
-            item = await AppDataSource.getRepository(Item).findOne({
-              where: { id: Number(itemId) },
-              relations: ["taric", "purchasePrices"],
-            });
-          } catch (e) { }
+        if (!item) {
+          if (itemId) {
+            try {
+              item = await AppDataSource.getRepository(Item).findOne({
+                where: { id: Number(itemId) },
+                relations: ["taric", "purchasePrices"],
+              });
+            } catch (e) { }
+          }
+          if (!item && oi.item_name) {
+            try {
+              item = await AppDataSource.getRepository(Item).findOne({
+                where: { item_name: oi.item_name.trim() },
+                relations: ["taric", "purchasePrices"],
+              });
+            } catch (e) { }
+          }
+          if (!item && oi.ean && oi.ean !== "-" && oi.ean !== "Unknown") {
+            try {
+              item = await AppDataSource.getRepository(Item).findOne({
+                where: { ean: oi.ean.trim() },
+                relations: ["taric", "purchasePrices"],
+              });
+            } catch (e) { }
+          }
         }
 
         const ean = item?.ean || oi._fallbackEan || "-";
@@ -1603,8 +1698,9 @@ export class InvoiceController {
     const sumTaricQty = taricGroups.reduce((s, g) => s + (g.totalQty || 0), 0);
 
     if (sumTaricPrice === 0 && invoiceGross > 0 && sumTaricQty > 0) {
-      const netForTaric = Math.max(0, invoiceGross - Number(invoice.freightCost || 0));
-      const targetAmount = netForTaric > 0 ? netForTaric : invoiceGross;
+      const freight = Number(invoice.freightCost || 0);
+      const netForTaric = Math.max(0, invoiceGross - freight);
+      const targetAmount = netForTaric;
       taricGroups.forEach((g) => {
         g.totalPrice = (g.totalQty / sumTaricQty) * targetAmount;
       });
