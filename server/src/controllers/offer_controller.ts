@@ -3521,21 +3521,15 @@ export class OfferController {
         let discountedSubtotal = subtotal - discount;
         if (discountedSubtotal < 0) discountedSubtotal = 0;
 
-        const shipping = getSafeNumber(
-          offerData.shippingCost || offerData.shipping,
-        );
-        const amountBeforeTax = discountedSubtotal + shipping;
-
         const taxRate = getSafeNumber(offerData.taxRate ?? 19) / 100;
-        const taxAmount = amountBeforeTax * taxRate;
-        const totalAmount = amountBeforeTax + taxAmount;
+        const taxAmount = discountedSubtotal * taxRate;
+        const totalAmount = discountedSubtotal + taxAmount;
 
         return {
           subtotal: subtotal.toFixed(2),
           taxAmount: taxAmount.toFixed(2),
           totalAmount: totalAmount.toFixed(2),
           discountAmount: discount.toFixed(2),
-          shippingCost: shipping.toFixed(2),
         };
       };
 
@@ -4148,19 +4142,6 @@ export class OfferController {
           );
       }
 
-      if (Number(totals.shippingCost || 0) > 0) {
-        yPos += 16;
-        doc.font(R).text("Versandkosten", TOTALS_LABEL_X, yPos);
-        doc
-          .font(R)
-          .text(
-            `${formatGermanNum(totals.shippingCost, 2)} ${offerCurr}`,
-            TOTALS_VAL_X - TOTALS_RIGHT_PAD,
-            yPos,
-            { align: "right", width: TOTALS_VAL_W },
-          );
-      }
-
       const rateOrder: number[] = [];
       const vatMap = new Map<number, number>();
       (offer.lineItems || (offer as any).items || []).forEach((it: any) => {
@@ -4181,16 +4162,6 @@ export class OfferController {
         const vatAmt = lineNet * (rate / 100);
         vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
       });
-
-      const shippingCostNum = getSafeNumber(offer.shippingCost || offer.shipping);
-      if (shippingCostNum > 0) {
-        const shipRate = offer.taxRate !== undefined && offer.taxRate !== null ? Number(offer.taxRate) : 19;
-        if (!vatMap.has(shipRate)) {
-          rateOrder.push(shipRate);
-        }
-        const shipVat = shippingCostNum * (shipRate / 100);
-        vatMap.set(shipRate, (vatMap.get(shipRate) || 0) + shipVat);
-      }
 
       const vatEntries = rateOrder.map((rate) => ({
         rate,
@@ -4238,7 +4209,7 @@ export class OfferController {
             { align: "right", width: TOTALS_VAL_W },
           );
       }
-      const finalBrutto = Number(totals.subtotal) - Number(totals.discountAmount || 0) + Number(totals.shippingCost || 0) + calcVatTotal;
+      const finalBrutto = Number(totals.subtotal) - Number(totals.discountAmount || 0) + calcVatTotal;
 
       yPos += 22;
       const bruttoBoxX = TOTALS_LABEL_X - 6;
