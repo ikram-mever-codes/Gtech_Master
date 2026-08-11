@@ -734,29 +734,44 @@ export async function generateGtechDocumentPdf(
     if (opts.vatBreakdown && opts.vatBreakdown.length > 0) {
       vatEntries = opts.vatBreakdown;
     } else {
+      const rateOrder: number[] = [];
       const vatMap = new Map<number, number>();
       (opts.lineItems || []).forEach((it) => {
-        if (it.isFreizeile) return;
         const rate =
-          it.vatRate !== undefined
+          it.vatRate !== undefined && it.vatRate !== null
             ? Number(it.vatRate)
-            : opts.taxRate !== undefined
+            : opts.taxRate !== undefined && opts.taxRate !== null
               ? Number(opts.taxRate)
               : 19;
-        const lineNet = Number(it.lineTotal || 0);
+        if (!vatMap.has(rate)) {
+          rateOrder.push(rate);
+        }
+        const lineNet = Number(it.lineTotal || (it.quantity * (it.unitPrice || 0)));
         const vatAmt = lineNet * (rate / 100);
         vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
       });
 
+      if (Number(opts.shippingCost || 0) > 0) {
+        const shipRate = opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 19;
+        if (!vatMap.has(shipRate)) {
+          rateOrder.push(shipRate);
+        }
+        const shipVat = Number(opts.shippingCost) * (shipRate / 100);
+        vatMap.set(shipRate, (vatMap.get(shipRate) || 0) + shipVat);
+      }
+
       if (vatMap.size > 0) {
-        vatEntries = Array.from(vatMap.entries())
-          .map(([rate, amount]) => ({ rate, amount }))
-          .sort((a, b) => b.rate - a.rate);
+        vatEntries = rateOrder.map((rate) => ({
+          rate,
+          amount: vatMap.get(rate) || 0,
+        }));
       }
     }
 
+    let calcVatTotal = 0;
     if (vatEntries.length > 0) {
       for (const entry of vatEntries) {
+        calcVatTotal += entry.amount;
         yPos += 16;
         doc
           .font(R)
@@ -773,7 +788,8 @@ export async function generateGtechDocumentPdf(
         );
       }
     } else {
-      const taxRatePercent = opts.taxRate ? Number(opts.taxRate) : 19;
+      const taxRatePercent = opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 19;
+      calcVatTotal = Number(opts.taxAmount || 0);
       yPos += 16;
       doc
         .font(R)
@@ -790,6 +806,8 @@ export async function generateGtechDocumentPdf(
       );
     }
 
+    const finalBrutto = Number(opts.subtotal || 0) - Number(opts.discountAmount || 0) + Number(opts.shippingCost || 0) + calcVatTotal;
+
     yPos += 22;
     const bruttoBoxX = TOTALS_LABEL_X - 6;
     const bruttoBoxW = TABLE_END_X - bruttoBoxX;
@@ -798,7 +816,7 @@ export async function generateGtechDocumentPdf(
     doc.font(SB).fontSize(10).fillColor("#1A202C");
     doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
     doc.text(
-      `${formatGermanNum(opts.totalAmount, 2)} ${currency}`,
+      `${formatGermanNum(finalBrutto, 2)} ${currency}`,
       TOTALS_VAL_X - TOTALS_RIGHT_PAD,
       yPos,
       { align: "right", width: TOTALS_VAL_W },
