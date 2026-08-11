@@ -18,7 +18,7 @@ import {
   AlertCircle,
   Mail,
 } from "lucide-react";
-import { downloadRechnungEml } from "@/api/rechnungen";
+import { downloadRechnungEml, uploadGelangenheitsbestaetigung, deleteGelangenheitsbestaetigung } from "@/api/rechnungen";
 import {
   updateRechnungKItem,
   createRechnungKFromRechnung,
@@ -196,6 +196,9 @@ export default function RechnungDetailModal({
     deliveryAddress: any;
   }>({ customerSnapshot: {}, deliveryAddress: {} });
   const [savingAddress, setSavingAddress] = useState(false);
+
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [removingDoc, setRemovingDoc] = useState(false);
 
   const linkedDocs = rechnung?.linkedDocuments || {};
   const auftragDocs = sortByCreatedAtDesc(linkedDocs.auftrag || []);
@@ -491,6 +494,59 @@ export default function RechnungDetailModal({
     }
   };
 
+  // --- Gelangenheitsbestätigung upload/remove ----------------------------------
+  const isExportInvoice =
+    data?.tax_profile_case === "EU_IGL" ||
+    data?.tax_profile_case === "third_country";
+
+  const handleUploadGelangenheits = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Only PDF files are allowed.", errorStyles);
+      return;
+    }
+    setUploadingDoc(true);
+    try {
+      const res: any = await uploadGelangenheitsbestaetigung(data.id, file);
+      if (res?.success) {
+        setData((prev: any) => ({
+          ...prev,
+          gelangenheitsbestaetigung_doc: res.data?.gelangenheitsbestaetigung_doc,
+        }));
+        toast.success("Gelangenheitsbestätigung uploaded.", successStyles);
+        onChanged?.();
+      }
+    } catch {
+      // error already toasted by API helper
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveGelangenheits = async () => {
+    if (!window.confirm("Remove the uploaded Gelangenheitsbestätigung?")) return;
+    setRemovingDoc(true);
+    try {
+      const res: any = await deleteGelangenheitsbestaetigung(data.id);
+      if (res?.success) {
+        setData((prev: any) => ({
+          ...prev,
+          gelangenheitsbestaetigung_doc: null,
+        }));
+        toast.success("Gelangenheitsbestätigung removed.", successStyles);
+        onChanged?.();
+      }
+    } catch {
+      // error already toasted
+    } finally {
+      setRemovingDoc(false);
+    }
+  };
+
   const allItemsFullyCorrected = items.every((item: any) => {
     const openQty = openQuantities[item.id] || 0;
     return openQty <= 0;
@@ -574,11 +630,10 @@ export default function RechnungDetailModal({
               <button
                 type="button"
                 onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                  isEditMode
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${isEditMode
                     ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                  }`}
               >
                 {isEditMode ? (
                   <>
@@ -892,11 +947,10 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${
-                                  isFullyCorrected
+                                className={`font-semibold ${isFullyCorrected
                                     ? "text-green-600"
                                     : "text-amber-600"
-                                }`}
+                                  }`}
                               >
                                 {openQty}
                               </span>
@@ -1033,6 +1087,74 @@ export default function RechnungDetailModal({
             </div>
           </div>
 
+          {/* ── Gelangenheitsbestätigung section (EU_IGL / third_country only) ── */}
+          {isExportInvoice && !isCorrection && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="text-sm font-bold text-amber-800">
+                    Gelangenheitsbestätigung / Ausfuhrnachweis
+                  </p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    Required for {data.tax_profile_case === "EU_IGL" ? "EU_IGL" : "third country"} invoices
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {data.gelangenheitsbestaetigung_doc ? (
+                    <>
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_API_URL || ""}${data.gelangenheitsbestaetigung_doc}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center gap-1.5 transition-all"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        View PDF
+                      </a>
+                      <button
+                        onClick={handleRemoveGelangenheits}
+                        disabled={removingDoc}
+                        className="px-3 py-1.5 text-xs bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-semibold flex items-center gap-1.5 disabled:opacity-50 transition-all"
+                      >
+                        <TrashIcon className="w-3.5 h-3.5" />
+                        {removingDoc ? "Removing…" : "Remove"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs text-amber-700 font-medium">
+                        ⚠ Not uploaded yet
+                      </span>
+                      <label className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          : "bg-amber-600 text-white hover:bg-amber-700"
+                        }`}>
+                        {uploadingDoc ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Uploading…
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="w-3.5 h-3.5" />
+                            Upload PDF
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          disabled={uploadingDoc}
+                          onChange={handleUploadGelangenheits}
+                        />
+                      </label>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
             <div className="flex items-center gap-2 mb-3">
               <LinkIcon className="h-4 w-4 text-gray-500" />
@@ -1041,8 +1163,8 @@ export default function RechnungDetailModal({
               </h3>
             </div>
             {auftragDocs.length === 0 &&
-            rechnungenKDocs.length === 0 &&
-            rechnungDocs.length === 0 ? (
+              rechnungenKDocs.length === 0 &&
+              rechnungDocs.length === 0 ? (
               <p className="text-sm text-gray-500">No linked documents yet.</p>
             ) : (
               <div className="space-y-3">
@@ -1181,11 +1303,10 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-                  hasCorrections && !isCreating
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
                     ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 {isCreating ? (
                   <>

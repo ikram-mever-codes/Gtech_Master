@@ -114,6 +114,37 @@ export const downloadRechnungPdf = async (
   }
 };
 
+export const uploadGelangenheitsbestaetigung = async (
+  id: string | number,
+  file: File,
+) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response: any = await api.post(
+      `/rechnungen/${id}/gelangenheitsbestaetigung`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to upload Gelangenheitsbestätigung");
+    throw error;
+  }
+};
+
+export const deleteGelangenheitsbestaetigung = async (id: string | number) => {
+  try {
+    const response: any = await api.delete(
+      `/rechnungen/${id}/gelangenheitsbestaetigung`,
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to remove Gelangenheitsbestätigung");
+    throw error;
+  }
+};
+
 export const downloadRechnungEml = async (
   id: string | number,
   invoiceNo?: string,

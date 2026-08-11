@@ -265,11 +265,9 @@ export async function generateGtechDocumentPdf(
     ""
   ).trim();
   const mainAddInfo = (
-    customer.additionalInfo ||
     customer.addressAdditionalLine ||
     customer.addressLine2 ||
     opts.customerEntity?.addressLine2 ||
-    opts.customerEntity?.additionalInfo ||
     ""
   ).trim();
 
@@ -303,14 +301,16 @@ export async function generateGtechDocumentPdf(
 
     const lines: string[] = [];
     if (cName && cName.trim()) lines.push(cName.trim());
-    if (
+
+    const addLineCleaned =
       addLine &&
-      addLine.trim() &&
-      addLine.trim() !== "Additional Info" &&
-      addLine.trim() !== cName.trim()
-    ) {
-      lines.push(addLine.trim());
-    }
+        addLine.trim() &&
+        addLine.trim() !== "Additional Info" &&
+        addLine.trim() !== cName.trim()
+        ? addLine.trim()
+        : "\u00a0";
+    lines.push(addLineCleaned);
+
     if (street && street.trim()) lines.push(street.trim());
     if (cityLineVal) lines.push(cityLineVal);
     if (!isGer && dispC && dispC.toUpperCase() !== cityLineVal.toUpperCase()) {

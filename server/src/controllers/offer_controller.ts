@@ -34,16 +34,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -54,7 +54,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -118,10 +118,6 @@ import { CustomerOrder } from "../models/customer_orders";
 let cachedCustomerSvg: string | null = null;
 let cachedTemplatePath: string | null = null;
 
-/**
- * For SVG templates: draws the SVG as background on the current PDFKit page.
- * For PDF templates: skipped during PDFKit generation; handled by mergePdfTemplate() post-processing.
- */
 async function drawCustomerSvgBackground(doc: any): Promise<void> {
   try {
     const activePath = await getActiveTemplateFilePath("customer_doc_template");
@@ -972,10 +968,8 @@ export class OfferController {
       country: customer.country || customer.businessDetails?.country || "",
       street: customer.addressLine1 || customer.businessDetails?.street,
       additionalInfo:
-        custAny.additionalInfo ||
         custAny.addressAdditionalLine ||
         custAny.addressLine2 ||
-        customer.businessDetails?.description ||
         "",
     };
   }
@@ -1179,9 +1173,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-                createOfferDto.defaultPriceMatrix,
-                createOfferDto.totalPriceDecimalPlaces || 2,
-              )
+              createOfferDto.defaultPriceMatrix,
+              createOfferDto.totalPriceDecimalPlaces || 2,
+            )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -1212,7 +1206,7 @@ export class OfferController {
         // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         paymentMethod: createOfferDto.paymentMethod,
@@ -1458,7 +1452,7 @@ export class OfferController {
         paymentMethod: body.paymentMethod,
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         shippingMethod: body.shippingMethod,
@@ -1584,7 +1578,6 @@ export class OfferController {
       postalCode: custAny.postalCode || custAny.businessDetails?.postalCode,
       country: custAny.country || custAny.businessDetails?.country,
       additionalInfo:
-        custAny.additionalInfo ||
         custAny.addressAdditionalLine ||
         custAny.addressLine2,
       contactName: customer.legalName || customer.companyName,
@@ -3071,10 +3064,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                    totalPriceDecimalPlaces,
-                  ),
-                );
+                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                  totalPriceDecimalPlaces,
+                ),
+              );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -3284,11 +3277,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-                ...tpl,
-                price: match.price,
-                total: match.total,
-                isActive: match.isActive,
-              }
+              ...tpl,
+              price: match.price,
+              total: match.total,
+              isActive: match.isActive,
+            }
             : { ...tpl };
         });
 
@@ -3612,7 +3605,7 @@ export class OfferController {
         customerEntity?.companyName ||
         ""
       ).trim();
-      const primaryName = companyName || legalName;
+      const primaryName = legalName || companyName;
       const mainCityStr = (customer.city || customerEntity?.city || "").trim();
       const mainPostalStr = (
         customer.postalCode ||
@@ -3626,11 +3619,9 @@ export class OfferController {
         ""
       ).trim();
       const mainAddInfo = (
-        customer.additionalInfo ||
         customer.addressAdditionalLine ||
         customer.addressLine2 ||
         customerEntity?.addressLine2 ||
-        customerEntity?.additionalInfo ||
         ""
       ).trim();
 
@@ -3666,14 +3657,14 @@ export class OfferController {
         const lines: string[] = [];
         if (cName && cName.trim()) lines.push(cName.trim());
 
-        if (
+        const addLineCleaned =
           addLine &&
-          addLine.trim() &&
-          addLine.trim() !== "Additional Info" &&
-          addLine.trim() !== cName.trim()
-        ) {
-          lines.push(addLine.trim());
-        }
+            addLine.trim() &&
+            addLine.trim() !== "Additional Info" &&
+            addLine.trim() !== cName.trim()
+            ? addLine.trim()
+            : "\u00a0";
+        lines.push(addLineCleaned);
 
         if (street && street.trim()) lines.push(street.trim());
         if (cityLineVal) lines.push(cityLineVal);
@@ -3742,52 +3733,10 @@ export class OfferController {
             offerDelivery.postal_code || offerDelivery.postalCode || "",
             offerDelivery.city || "",
             offerDelivery.country ||
-              customer.country ||
-              customerEntity?.country,
+            customer.country ||
+            customerEntity?.country,
           );
           if (shipLinesToRender.length > 0) isExplicitOnOffer = true;
-        }
-      }
-
-      if (
-        shipLinesToRender.length === 0 &&
-        customerEntity?.shippingAddresses?.length
-      ) {
-        const mainStreetCityNorm =
-          `${mainStreetStr} ${mainPostalStr} ${mainCityStr}`
-            .toLowerCase()
-            .replace(/[^a-z0-9]/gi, "")
-            .trim();
-        const diffAddr =
-          customerEntity.shippingAddresses.find((sa: any) => {
-            const saStreetCity =
-              `${sa.street || ""} ${sa.postal_code || ""} ${sa.city || ""}`
-                .toLowerCase()
-                .replace(/[^a-z0-9]/gi, "")
-                .trim();
-            return saStreetCity && saStreetCity !== mainStreetCityNorm;
-          }) ||
-          customerEntity.shippingAddresses.find((sa: any) => sa.is_default) ||
-          customerEntity.shippingAddresses[0];
-
-        if (diffAddr) {
-          const sName =
-            diffAddr.name && diffAddr.name !== primaryName
-              ? `${primaryName}\n${diffAddr.name}`
-              : primaryName;
-          const sAddLine =
-            diffAddr.address_additional_line ||
-            diffAddr.additionalInfo ||
-            diffAddr.addressLine2 ||
-            "";
-          shipLinesToRender = formatAddressBlockLines(
-            sName,
-            sAddLine,
-            diffAddr.street || "",
-            diffAddr.postal_code || "",
-            diffAddr.city || "",
-            diffAddr.country || customer.country || customerEntity?.country,
-          );
         }
       }
 
@@ -4222,7 +4171,10 @@ export class OfferController {
             : offer.taxRate !== undefined
               ? Number(offer.taxRate)
               : 19;
-        const lineNet = Number(it.lineTotal || (Number(it.quantity || 1) * Number(it.price || 0)));
+        const lineNet = Number(
+          it.lineTotal ??
+          (Number(it.baseQuantity || it.quantity || 1) * Number(it.basePrice || it.price || 0))
+        );
         const vatAmt = lineNet * (rate / 100);
         vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
       });
