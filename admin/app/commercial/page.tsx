@@ -103,6 +103,7 @@ import { buildRechnungColumns } from "./rechnungColumns";
 import { buildRkColumns } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
 import { buildPaymentInboundColumns } from "./paymentInboundColumns";
+import PaymentInboundAssignModal from "./PaymentInboundAssignModal";
 import { AnyAaaaRecord } from "dns";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
@@ -398,6 +399,9 @@ const InvoiceListPage: React.FC = () => {
     useState<any>(null);
 
   const [showInboundModal, setShowInboundModal] = useState(false);
+  const [showAssignInboundModal, setShowAssignInboundModal] = useState(false);
+  const [selectedInboundForAssign, setSelectedInboundForAssign] =
+    useState<any>(null);
   const [submittingInbound, setSubmittingInbound] = useState(false);
   const [inboundForm, setInboundForm] = useState({
     paymentAccountId: "",
@@ -1567,6 +1571,12 @@ const InvoiceListPage: React.FC = () => {
       case "payment_inbound":
         return buildPaymentInboundColumns({
           onOpenDetails: handleOpenInvoiceDetails,
+          onAssign: (row: any) => {
+            setSelectedInboundForAssign(row);
+            tabData.ensureLoaded("auftrag");
+            tabData.ensureLoaded("rechnung");
+            setShowAssignInboundModal(true);
+          },
           onDelete: async (row: any) => {
             if (
               confirm(
@@ -2343,6 +2353,21 @@ const InvoiceListPage: React.FC = () => {
               </div>
             </form>
           </CustomModal>
+        )}
+        {showAssignInboundModal && selectedInboundForAssign && (
+          <PaymentInboundAssignModal
+            isOpen={showAssignInboundModal}
+            onClose={() => {
+              setShowAssignInboundModal(false);
+              setSelectedInboundForAssign(null);
+            }}
+            paymentInbound={selectedInboundForAssign}
+            auftraege={tabData.customerOrders || []}
+            rechnungen={tabData.rechnungen || []}
+            onSuccess={() => {
+              tabData.refetchPaymentInbounds();
+            }}
+          />
         )}
         {showCreateBestellungModal && (
           <BestellungPreviewModal

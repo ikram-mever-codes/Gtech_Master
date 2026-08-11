@@ -43,7 +43,7 @@ import rechnungRoutes from "./routes/rechnung_routes";
 import gtechCompanyRoutes from "./routes/gtech_company_routes";
 import systemParameterRoutes from "./routes/system_parameter_routes";
 import weiterversandServiceRoutes from "./routes/weiterversand_service_provider_routes";
-// Add Lieferschein routes
+import paymentAllocationRoutes from "./routes/payment_account_routes";
 import lieferscheinRoutes from "./routes/lieferschein_routes";
 
 const app: any = express();
@@ -111,6 +111,7 @@ app.use(
 app.use("/api/v1/payment-methods", paymentMethodRoutes);
 app.use("/api/v1/payment-accounts", paymentAccountRoutes);
 app.use("/api/v1/payment-inbounds", paymentInboundRoutes);
+app.use("/api/v1/payment-allocations", paymentAllocationRoutes);
 app.use("/api/v1/shipping-methods", shippingMethodRoutes);
 
 app.use("/api/v1/customer-orders", customerOrderRoutes);
