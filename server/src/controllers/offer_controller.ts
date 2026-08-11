@@ -3658,14 +3658,14 @@ export class OfferController {
         const lines: string[] = [];
         if (cName && cName.trim()) lines.push(cName.trim());
 
-        const addLineCleaned =
+        if (
           addLine &&
-            addLine.trim() &&
-            addLine.trim() !== "Additional Info" &&
-            addLine.trim() !== cName.trim()
-            ? addLine.trim()
-            : "\u00a0";
-        lines.push(addLineCleaned);
+          addLine.trim() &&
+          addLine.trim() !== "Additional Info" &&
+          addLine.trim() !== cName.trim()
+        ) {
+          lines.push(addLine.trim());
+        }
 
         if (street && street.trim()) lines.push(street.trim());
         if (cityLineVal) lines.push(cityLineVal);
@@ -3711,7 +3711,6 @@ export class OfferController {
       }
 
       let shipLinesToRender: string[] = [];
-      let isExplicitOnOffer = false;
 
       const offerDelivery = offer.deliveryAddress || offer.shippingAddress;
       if (offerDelivery) {
@@ -3719,7 +3718,6 @@ export class OfferController {
           shipLinesToRender = [primaryName, offerDelivery.trim()].filter(
             Boolean,
           );
-          isExplicitOnOffer = true;
         } else if (typeof offerDelivery === "object") {
           const sAddLine =
             offerDelivery.additionalInfo ||
@@ -3737,34 +3735,34 @@ export class OfferController {
             customer.country ||
             customerEntity?.country,
           );
-          if (shipLinesToRender.length > 0) isExplicitOnOffer = true;
         }
       }
 
-      const shipTextToRender = shipLinesToRender.join("\n").trim();
-
-      if (shipTextToRender) {
-        const shipNorm = shipTextToRender
-          .toLowerCase()
-          .replace(/[^a-z0-9]/gi, "")
-          .trim();
-        const mainNorm = `${mainStreetStr} ${mainPostalStr} ${mainCityStr}`
+      const normalizeAddress = (lines: string[]) =>
+        lines
+          .join(" ")
           .toLowerCase()
           .replace(/[^a-z0-9]/gi, "")
           .trim();
 
-        if (isExplicitOnOffer || (shipNorm && shipNorm !== mainNorm)) {
-          addrY += 6;
-          doc
-            .font(SB)
-            .fontSize(8.5)
-            .fillColor("#2D3748")
-            .text("Lieferadresse:", ADDR_X, addrY, { width: MM(80) });
-          addrY += 11;
-          doc.font(R).fontSize(8.5).fillColor("#3F4446");
-          doc.text(shipTextToRender, ADDR_X, addrY, { width: MM(80) });
-          addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
-        }
+      const mainNorm = normalizeAddress(mainAddrLines);
+      const shipNorm = normalizeAddress(shipLinesToRender);
+
+      const hasRealDifferentAddress =
+        shipNorm.length > 5 && mainNorm.length > 5 && shipNorm !== mainNorm;
+
+      if (hasRealDifferentAddress) {
+        const shipTextToRender = shipLinesToRender.join("\n").trim();
+        addrY += 6;
+        doc
+          .font(SB)
+          .fontSize(8.5)
+          .fillColor("#2D3748")
+          .text("Lieferadresse:", ADDR_X, addrY, { width: MM(80) });
+        addrY += 11;
+        doc.font(R).fontSize(8.5).fillColor("#3F4446");
+        doc.text(shipTextToRender, ADDR_X, addrY, { width: MM(80) });
+        addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
       }
 
       const bannerW = MM(67);
