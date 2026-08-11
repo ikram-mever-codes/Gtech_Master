@@ -251,12 +251,14 @@ export const getItems = async (
       });
     }
 
-    // Active status filter - skip when searching
-    if (isActive && !search && !eanSearch) {
+    const filterParam = ((req.query.filter as string) || "").trim();
+
+    // Active status filter - skip when searching or auditing
+    if (isActive && !search && !eanSearch && !filterParam) {
       idQb.andWhere("item.isActive = :isActive", { isActive });
     }
 
-    if (category) {
+    if (category && filterParam !== "null_category") {
       idQb.andWhere(
         "(category.name = :category OR item.supp_cat = :category)",
         { category },
@@ -344,6 +346,108 @@ export const getItems = async (
         return `item.id NOT IN ${sub}`;
       });
       idQb.setParameter("excTags", excTags);
+    }
+
+    if (filterParam) {
+      if (filterParam !== "wrong_shipping_class") {
+        const activeItemSql = `(
+          EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND wi.is_active = 'Y')
+          OR
+          (NOT EXISTS (SELECT 1 FROM warehouse_item wi WHERE wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND item.isActive = 'Y')
+        )`;
+        idQb.andWhere(activeItemSql);
+      }
+      if (filterParam === "null_category") {
+        idQb.andWhere("(item.cat_id IS NULL OR item.cat_id = 0)");
+      } else if (filterParam === "no_taric") {
+        idQb.andWhere("(item.taric_id IS NULL OR item.taric_id = 0)");
+      } else if (filterParam === "mismatched_tarics") {
+        idQb.andWhere("item.parent_id IS NOT NULL")
+          .andWhere("item.taric_id IS NOT NULL AND item.taric_id != 0")
+          .andWhere("parent.taric_id IS NOT NULL AND parent.taric_id != 0")
+          .andWhere("item.taric_id <> parent.taric_id");
+      } else if (filterParam === "missing_var_values_en") {
+        idQb.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(VariationValue, "vv")
+            .where("vv.item_id = item.id")
+            .andWhere(
+              "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
+                "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+                "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
+            );
+          return `EXISTS ${subQuery.getQuery()}`;
+        });
+      } else if (filterParam === "wrong_shipping_class") {
+        idQb.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(WarehouseItem, "wi")
+            .where("wi.item_id = item.id")
+            .andWhere("(wi.ship_class IS NULL OR wi.ship_class = 'Na' OR wi.ship_class = 'NA' OR wi.ship_class = '')");
+          return `EXISTS ${subQuery.getQuery()}`;
+        });
+      } else if (filterParam === "no_supplier") {
+        idQb.andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)")
+          .andWhere((qb) => {
+            const subQuery = qb
+              .subQuery()
+              .select("1")
+              .from(SupplierItem, "si")
+              .where("si.item_id = item.id AND si.is_default = 'Y'")
+              .andWhere("si.supplier_id IS NOT NULL AND si.supplier_id != 0");
+            return `NOT EXISTS ${subQuery.getQuery()}`;
+          });
+      } else if (filterParam === "no_rmb_price") {
+        idQb.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(SupplierItem, "si")
+            .where("si.item_id = item.id AND si.is_default = 'Y'")
+            .andWhere("(si.price_rmb IS NULL OR si.price_rmb = 0)");
+          return `EXISTS ${subQuery.getQuery()}`;
+        });
+      } else if (filterParam === "is_po_no_url_null") {
+        idQb.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(SupplierItem, "si")
+            .where("si.item_id = item.id AND si.is_default = 'Y'")
+            .andWhere("si.is_po = 'No'")
+            .andWhere("(si.url IS NULL OR si.url = '' OR si.url = 'null' OR si.url = 'NULL')");
+          return `EXISTS ${subQuery.getQuery()}`;
+        });
+      } else if (filterParam === "is_po_null") {
+        idQb.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(SupplierItem, "si")
+            .where("si.item_id = item.id AND si.is_default = 'Y'")
+            .andWhere("(si.is_po IS NULL OR si.is_po = '' OR si.is_po = 'null' OR si.is_po = 'NULL')");
+          return `EXISTS ${subQuery.getQuery()}`;
+        });
+      } else if (filterParam === "new_picture_required") {
+        idQb.andWhere("item.is_npr = 'Y'");
+      } else if (filterParam === "no_picture") {
+        idQb.andWhere("(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')");
+      } else if (filterParam === "multiple_parents_pictures") {
+        idQb.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("sub_item.photo")
+            .from(Item, "sub_item")
+            .where("sub_item.photo IS NOT NULL AND sub_item.photo != '' AND sub_item.photo != 'null' AND sub_item.photo != 'NULL' AND sub_item.parent_id IS NOT NULL")
+            .groupBy("sub_item.photo")
+            .having("COUNT(DISTINCT sub_item.parent_id) > 1");
+          return `item.photo IN ${subQuery.getQuery()}`;
+        });
+      }
     }
 
     const [idObjects, totalRecords] = await idQb

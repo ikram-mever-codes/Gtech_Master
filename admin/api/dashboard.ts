@@ -36,7 +36,7 @@ export type DashboardReportsResponse = {
 
 export const getDashboardReports = async (): Promise<DashboardReportsResponse> => {
   try {
-    const response = await api.get("/dashboard/reports-control");
+    const response = await api.get("/dashboard/reports-control?refresh=true");
     return response as any;
   } catch (error) {
     handleApiError(error, "Failed to load dashboard reports");

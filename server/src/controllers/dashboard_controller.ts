@@ -15,7 +15,7 @@ interface CacheData {
 }
 
 let reportsCache: CacheData | null = null;
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 0;
 
 export const getAuditReports = async (req: Request, res: Response) => {
   try {
@@ -171,8 +171,8 @@ export const getAuditReports = async (req: Request, res: Response) => {
             .where("vv.item_id = item.id")
             .andWhere(
               "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
-                "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
-                "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
+              "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+              "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
             );
           return `EXISTS ${subQuery.getQuery()}`;
         })

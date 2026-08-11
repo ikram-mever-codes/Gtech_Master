@@ -187,18 +187,18 @@ const ItemsManagementPage: React.FC = () => {
     inactiveItems: 0,
   });
 
-  const [filters, setFilters] = useState<FilterState>({
+  const [filters, setFilters] = useState<FilterState>(() => ({
     search: "",
     eanSearch: "",
     status: "",
-    category: "PRO",
+    category: auditFilter ? "" : "PRO",
     supplier: "",
-    isActive: "Y",
+    isActive: auditFilter ? "" : "Y",
     tags: "",
     company: "",
     isLabel: "",
     isStock: "",
-  });
+  }));
   const [taricSearch, setTaricSearch] = useState("");
   const [itemsTotalRecords, setItemsTotalRecords] = useState(0);
   const [itemsTotalPages, setItemsTotalPages] = useState(1);
@@ -413,8 +413,8 @@ const ItemsManagementPage: React.FC = () => {
             const params: any = {
               page: page,
               limit: PAGE_LIMIT,
-              isActive: filters.isActive || undefined,
-              category: filters.category || undefined,
+              isActive: (auditFilter ? undefined : filters.isActive) || undefined,
+              category: (auditFilter ? undefined : filters.category) || undefined,
               supplier: filters.supplier || undefined,
               tags: filters.tags || undefined,
               isLabel: filters.isLabel || undefined,
@@ -1715,26 +1715,6 @@ const ItemsManagementPage: React.FC = () => {
             )}
           </div>
         </div>
-        {auditFilter && searchParams.get("hide_banner") !== "true" && (
-          <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="font-bold">
-                ⚠️ Reports &amp; Control Health Audit View Active:
-              </span>
-              <span className="font-semibold text-gray-800">{auditFilter}</span>
-            </div>
-            <button
-              onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete("filter");
-                window.location.href = `/items?${params.toString()}`;
-              }}
-              className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold"
-            >
-              Clear Audit Filter
-            </button>
-          </div>
-        )}
 
         <div className="mb-6">
           <div className="border-b border-gray-200">

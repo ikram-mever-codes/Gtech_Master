@@ -97,30 +97,30 @@ export default function Dashboard() {
   const handleNavigation = (category: string, type: string) => {
     if (category === "orders") {
       if (type === "unassigned_cargo") {
-        router.push(`/invoices?tab=orders&filter=${type}&hide_banner=true`);
+        router.push(`/invoices?tab=orders&filter=${type}`);
       } else if (type === "purchase_problem" || type === "check_problem") {
-        router.push(`/orders?tab=problems&filter=${type}&hide_banner=true`);
+        router.push(`/orders?tab=problems&filter=${type}`);
       } else if (
         type === "rmb_special_no_value" ||
         type === "eur_special_no_value" ||
         type === "dimension_special_no_value"
       ) {
-        router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
+        router.push(`/invoices?tab=order_items&filter=${type}`);
       } else if (type === "missing_gelangenheitsbestaetigung") {
-        router.push(`/commercial?tab=rechnung&filter=${type}&hide_banner=true`);
+        router.push(`/commercial?tab=rechnung&filter=${type}`);
       } else {
-        router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
+        router.push(`/invoices?tab=order_items&filter=${type}`);
       }
     } else if (category === "items") {
       if (type === "wrong_shipping_class") {
-        router.push(`/items?tab=warehouse&filter=${type}&hide_banner=true`);
+        router.push(`/items?tab=warehouse&filter=${type}`);
       } else {
-        router.push(`/items?tab=items&filter=${type}&hide_banner=true`);
+        router.push(`/items?tab=items&filter=${type}`);
       }
     } else if (category === "suppliers") {
-      router.push(`/items?tab=items&filter=${type}&hide_banner=true`);
+      router.push(`/items?tab=items&filter=${type}`);
     } else if (category === "pictures") {
-      router.push(`/items?tab=items&filter=${type}&hide_banner=true`);
+      router.push(`/items?tab=items&filter=${type}`);
     }
   };
 

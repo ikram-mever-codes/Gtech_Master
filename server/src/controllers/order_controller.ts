@@ -506,7 +506,7 @@ export const getAllOrders = async (
   try {
     const orderRepo = AppDataSource.getRepository(Order);
     const warehouseRepo = AppDataSource.getRepository(WarehouseItem);
-    const { search = "", status = "" } = (req.query || {}) as any;
+    const { search = "", status = "", filter = "" } = (req.query || {}) as any;
 
     const qb = orderRepo
       .createQueryBuilder("o")
@@ -528,6 +528,16 @@ export const getAllOrders = async (
       if (status) qb.andWhere("o.status = :status", { status });
     } else if (status) {
       qb.where("o.status = :status", { status });
+    }
+
+    if (filter) {
+      if (filter === "unassigned_cargo") {
+        qb.andWhere("(o.cargo_id IS NULL OR o.cargo_id = 0)");
+      } else if (filter === "purchase_problem") {
+        qb.andWhere("(o.status ILIKE '%purchase%problem%' OR o.problem_status ILIKE '%purchase%problem%')");
+      } else if (filter === "check_problem") {
+        qb.andWhere("(o.status ILIKE '%check%problem%' OR o.problem_status ILIKE '%check%problem%')");
+      }
     }
 
     const orders = await qb.getMany();

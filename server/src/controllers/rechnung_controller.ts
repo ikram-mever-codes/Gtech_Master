@@ -460,16 +460,29 @@ export const createRechnungFromAuftrag = async (
   }
 };
 export const getAllRechnungen = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
-    const rechnungen = await rechnungRepo.find({
-      order: { created_at: "DESC" },
-      relations: ["items", "customer"],
-    });
+    const filter = (req.query.filter as string) || "";
+
+    const qb = rechnungRepo
+      .createQueryBuilder("r")
+      .leftJoinAndSelect("r.items", "items")
+      .leftJoinAndSelect("r.customer", "c")
+      .orderBy("r.created_at", "DESC");
+
+    if (filter === "missing_gelangenheitsbestaetigung") {
+      qb.andWhere(
+        "(r.tax_profile_case IN ('EU_IGL', 'third_country') OR (c.country IS NOT NULL AND c.country != '' AND c.country NOT IN ('DE', 'Deutschland', 'DEU')))",
+      ).andWhere(
+        "(r.gelangenheitsbestaetigung_doc IS NULL OR r.gelangenheitsbestaetigung_doc = '' OR r.gelangenheitsbestaetigung_doc = 'null')",
+      );
+    }
+
+    const rechnungen = await qb.getMany();
 
     const linkedDocumentsByRechnungId =
       await getLinkedDocumentsForRechnungen(rechnungen);
