@@ -1262,7 +1262,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
               <FunnelIcon className="w-5 h-5 text-gray-400" />
             </div>
 
-            <div className="w-52 shrink-0">
+            <div className="w-48 shrink-0">
               <input
                 type="text"
                 value={clientFilters.companyName}
@@ -1277,7 +1277,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
               />
             </div>
 
-            <div className="flex-1 min-w-[250px]">
+            <div className="w-56 shrink-0">
               <TagFilterSelector
                 category="company"
                 compact={true}
@@ -1365,7 +1365,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
               <div className="text-center">

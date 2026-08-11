@@ -301,7 +301,7 @@ const CombinedInquiriesPageContent = () => {
 
     return (
       <th
-        className={`px-2 py-3 text-${align} text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 transition-colors group ${field === 'name' ? 'min-w-[13rem]' : ''}`}
+        className={`px-3 py-3 text-${align} text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 transition-colors group ${field === 'name' ? 'min-w-[13rem]' : ''}`}
         onClick={() => handleSort(field)}
       >
         <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -1517,10 +1517,10 @@ const CombinedInquiriesPageContent = () => {
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap items-center gap-2 w-full">
             <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-              <FunnelIcon className="w-5 h-5 text-primary" />
+              <FunnelIcon className="w-5 h-5 text-gray-400" />
             </div>
 
-            <div className="flex-grow flex-shrink flex-1 min-w-[200px]">
+            <div className="w-56 shrink-0">
               <TagFilterSelector
                 category="inquiry"
                 compact={true}
@@ -1537,7 +1537,7 @@ const CombinedInquiriesPageContent = () => {
               />
             </div>
 
-            <div className="flex-grow flex-shrink flex-1 min-w-[200px]">
+            <div className="w-60 shrink-0">
               <TagFilterSelector
                 category="request_item"
                 compact={true}
@@ -1557,7 +1557,7 @@ const CombinedInquiriesPageContent = () => {
               />
             </div>
 
-            <div className="flex-grow flex-shrink flex-1 min-w-[220px]">
+            <div className="w-52 shrink-0">
               <CustomerSearchInput
                 value={selectedCustomerId}
                 onChange={(id) => {
@@ -1580,15 +1580,15 @@ const CombinedInquiriesPageContent = () => {
                   setSelectedCustomerId("");
                   setInquiryCurrentPage(1);
                 }}
-                className="w-full lg:w-auto px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
               >
-                <ArrowPathIcon className="w-3.5 h-3.5" />
+                <ArrowPathIcon className="w-4 h-4" />
                 Reset
               </button>
             </div>
           </div>
         </div>
-        <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
+        <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
           {inquiryLoading ? (
             <div className="p-8 text-center">
               <div className="inline-flex items-center gap-3">
@@ -1607,12 +1607,12 @@ const CombinedInquiriesPageContent = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-200/50 border-b border-gray-200/50">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     {renderSortableHeader("name", "Inquiry", "left")}
                     {renderSortableHeader("customer.companyName", "Company / Contacts", "left")}
                     {showPicColumn && (
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                      <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-16">
                         Pic
                       </th>
                     )}
@@ -1625,7 +1625,7 @@ const CombinedInquiriesPageContent = () => {
                     {renderSortableHeader("owner_user_id", "Owner", "left")}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200/50">
+                <tbody className="divide-y divide-gray-100">
                   {inquiries.map((inquiry) => (
                     <React.Fragment key={inquiry.id}>
                       <tr className="hover:bg-gray-50/50 transition-colors">
