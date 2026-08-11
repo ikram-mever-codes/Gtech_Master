@@ -1249,6 +1249,7 @@ export class OfferController {
           offerId: savedOffer.id,
           itemName: savedOffer.assemblyName || inquiry.name,
           description: savedOffer.assemblyDescription || inquiry.description,
+          photo: inquiry.image || undefined,
           position: position++,
           isAssemblyItem: true,
           isEstimated: inquiry.isEstimated,

@@ -48,6 +48,7 @@ import {
   removeRequestFromInquiry,
   getInquiryById,
 } from "@/api/inquiry";
+import { uploadFile } from "@/api/library";
 import {
   getAvailableIntervals,
   getAvailablePriorities as getAvailableRequestPriorities,
@@ -381,8 +382,31 @@ const CombinedInquiriesPageContent = () => {
     new Set(),
   );
   const [allRequestsExpanded, setAllRequestsExpanded] = useState(true);
-  const [inquiryImageFile, setInquiryImageFile] = useState<File | null>(null);
-  const [inquiryImagePreview, setInquiryImagePreview] = useState<string>("");
+  const [uploadingAssemblyImage, setUploadingAssemblyImage] = useState(false);
+
+  const handleAssemblyImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAssemblyImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res: any = await uploadFile(formData);
+      const fileUrl = res.data?.url || res.data?.fileUrl;
+      if (fileUrl) {
+        setInquiryFormData((prev: any) => ({
+          ...prev,
+          image: fileUrl,
+        }));
+        toast.success("Assembly image uploaded successfully");
+      }
+    } catch (err) {
+      console.error("Failed to upload assembly image:", err);
+    } finally {
+      setUploadingAssemblyImage(false);
+      e.target.value = "";
+    }
+  };
   const [inquiryFormData, setInquiryFormData] = useState<CreateInquiryPayload>({
     name: "",
     description: "",
@@ -987,7 +1011,6 @@ const CombinedInquiriesPageContent = () => {
       next_action: inquiry.next_action || "",
     });
     setNewInquiryTags((inquiry as any).tags || []);
-    setInquiryImagePreview(inquiry.image || "");
     if (inquiry.requests && inquiry.requests.length > 0) {
       setInquiryRequests(mapRequestsFromServer(inquiry.requests));
     }
@@ -1186,8 +1209,6 @@ const CombinedInquiriesPageContent = () => {
         annualPotentialKEur: 0,
       },
     ]);
-    setInquiryImageFile(null);
-    setInquiryImagePreview("");
     setEditModeEnabled(false);
     setEditingInquiryId(null);
     setInquiryModalMode("create");
@@ -1225,6 +1246,10 @@ const CombinedInquiriesPageContent = () => {
     };
     let initialFormData: any = {};
     if (type === "inquiry" && inquiryData) {
+      if (!inquiryData.isAssembly) {
+        toast.error("Only assembly inquiries (isAssembly = true) can be converted to an item");
+        return;
+      }
       setConversionInquiryData(inquiryData);
       existingDims = {
         weight: !!inquiryData.weight,
@@ -1785,19 +1810,14 @@ const CombinedInquiriesPageContent = () => {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="text-purple-500 hover:text-purple-700 transition-colors shrink-0"
+                                  className="inline-block transition-transform hover:scale-110 shrink-0"
                                   title="Open Asana task"
                                 >
-                                  <svg
-                                    className="h-4 w-4"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                  >
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                    <circle cx="12" cy="8.5" r="1.5" />
-                                    <circle cx="8.5" cy="14.5" r="1.5" />
-                                    <circle cx="15.5" cy="14.5" r="1.5" />
-                                  </svg>
+                                  <img
+                                    src="/asana.svg"
+                                    alt="Asana"
+                                    className="w-4 h-4 object-contain"
+                                  />
                                 </a>
                               )}
                           </div>
@@ -1808,15 +1828,6 @@ const CombinedInquiriesPageContent = () => {
                           <tr className="bg-gray-50/50 border-t border-b border-gray-100">
                             <td colSpan={totalCols} className="px-6 py-4">
                               <div>
-                                <div className="text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wider flex items-center gap-1.5 select-none">
-                                  <ClipboardList className="h-4 w-4 text-blue-500" />
-                                  <span>
-                                    Request Items for:{" "}
-                                    <strong className="text-gray-800">
-                                      {inquiry.name}
-                                    </strong>
-                                  </span>
-                                </div>
                                 <div className="overflow-x-auto shadow-sm rounded-lg border border-gray-200 bg-white">
                                   <table className="w-full text-sm">
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
@@ -1824,11 +1835,9 @@ const CombinedInquiriesPageContent = () => {
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           Request Item
                                         </th>
-                                        {inquiry.isAssembly && (
-                                          <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                                            Pic
-                                          </th>
-                                        )}
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                                          Pic
+                                        </th>
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           Qty &amp; Interval
                                         </th>
@@ -1853,7 +1862,7 @@ const CombinedInquiriesPageContent = () => {
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
-                                      {inquiry.requests.map((request: any) => (
+                                      {inquiry.requests.map((request: any, index: number) => (
                                         <tr
                                           key={request.id}
                                           onClick={() => {
@@ -1875,41 +1884,51 @@ const CombinedInquiriesPageContent = () => {
                                               <div className="text-sm font-medium text-gray-900">
                                                 {request.itemName}
                                               </div>
-                                              {request.itemNo && (
-                                                <div className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold inline-block mt-0.5">
-                                                  {request.itemNo}
-                                                </div>
-                                              )}
+                                              {(() => {
+                                                const getLetterSuffix = (idx: number) => {
+                                                  let suffix = "";
+                                                  let temp = idx;
+                                                  while (temp >= 0) {
+                                                    suffix = String.fromCharCode((temp % 26) + 97) + suffix;
+                                                    temp = Math.floor(temp / 26) - 1;
+                                                  }
+                                                  return suffix;
+                                                };
+                                                const rawItemNo = request.itemNo || `${inquiry.inquiryNo || "AF"}${getLetterSuffix(index)}`;
+                                                const displayItemNo = rawItemNo.replace(/^(.+)-([a-z])$/i, "$1$2");
+                                                return (
+                                                  <div className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold inline-block mt-0.5">
+                                                    {displayItemNo}
+                                                  </div>
+                                                );
+                                              })()}
                                             </div>
                                           </td>
-                                          {inquiry.isAssembly && (
-                                            <td className="px-3 py-3 text-center">
-                                              <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
-                                                {request.images &&
-                                                  request.images.length > 0 ? (
-                                                  <img
-                                                    src={request.images[0]}
-                                                    alt="Item"
-                                                    className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      window.open(
-                                                        request.images![0],
-                                                        "_blank",
-                                                      );
-                                                    }}
-                                                    title="View image"
-                                                  />
-                                                ) : (
-                                                  <PhotoIcon
-                                                    className="w-5 h-5 text-gray-300"
-                                                    title="No image available"
-                                                  />
-                                                )}
-                                              </div>
-                                            </td>
-                                          )}
-                                          <td className="px-4 py-3 text-center">
+                                          <td className="px-3 py-3 text-center">
+                                            <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
+                                              {request.images &&
+                                                request.images.length > 0 ? (
+                                                <img
+                                                  src={request.images[0]}
+                                                  alt="Item"
+                                                  className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    window.open(
+                                                      request.images![0],
+                                                      "_blank",
+                                                    );
+                                                  }}
+                                                  title="View image"
+                                                />
+                                              ) : (
+                                                <PhotoIcon
+                                                  className="w-5 h-5 text-gray-300"
+                                                  title="No image available"
+                                                />
+                                              )}
+                                            </div>
+                                          </td>                                <td className="px-4 py-3 text-center">
                                             <div className="text-sm font-medium text-gray-900">
                                               {request.qty} / {request.interval}
                                             </div>
@@ -2030,31 +2049,14 @@ const CombinedInquiriesPageContent = () => {
                                                     "_blank",
                                                   );
                                                 }}
-                                                className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                                className="inline-block transition-transform hover:scale-110 p-0.5"
                                                 title="Open Asana link"
                                               >
-                                                <svg
-                                                  className="h-4 w-4"
-                                                  viewBox="0 0 24 24"
-                                                  fill="currentColor"
-                                                >
-                                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                                  <circle
-                                                    cx="12"
-                                                    cy="8.5"
-                                                    r="1.5"
-                                                  />
-                                                  <circle
-                                                    cx="8.5"
-                                                    cy="14.5"
-                                                    r="1.5"
-                                                  />
-                                                  <circle
-                                                    cx="15.5"
-                                                    cy="14.5"
-                                                    r="1.5"
-                                                  />
-                                                </svg>
+                                                <img
+                                                  src="/asana.svg"
+                                                  alt="Asana"
+                                                  className="w-4 h-4 object-contain"
+                                                />
                                               </button>
                                             ) : (
                                               <span
@@ -2506,9 +2508,55 @@ const CombinedInquiriesPageContent = () => {
                       </label>
                     </div>
                   </div>
-                  {false && inquiryFormData.isAssembly && (
+                  {inquiryFormData.isAssembly && (
                     <div className="col-span-2 bg-orange-100/50 border border-orange-200 rounded-xl p-4 mt-2 space-y-4">
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-4 gap-3 items-end">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Assembly Picture
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {inquiryFormData.image ? (
+                              <div className="relative w-10 h-10 rounded border border-gray-300 overflow-hidden bg-gray-50 flex-shrink-0">
+                                <img
+                                  src={inquiryFormData.image}
+                                  alt="Assembly"
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setInquiryFormData({
+                                      ...inquiryFormData,
+                                      image: "",
+                                    })
+                                  }
+                                  className="absolute top-0 right-0 bg-red-600 text-white rounded-bl p-0.5 hover:bg-red-700"
+                                  title="Remove image"
+                                >
+                                  <XMarkIcon className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-10 h-10 rounded border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 flex-shrink-0">
+                                <PhotoIcon className="w-5 h-5" />
+                              </div>
+                            )}
+                            <label className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-all ${uploadingAssemblyImage
+                              ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                              }`}>
+                              {uploadingAssemblyImage ? "Uploading..." : inquiryFormData.image ? "Change" : "Upload"}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingAssemblyImage || (inquiryModalMode === "edit" && !editModeEnabled)}
+                                onChange={handleAssemblyImageUpload}
+                              />
+                            </label>
+                          </div>
+                        </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             ItemName*

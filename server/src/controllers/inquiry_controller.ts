@@ -575,13 +575,13 @@ export class InquiryController {
           total_potential_k_eur += annualPotentialKEur;
 
           const letterSuffix = this.getLetterSuffix(index);
-          let assignedItemNo = `${savedInquiry.inquiryNo || "AF"}-${letterSuffix}`;
+          let assignedItemNo = `${savedInquiry.inquiryNo || "AF"}${letterSuffix}`;
           if (reqData.itemNo && typeof reqData.itemNo === "string" && reqData.itemNo.trim()) {
             const rawNo = reqData.itemNo.trim();
             if (savedInquiry.inquiryNo && rawNo.startsWith(savedInquiry.inquiryNo)) {
-              assignedItemNo = rawNo;
+              assignedItemNo = rawNo.replace(/^(.+)-([a-z])$/i, "$1$2");
             } else if (/^[a-z]$/i.test(rawNo)) {
-              assignedItemNo = `${savedInquiry.inquiryNo || "AF"}-${rawNo.toLowerCase()}`;
+              assignedItemNo = `${savedInquiry.inquiryNo || "AF"}${rawNo.toLowerCase()}`;
             } else if (rawNo !== String(index + 1).padStart(3, "0")) {
               assignedItemNo = rawNo;
             }
@@ -824,9 +824,22 @@ export class InquiryController {
               const annualPotentialKEur = annualPotential / 1000;
               total_potential_k_eur += annualPotentialKEur;
 
+              const letterSuffix = this.getLetterSuffix(index);
+              let assignedItemNo = `${existingInquiry.inquiryNo || "AF"}${letterSuffix}`;
+              if (reqData.itemNo && typeof reqData.itemNo === "string" && reqData.itemNo.trim()) {
+                const rawNo = reqData.itemNo.trim();
+                if (existingInquiry.inquiryNo && rawNo.startsWith(existingInquiry.inquiryNo)) {
+                  assignedItemNo = rawNo.replace(/^(.+)-([a-z])$/i, "$1$2");
+                } else if (/^[a-z]$/i.test(rawNo)) {
+                  assignedItemNo = `${existingInquiry.inquiryNo || "AF"}${rawNo.toLowerCase()}`;
+                } else if (rawNo !== String(index + 1).padStart(3, "0")) {
+                  assignedItemNo = rawNo;
+                }
+              }
+
               const requestItem = this.requestRepository.create({
                 ...reqDataWithoutId,
-                itemNo: reqData.itemNo || String(index + 1).padStart(3, "0"),
+                itemNo: assignedItemNo,
                 cat_id: reqData.cat_id || defaultProCatId,
                 businessId: starBusinessDetails.id,
                 business: starBusinessDetails,
@@ -995,8 +1008,15 @@ export class InquiryController {
           parseFloat(requestData.unitWeight) * parseFloat(currentQty);
       }
 
+      const existingCount = (inquiry.requests || []).length;
+      const letterSuffix = this.getLetterSuffix(existingCount);
+      const assignedItemNo = requestData.itemNo
+        ? String(requestData.itemNo).replace(/^(.+)-([a-z])$/i, "$1$2")
+        : `${inquiry.inquiryNo || "AF"}${letterSuffix}`;
+
       const requestItem = this.requestRepository.create({
         ...requestData,
+        itemNo: assignedItemNo,
         inquiry,
         qty: currentQty,
         totalWeight: totalWeight || requestData.totalWeight,
@@ -1110,6 +1130,13 @@ export class InquiryController {
         return response.status(404).json({
           success: false,
           message: "Inquiry not found",
+        });
+      }
+
+      if (!inquiry.isAssembly) {
+        return response.status(400).json({
+          success: false,
+          message: "Only assembly inquiries (isAssembly = true) can be converted to an Item",
         });
       }
 
