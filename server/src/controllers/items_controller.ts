@@ -375,8 +375,8 @@ export const getItems = async (
             .where("vv.item_id = item.id")
             .andWhere(
               "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
-                "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
-                "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
+              "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+              "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
             );
           return `EXISTS ${subQuery.getQuery()}`;
         });
@@ -407,9 +407,8 @@ export const getItems = async (
             .subQuery()
             .select("1")
             .from(SupplierItem, "si")
-            .where("si.item_id = item.id AND si.is_default = 'Y'")
-            .andWhere("(si.price_rmb IS NULL OR si.price_rmb = 0)");
-          return `EXISTS ${subQuery.getQuery()}`;
+            .where("si.item_id = item.id AND si.is_default = 'Y' AND si.price_rmb IS NOT NULL AND si.price_rmb > 0");
+          return `NOT EXISTS ${subQuery.getQuery()}`;
         });
       } else if (filterParam === "is_po_no_url_null") {
         idQb.andWhere((qb) => {
@@ -947,31 +946,31 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-              id: defaultSi.id,
-              supplierId: defaultSi.supplier_id,
-              supplierName:
-                defaultSi.supplier?.company_name ||
-                defaultSi.supplier?.name ||
-                "Unknown",
-              priceRMB: defaultSi.price_rmb?.toString() || "0",
-              currency: defaultSi.currency || "RMB",
-              isPO: defaultSi.is_po || "No",
-              moq: defaultSi.moq?.toString() || "0",
-              interval: defaultSi.oi?.toString() || "0",
-              leadTime: defaultSi.lead_time || "",
-              noteCN: defaultSi.note_cn || "",
-              url: defaultSi.url || "",
-            }
+            id: defaultSi.id,
+            supplierId: defaultSi.supplier_id,
+            supplierName:
+              defaultSi.supplier?.company_name ||
+              defaultSi.supplier?.name ||
+              "Unknown",
+            priceRMB: defaultSi.price_rmb?.toString() || "0",
+            currency: defaultSi.currency || "RMB",
+            isPO: defaultSi.is_po || "No",
+            moq: defaultSi.moq?.toString() || "0",
+            interval: defaultSi.oi?.toString() || "0",
+            leadTime: defaultSi.lead_time || "",
+            noteCN: defaultSi.note_cn || "",
+            url: defaultSi.url || "",
+          }
           : {
-              priceRMB: "0",
-              currency: "RMB",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            };
+            priceRMB: "0",
+            currency: "RMB",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -2196,9 +2195,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2274,17 +2273,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3844,23 +3843,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         return {
@@ -4814,5 +4813,77 @@ export const migrateItemNoDeFromWarehouse = async (
   } catch (error) {
     console.error("item_no_de/ItemID_DE migration error:", error);
     return next(new ErrorHandler("Failed to migrate item_no_de", 500));
+  }
+};
+
+export const getUnusedPictures = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const uploadDir = path.join(process.cwd(), "uploads");
+    if (!fs.existsSync(uploadDir)) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        count: 0,
+      });
+    }
+
+    const files = fs.readdirSync(uploadDir);
+    const itemsWithPhotos = await AppDataSource.getRepository(Item)
+      .createQueryBuilder("item")
+      .select(["item.photo", "item.pix_path", "item.pix_path_eBay"])
+      .where(
+        "item.photo IS NOT NULL OR item.pix_path IS NOT NULL OR item.pix_path_eBay IS NOT NULL",
+      )
+      .getRawMany();
+
+    const referencedPhotos = new Set<string>();
+    itemsWithPhotos.forEach((item) => {
+      const photo = item.item_photo || item.photo;
+      const pixPath = item.item_pix_path || item.pix_path;
+      const pixPathEbay = item.item_pix_path_eBay || item.pix_path_eBay;
+
+      if (photo) referencedPhotos.add(path.basename(photo).trim());
+      if (pixPath) referencedPhotos.add(path.basename(pixPath).trim());
+      if (pixPathEbay) referencedPhotos.add(path.basename(pixPathEbay).trim());
+    });
+
+    const protocol =
+      req.protocol === "https" || req.get("x-forwarded-proto") === "https"
+        ? "https"
+        : "http";
+    const host = req.get("host");
+    const unusedFiles: any[] = [];
+
+    for (const file of files) {
+      if (!referencedPhotos.has(file)) {
+        try {
+          const filePath = path.join(uploadDir, file);
+          const stats = fs.statSync(filePath);
+          if (stats.isFile()) {
+            unusedFiles.push({
+              filename: file,
+              size: stats.size,
+              createdAt: stats.birthtime || stats.ctime,
+              url: `${protocol}://${host}/uploads/${file}`,
+            });
+          }
+        } catch (e) {
+          // ignore stat errors for single files
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: unusedFiles,
+      count: unusedFiles.length,
+    });
+  } catch (error) {
+    console.error("Error in getUnusedPictures:", error);
+    return next(error);
   }
 };

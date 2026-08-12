@@ -1312,6 +1312,26 @@ const InvoiceListPage: React.FC = () => {
           city: r.customer?.city || "",
         },
       }));
+
+      const auditFilter = searchParams.get("filter");
+      if (auditFilter === "missing_gelangenheitsbestaetigung") {
+        list = list.filter((r: any) => {
+          const country = (
+            r.customerSnapshot?.country ||
+            r.customer?.country ||
+            ""
+          ).trim();
+          const isAbroad =
+            r.tax_profile_case === "EU_IGL" ||
+            r.tax_profile_case === "third_country" ||
+            (country !== "" && !["DE", "Deutschland", "DEU"].includes(country));
+          const missingDoc =
+            !r.gelangenheitsbestaetigung_doc ||
+            r.gelangenheitsbestaetigung_doc === "" ||
+            r.gelangenheitsbestaetigung_doc === "null";
+          return isAbroad && missingDoc;
+        });
+      }
     } else if (activeInvTab === "payment_inbound") {
       list = (tabData.paymentInbounds || []).map((pi: any) => ({
         ...pi,

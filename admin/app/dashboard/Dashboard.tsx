@@ -120,7 +120,11 @@ export default function Dashboard() {
     } else if (category === "suppliers") {
       router.push(`/items?tab=items&filter=${type}`);
     } else if (category === "pictures") {
-      router.push(`/items?tab=items&filter=${type}`);
+      if (type === "unused_pictures") {
+        router.push(`/library?filter=${type}`);
+      } else {
+        router.push(`/items?tab=items&filter=${type}`);
+      }
     }
   };
 

@@ -340,7 +340,13 @@ export default function OrdersTable({
         </div>
       );
     }
-    const hasCargo = !!row.cargo_id || !!row.cargoId || !!row.cargo?.id;
+    const hasCargo = Boolean(
+      row.cargo_id &&
+      row.cargo_id !== 0 &&
+      row.cargo_id !== "0" &&
+      row.cargo_id !== "-" &&
+      row.cargo_id !== "null"
+    );
     return (
       <div className="flex items-center justify-center gap-1.5">
         <button
@@ -439,7 +445,14 @@ export default function OrdersTable({
     {
       header: "Cargo",
       width: "55px",
-      render: (row) => row.cargo_id ?? "-",
+      render: (row) =>
+        row.cargo_id &&
+          row.cargo_id !== 0 &&
+          row.cargo_id !== "0" &&
+          row.cargo_id !== "-" &&
+          row.cargo_id !== "null"
+          ? row.cargo_id
+          : "-",
       align: "center",
     },
     {

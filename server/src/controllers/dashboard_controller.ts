@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../config/database";
 import { Item } from "../models/items";
+import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { WarehouseItem } from "../models/warehouse_items";
 import { SupplierItem } from "../models/supplier_items";
@@ -115,13 +116,11 @@ export const getAuditReports = async (req: Request, res: Response) => {
       multipleParentsPicturesRaw,
       missingGelangenheitsCount,
     ] = await Promise.all([
-      AppDataSource.getRepository(OrderItem)
-        .createQueryBuilder("oi")
-        .innerJoin("oi.order", "o")
-        .where("oi.cargo_id IS NULL OR oi.cargo_id = 0")
-        .select("COUNT(DISTINCT oi.order_id)", "cnt")
-        .getRawOne()
-        .then((res) => Number(res?.cnt || 0)),
+      AppDataSource.getRepository(Order)
+        .createQueryBuilder("o")
+        .leftJoin("o.cargo", "c")
+        .where("o.cargo_id IS NULL OR o.cargo_id = 0 OR c.id IS NULL")
+        .getCount(),
 
       AppDataSource.getRepository(OrderItem)
         .createQueryBuilder("oi")
@@ -149,7 +148,7 @@ export const getAuditReports = async (req: Request, res: Response) => {
         .innerJoin("oi.order", "o")
         .innerJoin("oi.item", "item")
         .where("item.is_eur_special = 'Y'")
-        .andWhere("(item.price IS NULL OR item.price = 0 OR item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)")
+        .andWhere("(item.price IS NULL OR item.price = 0) AND (item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)")
         .getCount(),
 
       AppDataSource.getRepository(OrderItem)
@@ -214,9 +213,15 @@ export const getAuditReports = async (req: Request, res: Response) => {
 
       AppDataSource.getRepository(Item)
         .createQueryBuilder("item")
-        .leftJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
         .where(activeItemSql)
-        .andWhere("(si.price_rmb IS NULL OR si.price_rmb = 0)")
+        .andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(SupplierItem, "si")
+            .where("si.item_id = item.id AND si.is_default = 'Y' AND si.price_rmb IS NOT NULL AND si.price_rmb > 0");
+          return `NOT EXISTS ${subQuery.getQuery()}`;
+        })
         .getCount(),
 
       AppDataSource.getRepository(Item)

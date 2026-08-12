@@ -3706,39 +3706,62 @@ export class OfferController {
 
       let shipLinesToRender: string[] = [];
       let shipCoreKey = "";
+      let isExplicitlySame = false;
 
       const offerDelivery = offer.deliveryAddress || offer.shippingAddress;
       if (offerDelivery) {
-        if (typeof offerDelivery === "string" && offerDelivery.trim()) {
-          shipLinesToRender = [primaryName, offerDelivery.trim()].filter(
-            Boolean,
-          );
-          shipCoreKey = offerDelivery.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
-        } else if (typeof offerDelivery === "object") {
-          const sStreet = (offerDelivery.street || offerDelivery.addressLine1 || "").trim();
-          const sPostal = (offerDelivery.postal_code || offerDelivery.postalCode || "").trim();
-          const sCity = (offerDelivery.city || "").trim();
-          const sCountry = (offerDelivery.country || customer.country || customerEntity?.country || "");
-
-          shipCoreKey = `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
-            .toLowerCase()
-            .replace(/[^a-z0-9]/gi, "");
-
-          if (sStreet || sCity || sPostal) {
-            const sAddLine =
-              offerDelivery.additionalInfo ||
-              offerDelivery.address_additional_line ||
-              offerDelivery.addressLine2 ||
-              offerDelivery.additionalLine ||
-              "";
-            shipLinesToRender = formatAddressBlockLines(
-              offerDelivery.companyName || offerDelivery.name || primaryName,
-              sAddLine,
-              sStreet,
-              sPostal,
-              sCity,
-              sCountry,
+        if (typeof offerDelivery === "string") {
+          const trimmed = offerDelivery.trim().toLowerCase();
+          if (
+            !trimmed ||
+            trimmed === "same" ||
+            trimmed.includes("same as") ||
+            trimmed.includes("same delivery") ||
+            trimmed.includes("billing") ||
+            trimmed.includes("rechnungsadresse") ||
+            trimmed.includes("hauptadresse") ||
+            trimmed.includes("customer address")
+          ) {
+            isExplicitlySame = true;
+          } else {
+            shipLinesToRender = [primaryName, offerDelivery.trim()].filter(
+              Boolean,
             );
+            shipCoreKey = offerDelivery.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
+          }
+        } else if (typeof offerDelivery === "object") {
+          if (
+            offerDelivery.sameAsBilling ||
+            offerDelivery.isSameAsBilling ||
+            offerDelivery.useBilling
+          ) {
+            isExplicitlySame = true;
+          } else {
+            const sStreet = (offerDelivery.street || offerDelivery.addressLine1 || "").trim();
+            const sPostal = (offerDelivery.postal_code || offerDelivery.postalCode || "").trim();
+            const sCity = (offerDelivery.city || "").trim();
+            const sCountry = (offerDelivery.country || customer.country || customerEntity?.country || "");
+
+            if (sStreet || sCity || sPostal) {
+              shipCoreKey = `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
+                .toLowerCase()
+                .replace(/[^a-z0-9]/gi, "");
+
+              const sAddLine =
+                offerDelivery.additionalInfo ||
+                offerDelivery.address_additional_line ||
+                offerDelivery.addressLine2 ||
+                offerDelivery.additionalLine ||
+                "";
+              shipLinesToRender = formatAddressBlockLines(
+                offerDelivery.companyName || offerDelivery.name || primaryName,
+                sAddLine,
+                sStreet,
+                sPostal,
+                sCity,
+                sCountry,
+              );
+            }
           }
         }
       }
@@ -3748,7 +3771,11 @@ export class OfferController {
         .replace(/[^a-z0-9]/gi, "");
 
       const hasRealDifferentAddress =
-        shipCoreKey.length > 5 && mainCoreKey.length > 5 && shipCoreKey !== mainCoreKey;
+        !isExplicitlySame &&
+        shipLinesToRender.length > 0 &&
+        shipCoreKey.length > 5 &&
+        mainCoreKey.length > 5 &&
+        shipCoreKey !== mainCoreKey;
 
       if (hasRealDifferentAddress) {
         const shipTextToRender = shipLinesToRender.join("\n").trim();
@@ -3917,7 +3944,6 @@ export class OfferController {
       doc.font(R).fontSize(8.5).fillColor("#3F4446");
 
       let currentY = tableY + headerHeight;
-      const vatRatePercent = getSafeNumber(offer.taxRate ?? 19);
 
       if (offer.lineItems && Array.isArray(offer.lineItems)) {
         const customerItems = offer.lineItems
@@ -4022,11 +4048,19 @@ export class OfferController {
               .fill("#FFFFFF");
           }
 
+          // Resolve per-item MwSt: item's own taxRate → offer-level taxRate → 0
+          const itemTaxRate =
+            item.taxRate !== undefined && item.taxRate !== null
+              ? getSafeNumber(item.taxRate)
+              : offer.taxRate !== undefined && offer.taxRate !== null
+                ? getSafeNumber(offer.taxRate)
+                : 0;
+
           const rowData = [
             (rowIndex + 1).toString(),
             artNrStr,
             fullBezText,
-            `${vatRatePercent}%`,
+            `${formatGermanNum(itemTaxRate, 2)}%`,
             qtyStr,
             formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3),
             formatNumber(netTotalNum, 2),
@@ -4058,42 +4092,59 @@ export class OfferController {
       }
 
       const shippingMethod = (offer.shippingMethod || "").trim();
+      const shippingCostNum = getSafeNumber(offer.shippingCost);
+      const shippingQtyNum = getSafeNumber(offer.shippingQuantity) || 1;
+      const shippingTotal = shippingCostNum * shippingQtyNum;
+      const shippingTaxRateNum =
+        offer.shippingTaxRate !== undefined && offer.shippingTaxRate !== null
+          ? getSafeNumber(offer.shippingTaxRate)
+          : offer.taxRate !== undefined && offer.taxRate !== null
+            ? getSafeNumber(offer.taxRate)
+            : 0;
 
       if (shippingMethod) {
-        const rowH = 22;
         const totalItemCount = offer.lineItems
           ? offer.lineItems.filter((item: any) => !item.isComponent).length
           : 0;
         const shipRowNum = totalItemCount + 1;
         const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
 
-        if (currentY + rowH > MM(265)) {
+        // Calculate row height
+        const shipTextHeight = doc.font(R).fontSize(8.5).heightOfString(shippingMethod, { width: columns[2].width - 4 });
+        const shipRowH = Math.max(22, shipTextHeight + 10);
+
+        if (currentY + shipRowH > MM(265)) {
           doc.addPage();
           drawCustomerSvgBackground(doc);
           currentY = MM(30);
         }
 
-        doc.rect(LEFT_X, currentY, tableWidth, rowH).fill(shipRowBg);
+        doc.rect(LEFT_X, currentY, tableWidth, shipRowH).fill(shipRowBg);
 
-        // Row number in Pos column
-        doc.font(R).fontSize(8.5).fillColor("#2D3748");
-        doc.text(String(shipRowNum), LEFT_X + 2, currentY + 6, {
-          width: columns[0].width - 4,
-          lineBreak: false,
+        // Render all 7 columns for the shipping row
+        const shipRowData = [
+          String(shipRowNum),
+          "—",
+          shippingMethod,
+          `${formatGermanNum(shippingTaxRateNum, 2)}%`,
+          String(shippingQtyNum),
+          formatNumber(shippingCostNum, offer.unitPriceDecimalPlaces || 3),
+          formatNumber(shippingTotal, 2),
+        ];
+
+        let shipX = LEFT_X;
+        shipRowData.forEach((data, colIndex) => {
+          doc.font(R).fontSize(8.5).fillColor("#2D3748");
+          const col = columns[colIndex];
+          doc.text(data, shipX + 2, currentY + 5, {
+            width: col.width - 4,
+            align: col.align as any,
+            lineBreak: colIndex === 2,
+          });
+          shipX += col.width;
         });
 
-        // Shipping method name in Bezeichnung column
-        const posW = columns[0].width;
-        const artW = columns[1].width;
-        const bezX = LEFT_X + posW + artW;
-        const bezW = columns[2].width;
-        doc.font(R).fontSize(8.5).fillColor("#2D3748");
-        doc.text(shippingMethod, bezX + 2, currentY + 6, {
-          width: bezW - 4,
-          lineBreak: false,
-        });
-
-        currentY += rowH;
+        currentY += shipRowH;
       }
 
       doc
@@ -4195,7 +4246,7 @@ export class OfferController {
             );
         }
       } else {
-        const taxRatePercent = offer.taxRate !== undefined && offer.taxRate !== null ? Number(offer.taxRate) : 19;
+        const taxRatePercent = offer.taxRate !== undefined && offer.taxRate !== null ? Number(offer.taxRate) : 0;
         calcVatTotal = Number(totals.taxAmount);
         yPos += 16;
         doc

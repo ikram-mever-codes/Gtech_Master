@@ -28,11 +28,8 @@ export const calculateInvoiceTotal = (invoice: any): number => {
   }
 
   const gross = Number(invoice.grossTotal ?? invoice.gross_total ?? 0);
-  if (gross > freight) {
-    return gross;
-  }
   if (gross > 0) {
-    return gross + freight;
+    return Math.max(gross, freight);
   }
 
   return freight;

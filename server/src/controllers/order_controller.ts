@@ -18,6 +18,7 @@ import { Customer } from "../models/customers";
 import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
 import { NumberSequenceService } from "../services/number_sequence_service";
+import { InvoiceController } from "./invoice_controller";
 
 const _cjkFontCandidates: string[] = [
   path.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
@@ -87,7 +88,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) {}
+      } catch (e: any) { }
     }
   }
 })();
@@ -205,18 +206,18 @@ export const createOrder = async (
     const dbItems =
       itemIds.length > 0
         ? await itemRepo
-            .createQueryBuilder("i")
-            .where("i.id IN (:...itemIds)", { itemIds })
-            .getMany()
+          .createQueryBuilder("i")
+          .where("i.id IN (:...itemIds)", { itemIds })
+          .getMany()
         : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
     const supplierItems =
       itemIds.length > 0
         ? await supplierItemRepo
-            .createQueryBuilder("si")
-            .where("si.item_id IN (:...itemIds)", { itemIds })
-            .getMany()
+          .createQueryBuilder("si")
+          .where("si.item_id IN (:...itemIds)", { itemIds })
+          .getMany()
         : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
@@ -295,12 +296,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -489,12 +490,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -532,7 +533,7 @@ export const getAllOrders = async (
 
     if (filter) {
       if (filter === "unassigned_cargo") {
-        qb.andWhere("(o.cargo_id IS NULL OR o.cargo_id = 0)");
+        qb.andWhere("(o.cargo_id IS NULL OR o.cargo_id = 0 OR cargo.id IS NULL)");
       } else if (filter === "purchase_problem") {
         qb.andWhere("(o.status ILIKE '%purchase%problem%' OR o.problem_status ILIKE '%purchase%problem%')");
       } else if (filter === "check_problem") {
@@ -541,6 +542,23 @@ export const getAllOrders = async (
     }
 
     const orders = await qb.getMany();
+
+    const orphanedOrderIds: number[] = [];
+    orders.forEach((order) => {
+      if (order.cargo_id && !order.cargo) {
+        orphanedOrderIds.push(order.id);
+        order.cargo_id = null as any;
+      }
+    });
+    if (orphanedOrderIds.length > 0) {
+      orderRepo
+        .createQueryBuilder()
+        .update(Order)
+        .set({ cargo_id: () => "NULL" as any })
+        .where("id IN (:...orphanedOrderIds)", { orphanedOrderIds })
+        .execute()
+        .catch(() => { });
+    }
 
     for (const ord of orders) {
       if (
@@ -556,7 +574,7 @@ export const getAllOrders = async (
         ord.order_no = newDeNo;
         try {
           await orderRepo.update(ord.id, { order_no: newDeNo });
-        } catch (_) {}
+        } catch (_) { }
       }
     }
 
@@ -626,74 +644,79 @@ export const getAllOrders = async (
       }
     });
 
-    const mappedOrders = orders.map((order) => ({
-      ...order,
-      supplier_name:
-        order.supplier?.company_name || order.supplier?.name || "Unassigned",
-      customer_name:
-        order.cargo?.customer?.companyName ||
-        order.cargo?.bill_to_display_name ||
-        order.customer?.companyName ||
-        "No Customer",
-      items: (order.orderItems || []).map((oi) => {
-        const itemDetails =
-          oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
-        console.log(itemDetails);
-        let warehouseItem = null;
-        if (oi.item_id) {
-          warehouseItem = warehouseByItemId.get(oi.item_id);
-        }
-        if (!warehouseItem && oi.ItemID_DE) {
-          warehouseItem = warehouseByItemIdDE.get(oi.ItemID_DE);
-        }
-        if (!warehouseItem && itemDetails?.id) {
-          warehouseItem = warehouseByItemId.get(itemDetails.id);
-        }
+    const mappedOrders = orders.map((order) => {
+      const hasValidCargo = Boolean(order.cargo && order.cargo.id && order.cargo_id);
+      const validCargoId = hasValidCargo ? order.cargo_id : null;
 
-        const defaultSup = defaultSupplierMap.get(
-          oi.item_id || itemDetails?.id || 0,
-        );
+      return {
+        ...order,
+        cargo_id: validCargoId,
+        supplier_name:
+          order.supplier?.company_name || order.supplier?.name || "Unassigned",
+        customer_name:
+          order.cargo?.customer?.companyName ||
+          order.cargo?.bill_to_display_name ||
+          order.customer?.companyName ||
+          "No Customer",
+        items: (order.orderItems || []).map((oi) => {
+          const itemDetails =
+            oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
+          console.log(itemDetails);
+          let warehouseItem = null;
+          if (oi.item_id) {
+            warehouseItem = warehouseByItemId.get(oi.item_id);
+          }
+          if (!warehouseItem && oi.ItemID_DE) {
+            warehouseItem = warehouseByItemIdDE.get(oi.ItemID_DE);
+          }
+          if (!warehouseItem && itemDetails?.id) {
+            warehouseItem = warehouseByItemId.get(itemDetails.id);
+          }
 
-        const resolvedSupplierName =
-          itemDetails?.supplier?.company_name ||
-          itemDetails?.supplier?.name ||
-          defaultSup?.name ||
-          order.supplier?.company_name ||
-          order.supplier?.name ||
-          null;
+          const defaultSup = defaultSupplierMap.get(
+            oi.item_id || itemDetails?.id || 0,
+          );
 
-        const rmbPrice =
-          rmbPriceMap.get(oi.item_id || itemDetails?.id || 0) || 0;
+          const resolvedSupplierName =
+            itemDetails?.supplier?.company_name ||
+            itemDetails?.supplier?.name ||
+            defaultSup?.name ||
+            order.supplier?.company_name ||
+            order.supplier?.name ||
+            null;
 
-        const finalPrice =
-          rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
+          const rmbPrice =
+            rmbPriceMap.get(oi.item_id || itemDetails?.id || 0) || 0;
 
-        return {
-          ...oi,
-          de_no: itemDetails?.item_no_de || "-",
-          ItemID_DE: oi?.ItemID_DE || "-",
-          item_id: oi.item_id || itemDetails?.id,
-          ean: itemDetails?.ean || warehouseItem?.ean || "-",
-          remark_de: oi.remark_de,
-          remark_cn: oi.remarks_cn,
-          remark_en: itemDetails?.remark || "",
-          item_name:
-            itemDetails?.item_name ||
-            warehouseItem?.item_name_en ||
-            warehouseItem?.item_name_de ||
-            (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
-          model: itemDetails?.model || "-",
-          price: finalPrice,
-          currency: "CNY",
-          taric_id: oi.taric_id || itemDetails?.taric_id,
-          taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
-          supplier_id:
-            itemDetails?.supplier_id || defaultSup?.id || order.supplier_id,
-          supplier_name: resolvedSupplierName || "Unassigned",
-          rmb_price: rmbPrice,
-          item: itemDetails,
-          warehouse_data: warehouseItem
-            ? {
+          const finalPrice =
+            rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
+
+          return {
+            ...oi,
+            de_no: itemDetails?.item_no_de || "-",
+            ItemID_DE: oi?.ItemID_DE || "-",
+            item_id: oi.item_id || itemDetails?.id,
+            ean: itemDetails?.ean || warehouseItem?.ean || "-",
+            remark_de: oi.remark_de,
+            remark_cn: oi.remarks_cn,
+            remark_en: itemDetails?.remark || "",
+            item_name:
+              itemDetails?.item_name ||
+              warehouseItem?.item_name_en ||
+              warehouseItem?.item_name_de ||
+              (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
+            model: itemDetails?.model || "-",
+            price: finalPrice,
+            currency: "CNY",
+            taric_id: oi.taric_id || itemDetails?.taric_id,
+            taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
+            supplier_id:
+              itemDetails?.supplier_id || defaultSup?.id || order.supplier_id,
+            supplier_name: resolvedSupplierName || "Unassigned",
+            rmb_price: rmbPrice,
+            item: itemDetails,
+            warehouse_data: warehouseItem
+              ? {
                 id: warehouseItem.id,
                 item_no_de: itemDetails?.item_no_de,
                 item_name_de: warehouseItem.item_name_de,
@@ -708,11 +731,13 @@ export const getAllOrders = async (
                 is_no_auto_order: warehouseItem.is_no_auto_order,
                 category_id: warehouseItem.category_id,
               }
-            : null,
-        };
-      }),
-      orderItems: undefined,
-    }));
+              : null,
+            cargo_id: hasValidCargo ? (oi.cargo_id || validCargoId) : null,
+          };
+        }),
+        orderItems: undefined,
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -914,12 +939,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -1554,9 +1579,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-      starCustomerDetails?.deliveryAddressLine1 ||
-      businessDetails?.address ||
-      "",
+    starCustomerDetails?.deliveryAddressLine1 ||
+    businessDetails?.address ||
+    "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -1574,9 +1599,9 @@ const resolveCustomerAddress = (
       "",
     country: formatCountry(
       customer.country ||
-        starCustomerDetails?.deliveryCountry ||
-        businessDetails?.country ||
-        "",
+      starCustomerDetails?.deliveryCountry ||
+      businessDetails?.country ||
+      "",
     ),
     phone:
       customer.contactPhoneNumber ||
@@ -1600,8 +1625,10 @@ export const generateCommercialInvoicePDF = async (
       return next(new ErrorHandler("Invalid Invoice ID format.", 400));
     }
 
-    const invoiceRepository = AppDataSource.getRepository(Invoice);
-    const invoice = await invoiceRepository.findOne({
+    const expandedData = await InvoiceController.fetchExpandedDetailsData(invoiceId);
+
+    const invoiceRepo = AppDataSource.getRepository(Invoice);
+    let invoice = await invoiceRepo.findOne({
       where: { id: invoiceId },
       relations: [
         "customer",
@@ -1611,14 +1638,20 @@ export const generateCommercialInvoicePDF = async (
         "items.item",
       ],
     });
-    if (!invoice) {
+
+    if (!invoice && expandedData?.invoice) {
+      invoice = expandedData.invoice as any;
+    }
+
+    if (!invoice && !expandedData?.invoice) {
       return res
         .status(404)
         .json({ success: false, message: "Invoice not found" });
     }
 
+    const orderNumberVal = invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
     let cargo = await AppDataSource.getRepository(Cargo).findOne({
-      where: { cargo_no: invoice.orderNumber },
+      where: { cargo_no: orderNumberVal },
       relations: [
         "customer",
         "customer.businessDetails",
@@ -1626,9 +1659,9 @@ export const generateCommercialInvoicePDF = async (
       ],
     });
 
-    if (!cargo && invoice.orderNumber) {
+    if (!cargo && orderNumberVal) {
       cargo = await AppDataSource.getRepository(Cargo).findOne({
-        where: { cargo_no: Like(`%${invoice.orderNumber}%`) },
+        where: { cargo_no: Like(`%${orderNumberVal}%`) },
         relations: [
           "customer",
           "customer.businessDetails",
@@ -1636,109 +1669,6 @@ export const generateCommercialInvoicePDF = async (
         ],
       });
     }
-
-    const orderItemRepo = AppDataSource.getRepository(OrderItem);
-    let rawOrderItems: any[] = [];
-    if (cargo) {
-      const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
-        where: { cargo_id: cargo.id },
-      });
-      const orderIdsFromCargo = cargoOrders
-        .map((co) => co.order_id)
-        .filter(Boolean);
-
-      const whereConditions: any[] = [{ cargo_id: cargo.id }];
-      if (orderIdsFromCargo.length > 0) {
-        whereConditions.push({ order_id: In(orderIdsFromCargo) });
-      }
-
-      rawOrderItems = await orderItemRepo.find({
-        where: whereConditions,
-        relations: ["item", "item.taric"],
-      });
-
-      const itemMap = new Map();
-      rawOrderItems.forEach((oi) => itemMap.set(oi.id, oi));
-      rawOrderItems = Array.from(itemMap.values());
-    } else {
-      const order = await AppDataSource.getRepository(Order).findOne({
-        where: { order_no: invoice.orderNumber },
-      });
-      if (order)
-        rawOrderItems = await orderItemRepo.find({
-          where: { order_id: order.id },
-          relations: ["item", "item.taric"],
-        });
-    }
-
-    const manualCodes: string[] = [];
-    rawOrderItems.forEach((oi: any) => {
-      if (oi.set_taric_code)
-        oi.set_taric_code.split("/").forEach((c: string) => {
-          if (c.trim()) manualCodes.push(c.trim());
-        });
-    });
-    const uniqueCodes = [...new Set(manualCodes)];
-    const manualTarics =
-      uniqueCodes.length > 0
-        ? await AppDataSource.getRepository(Taric).find({
-            where: { code: In(uniqueCodes) },
-          })
-        : [];
-    const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
-
-    const taricGroupsMap = new Map<
-      string,
-      { hsCode: string; desc: string; qty: number; totalPrice: number }
-    >();
-    rawOrderItems.forEach((oi: any) => {
-      const item = oi.item;
-      const taricCode = item?.taric?.code || "";
-      const isProject =
-        !taricCode || taricCode === "0" || taricCode === "0000000000";
-      let groupKey: string;
-      let hsCode: string;
-      let desc: string;
-      if (oi.set_taric_code) {
-        const codes = oi.set_taric_code.split("/");
-        const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-        groupKey = `hs_${target}`;
-        hsCode = target;
-        const mt = manualTaricMap.get(target);
-        desc = mt?.name_en || item?.item_name || "Unknown";
-      } else if (item?.taric?.id && !isProject) {
-        groupKey = `hs_${taricCode}`;
-        hsCode = taricCode;
-        desc = item.taric.name_en || item.item_name || "Unknown";
-      } else {
-        groupKey = `item_${item?.id || Math.random()}`;
-        hsCode = "n/a";
-        desc = item?.item_name || "Unknown";
-      }
-      let unitPrice = 0;
-      if (
-        item?.transfer_price_EUR !== undefined &&
-        item?.transfer_price_EUR !== null
-      )
-        unitPrice = Number(item.transfer_price_EUR);
-      else if (
-        oi.eur_special_price !== undefined &&
-        oi.eur_special_price !== null
-      )
-        unitPrice = Number(oi.eur_special_price);
-      else if (oi.price !== undefined && oi.price !== null)
-        unitPrice = Number(oi.price);
-      else if (item?.price !== undefined && item?.price !== null)
-        unitPrice = Number(item.price);
-      const qty = Number(oi.qty || 0);
-      if (!taricGroupsMap.has(groupKey))
-        taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
-      const g = taricGroupsMap.get(groupKey)!;
-      g.qty += qty;
-      g.totalPrice += qty * unitPrice;
-    });
-
-    const groupedItems = Array.from(taricGroupsMap.values());
 
     type LineItem = {
       no: number;
@@ -1748,18 +1678,34 @@ export const generateCommercialInvoicePDF = async (
       unit: string;
       price: string;
     };
-    let lineItems: LineItem[];
-    if (groupedItems.length > 0) {
-      lineItems = groupedItems.map((g, i) => ({
+
+    let lineItems: LineItem[] = [];
+
+    if (expandedData?.taricGroups && expandedData.taricGroups.length > 0) {
+      lineItems = expandedData.taricGroups.map((g: any, i: number) => ({
         no: i + 1,
-        desc: g.desc,
-        hs: g.hsCode,
-        qty: g.qty,
-        unit: g.qty > 0 ? (g.totalPrice / g.qty).toFixed(3) : "0.000",
-        price: g.totalPrice.toFixed(2),
+        desc: g.taricNameEn || "Unknown Item",
+        hs: g.taricCode || "n/a",
+        qty: Number(g.totalQty || 0),
+        unit: Number(g.unitPrice || 0).toFixed(3),
+        price: Number(g.totalPrice || 0).toFixed(2),
       }));
-    } else {
-      lineItems = (invoice.items || []).map((item: any, i: number) => ({
+    } else if (expandedData?.detailedItems && expandedData.detailedItems.length > 0) {
+      lineItems = expandedData.detailedItems.map((it: any, i: number) => {
+        const q = Number(it.qty || it.quantity || 0);
+        const p = Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.unit_price || 0);
+        const tot = Number(it.price || it.total_price || q * p);
+        return {
+          no: i + 1,
+          desc: it.item?.item_name || it.description || "Unknown Item",
+          hs: it.set_taric_code || it.item?.taric?.code || it.ean || "n/a",
+          qty: q,
+          unit: p.toFixed(3),
+          price: tot.toFixed(2),
+        };
+      });
+    } else if (invoice?.items && invoice.items.length > 0) {
+      lineItems = invoice.items.map((item: any, i: number) => ({
         no: i + 1,
         desc: item.description || item.item?.item_name || "Unknown Item",
         hs: item.articleNumber || "n/a",
@@ -1769,14 +1715,23 @@ export const generateCommercialInvoicePDF = async (
       }));
     }
 
-    const totalQty = lineItems.reduce((s, it) => s + it.qty, 0);
-    const subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
-    const freightCost =
-      invoice.freightCost !== undefined && invoice.freightCost !== null
-        ? Number(invoice.freightCost)
-        : 0;
+    let totalQty = lineItems.reduce((s, it) => s + it.qty, 0);
+    let subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
+    const invoiceGross = Number(expandedData?.invoice?.grossTotal ?? invoice?.grossTotal ?? expandedData?.invoice?.netTotal ?? invoice?.netTotal ?? 0);
+    const freightCost = Number(expandedData?.invoice?.freightCost ?? invoice?.freightCost ?? 0);
+
+    if (subTotal === 0 && invoiceGross > freightCost && totalQty > 0) {
+      const netForItems = invoiceGross - freightCost;
+      lineItems.forEach((it) => {
+        const itemPrice = (it.qty / totalQty) * netForItems;
+        it.price = itemPrice.toFixed(2);
+        it.unit = it.qty > 0 ? (itemPrice / it.qty).toFixed(3) : "0.000";
+      });
+      subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
+    }
+
     const grandTotal = (subTotal + freightCost).toFixed(2);
-    const customer = invoice.customer || cargo?.customer;
+    const customer: any = invoice?.customer || cargo?.customer || expandedData?.invoice?.customer;
     const customerAddress = resolveCustomerAddress(customer);
 
     const GTECH_GMBH = {
@@ -1811,7 +1766,7 @@ export const generateCommercialInvoicePDF = async (
       customerAddress.contact &&
       customer?.legalName &&
       customerAddress.contact.trim().toLowerCase() ===
-        customer.legalName.trim().toLowerCase()
+      customer.legalName.trim().toLowerCase()
     );
     const shipToContact =
       cargo?.ship_to_contact_person ||
@@ -1844,13 +1799,13 @@ export const generateCommercialInvoicePDF = async (
     };
 
     const isClosedInvoice =
-      invoice.status === "closed" ||
-      invoice.status === "Closed" ||
-      (invoice as any).isClosed;
+      invoice?.status === "closed" ||
+      invoice?.status === "Closed" ||
+      (invoice as any)?.isClosed;
 
-    const invoiceNoVal = (invoice.invoiceNumber || "").replace(/-/g, "").trim();
-    const formattedDateVal = formatGermanDate(invoice.invoiceDate);
-    const cargoNoVal = (cargo?.cargo_no || invoice.orderNumber || "").trim();
+    const invoiceNoVal = (invoice?.invoiceNumber || (invoice as any)?.invoice_number || "").replace(/-/g, "").trim();
+    const formattedDateVal = formatGermanDate(invoice?.invoiceDate || (invoice as any)?.invoice_date);
+    const cargoNoVal = (cargo?.cargo_no || invoice?.orderNumber || (invoice as any)?.order_number || "").trim();
 
     const data = {
       invoiceNo: isClosedInvoice
@@ -1972,7 +1927,7 @@ export const generateCommercialInvoicePDF = async (
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
               .text("中国安徽...", 152, 101);
-          } catch (e) {}
+          } catch (e) { }
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -2197,12 +2152,14 @@ export const generateCommercialInvoicePDF = async (
     if (cargo?.cargo_no) {
       remarkLines.push(`${cargo.cargo_no}`);
     }
-    const orderForRemark = await AppDataSource.getRepository(Order).findOne({
-      where: { order_no: invoice.orderNumber },
-    });
+    const targetOrderNo = invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
+    const orderForRemark = targetOrderNo ? await AppDataSource.getRepository(Order).findOne({
+      where: { order_no: targetOrderNo },
+    }) : null;
     const orderComment = orderForRemark?.comment || "";
     if (orderComment) remarkLines.push(orderComment);
-    if (invoice.remark) remarkLines.push(invoice.remark);
+    const invoiceRemark = invoice?.remark || expandedData?.invoice?.remark || "";
+    if (invoiceRemark) remarkLines.push(invoiceRemark);
     remarkLines.forEach((line, idx) => {
       doc.text(line, remarkX, itemY + idx * 15);
     });
@@ -2262,7 +2219,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;

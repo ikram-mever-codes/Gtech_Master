@@ -41,6 +41,7 @@ import {
   syncItemData,
   syncCustomerPrices,
   migrateItemNoDeFromWarehouse,
+  getUnusedPictures,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -65,6 +66,7 @@ router.get("/cat/fix", syncSuppCatWithCategoryName);
 // router.get("/sync/prices", syncCustomerPrices);
 
 router.get("/sync/item-no-de", migrateItemNoDeFromWarehouse);
+router.get("/unused-pictures", getUnusedPictures);
 
 router.get("/", getItems);
 router.post("/", createItem);

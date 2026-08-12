@@ -42,12 +42,16 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import { getAllCustomers } from "@/api/customers";
+import { getUnusedPictures } from "@/api/items";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { LibraryBig } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { formatDate } from "@/utils/date";
 
 const LibraryPage: React.FC = () => {
+  const searchParams = useSearchParams();
+  const isUnusedPictures = searchParams.get("filter") === "unused_pictures";
   const [files, setFiles] = useState<LibraryFile[]>([]);
   const [allFiles, setAllFiles] = useState<LibraryFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -115,18 +119,40 @@ const LibraryPage: React.FC = () => {
   const fetchFiles = useCallback(async () => {
     setLoading(true);
     try {
+      if (isUnusedPictures) {
+        const response: any = await getUnusedPictures();
+        const rawFiles = response?.data || [];
+        const mapped: LibraryFile[] = rawFiles.map((f: any, idx: number) => ({
+          id: `unused-${idx}-${f.filename}`,
+          originalName: f.filename,
+          filename: f.filename,
+          fileSize: f.size || 0,
+          mimeType: "image/jpeg",
+          fileType: "IMAGE" as any,
+          url: f.url,
+          thumbnailUrl: f.url,
+          description: "Unused picture (not assigned to any item)",
+          tags: ["Unused"],
+          isPublic: true,
+          uploadedAt: f.createdAt || new Date(),
+        }));
+        setFiles(mapped);
+        setAllFiles(mapped);
+        setTotalRecords(mapped.length);
+        setTotalPages(Math.ceil(mapped.length / itemsPerPage) || 1);
+        return;
+      }
       const response: any = await getFiles(filters);
-      setFiles(response.data);
-      console.log("Fetched files:", response);
-      setAllFiles(response.data);
-      setTotalRecords(response.data.length);
+      setFiles(response.data || []);
+      setAllFiles(response.data || []);
+      setTotalRecords(response.data?.length || 0);
       setTotalPages(response?.pagination?.pages || 1);
     } catch (error) {
       console.error("Error fetching files:", error);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, isUnusedPictures]);
 
   const fetchStatistics = async () => {
     try {
@@ -351,7 +377,10 @@ const LibraryPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8 w-full flex justify-between items-center">
           <div>
-            <PageHeader title="Library" icon={LibraryBig} />
+            <PageHeader
+              title={isUnusedPictures ? "Unused Pictures (Control Panel)" : "Library"}
+              icon={isUnusedPictures ? PhotoIcon : LibraryBig}
+            />
           </div>
           <div>
             <div className="flex gap-3">

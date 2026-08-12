@@ -1038,7 +1038,14 @@ const InvoiceListPage: React.FC = () => {
     const filterParam = searchParams.get("filter");
     if (filterParam) {
       if (filterParam === "unassigned_cargo") {
-        allItems = allItems.filter((i: any) => !i.cargo_id || i.cargo_id === 0);
+        allItems = allItems.filter(
+          (i: any) =>
+            !i.cargo_id ||
+            i.cargo_id === 0 ||
+            i.cargo_id === "0" ||
+            i.cargo_id === "-" ||
+            i.cargo_id === "null",
+        );
       } else if (filterParam === "purchase_problem") {
         allItems = allItems.filter(
           (i: any) =>
@@ -1109,8 +1116,13 @@ const InvoiceListPage: React.FC = () => {
     let list = orders;
     const filterParam = searchParams.get("filter");
     if (filterParam === "unassigned_cargo") {
-      list = list.filter((o: any) =>
-        (o.items || []).some((i: any) => !i.cargo_id || i.cargo_id === 0),
+      list = list.filter(
+        (o: any) =>
+          !o.cargo_id ||
+          o.cargo_id === 0 ||
+          o.cargo_id === "0" ||
+          o.cargo_id === "-" ||
+          o.cargo_id === "null",
       );
     }
     if (!orderNoFilter) return list;
