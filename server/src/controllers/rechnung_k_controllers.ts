@@ -712,7 +712,7 @@ export const downloadRechnungKPdf = async (
     const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
     const rechnungK = await rechnungKRepo.findOne({
       where: [{ id: String(id) }, { invoice_number: String(id) }],
-      relations: ["items", "customer"],
+      relations: ["items", "customer", "customer.defaultTaxProfile"],
     });
 
     if (!rechnungK) {
@@ -721,6 +721,15 @@ export const downloadRechnungKPdf = async (
         .json({ success: false, message: "Correction invoice not found" });
       return;
     }
+
+    // Resolve the customer tax profile rate (mirrors UI getLineTaxRate)
+    const customerTaxProfileRate: number =
+      rechnungK.customer?.defaultTaxProfile?.taxRate !== undefined &&
+      rechnungK.customer?.defaultTaxProfile?.taxRate !== null
+        ? Number(rechnungK.customer.defaultTaxProfile.taxRate)
+        : rechnungK.tax_rate !== undefined && rechnungK.tax_rate !== null
+          ? Number(rechnungK.tax_rate)
+          : 19;
 
     const customerSnap = rechnungK.customerSnapshot || rechnungK.customer || {};
     const contactName =
@@ -749,7 +758,10 @@ export const downloadRechnungKPdf = async (
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
       remarks: it.remark || it.notes || "-",
-      vatRate: it.taxRate ?? rechnungK.tax_rate ?? 19,
+      // Freizeile: use item's own taxRate if set; catalog: use tax profile rate
+      vatRate: (it.itemType === "freizeile" || it.isFreizeile)
+        ? (it.taxRate !== undefined && it.taxRate !== null ? Number(it.taxRate) : customerTaxProfileRate)
+        : customerTaxProfileRate,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
       lineTotal: Number(
@@ -785,7 +797,7 @@ export const downloadRechnungKPdf = async (
       subtotal: Number(rechnungK.subtotal || 0),
       taxAmount: Number(rechnungK.tax_amount || 0),
       totalAmount: Number(rechnungK.total_amount || 0),
-      taxRate: Number(rechnungK.tax_rate || 19),
+      taxRate: customerTaxProfileRate,
       currency: rechnungK.currency || "EUR",
       notes: rechnungK.notes,
       deliveryTime: rechnungK.date_delivery,

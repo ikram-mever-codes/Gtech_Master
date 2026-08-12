@@ -3453,6 +3453,16 @@ export class OfferController {
         ],
       });
 
+      // Resolve the customer's tax profile (same as UI getLineTaxRate logic)
+      // UI uses offer.taxProfile.taxRate — we replicate that here
+      const taxProfile = await this.getCustomerTaxProfile(offer?.customerId);
+      const taxProfileRate: number =
+        taxProfile?.taxRate !== undefined && taxProfile?.taxRate !== null
+          ? Number(taxProfile.taxRate)
+          : offer?.taxRate !== undefined && offer?.taxRate !== null
+            ? Number(offer.taxRate)
+            : 19;
+
       if (!offer) {
         return response.status(404).json({
           success: false,
@@ -4048,13 +4058,15 @@ export class OfferController {
               .fill("#FFFFFF");
           }
 
-          // Resolve per-item MwSt: item's own taxRate → offer-level taxRate → 0
-          const itemTaxRate =
-            item.taxRate !== undefined && item.taxRate !== null
+          const isFreizeileItem =
+            item.itemType === "freizeile" ||
+            item.isFreizeile ||
+            (!item.material && (item.description || item.itemName));
+          const itemTaxRate = isFreizeileItem
+            ? (item.taxRate !== undefined && item.taxRate !== null
               ? getSafeNumber(item.taxRate)
-              : offer.taxRate !== undefined && offer.taxRate !== null
-                ? getSafeNumber(offer.taxRate)
-                : 0;
+              : taxProfileRate)
+            : taxProfileRate;
 
           const rowData = [
             (rowIndex + 1).toString(),
@@ -4098,9 +4110,7 @@ export class OfferController {
       const shippingTaxRateNum =
         offer.shippingTaxRate !== undefined && offer.shippingTaxRate !== null
           ? getSafeNumber(offer.shippingTaxRate)
-          : offer.taxRate !== undefined && offer.taxRate !== null
-            ? getSafeNumber(offer.taxRate)
-            : 0;
+          : taxProfileRate;
 
       if (shippingMethod) {
         const totalItemCount = offer.lineItems
@@ -4109,7 +4119,6 @@ export class OfferController {
         const shipRowNum = totalItemCount + 1;
         const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
 
-        // Calculate row height
         const shipTextHeight = doc.font(R).fontSize(8.5).heightOfString(shippingMethod, { width: columns[2].width - 4 });
         const shipRowH = Math.max(22, shipTextHeight + 10);
 
@@ -4121,7 +4130,6 @@ export class OfferController {
 
         doc.rect(LEFT_X, currentY, tableWidth, shipRowH).fill(shipRowBg);
 
-        // Render all 7 columns for the shipping row
         const shipRowData = [
           String(shipRowNum),
           "—",
@@ -4202,12 +4210,15 @@ export class OfferController {
       const vatMap = new Map<number, number>();
       (offer.lineItems || (offer as any).items || []).forEach((it: any) => {
         if (it.isComponent) return;
-        const rate =
-          it.taxRate !== undefined && it.taxRate !== null
+        const itIsFreizeile =
+          it.itemType === "freizeile" ||
+          it.isFreizeile ||
+          (!it.material && (it.description || it.itemName));
+        const rate = itIsFreizeile
+          ? (it.taxRate !== undefined && it.taxRate !== null
             ? Number(it.taxRate)
-            : offer.taxRate !== undefined && offer.taxRate !== null
-              ? Number(offer.taxRate)
-              : 19;
+            : taxProfileRate)
+          : taxProfileRate;
         if (!vatMap.has(rate)) {
           rateOrder.push(rate);
         }

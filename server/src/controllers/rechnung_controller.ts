@@ -30,9 +30,9 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const [auftrag, rechnungenK] = await Promise.all([
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
-          where: { id: rechnung.auftrag_id },
-          select: ["id", "order_no", "created_at"],
-        })
+        where: { id: rechnung.auftrag_id },
+        select: ["id", "order_no", "created_at"],
+      })
       : Promise.resolve(null),
     rechnungKRepo.find({
       where: { original_rechnung_id: rechnung.id },
@@ -71,9 +71,9 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const [auftraege, rechnungenK] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "order_no", "created_at"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "created_at"],
+      })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
@@ -770,13 +770,20 @@ export const downloadRechnungPdf = async (
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = await rechnungRepo.findOne({
       where: [{ id: String(id) }, { invoice_number: String(id) }],
-      relations: ["items", "customer"],
+      relations: ["items", "customer", "customer.defaultTaxProfile"],
     });
 
     if (!rechnung) {
       res.status(404).json({ success: false, message: "Rechnung not found" });
       return;
     }
+    const customerTaxProfileRate: number =
+      rechnung.customer?.defaultTaxProfile?.taxRate !== undefined &&
+        rechnung.customer?.defaultTaxProfile?.taxRate !== null
+        ? Number(rechnung.customer.defaultTaxProfile.taxRate)
+        : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
+          ? Number(rechnung.tax_rate)
+          : 19;
 
     const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
     const contactName =
@@ -805,13 +812,16 @@ export const downloadRechnungPdf = async (
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
       remarks: it.remark || it.notes || "-",
-      vatRate: it.taxRate ?? rechnung.tax_rate ?? 19,
+      // Freizeile: use item's own taxRate if set; catalog: use tax profile rate
+      vatRate: (it.itemType === "freizeile" || it.isFreizeile)
+        ? (it.taxRate !== undefined && it.taxRate !== null ? Number(it.taxRate) : customerTaxProfileRate)
+        : customerTaxProfileRate,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
       lineTotal: Number(
         it.total_price ||
-          it.lineTotal ||
-          Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
+        it.lineTotal ||
+        Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
       ),
     }));
 
@@ -839,7 +849,7 @@ export const downloadRechnungPdf = async (
       subtotal: Number(rechnung.subtotal || 0),
       taxAmount: Number(rechnung.tax_amount || 0),
       totalAmount: Number(rechnung.total_amount || 0),
-      taxRate: Number(rechnung.tax_rate || 19),
+      taxRate: customerTaxProfileRate,
       currency: rechnung.currency || "EUR",
       notes: rechnung.notes,
       deliveryTime: rechnung.date_delivery,
