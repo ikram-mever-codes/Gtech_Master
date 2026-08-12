@@ -2508,13 +2508,12 @@ const CombinedInquiriesPageContent = () => {
                       </label>
                     </div>
                   </div>
-                  {inquiryFormData.isAssembly && (
-                    <div className="col-span-2 bg-orange-100/50 border border-orange-200 rounded-xl p-4 mt-2 space-y-4">
-                      <div className="grid grid-cols-4 gap-3 items-end">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Assembly Picture
-                          </label>
+                  <div className={`col-span-2 rounded-xl p-4 mt-2 space-y-4 transition-colors ${inquiryFormData.isAssembly ? "bg-orange-100/50 border border-orange-200" : "bg-gray-50/80 border border-gray-200"}`}>
+                    <div className="grid grid-cols-4 gap-3 items-end">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          {inquiryFormData.isAssembly ? "Assembly Picture" : "Item Picture"}
+                        </label>
                           <div className="flex items-center gap-2">
                             {inquiryFormData.image ? (
                               <div className="relative w-10 h-10 rounded border border-gray-300 overflow-hidden bg-gray-50 flex-shrink-0">
@@ -2977,28 +2976,29 @@ const CombinedInquiriesPageContent = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="pt-2">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Assembly Instructions
-                        </label>
-                        <textarea
-                          value={inquiryFormData.assemblyInstructions}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              assemblyInstructions: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          rows={2}
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          placeholder="Enter assembly instructions..."
-                        />
-                      </div>
+                      {inquiryFormData.isAssembly && (
+                        <div className="pt-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Assembly Instructions
+                          </label>
+                          <textarea
+                            value={inquiryFormData.assemblyInstructions}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                assemblyInstructions: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            rows={2}
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            placeholder="Enter assembly instructions..."
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
                 </div>
               </div>
             </div>
