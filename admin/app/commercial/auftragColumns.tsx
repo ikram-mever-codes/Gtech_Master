@@ -52,7 +52,7 @@ const itemCountCalc = (row: any) => row.items?.length || 0;
  */
 export const getStatusBackgroundColor = (status: string): string => {
   if (status === "partially_delivered") {
-    return "#D8964A";
+    return "#ccc";
   }
   if (status === "open") {
     return "#FFFFFF";
@@ -260,7 +260,7 @@ export function buildAuftragColumns({
             >
               <FileDown className="h-3.5 w-3.5" /> PDF
             </button>
-
+            {/* 
             {!isClosed && (
               <button
                 onClick={(e) => {
@@ -276,7 +276,7 @@ export function buildAuftragColumns({
               >
                 Close
               </button>
-            )}
+            )} */}
           </div>
         );
       },

@@ -28,7 +28,13 @@ export class PaymentInbound {
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   received_date!: Date;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0, transformer: numericTransformer })
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericTransformer,
+  })
   amount!: number;
 
   @Column({ type: "varchar", length: 10, default: "EUR" })

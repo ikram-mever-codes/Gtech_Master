@@ -27,6 +27,65 @@ const valueNetCalc = (row: any) => Number(row.netTotal || row.grossTotal || 0);
 const itemCountCalc = (row: any) =>
   row.customItemCount ?? row.items?.length ?? 0;
 
+/**
+ * Row-background color per Rechnung payment status, mirroring
+ * getStatusBackgroundColor in auftragColumns.tsx so both tables follow
+ * the same "status drives row color" convention.
+ */
+export const getRechnungStatusBackgroundColor = (status: string): string => {
+  if (status === "paid") {
+    return "#DFF0D8";
+  }
+  if (status === "partially_paid") {
+    return "#FFF3CD";
+  }
+  if (status === "overdue") {
+    return "#F8D7DA";
+  }
+  // "unpaid" and anything unrecognized — no background.
+  return "#FFFFFF";
+};
+
+export const RECHNUNG_PAYMENT_STATUS_LABELS: Record<string, string> = {
+  paid: "Paid",
+  partially_paid: "Partially Paid",
+  unpaid: "Unpaid",
+  overdue: "Overdue",
+};
+
+/** Options list for a Rechnung payment-status filter dropdown. */
+export const RECHNUNG_PAYMENT_STATUS_FILTER_OPTIONS = [
+  "overdue",
+  "partially_paid",
+  "unpaid",
+  "paid",
+].map((value) => ({ value, label: RECHNUNG_PAYMENT_STATUS_LABELS[value] }));
+
+const PaymentStatusBadge: React.FC<{ row: any }> = ({ row }) => {
+  const status = row.payment_status || "unpaid";
+  const label = RECHNUNG_PAYMENT_STATUS_LABELS[status] || status;
+  const classes: Record<string, string> = {
+    paid: "bg-emerald-100 text-emerald-800 border-emerald-300",
+    partially_paid: "bg-amber-100 text-amber-800 border-amber-300",
+    unpaid: "bg-gray-100 text-gray-600 border-gray-300",
+    overdue: "bg-rose-100 text-rose-800 border-rose-300",
+  };
+  return (
+    <span
+      className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${
+        classes[status] || classes.unpaid
+      }`}
+      title={
+        row.paid_amount !== undefined
+          ? `Paid: ${Number(row.paid_amount).toFixed(2)} / Open: ${Number(row.open_amount ?? 0).toFixed(2)}`
+          : undefined
+      }
+    >
+      {label}
+    </span>
+  );
+};
+
 export function buildRechnungColumns({
   expandedDocIds,
   setExpandedDocIds,
@@ -61,6 +120,12 @@ export function buildRechnungColumns({
     buildValueNetColumn(valueNetCalc),
     buildItemCountColumn(itemCountCalc),
     {
+      header: "Payment",
+      width: "120px",
+      align: "center",
+      render: (row) => <PaymentStatusBadge row={row} />,
+    },
+    {
       header: "Actions",
       width: "100px",
       align: "center",
@@ -89,7 +154,10 @@ export function buildRechnungColumns({
               onClick={async (e) => {
                 e.stopPropagation();
                 try {
-                  await downloadRechnungPdf(row.id, row.invoiceNumber || row.invoice_number);
+                  await downloadRechnungPdf(
+                    row.id,
+                    row.invoiceNumber || row.invoice_number,
+                  );
                 } catch (_) {}
               }}
               className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"

@@ -69,6 +69,7 @@ import { RechnungItem } from "../models/rechnung_items";
 import { Rechnung_k } from "../models/rechnung_k";
 import { RechnungKItem } from "../models/rechnung_k_items";
 import { Lieferschein } from "../models/lieferscheine";
+import { PaymentAllocation } from "../models/payment_allocations";
 
 dotenv.config();
 
@@ -139,7 +140,7 @@ export const AppDataSource = new DataSource({
     PaymentInbound,
     ShippingMethod,
     WeiterversandServiceProvider,
-
+    PaymentAllocation,
     NumberSequence,
     Rechnung,
     RechnungCustomer,

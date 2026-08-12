@@ -191,8 +191,7 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
               const qtyDisplay = Math.round(
                 parseFlexibleNumber(item.baseQuantity) ?? 1,
               );
-              const rowColor =
-                item.highlightColor || (freetext ? "#D8964A" : null);
+              const rowColor = item.highlightColor;
               const thumb = item.photo;
               const lineTaxRate = getLineTaxRate(item, offer);
               return (

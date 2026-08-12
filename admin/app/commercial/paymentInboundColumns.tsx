@@ -7,11 +7,22 @@ import { formatDate } from "@/utils/date";
 interface PaymentInboundColumnsArgs {
   onOpenDetails: (row: any) => void;
   onDelete: (row: any) => void;
+  onAssign: (row: any) => void;
 }
+
+const formatMoney = (val: number, currencyCode: string) => {
+  const curr = currencyCode || "EUR";
+  const symbol = curr === "EUR" ? "€" : curr === "USD" ? "$" : `${curr} `;
+  return `${symbol}${val.toLocaleString("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 export function buildPaymentInboundColumns({
   onOpenDetails,
   onDelete,
+  onAssign,
 }: PaymentInboundColumnsArgs): ColumnDef<any>[] {
   return [
     {
@@ -58,7 +69,10 @@ export function buildPaymentInboundColumns({
           row.customer?.companyName ||
           "—";
         return (
-          <div className="truncate max-w-[200px] font-medium text-gray-800" title={text}>
+          <div
+            className="truncate max-w-[200px] font-medium text-gray-800"
+            title={text}
+          >
             {text}
           </div>
         );
@@ -81,14 +95,32 @@ export function buildPaymentInboundColumns({
       render: (row) => {
         const val = Number(row.amount ?? row.grossTotal ?? 0);
         const curr = row.currency_code || row.currencyCode || "EUR";
-        const symbol = curr === "EUR" ? "€" : curr === "USD" ? "$" : `${curr} `;
         return (
           <span className="font-bold text-gray-900">
-            {symbol}
-            {val.toLocaleString("de-DE", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatMoney(val, curr)}
+          </span>
+        );
+      },
+    },
+    {
+      header: "Open Amount",
+      width: "130px",
+      align: "right",
+      render: (row) => {
+        const total = Number(row.amount ?? row.grossTotal ?? 0);
+        // open_amount is attached server-side; fall back to "fully open"
+        // if a row somehow arrives without it (e.g. optimistic state).
+        const openAmount =
+          row.open_amount !== undefined && row.open_amount !== null
+            ? Number(row.open_amount)
+            : total;
+        const curr = row.currency_code || row.currencyCode || "EUR";
+        const isFullyAssigned = openAmount <= 0.005;
+        return (
+          <span
+            className={`font-bold ${isFullyAssigned ? "text-gray-400" : "text-amber-600"}`}
+          >
+            {formatMoney(Math.max(openAmount, 0), curr)}
           </span>
         );
       },
@@ -108,30 +140,51 @@ export function buildPaymentInboundColumns({
     },
     {
       header: "Actions",
-      width: "140px",
+      width: "220px",
       align: "center",
-      render: (row) => (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenDetails(row);
-            }}
-            className="px-2.5 py-1 text-[11px] font-bold bg-[#2F6B46] hover:bg-[#255638] text-white rounded-[4px] transition shadow-sm"
-          >
-            Edit
-          </button>
-          <button
-            onClick={async (e) => {
-              e.stopPropagation();
-              onDelete(row);
-            }}
-            className="px-2.5 py-1 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-[4px] transition shadow-sm"
-          >
-            Delete
-          </button>
-        </div>
-      ),
+      render: (row) => {
+        const total = Number(row.amount ?? row.grossTotal ?? 0);
+        const openAmount =
+          row.open_amount !== undefined && row.open_amount !== null
+            ? Number(row.open_amount)
+            : total;
+        const canAssign = openAmount > 0.005;
+
+        return (
+          <div className="flex items-center justify-center gap-2">
+            {canAssign && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAssign(row);
+                }}
+                title="Assign this payment to an Auftrag or Rechnung"
+                className="px-2.5 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-[4px] transition shadow-sm"
+              >
+                Assign
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetails(row);
+              }}
+              className="px-2.5 py-1 text-[11px] font-bold bg-[#2F6B46] hover:bg-[#255638] text-white rounded-[4px] transition shadow-sm"
+            >
+              Edit
+            </button>
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                onDelete(row);
+              }}
+              className="px-2.5 py-1 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-[4px] transition shadow-sm"
+            >
+              Delete
+            </button>
+          </div>
+        );
+      },
     },
   ];
 }
