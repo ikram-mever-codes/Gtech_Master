@@ -11,7 +11,7 @@ const router = Router();
 
 // Assign part (or all) of a Payment Inbound to an Auftrag or Rechnung.
 // Body: { paymentInboundId, targetType: "auftrag" | "rechnung", targetId, amount, notes? }
-router.post("/", authenticateUser, createPaymentAllocation as any);
+router.post("/", authenticateUser, createPaymentAllocation);
 
 // All allocations for one Payment Inbound, plus its allocated/open summary.
 router.get(
