@@ -1341,7 +1341,14 @@ export class InvoiceController {
           Number(oi.qty || 0) * Number(oi._fallbackEk || oi.eur_special_price || 0);
       });
 
-      let cciTotalGross = Number(cciInvoice.gross_total || cciInvoice.net_total || 0);
+      const linkedInv = await invoiceRepository.findOne({ where: { id: cciInvoice.id } });
+      let cciTotalGross = Number(
+        cciInvoice.gross_total ||
+          cciInvoice.net_total ||
+          linkedInv?.grossTotal ||
+          linkedInv?.netTotal ||
+          0,
+      );
       if (cciTotalGross === 0 && detailedItems.length > 0) {
         cciTotalGross = detailedItems.reduce(
           (s, it) => s + Number(it.qty || 0) * Number(it.eur_special_price || 0),
@@ -1360,12 +1367,27 @@ export class InvoiceController {
         taricGroups.forEach((g) => {
           g.totalPrice = (g.totalQty / sumTaricQty) * targetAmount;
         });
+
+        const totalDetailedQty = detailedItems.reduce((s, it) => s + Number(it.qty || 0), 0);
+        if (totalDetailedQty > 0) {
+          detailedItems.forEach((it) => {
+            const itemNet = (Number(it.qty || 0) / totalDetailedQty) * netForTaric;
+            it.eur_special_price = Number(it.qty || 0) > 0 ? itemNet / Number(it.qty || 0) : 0;
+            it.price = itemNet;
+            it.unit_price = it.eur_special_price;
+            it.unitPrice = it.eur_special_price;
+            it._fallbackEk = it.eur_special_price;
+          });
+        }
       }
 
       taricGroups = taricGroups.map((g: any) => {
         g.unitPrice = g.totalQty > 0 ? (g.totalPrice / g.totalQty).toFixed(2) : "0.00";
         return g;
       });
+
+      const effectiveFreight = Number(cciInvoice.freight_cost || 0);
+      const effectiveGross = cciTotalGross > 0 ? cciTotalGross : (sumTaricPrice + effectiveFreight);
 
       return {
         invoice: {
@@ -1375,10 +1397,10 @@ export class InvoiceController {
           invoiceDate: cciInvoice.invoice_date,
           deliveryDate: cciInvoice.delivery_date,
           dueDate: cciInvoice.due_date,
-          netTotal: cciInvoice.net_total,
+          netTotal: cciInvoice.net_total || Math.max(0, effectiveGross - effectiveFreight),
           taxAmount: cciInvoice.tax_amount,
-          grossTotal: cciInvoice.gross_total,
-          freightCost: cciInvoice.freight_cost,
+          grossTotal: effectiveGross,
+          freightCost: effectiveFreight,
           description: cciInvoice.description,
           remark: cciInvoice.remark,
           status: cciInvoice.status,
