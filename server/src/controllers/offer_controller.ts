@@ -3706,39 +3706,62 @@ export class OfferController {
 
       let shipLinesToRender: string[] = [];
       let shipCoreKey = "";
+      let isExplicitlySame = false;
 
       const offerDelivery = offer.deliveryAddress || offer.shippingAddress;
       if (offerDelivery) {
-        if (typeof offerDelivery === "string" && offerDelivery.trim()) {
-          shipLinesToRender = [primaryName, offerDelivery.trim()].filter(
-            Boolean,
-          );
-          shipCoreKey = offerDelivery.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
-        } else if (typeof offerDelivery === "object") {
-          const sStreet = (offerDelivery.street || offerDelivery.addressLine1 || "").trim();
-          const sPostal = (offerDelivery.postal_code || offerDelivery.postalCode || "").trim();
-          const sCity = (offerDelivery.city || "").trim();
-          const sCountry = (offerDelivery.country || customer.country || customerEntity?.country || "");
-
-          shipCoreKey = `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
-            .toLowerCase()
-            .replace(/[^a-z0-9]/gi, "");
-
-          if (sStreet || sCity || sPostal) {
-            const sAddLine =
-              offerDelivery.additionalInfo ||
-              offerDelivery.address_additional_line ||
-              offerDelivery.addressLine2 ||
-              offerDelivery.additionalLine ||
-              "";
-            shipLinesToRender = formatAddressBlockLines(
-              offerDelivery.companyName || offerDelivery.name || primaryName,
-              sAddLine,
-              sStreet,
-              sPostal,
-              sCity,
-              sCountry,
+        if (typeof offerDelivery === "string") {
+          const trimmed = offerDelivery.trim().toLowerCase();
+          if (
+            !trimmed ||
+            trimmed === "same" ||
+            trimmed.includes("same as") ||
+            trimmed.includes("same delivery") ||
+            trimmed.includes("billing") ||
+            trimmed.includes("rechnungsadresse") ||
+            trimmed.includes("hauptadresse") ||
+            trimmed.includes("customer address")
+          ) {
+            isExplicitlySame = true;
+          } else {
+            shipLinesToRender = [primaryName, offerDelivery.trim()].filter(
+              Boolean,
             );
+            shipCoreKey = offerDelivery.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
+          }
+        } else if (typeof offerDelivery === "object") {
+          if (
+            offerDelivery.sameAsBilling ||
+            offerDelivery.isSameAsBilling ||
+            offerDelivery.useBilling
+          ) {
+            isExplicitlySame = true;
+          } else {
+            const sStreet = (offerDelivery.street || offerDelivery.addressLine1 || "").trim();
+            const sPostal = (offerDelivery.postal_code || offerDelivery.postalCode || "").trim();
+            const sCity = (offerDelivery.city || "").trim();
+            const sCountry = (offerDelivery.country || customer.country || customerEntity?.country || "");
+
+            if (sStreet || sCity || sPostal) {
+              shipCoreKey = `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
+                .toLowerCase()
+                .replace(/[^a-z0-9]/gi, "");
+
+              const sAddLine =
+                offerDelivery.additionalInfo ||
+                offerDelivery.address_additional_line ||
+                offerDelivery.addressLine2 ||
+                offerDelivery.additionalLine ||
+                "";
+              shipLinesToRender = formatAddressBlockLines(
+                offerDelivery.companyName || offerDelivery.name || primaryName,
+                sAddLine,
+                sStreet,
+                sPostal,
+                sCity,
+                sCountry,
+              );
+            }
           }
         }
       }
@@ -3748,7 +3771,11 @@ export class OfferController {
         .replace(/[^a-z0-9]/gi, "");
 
       const hasRealDifferentAddress =
-        shipCoreKey.length > 5 && mainCoreKey.length > 5 && shipCoreKey !== mainCoreKey;
+        !isExplicitlySame &&
+        shipLinesToRender.length > 0 &&
+        shipCoreKey.length > 5 &&
+        mainCoreKey.length > 5 &&
+        shipCoreKey !== mainCoreKey;
 
       if (hasRealDifferentAddress) {
         const shipTextToRender = shipLinesToRender.join("\n").trim();
