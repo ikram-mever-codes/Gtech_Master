@@ -833,6 +833,7 @@ export const downloadRechnungPdf = async (
       showPrices: true,
       shippingMethod: rechnung.shipping_method,
       shippingCost: Number(rechnung.shipping_cost || 0),
+      shippingQuantity: Number(rechnung.shipping_quantity || 1),
       discountPercentage: Number(rechnung.discount_percentage || 0),
       discountAmount: Number(rechnung.discount_amount || 0),
       subtotal: Number(rechnung.subtotal || 0),

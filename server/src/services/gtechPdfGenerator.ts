@@ -169,6 +169,7 @@ export interface PdfDocumentOptions {
   showPrices?: boolean;
   shippingMethod?: string;
   shippingCost?: number;
+  shippingQuantity?: number;
   shippingTaxRate?: number;
   discountPercentage?: number;
   discountAmount?: number;
@@ -666,37 +667,69 @@ export async function generateGtechDocumentPdf(
   }
 
   const shippingMethod = (opts.shippingMethod || "").trim();
+  const shippingCostNum = Number(opts.shippingCost || 0);
+  const shippingQtyNum = Number(opts.shippingQuantity || 1);
+  const shippingLineTotal = shippingCostNum * shippingQtyNum;
+  const shippingTaxRateForRow =
+    opts.shippingTaxRate !== undefined && opts.shippingTaxRate !== null
+      ? Number(opts.shippingTaxRate)
+      : opts.taxRate !== undefined && opts.taxRate !== null
+        ? Number(opts.taxRate)
+        : 0;
+
   if (shippingMethod) {
-    const rowH = 22;
     const totalItemCount = opts.lineItems ? opts.lineItems.length : 0;
     const shipRowNum = totalItemCount + 1;
     const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
 
-    if (currentY + rowH > MM(265)) {
+    const shipTextHeight = doc.font(R).fontSize(8.5).heightOfString(shippingMethod, { width: columns[2].width - 4 });
+    const shipRowH = Math.max(22, shipTextHeight + 10);
+
+    if (currentY + shipRowH > MM(265)) {
       doc.addPage();
       await drawCustomerSvgBackground(doc);
       currentY = MM(30);
     }
 
-    doc.rect(LEFT_X, currentY, tableWidth, rowH).fill(shipRowBg);
+    doc.rect(LEFT_X, currentY, tableWidth, shipRowH).fill(shipRowBg);
 
-    doc.font(R).fontSize(8.5).fillColor("#2D3748");
-    doc.text(String(shipRowNum), LEFT_X + 2, currentY + 6, {
-      width: columns[0].width - 4,
-      lineBreak: false,
-    });
+    if (showPrices) {
+      // All 7 columns: Pos, Art.-Nr, Bezeichnung, MwSt, Menge, Netto-Preis, Netto gesamt
+      const shipRowData = [
+        String(shipRowNum),
+        "—",
+        shippingMethod,
+        `${formatGermanNum(shippingTaxRateForRow, 2)}%`,
+        String(shippingQtyNum),
+        formatGermanNum(shippingCostNum, 3),
+        formatGermanNum(shippingLineTotal, 2),
+      ];
+      let shipX = LEFT_X;
+      shipRowData.forEach((data, colIndex) => {
+        doc.font(R).fontSize(8.5).fillColor("#2D3748");
+        const col = columns[colIndex];
+        doc.text(data, shipX + 2, currentY + 5, {
+          width: col.width - 4,
+          align: col.align as any,
+          lineBreak: colIndex === 2,
+        });
+        shipX += col.width;
+      });
+    } else {
+      // No-price view (Lieferschein): just Pos + Bezeichnung
+      doc.font(R).fontSize(8.5).fillColor("#2D3748");
+      doc.text(String(shipRowNum), LEFT_X + 2, currentY + 6, {
+        width: columns[0].width - 4,
+        lineBreak: false,
+      });
+      const bezX = LEFT_X + columns[0].width + columns[1].width;
+      doc.text(shippingMethod, bezX + 2, currentY + 6, {
+        width: columns[2].width - 4,
+        lineBreak: false,
+      });
+    }
 
-    const posW = columns[0].width;
-    const artW = columns[1].width;
-    const bezX = LEFT_X + posW + artW;
-    const bezW = columns[2].width;
-    doc.font(R).fontSize(8.5).fillColor("#2D3748");
-    doc.text(shippingMethod, bezX + 2, currentY + 6, {
-      width: bezW - 4,
-      lineBreak: false,
-    });
-
-    currentY += rowH;
+    currentY += shipRowH;
   }
 
   doc
@@ -815,7 +848,7 @@ export async function generateGtechDocumentPdf(
         );
       }
     } else {
-      const taxRatePercent = opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 19;
+      const taxRatePercent = opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 0;
       calcVatTotal = Number(opts.taxAmount || 0);
       yPos += 16;
       doc

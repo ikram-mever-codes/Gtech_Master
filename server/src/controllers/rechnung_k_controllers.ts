@@ -779,6 +779,7 @@ export const downloadRechnungKPdf = async (
       showPrices: true,
       shippingMethod: rechnungK.shipping_method,
       shippingCost: Number(rechnungK.shipping_cost || 0),
+      shippingQuantity: Number(rechnungK.shipping_quantity || 1),
       discountPercentage: Number(rechnungK.discount_percentage || 0),
       discountAmount: Number(rechnungK.discount_amount || 0),
       subtotal: Number(rechnungK.subtotal || 0),
