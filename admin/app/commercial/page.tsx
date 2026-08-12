@@ -99,7 +99,10 @@ import {
   getStatusBackgroundColor,
 } from "./auftragColumns";
 import { buildBestellungColumns } from "./bestellungColumns";
-import { buildRechnungColumns } from "./rechnungColumns";
+import {
+  buildRechnungColumns,
+  getRechnungStatusBackgroundColor,
+} from "./rechnungColumns";
 import { buildRkColumns } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
 import { buildPaymentInboundColumns } from "./paymentInboundColumns";
@@ -1462,13 +1465,17 @@ const InvoiceListPage: React.FC = () => {
       }
       if (status) {
         // Auftrag rows are keyed by the delivery lifecycle
-        // (open/partially_delivered/delivered/closed) via auftrag_status,
-        // not by the generic `status` field other document types use —
+        // (open/partially_delivered/delivered/closed) via auftrag_status;
+        // Rechnung rows are keyed by the derived payment lifecycle
+        // (paid/partially_paid/unpaid/overdue) via payment_status. Neither
+        // matches the generic `status` field other document types use —
         // match against the right field per tab.
         const itemStatus =
           activeInvTab === "auftrag"
             ? String(item.auftrag_status || item.status || "open").toLowerCase()
-            : String(item.status || "").toLowerCase();
+            : activeInvTab === "rechnung"
+              ? String(item.payment_status || "unpaid").toLowerCase()
+              : String(item.status || "").toLowerCase();
         if (itemStatus !== status.toLowerCase()) return false;
       }
       if (datePreset && datePreset !== "all") {
@@ -1607,14 +1614,47 @@ const InvoiceListPage: React.FC = () => {
               : false;
 
   return (
-    <div className="w-full mx-auto">
-      <div
-        className="bg-white min-h-[80vh] rounded-lg shadow-sm pb-8 p-6"
-        style={{
-          border: "1px solid #e0e0e0",
-          background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
-        }}
-      >
+    <div
+      className="min-h-screen font-['Poppins']"
+      style={{ backgroundColor: "#F8F9FA", color: "#212529" }}
+    >
+      <div className="w-full mx-auto p-0">
+        {searchParams.get("filter") &&
+          searchParams.get("hide_banner") !== "true" && (
+            <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">
+                  ⚠️ Reports & Control Health Audit View Active:
+                </span>
+                <span className="font-semibold text-gray-800">
+                  {(() => {
+                    switch (searchParams.get("filter")) {
+                      case "unassigned_cargo":
+                        return "Orders unassigned to cargo";
+                      case "rmb_special_no_value":
+                        return "RMB Special SET with no value";
+                      case "eur_special_no_value":
+                        return "EUR Special SET with no value";
+                      case "dimension_special_no_value":
+                        return "Dimension Special SET with no value";
+                      default:
+                        return searchParams.get("filter");
+                    }
+                  })()}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete("filter");
+                  window.location.href = `/invoices?${params.toString()}`;
+                }}
+                className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
+              >
+                Clear Audit Filter
+              </button>
+            </div>
+          )}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <PageHeader title="Commercial" icon={DollarSign} />
@@ -1789,6 +1829,15 @@ const InvoiceListPage: React.FC = () => {
                   // closed, matching the Auftrag sort order above.
                   const status = row.auftrag_status || row.status || "open";
                   const statusColor = getStatusBackgroundColor(status);
+                  if (statusColor && statusColor !== "#FFFFFF") {
+                    hex = statusColor;
+                  }
+                } else if (activeInvTab === "rechnung") {
+                  // No manual override — fall back to the derived payment
+                  // status: overdue / partially paid / unpaid / paid.
+                  const paymentStatus = row.payment_status || "unpaid";
+                  const statusColor =
+                    getRechnungStatusBackgroundColor(paymentStatus);
                   if (statusColor && statusColor !== "#FFFFFF") {
                     hex = statusColor;
                   }

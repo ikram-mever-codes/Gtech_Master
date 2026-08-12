@@ -87,7 +87,6 @@ export const createPaymentAllocation = async (
         .json({ success: false, message: "paymentInboundId is required" });
       return;
     }
-    0;
 
     const finalTargetType = String(
       targetType || target_type || "",
@@ -321,3 +320,111 @@ export const getAllocationsForTarget = async (
     next(error);
   }
 };
+
+// ============================================================
+// Rechnung payment status — derived, never stored. Computed fresh
+// from PaymentAllocation sums + due-date logic every time a Rechnung
+// is read, so it can't go stale the way a persisted field could.
+// ============================================================
+
+export type RechnungPaymentStatus =
+  | "paid"
+  | "partially_paid"
+  | "unpaid"
+  | "overdue";
+
+/**
+ * The date payment is considered due: the Rechnung's own due_date if
+ * set, otherwise invoice_date (falling back to delivery_date) plus
+ * payment_terms days (or 30 days if payment_terms isn't a usable
+ * number) — the same default window used elsewhere in this codebase
+ * (see the CCI invoice due_date fallback in createRechnungFromAuftrag).
+ */
+function getEffectiveDueDate(rechnung: {
+  due_date?: any;
+  invoice_date?: any;
+  delivery_date?: any;
+  payment_terms?: any;
+}): Date | null {
+  if (rechnung.due_date) {
+    const d = new Date(rechnung.due_date);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  const baseRaw = rechnung.invoice_date || rechnung.delivery_date;
+  if (!baseRaw) return null;
+  const base = new Date(baseRaw);
+  if (isNaN(base.getTime())) return null;
+
+  const parsedTerms = parseInt(String(rechnung.payment_terms), 10);
+  const termDays = !isNaN(parsedTerms) && parsedTerms > 0 ? parsedTerms : 30;
+
+  const due = new Date(base);
+  due.setDate(due.getDate() + termDays);
+  return due;
+}
+
+/**
+ * paid: fully covered by allocations.
+ * overdue: not fully paid AND the effective due date has passed —
+ *   checked before partially_paid/unpaid so a late partial payment
+ *   still shows as overdue rather than hiding behind "partially paid".
+ * partially_paid: some but not all of the total has been allocated,
+ *   due date not yet passed.
+ * unpaid: nothing allocated yet, due date not yet passed.
+ */
+export function computeRechnungPaymentStatus(
+  rechnung: {
+    due_date?: any;
+    invoice_date?: any;
+    delivery_date?: any;
+    payment_terms?: any;
+    total_amount?: any;
+  },
+  paidAmount: number,
+): RechnungPaymentStatus {
+  const total = Number(rechnung.total_amount) || 0;
+  const paid = round2(paidAmount);
+
+  if (total > 0 && paid >= total - 0.01) return "paid";
+
+  const dueDate = getEffectiveDueDate(rechnung);
+  if (dueDate && dueDate.getTime() < Date.now()) return "overdue";
+
+  return paid > 0.005 ? "partially_paid" : "unpaid";
+}
+
+/**
+ * Attaches paid_amount / open_amount / payment_status to a list of
+ * Rechnung rows in one batched query — same pattern as
+ * attachAllocationSummaryToInbounds. Mutates the rows in place.
+ */
+export async function attachPaymentStatusToRechnungen(
+  rechnungen: Rechnung[],
+): Promise<void> {
+  if (rechnungen.length === 0) return;
+
+  const repo = AppDataSource.getRepository(PaymentAllocation);
+  const ids = rechnungen.map((r) => r.id);
+  const rows = await repo
+    .createQueryBuilder("pa")
+    .select("pa.rechnung_id", "id")
+    .addSelect("COALESCE(SUM(pa.amount), 0)", "sum")
+    .where("pa.target_type = :targetType", {
+      targetType: PaymentAllocationTargetType.RECHNUNG,
+    })
+    .andWhere("pa.rechnung_id IN (:...ids)", { ids })
+    .groupBy("pa.rechnung_id")
+    .getRawMany();
+
+  const paidById = new Map<string, number>(
+    rows.map((r: any) => [r.id, round2(Number(r.sum) || 0)]),
+  );
+
+  for (const rechnung of rechnungen as any[]) {
+    const paid = paidById.get(rechnung.id) || 0;
+    rechnung.paid_amount = paid;
+    rechnung.open_amount = round2(Number(rechnung.total_amount || 0) - paid);
+    rechnung.payment_status = computeRechnungPaymentStatus(rechnung, paid);
+  }
+}

@@ -18,6 +18,7 @@ import { createLieferscheinFromRechnung } from "./lieferschein_controller";
 import { Lieferschein } from "../models/lieferscheine";
 import { In } from "typeorm/find-options/operator/In";
 import { Rechnung_k } from "../models/rechnung_k";
+import { attachPaymentStatusToRechnungen } from "./payment_allocations_controller";
 
 /** Fetches documents linked to a Rechnung: the originating Auftrag
  * (CustomerOrder, via auftrag_id) and every correction invoice
@@ -487,6 +488,12 @@ export const getAllRechnungen = async (
     const linkedDocumentsByRechnungId =
       await getLinkedDocumentsForRechnungen(rechnungen);
 
+    // Derived, not stored: paid_amount / open_amount / payment_status
+    // are computed fresh from PaymentAllocation sums (plus due-date
+    // logic) on every read, so they're always accurate without needing
+    // any write path to remember to update them.
+    await attachPaymentStatusToRechnungen(rechnungen);
+
     const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => ({
       ...r,
       linkedDocuments: linkedDocumentsByRechnungId.get(r.id) || {
@@ -577,6 +584,7 @@ export const getRechnungById = async (
     }
 
     const linkedDocuments = await getLinkedDocumentsForRechnung(rechnung);
+    await attachPaymentStatusToRechnungen([rechnung]);
 
     res.json({
       success: true,

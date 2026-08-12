@@ -43,7 +43,7 @@ import rechnungRoutes from "./routes/rechnung_routes";
 import gtechCompanyRoutes from "./routes/gtech_company_routes";
 import systemParameterRoutes from "./routes/system_parameter_routes";
 import weiterversandServiceRoutes from "./routes/weiterversand_service_provider_routes";
-import paymentAllocationRoutes from "./routes/payment_account_routes";
+import paymentAllocationRoutes from "./routes/payment_allocation_routes";
 import lieferscheinRoutes from "./routes/lieferschein_routes";
 
 const app: any = express();

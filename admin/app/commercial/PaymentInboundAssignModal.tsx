@@ -150,10 +150,6 @@ export const PaymentInboundAssignModal: React.FC<
         notes: notes.trim() || undefined,
       });
       if (res?.success) {
-        toast.success(
-          res.message || "Payment assigned successfully.",
-          successStyles,
-        );
         setSelectedDoc(null);
         setAmount("");
         setNotes("");
@@ -183,7 +179,6 @@ export const PaymentInboundAssignModal: React.FC<
     setRemovingId(allocation.id);
     try {
       await deletePaymentAllocation(allocation.id);
-      toast.success("Assignment removed.", successStyles);
       await loadAllocations();
       onSuccess();
     } catch (e: any) {
