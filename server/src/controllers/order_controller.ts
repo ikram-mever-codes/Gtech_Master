@@ -1691,52 +1691,87 @@ export const generateCommercialInvoicePDF = async (
       string,
       { hsCode: string; desc: string; qty: number; totalPrice: number }
     >();
-    rawOrderItems.forEach((oi: any) => {
-      const item = oi.item;
-      const taricCode = item?.taric?.code || "";
-      const isProject =
-        !taricCode || taricCode === "0" || taricCode === "0000000000";
-      let groupKey: string;
-      let hsCode: string;
-      let desc: string;
-      if (oi.set_taric_code) {
-        const codes = oi.set_taric_code.split("/");
-        const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-        groupKey = `hs_${target}`;
-        hsCode = target;
-        const mt = manualTaricMap.get(target);
-        desc = mt?.name_en || item?.item_name || "Unknown";
-      } else if (item?.taric?.id && !isProject) {
-        groupKey = `hs_${taricCode}`;
-        hsCode = taricCode;
-        desc = item.taric.name_en || item.item_name || "Unknown";
-      } else {
-        groupKey = `item_${item?.id || Math.random()}`;
-        hsCode = "n/a";
-        desc = item?.item_name || "Unknown";
-      }
-      let unitPrice = 0;
-      if (
-        item?.transfer_price_EUR !== undefined &&
-        item?.transfer_price_EUR !== null
-      )
-        unitPrice = Number(item.transfer_price_EUR);
-      else if (
-        oi.eur_special_price !== undefined &&
-        oi.eur_special_price !== null
-      )
-        unitPrice = Number(oi.eur_special_price);
-      else if (oi.price !== undefined && oi.price !== null)
-        unitPrice = Number(oi.price);
-      else if (item?.price !== undefined && item?.price !== null)
-        unitPrice = Number(item.price);
-      const qty = Number(oi.qty || 0);
-      if (!taricGroupsMap.has(groupKey))
-        taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
-      const g = taricGroupsMap.get(groupKey)!;
-      g.qty += qty;
-      g.totalPrice += qty * unitPrice;
-    });
+
+    const invoiceItemsList = invoice.items || [];
+    if (invoiceItemsList.length > 0) {
+      invoiceItemsList.forEach((invItem: any) => {
+        const item = invItem.item;
+        const taricCode = item?.taric?.code || invItem.articleNumber || "";
+        const isProject =
+          !taricCode || taricCode === "0" || taricCode === "0000000000";
+        let groupKey: string;
+        let hsCode: string;
+        let desc: string;
+
+        if (taricCode && !isProject) {
+          groupKey = `hs_${taricCode}`;
+          hsCode = taricCode;
+          desc = item?.taric?.name_en || invItem.description || "Machinery parts";
+        } else {
+          groupKey = `item_${invItem.id || Math.random()}`;
+          hsCode = invItem.articleNumber || "n/a";
+          desc = invItem.description || item?.item_name || "Unknown Item";
+        }
+
+        const qty = Number(invItem.quantity || 0);
+        const unitPrice = Number(invItem.unitPrice || 0);
+        const lineTotal = Number(invItem.netPrice ?? (qty * unitPrice));
+
+        if (!taricGroupsMap.has(groupKey)) {
+          taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
+        }
+        const g = taricGroupsMap.get(groupKey)!;
+        g.qty += qty;
+        g.totalPrice += lineTotal;
+      });
+    } else {
+      rawOrderItems.forEach((oi: any) => {
+        const item = oi.item;
+        const taricCode = item?.taric?.code || "";
+        const isProject =
+          !taricCode || taricCode === "0" || taricCode === "0000000000";
+        let groupKey: string;
+        let hsCode: string;
+        let desc: string;
+        if (oi.set_taric_code) {
+          const codes = oi.set_taric_code.split("/");
+          const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+          groupKey = `hs_${target}`;
+          hsCode = target;
+          const mt = manualTaricMap.get(target);
+          desc = mt?.name_en || item?.item_name || "Unknown";
+        } else if (item?.taric?.id && !isProject) {
+          groupKey = `hs_${taricCode}`;
+          hsCode = taricCode;
+          desc = item.taric.name_en || item.item_name || "Unknown";
+        } else {
+          groupKey = `item_${item?.id || Math.random()}`;
+          hsCode = "n/a";
+          desc = item?.item_name || "Unknown";
+        }
+        let unitPrice = 0;
+        if (
+          item?.transfer_price_EUR !== undefined &&
+          item?.transfer_price_EUR !== null
+        )
+          unitPrice = Number(item.transfer_price_EUR);
+        else if (
+          oi.eur_special_price !== undefined &&
+          oi.eur_special_price !== null
+        )
+          unitPrice = Number(oi.eur_special_price);
+        else if (oi.price !== undefined && oi.price !== null)
+          unitPrice = Number(oi.price);
+        else if (item?.price !== undefined && item?.price !== null)
+          unitPrice = Number(item.price);
+        const qty = Number(oi.qty || 0);
+        if (!taricGroupsMap.has(groupKey))
+          taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
+        const g = taricGroupsMap.get(groupKey)!;
+        g.qty += qty;
+        g.totalPrice += qty * unitPrice;
+      });
+    }
 
     const groupedItems = Array.from(taricGroupsMap.values());
 
