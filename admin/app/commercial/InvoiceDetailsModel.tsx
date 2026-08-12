@@ -258,10 +258,24 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               {(activeInvTab === "rk" || activeInvTab === "closed_invoices" || activeInvTab === "rechnung" || activeInvTab === "closed") && (
                 <span className="text-sm font-bold text-emerald-600 block mt-0.5">
                   Total: €
-                  {calculateInvoiceTotal(selectedInvoice).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {(() => {
+                    const expData = expandedStates[selectedInvoice.id]?.data;
+                    const taricSum = expData?.taricGroups?.reduce(
+                      (s: number, g: any) => s + (Number(g.totalPrice) || 0),
+                      0,
+                    ) || 0;
+                    const freight = Number(selectedInvoice.freightCost || 0);
+                    if (taricSum > 0) {
+                      return (taricSum + freight).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      });
+                    }
+                    return calculateInvoiceTotal(selectedInvoice).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    });
+                  })()}
                 </span>
               )}
             </div>

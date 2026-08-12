@@ -941,108 +941,150 @@ export class InvoiceController {
       const orderIdMap = new Map();
       orders.forEach((o) => orderIdMap.set(o.order_no, o.id));
 
-      const data = invoices
-        .map((inv) => {
-          const cargo = orderToCargoMap.get(inv.orderNumber);
+      const data = (
+        await Promise.all(
+          invoices.map(async (inv) => {
+            const cargo = orderToCargoMap.get(inv.orderNumber);
 
-          let customItemCount = 0;
-          let customTotalQty = 0;
-          let itemsTotalPrice = 0;
+            let customItemCount = 0;
+            let customTotalQty = 0;
+            let itemsTotalPrice = 0;
 
-          if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
-            const stats = orderItemSummaryByCargoId.get(cargo.id);
-            customItemCount = stats.count_items;
-            customTotalQty = stats.total_qty;
-            itemsTotalPrice = Number(stats.total_price || 0);
-          } else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
-            const orderId = orderIdMap.get(inv.orderNumber);
-            if (orderItemSummaryByOrderId.has(orderId)) {
-              const stats = orderItemSummaryByOrderId.get(orderId);
+            try {
+              const exp = await InvoiceController.fetchExpandedDetailsData(inv.id);
+              if (exp?.taricGroups && exp.taricGroups.length > 0) {
+                const taricSum = exp.taricGroups.reduce(
+                  (s: number, g: any) => s + Number(g.totalPrice || 0),
+                  0,
+                );
+                const taricQty = exp.taricGroups.reduce(
+                  (s: number, g: any) => s + Number(g.totalQty || 0),
+                  0,
+                );
+                if (taricSum > 0) itemsTotalPrice = taricSum;
+                if (taricQty > 0) customTotalQty = taricQty;
+                if (exp.taricGroups.length > 0)
+                  customItemCount = exp.taricGroups.length;
+              } else if (exp?.detailedItems && exp.detailedItems.length > 0) {
+                const itemSum = exp.detailedItems.reduce(
+                  (s: number, it: any) =>
+                    s +
+                    Number(it.qty || it.quantity || 0) *
+                    Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0),
+                  0,
+                );
+                const itemQty = exp.detailedItems.reduce(
+                  (s: number, it: any) => s + Number(it.qty || it.quantity || 0),
+                  0,
+                );
+                if (itemSum > 0) itemsTotalPrice = itemSum;
+                if (itemQty > 0) customTotalQty = itemQty;
+                if (exp.detailedItems.length > 0)
+                  customItemCount = exp.detailedItems.length;
+              }
+            } catch (e) {
+              console.warn(`[InvoiceController.getAllInvoices] Expanded details failed for ${inv.id}:`, e);
+            }
+
+            if (customItemCount === 0 && cargo && orderItemSummaryByCargoId.has(cargo.id)) {
+              const stats = orderItemSummaryByCargoId.get(cargo.id);
               customItemCount = stats.count_items;
               customTotalQty = stats.total_qty;
-              itemsTotalPrice = Number(stats.total_price || 0);
+              if (itemsTotalPrice === 0) itemsTotalPrice = Number(stats.total_price || 0);
+            } else if (customItemCount === 0 && inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
+              const orderId = orderIdMap.get(inv.orderNumber);
+              if (orderItemSummaryByOrderId.has(orderId)) {
+                const stats = orderItemSummaryByOrderId.get(orderId);
+                customItemCount = stats.count_items;
+                customTotalQty = stats.total_qty;
+                if (itemsTotalPrice === 0) itemsTotalPrice = Number(stats.total_price || 0);
+              }
             }
-          }
-          if (customItemCount === 0 && inv.items) {
-            customItemCount = inv.items.length;
-            customTotalQty = inv.items.reduce(
-              (sum, item) => sum + Number(item.quantity || 0),
-              0,
-            );
-          }
-          if (itemsTotalPrice === 0 && inv.items && inv.items.length > 0) {
-            itemsTotalPrice = inv.items.reduce(
-              (sum, item) =>
-                sum +
-                Number(item.quantity || 0) *
-                Number(item.unitPrice || item.netPrice || (item as any).price || 0),
-              0,
-            );
-          }
+            if (customItemCount === 0 && inv.items) {
+              customItemCount = inv.items.length;
+              customTotalQty = inv.items.reduce(
+                (sum, item) => sum + Number(item.quantity || 0),
+                0,
+              );
+            }
+            if (itemsTotalPrice === 0 && inv.items && inv.items.length > 0) {
+              itemsTotalPrice = inv.items.reduce(
+                (sum, item) =>
+                  sum +
+                  Number(item.quantity || 0) *
+                  Number(item.unitPrice || item.netPrice || (item as any).price || 0),
+                0,
+              );
+            }
 
-          const freight = Number(inv.freightCost || 0);
-          let calculatedGrossTotal = 0;
-          if (itemsTotalPrice > 0) {
-            calculatedGrossTotal = itemsTotalPrice + freight;
-          } else {
-            const dbGross = Number(inv.grossTotal || 0);
-            if (dbGross > freight) {
-              calculatedGrossTotal = dbGross;
-            } else if (dbGross > 0 && freight > 0) {
-              calculatedGrossTotal = dbGross + freight;
+            const freight = Number(inv.freightCost || 0);
+            let calculatedGrossTotal = 0;
+            if (itemsTotalPrice > 0) {
+              calculatedGrossTotal = itemsTotalPrice + freight;
             } else {
-              calculatedGrossTotal = Math.max(dbGross, freight);
+              const dbGross = Number(inv.grossTotal || 0);
+              if (dbGross > freight) {
+                calculatedGrossTotal = dbGross;
+              } else if (dbGross > 0 && freight > 0) {
+                calculatedGrossTotal = dbGross + freight;
+              } else {
+                calculatedGrossTotal = Math.max(dbGross, freight);
+              }
             }
-          }
 
-          const cargoNo =
-            cargo?.cargo_no ||
-            (inv.orderNumber && !orderIdMap.has(inv.orderNumber)
-              ? inv.orderNumber
-              : undefined);
+            console.log(
+              `[InvoiceTotalDebug] ${inv.invoiceNumber || inv.id} (${cargo?.cargo_no || inv.orderNumber}): itemsNet=${itemsTotalPrice.toFixed(2)}, freight=${freight.toFixed(2)}, grossTotal=${calculatedGrossTotal.toFixed(2)}`,
+            );
 
-          const order = orders.find((o) => o.order_no === inv.orderNumber);
-          const orderComment =
-            order?.comment ||
-            cargoCommentMap.get(cargo?.cargo_no || "") ||
-            cargoCommentMap.get(inv.orderNumber || "") ||
-            "";
+            const cargoNo =
+              cargo?.cargo_no ||
+              (inv.orderNumber && !orderIdMap.has(inv.orderNumber)
+                ? inv.orderNumber
+                : undefined);
 
-          const rawBillTo = "GTech Industries GmbH";
+            const order = orders.find((o) => o.order_no === inv.orderNumber);
+            const orderComment =
+              order?.comment ||
+              cargoCommentMap.get(cargo?.cargo_no || "") ||
+              cargoCommentMap.get(inv.orderNumber || "") ||
+              "";
 
-          const shipCompanyCandidate =
-            typeof cargo?.ship_to_company_name === "string" &&
-              cargo.ship_to_company_name.trim().length > 1 &&
-              !isStreetAddress(cargo.ship_to_company_name)
-              ? cargo.ship_to_company_name.trim()
-              : typeof cargo?.ship_to_display_name === "string" &&
-                cargo.ship_to_display_name.trim().length > 1 &&
-                !isStreetAddress(cargo.ship_to_display_name)
-                ? cargo.ship_to_display_name.trim()
-                : undefined;
+            const rawBillTo = "GTech Industries GmbH";
 
-          const rawShipTo =
-            shipCompanyCandidate ||
-            inv.customer?.companyName ||
-            cargo?.customer?.companyName ||
-            inv.customer?.legalName ||
-            "-";
+            const shipCompanyCandidate =
+              typeof cargo?.ship_to_company_name === "string" &&
+                cargo.ship_to_company_name.trim().length > 1 &&
+                !isStreetAddress(cargo.ship_to_company_name)
+                ? cargo.ship_to_company_name.trim()
+                : typeof cargo?.ship_to_display_name === "string" &&
+                  cargo.ship_to_display_name.trim().length > 1 &&
+                  !isStreetAddress(cargo.ship_to_display_name)
+                  ? cargo.ship_to_display_name.trim()
+                  : undefined;
 
-          return {
-            ...inv,
-            grossTotal: calculatedGrossTotal,
-            bill_to: rawBillTo,
-            ship_to: rawShipTo,
-            customItemCount,
-            customTotalQty,
-            cargoNo: cargoNo || inv.orderNumber,
-            cargoId: cargo?.id || null,
-            cargo_id: cargo?.id || null,
-            cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null,
-            orderComment,
-          };
-        })
-        .filter((inv): inv is any => inv !== null);
+            const rawShipTo =
+              shipCompanyCandidate ||
+              inv.customer?.companyName ||
+              cargo?.customer?.companyName ||
+              inv.customer?.legalName ||
+              "-";
+
+            return {
+              ...inv,
+              grossTotal: calculatedGrossTotal,
+              bill_to: rawBillTo,
+              ship_to: rawShipTo,
+              customItemCount,
+              customTotalQty,
+              cargoNo: cargoNo || inv.orderNumber,
+              cargoId: cargo?.id || null,
+              cargo_id: cargo?.id || null,
+              cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null,
+              orderComment,
+            };
+          })
+        )
+      ).filter((inv): inv is any => inv !== null);
 
       const finalDataMap = new Map();
       data.forEach((inv) => {
@@ -1097,7 +1139,6 @@ export class InvoiceController {
               Number((it as any).unitPrice || 0) ||
               Number((it as any).net_price || 0) ||
               Number((it as any).total_price || 0);
-            // For old invoices where price was saved as 0, use Item Master transfer price
             if (unitPrice === 0 && it.item_id && masterItemPriceMap.has(Number(it.item_id))) {
               unitPrice = masterItemPriceMap.get(Number(it.item_id))!;
             }
@@ -1344,10 +1385,10 @@ export class InvoiceController {
       const linkedInv = await invoiceRepository.findOne({ where: { id: cciInvoice.id } });
       let cciTotalGross = Number(
         cciInvoice.gross_total ||
-          cciInvoice.net_total ||
-          linkedInv?.grossTotal ||
-          linkedInv?.netTotal ||
-          0,
+        cciInvoice.net_total ||
+        linkedInv?.grossTotal ||
+        linkedInv?.netTotal ||
+        0,
       );
       if (cciTotalGross === 0 && detailedItems.length > 0) {
         cciTotalGross = detailedItems.reduce(
@@ -2649,8 +2690,6 @@ export class InvoiceController {
           closed_at: new Date(),
           customer: cciCustomer,
         });
-
-        // ── Fetch expanded data FIRST so we can compute the correct gross_total ──
         const itemsToSave: any[] = [];
         let expandedData: any = null;
         try {
@@ -2663,7 +2702,6 @@ export class InvoiceController {
 
         const detailedItems = expandedData?.detailedItems || [];
 
-        // Compute the correct gross_total: sum of actual item prices + freight
         const freezeFreight = Number(invoice.freightCost || 0);
         let correctGrossTotal: number;
         if (detailedItems.length > 0) {
@@ -2676,11 +2714,9 @@ export class InvoiceController {
           }, 0);
           correctGrossTotal = freezeItemsSum + freezeFreight;
         } else {
-          // No expanded items available — keep invoice's own grossTotal as fallback
           correctGrossTotal = Number(invoice.grossTotal || 0);
         }
 
-        // Update the already-saved CCI record with the correct gross_total
         cciInvoice.gross_total = correctGrossTotal;
         await cciInvoiceRepo.save(cciInvoice);
 
