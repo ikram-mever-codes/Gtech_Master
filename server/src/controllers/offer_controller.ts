@@ -3453,16 +3453,6 @@ export class OfferController {
         ],
       });
 
-      // Resolve the customer's tax profile (same as UI getLineTaxRate logic)
-      // UI uses offer.taxProfile.taxRate — we replicate that here
-      const taxProfile = await this.getCustomerTaxProfile(offer?.customerId);
-      const taxProfileRate: number =
-        taxProfile?.taxRate !== undefined && taxProfile?.taxRate !== null
-          ? Number(taxProfile.taxRate)
-          : offer?.taxRate !== undefined && offer?.taxRate !== null
-            ? Number(offer.taxRate)
-            : 19;
-
       if (!offer) {
         return response.status(404).json({
           success: false,
@@ -3471,16 +3461,25 @@ export class OfferController {
       }
 
       let customerEntity: any = null;
+      let customerTaxProfile: any = null;
       if (offer.customerId) {
         try {
           customerEntity = await AppDataSource.getRepository(Customer).findOne({
             where: { id: offer.customerId },
-            relations: ["shippingAddresses"],
+            relations: ["shippingAddresses", "defaultTaxProfile"],
           });
+          if (customerEntity?.defaultTaxProfile) {
+            customerTaxProfile = this.mapTaxProfile(customerEntity.defaultTaxProfile);
+          }
         } catch (e) {
-          console.warn("Could not fetch customer shipping addresses:", e);
+          console.warn("Could not fetch customer shipping addresses / tax profile:", e);
         }
       }
+
+      const getSafeNumber = (numValue: any): number => {
+        const parsed = parseFlexibleNumber(numValue);
+        return parsed ?? 0;
+      };
 
       const formatDate = (dateValue: any): string => {
         if (!dateValue) return "N/A";
@@ -3488,11 +3487,6 @@ export class OfferController {
           typeof dateValue === "string" ? new Date(dateValue) : dateValue;
         if (!(date instanceof Date) || isNaN(date.getTime())) return "N/A";
         return date.toLocaleDateString("de-DE");
-      };
-
-      const getSafeNumber = (numValue: any): number => {
-        const parsed = parseFlexibleNumber(numValue);
-        return parsed ?? 0;
       };
 
       const formatNumber = (numValue: any, decimals: number = 2): string => {
@@ -3514,14 +3508,39 @@ export class OfferController {
         return qty * getSafeNumber(item.basePrice);
       };
 
+      // Live customer tax profile rate takes precedence over stored offer.taxRate default
+      const resolvedDefaultTaxRate: number =
+        customerTaxProfile?.taxRate !== undefined && customerTaxProfile?.taxRate !== null
+          ? getSafeNumber(customerTaxProfile.taxRate)
+          : offer.taxRate !== undefined && offer.taxRate !== null
+            ? getSafeNumber(offer.taxRate)
+            : 19;
+
+      const isFreetextLine = (item: any): boolean =>
+        !item?.sourceItemId && !item?.requestedItemId && (item?.itemType === "freizeile" || item?.isFreizeile || (!item?.material && (item?.description || item?.itemName)));
+
+      const getEffectiveLineTaxRate = (item: any): number => {
+        if (isFreetextLine(item)) {
+          const own = item?.taxRate !== undefined && item?.taxRate !== null ? getSafeNumber(item.taxRate) : null;
+          return own !== null ? own : resolvedDefaultTaxRate;
+        }
+        return (item?.taxRate !== undefined && item?.taxRate !== null)
+          ? getSafeNumber(item.taxRate)
+          : resolvedDefaultTaxRate;
+      };
+
       const calculateTotals = (offerData: any) => {
         let subtotal = 0;
+        let taxAmount = 0;
         if (offerData.lineItems && Array.isArray(offerData.lineItems)) {
           const customerItems = offerData.lineItems.filter(
             (item: any) => !item.isComponent,
           );
           customerItems.forEach((item: any) => {
-            subtotal += getLineTotal(item);
+            const lineNet = getLineTotal(item);
+            subtotal += lineNet;
+            const lineRate = getEffectiveLineTaxRate(item);
+            taxAmount += lineNet * (lineRate / 100);
           });
         }
 
@@ -3531,9 +3550,20 @@ export class OfferController {
         let discountedSubtotal = subtotal - discount;
         if (discountedSubtotal < 0) discountedSubtotal = 0;
 
-        const taxRate = getSafeNumber(offerData.taxRate ?? 19) / 100;
-        const taxAmount = discountedSubtotal * taxRate;
-        const totalAmount = discountedSubtotal + taxAmount;
+        const discountFactor = subtotal > 0 ? (discountedSubtotal / subtotal) : 1;
+        taxAmount = taxAmount * discountFactor;
+
+        const shippingCost = getSafeNumber(offerData.shippingCost);
+        const shippingQty = getSafeNumber(offerData.shippingQuantity) || 1;
+        const shippingTotal = shippingCost * shippingQty;
+        if (shippingTotal > 0) {
+          const shipRate = offerData.shippingTaxRate !== undefined && offerData.shippingTaxRate !== null
+            ? getSafeNumber(offerData.shippingTaxRate)
+            : resolvedDefaultTaxRate;
+          taxAmount += shippingTotal * (shipRate / 100);
+        }
+
+        const totalAmount = discountedSubtotal + shippingTotal + taxAmount;
 
         return {
           subtotal: subtotal.toFixed(2),
@@ -4058,15 +4088,7 @@ export class OfferController {
               .fill("#FFFFFF");
           }
 
-          const isFreizeileItem =
-            item.itemType === "freizeile" ||
-            item.isFreizeile ||
-            (!item.material && (item.description || item.itemName));
-          const itemTaxRate = isFreizeileItem
-            ? (item.taxRate !== undefined && item.taxRate !== null
-              ? getSafeNumber(item.taxRate)
-              : taxProfileRate)
-            : taxProfileRate;
+          const itemTaxRate = getEffectiveLineTaxRate(item);
 
           const rowData = [
             (rowIndex + 1).toString(),
@@ -4110,7 +4132,7 @@ export class OfferController {
       const shippingTaxRateNum =
         offer.shippingTaxRate !== undefined && offer.shippingTaxRate !== null
           ? getSafeNumber(offer.shippingTaxRate)
-          : taxProfileRate;
+          : resolvedDefaultTaxRate;
 
       if (shippingMethod) {
         const totalItemCount = offer.lineItems
@@ -4119,6 +4141,7 @@ export class OfferController {
         const shipRowNum = totalItemCount + 1;
         const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
 
+        // Calculate row height
         const shipTextHeight = doc.font(R).fontSize(8.5).heightOfString(shippingMethod, { width: columns[2].width - 4 });
         const shipRowH = Math.max(22, shipTextHeight + 10);
 
@@ -4130,6 +4153,7 @@ export class OfferController {
 
         doc.rect(LEFT_X, currentY, tableWidth, shipRowH).fill(shipRowBg);
 
+        // Render all 7 columns for the shipping row
         const shipRowData = [
           String(shipRowNum),
           "—",
@@ -4208,27 +4232,27 @@ export class OfferController {
 
       const rateOrder: number[] = [];
       const vatMap = new Map<number, number>();
+      const discountFactor = Number(totals.subtotal) > 0 ? ((Number(totals.subtotal) - Number(totals.discountAmount || 0)) / Number(totals.subtotal)) : 1;
+
       (offer.lineItems || (offer as any).items || []).forEach((it: any) => {
         if (it.isComponent) return;
-        const itIsFreizeile =
-          it.itemType === "freizeile" ||
-          it.isFreizeile ||
-          (!it.material && (it.description || it.itemName));
-        const rate = itIsFreizeile
-          ? (it.taxRate !== undefined && it.taxRate !== null
-            ? Number(it.taxRate)
-            : taxProfileRate)
-          : taxProfileRate;
+        const rate = getEffectiveLineTaxRate(it);
         if (!vatMap.has(rate)) {
           rateOrder.push(rate);
         }
-        const lineNet = Number(
-          it.lineTotal ??
-          (Number(it.baseQuantity || it.quantity || 1) * Number(it.basePrice || it.price || 0))
-        );
+        const lineNet = getLineTotal(it) * discountFactor;
         const vatAmt = lineNet * (rate / 100);
         vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
       });
+
+      if (shippingTotal > 0) {
+        const shipRate = shippingTaxRateNum;
+        if (!vatMap.has(shipRate)) {
+          rateOrder.push(shipRate);
+        }
+        const shipVat = shippingTotal * (shipRate / 100);
+        vatMap.set(shipRate, (vatMap.get(shipRate) || 0) + shipVat);
+      }
 
       const vatEntries = rateOrder.map((rate) => ({
         rate,

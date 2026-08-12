@@ -722,22 +722,10 @@ export const downloadRechnungKPdf = async (
       return;
     }
 
-    let customerTaxProfileRate: number = rechnungK.tax_rate !== undefined && rechnungK.tax_rate !== null
-      ? Number(rechnungK.tax_rate)
-      : 19;
-    const origCustIdK = rechnungK.customer?.original_customer_id;
-    if (origCustIdK) {
-      try {
-        const { Customer } = await import("../models/customers");
-        const origCustomer = await AppDataSource.getRepository(Customer).findOne({
-          where: { id: origCustIdK },
-          relations: ["defaultTaxProfile"],
-        });
-        if (origCustomer?.defaultTaxProfile?.taxRate !== undefined && origCustomer.defaultTaxProfile.taxRate !== null) {
-          customerTaxProfileRate = Number(origCustomer.defaultTaxProfile.taxRate);
-        }
-      } catch (_) { /* fallback to stored tax_rate */ }
-    }
+    const defaultTaxRate =
+      rechnungK.tax_rate !== undefined && rechnungK.tax_rate !== null
+        ? Number(rechnungK.tax_rate)
+        : 19;
 
     const customerSnap = rechnungK.customerSnapshot || rechnungK.customer || {};
     const contactName =
@@ -766,10 +754,10 @@ export const downloadRechnungKPdf = async (
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
       remarks: it.remark || it.notes || "-",
-      // Freizeile: use item's own taxRate if set; catalog: use tax profile rate
-      vatRate: (it.itemType === "freizeile" || it.isFreizeile)
-        ? (it.taxRate !== undefined && it.taxRate !== null ? Number(it.taxRate) : customerTaxProfileRate)
-        : customerTaxProfileRate,
+      vatRate:
+        it.taxRate !== undefined && it.taxRate !== null
+          ? Number(it.taxRate)
+          : defaultTaxRate,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
       lineTotal: Number(
@@ -800,12 +788,13 @@ export const downloadRechnungKPdf = async (
       shippingMethod: rechnungK.shipping_method,
       shippingCost: Number(rechnungK.shipping_cost || 0),
       shippingQuantity: Number(rechnungK.shipping_quantity || 1),
+      shippingTaxRate: defaultTaxRate,
       discountPercentage: Number(rechnungK.discount_percentage || 0),
       discountAmount: Number(rechnungK.discount_amount || 0),
       subtotal: Number(rechnungK.subtotal || 0),
       taxAmount: Number(rechnungK.tax_amount || 0),
       totalAmount: Number(rechnungK.total_amount || 0),
-      taxRate: customerTaxProfileRate,
+      taxRate: defaultTaxRate,
       currency: rechnungK.currency || "EUR",
       notes: rechnungK.notes,
       deliveryTime: rechnungK.date_delivery,

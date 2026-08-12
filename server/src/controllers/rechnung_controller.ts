@@ -131,7 +131,6 @@ export const createRechnungFromAuftrag = async (
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
 
-    // Generate invoice number
     let invoiceNo = "";
     try {
       invoiceNo = await NumberSequenceService.getNextNumber("invoice");
@@ -140,7 +139,6 @@ export const createRechnungFromAuftrag = async (
       invoiceNo = `R${yy}${mm}-${Date.now().toString().slice(-4)}`;
     }
 
-    // Generate delivery note number (for Lieferschein)
     let deliveryNoteNo = "";
     try {
       deliveryNoteNo =
@@ -159,7 +157,6 @@ export const createRechnungFromAuftrag = async (
       .toString()
       .padStart(2, "0")}.${now.getFullYear()}`;
 
-    // Prepare customer snapshot
     const custRepo = AppDataSource.getRepository(Customer);
     let originalCust: Customer | null = null;
     if (auftrag.customer_id) {
@@ -261,7 +258,6 @@ export const createRechnungFromAuftrag = async (
 
       itemsToCreate.push(itemData);
 
-      // Deduct delivered quantity from Auftrag line item remaining quantity
       if (sourceLine) {
         const currentQty = Number(sourceLine.quantity) || 0;
         const newRemainingQty = Math.max(0, currentQty - qty);
@@ -778,22 +774,13 @@ export const downloadRechnungPdf = async (
       return;
     }
 
-    let customerTaxProfileRate: number = rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
-      ? Number(rechnung.tax_rate)
-      : 19;
-    const origCustId = rechnung.customer?.original_customer_id;
-    if (origCustId) {
-      try {
-        const { Customer } = await import("../models/customers");
-        const origCustomer = await AppDataSource.getRepository(Customer).findOne({
-          where: { id: origCustId },
-          relations: ["defaultTaxProfile"],
-        });
-        if (origCustomer?.defaultTaxProfile?.taxRate !== undefined && origCustomer.defaultTaxProfile.taxRate !== null) {
-          customerTaxProfileRate = Number(origCustomer.defaultTaxProfile.taxRate);
-        }
-      } catch (_) { /* fallback to stored tax_rate */ }
-    }
+    const defaultTaxRate =
+      rechnung.tax_profile_case === "EU_IGL" ||
+      rechnung.tax_profile_case === "third_country"
+        ? 0
+        : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
+          ? Number(rechnung.tax_rate)
+          : 19;
 
     const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
     const contactName =
@@ -822,10 +809,10 @@ export const downloadRechnungPdf = async (
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
       remarks: it.remark || it.notes || "-",
-      // Freizeile: use item's own taxRate if set; catalog: use tax profile rate
-      vatRate: (it.itemType === "freizeile" || it.isFreizeile)
-        ? (it.taxRate !== undefined && it.taxRate !== null ? Number(it.taxRate) : customerTaxProfileRate)
-        : customerTaxProfileRate,
+      vatRate:
+        it.taxRate !== undefined && it.taxRate !== null
+          ? Number(it.taxRate)
+          : defaultTaxRate,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
       lineTotal: Number(
@@ -854,12 +841,13 @@ export const downloadRechnungPdf = async (
       shippingMethod: rechnung.shipping_method,
       shippingCost: Number(rechnung.shipping_cost || 0),
       shippingQuantity: Number(rechnung.shipping_quantity || 1),
+      shippingTaxRate: defaultTaxRate,
       discountPercentage: Number(rechnung.discount_percentage || 0),
       discountAmount: Number(rechnung.discount_amount || 0),
       subtotal: Number(rechnung.subtotal || 0),
       taxAmount: Number(rechnung.tax_amount || 0),
       totalAmount: Number(rechnung.total_amount || 0),
-      taxRate: customerTaxProfileRate,
+      taxRate: defaultTaxRate,
       currency: rechnung.currency || "EUR",
       notes: rechnung.notes,
       deliveryTime: rechnung.date_delivery,

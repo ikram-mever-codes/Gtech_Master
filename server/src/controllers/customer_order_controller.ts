@@ -1362,13 +1362,21 @@ export const downloadCustomerOrderPdf = async (
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
     const order = await customerOrderRepo.findOne({
       where: [{ id: Number(id) || 0 }, { order_no: String(id) }],
-      relations: ["orderItems", "customer"],
+      relations: ["orderItems", "customer", "customer.defaultTaxProfile"],
     });
 
     if (!order) {
       res.status(404).json({ success: false, message: "Auftrag not found" });
       return;
     }
+
+    const defaultTaxRate =
+      order.customer?.defaultTaxProfile?.tax_rate !== undefined &&
+      order.customer?.defaultTaxProfile?.tax_rate !== null
+        ? Number(order.customer.defaultTaxProfile.tax_rate)
+        : order.tax_rate !== undefined && order.tax_rate !== null
+          ? Number(order.tax_rate)
+          : 19;
 
     const customerSnap = order.customerSnapshot || order.customer || {};
     const contactName =
@@ -1391,12 +1399,18 @@ export const downloadCustomerOrderPdf = async (
       `auftrag_${order.order_no || order.id}.pdf`,
     );
 
+    const isFreetext = (it: any) =>
+      !it.sourceItemId && !it.material && (it.itemName || it.description);
+
     const items = (order.orderItems || []).map((it: any, idx: number) => ({
       position: it.position || idx + 1,
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.itemName || it.description || "Item",
       remarks: it.notes || it.specification || "-",
-      vatRate: it.taxRate ?? order.tax_rate ?? 19,
+      vatRate:
+        it.taxRate !== undefined && it.taxRate !== null
+          ? Number(it.taxRate)
+          : defaultTaxRate,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.price || 0),
       lineTotal: Number(
@@ -1420,12 +1434,13 @@ export const downloadCustomerOrderPdf = async (
       shippingMethod: order.shipping_method,
       shippingCost: Number(order.shipping_cost || 0),
       shippingQuantity: Number(order.shipping_quantity || 1),
+      shippingTaxRate: defaultTaxRate,
       discountPercentage: Number(order.discount_percentage || 0),
       discountAmount: Number(order.discount_amount || 0),
       subtotal: Number(order.subtotal || 0),
       taxAmount: Number(order.tax_amount || 0),
       totalAmount: Number(order.total_amount || 0),
-      taxRate: Number(order.tax_rate || 19),
+      taxRate: defaultTaxRate,
       currency: order.currency || "EUR",
       notes: order.notes,
       deliveryTime: order.date_delivery || order.delivery_terms,

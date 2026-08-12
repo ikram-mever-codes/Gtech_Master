@@ -608,7 +608,7 @@ export async function generateGtechDocumentPdf(
           (rowIndex + 1).toString(),
           artNrStr,
           itemNameStr,
-          `${item.vatRate !== undefined && item.vatRate !== null ? item.vatRate : (opts.taxRate ?? 0)}%`,
+          `${item.vatRate ?? opts.taxRate ?? 19}%`,
           String(item.quantity ?? 1),
           formatGermanNum(item.unitPrice, 3),
           formatGermanNum(item.lineTotal ?? (item.quantity * (item.unitPrice || 0)), 2),
@@ -694,7 +694,6 @@ export async function generateGtechDocumentPdf(
     doc.rect(LEFT_X, currentY, tableWidth, shipRowH).fill(shipRowBg);
 
     if (showPrices) {
-      // All 7 columns: Pos, Art.-Nr, Bezeichnung, MwSt, Menge, Netto-Preis, Netto gesamt
       const shipRowData = [
         String(shipRowNum),
         "—",
@@ -716,7 +715,6 @@ export async function generateGtechDocumentPdf(
         shipX += col.width;
       });
     } else {
-      // No-price view (Lieferschein): just Pos + Bezeichnung
       doc.font(R).fontSize(8.5).fillColor("#2D3748");
       doc.text(String(shipRowNum), LEFT_X + 2, currentY + 6, {
         width: columns[0].width - 4,
