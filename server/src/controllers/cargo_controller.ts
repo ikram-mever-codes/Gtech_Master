@@ -585,6 +585,23 @@ export const deleteCargo = async (
       .where("cargo_id = :cargoId", { cargoId: cargo.id })
       .execute();
 
+    const orderRepo = AppDataSource.getRepository(Order);
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+
+    await orderRepo
+      .createQueryBuilder()
+      .update(Order)
+      .set({ cargo_id: () => "NULL" as any })
+      .where("cargo_id = :cargoId", { cargoId: cargo.id })
+      .execute();
+
+    await orderItemRepo
+      .createQueryBuilder()
+      .update(OrderItem)
+      .set({ cargo_id: () => "NULL" as any })
+      .where("cargo_id = :cargoId", { cargoId: cargo.id })
+      .execute();
+
     await cargoRepo.delete(cargo.id);
 
     res.status(200).json({
@@ -711,6 +728,29 @@ export const removeOrderFromCargo = async (
       .where("cargo_id = :cargoId AND order_id = :orderId", {
         cargoId: Number(id),
         orderId: Number(orderId),
+      })
+      .execute();
+
+    const orderRepo = AppDataSource.getRepository(Order);
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+
+    await orderRepo
+      .createQueryBuilder()
+      .update(Order)
+      .set({ cargo_id: () => "NULL" as any })
+      .where("id = :orderId AND cargo_id = :cargoId", {
+        orderId: Number(orderId),
+        cargoId: Number(id),
+      })
+      .execute();
+
+    await orderItemRepo
+      .createQueryBuilder()
+      .update(OrderItem)
+      .set({ cargo_id: () => "NULL" as any })
+      .where("order_id = :orderId AND cargo_id = :cargoId", {
+        orderId: Number(orderId),
+        cargoId: Number(id),
       })
       .execute();
 

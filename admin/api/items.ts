@@ -1139,3 +1139,13 @@ export const downloadOrderPdf = async (id: string) => {
     throw error;
   }
 };
+
+export const getUnusedPictures = async () => {
+  try {
+    const response: any = await api.get("/items/unused-pictures");
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch unused pictures");
+    throw error;
+  }
+};

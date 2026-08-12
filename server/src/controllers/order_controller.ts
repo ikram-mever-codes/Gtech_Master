@@ -533,7 +533,7 @@ export const getAllOrders = async (
 
     if (filter) {
       if (filter === "unassigned_cargo") {
-        qb.andWhere("(o.cargo_id IS NULL OR o.cargo_id = 0)");
+        qb.andWhere("(o.cargo_id IS NULL OR o.cargo_id = 0 OR cargo.id IS NULL)");
       } else if (filter === "purchase_problem") {
         qb.andWhere("(o.status ILIKE '%purchase%problem%' OR o.problem_status ILIKE '%purchase%problem%')");
       } else if (filter === "check_problem") {
@@ -542,6 +542,23 @@ export const getAllOrders = async (
     }
 
     const orders = await qb.getMany();
+
+    const orphanedOrderIds: number[] = [];
+    orders.forEach((order) => {
+      if (order.cargo_id && !order.cargo) {
+        orphanedOrderIds.push(order.id);
+        order.cargo_id = null as any;
+      }
+    });
+    if (orphanedOrderIds.length > 0) {
+      orderRepo
+        .createQueryBuilder()
+        .update(Order)
+        .set({ cargo_id: () => "NULL" as any })
+        .where("id IN (:...orphanedOrderIds)", { orphanedOrderIds })
+        .execute()
+        .catch(() => { });
+    }
 
     for (const ord of orders) {
       if (
@@ -627,93 +644,100 @@ export const getAllOrders = async (
       }
     });
 
-    const mappedOrders = orders.map((order) => ({
-      ...order,
-      supplier_name:
-        order.supplier?.company_name || order.supplier?.name || "Unassigned",
-      customer_name:
-        order.cargo?.customer?.companyName ||
-        order.cargo?.bill_to_display_name ||
-        order.customer?.companyName ||
-        "No Customer",
-      items: (order.orderItems || []).map((oi) => {
-        const itemDetails =
-          oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
-        console.log(itemDetails);
-        let warehouseItem = null;
-        if (oi.item_id) {
-          warehouseItem = warehouseByItemId.get(oi.item_id);
-        }
-        if (!warehouseItem && oi.ItemID_DE) {
-          warehouseItem = warehouseByItemIdDE.get(oi.ItemID_DE);
-        }
-        if (!warehouseItem && itemDetails?.id) {
-          warehouseItem = warehouseByItemId.get(itemDetails.id);
-        }
+    const mappedOrders = orders.map((order) => {
+      const hasValidCargo = Boolean(order.cargo && order.cargo.id && order.cargo_id);
+      const validCargoId = hasValidCargo ? order.cargo_id : null;
 
-        const defaultSup = defaultSupplierMap.get(
-          oi.item_id || itemDetails?.id || 0,
-        );
+      return {
+        ...order,
+        cargo_id: validCargoId,
+        supplier_name:
+          order.supplier?.company_name || order.supplier?.name || "Unassigned",
+        customer_name:
+          order.cargo?.customer?.companyName ||
+          order.cargo?.bill_to_display_name ||
+          order.customer?.companyName ||
+          "No Customer",
+        items: (order.orderItems || []).map((oi) => {
+          const itemDetails =
+            oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
+          console.log(itemDetails);
+          let warehouseItem = null;
+          if (oi.item_id) {
+            warehouseItem = warehouseByItemId.get(oi.item_id);
+          }
+          if (!warehouseItem && oi.ItemID_DE) {
+            warehouseItem = warehouseByItemIdDE.get(oi.ItemID_DE);
+          }
+          if (!warehouseItem && itemDetails?.id) {
+            warehouseItem = warehouseByItemId.get(itemDetails.id);
+          }
 
-        const resolvedSupplierName =
-          itemDetails?.supplier?.company_name ||
-          itemDetails?.supplier?.name ||
-          defaultSup?.name ||
-          order.supplier?.company_name ||
-          order.supplier?.name ||
-          null;
+          const defaultSup = defaultSupplierMap.get(
+            oi.item_id || itemDetails?.id || 0,
+          );
 
-        const rmbPrice =
-          rmbPriceMap.get(oi.item_id || itemDetails?.id || 0) || 0;
+          const resolvedSupplierName =
+            itemDetails?.supplier?.company_name ||
+            itemDetails?.supplier?.name ||
+            defaultSup?.name ||
+            order.supplier?.company_name ||
+            order.supplier?.name ||
+            null;
 
-        const finalPrice =
-          rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
+          const rmbPrice =
+            rmbPriceMap.get(oi.item_id || itemDetails?.id || 0) || 0;
 
-        return {
-          ...oi,
-          de_no: itemDetails?.item_no_de || "-",
-          ItemID_DE: oi?.ItemID_DE || "-",
-          item_id: oi.item_id || itemDetails?.id,
-          ean: itemDetails?.ean || warehouseItem?.ean || "-",
-          remark_de: oi.remark_de,
-          remark_cn: oi.remarks_cn,
-          remark_en: itemDetails?.remark || "",
-          item_name:
-            itemDetails?.item_name ||
-            warehouseItem?.item_name_en ||
-            warehouseItem?.item_name_de ||
-            (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
-          model: itemDetails?.model || "-",
-          price: finalPrice,
-          currency: "CNY",
-          taric_id: oi.taric_id || itemDetails?.taric_id,
-          taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
-          supplier_id:
-            itemDetails?.supplier_id || defaultSup?.id || order.supplier_id,
-          supplier_name: resolvedSupplierName || "Unassigned",
-          rmb_price: rmbPrice,
-          item: itemDetails,
-          warehouse_data: warehouseItem
-            ? {
-              id: warehouseItem.id,
-              item_no_de: itemDetails?.item_no_de,
-              item_name_de: warehouseItem.item_name_de,
-              item_name_en: warehouseItem.item_name_en,
-              stock_qty: warehouseItem.stock_qty,
-              msq: warehouseItem.msq,
-              buffer: warehouseItem.buffer,
-              is_stock_item: warehouseItem.is_stock_item,
-              is_SnSI: warehouseItem.is_SnSI,
-              ship_class: warehouseItem.ship_class,
-              is_active: warehouseItem.is_active,
-              is_no_auto_order: warehouseItem.is_no_auto_order,
-              category_id: warehouseItem.category_id,
-            }
-            : null,
-        };
-      }),
-      orderItems: undefined,
-    }));
+          const finalPrice =
+            rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
+
+          return {
+            ...oi,
+            de_no: itemDetails?.item_no_de || "-",
+            ItemID_DE: oi?.ItemID_DE || "-",
+            item_id: oi.item_id || itemDetails?.id,
+            ean: itemDetails?.ean || warehouseItem?.ean || "-",
+            remark_de: oi.remark_de,
+            remark_cn: oi.remarks_cn,
+            remark_en: itemDetails?.remark || "",
+            item_name:
+              itemDetails?.item_name ||
+              warehouseItem?.item_name_en ||
+              warehouseItem?.item_name_de ||
+              (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
+            model: itemDetails?.model || "-",
+            price: finalPrice,
+            currency: "CNY",
+            taric_id: oi.taric_id || itemDetails?.taric_id,
+            taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
+            supplier_id:
+              itemDetails?.supplier_id || defaultSup?.id || order.supplier_id,
+            supplier_name: resolvedSupplierName || "Unassigned",
+            rmb_price: rmbPrice,
+            item: itemDetails,
+            warehouse_data: warehouseItem
+              ? {
+                id: warehouseItem.id,
+                item_no_de: itemDetails?.item_no_de,
+                item_name_de: warehouseItem.item_name_de,
+                item_name_en: warehouseItem.item_name_en,
+                stock_qty: warehouseItem.stock_qty,
+                msq: warehouseItem.msq,
+                buffer: warehouseItem.buffer,
+                is_stock_item: warehouseItem.is_stock_item,
+                is_SnSI: warehouseItem.is_SnSI,
+                ship_class: warehouseItem.ship_class,
+                is_active: warehouseItem.is_active,
+                is_no_auto_order: warehouseItem.is_no_auto_order,
+                category_id: warehouseItem.category_id,
+              }
+              : null,
+            cargo_id: hasValidCargo ? (oi.cargo_id || validCargoId) : null,
+          };
+        }),
+        orderItems: undefined,
+      };
+    });
 
     return res.status(200).json({
       success: true,
