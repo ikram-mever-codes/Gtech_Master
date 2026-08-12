@@ -6,8 +6,13 @@ export const calculateInvoiceTotal = (invoice: any): number => {
   if (!invoice) return 0;
 
   const freight = Number(invoice.freightCost ?? invoice.freight_cost ?? 0);
-  const items = invoice.items || [];
+  const gross = Number(invoice.grossTotal ?? invoice.gross_total ?? 0);
 
+  if (gross > freight) {
+    return gross;
+  }
+
+  const items = invoice.items || [];
   const itemsSum = items.reduce(
     (s: number, it: any) =>
       s +
@@ -27,7 +32,6 @@ export const calculateInvoiceTotal = (invoice: any): number => {
     return itemsSum + freight;
   }
 
-  const gross = Number(invoice.grossTotal ?? invoice.gross_total ?? 0);
   if (gross > 0) {
     return Math.max(gross, freight);
   }

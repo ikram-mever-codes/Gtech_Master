@@ -1097,107 +1097,124 @@ export class InvoiceController {
         order: { invoice_date: "DESC" },
       });
 
-      const zeroItemIds = new Set<number>();
-      cciInvoices.forEach((cci) => {
-        (cci.items || []).forEach((it) => {
-          if (Number(it.unit_price || 0) === 0 && it.item_id) {
-            zeroItemIds.add(Number(it.item_id));
-          }
-        });
-      });
-      const masterItemPriceMap = new Map<number, number>();
-      if (zeroItemIds.size > 0) {
-        try {
-          const masterItems = await AppDataSource.getRepository(Item).find({
-            where: { id: In([...zeroItemIds]) },
-            select: ["id", "transfer_price_EUR", "price", "sales_price"],
-          });
-          masterItems.forEach((m) => {
-            const p =
-              Number(m.transfer_price_EUR || 0) ||
-              Number(m.price || 0) ||
-              Number(m.sales_price || 0);
-            masterItemPriceMap.set(m.id, p);
-          });
-        } catch (e) {
-          console.warn("Could not batch-fetch item master prices for CCI display:", e);
-        }
-      }
+      await Promise.all(
+        cciInvoices.map(async (cci) => {
+          let customItemCount = cci.items?.length || 0;
+          let customTotalQty =
+            cci.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0;
+          const cargoNo = cci.cargo_no || cci.order_number || "";
 
-      cciInvoices.forEach((cci) => {
-        const customItemCount = cci.items?.length || 0;
-        const customTotalQty =
-          cci.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0;
-        const cargoNo = cci.cargo_no || cci.order_number || "";
+          let cciGrossTotal = 0;
+          let itemsSum = 0;
 
-        const itemsSum = (cci.items || []).reduce(
-          (s, it) => {
-            const qty = Number(it.quantity || 0);
-            let unitPrice =
-              Number(it.unit_price || 0) ||
-              Number((it as any).price || 0) ||
-              Number((it as any).unitPrice || 0) ||
-              Number((it as any).net_price || 0) ||
-              Number((it as any).total_price || 0);
-            if (unitPrice === 0 && it.item_id && masterItemPriceMap.has(Number(it.item_id))) {
-              unitPrice = masterItemPriceMap.get(Number(it.item_id))!;
+          try {
+            const exp = await InvoiceController.fetchExpandedDetailsData(cci.id);
+            if (exp?.taricGroups && exp.taricGroups.length > 0) {
+              const taricSum = exp.taricGroups.reduce(
+                (s: number, g: any) => s + Number(g.totalPrice || 0),
+                0,
+              );
+              const taricQty = exp.taricGroups.reduce(
+                (s: number, g: any) => s + Number(g.totalQty || 0),
+                0,
+              );
+              if (taricSum > 0) itemsSum = taricSum;
+              if (taricQty > 0) customTotalQty = taricQty;
+              if (exp.taricGroups.length > 0)
+                customItemCount = exp.taricGroups.length;
+            } else if (exp?.detailedItems && exp.detailedItems.length > 0) {
+              const dSum = exp.detailedItems.reduce(
+                (s: number, it: any) =>
+                  s +
+                  Number(it.qty || it.quantity || 0) *
+                    Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0),
+                0,
+              );
+              const dQty = exp.detailedItems.reduce(
+                (s: number, it: any) => s + Number(it.qty || it.quantity || 0),
+                0,
+              );
+              if (dSum > 0) itemsSum = dSum;
+              if (dQty > 0) customTotalQty = dQty;
+              if (exp.detailedItems.length > 0)
+                customItemCount = exp.detailedItems.length;
             }
-            return s + qty * unitPrice;
-          },
-          0,
-        );
-        const freight = Number(cci.freight_cost || 0);
-        let cciGrossTotal = 0;
-        if (itemsSum > 0) {
-          cciGrossTotal = itemsSum + freight;
-        } else {
-          const dbGross = Number(cci.gross_total || 0);
-          if (dbGross > freight) {
-            cciGrossTotal = dbGross;
-          } else if (dbGross > 0 && freight > 0) {
-            cciGrossTotal = dbGross + freight;
+          } catch (e) {
+            console.warn(`[InvoiceController.getAllInvoices] fetchExpandedDetailsData failed for CCI ${cci.id}:`, e);
+          }
+
+          if (itemsSum === 0 && cci.items && cci.items.length > 0) {
+            itemsSum = (cci.items || []).reduce(
+              (s, it) => {
+                const qty = Number(it.quantity || 0);
+                const unitPrice =
+                  Number(it.unit_price || 0) ||
+                  Number((it as any).price || 0) ||
+                  Number((it as any).unitPrice || 0) ||
+                  Number((it as any).net_price || 0) ||
+                  Number((it as any).total_price || 0);
+                return s + qty * unitPrice;
+              },
+              0,
+            );
+          }
+
+          const freight = Number(cci.freight_cost || 0);
+          if (itemsSum > 0) {
+            cciGrossTotal = itemsSum + freight;
           } else {
-            cciGrossTotal = Math.max(dbGross, freight);
-          }
-        }
-
-        finalDataMap.set(cci.id, {
-          id: cci.id,
-          invoiceNumber: cci.invoice_number,
-          orderNumber: cci.order_number,
-          invoiceDate: cci.invoice_date,
-          deliveryDate: cci.delivery_date,
-          dueDate: cci.due_date,
-          netTotal: Number(cci.net_total || 0),
-          taxAmount: Number(cci.tax_amount || 0),
-          grossTotal: cciGrossTotal,
-          freightCost: Number(cci.freight_cost || 0),
-          description: cci.description || "",
-          remark: cci.remark || "",
-          status: cci.status || "closed",
-          bill_to: "GTech Industries GmbH",
-          ship_to:
-            cci.customer?.company_name ||
-            (cci.customer?.ship_to_address &&
-              !isStreetAddress(cci.customer.ship_to_address)
-              ? cci.customer.ship_to_address
-              : "-"),
-          customItemCount,
-          customTotalQty,
-          cargoNo: cargoNo,
-          cargoId: cargoNo || null,
-          cargo_id: cargoNo || null,
-          cargo: cargoNo ? { id: cargoNo, cargo_no: cargoNo } : null,
-          customer: cci.customer
-            ? {
-              id: cci.customer.original_customer_id || cci.customer.id,
-              companyName: cci.customer.company_name,
-              email: cci.customer.email,
+            const dbGross = Number(cci.gross_total || 0);
+            if (dbGross > freight) {
+              cciGrossTotal = dbGross;
+            } else if (dbGross > 0 && freight > 0) {
+              cciGrossTotal = dbGross + freight;
+            } else {
+              cciGrossTotal = Math.max(dbGross, freight);
             }
-            : null,
-          items: cci.items,
-        });
-      });
+          }
+
+          console.log(
+            `[InvoiceTotalDebug CCI] ${cci.invoice_number || cci.id} (${cargoNo}): itemsSum=${itemsSum.toFixed(2)}, freight=${freight.toFixed(2)}, grossTotal=${cciGrossTotal.toFixed(2)}`,
+          );
+
+          finalDataMap.set(cci.id, {
+            id: cci.id,
+            invoiceNumber: cci.invoice_number,
+            orderNumber: cci.order_number,
+            invoiceDate: cci.invoice_date,
+            deliveryDate: cci.delivery_date,
+            dueDate: cci.due_date,
+            netTotal: Number(cci.net_total || 0),
+            taxAmount: Number(cci.tax_amount || 0),
+            grossTotal: cciGrossTotal,
+            freightCost: Number(cci.freight_cost || 0),
+            description: cci.description || "",
+            remark: cci.remark || "",
+            status: cci.status || "closed",
+            bill_to: "GTech Industries GmbH",
+            ship_to:
+              cci.customer?.company_name ||
+              (cci.customer?.ship_to_address &&
+                !isStreetAddress(cci.customer.ship_to_address)
+                ? cci.customer.ship_to_address
+                : "-"),
+            customItemCount,
+            customTotalQty,
+            cargoNo: cargoNo,
+            cargoId: cargoNo || null,
+            cargo_id: cargoNo || null,
+            cargo: cargoNo ? { id: cargoNo, cargo_no: cargoNo } : null,
+            customer: cci.customer
+              ? {
+                id: cci.customer.original_customer_id || cci.customer.id,
+                companyName: cci.customer.company_name,
+                email: cci.customer.email,
+              }
+              : null,
+            items: cci.items,
+          });
+        })
+      );
 
       return res
         .status(200)
