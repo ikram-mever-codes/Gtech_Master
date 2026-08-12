@@ -22,15 +22,15 @@ async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
   const [originalRechnung, auftrag] = await Promise.all([
     rechnungK.original_rechnung_id
       ? rechnungRepo.findOne({
-          where: { id: rechnungK.original_rechnung_id },
-          select: ["id", "invoice_number", "created_at"],
-        })
+        where: { id: rechnungK.original_rechnung_id },
+        select: ["id", "invoice_number", "created_at"],
+      })
       : Promise.resolve(null),
     rechnungK.auftrag_id
       ? customerOrderRepo.findOne({
-          where: { id: rechnungK.auftrag_id },
-          select: ["id", "order_no", "created_at"],
-        })
+        where: { id: rechnungK.auftrag_id },
+        select: ["id", "order_no", "created_at"],
+      })
       : Promise.resolve(null),
   ]);
 
@@ -70,15 +70,15 @@ async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
   const [rechnungen, auftraege] = await Promise.all([
     originalRechnungIds.length
       ? rechnungRepo.find({
-          where: { id: In(originalRechnungIds) },
-          select: ["id", "invoice_number", "created_at"],
-        })
+        where: { id: In(originalRechnungIds) },
+        select: ["id", "invoice_number", "created_at"],
+      })
       : Promise.resolve([]),
     auftragIds.length
       ? customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "order_no", "created_at"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "created_at"],
+      })
       : Promise.resolve([]),
   ]);
 
@@ -722,6 +722,11 @@ export const downloadRechnungKPdf = async (
       return;
     }
 
+    const defaultTaxRate =
+      rechnungK.tax_rate !== undefined && rechnungK.tax_rate !== null
+        ? Number(rechnungK.tax_rate)
+        : 19;
+
     const customerSnap = rechnungK.customerSnapshot || rechnungK.customer || {};
     const contactName =
       (req as any).user?.name || (req as any).user?.username || "Admin";
@@ -749,13 +754,16 @@ export const downloadRechnungKPdf = async (
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
       remarks: it.remark || it.notes || "-",
-      vatRate: it.taxRate ?? rechnungK.tax_rate ?? 19,
+      vatRate:
+        it.taxRate !== undefined && it.taxRate !== null
+          ? Number(it.taxRate)
+          : defaultTaxRate,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
       lineTotal: Number(
         it.total_price ||
-          it.lineTotal ||
-          Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
+        it.lineTotal ||
+        Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
       ),
     }));
 
@@ -771,8 +779,8 @@ export const downloadRechnungKPdf = async (
         [
           "Datum",
           rechnungK.date_created ||
-            rechnungK.created_at ||
-            rechnungK.invoice_date,
+          rechnungK.created_at ||
+          rechnungK.invoice_date,
         ],
       ],
       lineItems: items,
@@ -780,12 +788,13 @@ export const downloadRechnungKPdf = async (
       shippingMethod: rechnungK.shipping_method,
       shippingCost: Number(rechnungK.shipping_cost || 0),
       shippingQuantity: Number(rechnungK.shipping_quantity || 1),
+      shippingTaxRate: defaultTaxRate,
       discountPercentage: Number(rechnungK.discount_percentage || 0),
       discountAmount: Number(rechnungK.discount_amount || 0),
       subtotal: Number(rechnungK.subtotal || 0),
       taxAmount: Number(rechnungK.tax_amount || 0),
       totalAmount: Number(rechnungK.total_amount || 0),
-      taxRate: Number(rechnungK.tax_rate || 19),
+      taxRate: defaultTaxRate,
       currency: rechnungK.currency || "EUR",
       notes: rechnungK.notes,
       deliveryTime: rechnungK.date_delivery,

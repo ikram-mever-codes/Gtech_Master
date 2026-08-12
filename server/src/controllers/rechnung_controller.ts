@@ -31,9 +31,9 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const [auftrag, rechnungenK] = await Promise.all([
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
-          where: { id: rechnung.auftrag_id },
-          select: ["id", "order_no", "created_at"],
-        })
+        where: { id: rechnung.auftrag_id },
+        select: ["id", "order_no", "created_at"],
+      })
       : Promise.resolve(null),
     rechnungKRepo.find({
       where: { original_rechnung_id: rechnung.id },
@@ -72,9 +72,9 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const [auftraege, rechnungenK] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "order_no", "created_at"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "created_at"],
+      })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
@@ -132,7 +132,6 @@ export const createRechnungFromAuftrag = async (
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
 
-    // Generate invoice number
     let invoiceNo = "";
     try {
       invoiceNo = await NumberSequenceService.getNextNumber("invoice");
@@ -141,7 +140,6 @@ export const createRechnungFromAuftrag = async (
       invoiceNo = `R${yy}${mm}-${Date.now().toString().slice(-4)}`;
     }
 
-    // Generate delivery note number (for Lieferschein)
     let deliveryNoteNo = "";
     try {
       deliveryNoteNo =
@@ -160,7 +158,6 @@ export const createRechnungFromAuftrag = async (
       .toString()
       .padStart(2, "0")}.${now.getFullYear()}`;
 
-    // Prepare customer snapshot
     const custRepo = AppDataSource.getRepository(Customer);
     let originalCust: Customer | null = null;
     if (auftrag.customer_id) {
@@ -262,7 +259,6 @@ export const createRechnungFromAuftrag = async (
 
       itemsToCreate.push(itemData);
 
-      // Deduct delivered quantity from Auftrag line item remaining quantity
       if (sourceLine) {
         const currentQty = Number(sourceLine.quantity) || 0;
         const newRemainingQty = Math.max(0, currentQty - qty);
@@ -786,6 +782,14 @@ export const downloadRechnungPdf = async (
       return;
     }
 
+    const defaultTaxRate =
+      rechnung.tax_profile_case === "EU_IGL" ||
+      rechnung.tax_profile_case === "third_country"
+        ? 0
+        : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
+          ? Number(rechnung.tax_rate)
+          : 19;
+
     const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
     const contactName =
       (req as any).user?.name || (req as any).user?.username || "Admin";
@@ -813,13 +817,16 @@ export const downloadRechnungPdf = async (
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
       remarks: it.remark || it.notes || "-",
-      vatRate: it.taxRate ?? rechnung.tax_rate ?? 19,
+      vatRate:
+        it.taxRate !== undefined && it.taxRate !== null
+          ? Number(it.taxRate)
+          : defaultTaxRate,
       quantity: Number(it.quantity || 1),
       unitPrice: Number(it.unit_price_eur || it.price || 0),
       lineTotal: Number(
         it.total_price ||
-          it.lineTotal ||
-          Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
+        it.lineTotal ||
+        Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
       ),
     }));
 
@@ -842,12 +849,13 @@ export const downloadRechnungPdf = async (
       shippingMethod: rechnung.shipping_method,
       shippingCost: Number(rechnung.shipping_cost || 0),
       shippingQuantity: Number(rechnung.shipping_quantity || 1),
+      shippingTaxRate: defaultTaxRate,
       discountPercentage: Number(rechnung.discount_percentage || 0),
       discountAmount: Number(rechnung.discount_amount || 0),
       subtotal: Number(rechnung.subtotal || 0),
       taxAmount: Number(rechnung.tax_amount || 0),
       totalAmount: Number(rechnung.total_amount || 0),
-      taxRate: Number(rechnung.tax_rate || 19),
+      taxRate: defaultTaxRate,
       currency: rechnung.currency || "EUR",
       notes: rechnung.notes,
       deliveryTime: rechnung.date_delivery,
