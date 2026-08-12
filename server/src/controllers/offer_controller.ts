@@ -3705,6 +3705,7 @@ export class OfferController {
       }
 
       let shipLinesToRender: string[] = [];
+      let shipCoreKey = "";
 
       const offerDelivery = offer.deliveryAddress || offer.shippingAddress;
       if (offerDelivery) {
@@ -3712,38 +3713,42 @@ export class OfferController {
           shipLinesToRender = [primaryName, offerDelivery.trim()].filter(
             Boolean,
           );
+          shipCoreKey = offerDelivery.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
         } else if (typeof offerDelivery === "object") {
-          const sAddLine =
-            offerDelivery.additionalInfo ||
-            offerDelivery.address_additional_line ||
-            offerDelivery.addressLine2 ||
-            offerDelivery.additionalLine ||
-            "";
-          shipLinesToRender = formatAddressBlockLines(
-            offerDelivery.companyName || offerDelivery.name || primaryName,
-            sAddLine,
-            offerDelivery.street || offerDelivery.addressLine1 || "",
-            offerDelivery.postal_code || offerDelivery.postalCode || "",
-            offerDelivery.city || "",
-            offerDelivery.country ||
-            customer.country ||
-            customerEntity?.country,
-          );
+          const sStreet = (offerDelivery.street || offerDelivery.addressLine1 || "").trim();
+          const sPostal = (offerDelivery.postal_code || offerDelivery.postalCode || "").trim();
+          const sCity = (offerDelivery.city || "").trim();
+          const sCountry = (offerDelivery.country || customer.country || customerEntity?.country || "");
+
+          shipCoreKey = `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
+            .toLowerCase()
+            .replace(/[^a-z0-9]/gi, "");
+
+          if (sStreet || sCity || sPostal) {
+            const sAddLine =
+              offerDelivery.additionalInfo ||
+              offerDelivery.address_additional_line ||
+              offerDelivery.addressLine2 ||
+              offerDelivery.additionalLine ||
+              "";
+            shipLinesToRender = formatAddressBlockLines(
+              offerDelivery.companyName || offerDelivery.name || primaryName,
+              sAddLine,
+              sStreet,
+              sPostal,
+              sCity,
+              sCountry,
+            );
+          }
         }
       }
 
-      const normalizeAddress = (lines: string[]) =>
-        lines
-          .join(" ")
-          .toLowerCase()
-          .replace(/[^a-z0-9]/gi, "")
-          .trim();
-
-      const mainNorm = normalizeAddress(mainAddrLines);
-      const shipNorm = normalizeAddress(shipLinesToRender);
+      const mainCoreKey = `${mainStreetStr}${mainPostalStr}${mainCityStr}${(customer.country || "").trim()}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]/gi, "");
 
       const hasRealDifferentAddress =
-        shipNorm.length > 5 && mainNorm.length > 5 && shipNorm !== mainNorm;
+        shipCoreKey.length > 5 && mainCoreKey.length > 5 && shipCoreKey !== mainCoreKey;
 
       if (hasRealDifferentAddress) {
         const shipTextToRender = shipLinesToRender.join("\n").trim();
