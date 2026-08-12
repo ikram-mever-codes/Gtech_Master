@@ -712,7 +712,7 @@ export const downloadRechnungKPdf = async (
     const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
     const rechnungK = await rechnungKRepo.findOne({
       where: [{ id: String(id) }, { invoice_number: String(id) }],
-      relations: ["items", "customer", "customer.defaultTaxProfile"],
+      relations: ["items", "customer"],
     });
 
     if (!rechnungK) {
@@ -722,14 +722,24 @@ export const downloadRechnungKPdf = async (
       return;
     }
 
-    // Resolve the customer tax profile rate (mirrors UI getLineTaxRate)
-    const customerTaxProfileRate: number =
-      rechnungK.customer?.defaultTaxProfile?.taxRate !== undefined &&
-      rechnungK.customer?.defaultTaxProfile?.taxRate !== null
-        ? Number(rechnungK.customer.defaultTaxProfile.taxRate)
-        : rechnungK.tax_rate !== undefined && rechnungK.tax_rate !== null
-          ? Number(rechnungK.tax_rate)
-          : 19;
+    // Resolve the customer tax profile rate via original_customer_id
+    // (RechnungCustomer is a snapshot entity without taxProfile relation)
+    let customerTaxProfileRate: number = rechnungK.tax_rate !== undefined && rechnungK.tax_rate !== null
+      ? Number(rechnungK.tax_rate)
+      : 19;
+    const origCustIdK = rechnungK.customer?.original_customer_id;
+    if (origCustIdK) {
+      try {
+        const { Customer } = await import("../models/customer");
+        const origCustomer = await AppDataSource.getRepository(Customer).findOne({
+          where: { id: origCustIdK },
+          relations: ["defaultTaxProfile"],
+        });
+        if (origCustomer?.defaultTaxProfile?.taxRate !== undefined && origCustomer.defaultTaxProfile.taxRate !== null) {
+          customerTaxProfileRate = Number(origCustomer.defaultTaxProfile.taxRate);
+        }
+      } catch (_) { /* fallback to stored tax_rate */ }
+    }
 
     const customerSnap = rechnungK.customerSnapshot || rechnungK.customer || {};
     const contactName =
