@@ -302,20 +302,18 @@ export async function generateGtechDocumentPdf(
     const lines: string[] = [];
     if (cName && cName.trim()) lines.push(cName.trim());
 
-    const addLineCleaned =
+    if (
       addLine &&
-        addLine.trim() &&
-        addLine.trim() !== "Additional Info" &&
-        addLine.trim() !== cName.trim()
-        ? addLine.trim()
-        : "\u00a0";
-    lines.push(addLineCleaned);
+      addLine.trim() &&
+      addLine.trim() !== "Additional Info" &&
+      addLine.trim() !== cName.trim()
+    ) {
+      lines.push(addLine.trim());
+    }
 
     if (street && street.trim()) lines.push(street.trim());
     if (cityLineVal) lines.push(cityLineVal);
-    if (!isGer && dispC && dispC.toUpperCase() !== cityLineVal.toUpperCase()) {
-      lines.push(dispC);
-    }
+
     return lines;
   };
 
@@ -356,60 +354,62 @@ export async function generateGtechDocumentPdf(
   }
 
   let shipLinesToRender: string[] = [];
-  let isExplicitOnOffer = false;
+  let shipCoreKey = "";
 
   const offerDelivery = opts.deliveryAddress;
   if (offerDelivery) {
     if (typeof offerDelivery === "string" && offerDelivery.trim()) {
       shipLinesToRender = [primaryName, offerDelivery.trim()].filter(Boolean);
-      isExplicitOnOffer = true;
+      shipCoreKey = offerDelivery.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
     } else if (typeof offerDelivery === "object") {
-      const sAddLine =
-        offerDelivery.additionalInfo ||
-        offerDelivery.addressAdditionalLine ||
-        offerDelivery.addressLine2 ||
-        "";
-      const sContact =
-        offerDelivery.contactName || offerDelivery.name || primaryName;
-      shipLinesToRender = formatAddressBlockLines(
-        sContact,
-        sAddLine,
-        offerDelivery.street || offerDelivery.addressLine1 || "",
-        offerDelivery.postal_code || offerDelivery.postalCode || "",
-        offerDelivery.city || "",
-        offerDelivery.country || customer.country,
-      );
-      if (shipLinesToRender.length > 0) isExplicitOnOffer = true;
+      const sStreet = (offerDelivery.street || offerDelivery.addressLine1 || "").trim();
+      const sPostal = (offerDelivery.postal_code || offerDelivery.postalCode || "").trim();
+      const sCity = (offerDelivery.city || "").trim();
+      const sCountry = offerDelivery.country || customer.country || "";
+
+      shipCoreKey = `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]/gi, "");
+
+      if (sStreet || sCity || sPostal) {
+        const sAddLine =
+          offerDelivery.additionalInfo ||
+          offerDelivery.addressAdditionalLine ||
+          offerDelivery.addressLine2 ||
+          "";
+        const sContact =
+          offerDelivery.contactName || offerDelivery.name || primaryName;
+        shipLinesToRender = formatAddressBlockLines(
+          sContact,
+          sAddLine,
+          sStreet,
+          sPostal,
+          sCity,
+          sCountry,
+        );
+      }
     }
   }
 
-  const shipTextToRender = shipLinesToRender.join("\n").trim();
-  if (shipTextToRender) {
-    const shipNorm = shipLinesToRender
-      .filter((l) => l && l.trim() !== primaryName.trim())
-      .join(" ")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/gi, "")
-      .trim();
-    const mainNorm = `${mainStreetStr} ${mainPostalStr} ${mainCityStr}`
-      .toLowerCase()
-      .replace(/[^a-z0-9]/gi, "")
-      .trim();
+  const mainCoreKey = `${mainStreetStr}${mainPostalStr}${mainCityStr}${(customer.country || "").trim()}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]/gi, "");
 
-    const hasRealDifferentAddress = shipNorm && shipNorm.length > 3 && shipNorm !== mainNorm;
+  const hasRealDifferentAddress =
+    shipCoreKey.length > 5 && mainCoreKey.length > 5 && shipCoreKey !== mainCoreKey;
 
-    if (hasRealDifferentAddress) {
-      addrY += 6;
-      doc
-        .font(SB)
-        .fontSize(8.5)
-        .fillColor("#2D3748")
-        .text("Lieferadresse:", ADDR_X, addrY, { width: MM(80) });
-      addrY += 11;
-      doc.font(R).fontSize(8.5).fillColor("#3F4446");
-      doc.text(shipTextToRender, ADDR_X, addrY, { width: MM(80) });
-      addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
-    }
+  if (hasRealDifferentAddress) {
+    const shipTextToRender = shipLinesToRender.join("\n").trim();
+    addrY += 6;
+    doc
+      .font(SB)
+      .fontSize(8.5)
+      .fillColor("#2D3748")
+      .text("Lieferadresse:", ADDR_X, addrY, { width: MM(80) });
+    addrY += 11;
+    doc.font(R).fontSize(8.5).fillColor("#3F4446");
+    doc.text(shipTextToRender, ADDR_X, addrY, { width: MM(80) });
+    addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
   }
 
   const bannerW = MM(67);

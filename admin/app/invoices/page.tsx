@@ -1525,47 +1525,14 @@ const InvoiceListPage: React.FC = () => {
   );
 
   return (
-    <div
-      className="min-h-screen font-['Poppins']"
-      style={{ backgroundColor: "#F8F9FA", color: "#212529" }}
-    >
-      <div className="w-full mx-auto p-0">
-        {searchParams.get("filter") &&
-          searchParams.get("hide_banner") !== "true" && (
-            <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">
-                  ⚠️ Reports & Control Health Audit View Active:
-                </span>
-                <span className="font-semibold text-gray-800">
-                  {(() => {
-                    switch (searchParams.get("filter")) {
-                      case "unassigned_cargo":
-                        return "Order items unassigned to cargo";
-                      case "rmb_special_no_value":
-                        return "RMB Special SET with no value";
-                      case "eur_special_no_value":
-                        return "EUR Special SET with no value";
-                      case "dimension_special_no_value":
-                        return "Dimension Special SET with no value";
-                      default:
-                        return searchParams.get("filter");
-                    }
-                  })()}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete("filter");
-                  window.location.href = `/invoices?${params.toString()}`;
-                }}
-                className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
-              >
-                Clear Audit Filter
-              </button>
-            </div>
-          )}
+    <div className="w-full mx-auto">
+      <div
+        className="bg-white min-h-[80vh] rounded-lg shadow-sm pb-8 p-6"
+        style={{
+          border: "1px solid #e0e0e0",
+          background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
+        }}
+      >
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <PageHeader
@@ -1725,7 +1692,7 @@ const InvoiceListPage: React.FC = () => {
         </div>
 
         {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
+          <div className="bg-white rounded-md border border-gray-200 p-4 shadow-sm mb-6">
             {activeInvTab === "order_items" && orderNoFilter && (
               <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-100 mb-4 rounded-[4px]">
                 <span className="text-xs text-blue-700 font-medium">

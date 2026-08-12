@@ -1524,49 +1524,24 @@ const OrderPage: React.FC = () => {
   const lockAllExceptQty = isConvertMode;
 
   return (
-    <>
-      <div className="min-h-screen bg-transparent font-poppins">
-        <div className="max-w-full mx-auto">
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <PageHeader
-                  title={activeTabObj?.label || "Orders"}
-                  icon={ShoppingCart}
-                />
-              </div>
-            </div>
+    <div className="w-full mx-auto">
+      <div
+        className="bg-white min-h-[80vh] rounded-lg shadow-sm pb-8 p-6"
+        style={{
+          border: "1px solid #e0e0e0",
+          background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
+        }}
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <PageHeader
+              title="Order Processing"
+              icon={ShoppingCart}
+            />
           </div>
+        </div>
 
-          {searchParams.get("filter") && searchParams.get("hide_banner") !== "true" && (
-            <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>
-                <span className="font-semibold text-gray-800">
-                  {(() => {
-                    switch (searchParams.get("filter")) {
-                      case "unassigned_cargo": return "Orders unassigned to cargo";
-                      case "purchase_problem": return "Orders with purchase problem";
-                      case "check_problem": return "Orders with Check Problem";
-                      default: return searchParams.get("filter");
-                    }
-                  })()}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete("filter");
-                  window.location.href = `/orders?${params.toString()}`;
-                }}
-                className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
-              >
-                Clear Audit Filter
-              </button>
-            </div>
-          )}
-
-          <div className="border-b border-gray-100 mb-6 pb-px">
+        <div className="border-b border-gray-100 mb-6 pb-px">
             <nav className="-mb-px flex space-x-8 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
@@ -2820,7 +2795,6 @@ const OrderPage: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
 
       {showSupplierConfirm && pendingNsoGroup && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
@@ -3481,7 +3455,7 @@ const OrderPage: React.FC = () => {
           </div>
         </CustomModal>
       )}
-    </>
+    </div>
   );
 };
 
