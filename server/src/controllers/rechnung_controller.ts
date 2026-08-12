@@ -778,15 +778,13 @@ export const downloadRechnungPdf = async (
       return;
     }
 
-    // Resolve the customer tax profile rate via original_customer_id
-    // (RechnungCustomer is a snapshot entity without taxProfile relation)
     let customerTaxProfileRate: number = rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
       ? Number(rechnung.tax_rate)
       : 19;
     const origCustId = rechnung.customer?.original_customer_id;
     if (origCustId) {
       try {
-        const { Customer } = await import("../models/customer");
+        const { Customer } = await import("../models/customers");
         const origCustomer = await AppDataSource.getRepository(Customer).findOne({
           where: { id: origCustId },
           relations: ["defaultTaxProfile"],
