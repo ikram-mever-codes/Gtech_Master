@@ -173,8 +173,6 @@ export const getRechnungOpenQuantities = async (
         }
       }
     }
-
-    // Build response with open quantities
     const itemsWithOpenQty = (rechnung.items || []).map((item) => {
       const originalQty = Number(item.quantity) || 0;
       const correctedQty = correctedQuantities[item.id] || 0;
@@ -220,10 +218,6 @@ export const getRechnungOpenQuantities = async (
   }
 };
 
-/**
- * Get the corrected quantity for a specific item across all RKs
- * This calculates how much quantity has already been corrected
- */
 async function getCorrectedQuantityForItem(
   rechnungItemId: string,
   rechnungKIdToExclude?: string,
@@ -822,10 +816,11 @@ export const downloadRechnungKPdf = async (
       ? `RK ${rechnungK.invoice_number || rechnungK.id} ${cleanTitle} ${datePart}.pdf`
       : `RK ${rechnungK.invoice_number || rechnungK.id} ${datePart}.pdf`;
 
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${downloadFileName}"`,
+      `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
     );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

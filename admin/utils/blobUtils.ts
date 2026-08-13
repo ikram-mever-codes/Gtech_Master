@@ -25,6 +25,28 @@ export const downloadBlob = (blob: Blob, filename: string) => {
     link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
-    link.parentNode?.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+        link.parentNode?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }, 60000);
+};
+
+export const getFilenameFromResponse = (
+    response: any,
+    fallbackName: string,
+): string => {
+    const cd =
+        response?.headers?.["content-disposition"] ||
+        response?.headers?.["Content-Disposition"];
+    if (cd) {
+        const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match && utf8Match[1]) {
+            return decodeURIComponent(utf8Match[1].replace(/["']/g, "")).trim();
+        }
+        const match = cd.match(/filename="?([^";]+)"?/i);
+        if (match && match[1]) {
+            return decodeURIComponent(match[1].replace(/["']/g, "")).trim();
+        }
+    }
+    return fallbackName;
 };

@@ -1,6 +1,7 @@
 import { api, handleApiError } from "@/utils/api";
 import { toast } from "react-hot-toast";
 import { loadingStyles } from "@/utils/constants";
+import { downloadBlob, getFilenameFromResponse } from "@/utils/blobUtils";
 
 export const getAllLieferscheine = async () => {
   try {
@@ -76,12 +77,12 @@ export const downloadLieferscheinPdf = async (
     });
     const blob = new Blob([response.data], { type: "application/pdf" });
     if (blob.size === 0) throw new Error("The downloaded PDF is empty.");
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-      toast.dismiss();
-    }, 1000);
+    const filename = getFilenameFromResponse(
+      response,
+      `Lieferschein ${deliveryNoteNo || id}.pdf`,
+    );
+    downloadBlob(blob, filename);
+    toast.dismiss();
     return true;
   } catch (error) {
     toast.dismiss();

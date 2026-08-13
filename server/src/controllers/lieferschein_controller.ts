@@ -414,10 +414,11 @@ export const downloadLieferscheinPdf = async (
       ? `Lieferschein ${lieferschein.delivery_note_number || lieferschein.id} ${cleanTitle} ${datePart}.pdf`
       : `Lieferschein ${lieferschein.delivery_note_number || lieferschein.id} ${datePart}.pdf`;
 
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${downloadFileName}"`,
+      `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
     );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

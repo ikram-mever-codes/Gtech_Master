@@ -1474,10 +1474,11 @@ export const downloadCustomerOrderPdf = async (
       ? `Auftrag ${order.order_no || order.id} ${cleanTitle} ${datePart}.pdf`
       : `Auftrag ${order.order_no || order.id} ${datePart}.pdf`;
 
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${downloadFileName}"`,
+      `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
     );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

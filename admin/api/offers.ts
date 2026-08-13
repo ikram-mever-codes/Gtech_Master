@@ -1,6 +1,7 @@
 import { api, handleApiError } from "@/utils/api";
 import { toast } from "react-hot-toast";
 import { loadingStyles, successStyles } from "@/utils/constants";
+import { downloadBlob, getFilenameFromResponse } from "@/utils/blobUtils";
 
 export type PricingMode = "classic" | "matrix";
 
@@ -490,13 +491,12 @@ export const downloadOfferPdf = async (id: string, offerNumber?: string) => {
     if (blob.size === 0) {
       throw new Error("The downloaded PDF is empty.");
     }
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-      toast.dismiss();
-    }, 1000);
-
+    const filename = getFilenameFromResponse(
+      response,
+      `Angebot ${offer.offerNumber || offerNumber || id}.pdf`,
+    );
+    downloadBlob(blob, filename);
+    toast.dismiss();
     return true;
   } catch (error) {
     toast.dismiss();

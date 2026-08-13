@@ -784,7 +784,7 @@ export const downloadRechnungPdf = async (
 
     const defaultTaxRate =
       rechnung.tax_profile_case === "EU_IGL" ||
-      rechnung.tax_profile_case === "third_country"
+        rechnung.tax_profile_case === "third_country"
         ? 0
         : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
           ? Number(rechnung.tax_rate)
@@ -889,10 +889,11 @@ export const downloadRechnungPdf = async (
       ? `Rechnung ${rechnung.invoice_number || rechnung.id} ${cleanTitle} ${datePart}.pdf`
       : `Rechnung ${rechnung.invoice_number || rechnung.id} ${datePart}.pdf`;
 
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${downloadFileName}"`,
+      `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
     );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

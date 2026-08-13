@@ -4462,10 +4462,11 @@ export class OfferController {
         ? `Angebot ${offer.offerNumber || "offer"} ${cleanTitle} ${datePart}.pdf`
         : `Angebot ${offer.offerNumber || "offer"} ${datePart}.pdf`;
 
+      response.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
-        `attachment; filename="${downloadFileName}"`,
+        `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
       );
 
       const fileStream = fs.createReadStream(pdfPath);
