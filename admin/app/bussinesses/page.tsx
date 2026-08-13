@@ -539,6 +539,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
     taxProfiles,
   ]);
 
+  const availableCountries = useMemo(() => {
+    const fromDb = (dbCountries || [])
+      .filter((c: any) => c.is_active !== false)
+      .map((c: any) => (c.iso2 || c.name || "").trim().toUpperCase())
+      .filter(Boolean);
+    const fromBiz = (allBusinesses || [])
+      .map((b: any) => toCountryCode(b.country).toUpperCase())
+      .filter(Boolean);
+    const set = new Set<string>([...fromDb, ...fromBiz]);
+    return Array.from(set).sort();
+  }, [dbCountries, allBusinesses]);
 
   const filteredBusinesses = useMemo(() => {
     const cn = clientFilters.companyName.trim().toLowerCase();
@@ -1344,15 +1355,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 <option value="" className="text-gray-400">
                   Country...
                 </option>
-                <option value="DE" className="text-gray-900 font-normal">
-                  DE
-                </option>
-                <option value="AT" className="text-gray-900 font-normal">
-                  AT
-                </option>
-                <option value="CH" className="text-gray-900 font-normal">
-                  CH
-                </option>
+                {availableCountries.map((code: string) => (
+                  <option
+                    key={code}
+                    value={code}
+                    className="text-gray-900 font-normal"
+                  >
+                    {code}
+                  </option>
+                ))}
               </select>
             </div>
 
