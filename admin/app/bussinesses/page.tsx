@@ -1552,19 +1552,14 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   href={business.asanaLink}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                  className="inline-block transition-transform hover:scale-110 p-0.5"
                                   title="Open Asana task"
                                 >
-                                  <svg
-                                    className="h-5 w-5"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                  >
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                    <circle cx="12" cy="8.5" r="1.5" />
-                                    <circle cx="8.5" cy="14.5" r="1.5" />
-                                    <circle cx="15.5" cy="14.5" r="1.5" />
-                                  </svg>
+                                  <img
+                                    src="/asana.svg"
+                                    alt="Asana"
+                                    className="w-4 h-4 object-contain"
+                                  />
                                 </a>
                               )}
                             </div>

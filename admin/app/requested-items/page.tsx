@@ -737,10 +737,14 @@ const RequestedItemsPage: React.FC = () => {
                               onClick={(e) =>
                                 handleAsanaLinkClick(item.asanaLink!, e)
                               }
-                              className="text-purple-500 hover:text-purple-700 transition-colors"
+                              className="inline-block transition-transform hover:scale-110 p-0.5"
                               title="Open Asana link"
                             >
-                              <LinkIcon className="h-5 w-5" />
+                              <img
+                                src="/asana.svg"
+                                alt="Asana"
+                                className="w-4 h-4 object-contain"
+                              />
                             </button>
                           )}
                         </div>
