@@ -402,10 +402,22 @@ export const downloadLieferscheinPdf = async (
       outputFilePath: filePath,
     });
 
+    const datePart = (() => {
+      const d = (lieferschein.date_created || lieferschein.created_at) ? new Date(lieferschein.date_created || lieferschein.created_at) : new Date();
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yy}${mm}${dd}`;
+    })();
+    const cleanTitle = ((lieferschein as any)?.title || (rechnung as any)?.title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+    const downloadFileName = cleanTitle
+      ? `Lieferschein ${lieferschein.delivery_note_number || lieferschein.id} ${cleanTitle} ${datePart}.pdf`
+      : `Lieferschein ${lieferschein.delivery_note_number || lieferschein.id} ${datePart}.pdf`;
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=lieferschein_${lieferschein.delivery_note_number}.pdf`,
+      `attachment; filename="${downloadFileName}"`,
     );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

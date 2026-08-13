@@ -877,10 +877,22 @@ export const downloadRechnungPdf = async (
       outputFilePath: filePath,
     });
 
+    const datePart = (() => {
+      const d = (rechnung.date_created || rechnung.created_at) ? new Date(rechnung.date_created || rechnung.created_at) : new Date();
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yy}${mm}${dd}`;
+    })();
+    const cleanTitle = ((rechnung as any).title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+    const downloadFileName = cleanTitle
+      ? `Rechnung ${rechnung.invoice_number || rechnung.id} ${cleanTitle} ${datePart}.pdf`
+      : `Rechnung ${rechnung.invoice_number || rechnung.id} ${datePart}.pdf`;
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=rechnung_${rechnung.invoice_number}.pdf`,
+      `attachment; filename="${downloadFileName}"`,
     );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

@@ -154,7 +154,6 @@ export const getRechnungOpenQuantities = async (
       return;
     }
 
-    // Get all correction invoices (RK) for this Rechnung
     const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
     const allRKs = await rechnungKRepo.find({
       where: { original_rechnung_id: rechnungId },
@@ -585,7 +584,6 @@ export const updateRechnungKItem = async (
       return;
     }
 
-    // Validate quantity doesn't exceed open quantity for this item
     if (quantity !== undefined) {
       const parsedQty = Number(quantity);
       if (isNaN(parsedQty) || parsedQty <= 0) {
@@ -596,9 +594,7 @@ export const updateRechnungKItem = async (
         return;
       }
 
-      // Check if this is a correction item with source reference
       if (item.sourceLineItemId) {
-        // Get all RKs for this original Rechnung
         const allRKs = await rechnungKRepo.find({
           where: { original_rechnung_id: rechnungK.original_rechnung_id },
           relations: ["items"],
@@ -614,7 +610,6 @@ export const updateRechnungKItem = async (
           }
         }
 
-        // Get original quantity from the source item
         const rechnungRepo = AppDataSource.getRepository(Rechnung);
         const originalRechnung = await rechnungRepo.findOne({
           where: { id: rechnungK.original_rechnung_id },
@@ -627,7 +622,6 @@ export const updateRechnungKItem = async (
         const originalQty = Number(originalItem?.quantity) || 0;
         const openQty = Math.max(0, originalQty - totalCorrectedQty);
 
-        // Add back the current item's quantity if it's being updated
         const currentQty = Number(item.quantity) || 0;
         const availableQty = openQty + currentQty;
 
@@ -816,10 +810,22 @@ export const downloadRechnungKPdf = async (
       outputFilePath: filePath,
     });
 
+    const datePart = (() => {
+      const d = (rechnungK.date_created || rechnungK.created_at) ? new Date(rechnungK.date_created || rechnungK.created_at) : new Date();
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yy}${mm}${dd}`;
+    })();
+    const cleanTitle = ((rechnungK as any).title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+    const downloadFileName = cleanTitle
+      ? `RK ${rechnungK.invoice_number || rechnungK.id} ${cleanTitle} ${datePart}.pdf`
+      : `RK ${rechnungK.invoice_number || rechnungK.id} ${datePart}.pdf`;
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=rk_${rechnungK.invoice_number}.pdf`,
+      `attachment; filename="${downloadFileName}"`,
     );
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

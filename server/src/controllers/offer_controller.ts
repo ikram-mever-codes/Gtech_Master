@@ -4450,10 +4450,22 @@ export class OfferController {
         console.warn("Database update failed but PDF was created:", dbError);
       }
 
+      const datePart = (() => {
+        const d = offer.createdAt ? new Date(offer.createdAt) : new Date();
+        const yy = String(d.getFullYear()).slice(-2);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yy}${mm}${dd}`;
+      })();
+      const cleanTitle = (offer.title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+      const downloadFileName = cleanTitle
+        ? `Angebot ${offer.offerNumber || "offer"} ${cleanTitle} ${datePart}.pdf`
+        : `Angebot ${offer.offerNumber || "offer"} ${datePart}.pdf`;
+
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
-        `attachment; filename="${pdfFileName}"`,
+        `attachment; filename="${downloadFileName}"`,
       );
 
       const fileStream = fs.createReadStream(pdfPath);

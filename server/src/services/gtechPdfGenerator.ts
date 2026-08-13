@@ -624,7 +624,7 @@ export async function generateGtechDocumentPdf(
           (rowIndex + 1).toString(),
           artNrStr,
           itemNameStr,
-          `${formatGermanNum(item.vatRate ?? opts.taxRate ?? 19, 2)}%`,
+          `${formatGermanNum(item.vatRate ?? opts.taxRate ?? 0, 2)}%`,
           String(item.quantity ?? 1),
           formatGermanNum(item.unitPrice, 3),
           formatGermanNum(item.lineTotal ?? (item.quantity * (item.unitPrice || 0)), 2),
@@ -818,7 +818,7 @@ export async function generateGtechDocumentPdf(
             ? Number(it.vatRate)
             : opts.taxRate !== undefined && opts.taxRate !== null
               ? Number(opts.taxRate)
-              : 19;
+              : 0;
         if (!vatMap.has(rate)) {
           rateOrder.push(rate);
         }
@@ -831,7 +831,7 @@ export async function generateGtechDocumentPdf(
       });
 
       if (Number(opts.shippingCost || 0) > 0) {
-        const shipRate = opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 19;
+        const shipRate = opts.shippingTaxRate !== undefined && opts.shippingTaxRate !== null ? Number(opts.shippingTaxRate) : opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 0;
         if (!vatMap.has(shipRate)) {
           rateOrder.push(shipRate);
         }
