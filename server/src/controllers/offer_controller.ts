@@ -4005,8 +4005,8 @@ export class OfferController {
           .filter((item: any) => !item.isComponent)
           .slice()
           .sort((a: any, b: any) => {
-            const orderA = a.sortOrder ?? a.position ?? a.index ?? 0;
-            const orderB = b.sortOrder ?? b.position ?? b.index ?? 0;
+            const orderA = (a.position !== undefined && a.position !== null && a.position !== 0) ? Number(a.position) : (Number(a.sortOrder) || Number(a.index) || 0);
+            const orderB = (b.position !== undefined && b.position !== null && b.position !== 0) ? Number(b.position) : (Number(b.sortOrder) || Number(b.index) || 0);
             return orderA - orderB;
           });
 
@@ -4319,7 +4319,7 @@ export class OfferController {
         positiveVatEntries.length > 0
           ? positiveVatEntries
           : vatEntries.length > 0
-            ? [vatEntries[0]]
+            ? vatEntries
             : [{ rate: Number(offer.taxRate || 0), amount: 0 }];
 
       let calcVatTotal = 0;

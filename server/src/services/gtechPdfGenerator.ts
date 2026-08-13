@@ -555,8 +555,11 @@ export async function generateGtechDocumentPdf(
   let currentY = tableY + headerHeight;
 
   if (opts.lineItems && opts.lineItems.length > 0) {
-    for (let rowIndex = 0; rowIndex < opts.lineItems.length; rowIndex++) {
-      const item = opts.lineItems[rowIndex];
+    const sortedLineItems = opts.lineItems
+      .slice()
+      .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+    for (let rowIndex = 0; rowIndex < sortedLineItems.length; rowIndex++) {
+      const item = sortedLineItems[rowIndex];
       const isFreizeile = item.isFreizeile || (!item.artNr && item.bezeichnung);
       const itemNameStr = cleanPdfText(item.bezeichnung) || (isFreizeile ? "Freizeile" : "Item");
       const artNrStr = cleanPdfText(item.artNr) || "—";
@@ -819,7 +822,10 @@ export async function generateGtechDocumentPdf(
         if (!vatMap.has(rate)) {
           rateOrder.push(rate);
         }
-        const lineNet = Number(it.lineTotal || (it.quantity * (it.unitPrice || 0)));
+        const lineNet =
+          it.lineTotal !== undefined && it.lineTotal !== null
+            ? Number(it.lineTotal)
+            : (Number(it.quantity ?? 1) * Number(it.unitPrice || 0));
         const vatAmt = lineNet * (rate / 100);
         vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
       });
@@ -848,7 +854,7 @@ export async function generateGtechDocumentPdf(
       positiveVatEntries.length > 0
         ? positiveVatEntries
         : vatEntries.length > 0
-          ? [vatEntries[0]]
+          ? vatEntries
           : [{ rate: Number(opts.taxRate || 0), amount: 0 }];
 
     let calcVatTotal = 0;

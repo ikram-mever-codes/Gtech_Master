@@ -749,23 +749,33 @@ export const downloadRechnungKPdf = async (
       `rk_${rechnungK.invoice_number || rechnungK.id}.pdf`,
     );
 
-    const items = (rechnungK.items || []).map((it: any, idx: number) => ({
-      position: it.position || idx + 1,
-      artNr: it.itemNo || it.material || "—",
-      bezeichnung: it.item_name || it.description || "Item",
-      remarks: it.remark || it.notes || it.specification || it.remark_ex || "-",
-      vatRate:
-        it.taxRate !== undefined && it.taxRate !== null
-          ? Number(it.taxRate)
-          : defaultTaxRate,
-      quantity: Number(it.quantity || 1),
-      unitPrice: Number(it.unit_price_eur || it.price || 0),
-      lineTotal: Number(
-        it.total_price ||
-        it.lineTotal ||
-        Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0),
-      ),
-    }));
+    const rawItems = (rechnungK.items || [])
+      .slice()
+      .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+
+    const items = rawItems.map((it: any, idx: number) => {
+      const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
+      const unitPrice = Number(it.unit_price_eur || it.price || 0);
+      const lineTotal =
+        it.total_price !== undefined && it.total_price !== null
+          ? Number(it.total_price)
+          : it.lineTotal !== undefined && it.lineTotal !== null
+            ? Number(it.lineTotal)
+            : qty * unitPrice;
+      return {
+        position: it.position || idx + 1,
+        artNr: it.itemNo || it.material || "—",
+        bezeichnung: it.item_name || it.description || "Item",
+        remarks: it.remark || it.notes || it.specification || it.remark_ex || "-",
+        vatRate:
+          it.taxRate !== undefined && it.taxRate !== null
+            ? Number(it.taxRate)
+            : defaultTaxRate,
+        quantity: qty,
+        unitPrice: unitPrice,
+        lineTotal: lineTotal,
+      };
+    });
 
     await generateGtechDocumentPdf({
       documentType: "RK" as any,

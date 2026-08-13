@@ -349,12 +349,16 @@ export const downloadLieferscheinPdf = async (
       `ls_${lieferschein.delivery_note_number || lieferschein.id}.pdf`,
     );
 
-    const items = (rechnung?.items || []).map((it: any, idx: number) => ({
+    const rawItems = (rechnung?.items || [])
+      .slice()
+      .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+
+    const items = rawItems.map((it: any, idx: number) => ({
       position: it.position || idx + 1,
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
-      remarks: it.remark || it.notes || "-",
-      quantity: Number(it.quantity || 1),
+      remarks: it.remark || it.notes || it.specification || it.remark_ex || "-",
+      quantity: it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1,
     }));
 
     const formatDateStr = (dateVal: any): string => {
