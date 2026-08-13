@@ -4125,8 +4125,8 @@ export class OfferController {
             itemNameStr,
             `${formatGermanNum(itemTaxRate, 2)}%`,
             qtyStr,
-            formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3),
-            formatNumber(netTotalNum, 2),
+            formatGermanNum(unitPriceNum, offer.unitPriceDecimalPlaces || 3),
+            formatGermanNum(netTotalNum, 2),
           ];
 
           currentX = LEFT_X;
@@ -4212,8 +4212,8 @@ export class OfferController {
           shippingMethod,
           `${formatGermanNum(shippingTaxRateNum, 2)}%`,
           String(shippingQtyNum),
-          formatNumber(shippingCostNum, offer.unitPriceDecimalPlaces || 3),
-          formatNumber(shippingTotal, 2),
+          formatGermanNum(shippingCostNum, offer.unitPriceDecimalPlaces || 3),
+          formatGermanNum(shippingTotal, 2),
         ];
 
         let shipX = LEFT_X;

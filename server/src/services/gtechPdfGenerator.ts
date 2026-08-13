@@ -624,7 +624,7 @@ export async function generateGtechDocumentPdf(
           (rowIndex + 1).toString(),
           artNrStr,
           itemNameStr,
-          `${item.vatRate ?? opts.taxRate ?? 19}%`,
+          `${formatGermanNum(item.vatRate ?? opts.taxRate ?? 19, 2)}%`,
           String(item.quantity ?? 1),
           formatGermanNum(item.unitPrice, 3),
           formatGermanNum(item.lineTotal ?? (item.quantity * (item.unitPrice || 0)), 2),
