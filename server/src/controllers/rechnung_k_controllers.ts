@@ -753,7 +753,7 @@ export const downloadRechnungKPdf = async (
       position: it.position || idx + 1,
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
-      remarks: it.remark || it.notes || "-",
+      remarks: it.remark || it.notes || it.specification || it.remark_ex || "-",
       vatRate:
         it.taxRate !== undefined && it.taxRate !== null
           ? Number(it.taxRate)

@@ -114,6 +114,15 @@ function cleanPdfText(text?: string | null): string {
 
 function formatDate(dateVal: any): string {
   if (!dateVal) return "—";
+  if (typeof dateVal === "string") {
+    const parts = dateVal.trim().split(".");
+    if (parts.length === 3 && parts[2].length === 4) {
+      const day = parts[0].padStart(2, "0");
+      const month = parts[1].padStart(2, "0");
+      const year = parts[2];
+      return `${day}.${month}.${year}`;
+    }
+  }
   const d = new Date(dateVal);
   if (isNaN(d.getTime())) return String(dateVal);
   const day = String(d.getDate()).padStart(2, "0");
@@ -486,7 +495,10 @@ export async function generateGtechDocumentPdf(
   opts.metadataItems.forEach(([label, value]) => {
     if (!label && !value) return;
     const lblStr = String(label || "");
-    const valStr = String(value || "");
+    const valStr =
+      lblStr === "Datum" || lblStr === "Lieferdatum" || lblStr === "Date"
+        ? formatDate(value)
+        : String(value || "");
     const hLbl = doc.font(R).fontSize(8.5).heightOfString(lblStr, { width: LABEL_W });
     const hVal = doc.font(M).fontSize(8.5).heightOfString(valStr, { width: VALUE_W });
     const rowH = Math.max(11, hLbl, hVal);
@@ -552,17 +564,17 @@ export async function generateGtechDocumentPdf(
       const hasRemark = !!(rawRemarks && rawRemarks !== "-");
 
       const bezWidth = columns[2].width - 4;
-      const remarkWidth = showPrices ? (columns[2].width + columns[3].width - 4) : bezWidth;
-      const halfRowGap = 4;
+      const remarkWidth = columns[2].width + (columns[3] ? columns[3].width : 0) - 4;
+      const halfRowGap = 3;
 
       doc.font(R).fontSize(8.5);
       const nameHeight = doc.heightOfString(itemNameStr, { width: bezWidth, lineGap: 2 });
       const remarkHeight = hasRemark
-        ? doc.heightOfString(rawRemarks, { width: remarkWidth, lineGap: 2 }) + halfRowGap + 3
+        ? doc.heightOfString(rawRemarks, { width: remarkWidth, lineGap: 2 }) + halfRowGap
         : 0;
-      const computedRowHeight = Math.max(26, nameHeight + remarkHeight + 12);
+      const computedRowHeight = Math.max(22, nameHeight + (hasRemark ? (halfRowGap + remarkHeight) : 0) + 8);
 
-      if (currentY + computedRowHeight > MM(265)) {
+      if (currentY + computedRowHeight > MM(270)) {
         doc
           .moveTo(LEFT_X, currentY)
           .lineTo(LEFT_X + tableWidth, currentY)
@@ -572,8 +584,9 @@ export async function generateGtechDocumentPdf(
 
         doc.addPage();
         await drawCustomerSvgBackground(doc);
+        doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
 
-        const newTableY = MM(30);
+        const newTableY = MM(25);
         doc.rect(LEFT_X, newTableY, tableWidth, headerHeight).fill("#ECEAE6");
         doc.font(SB).fontSize(8.5).fillColor("#1A202C");
         let tempX = LEFT_X;
@@ -685,10 +698,11 @@ export async function generateGtechDocumentPdf(
     const shipTextHeight = doc.font(R).fontSize(8.5).heightOfString(shippingMethod, { width: columns[2].width - 4 });
     const shipRowH = Math.max(22, shipTextHeight + 10);
 
-    if (currentY + shipRowH > MM(265)) {
+    if (currentY + shipRowH > MM(270)) {
       doc.addPage();
       await drawCustomerSvgBackground(doc);
-      currentY = MM(30);
+      doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+      currentY = MM(25);
     }
 
     doc.rect(LEFT_X, currentY, tableWidth, shipRowH).fill(shipRowBg);
@@ -737,13 +751,14 @@ export async function generateGtechDocumentPdf(
     .strokeColor("#CBD5E0")
     .stroke();
 
-  yPos = currentY + 15;
+  yPos = currentY + 12;
 
   if (showPrices) {
-    if (yPos + 120 > MM(265)) {
+    if (yPos + 80 > MM(272)) {
       doc.addPage();
       await drawCustomerSvgBackground(doc);
-      yPos = MM(30);
+      doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+      yPos = MM(25);
     }
 
     const TOTALS_RIGHT_PAD = 6;
@@ -826,38 +841,29 @@ export async function generateGtechDocumentPdf(
       }
     }
 
+    const positiveVatEntries = vatEntries.filter(
+      (e) => Number(e.amount.toFixed(2)) > 0,
+    );
+    const entriesToDisplay =
+      positiveVatEntries.length > 0
+        ? positiveVatEntries
+        : vatEntries.length > 0
+          ? [vatEntries[0]]
+          : [{ rate: Number(opts.taxRate || 0), amount: 0 }];
+
     let calcVatTotal = 0;
-    if (vatEntries.length > 0) {
-      for (const entry of vatEntries) {
-        calcVatTotal += entry.amount;
-        yPos += 16;
-        doc
-          .font(R)
-          .text(
-            `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
-            TOTALS_LABEL_X,
-            yPos,
-          );
-        doc.font(R).text(
-          `${formatGermanNum(entry.amount, 2)} ${currency}`,
-          TOTALS_VAL_X - TOTALS_RIGHT_PAD,
-          yPos,
-          { align: "right", width: TOTALS_VAL_W },
-        );
-      }
-    } else {
-      const taxRatePercent = opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 0;
-      calcVatTotal = Number(opts.taxAmount || 0);
+    for (const entry of entriesToDisplay) {
+      calcVatTotal += entry.amount;
       yPos += 16;
       doc
         .font(R)
         .text(
-          `MwSt. ${formatGermanNum(taxRatePercent, 2)}%`,
+          `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
           TOTALS_LABEL_X,
           yPos,
         );
       doc.font(R).text(
-        `${formatGermanNum(opts.taxAmount, 2)} ${currency}`,
+        `${formatGermanNum(entry.amount, 2)} ${currency}`,
         TOTALS_VAL_X - TOTALS_RIGHT_PAD,
         yPos,
         { align: "right", width: TOTALS_VAL_W },
@@ -894,10 +900,11 @@ export async function generateGtechDocumentPdf(
       }) + 5;
   }
 
-  if (yPos + notesHeight > MM(265)) {
+  if (yPos + notesHeight > MM(272)) {
     doc.addPage();
     await drawCustomerSvgBackground(doc);
-    yPos = MM(30);
+    doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+    yPos = MM(25);
   }
 
   doc.font(R).fontSize(9).fillColor("#3F4446");

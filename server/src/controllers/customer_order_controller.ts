@@ -1371,11 +1371,11 @@ export const downloadCustomerOrderPdf = async (
     }
 
     const defaultTaxRate =
-      order.customer?.defaultTaxProfile?.tax_rate !== undefined &&
-      order.customer?.defaultTaxProfile?.tax_rate !== null
-        ? Number(order.customer.defaultTaxProfile.tax_rate)
-        : order.tax_rate !== undefined && order.tax_rate !== null
-          ? Number(order.tax_rate)
+      order.tax_rate !== undefined && order.tax_rate !== null
+        ? Number(order.tax_rate)
+        : order.customer?.defaultTaxProfile?.tax_rate !== undefined &&
+          order.customer?.defaultTaxProfile?.tax_rate !== null
+          ? Number(order.customer.defaultTaxProfile.tax_rate)
           : 19;
 
     const customerSnap = order.customerSnapshot || order.customer || {};
@@ -1406,7 +1406,7 @@ export const downloadCustomerOrderPdf = async (
       position: it.position || idx + 1,
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.itemName || it.description || "Item",
-      remarks: it.notes || it.specification || "-",
+      remarks: it.notes || it.specification || it.remark || it.remark_ex || "-",
       vatRate:
         it.taxRate !== undefined && it.taxRate !== null
           ? Number(it.taxRate)

@@ -3462,10 +3462,14 @@ export class OfferController {
 
       let customerEntity: any = null;
       let customerTaxProfile: any = null;
-      if (offer.customerId) {
+      const targetCustId =
+        offer.customerId ||
+        offer.inquiry?.customer?.id ||
+        (offer.customerSnapshot as any)?.id;
+      if (targetCustId) {
         try {
           customerEntity = await AppDataSource.getRepository(Customer).findOne({
-            where: { id: offer.customerId },
+            where: { id: targetCustId },
             relations: ["shippingAddresses", "defaultTaxProfile"],
           });
           if (customerEntity?.defaultTaxProfile) {
@@ -3482,11 +3486,23 @@ export class OfferController {
       };
 
       const formatDate = (dateValue: any): string => {
-        if (!dateValue) return "N/A";
+        if (!dateValue) return "—";
+        if (typeof dateValue === "string") {
+          const parts = dateValue.trim().split(".");
+          if (parts.length === 3 && parts[2].length === 4) {
+            const day = parts[0].padStart(2, "0");
+            const month = parts[1].padStart(2, "0");
+            const year = parts[2];
+            return `${day}.${month}.${year}`;
+          }
+        }
         const date =
           typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-        if (!(date instanceof Date) || isNaN(date.getTime())) return "N/A";
-        return date.toLocaleDateString("de-DE");
+        if (!(date instanceof Date) || isNaN(date.getTime())) return "—";
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        return `${day}.${month}.${year}`;
       };
 
       const formatNumber = (numValue: any, decimals: number = 2): string => {
@@ -3508,7 +3524,6 @@ export class OfferController {
         return qty * getSafeNumber(item.basePrice);
       };
 
-      // Live customer tax profile rate takes precedence over stored offer.taxRate default
       const resolvedDefaultTaxRate: number =
         customerTaxProfile?.taxRate !== undefined && customerTaxProfile?.taxRate !== null
           ? getSafeNumber(customerTaxProfile.taxRate)
@@ -4026,22 +4041,35 @@ export class OfferController {
           const artNrStr = isFreizeile
             ? cleanPdfText(item.material) || "—"
             : cleanPdfText(item.material) || item.id?.substring(0, 8) || "—";
-          const rawRemarks = cleanPdfText(item.remarks);
-          const fullBezText =
-            rawRemarks && rawRemarks !== "-"
-              ? `${itemNameStr}\n${rawRemarks}`
-              : itemNameStr;
+          const rawRemarks = cleanPdfText(
+            item.notes ||
+            item.remarks ||
+            item.specification ||
+            item.remark_ex ||
+            item.remark ||
+            ""
+          );
+          const hasRemark = !!(rawRemarks && rawRemarks !== "-" && rawRemarks !== "—");
 
           const bezWidth = columns[2].width - 4;
+          const remarkWidth = columns[2].width + columns[3].width - 4;
+          const halfRowGap = 3;
 
           doc.font(R).fontSize(8.5);
-          const textHeight = doc.heightOfString(fullBezText, {
+          const nameHeight = doc.heightOfString(itemNameStr, {
             width: bezWidth,
+            lineGap: 2,
           });
+          const remarkHeight = hasRemark
+            ? doc.font(R).fontSize(8).heightOfString(rawRemarks, {
+              width: remarkWidth,
+              lineGap: 2,
+            }) + halfRowGap
+            : 0;
 
-          const computedRowHeight = Math.max(26, textHeight + 10);
+          const computedRowHeight = Math.max(22, nameHeight + (hasRemark ? (halfRowGap + remarkHeight) : 0) + 8);
 
-          if (currentY + computedRowHeight > MM(265)) {
+          if (currentY + computedRowHeight > MM(270)) {
             doc
               .moveTo(LEFT_X, currentY)
               .lineTo(LEFT_X + tableWidth, currentY)
@@ -4051,8 +4079,9 @@ export class OfferController {
 
             doc.addPage();
             drawCustomerSvgBackground(doc);
+            doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
 
-            const newTableY = MM(30);
+            const newTableY = MM(25);
             doc
               .rect(LEFT_X, newTableY, tableWidth, headerHeight)
               .fill("#ECEAE6");
@@ -4093,7 +4122,7 @@ export class OfferController {
           const rowData = [
             (rowIndex + 1).toString(),
             artNrStr,
-            fullBezText,
+            itemNameStr,
             `${formatGermanNum(itemTaxRate, 2)}%`,
             qtyStr,
             formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3),
@@ -4104,11 +4133,35 @@ export class OfferController {
           rowData.forEach((data, colIndex) => {
             doc.font(R).fontSize(8.5).fillColor("#2D3748");
             const col = columns[colIndex];
-            doc.text(data, currentX + 2, currentY + 5, {
-              width: col.width - 4,
-              align: col.align as any,
-              lineBreak: true,
-            });
+            if (colIndex === 2) {
+              doc.text(data, currentX + 2, currentY + 5, {
+                width: bezWidth,
+                align: "left",
+                lineBreak: true,
+                lineGap: 2,
+              });
+              if (hasRemark) {
+                doc.font(R).fontSize(8).fillColor("#4A5568");
+                doc.text(
+                  rawRemarks,
+                  currentX + 2,
+                  currentY + 5 + nameHeight + halfRowGap,
+                  {
+                    width: remarkWidth,
+                    align: "left",
+                    lineBreak: true,
+                    lineGap: 2,
+                  },
+                );
+              }
+            } else {
+              doc.text(data, currentX + 2, currentY + 5, {
+                width: col.width - 4,
+                align: col.align as any,
+                lineBreak: true,
+                lineGap: 2,
+              });
+            }
             currentX += col.width;
           });
 
@@ -4141,19 +4194,18 @@ export class OfferController {
         const shipRowNum = totalItemCount + 1;
         const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
 
-        // Calculate row height
         const shipTextHeight = doc.font(R).fontSize(8.5).heightOfString(shippingMethod, { width: columns[2].width - 4 });
         const shipRowH = Math.max(22, shipTextHeight + 10);
 
-        if (currentY + shipRowH > MM(265)) {
+        if (currentY + shipRowH > MM(270)) {
           doc.addPage();
           drawCustomerSvgBackground(doc);
-          currentY = MM(30);
+          doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+          currentY = MM(25);
         }
 
         doc.rect(LEFT_X, currentY, tableWidth, shipRowH).fill(shipRowBg);
 
-        // Render all 7 columns for the shipping row
         const shipRowData = [
           String(shipRowNum),
           "—",
@@ -4186,11 +4238,12 @@ export class OfferController {
         .strokeColor("#CBD5E0")
         .stroke();
 
-      yPos = currentY + 15;
-      if (yPos + 120 > MM(265)) {
+      yPos = currentY + 12;
+      if (yPos + 80 > MM(272)) {
         doc.addPage();
         drawCustomerSvgBackground(doc);
-        yPos = MM(30);
+        doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+        yPos = MM(25);
       }
 
       const TOTALS_RIGHT_PAD = 6;
@@ -4259,42 +4312,31 @@ export class OfferController {
         amount: vatMap.get(rate) || 0,
       }));
 
+      const positiveVatEntries = vatEntries.filter(
+        (e) => Number(e.amount.toFixed(2)) > 0,
+      );
+      const entriesToDisplay =
+        positiveVatEntries.length > 0
+          ? positiveVatEntries
+          : vatEntries.length > 0
+            ? [vatEntries[0]]
+            : [{ rate: Number(offer.taxRate || 0), amount: 0 }];
+
       let calcVatTotal = 0;
-      if (vatEntries.length > 0) {
-        for (const entry of vatEntries) {
-          calcVatTotal += entry.amount;
-          yPos += 16;
-          doc
-            .font(R)
-            .text(
-              `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
-              TOTALS_LABEL_X,
-              yPos,
-            );
-          doc
-            .font(R)
-            .text(
-              `${formatGermanNum(entry.amount, 2)} ${offerCurr}`,
-              TOTALS_VAL_X - TOTALS_RIGHT_PAD,
-              yPos,
-              { align: "right", width: TOTALS_VAL_W },
-            );
-        }
-      } else {
-        const taxRatePercent = offer.taxRate !== undefined && offer.taxRate !== null ? Number(offer.taxRate) : 0;
-        calcVatTotal = Number(totals.taxAmount);
+      for (const entry of entriesToDisplay) {
+        calcVatTotal += entry.amount;
         yPos += 16;
         doc
           .font(R)
           .text(
-            `MwSt. ${formatGermanNum(taxRatePercent, 2)}%`,
+            `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
             TOTALS_LABEL_X,
             yPos,
           );
         doc
           .font(R)
           .text(
-            `${formatGermanNum(totals.taxAmount, 2)} ${offerCurr}`,
+            `${formatGermanNum(entry.amount, 2)} ${offerCurr}`,
             TOTALS_VAL_X - TOTALS_RIGHT_PAD,
             yPos,
             { align: "right", width: TOTALS_VAL_W },
@@ -4328,10 +4370,11 @@ export class OfferController {
           }) + 5;
       }
 
-      if (yPos + notesHeight > MM(265)) {
+      if (yPos + notesHeight > MM(272)) {
         doc.addPage();
         drawCustomerSvgBackground(doc);
-        yPos = MM(30);
+        doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+        yPos = MM(25);
       }
 
       doc.font(R).fontSize(9).fillColor("#3F4446");
