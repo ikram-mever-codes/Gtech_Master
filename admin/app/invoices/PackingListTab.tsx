@@ -200,12 +200,6 @@ const PackingListTab: React.FC<PackingListTabProps> = ({ searchTerm: externalSea
               onChange={(e) => setLocalSearchTerm(e.target.value)}
             />
           </div>
-          <button
-            onClick={fetchInvoices}
-            className="p-2 border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 text-[#495057] transition-all"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
         </div>
       )}
 

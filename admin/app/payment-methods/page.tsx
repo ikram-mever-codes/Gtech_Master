@@ -8,7 +8,9 @@ import {
   Search,
   CheckCircle,
   XCircle,
+  X,
 } from "lucide-react";
+import { FunnelIcon } from "@heroicons/react/24/outline";
 import {
   getAllPaymentMethods,
   createPaymentMethod,
@@ -195,16 +197,29 @@ export default function PaymentMethodsPage() {
   );
 
   const filterBar = (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+        <FunnelIcon className="w-4 h-4 text-primary" />
+      </div>
+      <div className="relative w-80 shrink-0">
         <input
           type="text"
           placeholder="Search payment methods..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white"
+          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${searchQuery
+            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+            : "text-gray-900 border-gray-300 bg-white"
+            }`}
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -418,8 +433,8 @@ export default function PaymentMethodsPage() {
                     <div className="flex flex-wrap gap-2 pt-2">
                       <span
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_prepayment
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
-                            : "bg-gray-100 text-gray-400 border border-gray-200"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : "bg-gray-100 text-gray-400 border border-gray-200"
                           }`}
                       >
                         {selectedMethod.is_prepayment ? (
@@ -431,8 +446,8 @@ export default function PaymentMethodsPage() {
                       </span>
                       <span
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${selectedMethod.is_active
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-gray-100 text-gray-400 border border-gray-200"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-gray-100 text-gray-400 border border-gray-200"
                           }`}
                       >
                         {selectedMethod.is_active ? (

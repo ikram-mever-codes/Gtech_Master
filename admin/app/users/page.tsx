@@ -15,7 +15,8 @@ import {
   MenuItem,
   Button,
 } from "@mui/material";
-import { PlusIcon, RefreshCw, Users, Search } from "lucide-react";
+import { PlusIcon, RefreshCw, Users, Search, X } from "lucide-react";
+import { FunnelIcon } from "@heroicons/react/24/outline";
 import PageHeader from "@/components/UI/PageHeader";
 import { UserRole, UserStatus } from "@/utils/interfaces";
 import theme from "@/styles/theme";
@@ -131,10 +132,10 @@ export default function UsersPage() {
       render: (value: boolean) => (
         <span
           className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${value === true
-              ? "bg-green-100 text-green-700"
-              : value === false
-                ? "bg-amber-100 text-amber-800"
-                : "bg-red-100 text-red-800"
+            ? "bg-green-100 text-green-700"
+            : value === false
+              ? "bg-amber-100 text-amber-800"
+              : "bg-red-100 text-red-800"
             }`}
         >
           {value === true ? "Verified" : "Unverified"}
@@ -147,8 +148,8 @@ export default function UsersPage() {
       render: (value: boolean) => (
         <span
           className={`px-3 py-1 rounded-full text-xs font-semibold font-poppins ${value !== false
-              ? "bg-emerald-50 text-emerald-600"
-              : "bg-red-55 text-red-600"
+            ? "bg-emerald-50 text-emerald-600"
+            : "bg-red-55 text-red-600"
             }`}
         >
           {value !== false ? "Enabled" : "Disabled"}
@@ -205,20 +206,33 @@ export default function UsersPage() {
   );
 
   const filterBar = (
-    <div className="flex flex-wrap gap-4 items-center w-full">
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+    <div className="flex flex-wrap gap-3 items-center w-full">
+      <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+        <FunnelIcon className="w-4 h-4 text-primary" />
+      </div>
+      <div className="relative w-72 shrink-0">
         <input
           type="text"
           placeholder="Search users..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white"
+          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${searchText
+            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+            : "text-gray-900 border-gray-300 bg-white"
+            }`}
         />
+        {searchText && (
+          <button
+            onClick={() => setSearchText("")}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
-      <FormControl sx={{ minWidth: 150 }} size="small">
-        <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
+      <FormControl sx={{ minWidth: 140 }} size="small">
+        <InputLabel sx={{ color: "text.secondary", fontSize: "0.8rem" }}>Status</InputLabel>
         <Select
           multiple
           value={filters.status}
@@ -230,9 +244,11 @@ export default function UsersPage() {
           }
           renderValue={(selected) => selected.join(", ")}
           sx={{
-            borderRadius: "8px",
+            borderRadius: "6px",
+            height: "32px",
+            fontSize: "0.75rem",
             "& .MuiSelect-select": {
-              py: 1.2,
+              py: 0.5,
             },
           }}
           MenuProps={{
@@ -247,15 +263,15 @@ export default function UsersPage() {
         >
           {Object.values(UserStatus).map((status) => (
             <MenuItem key={status} value={status}>
-              <Checkbox checked={filters.status.includes(status)} />
+              <Checkbox checked={filters.status.includes(status)} size="small" />
               <ListItemText primary={status} />
             </MenuItem>
           ))}
         </Select>
       </FormControl>
 
-      <FormControl sx={{ minWidth: 150 }} size="small">
-        <InputLabel sx={{ color: "text.secondary" }}>Role</InputLabel>
+      <FormControl sx={{ minWidth: 140 }} size="small">
+        <InputLabel sx={{ color: "text.secondary", fontSize: "0.8rem" }}>Role</InputLabel>
         <Select
           multiple
           value={filters.role}
@@ -264,9 +280,11 @@ export default function UsersPage() {
           }
           renderValue={(selected) => selected.join(", ")}
           sx={{
-            borderRadius: "8px",
+            borderRadius: "6px",
+            height: "32px",
+            fontSize: "0.75rem",
             "& .MuiSelect-select": {
-              py: 1.2,
+              py: 0.5,
             },
           }}
           MenuProps={{
@@ -281,7 +299,7 @@ export default function UsersPage() {
         >
           {Object.values(UserRole).map((role) => (
             <MenuItem key={role} value={role}>
-              <Checkbox checked={filters.role.includes(role)} />
+              <Checkbox checked={filters.role.includes(role)} size="small" />
               <ListItemText primary={role} />
             </MenuItem>
           ))}
@@ -295,9 +313,10 @@ export default function UsersPage() {
           ml: "auto",
           backgroundColor: alpha(theme.palette.primary.main, 0.1),
           px: 2,
-          py: 1,
+          py: 0.5,
           borderRadius: 2,
-          fontWeight: 500,
+          fontWeight: 600,
+          fontSize: "0.75rem",
         }}
       >
         Total Users: {users.length}

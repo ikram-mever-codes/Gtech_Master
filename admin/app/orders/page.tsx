@@ -77,7 +77,7 @@ import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import { formatDate } from "@/utils/date";
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+  return `w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
     ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
     : isEmptySelect
       ? "text-gray-400 border-gray-300 bg-white"
@@ -1560,9 +1560,11 @@ const OrderPage: React.FC = () => {
             </nav>
           </div>
 
-          <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
-              <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
+          <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2 overflow-visible">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 flex-1">
+              <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+                <FunnelIcon className="w-4 h-4 text-primary" />
+              </div>
               <div className="w-64 shrink-0">
                 <input
                   type="text"
@@ -1604,9 +1606,9 @@ const OrderPage: React.FC = () => {
                     setPoSearch("");
                     setReprintSearch("");
                   }}
-                  className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                  className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
                 >
-                  <ArrowPathIcon className="w-4 h-4" />
+                  <ArrowPathIcon className="w-3.5 h-3.5" />
                   Reset
                 </button>
               )}

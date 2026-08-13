@@ -6,7 +6,9 @@ import {
   Plus,
   Search,
   ExternalLink,
+  X,
 } from "lucide-react";
+import { FunnelIcon } from "@heroicons/react/24/outline";
 import {
   getWeiterversandServiceProviders,
   createWeiterversandServiceProvider,
@@ -191,16 +193,30 @@ export default function WeiterversandServiceProvidersPage() {
   );
 
   const filterBar = (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+        <FunnelIcon className="w-4 h-4 text-primary" />
+      </div>
+      <div className="relative w-80 shrink-0">
         <input
           type="text"
           placeholder="Search service providers..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white"
+          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+            searchQuery
+              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+              : "text-gray-900 border-gray-300 bg-white"
+          }`}
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );

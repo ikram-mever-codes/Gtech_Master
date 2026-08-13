@@ -6,7 +6,7 @@ import { CommercialFilters } from "@/utils/commercialFilters";
 import type { InvoiceTab } from "../../hooks/useCommercialTabData";
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+  return `w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
     hasValue
       ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
       : isEmptySelect
@@ -23,8 +23,6 @@ interface CommercialFilterBarProps {
   onReset: () => void;
 }
 
-// Byte-for-byte the same markup as the inline block in the original page —
-// only the state/props are now passed in instead of closed over.
 const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
   activeInvTab,
   docFilters,
@@ -33,13 +31,13 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
   onReset,
 }) => {
   return (
-    <div className="mb-6 p-3.5 bg-white border border-gray-200 rounded-md shadow-sm space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-          <FunnelIcon className="w-5 h-5 text-gray-400" />
+    <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm overflow-visible">
+      <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full py-0.5 relative z-10">
+        <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+          <FunnelIcon className="w-4 h-4 text-primary" />
         </div>
 
-        <div className="w-36 shrink-0">
+        <div className="w-32 shrink-0">
           <input
             type="text"
             placeholder="DocumentNo..."
@@ -51,7 +49,7 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
           />
         </div>
 
-        <div className="w-32 shrink-0">
+        <div className="w-28 shrink-0">
           <input
             type="text"
             placeholder="CustomerNo..."
@@ -63,7 +61,7 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
           />
         </div>
 
-        <div className="w-40 shrink-0">
+        <div className="w-36 shrink-0">
           <input
             type="text"
             placeholder="CustomerName..."
@@ -75,7 +73,7 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-1 w-44 shrink-0">
+        <div className="flex items-center gap-1 w-36 shrink-0">
           <select
             value={docFilters.valueOperator}
             onChange={(e) =>
@@ -84,7 +82,7 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
                 valueOperator: e.target.value as any,
               }))
             }
-            className="w-14 px-2 py-2 text-sm border border-gray-300 rounded-md bg-white font-bold text-gray-700 focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+            className="w-10 px-1 h-8 text-xs border border-gray-300 rounded-md bg-white font-bold text-gray-700 focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
           >
             <option value="=">=</option>
             <option value="&gt;">{">"}</option>
@@ -101,7 +99,7 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
           />
         </div>
 
-        <div className="w-36 shrink-0">
+        <div className="w-32 shrink-0">
           <select
             value={docFilters.status}
             onChange={(e) =>
@@ -164,7 +162,7 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
           </select>
         </div>
 
-        <div className="w-40 shrink-0">
+        <div className="w-32 shrink-0">
           <select
             value={docFilters.datePreset}
             onChange={(e) =>
@@ -205,20 +203,20 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
         {isAnyFilterActive && (
           <button
             onClick={onReset}
-            className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+            className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
           >
-            <ArrowPathIcon className="w-4 h-4" />
+            <ArrowPathIcon className="w-3.5 h-3.5" />
             Reset
           </button>
         )}
       </div>
 
       {docFilters.datePreset === "custom" && (
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
-          <span className="font-bold text-gray-500 uppercase tracking-wider">
+        <div className="flex flex-wrap items-center gap-2 pt-2 mt-2 border-t border-gray-100 text-xs">
+          <span className="font-bold text-gray-500 uppercase tracking-wider text-[11px]">
             Custom Date Range:
           </span>
-          <div className="w-40">
+          <div className="w-36">
             <input
               type="text"
               placeholder="From (dd.mm.yyyy)..."
@@ -229,8 +227,8 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
               className={getInputClass(!!docFilters.dateFrom)}
             />
           </div>
-          <span className="text-gray-400 font-bold">to</span>
-          <div className="w-40">
+          <span className="text-gray-400 font-bold text-xs">to</span>
+          <div className="w-36">
             <input
               type="text"
               placeholder="To (dd.mm.yyyy)..."
@@ -248,3 +246,4 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
 };
 
 export default CommercialFilterBar;
+

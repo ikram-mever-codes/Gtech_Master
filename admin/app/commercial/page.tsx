@@ -1634,11 +1634,14 @@ const InvoiceListPage: React.FC = () => {
               : false;
 
   return (
-    <div
-      className="min-h-screen font-['Poppins']"
-      style={{ backgroundColor: "#F8F9FA", color: "#212529" }}
-    >
-      <div className="w-full mx-auto p-0">
+    <div className="w-full mx-auto font-['Poppins']">
+      <div
+        className="bg-white min-h-[80vh] rounded-lg shadow-sm pb-8 p-6"
+        style={{
+          border: "1px solid #e0e0e0",
+          background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
+        }}
+      >
         {searchParams.get("filter") &&
           searchParams.get("hide_banner") !== "true" && (
             <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">

@@ -35,6 +35,7 @@ import {
   Package,
   Clock,
 } from "lucide-react";
+import { FunnelIcon } from "@heroicons/react/24/outline";
 
 import {
   getAllInvoices,
@@ -92,10 +93,10 @@ const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
   return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
     }`;
 };
 
@@ -1598,8 +1599,8 @@ const InvoiceListPage: React.FC = () => {
                 setCurrentPage(1);
               }}
               className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
                 }`}
             >
               {tab.label}
@@ -1607,100 +1608,81 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
-        <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400" />
-            <input
-              type="text"
-              placeholder={
-                activeInvTab === "open_invoices" ||
-                  activeInvTab === "closed_invoices"
-                  ? "Search invoices, customers, or order numbers..."
-                  : activeInvTab === "cargos"
-                    ? "Search cargos..."
-                    : activeInvTab === "cargo_type"
-                      ? "Search cargo types..."
-                      : activeInvTab === "packing_list"
-                        ? "Search packing lists..."
-                        : "Search..."
-              }
-              value={
-                activeInvTab === "open_invoices" ||
-                  activeInvTab === "closed_invoices"
-                  ? searchTerm
-                  : orderNoFilter
-              }
-              onChange={(e) => {
-                if (
+        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2 overflow-visible">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
+            <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+              <FunnelIcon className="w-4 h-4 text-primary" />
+            </div>
+            <div className="relative w-80 shrink-0">
+              <input
+                type="text"
+                placeholder={
                   activeInvTab === "open_invoices" ||
-                  activeInvTab === "closed_invoices"
-                ) {
-                  setSearchTerm(e.target.value);
-                } else {
-                  setOrderNoFilter(e.target.value);
+                    activeInvTab === "closed_invoices"
+                    ? "Search invoices, customers, or order numbers..."
+                    : activeInvTab === "cargos"
+                      ? "Search cargos..."
+                      : activeInvTab === "cargo_type"
+                        ? "Search cargo types..."
+                        : activeInvTab === "packing_list"
+                          ? "Search packing lists..."
+                          : "Search..."
                 }
-              }}
-              className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all bg-white text-black"
-            />
-            {(activeInvTab === "open_invoices" ||
-              activeInvTab === "closed_invoices"
-              ? searchTerm
-              : orderNoFilter) && (
-                <button
-                  onClick={() => {
-                    if (
-                      activeInvTab === "open_invoices" ||
-                      activeInvTab === "closed_invoices"
-                    ) {
-                      setSearchTerm("");
-                    } else {
-                      setOrderNoFilter("");
-                    }
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+                value={
+                  activeInvTab === "open_invoices" ||
+                    activeInvTab === "closed_invoices"
+                    ? searchTerm
+                    : orderNoFilter
+                }
+                onChange={(e) => {
+                  if (
+                    activeInvTab === "open_invoices" ||
+                    activeInvTab === "closed_invoices"
+                  ) {
+                    setSearchTerm(e.target.value);
+                  } else {
+                    setOrderNoFilter(e.target.value);
+                  }
+                }}
+                className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${(activeInvTab === "open_invoices" || activeInvTab === "closed_invoices" ? searchTerm : orderNoFilter)
+                  ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                  : "text-gray-900 border-gray-300 bg-white"
+                  }`}
+              />
+              {(activeInvTab === "open_invoices" ||
+                activeInvTab === "closed_invoices"
+                ? searchTerm
+                : orderNoFilter) && (
+                  <button
+                    onClick={() => {
+                      if (
+                        activeInvTab === "open_invoices" ||
+                        activeInvTab === "closed_invoices"
+                      ) {
+                        setSearchTerm("");
+                      } else {
+                        setOrderNoFilter("");
+                      }
+                    }}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+            </div>
+
+            {activeInvTab === "cargos" && (
+              <SegmentedControl
+                options={[
+                  { value: "Open", label: "Open" },
+                  { value: "Shipped", label: "Shipped" },
+                  { value: "Delivered", label: "Delivered" },
+                ]}
+                value={cargoStatusFilter}
+                onChange={setCargoStatusFilter}
+              />
+            )}
           </div>
-
-          {activeInvTab === "cargos" && (
-            <SegmentedControl
-              options={[
-                { value: "Open", label: "Open" },
-                { value: "Shipped", label: "Shipped" },
-                { value: "Delivered", label: "Delivered" },
-              ]}
-              value={cargoStatusFilter}
-              onChange={setCargoStatusFilter}
-            />
-          )}
-
-          <button
-            onClick={() => {
-              if (activeInvTab === "cargos") {
-                cargosTabRef.current?.fetchCargos?.();
-              } else if (activeInvTab === "cargo_type") {
-                cargoTypesTabRef.current?.fetchCargoTypes?.();
-              } else if (
-                activeInvTab === "orders" ||
-                activeInvTab === "order_items"
-              ) {
-                fetchOrders();
-              } else {
-                setLoading(true);
-                loadInvoices();
-              }
-            }}
-            disabled={loading || loadingOrders}
-            className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-sm font-semibold"
-            title="Refresh"
-          >
-            <RefreshCw
-              className={`h-4.5 w-4.5 ${loading || loadingOrders ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </button>
         </div>
 
         {(activeInvTab === "orders" || activeInvTab === "order_items") && (
@@ -2003,8 +1985,8 @@ const InvoiceListPage: React.FC = () => {
                               key={i + 1}
                               onClick={() => setCurrentPage(i + 1)}
                               className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                                  ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                  : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
                                 }`}
                             >
                               {i + 1}
@@ -2318,8 +2300,8 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       onClick={() => setModalActiveTab("taric")}
                       className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "taric"
-                          ? "border-[#8CC21B] text-gray-900"
-                          : "border-transparent text-gray-500 hover:text-gray-700"
+                        ? "border-[#8CC21B] text-gray-900"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                     >
                       Taric Summary
@@ -2327,8 +2309,8 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       onClick={() => setModalActiveTab("items")}
                       className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${modalActiveTab === "items"
-                          ? "border-[#8CC21B] text-gray-900"
-                          : "border-transparent text-gray-500 hover:text-gray-700"
+                        ? "border-[#8CC21B] text-gray-900"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                     >
                       Items List

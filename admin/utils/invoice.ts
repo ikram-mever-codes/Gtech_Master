@@ -1,7 +1,3 @@
-/**
- * Utility function to calculate the total price of an invoice consistently across the app.
- * Total = Item Subtotal + Freight Cost.
- */
 export const calculateInvoiceTotal = (invoice: any): number => {
   if (!invoice) return 0;
 
@@ -17,14 +13,14 @@ export const calculateInvoiceTotal = (invoice: any): number => {
     (s: number, it: any) =>
       s +
       Number(it.quantity ?? it.qty ?? 0) *
-        Number(
-          it.unit_price ??
-            it.unitPrice ??
-            it.price ??
-            it.net_price ??
-            it.netPrice ??
-            0,
-        ),
+      Number(
+        it.unit_price ??
+        it.unitPrice ??
+        it.price ??
+        it.net_price ??
+        it.netPrice ??
+        0,
+      ),
     0,
   );
 

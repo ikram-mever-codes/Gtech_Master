@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getCategories } from "@/api/categories";
-import { Layers, RefreshCw } from "lucide-react";
+import { Layers } from "lucide-react";
 import MasterPageLayout from "@/components/General/MasterPageLayout";
 
 export default function CategoryPage() {
@@ -36,14 +36,6 @@ export default function CategoryPage() {
       <span className="text-xs font-semibold text-gray-500 font-poppins">
         Standard Categorization (Read-Only)
       </span>
-      <button
-        onClick={fetchCategories}
-        className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all flex items-center gap-1.5 text-xs font-semibold"
-        title="Refresh"
-      >
-        <RefreshCw className="h-4 w-4" />
-        Refresh
-      </button>
     </div>
   );
 
