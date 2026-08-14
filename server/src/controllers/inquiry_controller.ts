@@ -17,6 +17,7 @@ import { AuthorizedRequest } from "../middlewares/authorized";
 
 import { IsOptional, IsString, IsNumber, IsInt, Min } from "class-validator";
 import { Type } from "class-transformer";
+import { Offer } from "../models/offer";
 
 export class BaseItemConversionDto {
   @IsOptional()
@@ -94,7 +95,7 @@ export class BaseItemConversionDto {
   note?: string;
 }
 
-export class ConvertInquiryToItemDto extends BaseItemConversionDto { }
+export class ConvertInquiryToItemDto extends BaseItemConversionDto {}
 
 export class ConvertRequestToItemDto extends BaseItemConversionDto {
   @IsOptional()
@@ -190,6 +191,7 @@ export class ItemGenerator {
 
 export class InquiryController {
   private inquiryRepository: any = AppDataSource.getRepository(Inquiry);
+  private offerRepository: any = AppDataSource.getRepository(Offer);
   private requestRepository: any = AppDataSource.getRepository(RequestedItem);
   private customerRepository: any = AppDataSource.getRepository(Customer);
   private contactPersonRepository: any =
@@ -207,7 +209,8 @@ export class InquiryController {
 
   private async getNextInquiryNo(): Promise<string> {
     try {
-      const { NumberSequenceService } = await import("../services/number_sequence_service");
+      const { NumberSequenceService } =
+        await import("../services/number_sequence_service");
       return await NumberSequenceService.getNextNumber("inquiry");
     } catch (e) {
       const currentYear = new Date().getFullYear();
@@ -275,8 +278,12 @@ export class InquiryController {
 
       if (tags) {
         const tagIds = (tags as string).split(",");
-        const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
-        const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+        const includeTagIds = tagIds
+          .filter((id) => !id.startsWith("!"))
+          .map((id) => id.trim());
+        const excludeTagIds = tagIds
+          .filter((id) => id.startsWith("!"))
+          .map((id) => id.substring(1).trim());
 
         if (includeTagIds.length > 0) {
           queryBuilder.andWhere((qb: any) => {
@@ -291,7 +298,10 @@ export class InquiryController {
             return `inquiry.id IN ${subQuery.getQuery()}`;
           });
           queryBuilder.setParameter("inquiryIncludeTagIds", includeTagIds);
-          queryBuilder.setParameter("inquiryIncludeCount", includeTagIds.length);
+          queryBuilder.setParameter(
+            "inquiryIncludeCount",
+            includeTagIds.length,
+          );
         }
 
         if (excludeTagIds.length > 0) {
@@ -535,7 +545,9 @@ export class InquiryController {
         let defaultProCatId: number | undefined = undefined;
         try {
           const categoryRepository = AppDataSource.getRepository(Category);
-          const proCat = await categoryRepository.findOne({ where: { name: "PRO" } });
+          const proCat = await categoryRepository.findOne({
+            where: { name: "PRO" },
+          });
           if (proCat) {
             defaultProCatId = proCat.id;
           }
@@ -558,13 +570,26 @@ export class InquiryController {
           let factor = 12;
           if (reqData.interval) {
             const normalized = reqData.interval.toLowerCase().trim();
-            if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+            if (
+              normalized === "jährlich" ||
+              normalized === "jaehrlich" ||
+              normalized === "yearly"
+            ) {
               factor = 1;
-            } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+            } else if (
+              normalized === "halbjährlich" ||
+              normalized === "halbjaehrlich" ||
+              normalized === "half-yearly" ||
+              normalized === "half yearly" ||
+              normalized === "biannually"
+            ) {
               factor = 2;
             } else if (normalized === "quartal" || normalized === "quarterly") {
               factor = 4;
-            } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+            } else if (
+              normalized === "2 monatlich" ||
+              normalized === "bimonthly"
+            ) {
               factor = 6;
             } else if (normalized === "monatlich" || normalized === "monthly") {
               factor = 12;
@@ -576,9 +601,16 @@ export class InquiryController {
 
           const letterSuffix = this.getLetterSuffix(index);
           let assignedItemNo = `${savedInquiry.inquiryNo || "AF"}${letterSuffix}`;
-          if (reqData.itemNo && typeof reqData.itemNo === "string" && reqData.itemNo.trim()) {
+          if (
+            reqData.itemNo &&
+            typeof reqData.itemNo === "string" &&
+            reqData.itemNo.trim()
+          ) {
             const rawNo = reqData.itemNo.trim();
-            if (savedInquiry.inquiryNo && rawNo.startsWith(savedInquiry.inquiryNo)) {
+            if (
+              savedInquiry.inquiryNo &&
+              rawNo.startsWith(savedInquiry.inquiryNo)
+            ) {
               assignedItemNo = rawNo.replace(/^(.+)-([a-z])$/i, "$1$2");
             } else if (/^[a-z]$/i.test(rawNo)) {
               assignedItemNo = `${savedInquiry.inquiryNo || "AF"}${rawNo.toLowerCase()}`;
@@ -642,7 +674,12 @@ export class InquiryController {
   async updateInquiry(request: Request, response: Response) {
     try {
       const { id } = request.params;
-      console.log("DEBUG: updateInquiry called with id:", id, "body requests:", JSON.stringify(request.body.requests));
+      console.log(
+        "DEBUG: updateInquiry called with id:",
+        id,
+        "body requests:",
+        JSON.stringify(request.body.requests),
+      );
       const {
         name,
         description,
@@ -752,7 +789,9 @@ export class InquiryController {
         ...(purchasePrice !== undefined && { purchasePrice }),
         ...(purchasePriceCurrency !== undefined && { purchasePriceCurrency }),
         ...(total_potential_k_eur !== undefined && { total_potential_k_eur }),
-        ...(next_followup_at !== undefined && { next_followup_at: next_followup_at || null }),
+        ...(next_followup_at !== undefined && {
+          next_followup_at: next_followup_at || null,
+        }),
         ...(owner_user_id !== undefined && { owner_user_id }),
         ...(next_action !== undefined && { next_action }),
       };
@@ -785,7 +824,9 @@ export class InquiryController {
             let defaultProCatId: number | undefined = undefined;
             try {
               const categoryRepository = AppDataSource.getRepository(Category);
-              const proCat = await categoryRepository.findOne({ where: { name: "PRO" } });
+              const proCat = await categoryRepository.findOne({
+                where: { name: "PRO" },
+              });
               if (proCat) {
                 defaultProCatId = proCat.id;
               }
@@ -793,66 +834,94 @@ export class InquiryController {
               console.error("Failed to fetch default PRO category:", e);
             }
 
-            const requestEntities = requests.map((reqData: any, index: number) => {
-              let totalWeight = null;
-              const currentQty = reqData.qty || reqData.quantity;
-              if (reqData.unitWeight && currentQty) {
-                totalWeight =
-                  parseFloat(reqData.unitWeight) * parseFloat(currentQty);
-              }
-
-              const { id: _ignored, ...reqDataWithoutId } = reqData;
-
-              const qtyVal = parseInt(currentQty || "0", 10) || 0;
-              const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
-              let factor = 12;
-              if (reqData.interval) {
-                const normalized = reqData.interval.toLowerCase().trim();
-                if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
-                  factor = 1;
-                } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
-                  factor = 2;
-                } else if (normalized === "quartal" || normalized === "quarterly") {
-                  factor = 4;
-                } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
-                  factor = 6;
-                } else if (normalized === "monatlich" || normalized === "monthly") {
-                  factor = 12;
+            const requestEntities = requests.map(
+              (reqData: any, index: number) => {
+                let totalWeight = null;
+                const currentQty = reqData.qty || reqData.quantity;
+                if (reqData.unitWeight && currentQty) {
+                  totalWeight =
+                    parseFloat(reqData.unitWeight) * parseFloat(currentQty);
                 }
-              }
-              const annualPotential = qtyVal * targetPriceVal * factor;
-              const annualPotentialKEur = annualPotential / 1000;
-              total_potential_k_eur += annualPotentialKEur;
 
-              const letterSuffix = this.getLetterSuffix(index);
-              let assignedItemNo = `${existingInquiry.inquiryNo || "AF"}${letterSuffix}`;
-              if (reqData.itemNo && typeof reqData.itemNo === "string" && reqData.itemNo.trim()) {
-                const rawNo = reqData.itemNo.trim();
-                if (existingInquiry.inquiryNo && rawNo.startsWith(existingInquiry.inquiryNo)) {
-                  assignedItemNo = rawNo.replace(/^(.+)-([a-z])$/i, "$1$2");
-                } else if (/^[a-z]$/i.test(rawNo)) {
-                  assignedItemNo = `${existingInquiry.inquiryNo || "AF"}${rawNo.toLowerCase()}`;
-                } else if (rawNo !== String(index + 1).padStart(3, "0")) {
-                  assignedItemNo = rawNo;
+                const { id: _ignored, ...reqDataWithoutId } = reqData;
+
+                const qtyVal = parseInt(currentQty || "0", 10) || 0;
+                const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
+                let factor = 12;
+                if (reqData.interval) {
+                  const normalized = reqData.interval.toLowerCase().trim();
+                  if (
+                    normalized === "jährlich" ||
+                    normalized === "jaehrlich" ||
+                    normalized === "yearly"
+                  ) {
+                    factor = 1;
+                  } else if (
+                    normalized === "halbjährlich" ||
+                    normalized === "halbjaehrlich" ||
+                    normalized === "half-yearly" ||
+                    normalized === "half yearly" ||
+                    normalized === "biannually"
+                  ) {
+                    factor = 2;
+                  } else if (
+                    normalized === "quartal" ||
+                    normalized === "quarterly"
+                  ) {
+                    factor = 4;
+                  } else if (
+                    normalized === "2 monatlich" ||
+                    normalized === "bimonthly"
+                  ) {
+                    factor = 6;
+                  } else if (
+                    normalized === "monatlich" ||
+                    normalized === "monthly"
+                  ) {
+                    factor = 12;
+                  }
                 }
-              }
+                const annualPotential = qtyVal * targetPriceVal * factor;
+                const annualPotentialKEur = annualPotential / 1000;
+                total_potential_k_eur += annualPotentialKEur;
 
-              const requestItem = this.requestRepository.create({
-                ...reqDataWithoutId,
-                itemNo: assignedItemNo,
-                cat_id: reqData.cat_id || defaultProCatId,
-                businessId: starBusinessDetails.id,
-                business: starBusinessDetails,
-                inquiry: existingInquiry,
-                qty: currentQty,
-                totalWeight: totalWeight || reqData.totalWeight,
-                targetPrice: reqData.targetPrice || null,
-                annualPotential: annualPotential,
-                annualPotentialKEur: annualPotentialKEur,
-              });
+                const letterSuffix = this.getLetterSuffix(index);
+                let assignedItemNo = `${existingInquiry.inquiryNo || "AF"}${letterSuffix}`;
+                if (
+                  reqData.itemNo &&
+                  typeof reqData.itemNo === "string" &&
+                  reqData.itemNo.trim()
+                ) {
+                  const rawNo = reqData.itemNo.trim();
+                  if (
+                    existingInquiry.inquiryNo &&
+                    rawNo.startsWith(existingInquiry.inquiryNo)
+                  ) {
+                    assignedItemNo = rawNo.replace(/^(.+)-([a-z])$/i, "$1$2");
+                  } else if (/^[a-z]$/i.test(rawNo)) {
+                    assignedItemNo = `${existingInquiry.inquiryNo || "AF"}${rawNo.toLowerCase()}`;
+                  } else if (rawNo !== String(index + 1).padStart(3, "0")) {
+                    assignedItemNo = rawNo;
+                  }
+                }
 
-              return requestItem;
-            });
+                const requestItem = this.requestRepository.create({
+                  ...reqDataWithoutId,
+                  itemNo: assignedItemNo,
+                  cat_id: reqData.cat_id || defaultProCatId,
+                  businessId: starBusinessDetails.id,
+                  business: starBusinessDetails,
+                  inquiry: existingInquiry,
+                  qty: currentQty,
+                  totalWeight: totalWeight || reqData.totalWeight,
+                  targetPrice: reqData.targetPrice || null,
+                  annualPotential: annualPotential,
+                  annualPotentialKEur: annualPotentialKEur,
+                });
+
+                return requestItem;
+              },
+            );
 
             await this.requestRepository.save(requestEntities);
           }
@@ -897,15 +966,38 @@ export class InquiryController {
   async deleteInquiry(request: Request, response: Response) {
     try {
       const { id } = request.params;
-
       const inquiry = await this.inquiryRepository.findOne({
         where: { id },
+        relations: ["requests"],
       });
 
       if (!inquiry) {
         return response.status(404).json({
           success: false,
           message: "Inquiry not found",
+        });
+      }
+
+      const requestedItemIds = (inquiry.requests || []).map((r: any) => r.id);
+
+      const offerQuery = this.offerRepository
+        .createQueryBuilder("offer")
+        .leftJoin("offer.lineItems", "lineItem")
+        .where("offer.inquiryId = :inquiryId", { inquiryId: id });
+
+      if (requestedItemIds.length > 0) {
+        offerQuery.orWhere(
+          "lineItem.requestedItemId IN (:...requestedItemIds)",
+          { requestedItemIds },
+        );
+      }
+
+      const linkedOffer = await offerQuery.getOne();
+
+      if (linkedOffer) {
+        return response.status(409).json({
+          success: false,
+          message: `Cannot delete inquiry: offer "${linkedOffer.offerNumber}" is linked to this inquiry or one of its requested items. Remove or reassign the offer first.`,
         });
       }
 
@@ -1136,7 +1228,8 @@ export class InquiryController {
       if (!inquiry.isAssembly) {
         return response.status(400).json({
           success: false,
-          message: "Only assembly inquiries (isAssembly = true) can be converted to an Item",
+          message:
+            "Only assembly inquiries (isAssembly = true) can be converted to an Item",
         });
       }
 

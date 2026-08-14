@@ -8,10 +8,12 @@ import { Inquiry } from "../models/inquiry";
 import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
+import { OfferLineItem } from "../models/offer";
 
 export class RequestedItemController {
   private requestedItemRepository = AppDataSource.getRepository(RequestedItem);
   private businessRepository = AppDataSource.getRepository(StarBusinessDetails);
+  private offerLineItemRepository = AppDataSource.getRepository(OfferLineItem);
   private contactPersonRepository = AppDataSource.getRepository(ContactPerson);
   private inquiryRepository = AppDataSource.getRepository(Inquiry);
 
@@ -44,8 +46,12 @@ export class RequestedItemController {
 
       if (tags) {
         const tagIds = (tags as string).split(",");
-        const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
-        const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+        const includeTagIds = tagIds
+          .filter((id) => !id.startsWith("!"))
+          .map((id) => id.trim());
+        const excludeTagIds = tagIds
+          .filter((id) => id.startsWith("!"))
+          .map((id) => id.substring(1).trim());
 
         if (includeTagIds.length > 0) {
           queryBuilder.andWhere((qb: any) => {
@@ -143,17 +149,17 @@ export class RequestedItemController {
               ...item.business,
               customer: customer
                 ? {
-                  id: customer.id,
-                  companyName: customer.companyName,
-                  legalName: customer.legalName,
-                  email: customer.email,
-                  contactEmail: customer.contactEmail,
-                  contactPhoneNumber: customer.contactPhoneNumber,
-                  stage: customer.stage,
-                  avatar: customer.avatar,
-                  createdAt: customer.createdAt,
-                  updatedAt: customer.updatedAt,
-                }
+                    id: customer.id,
+                    companyName: customer.companyName,
+                    legalName: customer.legalName,
+                    email: customer.email,
+                    contactEmail: customer.contactEmail,
+                    contactPhoneNumber: customer.contactPhoneNumber,
+                    stage: customer.stage,
+                    avatar: customer.avatar,
+                    createdAt: customer.createdAt,
+                    updatedAt: customer.updatedAt,
+                  }
                 : null,
             },
           };
@@ -191,7 +197,16 @@ export class RequestedItemController {
 
       const item = await this.requestedItemRepository.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
+        relations: [
+          "business",
+          "contactPerson",
+          "inquiry",
+          "tags",
+          "parent",
+          "taricRel",
+          "category",
+          "supplier",
+        ],
       });
 
       if (!item) {
@@ -212,17 +227,17 @@ export class RequestedItemController {
           ...item.business,
           customer: customer
             ? {
-              id: customer.id,
-              companyName: customer.companyName,
-              legalName: customer.legalName,
-              email: customer.email,
-              contactEmail: customer.contactEmail,
-              contactPhoneNumber: customer.contactPhoneNumber,
-              stage: customer.stage,
-              avatar: customer.avatar,
-              createdAt: customer.createdAt,
-              updatedAt: customer.updatedAt,
-            }
+                id: customer.id,
+                companyName: customer.companyName,
+                legalName: customer.legalName,
+                email: customer.email,
+                contactEmail: customer.contactEmail,
+                contactPhoneNumber: customer.contactPhoneNumber,
+                stage: customer.stage,
+                avatar: customer.avatar,
+                createdAt: customer.createdAt,
+                updatedAt: customer.updatedAt,
+              }
             : null,
         },
       };
@@ -399,7 +414,16 @@ export class RequestedItemController {
 
       const itemWithRelations = await this.requestedItemRepository.findOne({
         where: { id: savedItem.id },
-        relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
+        relations: [
+          "business",
+          "contactPerson",
+          "inquiry",
+          "tags",
+          "parent",
+          "taricRel",
+          "category",
+          "supplier",
+        ],
       });
 
       return response.status(201).json({
@@ -572,7 +596,16 @@ export class RequestedItemController {
 
       const updatedItem = await this.requestedItemRepository.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
+        relations: [
+          "business",
+          "contactPerson",
+          "inquiry",
+          "tags",
+          "parent",
+          "taricRel",
+          "category",
+          "supplier",
+        ],
       });
 
       return response.status(200).json({
@@ -601,6 +634,19 @@ export class RequestedItemController {
         return response.status(404).json({
           success: false,
           message: "Requested item not found",
+        });
+      }
+
+      const linkedLineItem = await this.offerLineItemRepository
+        .createQueryBuilder("lineItem")
+        .leftJoinAndSelect("lineItem.offer", "offer")
+        .where("lineItem.requestedItemId = :id", { id })
+        .getOne();
+
+      if (linkedLineItem) {
+        return response.status(409).json({
+          success: false,
+          message: `Cannot delete requested item: it is used in offer "${linkedLineItem.offer?.offerNumber}". Remove it from the offer first.`,
         });
       }
 
