@@ -1428,6 +1428,21 @@ export const downloadCustomerOrderPdf = async (
       };
     });
 
+    const isDelivered =
+      order.auftrag_status === AuftragStatus.DELIVERED ||
+      order.auftrag_status === ("delivered" as any) ||
+      order.auftrag_status === AuftragStatus.CLOSED ||
+      order.auftrag_status === ("closed" as any) ||
+      String(order.status || "").toLowerCase() === "delivered" ||
+      String(order.status || "").toLowerCase() === "completed" ||
+      String(order.status || "").toLowerCase() === "closed" ||
+      !!order.real_delivery_date;
+
+    const effectiveDeliveryDate =
+      (isDelivered && order.real_delivery_date) ||
+      order.date_delivery ||
+      order.delivery_terms;
+
     await generateGtechDocumentPdf({
       documentType: "Auftrag" as any,
       documentNumber: order.order_no,
@@ -1439,6 +1454,7 @@ export const downloadCustomerOrderPdf = async (
         ["Kunde", kundeCombined],
         ["Datum", order.date_created || order.created_at],
       ],
+      isDelivered: isDelivered,
       lineItems: items,
       showPrices: true,
       shippingMethod: order.shipping_method,
@@ -1453,7 +1469,8 @@ export const downloadCustomerOrderPdf = async (
       taxRate: defaultTaxRate,
       currency: order.currency || "EUR",
       notes: order.notes,
-      deliveryTime: order.date_delivery || order.delivery_terms,
+      deliveryTime: effectiveDeliveryDate,
+      deliveryDate: effectiveDeliveryDate,
       deliveryTerms: order.delivery_terms,
       paymentTerms: order.payment_terms
         ? `Zahlungsziel: ${order.payment_terms} Tage`

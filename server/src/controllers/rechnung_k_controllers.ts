@@ -781,6 +781,7 @@ export const downloadRechnungKPdf = async (
           rechnungK.invoice_date,
         ],
       ],
+      isDelivered: true,
       lineItems: items,
       showPrices: true,
       shippingMethod: rechnungK.shipping_method,
@@ -795,7 +796,10 @@ export const downloadRechnungKPdf = async (
       taxRate: defaultTaxRate,
       currency: rechnungK.currency || "EUR",
       notes: rechnungK.notes,
-      deliveryTime: rechnungK.date_delivery,
+      deliveryTime:
+        (rechnungK as any).delivery_date || rechnungK.date_delivery,
+      deliveryDate:
+        (rechnungK as any).delivery_date || rechnungK.date_delivery,
       deliveryTerms: rechnungK.delivery_terms,
       paymentTerms: rechnungK.payment_terms
         ? `Zahlungsziel: ${rechnungK.payment_terms} Tage`

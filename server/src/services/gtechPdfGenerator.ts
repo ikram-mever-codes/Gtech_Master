@@ -168,7 +168,15 @@ export interface PdfLineItem {
 }
 
 export interface PdfDocumentOptions {
-  documentType: "Angebot" | "Auftragsbestätigung" | "Rechnung" | "Rechnungskorrektur" | "Lieferschein";
+  documentType:
+    | "Angebot"
+    | "Auftragsbestätigung"
+    | "Auftrag"
+    | "Rechnung"
+    | "Rechnungskorrektur"
+    | "RK"
+    | "Lieferschein"
+    | string;
   documentNumber: string;
   customerSnapshot: any;
   customerEntity?: any;
@@ -188,7 +196,9 @@ export interface PdfDocumentOptions {
   taxRate?: number;
   currency?: string;
   notes?: string;
-  deliveryTime?: string;
+  deliveryTime?: string | Date;
+  deliveryDate?: string | Date;
+  isDelivered?: boolean;
   deliveryTerms?: string;
   paymentTerms?: string;
   paymentMethod?: string;
@@ -940,17 +950,39 @@ export async function generateGtechDocumentPdf(
     doc.text(`Zahlungsart: ${combinedPaymentStr}`, LEFT_X, yPos);
     yPos += 14;
   }
-  if (opts.deliveryTime) {
-    let rawDelivery = opts.deliveryTime.trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(rawDelivery)) {
-      rawDelivery = formatDate(rawDelivery);
-    }
-    const hasLieferdatumInMetadata = (opts.metadataItems || []).some(([k]) => k.toLowerCase().includes("lieferdatum"));
-    const isFormattedDate = /^\d{2}\.\d{2}\.\d{4}$/.test(rawDelivery);
+  const deliveryInput = opts.deliveryTime || opts.deliveryDate;
+  if (deliveryInput) {
+    const rawDelivery = String(deliveryInput).trim();
+    if (rawDelivery) {
+      const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawDelivery);
+      const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawDelivery);
+      const parsed = new Date(rawDelivery);
+      const isValidDate =
+        (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
+        /\d{4}/.test(rawDelivery);
 
-    if (!hasLieferdatumInMetadata || !isFormattedDate) {
-      doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
-      yPos += 14;
+      const hasLieferdatumInMetadata = (opts.metadataItems || []).some(([k]) =>
+        k.toLowerCase().includes("lieferdatum")
+      );
+
+      if (!hasLieferdatumInMetadata || !isValidDate) {
+        if (isValidDate) {
+          const docType = String(opts.documentType || "");
+          const isOffer = docType === "Angebot";
+          const isDelivered = opts.isDelivered === true;
+          const isAuftrag =
+            docType === "Auftrag" || docType === "Auftragsbestätigung";
+
+          const label =
+            isOffer || (isAuftrag && !isDelivered)
+              ? "Lieferdatum: geschätzt"
+              : "Lieferdatum:";
+          doc.text(`${label} ${formatDate(rawDelivery)}`, LEFT_X, yPos);
+        } else {
+          doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
+        }
+        yPos += 14;
+      }
     }
   }
   if (opts.deliveryTerms) {
