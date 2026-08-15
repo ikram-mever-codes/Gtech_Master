@@ -1043,6 +1043,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }, 30000); // 30 second timeout
 
     try {
+      const isSameAsBilling =
+        selectedShippingAddressId === "__same__" ||
+        shippingAddresses.length === 0;
+
       const payload = {
         title: form.title,
         status: form.status,
@@ -1050,7 +1054,39 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         validUntil: form.validUntil,
         deliveryTime: form.deliveryTime,
         paymentTerms: form.paymentTerms,
-        deliveryAddress: form.deliveryAddress,
+        deliveryAddress: isSameAsBilling
+          ? {
+              addressName: "",
+              contactName:
+                form.customerSnapshot?.legalName ||
+                form.customerSnapshot?.companyName ||
+                offer?.customerSnapshot?.legalName ||
+                offer?.customerSnapshot?.companyName ||
+                "",
+              street:
+                form.customerSnapshot?.address ||
+                form.customerSnapshot?.street ||
+                offer?.customerSnapshot?.address ||
+                offer?.customerSnapshot?.street ||
+                "",
+              postalCode:
+                form.customerSnapshot?.postalCode ||
+                offer?.customerSnapshot?.postalCode ||
+                "",
+              city:
+                form.customerSnapshot?.city ||
+                offer?.customerSnapshot?.city ||
+                "",
+              country:
+                form.customerSnapshot?.country ||
+                offer?.customerSnapshot?.country ||
+                "",
+              contactPhone:
+                form.customerSnapshot?.contactPhoneNumber ||
+                offer?.customerSnapshot?.contactPhoneNumber ||
+                "",
+            }
+          : form.deliveryAddress,
         customerSnapshot: form.customerSnapshot,
         discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
         paymentMethod: form.paymentMethod || undefined,
@@ -1443,7 +1479,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     ? isDeliverySameAsBilling(currentDeliveryAddress, offer.customerSnapshot)
     : true;
   const showAsSame = edit
-    ? selectedShippingAddressId === "__same__"
+    ? selectedShippingAddressId === "__same__" || shippingAddresses.length === 0
     : deliverySameAsBilling;
 
   return (
