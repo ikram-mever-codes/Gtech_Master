@@ -11,6 +11,7 @@ import {
   JoinTable,
 } from "typeorm";
 import { StarBusinessDetails } from "./star_business_details";
+import { Customer } from "./customers";
 import { ContactPerson } from "./contact_person";
 import { Inquiry } from "./inquiry";
 import { Tag } from "./tags";
@@ -18,6 +19,7 @@ import { Parent } from "./parents";
 import { Taric } from "./tarics";
 import { Category } from "./categories";
 import { Supplier } from "./suppliers";
+import { Item } from "./items";
 
 export type Interval =
   | "Monatlich"
@@ -33,6 +35,8 @@ export class RequestedItem {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
+  // Unchanged: still targets StarBusinessDetails, same column/FK as
+  // before this migration started. No data backfill needed for this one.
   @ManyToOne(() => StarBusinessDetails, (business) => business.requestedItems, {
     nullable: false,
     onDelete: "CASCADE",
@@ -112,7 +116,7 @@ export class RequestedItem {
     {
       nullable: true,
       onDelete: "SET NULL",
-    }
+    },
   )
   @JoinColumn({ name: "contact_person_id" })
   contactPerson!: ContactPerson;
@@ -270,9 +274,29 @@ export class RequestedItem {
   @JoinColumn({ name: "supplier_id" })
   supplier!: Supplier | null;
 
-  constructor(partial?: Partial<RequestedItem>) {
-    if (partial) {
-      Object.assign(this, partial);
-    }
-  }
+  // --- New, additive: Customer alongside business (StarBusinessDetails) ---
+  // Nullable, own FK column. No data migration required — existing rows
+  // simply have customer_id = NULL until next save, and NULL always
+  // satisfies a FK check, so this can't reproduce the earlier crash.
+  // Populated server-side from business -> starBusinessDetailsId -> customer
+  // at create/update time; not expected to be supplied by the client.
+  @Column({ name: "customer_id", nullable: true })
+  customerId?: string;
+
+  @ManyToOne(() => Customer, (customer) => customer.requestedItems, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "customer_id" })
+  customer?: Customer | null;
+
+  @Column({ name: "item_id", nullable: true })
+  itemId?: number;
+
+  @ManyToOne(() => Item, (item) => item.requestedItemLinks, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "item_id" })
+  item?: Item | null;
 }

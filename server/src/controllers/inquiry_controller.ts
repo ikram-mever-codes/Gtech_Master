@@ -17,7 +17,13 @@ import { AuthorizedRequest } from "../middlewares/authorized";
 
 import { IsOptional, IsString, IsNumber, IsInt, Min } from "class-validator";
 import { Type } from "class-transformer";
+import { DeepPartial } from "typeorm";
 import { Offer } from "../models/offer";
+import {
+  ItemLinkService,
+  ItemLinkError,
+  toRequestedItemOwnFields,
+} from "../services/item_link_service";
 
 export class BaseItemConversionDto {
   @IsOptional()
@@ -189,6 +195,38 @@ export class ItemGenerator {
   }
 }
 
+function calcAnnualPotential(
+  qty: number,
+  targetPrice: number,
+  interval?: string,
+) {
+  let factor = 12;
+  const normalized = (interval || "Monatlich").toLowerCase().trim();
+  if (
+    normalized === "jährlich" ||
+    normalized === "jaehrlich" ||
+    normalized === "yearly"
+  ) {
+    factor = 1;
+  } else if (
+    normalized === "halbjährlich" ||
+    normalized === "halbjaehrlich" ||
+    normalized === "half-yearly" ||
+    normalized === "half yearly" ||
+    normalized === "biannually"
+  ) {
+    factor = 2;
+  } else if (normalized === "quartal" || normalized === "quarterly") {
+    factor = 4;
+  } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+    factor = 6;
+  } else if (normalized === "monatlich" || normalized === "monthly") {
+    factor = 12;
+  }
+  const annualPotential = qty * targetPrice * factor;
+  return { annualPotential, annualPotentialKEur: annualPotential / 1000 };
+}
+
 export class InquiryController {
   private inquiryRepository: any = AppDataSource.getRepository(Inquiry);
   private offerRepository: any = AppDataSource.getRepository(Offer);
@@ -254,16 +292,19 @@ export class InquiryController {
         .createQueryBuilder("inquiry")
         .leftJoinAndSelect("inquiry.customer", "customer")
         .leftJoinAndSelect("inquiry.contactPerson", "contactPerson")
+        .leftJoinAndSelect("inquiry.item", "inquiryItem")
         .leftJoinAndSelect("inquiry.requests", "requests")
         .leftJoinAndSelect("requests.business", "business")
         .leftJoinAndSelect("business.customer", "businessCustomer")
         .leftJoinAndSelect("requests.contactPerson", "requestContactPerson")
+        .leftJoinAndSelect("requests.item", "requestItem")
         .leftJoinAndSelect("requests.tags", "requestTags")
         .leftJoinAndSelect("inquiry.tags", "tags")
         .select([
           "inquiry",
           "customer",
           "contactPerson",
+          "inquiryItem",
           "requests",
           "business",
           "businessCustomer.companyName",
@@ -271,6 +312,7 @@ export class InquiryController {
           "requestContactPerson.name",
           "requestContactPerson.familyName",
           "requestContactPerson.id",
+          "requestItem",
           "requestTags",
           "tags",
         ])
@@ -385,7 +427,14 @@ export class InquiryController {
 
       const inquiry = await this.inquiryRepository.findOne({
         where: { id },
-        relations: ["customer", "contactPerson", "requests", "tags"],
+        relations: [
+          "customer",
+          "contactPerson",
+          "item",
+          "requests",
+          "requests.item",
+          "tags",
+        ],
       });
 
       if (!inquiry) {
@@ -415,7 +464,12 @@ export class InquiryController {
   }
 
   async createInquiry(request: Request, response: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
+      const body = request.body;
       const {
         name,
         description,
@@ -448,39 +502,52 @@ export class InquiryController {
         packageType,
         purchasePrice,
         purchasePriceCurrency,
+        taric,
         requests,
         total_potential_k_eur,
         next_followup_at,
         owner_user_id,
         next_action,
-      } = request.body;
+        itemId,
+      } = body;
 
       if (!name || !customerId) {
+        await queryRunner.rollbackTransaction();
         return response.status(400).json({
           success: false,
           message: "Missing required fields: name and customerId are required",
         });
       }
 
-      const customer = await this.customerRepository.findOne({
+      const customerRepo = queryRunner.manager.getRepository(Customer);
+      const contactRepo = queryRunner.manager.getRepository(ContactPerson);
+      const inquiryRepo = queryRunner.manager.getRepository(Inquiry);
+      const requestRepo = queryRunner.manager.getRepository(RequestedItem);
+      const starBusinessDetailsRepo =
+        queryRunner.manager.getRepository(StarBusinessDetails);
+      const categoryRepo = queryRunner.manager.getRepository(Category);
+
+      const customer = await customerRepo.findOne({
         where: { id: customerId },
         relations: ["starBusinessDetails"],
       });
 
       if (!customer) {
+        await queryRunner.rollbackTransaction();
         return response.status(404).json({
           success: false,
           message: "Customer not found",
         });
       }
 
-      let contactPerson = null;
+      let contactPerson: ContactPerson | null = null;
       if (contactPersonId) {
-        contactPerson = await this.contactPersonRepository.findOne({
+        contactPerson = await contactRepo.findOne({
           where: { id: contactPersonId },
         });
 
         if (!contactPerson) {
+          await queryRunner.rollbackTransaction();
           return response.status(404).json({
             success: false,
             message: "Contact person not found",
@@ -490,7 +557,29 @@ export class InquiryController {
 
       const inquiryNo = await this.getNextInquiryNo();
 
-      const inquiry = this.inquiryRepository.create({
+      // Resolve/create the master Item for the inquiry itself — assembly
+      // inquiries only, per the single-source-of-truth spec. Inquiry's own
+      // column names don't match RequestedItem's 1:1 (name vs itemName,
+      // purchasePriceCurrency vs currency, image vs photo), so translate
+      // before handing off to ItemLinkService, which reads by the
+      // RequestedItem-shaped key names in ITEM_FIELD_MAP.
+      let inquiryItem: Item | null = null;
+      if (isAssembly) {
+        inquiryItem = await ItemLinkService.resolveItem(queryRunner, {
+          itemId,
+          itemName: name,
+          weight,
+          width,
+          height,
+          length,
+          purchasePrice,
+          currency: purchasePriceCurrency,
+          taric,
+          photo: image,
+        } as any);
+      }
+
+      const inquiry = inquiryRepo.create({
         name,
         description,
         image,
@@ -527,25 +616,24 @@ export class InquiryController {
         next_followup_at: next_followup_at || null,
         owner_user_id,
         next_action,
-      });
+        item: inquiryItem,
+        itemId: inquiryItem?.id,
+      } as DeepPartial<Inquiry>);
 
-      const savedInquiry = await this.inquiryRepository.save(inquiry);
+      const savedInquiry = await inquiryRepo.save(inquiry);
 
       if (requests && Array.isArray(requests) && requests.length > 0) {
         let starBusinessDetails = customer.starBusinessDetails;
         if (!starBusinessDetails) {
-          const starBusinessDetailsRepository =
-            AppDataSource.getRepository(StarBusinessDetails);
-          starBusinessDetails = starBusinessDetailsRepository.create({
+          starBusinessDetails = starBusinessDetailsRepo.create({
             customer: customer,
           });
-          await starBusinessDetailsRepository.save(starBusinessDetails);
+          await starBusinessDetailsRepo.save(starBusinessDetails);
         }
 
         let defaultProCatId: number | undefined = undefined;
         try {
-          const categoryRepository = AppDataSource.getRepository(Category);
-          const proCat = await categoryRepository.findOne({
+          const proCat = await categoryRepo.findOne({
             where: { name: "PRO" },
           });
           if (proCat) {
@@ -555,49 +643,21 @@ export class InquiryController {
           console.error("Failed to fetch default PRO category:", e);
         }
 
-        let total_potential_k_eur = 0;
-        const requestEntities = requests.map((reqData: any, index: number) => {
-          let totalWeight = null;
+        let computedTotalPotentialKEur = 0;
+        const requestEntities: RequestedItem[] = [];
+
+        for (let index = 0; index < requests.length; index++) {
+          const reqData = requests[index];
           const currentQty = reqData.qty || reqData.quantity;
-          if (reqData.unitWeight && currentQty) {
-            totalWeight =
-              parseFloat(reqData.unitWeight) * parseFloat(currentQty);
-          }
-          const { id: _ignored, ...reqDataWithoutId } = reqData;
 
           const qtyVal = parseInt(currentQty || "0", 10) || 0;
           const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
-          let factor = 12;
-          if (reqData.interval) {
-            const normalized = reqData.interval.toLowerCase().trim();
-            if (
-              normalized === "jährlich" ||
-              normalized === "jaehrlich" ||
-              normalized === "yearly"
-            ) {
-              factor = 1;
-            } else if (
-              normalized === "halbjährlich" ||
-              normalized === "halbjaehrlich" ||
-              normalized === "half-yearly" ||
-              normalized === "half yearly" ||
-              normalized === "biannually"
-            ) {
-              factor = 2;
-            } else if (normalized === "quartal" || normalized === "quarterly") {
-              factor = 4;
-            } else if (
-              normalized === "2 monatlich" ||
-              normalized === "bimonthly"
-            ) {
-              factor = 6;
-            } else if (normalized === "monatlich" || normalized === "monthly") {
-              factor = 12;
-            }
-          }
-          const annualPotential = qtyVal * targetPriceVal * factor;
-          const annualPotentialKEur = annualPotential / 1000;
-          total_potential_k_eur += annualPotentialKEur;
+          const { annualPotential, annualPotentialKEur } = calcAnnualPotential(
+            qtyVal,
+            targetPriceVal,
+            reqData.interval,
+          );
+          computedTotalPotentialKEur += annualPotentialKEur;
 
           const letterSuffix = this.getLetterSuffix(index);
           let assignedItemNo = `${savedInquiry.inquiryNo || "AF"}${letterSuffix}`;
@@ -619,32 +679,54 @@ export class InquiryController {
             }
           }
 
-          const requestItem = this.requestRepository.create({
-            ...reqDataWithoutId,
-            itemNo: assignedItemNo,
+          // Resolve/create the master Item for this request item — every
+          // requested item gets one, linked or freshly drafted. cat_id
+          // falls back to the default PRO category on the Item, not on
+          // RequestedItem (cat_id is a shared field now).
+          const reqItem = await ItemLinkService.resolveItem(queryRunner, {
+            ...reqData,
             cat_id: reqData.cat_id || defaultProCatId,
+          });
+
+          const ownFields = toRequestedItemOwnFields(reqData);
+          const requestItem = requestRepo.create({
+            ...ownFields,
+            itemNo: assignedItemNo,
             businessId: starBusinessDetails.id,
             business: starBusinessDetails,
             inquiry: savedInquiry,
             qty: currentQty,
-            totalWeight: totalWeight || reqData.totalWeight,
             targetPrice: reqData.targetPrice || null,
-            annualPotential: annualPotential,
-            annualPotentialKEur: annualPotentialKEur,
-          });
+            annualPotential,
+            annualPotentialKEur,
+            item: reqItem,
+            itemId: reqItem.id,
+            // itemName column is still NOT NULL in the DB; mirror only —
+            // every read resolves the real value from reqItem.item_name.
+            itemName: reqItem.item_name || reqData.itemName || "",
+          } as DeepPartial<RequestedItem>);
 
-          return requestItem;
-        });
+          requestEntities.push(requestItem);
+        }
 
-        await this.requestRepository.save(requestEntities);
+        await requestRepo.save(requestEntities);
 
-        savedInquiry.total_potential_k_eur = total_potential_k_eur;
-        await this.inquiryRepository.save(savedInquiry);
+        savedInquiry.total_potential_k_eur = computedTotalPotentialKEur;
+        await inquiryRepo.save(savedInquiry);
       }
+
+      await queryRunner.commitTransaction();
 
       const completeInquiry = await this.inquiryRepository.findOne({
         where: { id: savedInquiry.id },
-        relations: ["customer", "contactPerson", "requests", "tags"],
+        relations: [
+          "customer",
+          "contactPerson",
+          "item",
+          "requests",
+          "requests.item",
+          "tags",
+        ],
       });
 
       const user = (request as AuthorizedRequest).user;
@@ -659,6 +741,12 @@ export class InquiryController {
         data: filteredData,
       });
     } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof ItemLinkError) {
+        return response
+          .status(error.status)
+          .json({ success: false, message: error.message });
+      }
       console.error("Error creating inquiry:", error);
       if (error instanceof Error) {
         console.error("Stack trace:", error.stack);
@@ -668,6 +756,8 @@ export class InquiryController {
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error",
       });
+    } finally {
+      await queryRunner.release();
     }
   }
 

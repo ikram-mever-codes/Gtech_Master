@@ -1,14 +1,152 @@
 import { Request, Response } from "express";
 import { RequestedItem } from "../models/requested_items";
 import { StarBusinessDetails } from "../models/star_business_details";
+import { Customer } from "../models/customers";
 import { ContactPerson } from "../models/contact_person";
 import { AppDataSource } from "../config/database";
-import { Customer } from "../models/customers";
 import { Inquiry } from "../models/inquiry";
+import { Item } from "../models/items";
 import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
 import { OfferLineItem } from "../models/offer";
+import {
+  ItemLinkService,
+  ItemLinkError,
+  ITEM_FIELD_MAP,
+  REQUESTED_ITEM_OWN_FIELDS,
+} from "../services/item_link_service";
+import { IsOptional, IsString, IsInt, IsIn } from "class-validator";
+import { Type } from "class-transformer";
+import { DeepPartial, EntityManager } from "typeorm";
+
+// Fields that used to live directly on RequestedItem but are now sourced
+// from the linked Item. No longer used to strip — kept for the itemId
+// re-linking checks below.
+const SHARED_KEYS = Object.keys(ITEM_FIELD_MAP);
+
+// Whitelist, not blacklist: only these keys are ever written to
+// RequestedItem's own columns. Everything else (shared Item fields,
+// relation ids handled explicitly, or anything the frontend sends that
+// doesn't map to a real column) is dropped here rather than passed
+// through to TypeORM, which throws EntityPropertyNotFoundError instead
+// of ignoring unknown keys. If a field genuinely needs to reach
+// RequestedItem, add it here explicitly — don't fall back to blacklisting.
+function toOwnFields(payload: Record<string, any>): Record<string, any> {
+  const own: Record<string, any> = {};
+  for (const key of REQUESTED_ITEM_OWN_FIELDS) {
+    if (payload[key] !== undefined) own[key] = payload[key];
+  }
+  const unrecognized = Object.keys(payload).filter(
+    (key) =>
+      !REQUESTED_ITEM_OWN_FIELDS.includes(key as any) &&
+      !SHARED_KEYS.includes(key) &&
+      ![
+        "businessId",
+        "contactPersonId",
+        "inquiryId",
+        "itemId",
+        "customerId",
+        "id",
+      ].includes(key),
+  );
+  if (unrecognized.length > 0) {
+    console.warn(
+      `RequestedItem payload had fields with no matching column, dropped: ${unrecognized.join(", ")}`,
+    );
+  }
+  return own;
+}
+
+function withItemFields(entity: any): any {
+  if (!entity) return entity;
+  const projected = ItemLinkService.projectItemFields(entity.item);
+  return {
+    ...entity,
+    ...projected,
+    // category/supplier are relations, not scalar shared fields — cat_id/
+    // supplier_id come from Item via `projected` above, but the relation
+    // OBJECTS must also come from item.category/item.supplier. RequestedItem
+    // still has its own category/supplier relations (joined via its own,
+    // now-unmaintained cat_id/supplier_id columns) — those are stale from
+    // whenever the row was first created and never updated again, so they
+    // must be overridden here rather than left to leak through the spread.
+    category: entity.item?.category ?? null,
+    supplier: entity.item?.supplier ?? null,
+  };
+}
+
+// Backward-compatible response shape: business.customer nested object.
+// Prefers the stored `customer` relation (fast, no extra query); falls
+// back to nothing if a legacy row hasn't been re-saved yet (customer is
+// still null for it) — the frontend already handles a missing customer
+// there since that's exactly the old pre-migration shape.
+function withNestedCustomer(
+  business?: StarBusinessDetails,
+  customer?: Customer | null,
+): any {
+  if (!business) return business;
+  if (!customer) return business;
+  return {
+    ...business,
+    customer: {
+      id: customer.id,
+      companyName: customer.companyName,
+      legalName: customer.legalName,
+      email: customer.email,
+      contactEmail: customer.contactEmail,
+      contactPhoneNumber: customer.contactPhoneNumber,
+      stage: customer.stage,
+      avatar: customer.avatar,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
+    },
+  };
+}
+
+// Derives the Customer for a given StarBusinessDetails id via the existing
+// Customer.starBusinessDetails link (column: customer.starBusinessDetailsId).
+async function resolveCustomerForBusiness(
+  manager: EntityManager,
+  businessId: string,
+): Promise<Customer | null> {
+  const customerRepo = manager.getRepository(Customer);
+  return customerRepo.findOne({
+    where: { starBusinessDetails: { id: businessId } },
+  });
+}
+
+export class CreateRequestedItemDto {
+  @IsString()
+  businessId!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  itemId?: number;
+
+  @IsOptional()
+  @IsString()
+  itemName?: string;
+
+  @IsString()
+  qty!: string;
+
+  @IsOptional()
+  @IsIn(["Monatlich", "2 monatlich", "Quartal", "halbjährlich", "jährlich"])
+  interval?: string;
+
+  @IsOptional()
+  @IsIn(["High", "Normal"])
+  priority?: string;
+}
+
+export class UpdateRequestedItemDto {
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  itemId?: number;
+}
 
 export class RequestedItemController {
   private requestedItemRepository = AppDataSource.getRepository(RequestedItem);
@@ -16,6 +154,7 @@ export class RequestedItemController {
   private offerLineItemRepository = AppDataSource.getRepository(OfferLineItem);
   private contactPersonRepository = AppDataSource.getRepository(ContactPerson);
   private inquiryRepository = AppDataSource.getRepository(Inquiry);
+  private itemRepository = AppDataSource.getRepository(Item);
 
   async getAllRequestedItems(request: Request, response: Response) {
     try {
@@ -34,7 +173,8 @@ export class RequestedItemController {
 
       const queryBuilder = this.requestedItemRepository
         .createQueryBuilder("requestedItem")
-        .leftJoinAndSelect("requestedItem.business", "starBusiness")
+        .leftJoinAndSelect("requestedItem.business", "business")
+        .leftJoinAndSelect("requestedItem.customer", "customer")
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
         .leftJoinAndSelect("requestedItem.tags", "tags")
@@ -42,6 +182,9 @@ export class RequestedItemController {
         .leftJoinAndSelect("requestedItem.taricRel", "taricRel")
         .leftJoinAndSelect("requestedItem.category", "category")
         .leftJoinAndSelect("requestedItem.supplier", "supplier")
+        .leftJoinAndSelect("requestedItem.item", "item")
+        .leftJoinAndSelect("item.category", "itemCategory")
+        .leftJoinAndSelect("item.supplier", "itemSupplier")
         .orderBy("requestedItem.createdAt", "DESC");
 
       if (tags) {
@@ -88,19 +231,16 @@ export class RequestedItemController {
           businessId,
         });
       }
-
       if (status) {
         queryBuilder.andWhere("requestedItem.requestStatus = :status", {
           status,
         });
       }
-
       if (priority) {
         queryBuilder.andWhere("requestedItem.priority = :priority", {
           priority,
         });
       }
-
       if (contactPersonId) {
         queryBuilder.andWhere(
           "requestedItem.contactPersonId = :contactPersonId",
@@ -109,21 +249,19 @@ export class RequestedItemController {
           },
         );
       }
-
       if (inquiryId) {
         queryBuilder.andWhere("requestedItem.inquiry.id = :inquiryId", {
           inquiryId,
         });
       }
-
+      // weight now lives on the linked Item, not on requestedItem directly.
       if (minWeight) {
-        queryBuilder.andWhere("requestedItem.weight >= :minWeight", {
+        queryBuilder.andWhere("item.weight >= :minWeight", {
           minWeight: parseFloat(minWeight as string),
         });
       }
-
       if (maxWeight) {
-        queryBuilder.andWhere("requestedItem.weight <= :maxWeight", {
+        queryBuilder.andWhere("item.weight <= :maxWeight", {
           maxWeight: parseFloat(maxWeight as string),
         });
       }
@@ -134,35 +272,10 @@ export class RequestedItemController {
         .take(Number(limit))
         .getManyAndCount();
 
-      const customerRepository = AppDataSource.getRepository(Customer);
-
-      const enrichedItems = await Promise.all(
-        items.map(async (item) => {
-          const customer = await customerRepository.findOne({
-            where: { starBusinessDetails: { id: item.businessId } },
-            relations: ["starBusinessDetails"],
-          });
-
-          return {
-            ...item,
-            business: {
-              ...item.business,
-              customer: customer
-                ? {
-                    id: customer.id,
-                    companyName: customer.companyName,
-                    legalName: customer.legalName,
-                    email: customer.email,
-                    contactEmail: customer.contactEmail,
-                    contactPhoneNumber: customer.contactPhoneNumber,
-                    stage: customer.stage,
-                    avatar: customer.avatar,
-                    createdAt: customer.createdAt,
-                    updatedAt: customer.updatedAt,
-                  }
-                : null,
-            },
-          };
+      const enrichedItems = items.map((item) =>
+        withItemFields({
+          ...item,
+          business: withNestedCustomer(item.business, item.customer),
         }),
       );
 
@@ -184,10 +297,9 @@ export class RequestedItemController {
       });
     } catch (error) {
       console.error("Error fetching requested items:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 
@@ -199,6 +311,7 @@ export class RequestedItemController {
         where: { id },
         relations: [
           "business",
+          "customer",
           "contactPerson",
           "inquiry",
           "tags",
@@ -206,41 +319,22 @@ export class RequestedItemController {
           "taricRel",
           "category",
           "supplier",
+          "item",
+          "item.category",
+          "item.supplier",
         ],
       });
 
       if (!item) {
-        return response.status(404).json({
-          success: false,
-          message: "Requested item not found",
-        });
+        return response
+          .status(404)
+          .json({ success: false, message: "Requested item not found" });
       }
 
-      const customerRepository = AppDataSource.getRepository(Customer);
-      const customer = await customerRepository.findOne({
-        where: { starBusinessDetails: { id: item.businessId } },
-      });
-
-      const enrichedItem = {
+      const enrichedItem = withItemFields({
         ...item,
-        business: {
-          ...item.business,
-          customer: customer
-            ? {
-                id: customer.id,
-                companyName: customer.companyName,
-                legalName: customer.legalName,
-                email: customer.email,
-                contactEmail: customer.contactEmail,
-                contactPhoneNumber: customer.contactPhoneNumber,
-                stage: customer.stage,
-                avatar: customer.avatar,
-                createdAt: customer.createdAt,
-                updatedAt: customer.updatedAt,
-              }
-            : null,
-        },
-      };
+        business: withNestedCustomer(item.business, item.customer),
+      });
 
       const user = (request as AuthorizedRequest).user;
       const filteredData = filterDataByRole(
@@ -248,174 +342,129 @@ export class RequestedItemController {
         user?.role || UserRole.STAFF,
       );
 
-      return response.status(200).json({
-        success: true,
-        data: filteredData,
-      });
+      return response.status(200).json({ success: true, data: filteredData });
     } catch (error) {
       console.error("Error fetching requested item:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 
   async createRequestedItem(request: Request, response: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      const {
-        businessId,
-        contactPersonId,
-        extraNote,
-        itemName,
-        material,
-        specification,
-        extraItems,
-        extraItemsDescriptions,
-        qty,
-        asanaLink,
-        interval,
-        sampleQty,
-        expectedDelivery,
-        priority,
-        requestStatus,
-        comment,
-        weight,
-        width,
-        height,
-        length,
-        purchasePrice,
-        currency,
-        inquiryId,
-        qualityCriteria,
-        attachments,
-        taric,
-        itemNo,
-        urgency1,
-        urgency2,
-        painPoints,
-        parent_id,
-        model,
-        ean,
-        taric_id,
-        item_name_cn,
-        cat_id,
-        remark,
-        photo,
-        pix_path,
-        pix_path_eBay,
-        is_rmb_special,
-        is_eur_special,
-        isActive,
-        supplier_id,
-        item_name_de,
-      } = request.body;
+      const body = request.body;
 
-      console.log("Received contactPersonId:", contactPersonId);
+      const { businessId, contactPersonId, inquiryId, itemId, itemName, qty } =
+        body;
 
-      if (!businessId || !itemName || !qty) {
+      if (!businessId || !qty) {
+        await queryRunner.rollbackTransaction();
         return response.status(400).json({
           success: false,
-          message:
-            "Missing required fields: businessId, itemName, and qty are required",
+          message: "Missing required fields: businessId and qty are required",
         });
       }
 
-      const business = await this.businessRepository.findOne({
+      if (!itemId && !itemName) {
+        await queryRunner.rollbackTransaction();
+        return response.status(400).json({
+          success: false,
+          message:
+            "itemName is required when no itemId is supplied (needed to create the draft Item)",
+        });
+      }
+
+      const businessRepo =
+        queryRunner.manager.getRepository(StarBusinessDetails);
+      const contactRepo = queryRunner.manager.getRepository(ContactPerson);
+      const inquiryRepo = queryRunner.manager.getRepository(Inquiry);
+      const requestedItemRepo =
+        queryRunner.manager.getRepository(RequestedItem);
+
+      const business = await businessRepo.findOne({
         where: { id: businessId },
       });
-
       if (!business) {
-        return response.status(404).json({
-          success: false,
-          message: "Business not found",
-        });
+        await queryRunner.rollbackTransaction();
+        return response
+          .status(404)
+          .json({ success: false, message: "Business not found" });
       }
 
       let contactPerson: any = null;
       if (contactPersonId) {
-        contactPerson = await this.contactPersonRepository.findOne({
+        contactPerson = await contactRepo.findOne({
           where: { id: contactPersonId },
         });
-
         if (!contactPerson) {
-          return response.status(404).json({
-            success: false,
-            message: "Contact person not found",
-          });
+          await queryRunner.rollbackTransaction();
+          return response
+            .status(404)
+            .json({ success: false, message: "Contact person not found" });
         }
       }
 
       let inquiry: any = null;
       if (inquiryId) {
-        inquiry = await this.inquiryRepository.findOne({
-          where: { id: inquiryId },
-        });
-
+        inquiry = await inquiryRepo.findOne({ where: { id: inquiryId } });
         if (!inquiry) {
-          return response.status(404).json({
-            success: false,
-            message: "Inquiry not found",
-          });
+          await queryRunner.rollbackTransaction();
+          return response
+            .status(404)
+            .json({ success: false, message: "Inquiry not found" });
         }
       }
 
-      const requestedItem = this.requestedItemRepository.create({
-        business: business,
-        contactPerson: contactPerson,
-        contactPersonId: contactPersonId || null,
-        inquiry: inquiry,
-        itemName,
-        material,
-        asanaLink,
-        extraNote,
-        specification,
-        extraItems: extraItems || "NO",
-        extraItemsDescriptions,
-        qty,
-        interval: interval || "Monatlich",
-        sampleQty,
-        expectedDelivery,
-        priority: priority || "Normal",
-        requestStatus: requestStatus || "Open",
-        comment,
-        weight,
-        width,
-        height,
-        length,
-        purchasePrice,
-        currency: currency || "RMB",
-        qualityCriteria,
-        attachments,
-        taric,
-        itemNo,
-        urgency1,
-        urgency2,
-        painPoints,
-        parent_id,
-        model,
-        ean,
-        taric_id,
-        item_name_cn,
-        cat_id,
-        remark,
-        photo,
-        pix_path,
-        pix_path_eBay,
-        is_rmb_special,
-        is_eur_special,
-        isActive,
-        supplier_id,
-        item_name_de,
-      });
+      // Derived, not client-supplied. If this business has no linked
+      // Customer yet (star_business_details row with no matching
+      // customer.starBusinessDetailsId), customer stays null — that's a
+      // pre-existing data gap, not something this endpoint should block on.
+      const customer = await resolveCustomerForBusiness(
+        queryRunner.manager,
+        businessId,
+      );
 
-      const savedItem: any =
-        await this.requestedItemRepository.save(requestedItem);
+      // Resolve or create the master Item (single source of truth for
+      // the shared fields listed in ITEM_FIELD_MAP).
+      const item = await ItemLinkService.resolveItem(queryRunner, body);
+
+      const ownFields = toOwnFields(body);
+      // itemName is item data now — but the RequestedItem column is still
+      // NOT NULL in the DB (no migration for that yet), so it has to be
+      // written on insert regardless. This is a mirror only: every read
+      // in this controller shows item.item_name via withItemFields, this
+      // column is never consulted again.
+      const requestedItemData: DeepPartial<RequestedItem> = {
+        ...ownFields,
+        business,
+        customer,
+        contactPerson,
+        contactPersonId: contactPersonId || null,
+        inquiry,
+        item,
+        itemId: item.id,
+        itemName: item.item_name || itemName || "",
+        extraItems: body.extraItems || "NO",
+        interval: body.interval || "Monatlich",
+        priority: body.priority || "Normal",
+        requestStatus: body.requestStatus || "Open",
+      };
+
+      const requestedItem = requestedItemRepo.create(requestedItemData);
+      const savedItem = await requestedItemRepo.save(requestedItem);
+
+      await queryRunner.commitTransaction();
 
       const itemWithRelations = await this.requestedItemRepository.findOne({
         where: { id: savedItem.id },
         relations: [
           "business",
+          "customer",
           "contactPerson",
           "inquiry",
           "tags",
@@ -423,181 +472,186 @@ export class RequestedItemController {
           "taricRel",
           "category",
           "supplier",
+          "item",
+          "item.category",
+          "item.supplier",
         ],
       });
 
       return response.status(201).json({
         success: true,
         message: "Requested item created successfully",
-        data: itemWithRelations,
+        data: withItemFields({
+          ...itemWithRelations,
+          business: withNestedCustomer(
+            itemWithRelations?.business,
+            itemWithRelations?.customer,
+          ),
+        }),
       });
     } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof ItemLinkError) {
+        return response
+          .status(error.status)
+          .json({ success: false, message: error.message });
+      }
       console.error("Error creating requested item:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
+    } finally {
+      await queryRunner.release();
     }
   }
 
   async updateRequestedItem(request: Request, response: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
       const { id } = request.params;
-      const {
-        contactPersonId,
-        itemName,
-        material,
-        specification,
-        extraItems,
-        extraNote,
-        extraItemsDescriptions,
-        qty,
-        asanaLink,
-        interval,
-        sampleQty,
-        expectedDelivery,
-        priority,
-        requestStatus,
-        comment,
-        weight,
-        width,
-        height,
-        length,
-        purchasePrice,
-        currency,
-        inquiryId,
-        qualityCriteria,
-        attachments,
-        taric,
-        itemNo,
-        urgency1,
-        urgency2,
-        painPoints,
-        parent_id,
-        model,
-        ean,
-        taric_id,
-        item_name_cn,
-        cat_id,
-        remark,
-        photo,
-        pix_path,
-        pix_path_eBay,
-        is_rmb_special,
-        is_eur_special,
-        isActive,
-        supplier_id,
-        item_name_de,
-      } = request.body;
+      const body = request.body;
 
-      const existingItem = await this.requestedItemRepository.findOne({
+      const requestedItemRepo =
+        queryRunner.manager.getRepository(RequestedItem);
+      const businessRepo =
+        queryRunner.manager.getRepository(StarBusinessDetails);
+      const contactRepo = queryRunner.manager.getRepository(ContactPerson);
+      const inquiryRepo = queryRunner.manager.getRepository(Inquiry);
+
+      const existingItem = await requestedItemRepo.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry", "tags"],
+        relations: [
+          "business",
+          "customer",
+          "contactPerson",
+          "inquiry",
+          "tags",
+          "item",
+        ],
       });
 
       if (!existingItem) {
-        return response.status(404).json({
-          success: false,
-          message: "Requested item not found",
-        });
+        await queryRunner.rollbackTransaction();
+        return response
+          .status(404)
+          .json({ success: false, message: "Requested item not found" });
       }
 
-      let contactPerson: ContactPerson | null = null;
-      if (contactPersonId !== undefined) {
-        if (contactPersonId) {
-          contactPerson = await this.contactPersonRepository.findOne({
-            where: { id: contactPersonId },
+      let contactPerson: ContactPerson | null | undefined = undefined;
+      if (body.contactPersonId !== undefined) {
+        if (body.contactPersonId) {
+          contactPerson = await contactRepo.findOne({
+            where: { id: body.contactPersonId },
           });
-
           if (!contactPerson) {
-            return response.status(404).json({
-              success: false,
-              message: "Contact person not found",
-            });
+            await queryRunner.rollbackTransaction();
+            return response
+              .status(404)
+              .json({ success: false, message: "Contact person not found" });
           }
         } else {
           contactPerson = null;
         }
       }
 
-      let inquiry: any = null;
-      if (inquiryId !== undefined) {
-        if (inquiryId) {
-          inquiry = await this.inquiryRepository.findOne({
-            where: { id: inquiryId },
+      let inquiry: Inquiry | null | undefined = undefined;
+      if (body.inquiryId !== undefined) {
+        if (body.inquiryId) {
+          inquiry = await inquiryRepo.findOne({
+            where: { id: body.inquiryId },
           });
-
           if (!inquiry) {
-            return response.status(404).json({
-              success: false,
-              message: "Inquiry not found",
-            });
+            await queryRunner.rollbackTransaction();
+            return response
+              .status(404)
+              .json({ success: false, message: "Inquiry not found" });
           }
         } else {
           inquiry = null;
         }
       }
 
-      const updateData: any = {
-        ...(itemName && { itemName }),
-        ...(extraNote !== undefined && { extraNote }),
-        ...(asanaLink !== undefined && { asanaLink }),
-        ...(material !== undefined && { material }),
-        ...(specification !== undefined && { specification }),
-        ...(extraItems && { extraItems }),
-        ...(extraItemsDescriptions !== undefined && { extraItemsDescriptions }),
-        ...(qty && { qty }),
-        ...(interval && { interval }),
-        ...(sampleQty !== undefined && { sampleQty }),
-        ...(expectedDelivery !== undefined && { expectedDelivery }),
-        ...(priority && { priority }),
-        ...(requestStatus && { requestStatus }),
-        ...(comment !== undefined && { comment }),
-        ...(weight !== undefined && { weight }),
-        ...(width !== undefined && { width }),
-        ...(height !== undefined && { height }),
-        ...(length !== undefined && { length }),
-        ...(purchasePrice !== undefined && { purchasePrice }),
-        ...(currency && { currency }),
-        ...(qualityCriteria !== undefined && { qualityCriteria }),
-        ...(attachments !== undefined && { attachments }),
-        ...(taric !== undefined && { taric }),
-        ...(itemNo !== undefined && { itemNo }),
-        ...(urgency1 !== undefined && { urgency1 }),
-        ...(urgency2 !== undefined && { urgency2 }),
-        ...(painPoints !== undefined && { painPoints }),
-        ...(parent_id !== undefined && { parent_id }),
-        ...(model !== undefined && { model }),
-        ...(ean !== undefined && { ean }),
-        ...(taric_id !== undefined && { taric_id }),
-        ...(item_name_cn !== undefined && { item_name_cn }),
-        ...(cat_id !== undefined && { cat_id }),
-        ...(remark !== undefined && { remark }),
-        ...(photo !== undefined && { photo }),
-        ...(pix_path !== undefined && { pix_path }),
-        ...(pix_path_eBay !== undefined && { pix_path_eBay }),
-        ...(is_rmb_special !== undefined && { is_rmb_special }),
-        ...(is_eur_special !== undefined && { is_eur_special }),
-        ...(isActive !== undefined && { isActive }),
-        ...(supplier_id !== undefined && { supplier_id }),
-        ...(item_name_de !== undefined && { item_name_de }),
-      };
+      // If businessId changes, re-derive customer from the new business.
+      // Otherwise, backfill customer for legacy rows that predate this
+      // field (existingItem.customer is null but business is unchanged).
+      let customer: Customer | null | undefined = undefined;
+      if (
+        body.businessId !== undefined &&
+        body.businessId !== existingItem.businessId
+      ) {
+        const newBusiness = await businessRepo.findOne({
+          where: { id: body.businessId },
+        });
+        if (!newBusiness) {
+          await queryRunner.rollbackTransaction();
+          return response
+            .status(404)
+            .json({ success: false, message: "Business not found" });
+        }
+        customer = await resolveCustomerForBusiness(
+          queryRunner.manager,
+          body.businessId,
+        );
+      } else if (!existingItem.customer) {
+        customer = await resolveCustomerForBusiness(
+          queryRunner.manager,
+          existingItem.businessId,
+        );
+      }
 
-      if (request.body.hasOwnProperty("contactPersonId")) {
-        updateData.contactPerson = contactPerson;
+      // --- Item resolution ---
+      // 1. payload.itemId given and differs from current link -> re-link to that (existing) Item.
+      // 2. payload has no itemId but the RequestedItem already has one -> sync shared fields onto it.
+      // 3. RequestedItem predates this migration (no item link yet) -> backfill a draft Item from
+      //    whatever shared-field values already sit on this row, then apply payload overrides.
+      let linkedItem: Item;
+      if (body.itemId !== undefined && body.itemId !== existingItem.itemId) {
+        linkedItem = await ItemLinkService.resolveItem(queryRunner, body);
+      } else if (existingItem.item) {
+        linkedItem = await ItemLinkService.syncItemFields(
+          queryRunner,
+          existingItem.item,
+          body,
+        );
+      } else {
+        const baseFields: Record<string, any> = {};
+        for (const key of SHARED_KEYS) {
+          if ((existingItem as any)[key] !== undefined)
+            baseFields[key] = (existingItem as any)[key];
+        }
+        linkedItem = await ItemLinkService.backfillItem(
+          queryRunner,
+          baseFields,
+          body,
+        );
+      }
+
+      const updateData: Record<string, any> = toOwnFields(body);
+
+      updateData.itemId = linkedItem.id;
+      if (contactPerson !== undefined) {
         updateData.contactPersonId = contactPerson ? contactPerson.id : null;
       }
-
-      if (request.body.hasOwnProperty("inquiryId")) {
+      if (inquiry !== undefined) {
         updateData.inquiry = inquiry;
       }
+      if (customer !== undefined) {
+        updateData.customer = customer;
+        updateData.customerId = customer ? customer.id : null;
+      }
 
-      await this.requestedItemRepository.update(id, updateData);
+      await requestedItemRepo.update(id, updateData);
+
+      await queryRunner.commitTransaction();
 
       const updatedItem = await this.requestedItemRepository.findOne({
         where: { id },
         relations: [
           "business",
+          "customer",
           "contactPerson",
           "inquiry",
           "tags",
@@ -605,20 +659,36 @@ export class RequestedItemController {
           "taricRel",
           "category",
           "supplier",
+          "item",
+          "item.category",
+          "item.supplier",
         ],
       });
 
       return response.status(200).json({
         success: true,
         message: "Requested item updated successfully",
-        data: updatedItem,
+        data: withItemFields({
+          ...updatedItem,
+          business: withNestedCustomer(
+            updatedItem?.business,
+            updatedItem?.customer,
+          ),
+        }),
       });
     } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof ItemLinkError) {
+        return response
+          .status(error.status)
+          .json({ success: false, message: error.message });
+      }
       console.error("Error updating requested item:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -629,12 +699,10 @@ export class RequestedItemController {
       const item = await this.requestedItemRepository.findOne({
         where: { id },
       });
-
       if (!item) {
-        return response.status(404).json({
-          success: false,
-          message: "Requested item not found",
-        });
+        return response
+          .status(404)
+          .json({ success: false, message: "Requested item not found" });
       }
 
       const linkedLineItem = await this.offerLineItemRepository
@@ -658,10 +726,9 @@ export class RequestedItemController {
       });
     } catch (error) {
       console.error("Error deleting requested item:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 
@@ -681,20 +748,20 @@ export class RequestedItemController {
       const business = await this.businessRepository.findOne({
         where: { id: businessId },
       });
-
       if (!business) {
-        return response.status(404).json({
-          success: false,
-          message: "Business not found",
-        });
+        return response
+          .status(404)
+          .json({ success: false, message: "Business not found" });
       }
 
       const queryBuilder = this.requestedItemRepository
         .createQueryBuilder("requestedItem")
         .leftJoinAndSelect("requestedItem.business", "business")
+        .leftJoinAndSelect("requestedItem.customer", "customer")
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
         .leftJoinAndSelect("requestedItem.tags", "tags")
+        .leftJoinAndSelect("requestedItem.item", "item")
         .where("requestedItem.businessId = :businessId", { businessId })
         .orderBy("requestedItem.createdAt", "DESC");
 
@@ -703,32 +770,28 @@ export class RequestedItemController {
           status,
         });
       }
-
       if (priority) {
         queryBuilder.andWhere("requestedItem.priority = :priority", {
           priority,
         });
       }
-
       if (minWeight) {
-        queryBuilder.andWhere("requestedItem.weight >= :minWeight", {
+        queryBuilder.andWhere("item.weight >= :minWeight", {
           minWeight: parseFloat(minWeight as string),
         });
       }
-
       if (maxWeight) {
-        queryBuilder.andWhere("requestedItem.weight <= :maxWeight", {
+        queryBuilder.andWhere("item.weight <= :maxWeight", {
           maxWeight: parseFloat(maxWeight as string),
         });
       }
-
       if (hasDimensions === "true") {
         queryBuilder.andWhere(
-          "(requestedItem.weight IS NOT NULL OR requestedItem.width IS NOT NULL OR requestedItem.height IS NOT NULL OR requestedItem.length IS NOT NULL)",
+          "(item.weight IS NOT NULL OR item.width IS NOT NULL OR item.height IS NOT NULL OR item.length IS NOT NULL)",
         );
       } else if (hasDimensions === "false") {
         queryBuilder.andWhere(
-          "(requestedItem.weight IS NULL AND requestedItem.width IS NULL AND requestedItem.height IS NULL AND requestedItem.length IS NULL)",
+          "(item.weight IS NULL AND item.width IS NULL AND item.height IS NULL AND item.length IS NULL)",
         );
       }
 
@@ -740,7 +803,12 @@ export class RequestedItemController {
 
       return response.status(200).json({
         success: true,
-        data: items,
+        data: items.map((item) =>
+          withItemFields({
+            ...item,
+            business: withNestedCustomer(item.business, item.customer),
+          }),
+        ),
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -750,10 +818,9 @@ export class RequestedItemController {
       });
     } catch (error) {
       console.error("Error fetching requested items by business:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 
@@ -765,20 +832,20 @@ export class RequestedItemController {
       const inquiry = await this.inquiryRepository.findOne({
         where: { id: inquiryId },
       });
-
       if (!inquiry) {
-        return response.status(404).json({
-          success: false,
-          message: "Inquiry not found",
-        });
+        return response
+          .status(404)
+          .json({ success: false, message: "Inquiry not found" });
       }
 
       const queryBuilder = this.requestedItemRepository
         .createQueryBuilder("requestedItem")
         .leftJoinAndSelect("requestedItem.business", "business")
+        .leftJoinAndSelect("requestedItem.customer", "customer")
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
         .leftJoinAndSelect("requestedItem.tags", "tags")
+        .leftJoinAndSelect("requestedItem.item", "item")
         .where("requestedItem.inquiry.id = :inquiryId", { inquiryId })
         .orderBy("requestedItem.createdAt", "DESC");
 
@@ -787,7 +854,6 @@ export class RequestedItemController {
           status,
         });
       }
-
       if (priority) {
         queryBuilder.andWhere("requestedItem.priority = :priority", {
           priority,
@@ -802,7 +868,12 @@ export class RequestedItemController {
 
       return response.status(200).json({
         success: true,
-        data: items,
+        data: items.map((item) =>
+          withItemFields({
+            ...item,
+            business: withNestedCustomer(item.business, item.customer),
+          }),
+        ),
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -812,10 +883,9 @@ export class RequestedItemController {
       });
     } catch (error) {
       console.error("Error fetching requested items by inquiry:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 
@@ -823,39 +893,41 @@ export class RequestedItemController {
     try {
       const { id } = request.params;
 
-      const item = await this.requestedItemRepository.findOne({
+      const requestedItem = await this.requestedItemRepository.findOne({
         where: { id },
+        relations: ["item"],
       });
 
-      if (!item) {
-        return response.status(404).json({
-          success: false,
-          message: "Requested item not found",
-        });
+      if (!requestedItem) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Requested item not found" });
       }
 
-      let volume = null;
+      const dims = requestedItem.item;
+      let volume: number | null = null;
       let volumeMessage = "Cannot calculate volume";
 
-      if (item.length && item.width && item.height) {
+      if (dims?.length && dims?.width && dims?.height) {
         volume =
-          parseFloat(item.length.toString()) *
-          parseFloat(item.width.toString()) *
-          parseFloat(item.height.toString());
+          parseFloat(dims.length.toString()) *
+          parseFloat(dims.width.toString()) *
+          parseFloat(dims.height.toString());
         volumeMessage = `Volume calculated: ${volume.toFixed(3)} cubic units`;
       } else {
-        volumeMessage = "Missing dimension data (length, width, or height)";
+        volumeMessage =
+          "Missing dimension data on the linked item (length, width, or height)";
       }
 
       return response.status(200).json({
         success: true,
         data: {
-          itemId: item.id,
-          itemName: item.itemName,
+          itemId: requestedItem.id,
+          itemName: dims?.item_name,
           dimensions: {
-            length: item.length,
-            width: item.width,
-            height: item.height,
+            length: dims?.length,
+            width: dims?.width,
+            height: dims?.height,
           },
           volume,
           message: volumeMessage,
@@ -863,26 +935,34 @@ export class RequestedItemController {
       });
     } catch (error) {
       console.error("Error calculating item volume:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 
   async bulkUpdateDimensions(request: Request, response: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
       const { items } = request.body;
 
       if (!Array.isArray(items) || items.length === 0) {
+        await queryRunner.rollbackTransaction();
         return response.status(400).json({
           success: false,
           message: "Items array is required and cannot be empty",
         });
       }
 
-      const results = [];
-      const errors = [];
+      const requestedItemRepo =
+        queryRunner.manager.getRepository(RequestedItem);
+      const itemRepo = queryRunner.manager.getRepository(Item);
+
+      const results: any[] = [];
+      const errors: any[] = [];
 
       for (const itemData of items) {
         const { id, weight, width, height, length } = itemData;
@@ -893,32 +973,37 @@ export class RequestedItemController {
         }
 
         try {
-          const item = await this.requestedItemRepository.findOne({
+          const requestedItem = await requestedItemRepo.findOne({
             where: { id },
+            relations: ["item"],
           });
 
-          if (!item) {
-            errors.push({ id, error: "Item not found" });
+          if (!requestedItem) {
+            errors.push({ id, error: "Requested item not found" });
             continue;
           }
 
-          const updateData: any = {};
-          if (weight !== undefined) updateData.weight = weight;
-          if (width !== undefined) updateData.width = width;
-          if (height !== undefined) updateData.height = height;
-          if (length !== undefined) updateData.length = length;
+          if (!requestedItem.item) {
+            errors.push({
+              id,
+              error: "Requested item has no linked Item to update",
+            });
+            continue;
+          }
 
-          await this.requestedItemRepository.update(id, updateData);
+          const dimUpdate: Partial<Item> = {};
+          if (weight !== undefined) dimUpdate.weight = weight;
+          if (width !== undefined) dimUpdate.width = width;
+          if (height !== undefined) dimUpdate.height = height;
+          if (length !== undefined) dimUpdate.length = length;
 
-          const updatedItem = await this.requestedItemRepository.findOne({
-            where: { id },
+          await itemRepo.update(requestedItem.item.id, dimUpdate);
+
+          const updatedItem = await itemRepo.findOne({
+            where: { id: requestedItem.item.id },
           });
 
-          results.push({
-            id,
-            success: true,
-            data: updatedItem,
-          });
+          results.push({ id, success: true, data: updatedItem });
         } catch (error) {
           errors.push({
             id,
@@ -926,6 +1011,17 @@ export class RequestedItemController {
           });
         }
       }
+
+      if (errors.length > 0 && results.length === 0) {
+        await queryRunner.rollbackTransaction();
+        return response.status(400).json({
+          success: false,
+          message: "No items were updated",
+          data: { updated: [], errors },
+        });
+      }
+
+      await queryRunner.commitTransaction();
 
       return response.status(200).json({
         success: true,
@@ -936,11 +1032,13 @@ export class RequestedItemController {
         },
       });
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       console.error("Error in bulk update dimensions:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -951,9 +1049,11 @@ export class RequestedItemController {
       const queryBuilder = this.requestedItemRepository
         .createQueryBuilder("requestedItem")
         .leftJoinAndSelect("requestedItem.business", "business")
+        .leftJoinAndSelect("requestedItem.customer", "customer")
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
+        .leftJoinAndSelect("requestedItem.item", "item")
         .where(
-          "(requestedItem.weight IS NULL OR requestedItem.width IS NULL OR requestedItem.height IS NULL OR requestedItem.length IS NULL)",
+          "(item.weight IS NULL OR item.width IS NULL OR item.height IS NULL OR item.length IS NULL OR item.id IS NULL)",
         )
         .orderBy("requestedItem.createdAt", "DESC");
 
@@ -971,7 +1071,12 @@ export class RequestedItemController {
 
       return response.status(200).json({
         success: true,
-        data: items,
+        data: items.map((item) =>
+          withItemFields({
+            ...item,
+            business: withNestedCustomer(item.business, item.customer),
+          }),
+        ),
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -980,15 +1085,14 @@ export class RequestedItemController {
         },
         summary: {
           totalMissingDimensionItems: total,
-          message: "Items with missing dimension data",
+          message: "Items with missing dimension data on the linked item",
         },
       });
     } catch (error) {
       console.error("Error fetching items with missing dimensions:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
+      return response
+        .status(500)
+        .json({ success: false, message: "Internal server error" });
     }
   }
 }
