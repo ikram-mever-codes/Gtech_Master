@@ -4523,8 +4523,35 @@ export class OfferController {
         yPos += 14;
       }
       if (offer.deliveryTime) {
-        doc.text(`Lieferzeit: ${offer.deliveryTime}`, LEFT_X, yPos);
-        yPos += 14;
+        const rawDelivery = String(offer.deliveryTime).trim();
+        if (rawDelivery) {
+          const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawDelivery);
+          const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawDelivery);
+          const parsed = new Date(rawDelivery);
+          const isValidDate =
+            (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
+            /\d{4}/.test(rawDelivery);
+
+          if (isValidDate) {
+            let formattedDate = rawDelivery;
+            const parts = rawDelivery.split(".");
+            if (parts.length === 3 && parts[2].length === 4) {
+              const day = parts[0].padStart(2, "0");
+              const month = parts[1].padStart(2, "0");
+              const year = parts[2];
+              formattedDate = `${day}.${month}.${year}`;
+            } else if (!isNaN(parsed.getTime())) {
+              const day = String(parsed.getDate()).padStart(2, "0");
+              const month = String(parsed.getMonth() + 1).padStart(2, "0");
+              const year = parsed.getFullYear();
+              formattedDate = `${day}.${month}.${year}`;
+            }
+            doc.text(`Lieferdatum: geschätzt ${formattedDate}`, LEFT_X, yPos);
+          } else {
+            doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
+          }
+          yPos += 14;
+        }
       }
       if (offer.deliveryTerms) {
         doc.text(`Lieferbedingungen: ${offer.deliveryTerms}`, LEFT_X, yPos);

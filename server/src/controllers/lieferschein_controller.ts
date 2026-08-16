@@ -388,16 +388,27 @@ export const downloadLieferscheinPdf = async (
           "Lieferdatum",
           formatDateStr(
             lieferschein.delivery_date ||
-              rechnung?.date_delivery ||
-              rechnung?.delivery_date,
+            (lieferschein as any).date_delivery ||
+            rechnung?.date_delivery ||
+            rechnung?.delivery_date,
           ),
         ],
       ],
+      isDelivered: true,
       lineItems: items,
       showPrices: false,
       shippingMethod: rechnung?.shipping_method,
       notes: lieferschein.notes || rechnung?.notes,
-      deliveryTime: rechnung?.date_delivery,
+      deliveryTime:
+        lieferschein.delivery_date ||
+        (lieferschein as any).date_delivery ||
+        rechnung?.date_delivery ||
+        rechnung?.delivery_date,
+      deliveryDate:
+        lieferschein.delivery_date ||
+        (lieferschein as any).date_delivery ||
+        rechnung?.date_delivery ||
+        rechnung?.delivery_date,
       deliveryTerms: rechnung?.delivery_terms,
       outputFilePath: filePath,
     });

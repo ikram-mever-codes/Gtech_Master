@@ -570,16 +570,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
   ]);
 
   const availableCountries = useMemo(() => {
-    const fromDb = (dbCountries || [])
+    return (dbCountries || [])
       .filter((c: any) => c.is_active !== false)
       .map((c: any) => (c.iso2 || c.name || "").trim().toUpperCase())
-      .filter(Boolean);
-    const fromBiz = (allBusinesses || [])
-      .map((b: any) => toCountryCode(b.country).toUpperCase())
-      .filter(Boolean);
-    const set = new Set<string>([...fromDb, ...fromBiz]);
-    return Array.from(set).sort();
-  }, [dbCountries, allBusinesses]);
+      .filter(Boolean)
+      .sort();
+  }, [dbCountries]);
 
   const filteredBusinesses = useMemo(() => {
     const cn = clientFilters.companyName.trim().toLowerCase();
