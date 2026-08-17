@@ -102,7 +102,7 @@ export const downloadRechnungPdf = async (
     if (blob.size === 0) throw new Error("The downloaded PDF is empty.");
     const filename = getFilenameFromResponse(
       response,
-      `Rechnung ${invoiceNo || id}.pdf`,
+      `Rechnung_${String(invoiceNo || id).replace(/[\s_]+/g, "_")}_GTech.pdf`,
     );
     downloadBlob(blob, filename);
     toast.dismiss();

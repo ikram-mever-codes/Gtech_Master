@@ -413,17 +413,15 @@ export const downloadLieferscheinPdf = async (
       outputFilePath: filePath,
     });
 
-    const datePart = (() => {
-      const d = (lieferschein.date_created || lieferschein.created_at) ? new Date(lieferschein.date_created || lieferschein.created_at) : new Date();
-      const yy = String(d.getFullYear()).slice(-2);
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yy}${mm}${dd}`;
-    })();
-    const cleanTitle = ((lieferschein as any)?.title || (rechnung as any)?.title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+    const cleanTitle = ((lieferschein as any)?.title || (rechnung as any)?.title || "")
+      .trim()
+      .replace(/[^\w-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const docNo = String(lieferschein.delivery_note_number || lieferschein.id || "lieferschein").trim().replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
-      ? `Lieferschein ${lieferschein.delivery_note_number || lieferschein.id} ${cleanTitle} ${datePart}.pdf`
-      : `Lieferschein ${lieferschein.delivery_note_number || lieferschein.id} ${datePart}.pdf`;
+      ? `Lieferschein_${docNo}_GTech_${cleanTitle}.pdf`
+      : `Lieferschein_${docNo}_GTech.pdf`;
 
     res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");

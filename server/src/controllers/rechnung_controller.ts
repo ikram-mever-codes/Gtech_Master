@@ -879,17 +879,15 @@ export const downloadRechnungPdf = async (
       outputFilePath: filePath,
     });
 
-    const datePart = (() => {
-      const d = (rechnung.date_created || rechnung.created_at) ? new Date(rechnung.date_created || rechnung.created_at) : new Date();
-      const yy = String(d.getFullYear()).slice(-2);
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yy}${mm}${dd}`;
-    })();
-    const cleanTitle = ((rechnung as any).title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+    const cleanTitle = ((rechnung as any).title || "")
+      .trim()
+      .replace(/[^\w-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const docNo = String(rechnung.invoice_number || rechnung.id || "rechnung").trim().replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
-      ? `Rechnung ${rechnung.invoice_number || rechnung.id} ${cleanTitle} ${datePart}.pdf`
-      : `Rechnung ${rechnung.invoice_number || rechnung.id} ${datePart}.pdf`;
+      ? `Rechnung_${docNo}_GTech_${cleanTitle}.pdf`
+      : `Rechnung_${docNo}_GTech.pdf`;
 
     res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");

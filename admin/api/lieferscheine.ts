@@ -79,7 +79,7 @@ export const downloadLieferscheinPdf = async (
     if (blob.size === 0) throw new Error("The downloaded PDF is empty.");
     const filename = getFilenameFromResponse(
       response,
-      `Lieferschein ${deliveryNoteNo || id}.pdf`,
+      `Lieferschein_${String(deliveryNoteNo || id).replace(/[\s_]+/g, "_")}_GTech.pdf`,
     );
     downloadBlob(blob, filename);
     toast.dismiss();

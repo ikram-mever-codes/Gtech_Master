@@ -1479,17 +1479,15 @@ export const downloadCustomerOrderPdf = async (
       outputFilePath: filePath,
     });
 
-    const datePart = (() => {
-      const d = (order.date_created || order.created_at) ? new Date(order.date_created || order.created_at) : new Date();
-      const yy = String(d.getFullYear()).slice(-2);
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yy}${mm}${dd}`;
-    })();
-    const cleanTitle = (order.title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+    const cleanTitle = (order.title || "")
+      .trim()
+      .replace(/[^\w-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const docNo = String(order.order_no || order.id || "order").trim().replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
-      ? `Auftrag ${order.order_no || order.id} ${cleanTitle} ${datePart}.pdf`
-      : `Auftrag ${order.order_no || order.id} ${datePart}.pdf`;
+      ? `Auftrag_${docNo}_GTech_${cleanTitle}.pdf`
+      : `Auftrag_${docNo}_GTech.pdf`;
 
     res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");

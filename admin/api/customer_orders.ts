@@ -212,7 +212,7 @@ export const downloadCustomerOrderPdf = async (
     if (blob.size === 0) throw new Error("The downloaded PDF is empty.");
     const filename = getFilenameFromResponse(
       response,
-      `Auftrag ${orderNo || id}.pdf`,
+      `Auftrag_${String(orderNo || id).replace(/[\s_]+/g, "_")}_GTech.pdf`,
     );
     downloadBlob(blob, filename);
     toast.dismiss();
