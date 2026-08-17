@@ -18,13 +18,18 @@ export const parseBlobError = async (blob: Blob): Promise<any> => {
     });
 };
 
-export const downloadBlob = (blob: Blob, filename: string) => {
+export const downloadBlob = (blob: Blob, filename: string, openInNewTab = true) => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
+
+    if (openInNewTab && (blob.type === "application/pdf" || filename.toLowerCase().endsWith(".pdf"))) {
+        window.open(url, "_blank");
+    }
+
     setTimeout(() => {
         link.parentNode?.removeChild(link);
         window.URL.revokeObjectURL(url);
