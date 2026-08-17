@@ -3016,21 +3016,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium">
-                      {formatCurrency(offer.subtotal || 0, offer.currency)}
+                      {formatCurrency(
+                        (offer.subtotal || 0) + shippingTotalForDisplay,
+                        offer.currency,
+                      )}
                     </span>
                   </div>
-
-                  {shippingTotalForDisplay !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Shipping cost</span>
-                      <span className="font-medium">
-                        {formatCurrency(
-                          shippingTotalForDisplay,
-                          offer.currency,
-                        )}
-                      </span>
-                    </div>
-                  )}
 
                   {offer.discountAmount > 0 && (
                     <div className="flex justify-between text-rose-600">

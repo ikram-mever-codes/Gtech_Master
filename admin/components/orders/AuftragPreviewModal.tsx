@@ -1721,23 +1721,11 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium">
                   {formatCurrency(
-                    order.subtotal || 0,
+                    (order.subtotal || 0) + shippingTotalForDisplay,
                     order?.currency || "EUR",
                   )}
                 </span>
               </div>
-
-              {shippingTotalForDisplay !== 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping cost</span>
-                  <span className="font-medium">
-                    {formatCurrency(
-                      shippingTotalForDisplay,
-                      order?.currency || "EUR",
-                    )}
-                  </span>
-                </div>
-              )}
 
               {order.discount_amount > 0 && (
                 <div className="flex justify-between text-rose-600">
