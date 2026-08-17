@@ -770,6 +770,20 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     0,
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
+
+  // Discount reduces each group's (and shipping's) base proportionally —
+  // pulled out here so it can be reused by both vatGroups and displayTotal.
+  const discountPct = edit
+    ? parseFlexibleNumber(form.discountPercentage) || 0
+    : order.discount_percentage || 0;
+  const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
+
+  // Shipping net amount (qty * cost), shared by vatGroups, the summary
+  // row, and the total calculation below.
+  const shippingTotalForDisplay = edit
+    ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
+    : (order.shipping_cost || 0) * (order.shipping_quantity || 1);
+
   const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
     const byRate = new Map<number, number>();
     visibleLineItems.forEach((li: any) => {
@@ -778,19 +792,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
     });
 
-    const shippingTotal = edit
-      ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
-      : (order.shipping_cost || 0) * (order.shipping_quantity || 1);
-
-    if (shippingTotal > 0) {
+    if (shippingTotalForDisplay > 0) {
       const shipRate = getShippingTaxRate(order);
-      byRate.set(shipRate, (byRate.get(shipRate) || 0) + shippingTotal);
+      byRate.set(
+        shipRate,
+        (byRate.get(shipRate) || 0) + shippingTotalForDisplay,
+      );
     }
-
-    const discountPct = edit
-      ? parseFlexibleNumber(form.discountPercentage) || 0
-      : order.discount_percentage || 0;
-    const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
 
     return Array.from(byRate.entries())
       .map(([rate, base]) => {
@@ -801,8 +809,14 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   })();
 
   const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
+  // Subtotal covers line items only — shipping's net amount has to be
+  // added in explicitly (discounted the same way as everything else),
+  // otherwise only its VAT portion ever reached the total.
   const displayTotal =
-    (order.subtotal || 0) - (order.discount_amount || 0) + vatTaxSum;
+    (order.subtotal || 0) -
+    (order.discount_amount || 0) +
+    shippingTotalForDisplay * discountFactor +
+    vatTaxSum;
 
   const currentDeliveryAddress = edit
     ? form.deliveryAddress
@@ -1712,6 +1726,19 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   )}
                 </span>
               </div>
+
+              {shippingTotalForDisplay !== 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Shipping cost</span>
+                  <span className="font-medium">
+                    {formatCurrency(
+                      shippingTotalForDisplay,
+                      order?.currency || "EUR",
+                    )}
+                  </span>
+                </div>
+              )}
+
               {order.discount_amount > 0 && (
                 <div className="flex justify-between text-rose-600">
                   <span>Discount</span>
