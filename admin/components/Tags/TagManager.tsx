@@ -111,6 +111,7 @@ export const EntityTagSelector = ({
   tagOrder,
   onTagsUpdated,
   disabled = false,
+  dropdownAlign = "right",
 }: {
   entityId: string | number;
   entityType: "company" | "contact" | "inquiry" | "request_item" | "item" | "supplier";
@@ -118,6 +119,7 @@ export const EntityTagSelector = ({
   tagOrder?: string;
   onTagsUpdated?: (tags: Tag[]) => void;
   disabled?: boolean;
+  dropdownAlign?: "left" | "right";
 }) => {
   const [currentTags, setCurrentTags] = useState<Tag[]>(sortTags(initialTags, tagOrder));
   const [allAvailableTags, setAllAvailableTags] = useState<Tag[]>([]);
@@ -206,7 +208,7 @@ export const EntityTagSelector = ({
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className={`absolute ${dropdownAlign === "right" ? "right-0" : "left-0"} mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150`}>
               <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                   Select Tag ({entityType})
@@ -257,11 +259,15 @@ export const TagPickerInput = ({
   selectedTags,
   onChange,
   disabled = false,
+  showEmptyText = true,
+  dropdownAlign = "right",
 }: {
   category: "company" | "contact" | "inquiry" | "request_item" | "item" | "supplier";
   selectedTags: Tag[];
   onChange: (tags: Tag[]) => void;
   disabled?: boolean;
+  showEmptyText?: boolean;
+  dropdownAlign?: "left" | "right";
 }) => {
   const [allAvailableTags, setAllAvailableTags] = useState<Tag[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -314,7 +320,7 @@ export const TagPickerInput = ({
             <PlusIcon className="h-4 w-4 stroke-[2]" />
           </button>
           {isDropdownOpen && (
-            <div className="absolute left-0 mt-1 w-60 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className={`absolute ${dropdownAlign === "right" ? "right-0" : "left-0"} mt-1 w-60 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150`}>
               <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                   Select Tag
@@ -357,7 +363,7 @@ export const TagPickerInput = ({
           )}
         </div>
       )}
-      {selectedTags.length === 0 && !isDropdownOpen && (
+      {showEmptyText && selectedTags.length === 0 && !isDropdownOpen && (
         <span className="text-xs text-gray-400 italic">No tags selected</span>
       )}
     </div>

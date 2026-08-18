@@ -903,7 +903,19 @@ const RequestedItemsPage: React.FC = () => {
                 resetForm();
               }}
               tagSelector={
-                modalMode === "edit" && editingItemId && (editModeEnabled || ((requestedItems.find((i) => i.id === editingItemId) as any)?.tags?.length > 0)) ? (
+                modalMode === "create" ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      TAGS
+                    </span>
+                    <TagPickerInput
+                      category="request_item"
+                      selectedTags={newItemTags}
+                      onChange={setNewItemTags}
+                      showEmptyText={false}
+                    />
+                  </div>
+                ) : modalMode === "edit" && editingItemId && (editModeEnabled || ((requestedItems.find((i) => i.id === editingItemId) as any)?.tags?.length > 0)) ? (
                   <div className="flex items-center gap-2">
                     {editModeEnabled && (
                       <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
@@ -1246,19 +1258,6 @@ const RequestedItemsPage: React.FC = () => {
                         placeholder="Additional comments..."
                       />
                     </div>
-
-                    {modalMode === "create" && (
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tags
-                        </label>
-                        <TagPickerInput
-                          category="request_item"
-                          selectedTags={newItemTags}
-                          onChange={setNewItemTags}
-                        />
-                      </div>
-                    )}
                   </div>
 
                   </div>

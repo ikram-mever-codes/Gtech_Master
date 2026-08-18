@@ -1890,7 +1890,19 @@ const CombinedBusinessContactsContent: React.FC = () => {
             setBusinessModalMode("create");
           }}
           tagSelector={
-            businessModalMode === "edit" && editingBusinessId && (businessEditMode || (businessForm.tags && businessForm.tags.length > 0)) ? (
+            businessModalMode === "create" ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  TAGS
+                </span>
+                <TagPickerInput
+                  category="company"
+                  selectedTags={newBusinessTags}
+                  onChange={setNewBusinessTags}
+                  showEmptyText={false}
+                />
+              </div>
+            ) : businessModalMode === "edit" && editingBusinessId && (businessEditMode || (businessForm.tags && businessForm.tags.length > 0)) ? (
               <div className="flex items-center gap-2">
                 {businessEditMode && (
                   <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
@@ -1950,9 +1962,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="space-y-6">
             <div className="rounded-xl p-4 -mx-4 bg-transparent">
-              <div className="grid grid-cols-6 gap-4">
+              <div className="grid grid-cols-12 gap-4">
                 {businessModalMode === "create" && (
-                  <div className="col-span-6 md:col-span-2">
+                  <div className="col-span-12 md:col-span-3">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Customer No (Leave blank autogenerate)
                     </label>
@@ -1972,7 +1984,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </div>
                 )}
 
-                <div className="col-span-6 md:col-span-2">
+                {/* ROW 1: Main Business Info (4 fields in one line) */}
+                <div className={`col-span-12 ${businessModalMode === "create" ? "md:col-span-3" : "md:col-span-5"}`}>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Company Name (full legal name) *
                   </label>
@@ -2031,9 +2044,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-3 flex items-end gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                <div className="col-span-6 md:col-span-3 flex items-end gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-xs font-medium text-gray-700 mb-1 truncate">
                       Star Portal Link Name
                     </label>
                     <input
@@ -2048,7 +2061,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       }}
                       disabled={businessFieldDisabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="Auto from web URL (between www. and next .)"
+                      placeholder="Auto from web URL"
                     />
                   </div>
 
@@ -2062,7 +2075,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="col-span-6 md:col-span-3">
+                {/* ROW 2: Address Fields (5 fields in one single line - Address Additional first) */}
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Address Additional Line
                   </label>
@@ -2081,7 +2095,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-3">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Street and Street Number
                   </label>
@@ -2100,7 +2114,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-4 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Postal Code
                   </label>
@@ -2118,7 +2132,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="80331"
                   />
                 </div>
-                <div className="col-span-2 md:col-span-1">
+
+                <div className="col-span-4 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     City
                   </label>
@@ -2136,7 +2151,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="München"
                   />
                 </div>
-                <div className="col-span-2 md:col-span-1">
+
+                <div className="col-span-4 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Country
                   </label>
@@ -2153,19 +2169,20 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   >
                     {dbCountries.length > 0
                       ? dbCountries.map((c) => (
-                        <option key={c.id} value={c.iso2}>
-                          {c.iso2} - {c.name}
-                        </option>
-                      ))
+                          <option key={c.id} value={c.iso2}>
+                            {c.iso2} - {c.name}
+                          </option>
+                        ))
                       : COUNTRY_OPTIONS.map((c) => (
-                        <option key={c.value} value={c.value}>
-                          {c.label}
-                        </option>
-                      ))}
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
                   </select>
                 </div>
 
-                <div className="col-span-6 md:col-span-2">
+                {/* ROW 3: Contact Fields (3 fields in one line) */}
+                <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Email
                   </label>
@@ -2183,7 +2200,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="info@muster.de"
                   />
                 </div>
-                <div className="col-span-6 md:col-span-2">
+
+                <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Phone
                   </label>
@@ -2201,7 +2219,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="+49 89 1234567"
                   />
                 </div>
-                <div className="col-span-6 md:col-span-2">
+
+                <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Web URL
                   </label>
@@ -2221,7 +2240,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-2">
+                {/* ROW 4: Tax Fields (4 fields in one line) */}
+                <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Debitor No
                   </label>
@@ -2240,7 +2260,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-2">
+                <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     VAT / Tax ID
                   </label>
@@ -2259,7 +2279,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-2">
+                <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     VAT Check Status
                   </label>
@@ -2286,7 +2306,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-6 md:col-span-2">
+                <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Tax Profile
                   </label>
@@ -2318,7 +2338,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-6 md:col-span-2">
+                {/* ROW 5: Payment & Shipping (3 fields in one line, equal width) */}
+                <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Payment Method
                   </label>
@@ -2337,13 +2358,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {(dbPaymentMethods.length > 0
                       ? dbPaymentMethods.map((pm: any) => pm.name)
                       : [
-                        "Prepayment",
-                        "Bank transfer",
-                        "Cash on delivery",
-                        "Invoice",
-                        "Credit card",
-                        "PayPal",
-                      ]
+                          "Prepayment",
+                          "Bank transfer",
+                          "Cash on delivery",
+                          "Invoice",
+                          "Credit card",
+                          "PayPal",
+                        ]
                     ).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -2352,40 +2373,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Default Shipping Method
-                  </label>
-                  <select
-                    value={businessForm.defaultShippingMethod || ""}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        defaultShippingMethod: e.target.value || "",
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                  >
-                    <option value="">None / Not Assigned</option>
-                    {(dbShippingMethods.length > 0
-                      ? dbShippingMethods.map((sm: any) => sm.name)
-                      : [
-                        "Standard shipping",
-                        "Express shipping",
-                        "Freight",
-                        "Courier",
-                        "Pickup",
-                      ]
-                    ).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-span-6 md:col-span-2">
+                <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Payment Due (in days)
                   </label>
@@ -2412,7 +2400,41 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6">
+                <div className="col-span-12 md:col-span-4">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Default Shipping Method
+                  </label>
+                  <select
+                    value={businessForm.defaultShippingMethod || ""}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        defaultShippingMethod: e.target.value || "",
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                  >
+                    <option value="">None / Not Assigned</option>
+                    {(dbShippingMethods.length > 0
+                      ? dbShippingMethods.map((sm: any) => sm.name)
+                      : [
+                          "Standard shipping",
+                          "Express shipping",
+                          "Freight",
+                          "Courier",
+                          "Pickup",
+                        ]
+                    ).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ROW 6: Note */}
+                <div className="col-span-12">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Note
                   </label>
@@ -2430,19 +2452,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Internal note…"
                   />
                 </div>
-
-                {businessModalMode === "create" && (
-                  <div className="col-span-6">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Tags
-                    </label>
-                    <TagPickerInput
-                      category="company"
-                      selectedTags={newBusinessTags}
-                      onChange={setNewBusinessTags}
-                    />
-                  </div>
-                )}
               </div>
             </div>
 
@@ -2613,7 +2622,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         }
         width="max-w-2xl"
       >
-        {modalMode === "edit" && (
+        {modalMode === "edit" ? (
           <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-gray-700">
@@ -2661,6 +2670,20 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                 />
               </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                TAGS
+              </span>
+              <TagPickerInput
+                category="contact"
+                selectedTags={newContactTags}
+                onChange={setNewContactTags}
+                showEmptyText={false}
+              />
             </div>
           </div>
         )}
@@ -2951,19 +2974,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 placeholder="Internal note about this contact…"
               />
             </div>
-
-            {modalMode === "create" && (
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tags
-                </label>
-                <TagPickerInput
-                  category="contact"
-                  selectedTags={newContactTags}
-                  onChange={setNewContactTags}
-                />
-              </div>
-            )}
           </div>
 
           <div className="mt-6 flex justify-between gap-3">

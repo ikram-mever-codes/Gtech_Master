@@ -30,7 +30,7 @@ import {
     Supplier,
 } from "@/api/suppliers";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
-import { EntityTagSelector, TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
+import { EntityTagSelector, TagPickerInput, TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { formatDate as centralFormatDate } from "@/utils/date";
 
@@ -500,7 +500,22 @@ export const SuppliersPage = React.forwardRef<
                             onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
                             onClose={() => setShowModal(false)}
                             tagSelector={
-                                modalMode === "edit" && editingId && (isEditEnabled || (formData.tags && formData.tags.length > 0)) ? (
+                                modalMode === "create" ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                                            TAGS
+                                        </span>
+                                        <TagPickerInput
+                                            category="supplier"
+                                            selectedTags={(formData.tags as Tag[]) || []}
+                                            onChange={(tags) => {
+                                                updateField("tags", tags);
+                                                updateField("tagOrder", tags.map((t) => t.id).join(","));
+                                            }}
+                                            showEmptyText={false}
+                                        />
+                                    </div>
+                                ) : modalMode === "edit" && editingId && (isEditEnabled || (formData.tags && formData.tags.length > 0)) ? (
                                     <div className="flex items-center gap-2">
                                         {isEditEnabled && (
                                             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
