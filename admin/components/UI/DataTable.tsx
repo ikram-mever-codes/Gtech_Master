@@ -107,7 +107,7 @@ export function DataTable<T>({
                             return (
                                 <th
                                     key={i}
-                                    className={`${thClassName || `px-3 py-3 text-${c.align || "left"} text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200`} ${isSortable ? 'cursor-pointer select-none hover:text-gray-900 transition-colors group' : ''}`}
+                                    className={`${thClassName || `px-3 py-3 text-${c.align || "left"} text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200`} ${isSortable ? 'cursor-pointer select-none hover:text-gray-900 transition-colors group' : ''}`}
                                     style={c.width ? { width: c.width, minWidth: c.width } : {}}
                                     onClick={() => isSortable && handleHeaderClick(c.sortKey!)}
                                 >

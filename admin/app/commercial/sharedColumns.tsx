@@ -171,7 +171,7 @@ export const kundeColumn: ColumnDef<any> = {
       "—";
     return (
       <div
-        className="truncate max-w-[140px] text-sm font-bold text-gray-900"
+        className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
         title={text}
       >
         {text}

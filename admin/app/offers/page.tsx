@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ArrowPathIcon,
   PlusIcon,
@@ -38,7 +38,15 @@ import { parseFlexibleNumber } from "@/utils/decimal";
 import { BASE_URL } from "@/utils/constants";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
-import { formatLieferort, formatTitel35 } from "@/app/commercial/sharedColumns";
+import { DataTable, ColumnDef } from "@/components/UI/DataTable";
+import {
+  datumColumn,
+  kundeColumn,
+  titelColumn,
+  lieferortColumn,
+  buildNettowertColumn,
+  buildExpandColumn,
+} from "@/app/commercial/sharedColumns";
 
 import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 // WEIGHT
@@ -300,9 +308,9 @@ const OffersPage: React.FC<any> = ({
 
   const [detailOfferId, setDetailOfferId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
-  const [expandedOfferIds, setExpandedOfferIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [expandedOfferIds, setExpandedOfferIds] = useState<
+    Set<string | number>
+  >(new Set());
 
   const toggleExpandOffer = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -424,9 +432,19 @@ const OffersPage: React.FC<any> = ({
     }
   };
 
-  const displayOffers = React.useMemo(() => {
-    let list = offers;
-    if (!docFilters) return list;
+  const getContrastTextColor = (bgColor?: string) => {
+    if (!bgColor) return undefined;
+    const hex = bgColor.replace("#", "");
+    if (hex.length !== 6) return undefined;
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness < 128 ? "#ffffff" : "#1f2937";
+  };
+
+  const displayOffers = useMemo(() => {
+    if (!docFilters) return offers;
     const {
       documentNo,
       customerNo,
@@ -439,35 +457,31 @@ const OffersPage: React.FC<any> = ({
       dateTo,
     } = docFilters;
 
-    return list.filter((offer: any) => {
-      if (documentNo?.trim()) {
-        const s = documentNo.toLowerCase().trim();
-        if (
-          !String(offer.offerNumber || "")
-            .toLowerCase()
-            .includes(s)
-        )
-          return false;
+    return offers.filter((offer: any) => {
+      if (documentNo) {
+        const no = String(offer.offerNumber || "");
+        if (!no.toLowerCase().includes(documentNo.toLowerCase())) return false;
       }
-      if (customerNo?.trim()) {
-        const s = customerNo.toLowerCase().trim();
+      if (customerNo) {
         const cNo = String(
           offer.customerSnapshot?.customerNumber ||
-            offer.customerSnapshot?.id ||
+            (offer as any).customer?.customer_number ||
             "",
-        ).toLowerCase();
-        if (!cNo.includes(s)) return false;
+        );
+        if (!cNo.toLowerCase().includes(customerNo.toLowerCase())) return false;
       }
-      if (customerName?.trim()) {
-        const s = customerName.toLowerCase().trim();
-        const cName = String(
+      if (customerName) {
+        const name = String(
           offer.customerSnapshot?.companyName ||
             offer.customerSnapshot?.name ||
+            (offer as any).customer?.company_name ||
+            (offer as any).customer?.name ||
             "",
-        ).toLowerCase();
-        if (!cName.includes(s)) return false;
+        );
+        if (!name.toLowerCase().includes(customerName.toLowerCase()))
+          return false;
       }
-      if (valueAmount?.trim()) {
+      if (valueAmount) {
         const val = Number(
           offer.totalAmount !== undefined && offer.totalAmount !== null
             ? offer.totalAmount
@@ -486,6 +500,120 @@ const OffersPage: React.FC<any> = ({
       return true;
     });
   }, [offers, docFilters]);
+
+  const offerColumns: ColumnDef<any>[] = useMemo(
+    () => [
+      buildExpandColumn(expandedOfferIds, setExpandedOfferIds),
+      datumColumn,
+      {
+        header: "Nr",
+        width: "110px",
+        align: "center",
+        render: (row: any) => (
+          <div className="text-sm font-semibold text-green-600 hover:underline whitespace-nowrap cursor-pointer">
+            {row.offerNumber}
+            {row.revision > 1 && (
+              <span className="ml-1 text-xs text-gray-500 font-normal">
+                R{row.revision}
+              </span>
+            )}
+          </div>
+        ),
+      },
+      kundeColumn,
+      titelColumn,
+      lieferortColumn,
+      {
+        header: "Lieferdatum",
+        width: "90px",
+        align: "center",
+        render: (row: any) => {
+          const raw = row.date_delivery || row.validUntil;
+          if (!raw)
+            return <span className="text-gray-400 font-normal text-sm">—</span>;
+          if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw)) {
+            const [d, m] = raw.split(".");
+            return (
+              <span className="text-sm text-gray-600 font-normal">{`${d}.${m}.`}</span>
+            );
+          }
+          return (
+            <span className="text-sm text-gray-600 font-normal">
+              {formatDate(raw)}
+            </span>
+          );
+        },
+      },
+      buildNettowertColumn((row: any) =>
+        Number(
+          row.subtotal !== undefined && row.subtotal !== null
+            ? row.subtotal
+            : row.totalAmount || 0,
+        ),
+      ),
+      {
+        header: "Status",
+        width: "90px",
+        align: "center",
+        render: (row: any) => (
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 font-medium capitalize">
+            {row.status || "Draft"}
+          </span>
+        ),
+      },
+      {
+        header: "Aktionen",
+        width: "90px",
+        align: "center",
+        render: (row: any) => {
+          const conversionCount =
+            Number(row.conversionCount) ||
+            (row.highlightColor === "#ECEAE6" ? 1 : 0);
+          const isConverted = conversionCount > 0;
+          return (
+            <div className="flex items-center justify-center gap-1 font-poppins">
+              <button
+                title={
+                  isConverted
+                    ? `Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""} to Auftrag (Click to convert again)`
+                    : "Convert Offer to Auftrag Order"
+                }
+                onClick={(e) => handleConvertOfferToAuftrag(row, e)}
+                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded-[4px] transition shadow-xs whitespace-nowrap cursor-pointer ${
+                  isConverted
+                    ? "bg-gray-500 hover:bg-gray-600 text-white"
+                    : "bg-[#2F6B46] hover:bg-[#255638] text-white"
+                }`}
+              >
+                <MoveRight className="h-3 w-3" />
+              </button>
+              {conversionCount > 0 && (
+                <span
+                  title={`Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""}`}
+                  className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-xs shrink-0"
+                >
+                  {conversionCount}
+                </span>
+              )}
+              <button
+                title="Download Angebot PDF"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    await downloadOfferPdf(row.id, row.offerNumber);
+                  } catch (_) {}
+                }}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+              >
+                <FileDown className="h-3 w-3" /> PDF
+              </button>
+            </div>
+          );
+        },
+      },
+    ],
+    [expandedOfferIds],
+  );
 
   const mainContent = (
     <>
@@ -573,270 +701,35 @@ const OffersPage: React.FC<any> = ({
         </div>
       )}
 
-      <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-flex items-center gap-3">
-              <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-              <span className="text-gray-600">Loading offers…</span>
-            </div>
-          </div>
-        ) : offers.length === 0 ? (
-          <div className="p-8 text-center">
-            <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No offers found</p>
-            <p className="text-gray-500 text-sm mt-2">
-              Create one from an inquiry, or from a customer and item(s).
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="w-9 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[70px]">
-                    Datum
-                  </th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[75px]">
-                    Nr
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">
-                    Kunde
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[135px]">
-                    Titel
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[110px]">
-                    Lieferort
-                  </th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[80px]">
-                    Lieferdatum
-                  </th>
-                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[95px]">
-                    Nettowert
-                  </th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
-                    Status
-                  </th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px]">
-                    Aktionen
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {displayOffers.map((offer: any) => {
-                  const isExpanded = expandedOfferIds.has(offer.id);
-                  const lineItems =
-                    offer.lineItems?.filter((li: any) => !li.isComponent) || [];
-                  const rowColor =
-                    offer.highlightColor && offer.highlightColor !== "#ECEAE6"
-                      ? offer.highlightColor
-                      : null;
-                  const rowTextColor = rowColor
-                    ? getContrastTextColor(rowColor)
-                    : undefined;
-                  const conversionCount =
-                    Number(offer.conversionCount) ||
-                    (offer.highlightColor === "#ECEAE6" ? 1 : 0);
-                  const isConverted = conversionCount > 0;
-                  const lieferort = formatLieferort(offer);
-                  const displayTitle = formatTitel35(offer);
-
-                  return (
-                    <React.Fragment key={offer.id}>
-                      <tr
-                        onClick={() => openDetail(offer)}
-                        className={`transition-colors cursor-pointer ${
-                          rowColor ? "" : "hover:bg-gray-50"
-                        }`}
-                        style={
-                          rowColor
-                            ? { backgroundColor: rowColor, color: rowTextColor }
-                            : undefined
-                        }
-                      >
-                        <td
-                          className="px-2 py-3 text-center"
-                          onClick={(e) => toggleExpandOffer(offer.id, e)}
-                        >
-                          <ExpandRowArrow
-                            isExpanded={isExpanded}
-                            isEmpty={lineItems.length === 0}
-                            title={
-                              lineItems.length === 0
-                                ? "No items in this offer"
-                                : isExpanded
-                                  ? "Collapse items"
-                                  : "Expand items"
-                            }
-                            onToggle={(e) => toggleExpandOffer(offer.id, e)}
-                          />
-                        </td>
-                        {/* 1. Datum */}
-                        <td className="px-3 py-3 text-center">
-                          <div
-                            className={`text-sm ${
-                              rowColor ? "" : "text-gray-700"
-                            }`}
-                            style={
-                              rowColor ? { color: rowTextColor } : undefined
-                            }
-                          >
-                            {formatDate(offer.createdAt)}
-                          </div>
-                        </td>
-                        {/* 2. Nr */}
-                        <td className="px-3 py-3 text-center">
-                          <div
-                            className="text-sm font-medium text-green-600 hover:underline"
-                            style={rowColor ? { color: rowTextColor } : undefined}
-                          >
-                            {offer.offerNumber}
-                            {offer.revision > 1 && (
-                              <span
-                                className={`ml-1 text-xs ${
-                                  rowColor ? "" : "text-gray-500"
-                                }`}
-                              >
-                                R{offer.revision}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        {/* 3. Kunde */}
-                        <td className="px-3 py-3">
-                          <div
-                            className={`text-sm font-medium truncate max-w-[120px] ${
-                              rowColor ? "" : "text-gray-900"
-                            }`}
-                            title={offer.customerSnapshot?.companyName || offer.customerSnapshot?.name}
-                          >
-                            {offer.customerSnapshot?.companyName || offer.customerSnapshot?.name || "—"}
-                          </div>
-                        </td>
-                        {/* 4. Titel */}
-                        <td className="px-3 py-3">
-                          <div
-                            className={`text-sm truncate max-w-[135px] ${
-                              rowColor ? "" : "text-gray-600"
-                            }`}
-                            title={offer.title || "—"}
-                          >
-                            {displayTitle}
-                          </div>
-                        </td>
-                        {/* 5. Lieferort */}
-                        <td className="px-3 py-3">
-                          <div
-                            className={`text-sm truncate max-w-[110px] ${
-                              rowColor ? "" : "text-gray-600"
-                            }`}
-                            title={lieferort}
-                          >
-                            {lieferort}
-                          </div>
-                        </td>
-                        {/* 6. Lieferdatum */}
-                        <td className="px-3 py-3 text-center">
-                          <div
-                            className={`text-sm ${
-                              rowColor ? "" : "text-gray-600"
-                            }`}
-                          >
-                            {offer.date_delivery
-                              ? formatDate(offer.date_delivery)
-                              : offer.validUntil
-                                ? formatDate(offer.validUntil)
-                                : "—"}
-                          </div>
-                        </td>
-                        {/* 7. Nettowert */}
-                        <td className="px-3 py-3 text-right">
-                          <div className="text-sm font-bold">
-                            {formatCurrency(
-                              offer.subtotal !== undefined && offer.subtotal !== null
-                                ? offer.subtotal
-                                : offer.totalAmount || 0,
-                              offer.currency,
-                            )}
-                          </div>
-                        </td>
-                        {/* 8. Status */}
-                        <td className="px-3 py-3 text-center">
-                          <span
-                            className="text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium bg-blue-50 text-blue-700 border-blue-200 capitalize"
-                          >
-                            {offer.status || "Draft"}
-                          </span>
-                        </td>
-                        {/* 9. Aktionen */}
-                        <td
-                          className="px-3 py-3 text-center"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="flex items-center justify-center gap-1 font-poppins">
-                            <button
-                              title={
-                                isConverted
-                                  ? `Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""} to Auftrag (Click to convert again)`
-                                  : "Convert Offer to Auftrag Order"
-                              }
-                              onClick={(e) =>
-                                handleConvertOfferToAuftrag(offer, e)
-                              }
-                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded-[4px] transition shadow-xs whitespace-nowrap cursor-pointer ${
-                                isConverted
-                                  ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                  : "bg-[#2F6B46] hover:bg-[#255638] text-white"
-                              }`}
-                            >
-                              <MoveRight className="h-3 w-3" />
-                            </button>
-                            {conversionCount > 0 && (
-                              <span
-                                title={`Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""}`}
-                                className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-xs shrink-0"
-                              >
-                                {conversionCount}
-                              </span>
-                            )}
-                            <button
-                              title="Download Angebot PDF"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  await downloadOfferPdf(
-                                    offer.id,
-                                    offer.offerNumber,
-                                  );
-                                } catch (_) {}
-                              }}
-                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
-                            >
-                              <FileDown className="h-3 w-3" /> PDF
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {isExpanded && (
-                        <tr className="bg-emerald-50/20 border-b border-gray-200">
-                          <td colSpan={10} className="px-6 py-4">
-                            <OfferLineItemsTable
-                              offer={offer}
-                              lineItems={lineItems}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="mb-6">
+        <DataTable
+          data={displayOffers}
+          columns={offerColumns}
+          loading={loading}
+          emptyMessage="No offers found"
+          onRowClick={(row) => openDetail(row)}
+          expandedRowIds={expandedOfferIds}
+          renderRowDetails={(row) => (
+            <OfferLineItemsTable
+              offer={row}
+              lineItems={
+                row.lineItems?.filter((li: any) => !li.isComponent) || []
+              }
+            />
+          )}
+          getRowStyle={(offer: any) => {
+            const rowColor =
+              offer.highlightColor && offer.highlightColor !== "#ECEAE6"
+                ? offer.highlightColor
+                : null;
+            if (!rowColor) return undefined;
+            return {
+              backgroundColor: rowColor,
+              color: getContrastTextColor(rowColor),
+            };
+          }}
+        />
+      </div>
 
         {totalPages > 1 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
@@ -890,7 +783,6 @@ const OffersPage: React.FC<any> = ({
             </div>
           </div>
         )}
-      </div>
     </>
   );
 
