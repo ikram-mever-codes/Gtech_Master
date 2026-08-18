@@ -270,12 +270,25 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           <h2 className="text-lg font-bold text-gray-900">
             {isRequest ? "Create New Request Item" : "Create New Item"}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                TAGS
+              </span>
+              <TagPickerInput
+                category={isRequest ? "request_item" : "item"}
+                selectedTags={newItemTags}
+                onChange={setNewItemTags}
+                showEmptyText={false}
+              />
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
         <div className="flex-grow overflow-y-auto p-6">
           {loadingOptions ? (
@@ -894,16 +907,6 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                 >
                   Special Item
                 </label>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tags
-                </label>
-                <TagPickerInput
-                  category={isRequest ? "request_item" : "item"}
-                  selectedTags={newItemTags}
-                  onChange={setNewItemTags}
-                />
               </div>
             </div>
           )}

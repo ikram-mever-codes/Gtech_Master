@@ -2280,7 +2280,19 @@ const CombinedInquiriesPageContent = () => {
             resetInquiryForm();
           }}
           tagSelector={
-            inquiryModalMode === "edit" && editingInquiryId && (editModeEnabled || ((inquiryFormData as any).tags && (inquiryFormData as any).tags.length > 0)) ? (
+            inquiryModalMode === "create" ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  TAGS
+                </span>
+                <TagPickerInput
+                  category="inquiry"
+                  selectedTags={newInquiryTags}
+                  onChange={setNewInquiryTags}
+                  showEmptyText={false}
+                />
+              </div>
+            ) : inquiryModalMode === "edit" && editingInquiryId && (editModeEnabled || ((inquiryFormData as any).tags && (inquiryFormData as any).tags.length > 0)) ? (
               <div className="flex items-center gap-2">
                 {editModeEnabled && (
                   <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
@@ -2449,18 +2461,6 @@ const CombinedInquiriesPageContent = () => {
                       placeholder="Enter inquiry description"
                     />
                   </div>
-                  {inquiryModalMode === "create" && (
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Tags
-                      </label>
-                      <TagPickerInput
-                        category="inquiry"
-                        selectedTags={newInquiryTags}
-                        onChange={setNewInquiryTags}
-                      />
-                    </div>
-                  )}
 
                   <div className="col-span-2 grid grid-cols-4 gap-4">
                     <div className="col-span-1">
