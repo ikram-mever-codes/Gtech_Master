@@ -181,7 +181,7 @@ const OrderPage: React.FC = () => {
   const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["id"]>(
-    () => (searchParams.get("tab") as any) || "nso",
+    () => (searchParams.get("tab") as any) || "label_print",
   );
   const [orderNoFilter, setOrderNoFilter] = useState<string>(
     () => searchParams.get("order_no") || "",
@@ -814,6 +814,8 @@ const OrderPage: React.FC = () => {
       if (validTabs.includes(tabParam)) {
         setActiveTab(tabParam as any);
       }
+    } else {
+      setActiveTab("label_print");
     }
     const orderNoParam = searchParams.get("order_no");
     if (orderNoParam !== null) {
