@@ -10,15 +10,25 @@ import {
   DollarSign,
   ArrowLeft,
   Globe,
-  Loader2
+  Loader2,
+  Calendar
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { getDashboardReports } from "@/api/dashboard";
 import { toast } from "react-hot-toast";
 
+function getISOWeekNumber(d: Date = new Date()): number {
+  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNr = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - dayNr);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  return Math.ceil((((target.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [todayDate, setTodayDate] = useState("");
+  const [calendarWeek, setCalendarWeek] = useState<number>(() => getISOWeekNumber());
   const [isLoading, setIsLoading] = useState(true);
   const [currencyRates, setCurrencyRates] = useState({
     EUR: { label: "Euro", rate: "1.00", symbol: "€" },
@@ -63,6 +73,12 @@ export default function Dashboard() {
         if (response && response.success && response.data) {
           const { rates, date } = response.data.currencyRates;
           setTodayDate(date);
+          if (date) {
+            const parsed = new Date(date);
+            if (!isNaN(parsed.getTime())) {
+              setCalendarWeek(getISOWeekNumber(parsed));
+            }
+          }
           setCurrencyRates({
             EUR: { label: "Euro", rate: "1.00", symbol: "€" },
             USD: { label: "US Dollar", rate: Number(rates.USD).toFixed(2), symbol: "$" },
@@ -86,6 +102,7 @@ export default function Dashboard() {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     setTodayDate(`${yyyy}-${mm}-${dd}`);
+    setCalendarWeek(getISOWeekNumber(today));
 
     fetchDashboardData();
   }, []);
@@ -133,8 +150,14 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto space-y-5">
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-[#E9ECEF]">
-          <div>
+          <div className="flex items-center gap-3 flex-wrap">
             <PageHeader title="Reports & Control" icon={ClipboardList} />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#8CC21B]/10 text-[#5e8014] border border-[#8CC21B]/30 rounded-full text-xs font-bold shadow-xs">
+              <Calendar className="w-3.5 h-3.5 text-[#8CC21B]" />
+              <span>CW {calendarWeek}</span>
+              <span className="text-gray-400 font-normal">|</span>
+              <span className="text-gray-500 font-semibold">Calendar Week {calendarWeek}</span>
+            </div>
           </div>
           <button
             onClick={handleBack}
@@ -154,12 +177,17 @@ export default function Dashboard() {
             className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center justify-between"
             style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="p-1 rounded bg-[#8CC21B]">
                 <DollarSign className="w-4 h-4 text-white" />
               </div>
-              <h2 className="text-sm sm:text-base font-bold text-[#212529] flex items-center gap-1.5">
-                Today <span className="text-[#8CC21B] font-extrabold">{todayDate}</span> Currency Rates
+              <h2 className="text-sm sm:text-base font-bold text-[#212529] flex items-center gap-2 flex-wrap">
+                <span>Today</span>
+                <span className="text-[#8CC21B] font-extrabold">{todayDate}</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-white text-[#5e8014] border border-[#8CC21B]/40 shadow-2xs">
+                  CW {calendarWeek}
+                </span>
+                <span>Currency Rates</span>
               </h2>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -167,200 +195,200 @@ export default function Dashboard() {
               Live Rates
             </div>
           </div>
+        </div>
 
-          <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(currencyRates).map(([key, item]) => (
-              <div
-                key={key}
-                className="bg-[#F8F9FA] rounded-md p-3.5 border border-[#E9ECEF] hover:border-[#8CC21B]/40 hover:bg-white transition-all duration-300 flex justify-between items-center group relative overflow-hidden"
-              >
-                {isLoading && (
-                  <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-[1px]">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B]" />
-                  </div>
-                )}
-                <div className="space-y-0.5">
-                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block font-sans">
-                    {item.label} ({key})
-                  </span>
-                  <div className="text-xl sm:text-2xl font-extrabold text-[#212529] tracking-tight">
-                    <span className="text-[#8CC21B] font-bold text-lg mr-0.5">{item.symbol}</span>
-                    {item.rate}
-                  </div>
+        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Object.entries(currencyRates).map(([key, item]) => (
+            <div
+              key={key}
+              className="bg-[#F8F9FA] rounded-md p-3.5 border border-[#E9ECEF] hover:border-[#8CC21B]/40 hover:bg-white transition-all duration-300 flex justify-between items-center group relative overflow-hidden"
+            >
+              {isLoading && (
+                <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-[1px]">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B]" />
                 </div>
-                <div className="w-9 h-9 rounded-full bg-white border border-[#E9ECEF] flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-[#E8F4D6] group-hover:text-[#6B8F1A] group-hover:border-transparent transition-all duration-300">
-                  {key}
+              )}
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block font-sans">
+                  {item.label} ({key})
+                </span>
+                <div className="text-xl sm:text-2xl font-extrabold text-[#212529] tracking-tight">
+                  <span className="text-[#8CC21B] font-bold text-lg mr-0.5">{item.symbol}</span>
+                  {item.rate}
                 </div>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-white border border-[#E9ECEF] flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-[#E8F4D6] group-hover:text-[#6B8F1A] group-hover:border-transparent transition-all duration-300">
+                {key}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+
+        <div
+          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+        >
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+            </div>
+          )}
+          <div
+            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
+          >
+            <div className="p-1 rounded bg-blue-50">
+              <ClipboardList className="w-4 h-4 text-blue-600" />
+            </div>
+            <h3 className="text-sm font-bold text-[#212529]">Orders</h3>
+          </div>
+          <div className="p-4 flex flex-col gap-2.5">
+            {controlData.orders.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                <span
+                  onClick={() => handleNavigation("orders", item.type)}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                >
+                  {item.label}
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                    }`}
+                >
+                  {item.count}
+                </span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-
+        <div
+          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+        >
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+            </div>
+          )}
           <div
-            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
           >
-            {isLoading && (
-              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-              </div>
-            )}
-            <div
-              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-            >
-              <div className="p-1 rounded bg-blue-50">
-                <ClipboardList className="w-4 h-4 text-blue-600" />
-              </div>
-              <h3 className="text-sm font-bold text-[#212529]">Orders</h3>
+            <div className="p-1 rounded bg-emerald-50">
+              <Package className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="p-4 flex flex-col gap-2.5">
-              {controlData.orders.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                  <span
-                    onClick={() => handleNavigation("orders", item.type)}
-                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                  >
-                    {item.label}
-                  </span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                      }`}
-                  >
-                    {item.count}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <h3 className="text-sm font-bold text-[#212529]">Items</h3>
           </div>
+          <div className="p-4 flex flex-col gap-2.5">
+            {controlData.items.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                <span
+                  onClick={() => handleNavigation("items", item.type)}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                >
+                  {item.label}
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                    }`}
+                >
+                  {item.count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
 
+        <div
+          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+        >
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+            </div>
+          )}
           <div
-            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
           >
-            {isLoading && (
-              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-              </div>
-            )}
-            <div
-              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-            >
-              <div className="p-1 rounded bg-emerald-50">
-                <Package className="w-4 h-4 text-emerald-600" />
-              </div>
-              <h3 className="text-sm font-bold text-[#212529]">Items</h3>
+            <div className="p-1 rounded bg-amber-50">
+              <Truck className="w-4 h-4 text-amber-600" />
             </div>
-            <div className="p-4 flex flex-col gap-2.5">
-              {controlData.items.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                  <span
-                    onClick={() => handleNavigation("items", item.type)}
-                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                  >
-                    {item.label}
-                  </span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                      }`}
-                  >
-                    {item.count}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <h3 className="text-sm font-bold text-[#212529]">Suppliers</h3>
           </div>
+          <div className="p-4 flex flex-col gap-2.5">
+            {controlData.suppliers.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                <span
+                  onClick={() => handleNavigation("suppliers", item.type)}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                >
+                  {item.label}
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                    }`}
+                >
+                  {item.count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
 
+        <div
+          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+        >
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+            </div>
+          )}
           <div
-            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
           >
-            {isLoading && (
-              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-              </div>
-            )}
-            <div
-              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-            >
-              <div className="p-1 rounded bg-amber-50">
-                <Truck className="w-4 h-4 text-amber-600" />
-              </div>
-              <h3 className="text-sm font-bold text-[#212529]">Suppliers</h3>
+            <div className="p-1 rounded bg-rose-50">
+              <ImageIcon className="w-4 h-4 text-rose-600" />
             </div>
-            <div className="p-4 flex flex-col gap-2.5">
-              {controlData.suppliers.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                  <span
-                    onClick={() => handleNavigation("suppliers", item.type)}
-                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                  >
-                    {item.label}
-                  </span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                      }`}
-                  >
-                    {item.count}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <h3 className="text-sm font-bold text-[#212529]">Pictures</h3>
           </div>
-
-          <div
-            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
-          >
-            {isLoading && (
-              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+          <div className="p-4 flex flex-col gap-2.5">
+            {controlData.pictures.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                <span
+                  onClick={() => handleNavigation("pictures", item.type)}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                >
+                  {item.label}
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                    }`}
+                >
+                  {item.count}
+                </span>
               </div>
-            )}
-            <div
-              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-            >
-              <div className="p-1 rounded bg-rose-50">
-                <ImageIcon className="w-4 h-4 text-rose-600" />
-              </div>
-              <h3 className="text-sm font-bold text-[#212529]">Pictures</h3>
-            </div>
-            <div className="p-4 flex flex-col gap-2.5">
-              {controlData.pictures.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                  <span
-                    onClick={() => handleNavigation("pictures", item.type)}
-                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                  >
-                    {item.label}
-                  </span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                      }`}
-                  >
-                    {item.count}
-                  </span>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
-
         </div>
 
       </div>
+
     </div>
   );
 }
