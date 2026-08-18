@@ -64,8 +64,8 @@ export function buildExpandColumn(
 }
 
 export const dateCreatedColumn: ColumnDef<any> = {
-  header: "date_created",
-  width: "70px",
+  header: "Created",
+  width: "60px",
   align: "center",
   render: (row) => {
     const rawDate =
@@ -84,7 +84,7 @@ export const dateCreatedColumn: ColumnDef<any> = {
 
 export const companyColumn: ColumnDef<any> = {
   header: "Company",
-  width: "100px",
+  width: "90px",
   align: "left",
   render: (row) => {
     const text =
@@ -97,7 +97,7 @@ export const companyColumn: ColumnDef<any> = {
       row.ship_to ||
       "N/A";
     return (
-      <div className="truncate max-w-[100px]" title={text}>
+      <div className="truncate max-w-[90px]" title={text}>
         {text}
       </div>
     );
@@ -106,7 +106,7 @@ export const companyColumn: ColumnDef<any> = {
 
 export const personColumn: ColumnDef<any> = {
   header: "Person",
-  width: "110px",
+  width: "90px",
   align: "left",
   render: (row) => {
     const text =
@@ -119,7 +119,7 @@ export const personColumn: ColumnDef<any> = {
       row.ship_to ||
       "-";
     return (
-      <div className="truncate max-w-[110px]" title={text}>
+      <div className="truncate max-w-[90px]" title={text}>
         {text}
       </div>
     );
@@ -127,8 +127,8 @@ export const personColumn: ColumnDef<any> = {
 };
 
 export const postalCodeColumn: ColumnDef<any> = {
-  header: "Shipping_postal_code",
-  width: "65px",
+  header: "Postal",
+  width: "55px",
   align: "center",
   render: (row) =>
     row.deliveryAddress?.postalCode ||
@@ -140,8 +140,8 @@ export const postalCodeColumn: ColumnDef<any> = {
 };
 
 export const cityColumn: ColumnDef<any> = {
-  header: "City, county",
-  width: "85px",
+  header: "City",
+  width: "75px",
   align: "left",
   render: (row) => {
     const city =
@@ -161,7 +161,7 @@ export const cityColumn: ColumnDef<any> = {
     const text =
       [city, formatCountryCode(country)].filter(Boolean).join(", ") || "-";
     return (
-      <div className="truncate max-w-[85px]" title={text}>
+      <div className="truncate max-w-[75px]" title={text}>
         {text}
       </div>
     );
@@ -172,8 +172,8 @@ export function buildValueNetColumn(
   calc: (row: any) => number,
 ): ColumnDef<any> {
   return {
-    header: "Value_net",
-    width: "70px",
+    header: "Net",
+    width: "65px",
     align: "right",
     render: (row: any) => {
       const val = calc(row);
@@ -189,8 +189,8 @@ export function buildItemCountColumn(
   calc: (row: any) => number,
 ): ColumnDef<any> {
   return {
-    header: "Item_Count",
-    width: "45px",
+    header: "Items",
+    width: "40px",
     align: "center",
     render: (row: any) => calc(row),
   };
