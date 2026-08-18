@@ -241,3 +241,13 @@ export const closeCustomerOrder = async (
     throw error;
   }
 };
+
+export const duplicateCustomerOrder = async (id: number | string) => {
+  try {
+    const response: any = await api.post(`/customer-orders/${id}/duplicate`);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to duplicate Auftrag");
+    throw error;
+  }
+};

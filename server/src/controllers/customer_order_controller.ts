@@ -1561,3 +1561,132 @@ export const closeCustomerOrder = async (
     next(error);
   }
 };
+
+export const duplicateCustomerOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const customerOrderItemRepo =
+      AppDataSource.getRepository(CustomerOrderItem);
+
+    const originalOrder = await customerOrderRepo.findOne({
+      where: { id: Number(id) },
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
+    });
+
+    if (!originalOrder) {
+      res.status(404).json({
+        success: false,
+        message: "Auftrag not found",
+      });
+      return;
+    }
+
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const defaultPrefix = `B${yy}${mm}-`;
+
+    let newOrderNo = "";
+    try {
+      newOrderNo = await NumberSequenceService.getNextNumber("customer_order");
+    } catch (err) {
+      console.warn(
+        "Could not generate sequence number for customer_order:",
+        err,
+      );
+      newOrderNo = `${defaultPrefix}${Date.now().toString().slice(-4)}`;
+    }
+
+    const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
+      now.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}.${now.getFullYear()}`;
+
+    const duplicatedOrder = customerOrderRepo.create({
+      order_no: newOrderNo,
+      customer_id: originalOrder.customer_id,
+      offer_id: originalOrder.offer_id,
+      title: originalOrder.title,
+      status: "Draft",
+      auftrag_status: AuftragStatus.OPEN,
+      currency: originalOrder.currency || "EUR",
+      tax_rate: originalOrder.tax_rate ?? 19,
+      discount_percentage: originalOrder.discount_percentage ?? 0,
+      discount_amount: originalOrder.discount_amount ?? 0,
+      shipping_cost: originalOrder.shipping_cost ?? 0,
+      shipping_quantity: originalOrder.shipping_quantity ?? 1,
+      payment_method: originalOrder.payment_method,
+      shipping_method: originalOrder.shipping_method,
+      payment_terms: originalOrder.payment_terms,
+      delivery_terms: originalOrder.delivery_terms,
+      terms_conditions: originalOrder.terms_conditions,
+      highlight_color: originalOrder.highlight_color,
+      subtotal: originalOrder.subtotal ?? 0,
+      tax_amount: originalOrder.tax_amount ?? 0,
+      total_amount: originalOrder.total_amount ?? 0,
+      notes: originalOrder.notes,
+      internal_notes: originalOrder.internal_notes,
+      customerSnapshot: originalOrder.customerSnapshot,
+      deliveryAddress: originalOrder.deliveryAddress,
+      date_created: dateCreatedStr,
+      date_emailed: undefined,
+      date_delivery: originalOrder.date_delivery,
+      stock_where: originalOrder.stock_where || StockWhere.EU,
+      real_delivery_date: undefined,
+      is_weiterversand: originalOrder.is_weiterversand || false,
+      weiterversand_service_provider_id:
+        originalOrder.weiterversand_service_provider_id,
+      weiterversand_labels: originalOrder.weiterversand_labels,
+      weiterversand_tracking: originalOrder.weiterversand_tracking,
+    });
+
+    const savedOrder = await customerOrderRepo.save(duplicatedOrder);
+
+    if (originalOrder.orderItems && originalOrder.orderItems.length > 0) {
+      const itemsToCreate = originalOrder.orderItems.map((it, idx) =>
+        customerOrderItemRepo.create({
+          customerOrderId: savedOrder.id,
+          itemName: it.itemName,
+          itemNo: it.itemNo,
+          material: it.material,
+          photo: it.photo,
+          specification: it.specification,
+          description: it.description,
+          weight: it.weight,
+          extraWeight: it.extraWeight,
+          quantity: it.quantity,
+          price: it.price,
+          taxRate: it.taxRate,
+          highlightColor: it.highlightColor,
+          lineTotal: it.lineTotal,
+          position: it.position || idx + 1,
+          sourceLineItemId: it.sourceLineItemId,
+          sourceItemId: it.sourceItemId,
+          notes: it.notes,
+        }),
+      );
+      await customerOrderItemRepo.save(itemsToCreate);
+      await calculateOrderTotals(savedOrder.id);
+    }
+
+    const fullOrder = await customerOrderRepo.findOne({
+      where: { id: savedOrder.id },
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Auftrag duplicated successfully as ${newOrderNo}`,
+      data: fullOrder,
+    });
+  } catch (error) {
+    console.error("Error duplicating customer order:", error);
+    next(error);
+  }
+};

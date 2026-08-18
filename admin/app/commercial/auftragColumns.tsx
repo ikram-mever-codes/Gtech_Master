@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { MoveRight, FileDown } from "lucide-react";
+import { MoveRight, FileDown, Copy } from "lucide-react";
 import { downloadCustomerOrderPdf } from "@/api/customer_orders";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
@@ -21,6 +21,7 @@ interface AuftragColumnsArgs {
   onOpenAuftragPreview: (id: string | number) => void;
   onConvertToBestellung: (row: any) => void;
   onGenerateRechnung: (row: any) => void;
+  onDuplicateAuftrag?: (row: any) => void;
   /**
    * The "Generated N times" badge in the original page reads from the
    * legacy `invoices` array. That array is never populated anywhere in the
@@ -138,6 +139,7 @@ export function buildAuftragColumns({
   onOpenAuftragPreview,
   onConvertToBestellung,
   onGenerateRechnung,
+  onDuplicateAuftrag,
   invoices,
 }: AuftragColumnsArgs): ColumnDef<any>[] {
   return [
@@ -167,7 +169,7 @@ export function buildAuftragColumns({
     buildItemCountColumn(itemCountCalc),
     {
       header: "Actions",
-      width: "160px",
+      width: "230px",
       align: "center",
       render: (row) => {
         const rechnungCount = (invoices || []).filter(
@@ -248,6 +250,19 @@ export function buildAuftragColumns({
               )}
             </div>
 
+            {onDuplicateAuftrag && (
+              <button
+                title="Duplicate Auftrag (creates a new Open Auftrag with all details)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDuplicateAuftrag(row);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer shadow-xs"
+              >
+                <Copy className="h-3.5 w-3.5" /> Duplicate
+              </button>
+            )}
+
             <button
               title="Download Auftrag PDF"
               onClick={async (e) => {
@@ -260,23 +275,6 @@ export function buildAuftragColumns({
             >
               <FileDown className="h-3.5 w-3.5" /> PDF
             </button>
-            {/* 
-            {!isClosed && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // This will trigger the close action in the parent
-                  const event = new CustomEvent("closeAuftrag", {
-                    detail: row,
-                  });
-                  document.dispatchEvent(event);
-                }}
-                title="Close Auftrag"
-                className="px-2 py-1 text-[10px] font-bold bg-gray-600 hover:bg-gray-700 text-white rounded-[4px] transition shadow-md flex items-center gap-1"
-              >
-                Close
-              </button>
-            )} */}
           </div>
         );
       },

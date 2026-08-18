@@ -22,6 +22,7 @@ import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
 
 import { updateCustomerProfile } from "@/api/customers";
+import { duplicateCustomerOrder } from "@/api/customer_orders";
 import {
   updateOrderItemStatus,
   splitOrderItem,
@@ -1548,6 +1549,22 @@ const InvoiceListPage: React.FC = () => {
 
   const legacyInvoices = useMemo(() => [], []);
 
+  const handleDuplicateAuftrag = async (row: any) => {
+    try {
+      const res = await duplicateCustomerOrder(row.id);
+      if (res?.success) {
+        toast.success(
+          res.message ||
+            `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
+          successStyles,
+        );
+        await tabData.refetchOrders();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to duplicate Auftrag", errorStyles);
+    }
+  };
+
   const commercialColumns: ColumnDef<any>[] = useMemo(() => {
     switch (activeInvTab) {
       case "auftrag":
@@ -1560,6 +1577,7 @@ const InvoiceListPage: React.FC = () => {
             setSelectedAuftragForRechnungModal(row);
             setShowAuftragToRechnungModal(true);
           },
+          onDuplicateAuftrag: handleDuplicateAuftrag,
           invoices: legacyInvoices,
         });
       case "bestellung":
