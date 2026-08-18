@@ -499,6 +499,28 @@ export const SuppliersPage = React.forwardRef<
                             isEditEnabled={isEditEnabled}
                             onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
                             onClose={() => setShowModal(false)}
+                            tagSelector={
+                                modalMode === "edit" && editingId && (isEditEnabled || (formData.tags && formData.tags.length > 0)) ? (
+                                    <div className="flex items-center gap-2">
+                                        {isEditEnabled && (
+                                            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                                                TAGS
+                                            </span>
+                                        )}
+                                        <EntityTagSelector
+                                            entityId={editingId}
+                                            entityType="supplier"
+                                            initialTags={(formData.tags as Tag[]) || []}
+                                            tagOrder={formData.tagOrder}
+                                            disabled={!isEditEnabled}
+                                            onTagsUpdated={(tags) => {
+                                                updateField("tags", tags);
+                                                updateField("tagOrder", tags.map((t) => t.id).join(","));
+                                            }}
+                                        />
+                                    </div>
+                                ) : null
+                            }
                         />
 
                         <div className="px-6 py-2 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
@@ -605,26 +627,7 @@ export const SuppliersPage = React.forwardRef<
                                         />
                                     </div>
 
-                                    {modalMode === "edit" && editingId && (
-                                        <div className="md:col-span-2">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                                Tags
-                                            </label>
-                                            <div className="p-3 border border-gray-200 rounded-lg bg-gray-50/50 min-h-[44px] flex items-center">
-                                                <EntityTagSelector
-                                                    entityId={editingId}
-                                                    entityType="supplier"
-                                                    initialTags={(formData.tags as Tag[]) || []}
-                                                    tagOrder={formData.tagOrder}
-                                                    disabled={!isEditEnabled}
-                                                    onTagsUpdated={(tags) => {
-                                                        updateField("tags", tags);
-                                                        updateField("tagOrder", tags.map((t) => t.id).join(","));
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
+
 
                                     <div className="grid grid-cols-3 gap-4 md:col-span-2">
                                         <div>

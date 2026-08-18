@@ -2210,6 +2210,31 @@ const CombinedInquiriesPageContent = () => {
             setShowCreateModal(false);
             resetInquiryForm();
           }}
+          tagSelector={
+            inquiryModalMode === "edit" && editingInquiryId && (editModeEnabled || ((inquiryFormData as any).tags && (inquiryFormData as any).tags.length > 0)) ? (
+              <div className="flex items-center gap-2">
+                {editModeEnabled && (
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    TAGS
+                  </span>
+                )}
+                <EntityTagSelector
+                  entityId={editingInquiryId}
+                  entityType="inquiry"
+                  initialTags={(inquiryFormData as any).tags || []}
+                  tagOrder={(inquiryFormData as any).tagOrder}
+                  onTagsUpdated={(updatedTags) =>
+                    setInquiryFormData((prev: any) => ({
+                      ...prev,
+                      tags: updatedTags,
+                      tagOrder: updatedTags.map((t: any) => t.id).join(","),
+                    }))
+                  }
+                  disabled={!editModeEnabled}
+                />
+              </div>
+            ) : null
+          }
           extraHeaderElements={(() => {
             let total = 0;
             inquiryRequests.forEach((req: any) => {
@@ -2251,9 +2276,13 @@ const CombinedInquiriesPageContent = () => {
               const annual = qty * targetPrice * factor;
               total += annual / 1000;
             });
+            const formattedTotal =
+              total % 1 === 0
+                ? total.toFixed(0)
+                : parseFloat(total.toFixed(2)).toString();
             return (
               <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
-                Potential: {total.toFixed(2)} k €
+                VP: {formattedTotal} k €
               </span>
             );
           })()}
@@ -2332,45 +2361,6 @@ const CombinedInquiriesPageContent = () => {
                       placeholder="PT0171 - Untere Schiebemuffe"
                     />
                   </div>
-                  {inquiryFormData.inquiryNo && (
-                    <div className="col-span-1">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Inquiry Number
-                      </label>
-                      <input
-                        type="text"
-                        value={inquiryFormData.inquiryNo}
-                        disabled
-                        className="w-full px-3 py-2 text-sm border border-gray-300 bg-gray-100 rounded-lg font-mono font-semibold text-gray-600 cursor-not-allowed"
-                      />
-                    </div>
-                  )}
-                  <div
-                    className={
-                      inquiryFormData.inquiryNo ? "col-span-1" : "col-span-2"
-                    }
-                  >
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={inquiryFormData.status}
-                      onChange={(e) =>
-                        setInquiryFormData({
-                          ...inquiryFormData,
-                          status: e.target.value as any,
-                        })
-                      }
-                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      {getInquiryStatuses().map((status) => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Description
@@ -2389,97 +2379,84 @@ const CombinedInquiriesPageContent = () => {
                       placeholder="Enter inquiry description"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Tags
-                    </label>
-                    {inquiryModalMode === "create" ? (
+                  {inquiryModalMode === "create" && (
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Tags
+                      </label>
                       <TagPickerInput
                         category="inquiry"
                         selectedTags={newInquiryTags}
                         onChange={setNewInquiryTags}
                       />
-                    ) : (
-                      <EntityTagSelector
-                        entityId={editingInquiryId!}
-                        entityType="inquiry"
-                        initialTags={(inquiryFormData as any).tags || []}
-                        tagOrder={(inquiryFormData as any).tagOrder}
-                        onTagsUpdated={(updatedTags) =>
-                          setInquiryFormData((prev: any) => ({
-                            ...prev,
-                            tags: updatedTags,
-                            tagOrder: updatedTags.map((t) => t.id).join(","),
-                          }))
-                        }
-                        disabled={!editModeEnabled}
-                      />
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Owner
-                    </label>
-                    <select
-                      value={inquiryFormData.owner_user_id || ""}
-                      onChange={(e) =>
-                        setInquiryFormData({
-                          ...inquiryFormData,
-                          owner_user_id: e.target.value,
-                        })
-                      }
-                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Select Owner</option>
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Next Action
-                    </label>
-                    <input
-                      type="text"
-                      value={inquiryFormData.next_action || ""}
-                      onChange={(e) =>
-                        setInquiryFormData({
-                          ...inquiryFormData,
-                          next_action: e.target.value,
-                        })
-                      }
-                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="e.g. Call client"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Follow-up Date
-                    </label>
-                    <input
-                      type="date"
-                      value={
-                        inquiryFormData.next_followup_at
-                          ? new Date(inquiryFormData.next_followup_at)
-                            .toISOString()
-                            .split("T")[0]
-                          : ""
-                      }
-                      onChange={(e) =>
-                        setInquiryFormData({
-                          ...inquiryFormData,
-                          next_followup_at: e.target.value || undefined,
-                        })
-                      }
-                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
+                  <div className="col-span-2 grid grid-cols-4 gap-4">
+                    <div className="col-span-1">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Owner
+                      </label>
+                      <select
+                        value={inquiryFormData.owner_user_id || ""}
+                        onChange={(e) =>
+                          setInquiryFormData({
+                            ...inquiryFormData,
+                            owner_user_id: e.target.value,
+                          })
+                        }
+                        disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select Owner</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Follow-up Date
+                      </label>
+                      <input
+                        type="date"
+                        value={
+                          inquiryFormData.next_followup_at
+                            ? new Date(inquiryFormData.next_followup_at)
+                              .toISOString()
+                              .split("T")[0]
+                            : ""
+                        }
+                        onChange={(e) =>
+                          setInquiryFormData({
+                            ...inquiryFormData,
+                            next_followup_at: e.target.value || undefined,
+                          })
+                        }
+                        disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Next Action
+                      </label>
+                      <input
+                        type="text"
+                        value={inquiryFormData.next_action || ""}
+                        onChange={(e) =>
+                          setInquiryFormData({
+                            ...inquiryFormData,
+                            next_action: e.target.value,
+                          })
+                        }
+                        disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="e.g. Call client"
+                      />
+                    </div>
                   </div>
                   <div className="col-span-2">
                     <div

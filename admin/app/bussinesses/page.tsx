@@ -1812,6 +1812,31 @@ const CombinedBusinessContactsContent: React.FC = () => {
             resetBusinessForm();
             setBusinessModalMode("create");
           }}
+          tagSelector={
+            businessModalMode === "edit" && editingBusinessId && (businessEditMode || (businessForm.tags && businessForm.tags.length > 0)) ? (
+              <div className="flex items-center gap-2">
+                {businessEditMode && (
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    TAGS
+                  </span>
+                )}
+                <EntityTagSelector
+                  entityId={editingBusinessId}
+                  entityType="company"
+                  initialTags={businessForm.tags || []}
+                  tagOrder={businessForm.tagOrder}
+                  disabled={!businessEditMode}
+                  onTagsUpdated={(updatedTags) =>
+                    setBusinessForm((prev: any) => ({
+                      ...prev,
+                      tags: updatedTags,
+                      tagOrder: updatedTags.map((t: any) => t.id).join(","),
+                    }))
+                  }
+                />
+              </div>
+            ) : null
+          }
           extraHeaderElements={
             <button
               type="button"
@@ -2299,33 +2324,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Tags
-                  </label>
-                  {businessModalMode === "create" ? (
+                {businessModalMode === "create" && (
+                  <div className="col-span-6">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
                     <TagPickerInput
                       category="company"
                       selectedTags={newBusinessTags}
                       onChange={setNewBusinessTags}
                     />
-                  ) : (
-                    <EntityTagSelector
-                      entityId={editingBusinessId!}
-                      entityType="company"
-                      initialTags={businessForm.tags || []}
-                      tagOrder={businessForm.tagOrder}
-                      onTagsUpdated={(updatedTags) =>
-                        setBusinessForm((prev: any) => ({
-                          ...prev,
-                          tags: updatedTags,
-                          tagOrder: updatedTags.map((t) => t.id).join(","),
-                        }))
-                      }
-                      disabled={businessFieldDisabled}
-                    />
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2497,9 +2507,34 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
         {modalMode === "edit" && (
           <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
-            <span className="text-sm font-medium text-gray-700">
-              Edit Mode
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">
+                Edit Mode
+              </span>
+              {editingContactId && (editModeEnabled || (createForm.tags && createForm.tags.length > 0)) && (
+                <div className="flex items-center gap-2">
+                  {editModeEnabled && (
+                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      TAGS
+                    </span>
+                  )}
+                  <EntityTagSelector
+                    entityId={editingContactId}
+                    entityType="contact"
+                    initialTags={createForm.tags || []}
+                    tagOrder={createForm.tagOrder}
+                    onTagsUpdated={(updatedTags) =>
+                      setCreateForm((prev: any) => ({
+                        ...prev,
+                        tags: updatedTags,
+                        tagOrder: updatedTags.map((t) => t.id).join(","),
+                      }))
+                    }
+                    disabled={!editModeEnabled}
+                  />
+                </div>
+              )}
+            </div>
             <div className="flex items-center">
               <span className="text-sm text-gray-500 mr-3">
                 {editModeEnabled ? "Enabled" : "Disabled"}
@@ -2812,33 +2847,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
               />
             </div>
 
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tags
-              </label>
-              {modalMode === "create" ? (
+            {modalMode === "create" && (
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tags
+                </label>
                 <TagPickerInput
                   category="contact"
                   selectedTags={newContactTags}
                   onChange={setNewContactTags}
                 />
-              ) : (
-                <EntityTagSelector
-                  entityId={editingContactId!}
-                  entityType="contact"
-                  initialTags={createForm.tags || []}
-                  tagOrder={createForm.tagOrder}
-                  onTagsUpdated={(updatedTags) =>
-                    setCreateForm((prev: any) => ({
-                      ...prev,
-                      tags: updatedTags,
-                      tagOrder: updatedTags.map((t) => t.id).join(","),
-                    }))
-                  }
-                  disabled={modalMode === "edit" && !editModeEnabled}
-                />
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 flex justify-between gap-3">

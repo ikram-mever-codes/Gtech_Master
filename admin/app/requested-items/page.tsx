@@ -902,6 +902,37 @@ const RequestedItemsPage: React.FC = () => {
                 setShowCreateModal(false);
                 resetForm();
               }}
+              tagSelector={
+                modalMode === "edit" && editingItemId && (editModeEnabled || ((requestedItems.find((i) => i.id === editingItemId) as any)?.tags?.length > 0)) ? (
+                  <div className="flex items-center gap-2">
+                    {editModeEnabled && (
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        TAGS
+                      </span>
+                    )}
+                    <EntityTagSelector
+                      entityId={editingItemId}
+                      entityType="request_item"
+                      initialTags={(requestedItems.find((i) => i.id === editingItemId) as any)?.tags || []}
+                      tagOrder={(requestedItems.find((i) => i.id === editingItemId) as any)?.tagOrder}
+                      disabled={!editModeEnabled}
+                      onTagsUpdated={(newTags) => {
+                        setRequestedItems((prev: any) =>
+                          prev.map((item: any) =>
+                            item.id === editingItemId
+                              ? {
+                                  ...item,
+                                  tags: newTags,
+                                  tagOrder: newTags.map((t: any) => t.id).join(","),
+                                }
+                              : item
+                          )
+                        );
+                      }}
+                    />
+                  </div>
+                ) : null
+              }
             />
             <div className="p-6 flex-1 overflow-y-auto">
 
@@ -1216,39 +1247,18 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tags
-                      </label>
-                      {modalMode === "create" ? (
+                    {modalMode === "create" && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tags
+                        </label>
                         <TagPickerInput
                           category="request_item"
                           selectedTags={newItemTags}
                           onChange={setNewItemTags}
                         />
-                      ) : (
-                        <EntityTagSelector
-                          entityId={editingItemId!}
-                          entityType="request_item"
-                          initialTags={(requestedItems.find((i) => i.id === editingItemId) as any)?.tags || []}
-                          tagOrder={(requestedItems.find((i) => i.id === editingItemId) as any)?.tagOrder}
-                          disabled={!editModeEnabled}
-                          onTagsUpdated={(newTags) => {
-                            setRequestedItems((prev: any) =>
-                              prev.map((item: any) =>
-                                item.id === editingItemId
-                                  ? {
-                                      ...item,
-                                      tags: newTags,
-                                      tagOrder: newTags.map((t) => t.id).join(","),
-                                    }
-                                  : item
-                              )
-                            );
-                          }}
-                        />
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   </div>

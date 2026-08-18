@@ -12,6 +12,7 @@ interface ModalHeaderProps {
   onToggleEdit?: () => void;
   onClose: () => void;
   extraHeaderElements?: React.ReactNode;
+  tagSelector?: React.ReactNode;
 }
 
 export const ModalHeader: React.FC<ModalHeaderProps> = ({
@@ -23,6 +24,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
   onToggleEdit,
   onClose,
   extraHeaderElements,
+  tagSelector,
 }) => {
   return (
     <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0 select-none sticky top-0 z-20 shadow-xs">
@@ -41,6 +43,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
         </div>
       </div>
       <div className="flex items-center gap-4 flex-shrink-0">
+        {tagSelector}
         {isEditMode && onToggleEdit && (
           <ViewEditToggle
             isEditEnabled={isEditEnabled}
