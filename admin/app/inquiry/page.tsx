@@ -2363,7 +2363,7 @@ const CombinedInquiriesPageContent = () => {
                 : parseFloat(total.toFixed(2)).toString();
             return (
               <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
-                VP: {formattedTotal} k €
+                VP {formattedTotal}
               </span>
             );
           })()}
