@@ -1876,9 +1876,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
             businessModalMode === "edit" ? businessForm.displayName || businessForm.companyName : null
           }
           subtitle={
-            businessModalMode === "edit" && businessForm.customerNumber
+            businessModalMode === "edit"
               ? businessForm.customerNumber
-              : null
+              : "Auto-generated"
           }
           icon={BuildingOfficeIcon}
           isEditMode={businessModalMode === "edit"}
@@ -1963,29 +1963,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
           <div className="space-y-6">
             <div className="rounded-xl p-4 -mx-4 bg-transparent">
               <div className="grid grid-cols-12 gap-4">
-                {businessModalMode === "create" && (
-                  <div className="col-span-12 md:col-span-3">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Customer No (Leave blank autogenerate)
-                    </label>
-                    <input
-                      type="text"
-                      value={businessForm.customerNumber}
-                      onChange={(e) =>
-                        setBusinessForm({
-                          ...businessForm,
-                          customerNumber: e.target.value,
-                        })
-                      }
-                      disabled={businessFieldDisabled}
-                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium font-mono text-gray-800"
-                      placeholder="Auto-generated if left blank"
-                    />
-                  </div>
-                )}
-
                 {/* ROW 1: Main Business Info (4 fields in one line) */}
-                <div className={`col-span-12 ${businessModalMode === "create" ? "md:col-span-3" : "md:col-span-5"}`}>
+                <div className="col-span-12 md:col-span-5">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Company Name (full legal name) *
                   </label>
