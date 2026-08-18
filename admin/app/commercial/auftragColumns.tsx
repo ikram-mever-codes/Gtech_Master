@@ -406,7 +406,7 @@ export function buildAuftragColumns({
         };
         return (
           <span
-            className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${
+            className={`text-[11px] px-2.5 py-0.5 text-nowrap rounded-full border font-medium ${
               colorClasses[status] || "bg-blue-50 text-blue-600 border-blue-200"
             }`}
           >
