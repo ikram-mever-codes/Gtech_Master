@@ -782,10 +782,13 @@ export async function generateGtechDocumentPdf(
     const rawCurrency = opts.currency || "EUR";
     const currency = (rawCurrency.toUpperCase() === "EUR" || rawCurrency === "€") ? "€" : rawCurrency;
 
+    const shippingTotalNet = Number(opts.shippingCost || 0) * (Number(opts.shippingQuantity) || 1);
+    const effectiveSubtotal = Number(opts.subtotal || 0) + shippingTotalNet;
+
     doc.font(R).fontSize(9).fillColor("#3F4446");
     doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
     doc.text(
-      `${formatGermanNum(opts.subtotal, 2)} ${currency}`,
+      `${formatGermanNum(effectiveSubtotal, 2)} ${currency}`,
       TOTALS_VAL_X - TOTALS_RIGHT_PAD,
       yPos,
       { align: "right", width: TOTALS_VAL_W },
@@ -798,17 +801,6 @@ export async function generateGtechDocumentPdf(
         .text(`Rabatt (${opts.discountPercentage || 0}%)`, TOTALS_LABEL_X, yPos);
       doc.font(R).text(
         `-${formatGermanNum(opts.discountAmount, 2)} ${currency}`,
-        TOTALS_VAL_X - TOTALS_RIGHT_PAD,
-        yPos,
-        { align: "right", width: TOTALS_VAL_W },
-      );
-    }
-
-    if (Number(opts.shippingCost || 0) > 0) {
-      yPos += 16;
-      doc.font(R).text("Versandkosten", TOTALS_LABEL_X, yPos);
-      doc.font(R).text(
-        `${formatGermanNum(opts.shippingCost, 2)} ${currency}`,
         TOTALS_VAL_X - TOTALS_RIGHT_PAD,
         yPos,
         { align: "right", width: TOTALS_VAL_W },
@@ -840,12 +832,12 @@ export async function generateGtechDocumentPdf(
         vatMap.set(rate, (vatMap.get(rate) || 0) + vatAmt);
       });
 
-      if (Number(opts.shippingCost || 0) > 0) {
+      if (shippingTotalNet > 0) {
         const shipRate = opts.shippingTaxRate !== undefined && opts.shippingTaxRate !== null ? Number(opts.shippingTaxRate) : opts.taxRate !== undefined && opts.taxRate !== null ? Number(opts.taxRate) : 0;
         if (!vatMap.has(shipRate)) {
           rateOrder.push(shipRate);
         }
-        const shipVat = Number(opts.shippingCost) * (shipRate / 100);
+        const shipVat = shippingTotalNet * (shipRate / 100);
         vatMap.set(shipRate, (vatMap.get(shipRate) || 0) + shipVat);
       }
 
@@ -886,7 +878,7 @@ export async function generateGtechDocumentPdf(
       );
     }
 
-    const finalBrutto = Number(opts.subtotal || 0) - Number(opts.discountAmount || 0) + Number(opts.shippingCost || 0) + calcVatTotal;
+    const finalBrutto = (effectiveSubtotal - Number(opts.discountAmount || 0)) + calcVatTotal;
 
     yPos += 22;
     const bruttoBoxX = TOTALS_LABEL_X - 6;
