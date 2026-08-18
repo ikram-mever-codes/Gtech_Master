@@ -1795,7 +1795,7 @@ const InvoiceListPage: React.FC = () => {
           />
         )}
         {activeInvTab !== "angebot" && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-6">
+          <div className="mb-6">
             <DataTable
               data={sortedItems}
               columns={commercialColumns}

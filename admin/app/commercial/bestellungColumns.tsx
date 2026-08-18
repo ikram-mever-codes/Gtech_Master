@@ -48,7 +48,7 @@ export function buildBestellungColumns({
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
     {
       header: "Datum",
-      width: "70px",
+      width: "75px",
       align: "center",
       render: (row) => {
         const rawDate =
@@ -58,14 +58,18 @@ export function buildBestellungColumns({
           /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)
         ) {
           const [d, m] = rawDate.split(".");
-          return `${d}.${m}.`;
+          return <span className="text-sm text-gray-800 font-normal">{`${d}.${m}.`}</span>;
         }
-        return rawDate ? formatDate(rawDate) : "-";
+        return (
+          <span className="text-sm text-gray-800 font-normal">
+            {rawDate ? formatDate(rawDate) : "—"}
+          </span>
+        );
       },
     },
     {
       header: "Nr",
-      width: "75px",
+      width: "110px",
       align: "center",
       render: (row) => (
         <button
@@ -73,7 +77,7 @@ export function buildBestellungColumns({
             e.stopPropagation();
             onOpenBestellungPreview(row.id);
           }}
-          className="text-green-600 hover:underline font-semibold"
+          className="text-green-600 hover:underline font-semibold whitespace-nowrap text-sm cursor-pointer"
         >
           {row.order_no || "N/A"}
         </button>
@@ -81,7 +85,7 @@ export function buildBestellungColumns({
     },
     {
       header: "Kunde",
-      width: "120px",
+      width: "140px",
       align: "left",
       render: (row) => {
         const text =
@@ -93,7 +97,10 @@ export function buildBestellungColumns({
           row.supplier?.name ||
           "—";
         return (
-          <div className="truncate max-w-[120px]" title={text}>
+          <div
+            className="truncate max-w-[140px] text-sm font-bold text-gray-900"
+            title={text}
+          >
             {text}
           </div>
         );
@@ -101,7 +108,7 @@ export function buildBestellungColumns({
     },
     {
       header: "Titel",
-      width: "130px",
+      width: "140px",
       align: "left",
       render: (row) => {
         const text =
@@ -111,7 +118,10 @@ export function buildBestellungColumns({
           row.items?.[0]?.itemName ||
           "—";
         return (
-          <div className="truncate max-w-[130px]" title={text}>
+          <div
+            className="truncate max-w-[140px] text-sm text-gray-600 font-normal"
+            title={text}
+          >
             {text}
           </div>
         );
@@ -128,7 +138,10 @@ export function buildBestellungColumns({
           row.notes ||
           "—";
         return (
-          <div className="truncate max-w-[110px]" title={text}>
+          <div
+            className="truncate max-w-[110px] text-sm text-gray-600 font-normal"
+            title={text}
+          >
             {text}
           </div>
         );
@@ -136,7 +149,7 @@ export function buildBestellungColumns({
     },
     {
       header: "Lieferort",
-      width: "95px",
+      width: "120px",
       align: "left",
       render: (row) => {
         const city = row.deliveryAddress?.city || "";
@@ -146,7 +159,10 @@ export function buildBestellungColumns({
           row.deliveryAddress?.addressName ||
           "—";
         return (
-          <div className="truncate max-w-[95px]" title={text}>
+          <div
+            className="truncate max-w-[120px] text-sm text-gray-600 font-normal"
+            title={text}
+          >
             {text}
           </div>
         );
@@ -154,39 +170,43 @@ export function buildBestellungColumns({
     },
     {
       header: "Lieferdatum",
-      width: "80px",
+      width: "90px",
       align: "center",
       render: (row) => {
         const raw = row.date_delivery || row.deliveryDate;
-        if (!raw) return "—";
+        if (!raw) return <span className="text-gray-400 font-normal text-sm">—</span>;
         if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw)) {
           const [d, m] = raw.split(".");
-          return `${d}.${m}.`;
+          return <span className="text-sm text-gray-600 font-normal">{`${d}.${m}.`}</span>;
         }
-        return formatDate(raw);
+        return <span className="text-sm text-gray-600 font-normal">{formatDate(raw)}</span>;
       },
     },
     {
       header: "Bestellwert netto",
-      width: "100px",
+      width: "110px",
       align: "right",
       render: (row) => {
         const val = valueNetCalc(row);
-        return `€${val.toLocaleString("de-DE", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`;
+        return (
+          <span className="text-sm font-bold text-gray-900">
+            {`${val.toLocaleString("de-DE", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })} €`}
+          </span>
+        );
       },
     },
     {
       header: "Status",
-      width: "110px",
+      width: "90px",
       align: "center",
       render: (row: any) => {
         const currentStatus = row.status || "draft";
         return (
           <span
-            className={`text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium ${getStatusStyle(currentStatus)}`}
+            className="text-[11px] px-2.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 font-medium capitalize"
           >
             {currentStatus}
           </span>
@@ -195,7 +215,7 @@ export function buildBestellungColumns({
     },
     {
       header: "Aktionen",
-      width: "80px",
+      width: "90px",
       align: "center",
       render: (row) => {
         const currentStatus = row.status || "draft";
@@ -207,7 +227,7 @@ export function buildBestellungColumns({
                   e.stopPropagation();
                   onMarkProcessing(row.id);
                 }}
-                className="px-2 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition shadow-xs"
+                className="px-2 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition shadow-xs cursor-pointer"
               >
                 Processing
               </button>
@@ -217,7 +237,7 @@ export function buildBestellungColumns({
                   e.stopPropagation();
                   onOpenBestellungPreview(row.id);
                 }}
-                className="px-2 py-0.5 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-xs"
+                className="px-2 py-0.5 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-xs cursor-pointer"
               >
                 View
               </button>

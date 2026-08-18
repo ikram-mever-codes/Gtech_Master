@@ -38,6 +38,7 @@ import { parseFlexibleNumber } from "@/utils/decimal";
 import { BASE_URL } from "@/utils/constants";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
+import { formatLieferort, formatTitel35 } from "@/app/commercial/sharedColumns";
 
 import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 // WEIGHT
@@ -594,21 +595,32 @@ const OffersPage: React.FC<any> = ({
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="w-9 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[70px]">
+                    Datum
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    No
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[75px]">
+                    Nr
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Company
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">
+                    Kunde
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[135px]">
+                    Titel
                   </th>
-
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[110px]">
+                    Lieferort
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[80px]">
+                    Lieferdatum
+                  </th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[95px]">
+                    Nettowert
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+                    Status
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px]">
+                    Aktionen
                   </th>
                 </tr>
               </thead>
@@ -628,6 +640,8 @@ const OffersPage: React.FC<any> = ({
                     Number(offer.conversionCount) ||
                     (offer.highlightColor === "#ECEAE6" ? 1 : 0);
                   const isConverted = conversionCount > 0;
+                  const lieferort = formatLieferort(offer);
+                  const displayTitle = formatTitel35(offer);
 
                   return (
                     <React.Fragment key={offer.id}>
@@ -659,7 +673,8 @@ const OffersPage: React.FC<any> = ({
                             onToggle={(e) => toggleExpandOffer(offer.id, e)}
                           />
                         </td>
-                        <td className="px-4 py-3">
+                        {/* 1. Datum */}
+                        <td className="px-3 py-3 text-center">
                           <div
                             className={`text-sm ${
                               rowColor ? "" : "text-gray-700"
@@ -671,85 +686,96 @@ const OffersPage: React.FC<any> = ({
                             {formatDate(offer.createdAt)}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        {/* 2. Nr */}
+                        <td className="px-3 py-3 text-center">
                           <div
-                            className="text-sm font-medium"
-                            style={{ color: rowTextColor }}
+                            className="text-sm font-medium text-green-600 hover:underline"
+                            style={rowColor ? { color: rowTextColor } : undefined}
                           >
-                            {!rowColor && (
-                              <span className="text-gray-900">
-                                {offer.offerNumber}
-                              </span>
-                            )}
-                            {rowColor && offer.offerNumber}
+                            {offer.offerNumber}
                             {offer.revision > 1 && (
                               <span
-                                className={`ml-2 text-xs ${
+                                className={`ml-1 text-xs ${
                                   rowColor ? "" : "text-gray-500"
                                 }`}
                               >
-                                Rev. {offer.revision}
+                                R{offer.revision}
                               </span>
                             )}
                           </div>
+                        </td>
+                        {/* 3. Kunde */}
+                        <td className="px-3 py-3">
                           <div
-                            className={`text-sm truncate max-w-[16rem] ${
+                            className={`text-sm font-medium truncate max-w-[120px] ${
+                              rowColor ? "" : "text-gray-900"
+                            }`}
+                            title={offer.customerSnapshot?.companyName || offer.customerSnapshot?.name}
+                          >
+                            {offer.customerSnapshot?.companyName || offer.customerSnapshot?.name || "—"}
+                          </div>
+                        </td>
+                        {/* 4. Titel */}
+                        <td className="px-3 py-3">
+                          <div
+                            className={`text-sm truncate max-w-[135px] ${
+                              rowColor ? "" : "text-gray-600"
+                            }`}
+                            title={offer.title || "—"}
+                          >
+                            {displayTitle}
+                          </div>
+                        </td>
+                        {/* 5. Lieferort */}
+                        <td className="px-3 py-3">
+                          <div
+                            className={`text-sm truncate max-w-[110px] ${
+                              rowColor ? "" : "text-gray-600"
+                            }`}
+                            title={lieferort}
+                          >
+                            {lieferort}
+                          </div>
+                        </td>
+                        {/* 6. Lieferdatum */}
+                        <td className="px-3 py-3 text-center">
+                          <div
+                            className={`text-sm ${
                               rowColor ? "" : "text-gray-600"
                             }`}
                           >
-                            {offer.title}
+                            {offer.date_delivery
+                              ? formatDate(offer.date_delivery)
+                              : offer.validUntil
+                                ? formatDate(offer.validUntil)
+                                : "—"}
                           </div>
-                          {offer.useUnitPrices && (
-                            <div className="mt-1">
-                              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded">
-                                Unit pricing
-                              </span>
-                            </div>
-                          )}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`text-sm font-medium truncate max-w-[12rem] ${
-                                rowColor ? "" : "text-gray-900"
-                              }`}
-                            >
-                              {offer.customerSnapshot?.companyName}
-                            </div>
-                          </div>
-                          {offer.customerSnapshot.country !== "DE" &&
-                            offer.customerSnapshot?.country !== "Germany" &&
-                            offer.customerSnapshot?.vatId && (
-                              <div
-                                className={`text-xs mt-0.5 ${
-                                  rowColor ? "opacity-80" : "text-gray-500"
-                                }`}
-                              >
-                                VAT: {offer.customerSnapshot.vatId}
-                              </div>
-                            )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
+                        {/* 7. Nettowert */}
+                        <td className="px-3 py-3 text-right">
                           <div className="text-sm font-bold">
                             {formatCurrency(
-                              offer.totalAmount || 0,
+                              offer.subtotal !== undefined && offer.subtotal !== null
+                                ? offer.subtotal
+                                : offer.totalAmount || 0,
                               offer.currency,
                             )}
                           </div>
-                          <div
-                            className={`text-xs ${
-                              rowColor ? "opacity-80" : "text-gray-500"
-                            }`}
-                          >
-                            {lineItems.length} items
-                          </div>
                         </td>
-
+                        {/* 8. Status */}
+                        <td className="px-3 py-3 text-center">
+                          <span
+                            className="text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium bg-blue-50 text-blue-700 border-blue-200 capitalize"
+                          >
+                            {offer.status || "Draft"}
+                          </span>
+                        </td>
+                        {/* 9. Aktionen */}
                         <td
-                          className="px-4 py-3 text-center"
+                          className="px-3 py-3 text-center"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="flex items-center justify-center gap-1.5 font-poppins">
+                          <div className="flex items-center justify-center gap-1 font-poppins">
                             <button
                               title={
                                 isConverted
@@ -759,18 +785,18 @@ const OffersPage: React.FC<any> = ({
                               onClick={(e) =>
                                 handleConvertOfferToAuftrag(offer, e)
                               }
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-[4px] transition shadow-md whitespace-nowrap cursor-pointer ${
+                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded-[4px] transition shadow-xs whitespace-nowrap cursor-pointer ${
                                 isConverted
                                   ? "bg-gray-500 hover:bg-gray-600 text-white"
                                   : "bg-[#2F6B46] hover:bg-[#255638] text-white"
                               }`}
                             >
-                              <MoveRight className="h-3.5 w-3.5" />
+                              <MoveRight className="h-3 w-3" />
                             </button>
                             {conversionCount > 0 && (
                               <span
                                 title={`Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""}`}
-                                className="px-1.5 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
+                                className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-xs shrink-0"
                               >
                                 {conversionCount}
                               </span>
@@ -786,9 +812,9 @@ const OffersPage: React.FC<any> = ({
                                   );
                                 } catch (_) {}
                               }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap"
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
                             >
-                              <FileDown className="h-3.5 w-3.5" /> PDF
+                              <FileDown className="h-3 w-3" /> PDF
                             </button>
                           </div>
                         </td>
@@ -796,7 +822,7 @@ const OffersPage: React.FC<any> = ({
 
                       {isExpanded && (
                         <tr className="bg-emerald-50/20 border-b border-gray-200">
-                          <td colSpan={6} className="px-6 py-4">
+                          <td colSpan={10} className="px-6 py-4">
                             <OfferLineItemsTable
                               offer={offer}
                               lineItems={lineItems}

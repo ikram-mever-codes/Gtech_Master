@@ -6,12 +6,12 @@ import { downloadLieferscheinPdf } from "@/api/lieferscheine";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
-  dateCreatedColumn,
-  companyColumn,
-  personColumn,
-  postalCodeColumn,
-  cityColumn,
-  buildItemCountColumn,
+  datumColumn,
+  kundeColumn,
+  titelColumn,
+  lieferortColumn,
+  lieferdatumColumn,
+  buildNettowertColumn,
 } from "./sharedColumns";
 
 interface LieferscheinColumnsArgs {
@@ -27,10 +27,10 @@ export function buildLieferscheinColumns({
 }: LieferscheinColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
-    dateCreatedColumn,
+    datumColumn,
     {
-      header: "No",
-      width: "110px",
+      header: "Nr",
+      width: "80px",
       align: "center",
       render: (row) => (
         <button
@@ -38,19 +38,19 @@ export function buildLieferscheinColumns({
             e.stopPropagation();
             onView(row);
           }}
-          className="truncate max-w-[110px] text-[#8CC21B] font-semibold hover:underline cursor-pointer"
+          className="truncate max-w-[80px] text-green-600 font-semibold hover:underline cursor-pointer"
           title={row.deliveryNoteNo || row.id}
         >
           {row.deliveryNoteNo || row.id}
         </button>
       ),
     },
-    companyColumn,
-    personColumn,
-    postalCodeColumn,
-    cityColumn,
-    buildItemCountColumn(
-      (row) => row.customItemCount ?? row.items?.length ?? 0,
+    kundeColumn,
+    titelColumn,
+    lieferortColumn,
+    lieferdatumColumn,
+    buildNettowertColumn((row) =>
+      Number(row.subtotal || row.netTotal || row.total_amount || 0),
     ),
     {
       header: "Status",
@@ -61,22 +61,22 @@ export function buildLieferscheinColumns({
         const getStatusColor = (status: string) => {
           switch (status?.toLowerCase()) {
             case "open":
-              return "bg-blue-100 text-blue-700";
+              return "bg-blue-50 text-blue-700 border-blue-200";
             case "in progress":
             case "processing":
-              return "bg-yellow-100 text-yellow-700";
+              return "bg-amber-50 text-amber-700 border-amber-200";
             case "completed":
             case "delivered":
-              return "bg-green-100 text-green-700";
+              return "bg-emerald-50 text-emerald-700 border-emerald-200";
             case "cancelled":
-              return "bg-red-100 text-red-700";
+              return "bg-rose-50 text-rose-700 border-rose-200";
             default:
-              return "bg-gray-100 text-gray-700";
+              return "bg-gray-100 text-gray-700 border-gray-200";
           }
         };
         return (
           <span
-            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${getStatusColor(
+            className={`text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium ${getStatusColor(
               status,
             )}`}
           >
@@ -86,17 +86,17 @@ export function buildLieferscheinColumns({
       },
     },
     {
-      header: "Actions",
+      header: "Aktionen",
       width: "90px",
       align: "center",
       render: (row) => (
-        <div className="flex items-center justify-center gap-1.5">
+        <div className="flex items-center justify-center gap-1 font-poppins">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onView(row);
             }}
-            className="px-2 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-[4px] transition shadow-md"
+            className="px-2 py-0.5 text-[10px] font-bold bg-[#2F6B46] hover:bg-[#255638] text-white rounded-[4px] transition shadow-xs cursor-pointer"
           >
             View
           </button>
@@ -106,12 +106,15 @@ export function buildLieferscheinColumns({
             onClick={async (e) => {
               e.stopPropagation();
               try {
-                await downloadLieferscheinPdf(row.id, row.deliveryNoteNo || row.delivery_note_number);
-              } catch (_) { }
+                await downloadLieferscheinPdf(
+                  row.id,
+                  row.deliveryNoteNo || row.delivery_note_number,
+                );
+              } catch (_) {}
             }}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
           >
-            <FileDown className="h-3.5 w-3.5" /> PDF
+            <FileDown className="h-3 w-3" /> PDF
           </button>
         </div>
       ),

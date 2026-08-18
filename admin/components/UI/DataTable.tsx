@@ -97,9 +97,9 @@ export function DataTable<T>({
     }, [data, currentSortColumn, currentSortDirection, columns]);
 
     return (
-        <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white">
+        <div className="overflow-x-auto bg-white rounded-md shadow-lg border border-gray-200">
             <table className="w-full border-collapse">
-                <thead className={headerClassName || "bg-gray-50/50 border-b border-gray-100"}>
+                <thead className={headerClassName || "bg-gray-50 border-b border-gray-200"}>
                     <tr>
                         {columns.map((c, i) => {
                             const isSortable = !!c.sortKey;
@@ -107,7 +107,7 @@ export function DataTable<T>({
                             return (
                                 <th
                                     key={i}
-                                    className={`${thClassName || `px-4 py-3.5 text-${c.align || "left"} text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100`} ${isSortable ? 'cursor-pointer select-none hover:text-gray-700 transition-colors group' : ''}`}
+                                    className={`${thClassName || `px-3 py-3 text-${c.align || "left"} text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200`} ${isSortable ? 'cursor-pointer select-none hover:text-gray-900 transition-colors group' : ''}`}
                                     style={c.width ? { width: c.width, minWidth: c.width } : {}}
                                     onClick={() => isSortable && handleHeaderClick(c.sortKey!)}
                                 >
@@ -146,13 +146,13 @@ export function DataTable<T>({
                         })}
                     </tr>
                 </thead>
-                <tbody className="bg-white text-sm divide-y divide-gray-100">
+                <tbody className="bg-white text-sm divide-y divide-gray-200">
                     {showTotals && processedData.length > 0 && (
-                        <tr className="bg-gray-50/50 font-bold text-gray-800 border-b border-gray-100">
+                        <tr className="bg-gray-50/50 font-bold text-gray-800 border-b border-gray-200">
                             {columns.map((c, i) => (
                                 <td
                                     key={`total-${i}`}
-                                    className={`px-4 py-3 text-${c.align || "left"} border-b border-gray-100 text-xs`}
+                                    className={`px-3 py-3 text-${c.align || "left"} border-b border-gray-200 text-xs`}
                                     style={c.width ? { width: c.width, minWidth: c.width } : {}}
                                 >
                                     {c.renderTotal ? c.renderTotal(processedData) : null}
@@ -209,7 +209,7 @@ export function DataTable<T>({
                             return (
                                 <React.Fragment key={(row as any).id || (row as any)._id || idx}>
                                     <tr
-                                        className={`hover:bg-gray-50/50 transition-all ${getRowClassName ? getRowClassName(row, idx) : ""} ${onRowClick ? "cursor-pointer" : ""}`}
+                                        className={`transition-colors hover:bg-gray-50 ${getRowClassName ? getRowClassName(row, idx) : ""} ${onRowClick ? "cursor-pointer" : ""}`}
                                         style={rowStyle}
                                         onClick={(e) => {
                                             if (!onRowClick) return;
@@ -222,7 +222,7 @@ export function DataTable<T>({
                                         {columns.map((c, i) => (
                                             <td
                                                 key={i}
-                                                className={tdClassName || `px-4 py-3.5 text-${c.align || "left"} border-b border-gray-100 ${rowStyle?.color ? "" : "text-gray-700"} font-medium`}
+                                                className={tdClassName || `px-3 py-3 text-${c.align || "left"} ${rowStyle?.color ? "" : "text-gray-700"}`}
                                                 style={{
                                                     ...(c.width ? { width: c.width, minWidth: c.width } : {}),
                                                     ...(rowStyle?.color ? { color: rowStyle.color } : {})

@@ -12,13 +12,12 @@ import { downloadCustomerOrderPdf } from "@/api/customer_orders";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
-  dateCreatedColumn,
-  companyColumn,
-  personColumn,
-  postalCodeColumn,
-  cityColumn,
-  buildValueNetColumn,
-  buildItemCountColumn,
+  datumColumn,
+  kundeColumn,
+  titelColumn,
+  lieferortColumn,
+  lieferdatumColumn,
+  buildNettowertColumn,
 } from "./sharedColumns";
 
 interface AuftragColumnsArgs {
@@ -335,10 +334,10 @@ export function buildAuftragColumns({
 }: AuftragColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
-    dateCreatedColumn,
+    datumColumn,
     {
-      header: "No",
-      width: "65px",
+      header: "Nr",
+      width: "110px",
       align: "center",
       render: (row) => (
         <button
@@ -346,18 +345,41 @@ export function buildAuftragColumns({
             e.stopPropagation();
             onOpenAuftragPreview(row.id);
           }}
-          className="text-green-600 hover:underline font-semibold"
+          className="text-green-600 hover:underline font-semibold whitespace-nowrap text-sm cursor-pointer"
         >
           {row.order_no || "N/A"}
         </button>
       ),
     },
-    companyColumn,
-    personColumn,
-    postalCodeColumn,
-    cityColumn,
-    buildValueNetColumn(valueNetCalc),
-    buildItemCountColumn(itemCountCalc),
+    kundeColumn,
+    titelColumn,
+    lieferortColumn,
+    lieferdatumColumn,
+    buildNettowertColumn(valueNetCalc),
+    {
+      header: "Status",
+      width: "90px",
+      align: "center",
+      render: (row) => {
+        const status = getRowStatus(row);
+        const label = AUFTRAG_STATUS_LABELS[status] || status;
+        const colorClasses: Record<string, string> = {
+          open: "bg-blue-50 text-blue-600 border-blue-200",
+          partially_delivered: "bg-amber-50 text-amber-600 border-amber-200",
+          delivered: "bg-emerald-50 text-emerald-600 border-emerald-200",
+          closed: "bg-gray-100 text-gray-600 border-gray-200",
+        };
+        return (
+          <span
+            className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${
+              colorClasses[status] || "bg-blue-50 text-blue-600 border-blue-200"
+            }`}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
     {
       header: "Aktionen",
       width: "55px",
