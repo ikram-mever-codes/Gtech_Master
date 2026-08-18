@@ -34,16 +34,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => { },
-      IsEnum: () => () => { },
-      IsNumber: () => () => { },
-      IsObject: () => () => { },
-      IsOptional: () => () => { },
-      IsString: () => () => { },
-      Max: () => () => { },
-      Min: () => () => { },
-      IsBoolean: () => () => { },
-      IsArray: () => () => { },
+      IsDate: () => () => {},
+      IsEnum: () => () => {},
+      IsNumber: () => () => {},
+      IsObject: () => () => {},
+      IsOptional: () => () => {},
+      IsString: () => () => {},
+      Max: () => () => {},
+      Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -54,7 +54,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => { },
+      Type: () => () => {},
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -114,6 +114,7 @@ import { CompanyShippingAddress } from "../models/company_shipping_address";
 import { getActiveTemplateFilePath } from "./system_parameter_controller";
 import * as pdfLib from "pdf-lib";
 import { CustomerOrder } from "../models/customer_orders";
+import { ItemLinkService } from "../services/item_link_service";
 
 let cachedCustomerSvg: string | null = null;
 let cachedTemplatePath: string | null = null;
@@ -910,6 +911,18 @@ export class OfferController {
     if (tiered !== null) return tiered;
     return Number(item.price) || 0;
   }
+
+  private itemFieldsOrFallback(
+    item: import("../models/items").Item | null | undefined,
+    fallback: Record<string, any>,
+  ): Record<string, any> {
+    const projected = ItemLinkService.projectItemFields(item);
+    const merged: Record<string, any> = { ...fallback };
+    for (const [key, value] of Object.entries(projected)) {
+      if (value !== undefined && value !== null) merged[key] = value;
+    }
+    return merged;
+  }
   private async getCustomerTaxProfile(
     customerId?: string | null,
   ): Promise<any> {
@@ -968,9 +981,7 @@ export class OfferController {
       country: customer.country || customer.businessDetails?.country || "",
       street: customer.addressLine1 || customer.businessDetails?.street,
       additionalInfo:
-        custAny.addressAdditionalLine ||
-        custAny.addressLine2 ||
-        "",
+        custAny.addressAdditionalLine || custAny.addressLine2 || "",
     };
   }
 
@@ -1133,7 +1144,9 @@ export class OfferController {
           "customer.businessDetails",
           "customer.shippingAddresses",
           "requests",
+          "requests.item",
           "contactPerson",
+          "item",
         ],
       });
 
@@ -1173,9 +1186,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-              createOfferDto.defaultPriceMatrix,
-              createOfferDto.totalPriceDecimalPlaces || 2,
-            )
+                createOfferDto.defaultPriceMatrix,
+                createOfferDto.totalPriceDecimalPlaces || 2,
+              )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -1206,7 +1219,7 @@ export class OfferController {
         // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-            customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         paymentMethod: createOfferDto.paymentMethod,
@@ -1244,18 +1257,35 @@ export class OfferController {
         pricingMode === "matrix" ? this.createDefaultPriceMatrix() : undefined;
 
       if (inquiry.isAssembly) {
+        // Item data for the assembly line: prefer inquiry.item (the linked
+        // draft/master Item), fall back to inquiry's own mirror columns
+        // only for rows that predate the Item link.
+        const assemblyItemData = this.itemFieldsOrFallback(inquiry.item, {
+          itemName: inquiry.name,
+          purchasePrice: inquiry.purchasePrice,
+          currency: inquiry.purchasePriceCurrency,
+          photo: inquiry.image,
+        });
+
         const assemblyLineItem = this.lineItemRepository.create({
           offer: savedOffer,
           offerId: savedOffer.id,
-          itemName: savedOffer.assemblyName || inquiry.name,
+          itemName:
+            savedOffer.assemblyName ||
+            assemblyItemData.itemName ||
+            inquiry.name,
           description: savedOffer.assemblyDescription || inquiry.description,
-          photo: inquiry.image || undefined,
+          photo: assemblyItemData.photo || undefined,
           position: position++,
           isAssemblyItem: true,
           isEstimated: inquiry.isEstimated,
           notes: savedOffer.assemblyNotes,
-          purchasePrice: inquiry.purchasePrice,
-          purchaseCurrency: inquiry.purchasePriceCurrency,
+          weight: assemblyItemData.weight,
+          width: assemblyItemData.width,
+          height: assemblyItemData.height,
+          length: assemblyItemData.length,
+          purchasePrice: assemblyItemData.purchasePrice,
+          purchaseCurrency: assemblyItemData.currency,
           priceMatrix: matrixForLine(),
           lineTotal: 0,
         });
@@ -1265,22 +1295,34 @@ export class OfferController {
           await this.lineItemRepository.save(assemblyLineItem);
         if (inquiry.requests && inquiry.requests.length > 0) {
           for (const request of inquiry.requests) {
-            const componentItem = this.lineItemRepository.create({
-              offer: savedOffer,
-              offerId: savedOffer.id,
-              requestedItemId: request.id,
-              itemName: request.itemName || "Component",
+            const componentItemData = this.itemFieldsOrFallback(request.item, {
+              itemName: request.itemName,
               material: request.material,
-              photo:
-                (request as any).photo || (request as any).picture || undefined,
               specification: request.specification,
-              description: request.comment || request.extraNote,
               weight: request.weight,
               width: request.width,
               height: request.height,
               length: request.length,
               purchasePrice: request.purchasePrice,
-              purchaseCurrency: request.currency,
+              currency: request.currency,
+              photo: (request as any).photo || (request as any).picture,
+            });
+
+            const componentItem = this.lineItemRepository.create({
+              offer: savedOffer,
+              offerId: savedOffer.id,
+              requestedItemId: request.id,
+              itemName: componentItemData.itemName || "Component",
+              material: componentItemData.material,
+              photo: componentItemData.photo || undefined,
+              specification: componentItemData.specification,
+              description: request.comment || request.extraNote,
+              weight: componentItemData.weight,
+              width: componentItemData.width,
+              height: componentItemData.height,
+              length: componentItemData.length,
+              purchasePrice: componentItemData.purchasePrice,
+              purchaseCurrency: componentItemData.currency,
               baseQuantity: request.qty,
               position: position++,
               isComponent: true,
@@ -1295,22 +1337,34 @@ export class OfferController {
       } else {
         if (inquiry.requests && inquiry.requests.length > 0) {
           for (const request of inquiry.requests) {
-            const lineItem = this.lineItemRepository.create({
-              offer: savedOffer,
-              offerId: savedOffer.id,
-              requestedItemId: request.id,
-              itemName: request.itemName || "Item",
+            const itemData = this.itemFieldsOrFallback(request.item, {
+              itemName: request.itemName,
               material: request.material,
-              photo:
-                (request as any).photo || (request as any).picture || undefined,
               specification: request.specification,
-              description: request.comment || request.extraNote,
               weight: request.weight,
               width: request.width,
               height: request.height,
               length: request.length,
               purchasePrice: request.purchasePrice,
-              purchaseCurrency: request.currency,
+              currency: request.currency,
+              photo: (request as any).photo || (request as any).picture,
+            });
+
+            const lineItem = this.lineItemRepository.create({
+              offer: savedOffer,
+              offerId: savedOffer.id,
+              requestedItemId: request.id,
+              itemName: itemData.itemName || "Item",
+              material: itemData.material,
+              photo: itemData.photo || undefined,
+              specification: itemData.specification,
+              description: request.comment || request.extraNote,
+              weight: itemData.weight,
+              width: itemData.width,
+              height: itemData.height,
+              length: itemData.length,
+              purchasePrice: itemData.purchasePrice,
+              purchaseCurrency: itemData.currency,
               baseQuantity: request.qty,
               position: position++,
               isEstimated: request.isEstimated,
@@ -1453,7 +1507,7 @@ export class OfferController {
         paymentMethod: body.paymentMethod,
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-            customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         shippingMethod: body.shippingMethod,
@@ -1578,9 +1632,7 @@ export class OfferController {
       city: custAny.city || custAny.businessDetails?.city,
       postalCode: custAny.postalCode || custAny.businessDetails?.postalCode,
       country: custAny.country || custAny.businessDetails?.country,
-      additionalInfo:
-        custAny.addressAdditionalLine ||
-        custAny.addressLine2,
+      additionalInfo: custAny.addressAdditionalLine || custAny.addressLine2,
       contactName: customer.legalName || customer.companyName,
       contactPhone: customer.contactPhoneNumber,
     };
@@ -3065,10 +3117,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                  totalPriceDecimalPlaces,
-                ),
-              );
+                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                    totalPriceDecimalPlaces,
+                  ),
+                );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -3278,11 +3330,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-              ...tpl,
-              price: match.price,
-              total: match.total,
-              isActive: match.isActive,
-            }
+                ...tpl,
+                price: match.price,
+                total: match.total,
+                isActive: match.isActive,
+              }
             : { ...tpl };
         });
 
@@ -3473,10 +3525,15 @@ export class OfferController {
             relations: ["shippingAddresses", "defaultTaxProfile"],
           });
           if (customerEntity?.defaultTaxProfile) {
-            customerTaxProfile = this.mapTaxProfile(customerEntity.defaultTaxProfile);
+            customerTaxProfile = this.mapTaxProfile(
+              customerEntity.defaultTaxProfile,
+            );
           }
         } catch (e) {
-          console.warn("Could not fetch customer shipping addresses / tax profile:", e);
+          console.warn(
+            "Could not fetch customer shipping addresses / tax profile:",
+            e,
+          );
         }
       }
 
@@ -3525,21 +3582,29 @@ export class OfferController {
       };
 
       const resolvedDefaultTaxRate: number =
-        customerTaxProfile?.taxRate !== undefined && customerTaxProfile?.taxRate !== null
+        customerTaxProfile?.taxRate !== undefined &&
+        customerTaxProfile?.taxRate !== null
           ? getSafeNumber(customerTaxProfile.taxRate)
           : offer.taxRate !== undefined && offer.taxRate !== null
             ? getSafeNumber(offer.taxRate)
             : 19;
 
       const isFreetextLine = (item: any): boolean =>
-        !item?.sourceItemId && !item?.requestedItemId && (item?.itemType === "freizeile" || item?.isFreizeile || (!item?.material && (item?.description || item?.itemName)));
+        !item?.sourceItemId &&
+        !item?.requestedItemId &&
+        (item?.itemType === "freizeile" ||
+          item?.isFreizeile ||
+          (!item?.material && (item?.description || item?.itemName)));
 
       const getEffectiveLineTaxRate = (item: any): number => {
         if (isFreetextLine(item)) {
-          const own = item?.taxRate !== undefined && item?.taxRate !== null ? getSafeNumber(item.taxRate) : null;
+          const own =
+            item?.taxRate !== undefined && item?.taxRate !== null
+              ? getSafeNumber(item.taxRate)
+              : null;
           return own !== null ? own : resolvedDefaultTaxRate;
         }
-        return (item?.taxRate !== undefined && item?.taxRate !== null)
+        return item?.taxRate !== undefined && item?.taxRate !== null
           ? getSafeNumber(item.taxRate)
           : resolvedDefaultTaxRate;
       };
@@ -3565,16 +3630,18 @@ export class OfferController {
         let discountedSubtotal = subtotal - discount;
         if (discountedSubtotal < 0) discountedSubtotal = 0;
 
-        const discountFactor = subtotal > 0 ? (discountedSubtotal / subtotal) : 1;
+        const discountFactor = subtotal > 0 ? discountedSubtotal / subtotal : 1;
         taxAmount = taxAmount * discountFactor;
 
         const shippingCost = getSafeNumber(offerData.shippingCost);
         const shippingQty = getSafeNumber(offerData.shippingQuantity) || 1;
         const shippingTotal = shippingCost * shippingQty;
         if (shippingTotal > 0) {
-          const shipRate = offerData.shippingTaxRate !== undefined && offerData.shippingTaxRate !== null
-            ? getSafeNumber(offerData.shippingTaxRate)
-            : resolvedDefaultTaxRate;
+          const shipRate =
+            offerData.shippingTaxRate !== undefined &&
+            offerData.shippingTaxRate !== null
+              ? getSafeNumber(offerData.shippingTaxRate)
+              : resolvedDefaultTaxRate;
           taxAmount += shippingTotal * (shipRate / 100);
         }
 
@@ -3782,7 +3849,10 @@ export class OfferController {
             shipLinesToRender = [primaryName, offerDelivery.trim()].filter(
               Boolean,
             );
-            shipCoreKey = offerDelivery.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
+            shipCoreKey = offerDelivery
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]/gi, "");
           }
         } else if (typeof offerDelivery === "object") {
           if (
@@ -3792,15 +3862,28 @@ export class OfferController {
           ) {
             isExplicitlySame = true;
           } else {
-            const sStreet = (offerDelivery.street || offerDelivery.addressLine1 || "").trim();
-            const sPostal = (offerDelivery.postal_code || offerDelivery.postalCode || "").trim();
+            const sStreet = (
+              offerDelivery.street ||
+              offerDelivery.addressLine1 ||
+              ""
+            ).trim();
+            const sPostal = (
+              offerDelivery.postal_code ||
+              offerDelivery.postalCode ||
+              ""
+            ).trim();
             const sCity = (offerDelivery.city || "").trim();
-            const sCountry = (offerDelivery.country || customer.country || customerEntity?.country || "");
+            const sCountry =
+              offerDelivery.country ||
+              customer.country ||
+              customerEntity?.country ||
+              "";
 
             if (sStreet || sCity || sPostal) {
-              shipCoreKey = `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
-                .toLowerCase()
-                .replace(/[^a-z0-9]/gi, "");
+              shipCoreKey =
+                `${sStreet}${sPostal}${sCity}${typeof sCountry === "string" ? sCountry : (sCountry as any)?.code || ""}`
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/gi, "");
 
               const sAddLine =
                 offerDelivery.additionalInfo ||
@@ -3821,9 +3904,10 @@ export class OfferController {
         }
       }
 
-      const mainCoreKey = `${mainStreetStr}${mainPostalStr}${mainCityStr}${(customer.country || "").trim()}`
-        .toLowerCase()
-        .replace(/[^a-z0-9]/gi, "");
+      const mainCoreKey =
+        `${mainStreetStr}${mainPostalStr}${mainCityStr}${(customer.country || "").trim()}`
+          .toLowerCase()
+          .replace(/[^a-z0-9]/gi, "");
 
       const hasRealDifferentAddress =
         !isExplicitlySame &&
@@ -4005,8 +4089,18 @@ export class OfferController {
           .filter((item: any) => !item.isComponent)
           .slice()
           .sort((a: any, b: any) => {
-            const orderA = (a.position !== undefined && a.position !== null && a.position !== 0) ? Number(a.position) : (Number(a.sortOrder) || Number(a.index) || 0);
-            const orderB = (b.position !== undefined && b.position !== null && b.position !== 0) ? Number(b.position) : (Number(b.sortOrder) || Number(b.index) || 0);
+            const orderA =
+              a.position !== undefined &&
+              a.position !== null &&
+              a.position !== 0
+                ? Number(a.position)
+                : Number(a.sortOrder) || Number(a.index) || 0;
+            const orderB =
+              b.position !== undefined &&
+              b.position !== null &&
+              b.position !== 0
+                ? Number(b.position)
+                : Number(b.sortOrder) || Number(b.index) || 0;
             return orderA - orderB;
           });
 
@@ -4043,13 +4137,17 @@ export class OfferController {
             : cleanPdfText(item.material) || item.id?.substring(0, 8) || "—";
           const rawRemarks = cleanPdfText(
             item.notes ||
-            item.remarks ||
-            item.specification ||
-            item.remark_ex ||
-            item.remark ||
-            ""
+              item.remarks ||
+              item.specification ||
+              item.remark_ex ||
+              item.remark ||
+              "",
           );
-          const hasRemark = !!(rawRemarks && rawRemarks !== "-" && rawRemarks !== "—");
+          const hasRemark = !!(
+            rawRemarks &&
+            rawRemarks !== "-" &&
+            rawRemarks !== "—"
+          );
 
           const bezWidth = columns[2].width - 4;
           const remarkWidth = columns[2].width + columns[3].width - 4;
@@ -4062,12 +4160,15 @@ export class OfferController {
           });
           const remarkHeight = hasRemark
             ? doc.font(R).fontSize(8).heightOfString(rawRemarks, {
-              width: remarkWidth,
-              lineGap: 2,
-            }) + halfRowGap
+                width: remarkWidth,
+                lineGap: 2,
+              }) + halfRowGap
             : 0;
 
-          const computedRowHeight = Math.max(22, nameHeight + (hasRemark ? (halfRowGap + remarkHeight) : 0) + 8);
+          const computedRowHeight = Math.max(
+            22,
+            nameHeight + (hasRemark ? halfRowGap + remarkHeight : 0) + 8,
+          );
 
           if (currentY + computedRowHeight > MM(270)) {
             doc
@@ -4194,7 +4295,10 @@ export class OfferController {
         const shipRowNum = totalItemCount + 1;
         const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
 
-        const shipTextHeight = doc.font(R).fontSize(8.5).heightOfString(shippingMethod, { width: columns[2].width - 4 });
+        const shipTextHeight = doc
+          .font(R)
+          .fontSize(8.5)
+          .heightOfString(shippingMethod, { width: columns[2].width - 4 });
         const shipRowH = Math.max(22, shipTextHeight + 10);
 
         if (currentY + shipRowH > MM(270)) {
@@ -4253,7 +4357,10 @@ export class OfferController {
       const TOTALS_LABEL_X = TOTALS_VAL_X - TOTALS_LABEL_W;
 
       const rawOfferCurr = offer.currency || "EUR";
-      const offerCurr = (rawOfferCurr.toUpperCase() === "EUR" || rawOfferCurr === "€") ? "€" : rawOfferCurr;
+      const offerCurr =
+        rawOfferCurr.toUpperCase() === "EUR" || rawOfferCurr === "€"
+          ? "€"
+          : rawOfferCurr;
 
       doc.font(R).fontSize(9).fillColor("#3F4446");
       doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
@@ -4285,7 +4392,11 @@ export class OfferController {
 
       const rateOrder: number[] = [];
       const vatMap = new Map<number, number>();
-      const discountFactor = Number(totals.subtotal) > 0 ? ((Number(totals.subtotal) - Number(totals.discountAmount || 0)) / Number(totals.subtotal)) : 1;
+      const discountFactor =
+        Number(totals.subtotal) > 0
+          ? (Number(totals.subtotal) - Number(totals.discountAmount || 0)) /
+            Number(totals.subtotal)
+          : 1;
 
       (offer.lineItems || (offer as any).items || []).forEach((it: any) => {
         if (it.isComponent) return;
@@ -4342,7 +4453,10 @@ export class OfferController {
             { align: "right", width: TOTALS_VAL_W },
           );
       }
-      const finalBrutto = Number(totals.subtotal) - Number(totals.discountAmount || 0) + calcVatTotal;
+      const finalBrutto =
+        Number(totals.subtotal) -
+        Number(totals.discountAmount || 0) +
+        calcVatTotal;
 
       yPos += 22;
       const bruttoBoxX = TOTALS_LABEL_X - 6;
@@ -4477,17 +4591,29 @@ export class OfferController {
         console.warn("Database update failed but PDF was created:", dbError);
       }
 
+      const docNo = String(offer.offerNumber || "offer")
+        .trim()
+        .replace(/[\s_]+/g, "_");
+      const datePart = (() => {
+        const d = offer.createdAt ? new Date(offer.createdAt) : new Date();
+        const yy = String(d.getFullYear()).slice(-2);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yy}${mm}${dd}`;
+      })();
       const cleanTitle = (offer.title || "")
         .trim()
-        .replace(/[^\w-]/g, "_")
-        .replace(/_+/g, "_")
-        .replace(/^_+|_+$/g, "");
-      const docNo = String(offer.offerNumber || "offer").trim().replace(/[\s_]+/g, "_");
+        .replace(/[\\/:*?"<>|]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
       const downloadFileName = cleanTitle
         ? `Angebot_${docNo}_GTech_${cleanTitle}.pdf`
         : `Angebot_${docNo}_GTech.pdf`;
 
-      response.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+      response.setHeader(
+        "Access-Control-Expose-Headers",
+        "Content-Disposition",
+      );
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",

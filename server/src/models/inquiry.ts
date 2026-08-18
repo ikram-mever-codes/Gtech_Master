@@ -16,6 +16,7 @@ import { ContactPerson } from "./contact_person";
 import { RequestedItem, Interval } from "./requested_items";
 import { Tag } from "./tags";
 import { Offer } from "./offer";
+import { Item } from "./items";
 
 export type Currency = "RMB" | "HKD" | "EUR" | "USD";
 
@@ -258,6 +259,24 @@ export class Inquiry {
 
   @Column({ type: "text", nullable: true })
   tagOrder?: string;
+
+  // --- Single source of truth link (assembly inquiries) ---
+  // Populated automatically when isAssembly = true and no itemId is
+  // supplied on create (see ItemLinkService.resolveItem). name/weight/
+  // width/height/length/purchasePrice/purchasePriceCurrency/taric on
+  // this entity remain for backward compatibility with existing rows
+  // and non-assembly inquiries; once linked, treat `item`'s matching
+  // columns as authoritative and project them back via
+  // ItemLinkService.projectItemFields for API responses.
+  @Column({ name: "item_id", nullable: true })
+  itemId?: number;
+
+  @ManyToOne(() => Item, (item) => item.inquiryLinks, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "item_id" })
+  item?: Item | null;
 
   constructor(partial?: Partial<Inquiry>) {
     if (partial) {

@@ -22,6 +22,7 @@ import { Item } from "./items";
 import { TaxProfile } from "./tax_profile";
 import { CompanyShippingAddress } from "./company_shipping_address";
 import { Country } from "./country";
+import { RequestedItem } from "./requested_items";
 
 @Entity()
 export class Customer {
@@ -160,6 +161,11 @@ export class Customer {
 
   @OneToMany(() => CompanyShippingAddress, (address) => address.company)
   shippingAddresses!: CompanyShippingAddress[];
+
+  // RequestedItem.customer (separate from business/StarBusinessDetails —
+  // see requested_items.ts for why the two coexist).
+  @OneToMany(() => RequestedItem, (requestedItem) => requestedItem.customer)
+  requestedItems!: RequestedItem[];
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -1405,6 +1405,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   const taxProfile = offer?.taxProfile || null;
 
+  // Discount reduces each group's base proportionally.
+  const discountFactor =
+    offer?.discountPercentage > 0 ? 1 - offer.discountPercentage / 100 : 1;
+
   const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
     const byRate = new Map<number, number>();
     visibleLineItems.forEach((li: any) => {
@@ -1413,7 +1417,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
     });
 
-    // Use real-time shipping total from form state when editing, otherwise from offer
     const shippingTotal = edit
       ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
       : (offer?.shippingCost || 0) * (offer?.shippingQuantity || 1);
@@ -1423,18 +1426,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       byRate.set(shipRate, (byRate.get(shipRate) || 0) + shippingTotal);
     }
 
-    // Discount reduces each group's base proportionally.
-    const discountFactor =
-      offer?.discountPercentage > 0 ? 1 - offer.discountPercentage / 100 : 1;
-
     return Array.from(byRate.entries())
       .map(([rate, base]) => {
         const adjustedBase = base * discountFactor;
-        return {
-          rate,
-          base: adjustedBase,
-          tax: adjustedBase * (rate / 100),
-        };
+        return { rate, base: adjustedBase, tax: adjustedBase * (rate / 100) };
       })
       .sort((a, b) => b.rate - a.rate);
   })();
@@ -1444,7 +1439,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     : (offer?.shippingCost || 0) * (offer?.shippingQuantity || 1);
   const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
   const displayTotal =
-    (offer?.subtotal || 0) - (offer?.discountAmount || 0) + vatTaxSum;
+    (offer?.subtotal || 0) -
+    (offer?.discountAmount || 0) +
+    shippingTotalForDisplay * discountFactor +
+    vatTaxSum;
 
   // --- Linked documents (Aufträge) -----------------------------------------
   // offer.linkedDocuments is now an array of full CustomerOrder records
@@ -3018,9 +3016,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium">
-                      {formatCurrency(offer.subtotal || 0, offer.currency)}
+                      {formatCurrency(
+                        (offer.subtotal || 0) + shippingTotalForDisplay,
+                        offer.currency,
+                      )}
                     </span>
                   </div>
+
                   {offer.discountAmount > 0 && (
                     <div className="flex justify-between text-rose-600">
                       <span>Discount</span>

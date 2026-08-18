@@ -1,12 +1,12 @@
 import {
   Entity,
+  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
-  PrimaryGeneratedColumn,
   ManyToMany,
   JoinTable,
   Index,
@@ -22,6 +22,8 @@ import { SalesPrice } from "./sales_prices";
 import { ItemQuality } from "./item_qualities";
 import { Tag } from "./tags";
 import { Customer } from "./customers";
+import { RequestedItem } from "./requested_items";
+import { Inquiry } from "./inquiry";
 
 @Entity()
 export class Item {
@@ -199,6 +201,26 @@ export class Item {
   @Column({ type: "int", nullable: true, default: 0 })
   MSQ_CN?: number;
 
+  // --- Draft-item / single-source-of-truth fields ---
+  // Set true when this Item was auto-created from a RequestedItem or an
+  // assembly Inquiry rather than entered directly as master data.
+  @Column({ type: "boolean", default: false })
+  isDraft!: boolean;
+
+  @Column({ type: "text", nullable: true })
+  material?: string;
+
+  @Column({ type: "text", nullable: true })
+  specification?: string;
+
+  // Plain taric string field, distinct from the taric_id / taric relation
+  // below (that relation points at the Taric master-data entity and is
+  // unrelated to this field). Named taricCode, not taric — "taric" is
+  // already taken by the existing relation property that items_controller.ts
+  // and others read as item.taric.code.
+  @Column({ type: "varchar", length: 100, nullable: true })
+  taricCode?: string;
+
   @OneToMany(() => PurchasePrice, (pp) => pp.item)
   purchasePrices!: PurchasePrice[];
 
@@ -249,4 +271,10 @@ export class Item {
 
   @Column({ type: "text", nullable: true })
   tagOrder?: string;
+
+  @OneToMany(() => RequestedItem, (requestedItem) => requestedItem.item)
+  requestedItemLinks!: RequestedItem[];
+
+  @OneToMany(() => Inquiry, (inquiry) => inquiry.item)
+  inquiryLinks!: Inquiry[];
 }
