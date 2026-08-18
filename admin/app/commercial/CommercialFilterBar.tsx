@@ -127,20 +127,21 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
               </>
             ) : activeInvTab === "rechnung" || activeInvTab === "rk" ? (
               <>
-                <option value="draft" className="text-gray-900 font-normal">
-                  Draft
+                <option
+                  value="partially_paid"
+                  className="text-gray-900 font-normal"
+                >
+                  Partially Paid{" "}
                 </option>
-                <option value="sent" className="text-gray-900 font-normal">
-                  Sent
-                </option>
+
                 <option value="paid" className="text-gray-900 font-normal">
                   Paid
                 </option>
+                <option value="unpaid" className="text-gray-900 font-normal">
+                  Unpaid
+                </option>
                 <option value="overdue" className="text-gray-900 font-normal">
                   Overdue
-                </option>
-                <option value="cancelled" className="text-gray-900 font-normal">
-                  Cancelled
                 </option>
               </>
             ) : (
@@ -246,4 +247,3 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
 };
 
 export default CommercialFilterBar;
-
