@@ -18,7 +18,11 @@ import {
   AlertCircle,
   Mail,
 } from "lucide-react";
-import { downloadRechnungEml, uploadGelangenheitsbestaetigung, deleteGelangenheitsbestaetigung } from "@/api/rechnungen";
+import {
+  downloadRechnungEml,
+  uploadGelangenheitsbestaetigung,
+  deleteGelangenheitsbestaetigung,
+} from "@/api/rechnungen";
 import {
   updateRechnungKItem,
   createRechnungKFromRechnung,
@@ -200,6 +204,11 @@ export default function RechnungDetailModal({
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [removingDoc, setRemovingDoc] = useState(false);
 
+  // --- Shipping cost state --------------------------------------------------
+  const [editShippingCost, setEditShippingCost] = useState<number>(0);
+  const [editShippingQuantity, setEditShippingQuantity] = useState<number>(1);
+  const [editShippingMethod, setEditShippingMethod] = useState<string>("");
+
   const linkedDocs = rechnung?.linkedDocuments || {};
   const auftragDocs = sortByCreatedAtDesc(linkedDocs.auftrag || []);
   const rechnungenKDocs = sortByCreatedAtDesc(linkedDocs.rechnungenK || []);
@@ -209,8 +218,13 @@ export default function RechnungDetailModal({
     setData(rechnung);
     setIsEditMode(false);
     setAddressEdit(false);
-    // Initialize corrections with default values for items that have open quantity
 
+    // Initialize shipping cost from rechnung data
+    setEditShippingCost(Number(rechnung?.shipping_cost) || 0);
+    setEditShippingQuantity(Number(rechnung?.shipping_quantity) || 1);
+    setEditShippingMethod(rechnung?.shipping_method || "");
+
+    // Initialize corrections with default values for items that have open quantity
     if (rechnung?.items) {
       const initialCorrections: Record<
         string,
@@ -232,9 +246,17 @@ export default function RechnungDetailModal({
   if (!isOpen || !data) return null;
 
   const items = data.items || [];
-  const netTotal = Number(data.subtotal ?? 0);
-  const taxAmount = Number(data.tax_amount ?? 0);
-  const grossTotal = Number(data.total_amount ?? 0);
+
+  // Calculate shipping total
+  const shippingTotal = editShippingCost * editShippingQuantity;
+
+  // Subtotal includes items + shipping
+  const netTotal = Number(data.subtotal ?? 0) + shippingTotal;
+  const taxAmount =
+    Number(data.tax_amount ?? 0) +
+    shippingTotal * (Number(data.tax_rate ?? 19) / 100);
+  const grossTotal = netTotal + taxAmount;
+
   const taxRate = Number(data.tax_rate ?? 19);
 
   const invoiceNumber = data.invoice_number || data.rk_number || data.id;
@@ -514,7 +536,8 @@ export default function RechnungDetailModal({
       if (res?.success) {
         setData((prev: any) => ({
           ...prev,
-          gelangenheitsbestaetigung_doc: res.data?.gelangenheitsbestaetigung_doc,
+          gelangenheitsbestaetigung_doc:
+            res.data?.gelangenheitsbestaetigung_doc,
         }));
         toast.success("Gelangenheitsbestätigung uploaded.", successStyles);
         onChanged?.();
@@ -528,7 +551,8 @@ export default function RechnungDetailModal({
   };
 
   const handleRemoveGelangenheits = async () => {
-    if (!window.confirm("Remove the uploaded Gelangenheitsbestätigung?")) return;
+    if (!window.confirm("Remove the uploaded Gelangenheitsbestätigung?"))
+      return;
     setRemovingDoc(true);
     try {
       const res: any = await deleteGelangenheitsbestaetigung(data.id);
@@ -630,10 +654,11 @@ export default function RechnungDetailModal({
               <button
                 type="button"
                 onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${isEditMode
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  isEditMode
                     ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                }`}
               >
                 {isEditMode ? (
                   <>
@@ -807,6 +832,12 @@ export default function RechnungDetailModal({
               <Field label="Payment method" value={data.payment_method} />
               <Field label="Payment terms" value={data.payment_terms} />
               <Field label="Shipping method" value={data.shipping_method} />
+              {shippingTotal > 0 && (
+                <Field
+                  label="Shipping Cost"
+                  value={formatDeCurrency(shippingTotal)}
+                />
+              )}
             </div>
           </div>
 
@@ -947,10 +978,11 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${isFullyCorrected
+                                className={`font-semibold ${
+                                  isFullyCorrected
                                     ? "text-green-600"
                                     : "text-amber-600"
-                                  }`}
+                                }`}
                               >
                                 {openQty}
                               </span>
@@ -1053,6 +1085,58 @@ export default function RechnungDetailModal({
                       </tr>
                     );
                   })}
+
+                  {/* Shipping row */}
+                  {shippingTotal > 0 && (
+                    <tr className="bg-gray-50/80 border-t-2 border-gray-200">
+                      <td className="px-2 py-2 text-gray-400">
+                        {items.length + 1}
+                      </td>
+                      {isCorrection && (
+                        <td className="px-2 py-2 text-gray-400"></td>
+                      )}
+                      <td className="px-2 py-2 text-gray-400">—</td>
+                      <td className="px-2 py-2 font-medium text-gray-700">
+                        {editShippingMethod || "Shipping"}
+                      </td>
+                      {showViewOnly && (
+                        <td className="px-2 py-2 text-gray-400"></td>
+                      )}
+                      <td className="px-2 py-2 text-center text-gray-600">
+                        {taxRate}%
+                      </td>
+                      {showCorrectionUI && (
+                        <>
+                          <td className="px-2 py-2 text-gray-400"></td>
+                          <td className="px-2 py-2 text-gray-400"></td>
+                          <td className="px-2 py-2 text-gray-400"></td>
+                        </>
+                      )}
+                      {showViewOnly && (
+                        <>
+                          <td className="px-2 py-2 text-right text-gray-700">
+                            {editShippingQuantity}
+                          </td>
+                          <td className="px-2 py-2 text-right text-gray-700">
+                            {formatDeCurrency(editShippingCost)}
+                          </td>
+                        </>
+                      )}
+                      {isCorrection && (
+                        <>
+                          <td className="px-2 py-2 text-right text-gray-700">
+                            {editShippingQuantity}
+                          </td>
+                          <td className="px-2 py-2 text-right text-gray-700">
+                            {formatDeCurrency(editShippingCost)}
+                          </td>
+                        </>
+                      )}
+                      <td className="px-2 py-2 text-right font-bold text-gray-800">
+                        {formatDeCurrency(shippingTotal)}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1096,7 +1180,11 @@ export default function RechnungDetailModal({
                     Gelangenheitsbestätigung / Ausfuhrnachweis
                   </p>
                   <p className="text-xs text-amber-600 mt-0.5">
-                    Required for {data.tax_profile_case === "EU_IGL" ? "EU_IGL" : "third country"} invoices
+                    Required for{" "}
+                    {data.tax_profile_case === "EU_IGL"
+                      ? "EU_IGL"
+                      : "third country"}{" "}
+                    invoices
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1125,10 +1213,13 @@ export default function RechnungDetailModal({
                       <span className="text-xs text-amber-700 font-medium">
                         ⚠ Not uploaded yet
                       </span>
-                      <label className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-amber-600 text-white hover:bg-amber-700"
-                        }`}>
+                      <label
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          uploadingDoc
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-amber-600 text-white hover:bg-amber-700"
+                        }`}
+                      >
                         {uploadingDoc ? (
                           <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1163,8 +1254,8 @@ export default function RechnungDetailModal({
               </h3>
             </div>
             {auftragDocs.length === 0 &&
-              rechnungenKDocs.length === 0 &&
-              rechnungDocs.length === 0 ? (
+            rechnungenKDocs.length === 0 &&
+            rechnungDocs.length === 0 ? (
               <p className="text-sm text-gray-500">No linked documents yet.</p>
             ) : (
               <div className="space-y-3">
@@ -1303,10 +1394,11 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+                  hasCorrections && !isCreating
                     ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
+                }`}
               >
                 {isCreating ? (
                   <>
