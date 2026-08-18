@@ -147,7 +147,7 @@ export function buildAuftragColumns({
     dateCreatedColumn,
     {
       header: "No",
-      width: "100px",
+      width: "75px",
       align: "center",
       render: (row) => (
         <button
@@ -169,7 +169,7 @@ export function buildAuftragColumns({
     buildItemCountColumn(itemCountCalc),
     {
       header: "Actions",
-      width: "230px",
+      width: "195px",
       align: "center",
       render: (row) => {
         const rechnungCount = (invoices || []).filter(
@@ -197,7 +197,7 @@ export function buildAuftragColumns({
         const isLocked = isAuftragActionLocked(row);
 
         return (
-          <div className="flex items-center justify-center gap-1.5 font-poppins">
+          <div className="flex items-center justify-center gap-1 font-poppins">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -210,13 +210,13 @@ export function buildAuftragColumns({
                   ? "Auftrag is delivered/closed and can no longer be converted"
                   : "Convert Auftrag directly to Bestellung"
               }
-              className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-md flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#8CC21B]"
+              className="px-1.5 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-md flex items-center gap-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#8CC21B]"
             >
-              <MoveRight className="w-3.5 h-3.5" />
+              <MoveRight className="w-3 h-3" />
               <span>Convert</span>
             </button>
 
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -231,19 +231,19 @@ export function buildAuftragColumns({
                       ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
                       : "Generate Rechnung & Lieferschein"
                 }
-                className={`px-2 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-1 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`px-1.5 py-1 text-[10px] font-bold text-white rounded-[4px] transition shadow-md flex items-center gap-0.5 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isConverted
                     ? "bg-gray-500 hover:bg-gray-600 text-white"
                     : "bg-[#2F6B46] hover:bg-[#255638] text-white"
                 }`}
               >
-                <MoveRight className="w-3.5 h-3.5" />
+                <MoveRight className="w-3 h-3" />
               </button>
 
               {rechnungCount > 0 && (
                 <span
                   title={`Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""}`}
-                  className="px-1.5 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
+                  className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-sm shrink-0"
                 >
                   {rechnungCount}
                 </span>
@@ -257,9 +257,9 @@ export function buildAuftragColumns({
                   e.stopPropagation();
                   onDuplicateAuftrag(row);
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer shadow-xs"
               >
-                <Copy className="h-3.5 w-3.5" /> Duplicate
+                <Copy className="h-3 w-3" /> Duplicate
               </button>
             )}
 
@@ -271,9 +271,9 @@ export function buildAuftragColumns({
                   await downloadCustomerOrderPdf(row.id, row.order_no);
                 } catch (_) {}
               }}
-              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
             >
-              <FileDown className="h-3.5 w-3.5" /> PDF
+              <FileDown className="h-3 w-3" /> PDF
             </button>
           </div>
         );

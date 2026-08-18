@@ -65,7 +65,7 @@ export function buildExpandColumn(
 
 export const dateCreatedColumn: ColumnDef<any> = {
   header: "date_created",
-  width: "100px",
+  width: "70px",
   align: "center",
   render: (row) => {
     const rawDate =
@@ -84,7 +84,7 @@ export const dateCreatedColumn: ColumnDef<any> = {
 
 export const companyColumn: ColumnDef<any> = {
   header: "Company",
-  width: "115px",
+  width: "100px",
   align: "left",
   render: (row) => {
     const text =
@@ -97,7 +97,7 @@ export const companyColumn: ColumnDef<any> = {
       row.ship_to ||
       "N/A";
     return (
-      <div className="truncate max-w-[115px]" title={text}>
+      <div className="truncate max-w-[100px]" title={text}>
         {text}
       </div>
     );
@@ -106,7 +106,7 @@ export const companyColumn: ColumnDef<any> = {
 
 export const personColumn: ColumnDef<any> = {
   header: "Person",
-  width: "150px",
+  width: "110px",
   align: "left",
   render: (row) => {
     const text =
@@ -119,7 +119,7 @@ export const personColumn: ColumnDef<any> = {
       row.ship_to ||
       "-";
     return (
-      <div className="truncate max-w-[150px]" title={text}>
+      <div className="truncate max-w-[110px]" title={text}>
         {text}
       </div>
     );
@@ -128,7 +128,7 @@ export const personColumn: ColumnDef<any> = {
 
 export const postalCodeColumn: ColumnDef<any> = {
   header: "Shipping_postal_code",
-  width: "75px",
+  width: "65px",
   align: "center",
   render: (row) =>
     row.deliveryAddress?.postalCode ||
@@ -141,7 +141,7 @@ export const postalCodeColumn: ColumnDef<any> = {
 
 export const cityColumn: ColumnDef<any> = {
   header: "City, county",
-  width: "95px",
+  width: "85px",
   align: "left",
   render: (row) => {
     const city =
@@ -161,7 +161,7 @@ export const cityColumn: ColumnDef<any> = {
     const text =
       [city, formatCountryCode(country)].filter(Boolean).join(", ") || "-";
     return (
-      <div className="truncate max-w-[95px]" title={text}>
+      <div className="truncate max-w-[85px]" title={text}>
         {text}
       </div>
     );
@@ -173,7 +173,7 @@ export function buildValueNetColumn(
 ): ColumnDef<any> {
   return {
     header: "Value_net",
-    width: "75px",
+    width: "70px",
     align: "right",
     render: (row: any) => {
       const val = calc(row);
@@ -190,7 +190,7 @@ export function buildItemCountColumn(
 ): ColumnDef<any> {
   return {
     header: "Item_Count",
-    width: "60px",
+    width: "45px",
     align: "center",
     render: (row: any) => calc(row),
   };
