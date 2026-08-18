@@ -6,6 +6,11 @@ import { UserRole } from "../models/users";
 const router: any = Router();
 const offerController = new OfferController();
 
+router.get(
+  "/sync-all-from-items",
+  offerController.syncAllOffersFromItems.bind(offerController),
+);
+
 // Apply authentication to all offer routes
 router.use(authenticateUser);
 
