@@ -98,6 +98,7 @@ import {
 import {
   buildAuftragColumns,
   getStatusBackgroundColor,
+  sortAuftraegeByStatus,
 } from "./auftragColumns";
 import { buildBestellungColumns } from "./bestellungColumns";
 import {
@@ -121,14 +122,6 @@ const invoiceTabs = [
   { id: "payment_inbound", label: "Payment Inbounds" },
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
-
-const STATUS_ORDER: Record<string, number> = {
-  partially_delivered: 0,
-  open: 1,
-  delivered: 2,
-  closed: 3,
-  default: 4,
-};
 
 const InvoiceListPage: React.FC = () => {
   const router = useRouter();
@@ -1245,11 +1238,11 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev: any) =>
         prev
           ? {
-            ...prev,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1450,11 +1443,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-          item.customer?.id ||
-          item.customer_id ||
-          item.customerSnapshot?.customerNumber ||
-          item.customerSnapshot?.id ||
-          "",
+            item.customer?.id ||
+            item.customer_id ||
+            item.customerSnapshot?.customerNumber ||
+            item.customerSnapshot?.id ||
+            "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1462,12 +1455,12 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-          item.customer_name ||
-          item.bill_to ||
-          item.ship_to ||
-          item.customerSnapshot?.companyName ||
-          item.customerSnapshot?.name ||
-          "",
+            item.customer_name ||
+            item.bill_to ||
+            item.ship_to ||
+            item.customerSnapshot?.companyName ||
+            item.customerSnapshot?.name ||
+            "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -1523,25 +1516,23 @@ const InvoiceListPage: React.FC = () => {
     docFilters,
   ]);
 
-  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+  // Auftrag rows must be ordered by status (partially_delivered -> open ->
+  // delivered -> closed) BEFORE pagination — sorting an already-paginated
+  // page slice (the previous behavior) only reordered the ~10 items on
+  // that page and left which items landed on which page decided by
+  // whatever filteredItems was ordered by before (date), so e.g. a
+  // partially_delivered Auftrag could sit on page 3 while closed ones
+  // showed on page 1. displayItems is the same items, just reordered —
+  // count never changes here, only order.
+  const displayItems = useMemo(() => {
+    if (activeInvTab !== "auftrag") return filteredItems;
+    return sortAuftraegeByStatus(filteredItems);
+  }, [filteredItems, activeInvTab]);
+
+  const totalPages = Math.ceil(displayItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentItems = filteredItems.slice(startIndex, endIndex);
-
-  // Sort items by status priority for Auftrag tab
-  const sortedItems = useMemo(() => {
-    if (activeInvTab !== "auftrag") return currentItems;
-
-    const sorted = [...currentItems];
-    sorted.sort((a, b) => {
-      const statusA = a.auftrag_status || a.status || "open";
-      const statusB = b.auftrag_status || b.status || "open";
-      const orderA = STATUS_ORDER[statusA] ?? STATUS_ORDER.default;
-      const orderB = STATUS_ORDER[statusB] ?? STATUS_ORDER.default;
-      return orderA - orderB;
-    });
-    return sorted;
-  }, [currentItems, activeInvTab]);
+  const currentItems = displayItems.slice(startIndex, endIndex);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1555,7 +1546,7 @@ const InvoiceListPage: React.FC = () => {
       if (res?.success) {
         toast.success(
           res.message ||
-          `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
+            `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
           successStyles,
         );
         await tabData.refetchOrders();
@@ -1755,10 +1746,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </button>
@@ -1796,13 +1788,14 @@ const InvoiceListPage: React.FC = () => {
         {activeInvTab !== "angebot" && (
           <div className="mb-6">
             <DataTable
-              data={sortedItems}
+              data={currentItems}
               columns={commercialColumns}
               loading={dataTableLoading}
-              emptyMessage={`No ${activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                ? "Orders"
-                : "Invoices"
-                } Found`}
+              emptyMessage={`No ${
+                activeInvTab === "auftrag" || activeInvTab === "bestellung"
+                  ? "Orders"
+                  : "Invoices"
+              } Found`}
               getRowClassName={(row) => {
                 if (activeInvTab === "rechnung") {
                   const rowOpenQuantities = allOpenQuantities[row.id] || {};
@@ -1920,8 +1913,8 @@ const InvoiceListPage: React.FC = () => {
               <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA] rounded-b-[4px] mt-4">
                 <div className="text-[11px] font-medium text-[#6C757D]">
                   Showing {startIndex + 1} to{" "}
-                  {Math.min(endIndex, filteredItems.length)} of{" "}
-                  {filteredItems.length} documents
+                  {Math.min(endIndex, displayItems.length)} of{" "}
+                  {displayItems.length} documents
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -1935,10 +1928,11 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                        ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                        : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                        }`}
+                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                        currentPage === i + 1
+                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                      }`}
                     >
                       {i + 1}
                     </button>

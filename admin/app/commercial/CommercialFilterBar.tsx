@@ -5,6 +5,16 @@ import { FunnelIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import { CommercialFilters } from "@/utils/commercialFilters";
 import type { InvoiceTab } from "../../hooks/useCommercialTabData";
 
+// Mirrors the string status values InvoiceListPage actually filters on
+// (item.auftrag_status, and STATUS_ORDER for the Auftrag tab's default
+// sort) — the old generic numeric options (1-4) never matched these.
+export enum AuftragStatus {
+  OPEN = "open",
+  PARTIALLY_DELIVERED = "partially_delivered",
+  DELIVERED = "delivered",
+  CLOSED = "closed",
+}
+
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
   return `w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
     hasValue
@@ -127,20 +137,48 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
               </>
             ) : activeInvTab === "rechnung" || activeInvTab === "rk" ? (
               <>
-                <option value="draft" className="text-gray-900 font-normal">
-                  Draft
+                <option
+                  value="partially_paid"
+                  className="text-gray-900 font-normal"
+                >
+                  Partially Paid{" "}
                 </option>
-                <option value="sent" className="text-gray-900 font-normal">
-                  Sent
-                </option>
+
                 <option value="paid" className="text-gray-900 font-normal">
                   Paid
+                </option>
+                <option value="unpaid" className="text-gray-900 font-normal">
+                  Unpaid
                 </option>
                 <option value="overdue" className="text-gray-900 font-normal">
                   Overdue
                 </option>
-                <option value="cancelled" className="text-gray-900 font-normal">
-                  Cancelled
+              </>
+            ) : activeInvTab === "auftrag" ? (
+              <>
+                <option
+                  value={AuftragStatus.OPEN}
+                  className="text-gray-900 font-normal"
+                >
+                  Open
+                </option>
+                <option
+                  value={AuftragStatus.PARTIALLY_DELIVERED}
+                  className="text-gray-900 font-normal"
+                >
+                  Partially Delivered
+                </option>
+                <option
+                  value={AuftragStatus.DELIVERED}
+                  className="text-gray-900 font-normal"
+                >
+                  Delivered
+                </option>
+                <option
+                  value={AuftragStatus.CLOSED}
+                  className="text-gray-900 font-normal"
+                >
+                  Closed
                 </option>
               </>
             ) : (
@@ -246,4 +284,3 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
 };
 
 export default CommercialFilterBar;
-

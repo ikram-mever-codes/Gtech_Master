@@ -4855,4 +4855,114 @@ export class OfferController {
       photo: item.photo || "",
     };
   }
+
+  private async syncOfferLineItemsFromItems(
+    offerId: string,
+  ): Promise<{ updated: number; checked: number }> {
+    const offer = await this.offerRepository.findOne({
+      where: { id: offerId },
+      relations: ["lineItems", "inquiry", "inquiry.item"],
+    });
+    if (!offer) {
+      throw new Error("Offer not found");
+    }
+
+    const toSave: OfferLineItem[] = [];
+    let checked = 0;
+
+    for (const li of (offer.lineItems || []) as OfferLineItem[]) {
+      checked++;
+
+      let data: Record<string, any>;
+      if (li.isAssemblyItem) {
+        if (!offer.inquiry) continue;
+        data = this.itemFieldsOrFallback(offer.inquiry.item, {});
+      } else if (li.requestedItemId) {
+        const requestedItem = await this.requestedItemRepository.findOne({
+          where: { id: li.requestedItemId },
+          relations: ["item"],
+        });
+        if (!requestedItem?.item) continue;
+        data = this.itemFieldsOrFallback(requestedItem.item, {});
+      } else {
+        continue;
+      }
+
+      let changed = false;
+      const applyIfDifferent = (field: keyof OfferLineItem, value: any) => {
+        if (value === undefined) return;
+        if ((li as any)[field] !== value) {
+          (li as any)[field] = value;
+          changed = true;
+        }
+      };
+
+      applyIfDifferent("weight", data.weight);
+      applyIfDifferent("width", data.width);
+      applyIfDifferent("height", data.height);
+      applyIfDifferent("length", data.length);
+      applyIfDifferent("material", data.material);
+      applyIfDifferent("specification", data.specification);
+      applyIfDifferent("photo", data.photo);
+      applyIfDifferent("purchasePrice", data.purchasePrice);
+      applyIfDifferent("purchaseCurrency", data.currency);
+
+      if (changed) toSave.push(li);
+    }
+
+    if (toSave.length > 0) {
+      await this.lineItemRepository.save(toSave);
+    }
+    await this.calculateOfferTotals(offerId);
+
+    return { updated: toSave.length, checked };
+  }
+  async syncAllOffersFromItems(request: Request, response: Response) {
+    try {
+      const statusFilter = (request.query.status as string) || "Draft";
+
+      const where =
+        statusFilter.toLowerCase() === "all" ? {} : { status: statusFilter };
+
+      const offers = await this.offerRepository.find({
+        where,
+        select: ["id"],
+      });
+
+      let totalUpdated = 0;
+      let totalChecked = 0;
+      const errors: any[] = [];
+
+      for (const o of offers) {
+        try {
+          const result = await this.syncOfferLineItemsFromItems(o.id);
+          totalUpdated += result.updated;
+          totalChecked += result.checked;
+        } catch (err) {
+          errors.push({
+            offerId: o.id,
+            error: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
+      }
+
+      return response.status(200).json({
+        success: true,
+        message: `Synced ${totalUpdated} line items across ${offers.length} offers (status: ${statusFilter})`,
+        data: {
+          offersProcessed: offers.length,
+          lineItemsChecked: totalChecked,
+          lineItemsUpdated: totalUpdated,
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      });
+    } catch (error) {
+      console.error("Error syncing all offers from items:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
 }

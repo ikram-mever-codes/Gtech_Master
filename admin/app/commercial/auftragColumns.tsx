@@ -52,6 +52,20 @@ const valueNetCalc = (row: any) => {
 const itemCountCalc = (row: any) => row.items?.length || 0;
 
 /**
+ * Total ordered quantity across all line items on this Auftrag — the
+ * "QTY Open" column. There's no per-line delivered/shipped-quantity field
+ * on CustomerOrderItem to net against (unlike Rechnung, which tracks that
+ * explicitly via getRechnungOpenQuantities), so this is the sum of
+ * ordered quantities, not (ordered - delivered). If a per-line delivered
+ * quantity gets added later, update this to net it out instead.
+ */
+const qtyOpenCalc = (row: any) =>
+  (row.items || []).reduce(
+    (sum: number, it: any) => sum + (Number(it.quantity ?? it.qty) || 0),
+    0,
+  );
+
+/**
  * Row-background color per Auftrag status, used for the status highlighting
  * in the Auftrag table. Kept in one place so the table color and any
  * legend/filter UI can't drift out of sync.
@@ -114,6 +128,12 @@ export function getAuftragStatusSortPriority(row: any): number {
  * Returns a new array of Auftrag rows sorted by status: Partially
  * Delivered -> Open -> Delivered -> Closed. Stable for rows sharing the
  * same status (preserves their existing relative order, e.g. by date).
+ *
+ * Must be applied to the FULL list before pagination, not to a single
+ * already-paginated page — sorting a page slice only reorders the ~10
+ * items on that page and leaves which items landed on which page decided
+ * by whatever the list was ordered by before (date), which defeats the
+ * point of a status-based sort across the whole list.
  */
 export function sortAuftraegeByStatus<
   T extends { auftrag_status?: string; status?: string },
@@ -153,175 +173,180 @@ const AuftragActionMenu: React.FC<{
   onGenerateRechnung,
   onDuplicateAuftrag,
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-      if (!isOpen) return;
-      const handleClickOutside = (e: MouseEvent) => {
-        if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-          setIsOpen(false);
-        }
-      };
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
-    const rechnungCount = (invoices || []).filter(
-      (inv: any) =>
-        (inv.orderNumber &&
-          String(inv.orderNumber).trim().toLowerCase() ===
+  const rechnungCount = (invoices || []).filter(
+    (inv: any) =>
+      (inv.orderNumber &&
+        String(inv.orderNumber).trim().toLowerCase() ===
           String(row.order_no || "")
             .trim()
             .toLowerCase()) ||
-        (inv.order_number &&
-          String(inv.order_number).trim().toLowerCase() ===
+      (inv.order_number &&
+        String(inv.order_number).trim().toLowerCase() ===
           String(row.order_no || "")
             .trim()
             .toLowerCase()) ||
-        (inv.auftrag_no &&
-          String(inv.auftrag_no).trim().toLowerCase() ===
+      (inv.auftrag_no &&
+        String(inv.auftrag_no).trim().toLowerCase() ===
           String(row.order_no || "")
             .trim()
             .toLowerCase()) ||
-        (row.id && (inv.auftrag_id === row.id || inv.auftragId === row.id)),
-    ).length;
+      (row.id && (inv.auftrag_id === row.id || inv.auftragId === row.id)),
+  ).length;
 
-    const isLocked = isAuftragActionLocked(row);
-    const isBottom = rowIndex !== undefined && rowIndex >= 5;
+  const isLocked = isAuftragActionLocked(row);
+  const isBottom = rowIndex !== undefined && rowIndex >= 5;
 
-    return (
-      <div className="relative inline-block text-left" ref={menuRef}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen((prev) => !prev);
-          }}
-          className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
+          isOpen
             ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
             : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
-            }`}
-          title="Aktionen"
+        }`}
+        title="Aktionen"
+      >
+        <ChevronRight
+          className={`w-4 h-4 transition-transform duration-150 ${
+            isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute right-0 ${
+            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
         >
-          <ChevronRight
-            className={`w-4 h-4 transition-transform duration-150 ${isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          {/* Option 1: In Bestellung umwandeln */}
+          <div className="p-1">
+            <button
+              type="button"
+              disabled={isLocked}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isLocked) return;
+                setIsOpen(false);
+                onConvertToBestellung(row);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors ${
+                isLocked
+                  ? "opacity-50 cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
               }`}
-          />
-        </button>
+              title={
+                isLocked
+                  ? "Auftrag is delivered/closed"
+                  : "In Bestellung umwandeln"
+              }
+            >
+              <ShoppingCart className="w-4 h-4 text-gray-500 shrink-0" />
+              <span className="text-xs font-semibold">
+                In Bestellung umwandeln
+              </span>
+            </button>
+          </div>
 
-        {isOpen && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
-              } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
-          >
-            {/* Option 1: In Bestellung umwandeln */}
-            <div className="p-1">
-              <button
-                type="button"
-                disabled={isLocked}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isLocked) return;
-                  setIsOpen(false);
-                  onConvertToBestellung(row);
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors ${isLocked
+          {/* Option 2: Ausliefern - Erstellt Rechnung & Lieferschein */}
+          <div className="p-1">
+            <button
+              type="button"
+              disabled={isLocked}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isLocked) return;
+                setIsOpen(false);
+                onGenerateRechnung(row);
+              }}
+              className={`w-full flex items-start gap-3 px-3 py-2 text-left rounded-lg transition-colors ${
+                isLocked
                   ? "opacity-50 cursor-not-allowed text-gray-400"
                   : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
-                  }`}
-                title={
-                  isLocked
-                    ? "Auftrag is delivered/closed"
-                    : "In Bestellung umwandeln"
-                }
-              >
-                <ShoppingCart className="w-4 h-4 text-gray-500 shrink-0" />
-                <span className="text-xs font-semibold">
-                  In Bestellung umwandeln
-                </span>
-              </button>
-            </div>
-
-            {/* Option 2: Ausliefern - Erstellt Rechnung & Lieferschein */}
-            <div className="p-1">
-              <button
-                type="button"
-                disabled={isLocked}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isLocked) return;
-                  setIsOpen(false);
-                  onGenerateRechnung(row);
-                }}
-                className={`w-full flex items-start gap-3 px-3 py-2 text-left rounded-lg transition-colors ${isLocked
-                  ? "opacity-50 cursor-not-allowed text-gray-400"
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
-                  }`}
-                title={
-                  isLocked
-                    ? "Auftrag is delivered/closed"
-                    : "Ausliefern - Rechnung & Lieferschein"
-                }
-              >
-                <Truck className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold">Ausliefern</div>
-                  <div className="text-[10px] text-gray-400 font-normal leading-tight">
-                    Erstellt Rechnung & Lieferschein
-                  </div>
+              }`}
+              title={
+                isLocked
+                  ? "Auftrag is delivered/closed"
+                  : "Ausliefern - Rechnung & Lieferschein"
+              }
+            >
+              <Truck className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold">Ausliefern</div>
+                <div className="text-[10px] text-gray-400 font-normal leading-tight">
+                  Erstellt Rechnung & Lieferschein
                 </div>
-                {rechnungCount > 0 && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-gray-100 text-gray-600 rounded-full border border-gray-200 shrink-0">
-                    {rechnungCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Option 3: Auftrag duplizieren */}
-            {onDuplicateAuftrag && (
-              <div className="p-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsOpen(false);
-                    onDuplicateAuftrag(row);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-                >
-                  <Copy className="w-4 h-4 text-gray-500 shrink-0" />
-                  <span className="text-xs font-semibold">
-                    Auftrag duplizieren
-                  </span>
-                </button>
               </div>
-            )}
+              {rechnungCount > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-gray-100 text-gray-600 rounded-full border border-gray-200 shrink-0">
+                  {rechnungCount}
+                </span>
+              )}
+            </button>
+          </div>
 
-            {/* Option 4: PDF öffnen */}
+          {/* Option 3: Auftrag duplizieren */}
+          {onDuplicateAuftrag && (
             <div className="p-1">
               <button
                 type="button"
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
                   setIsOpen(false);
-                  try {
-                    await downloadCustomerOrderPdf(row.id, row.order_no);
-                  } catch (_) { }
+                  onDuplicateAuftrag(row);
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
               >
-                <FileText className="w-4 h-4 text-gray-500 shrink-0" />
-                <span className="text-xs font-semibold">PDF öffnen</span>
+                <Copy className="w-4 h-4 text-gray-500 shrink-0" />
+                <span className="text-xs font-semibold">
+                  Auftrag duplizieren
+                </span>
               </button>
             </div>
+          )}
+
+          {/* Option 4: PDF öffnen */}
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                try {
+                  await downloadCustomerOrderPdf(row.id, row.order_no);
+                } catch (_) {}
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <FileText className="w-4 h-4 text-gray-500 shrink-0" />
+              <span className="text-xs font-semibold">PDF öffnen</span>
+            </button>
           </div>
-        )}
-      </div>
-    );
-  };
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function buildAuftragColumns({
   expandedDocIds,
@@ -357,6 +382,16 @@ export function buildAuftragColumns({
     lieferdatumColumn,
     buildNettowertColumn(valueNetCalc),
     {
+      header: "QTY Open",
+      width: "80px",
+      align: "center",
+      render: (row) => (
+        <span className="text-sm font-semibold text-gray-900">
+          {qtyOpenCalc(row)}
+        </span>
+      ),
+    },
+    {
       header: "Status",
       width: "90px",
       align: "center",
@@ -371,7 +406,7 @@ export function buildAuftragColumns({
         };
         return (
           <span
-            className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${
+            className={`text-[11px] px-2.5 py-0.5 text-nowrap rounded-full border font-medium ${
               colorClasses[status] || "bg-blue-50 text-blue-600 border-blue-200"
             }`}
           >
