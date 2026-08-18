@@ -179,10 +179,10 @@ const slugFromWebsite = (website?: string) => {
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
   return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
     }`;
 };
 
@@ -2005,42 +2005,42 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 </div>
 
                 <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Asana Link
+                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate">
+                    Star Portal Link Name
                   </label>
                   <input
-                    type="url"
-                    value={businessForm.asanaLink || ""}
-                    onChange={(e) =>
+                    type="text"
+                    value={businessForm.starPortalLinkName}
+                    onChange={(e) => {
+                      starPortalTouched.current = true;
                       setBusinessForm({
                         ...businessForm,
-                        asanaLink: e.target.value,
-                      })
-                    }
+                        starPortalLinkName: e.target.value,
+                      });
+                    }}
                     disabled={businessFieldDisabled}
                     className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="https://app.asana.com/..."
+                    placeholder="Auto from web URL"
                   />
                 </div>
 
                 <div className="col-span-6 md:col-span-3 flex items-end gap-1.5">
                   <div className="flex-1 min-w-0">
-                    <label className="block text-xs font-medium text-gray-700 mb-1 truncate">
-                      Star Portal Link Name
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Asana Link
                     </label>
                     <input
-                      type="text"
-                      value={businessForm.starPortalLinkName}
-                      onChange={(e) => {
-                        starPortalTouched.current = true;
+                      type="url"
+                      value={businessForm.asanaLink || ""}
+                      onChange={(e) =>
                         setBusinessForm({
                           ...businessForm,
-                          starPortalLinkName: e.target.value,
-                        });
-                      }}
+                          asanaLink: e.target.value,
+                        })
+                      }
                       disabled={businessFieldDisabled}
                       className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="Auto from web URL"
+                      placeholder="https://app.asana.com/..."
                     />
                   </div>
 
@@ -2148,15 +2148,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   >
                     {dbCountries.length > 0
                       ? dbCountries.map((c) => (
-                          <option key={c.id} value={c.iso2}>
-                            {c.iso2} - {c.name}
-                          </option>
-                        ))
+                        <option key={c.id} value={c.iso2}>
+                          {c.iso2} - {c.name}
+                        </option>
+                      ))
                       : COUNTRY_OPTIONS.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -2337,13 +2337,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {(dbPaymentMethods.length > 0
                       ? dbPaymentMethods.map((pm: any) => pm.name)
                       : [
-                          "Prepayment",
-                          "Bank transfer",
-                          "Cash on delivery",
-                          "Invoice",
-                          "Credit card",
-                          "PayPal",
-                        ]
+                        "Prepayment",
+                        "Bank transfer",
+                        "Cash on delivery",
+                        "Invoice",
+                        "Credit card",
+                        "PayPal",
+                      ]
                     ).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -2398,12 +2398,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {(dbShippingMethods.length > 0
                       ? dbShippingMethods.map((sm: any) => sm.name)
                       : [
-                          "Standard shipping",
-                          "Express shipping",
-                          "Freight",
-                          "Courier",
-                          "Pickup",
-                        ]
+                        "Standard shipping",
+                        "Express shipping",
+                        "Freight",
+                        "Courier",
+                        "Pickup",
+                      ]
                     ).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -2461,8 +2461,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 <label
                   htmlFor="labelLogoInput"
                   className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
-                      ? "opacity-50 cursor-not-allowed"
-                      : "cursor-pointer hover:bg-white"
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer hover:bg-white"
                     }`}
                 >
                   Upload
