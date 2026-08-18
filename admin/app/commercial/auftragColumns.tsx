@@ -1,7 +1,13 @@
 "use client";
 
-import React from "react";
-import { MoveRight, FileDown, Copy } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  ChevronRight,
+  ShoppingCart,
+  Truck,
+  Copy,
+  FileText,
+} from "lucide-react";
 import { downloadCustomerOrderPdf } from "@/api/customer_orders";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
@@ -133,6 +139,191 @@ const isAuftragActionLocked = (row: any): boolean => {
   return status === "delivered" || status === "closed";
 };
 
+const AuftragActionMenu: React.FC<{
+  row: any;
+  rowIndex?: number;
+  invoices: any[];
+  onConvertToBestellung: (row: any) => void;
+  onGenerateRechnung: (row: any) => void;
+  onDuplicateAuftrag?: (row: any) => void;
+}> = ({
+  row,
+  rowIndex,
+  invoices,
+  onConvertToBestellung,
+  onGenerateRechnung,
+  onDuplicateAuftrag,
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (!isOpen) return;
+      const handleClickOutside = (e: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+          setIsOpen(false);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [isOpen]);
+
+    const rechnungCount = (invoices || []).filter(
+      (inv: any) =>
+        (inv.orderNumber &&
+          String(inv.orderNumber).trim().toLowerCase() ===
+          String(row.order_no || "")
+            .trim()
+            .toLowerCase()) ||
+        (inv.order_number &&
+          String(inv.order_number).trim().toLowerCase() ===
+          String(row.order_no || "")
+            .trim()
+            .toLowerCase()) ||
+        (inv.auftrag_no &&
+          String(inv.auftrag_no).trim().toLowerCase() ===
+          String(row.order_no || "")
+            .trim()
+            .toLowerCase()) ||
+        (row.id && (inv.auftrag_id === row.id || inv.auftragId === row.id)),
+    ).length;
+
+    const isLocked = isAuftragActionLocked(row);
+    const isBottom = rowIndex !== undefined && rowIndex >= 5;
+
+    return (
+      <div className="relative inline-block text-left" ref={menuRef}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen((prev) => !prev);
+          }}
+          className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+            }`}
+          title="Aktionen"
+        >
+          <ChevronRight
+            className={`w-4 h-4 transition-transform duration-150 ${isOpen ? "rotate-90 text-[#8CC21B]" : ""
+              }`}
+          />
+        </button>
+
+        {isOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+              } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+          >
+            {/* Option 1: In Bestellung umwandeln */}
+            <div className="p-1">
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isLocked) return;
+                  setIsOpen(false);
+                  onConvertToBestellung(row);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors ${isLocked
+                  ? "opacity-50 cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
+                  }`}
+                title={
+                  isLocked
+                    ? "Auftrag is delivered/closed"
+                    : "In Bestellung umwandeln"
+                }
+              >
+                <ShoppingCart className="w-4 h-4 text-gray-500 shrink-0" />
+                <span className="text-xs font-semibold">
+                  In Bestellung umwandeln
+                </span>
+              </button>
+            </div>
+
+            {/* Option 2: Ausliefern - Erstellt Rechnung & Lieferschein */}
+            <div className="p-1">
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isLocked) return;
+                  setIsOpen(false);
+                  onGenerateRechnung(row);
+                }}
+                className={`w-full flex items-start gap-3 px-3 py-2 text-left rounded-lg transition-colors ${isLocked
+                  ? "opacity-50 cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
+                  }`}
+                title={
+                  isLocked
+                    ? "Auftrag is delivered/closed"
+                    : "Ausliefern - Rechnung & Lieferschein"
+                }
+              >
+                <Truck className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold">Ausliefern</div>
+                  <div className="text-[10px] text-gray-400 font-normal leading-tight">
+                    Erstellt Rechnung & Lieferschein
+                  </div>
+                </div>
+                {rechnungCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-gray-100 text-gray-600 rounded-full border border-gray-200 shrink-0">
+                    {rechnungCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Option 3: Auftrag duplizieren */}
+            {onDuplicateAuftrag && (
+              <div className="p-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    onDuplicateAuftrag(row);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                >
+                  <Copy className="w-4 h-4 text-gray-500 shrink-0" />
+                  <span className="text-xs font-semibold">
+                    Auftrag duplizieren
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Option 4: PDF öffnen */}
+            <div className="p-1">
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  try {
+                    await downloadCustomerOrderPdf(row.id, row.order_no);
+                  } catch (_) { }
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-gray-500 shrink-0" />
+                <span className="text-xs font-semibold">PDF öffnen</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
 export function buildAuftragColumns({
   expandedDocIds,
   setExpandedDocIds,
@@ -168,116 +359,19 @@ export function buildAuftragColumns({
     buildValueNetColumn(valueNetCalc),
     buildItemCountColumn(itemCountCalc),
     {
-      header: "Actions",
-      width: "175px",
+      header: "Aktionen",
+      width: "55px",
       align: "center",
-      render: (row) => {
-        const rechnungCount = (invoices || []).filter(
-          (inv: any) =>
-            (inv.orderNumber &&
-              String(inv.orderNumber).trim().toLowerCase() ===
-                String(row.order_no || "")
-                  .trim()
-                  .toLowerCase()) ||
-            (inv.order_number &&
-              String(inv.order_number).trim().toLowerCase() ===
-                String(row.order_no || "")
-                  .trim()
-                  .toLowerCase()) ||
-            (inv.auftrag_no &&
-              String(inv.auftrag_no).trim().toLowerCase() ===
-                String(row.order_no || "")
-                  .trim()
-                  .toLowerCase()) ||
-            (row.id && (inv.auftrag_id === row.id || inv.auftragId === row.id)),
-        ).length;
-        const isConverted = rechnungCount > 0;
-        const status = getRowStatus(row);
-        const isClosed = status === "closed";
-        const isLocked = isAuftragActionLocked(row);
-
-        return (
-          <div className="flex items-center justify-center gap-1 font-poppins">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isLocked) return;
-                onConvertToBestellung(row);
-              }}
-              disabled={isLocked}
-              title={
-                isLocked
-                  ? "Auftrag is delivered/closed and can no longer be converted"
-                  : "Convert Auftrag directly to Bestellung"
-              }
-              className="px-1.5 py-0.5 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab015] transition shadow-xs flex items-center gap-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#8CC21B]"
-            >
-              <MoveRight className="w-3 h-3" />
-              <span>Convert</span>
-            </button>
-
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isLocked) return;
-                  onGenerateRechnung(row);
-                }}
-                disabled={isLocked}
-                title={
-                  isLocked
-                    ? "Auftrag is delivered/closed and can no longer generate Rechnung/Lieferschein"
-                    : isConverted
-                      ? `Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""} to Rechnung/Lieferschein`
-                      : "Generate Rechnung & Lieferschein"
-                }
-                className={`px-1.5 py-0.5 text-[10px] font-bold text-white rounded-[4px] transition shadow-xs flex items-center gap-0.5 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isConverted
-                    ? "bg-gray-500 hover:bg-gray-600 text-white"
-                    : "bg-[#2F6B46] hover:bg-[#255638] text-white"
-                }`}
-              >
-                <MoveRight className="w-3 h-3" />
-              </button>
-
-              {rechnungCount > 0 && (
-                <span
-                  title={`Generated ${rechnungCount} time${rechnungCount > 1 ? "s" : ""}`}
-                  className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-xs shrink-0"
-                >
-                  {rechnungCount}
-                </span>
-              )}
-            </div>
-
-            {onDuplicateAuftrag && (
-              <button
-                title="Duplicate Auftrag (creates a new Open Auftrag with all details)"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDuplicateAuftrag(row);
-                }}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-[#8a4b16] bg-[#FAEDDE] hover:bg-[#f3dfca] border border-[#e8cbaf] rounded-[4px] transition-colors whitespace-nowrap cursor-pointer shadow-xs"
-              >
-                <Copy className="h-3 w-3" /> Duplicate
-              </button>
-            )}
-
-            <button
-              title="Download Auftrag PDF"
-              onClick={async (e) => {
-                e.stopPropagation();
-                try {
-                  await downloadCustomerOrderPdf(row.id, row.order_no);
-                } catch (_) {}
-              }}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
-            >
-              <FileDown className="h-3 w-3" /> PDF
-            </button>
-          </div>
-        );
-      },
+      render: (row, index) => (
+        <AuftragActionMenu
+          row={row}
+          rowIndex={index}
+          invoices={invoices}
+          onConvertToBestellung={onConvertToBestellung}
+          onGenerateRechnung={onGenerateRechnung}
+          onDuplicateAuftrag={onDuplicateAuftrag}
+        />
+      ),
     },
   ];
 }
