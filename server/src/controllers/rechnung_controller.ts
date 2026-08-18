@@ -31,9 +31,9 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const [auftrag, rechnungenK] = await Promise.all([
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
-        where: { id: rechnung.auftrag_id },
-        select: ["id", "order_no", "created_at"],
-      })
+          where: { id: rechnung.auftrag_id },
+          select: ["id", "order_no", "created_at"],
+        })
       : Promise.resolve(null),
     rechnungKRepo.find({
       where: { original_rechnung_id: rechnung.id },
@@ -72,9 +72,9 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const [auftraege, rechnungenK] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "order_no", "created_at"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "order_no", "created_at"],
+        })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
@@ -107,7 +107,8 @@ export const createRechnungFromAuftrag = async (
 ) => {
   try {
     const { auftragId } = req.params;
-    const { selectedItems, notes, deliveryDate, warehouse } = req.body;
+    const { selectedItems, notes, deliveryDate, warehouse, include_shipping } =
+      req.body;
 
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       res.status(400).json({
@@ -152,11 +153,7 @@ export const createRechnungFromAuftrag = async (
       deliveryNoteNo = `LS${yy}${mm}-${Date.now().toString().slice(-4)}`;
     }
 
-    const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
-      now.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}.${now.getFullYear()}`;
+    const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`;
 
     const custRepo = AppDataSource.getRepository(Customer);
     let originalCust: Customer | null = null;
@@ -297,13 +294,23 @@ export const createRechnungFromAuftrag = async (
     await customerOrderRepo.save(auftrag);
 
     const taxRate = Number(auftrag.tax_rate ?? 19);
-    const taxAmount = (subtotal * taxRate) / 100;
-    const totalAmount = subtotal + taxAmount;
+
+    // Get shipping values - only if shipping is included
+    const shippingCost = include_shipping
+      ? Number(auftrag.shipping_cost ?? 0)
+      : 0;
+    const shippingQuantity = include_shipping
+      ? Number(auftrag.shipping_quantity ?? 1)
+      : 0;
+    const shippingTotal = shippingCost * shippingQuantity;
+
+    // Add shipping to subtotal if included
+    const totalSubtotal = subtotal + shippingTotal;
+    const taxAmount = (totalSubtotal * taxRate) / 100;
+    const totalAmount = totalSubtotal + taxAmount;
 
     const discountPercentage = Number(auftrag.discount_percentage ?? 0);
     const discountAmount = Number(auftrag.discount_amount ?? 0);
-    const shippingCost = Number(auftrag.shipping_cost ?? 0);
-    const shippingQuantity = Number(auftrag.shipping_quantity ?? 1);
 
     // ============================================
     // CREATE RECHNUNG
@@ -316,7 +323,7 @@ export const createRechnungFromAuftrag = async (
       invoice_date: now,
       delivery_date: deliveryDate ? new Date(deliveryDate) : undefined,
       warehouse: warehouse || "CN",
-      subtotal: subtotal,
+      subtotal: totalSubtotal,
       tax_rate: taxRate,
       tax_amount: taxAmount,
       total_amount: totalAmount,
@@ -341,7 +348,7 @@ export const createRechnungFromAuftrag = async (
       customerSnapshot: auftrag.customerSnapshot || undefined,
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: auftrag.shipping_method || undefined,
+      shipping_method: include_shipping ? auftrag.shipping_method : undefined,
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
@@ -404,7 +411,7 @@ export const createRechnungFromAuftrag = async (
         invoice_date: now,
         delivery_date: deliveryDate ? new Date(deliveryDate) : now,
         due_date: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        net_total: subtotal,
+        net_total: totalSubtotal,
         tax_amount: taxAmount,
         gross_total: totalAmount,
         freight_cost: shippingCost,
@@ -415,7 +422,7 @@ export const createRechnungFromAuftrag = async (
         discount_percentage: discountPercentage,
         discount_amount: discountAmount,
         payment_terms: auftrag.payment_terms || undefined,
-        shipping_method: auftrag.shipping_method || undefined,
+        shipping_method: include_shipping ? auftrag.shipping_method : undefined,
       });
       const savedCciInv = await cciInvRepo.save(cciInv);
 
@@ -784,7 +791,7 @@ export const downloadRechnungPdf = async (
 
     const defaultTaxRate =
       rechnung.tax_profile_case === "EU_IGL" ||
-        rechnung.tax_profile_case === "third_country"
+      rechnung.tax_profile_case === "third_country"
         ? 0
         : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
           ? Number(rechnung.tax_rate)
@@ -814,10 +821,16 @@ export const downloadRechnungPdf = async (
 
     const rawItems = (rechnung.items || [])
       .slice()
-      .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+      .sort(
+        (a: any, b: any) =>
+          (Number(a.position) || 0) - (Number(b.position) || 0),
+      );
 
     const items = rawItems.map((it: any, idx: number) => {
-      const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
+      const qty =
+        it.quantity !== undefined && it.quantity !== null
+          ? Number(it.quantity)
+          : 1;
       const unitPrice = Number(it.unit_price_eur || it.price || 0);
       const lineTotal =
         it.total_price !== undefined && it.total_price !== null
@@ -829,7 +842,8 @@ export const downloadRechnungPdf = async (
         position: it.position || idx + 1,
         artNr: it.itemNo || it.material || "—",
         bezeichnung: it.item_name || it.description || "Item",
-        remarks: it.remark || it.notes || it.specification || it.remark_ex || "-",
+        remarks:
+          it.remark || it.notes || it.specification || it.remark_ex || "-",
         vatRate:
           it.taxRate !== undefined && it.taxRate !== null
             ? Number(it.taxRate)
@@ -884,7 +898,9 @@ export const downloadRechnungPdf = async (
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")
       .replace(/^_+|_+$/g, "");
-    const docNo = String(rechnung.invoice_number || rechnung.id || "rechnung").trim().replace(/[\s_]+/g, "_");
+    const docNo = String(rechnung.invoice_number || rechnung.id || "rechnung")
+      .trim()
+      .replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
       ? `Rechnung_${docNo}_GTech_${cleanTitle}.pdf`
       : `Rechnung_${docNo}_GTech.pdf`;

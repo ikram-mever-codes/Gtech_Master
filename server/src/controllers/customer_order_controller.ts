@@ -475,7 +475,7 @@ export const createAuftragFromOffer = async (
       offer_id: offer.id,
       title: offer.title,
       customer_id: offer.customerId || undefined,
-      status: "Draft",
+      status: "open",
       currency: offer.currency || "EUR",
       tax_rate: taxRate,
       discount_percentage: offer.discountPercentage || 0,
@@ -1374,7 +1374,7 @@ export const downloadCustomerOrderPdf = async (
       order.tax_rate !== undefined && order.tax_rate !== null
         ? Number(order.tax_rate)
         : order.customer?.defaultTaxProfile?.tax_rate !== undefined &&
-          order.customer?.defaultTaxProfile?.tax_rate !== null
+            order.customer?.defaultTaxProfile?.tax_rate !== null
           ? Number(order.customer.defaultTaxProfile.tax_rate)
           : 19;
 
@@ -1404,10 +1404,16 @@ export const downloadCustomerOrderPdf = async (
 
     const rawItems = (order.orderItems || [])
       .slice()
-      .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+      .sort(
+        (a: any, b: any) =>
+          (Number(a.position) || 0) - (Number(b.position) || 0),
+      );
 
     const items = rawItems.map((it: any, idx: number) => {
-      const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
+      const qty =
+        it.quantity !== undefined && it.quantity !== null
+          ? Number(it.quantity)
+          : 1;
       const unitPrice = Number(it.price || 0);
       const lineTotal =
         it.lineTotal !== undefined && it.lineTotal !== null
@@ -1417,7 +1423,8 @@ export const downloadCustomerOrderPdf = async (
         position: it.position || idx + 1,
         artNr: it.itemNo || it.material || "—",
         bezeichnung: it.itemName || it.description || "Item",
-        remarks: it.notes || it.specification || it.remark || it.remark_ex || "-",
+        remarks:
+          it.notes || it.specification || it.remark || it.remark_ex || "-",
         vatRate:
           it.taxRate !== undefined && it.taxRate !== null
             ? Number(it.taxRate)
@@ -1484,7 +1491,9 @@ export const downloadCustomerOrderPdf = async (
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")
       .replace(/^_+|_+$/g, "");
-    const docNo = String(order.order_no || order.id || "order").trim().replace(/[\s_]+/g, "_");
+    const docNo = String(order.order_no || order.id || "order")
+      .trim()
+      .replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
       ? `Auftrag_${docNo}_GTech_${cleanTitle}.pdf`
       : `Auftrag_${docNo}_GTech.pdf`;

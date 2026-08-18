@@ -165,6 +165,8 @@ export default function AuftragToRechnungModal({
   // Shipping cost state - editable in edit mode
   const [editShippingCost, setEditShippingCost] = useState<number>(0);
   const [editShippingQuantity, setEditShippingQuantity] = useState<number>(1);
+  // Shipping selection state - whether shipping is included in the invoice
+  const [shippingSelected, setShippingSelected] = useState<boolean>(true);
 
   useEffect(() => {
     if (!isOpen || !auftrag) return;
@@ -269,6 +271,8 @@ export default function AuftragToRechnungModal({
     // Set shipping cost and quantity from auftrag
     setEditShippingCost(Number(auftrag.shipping_cost) || 0);
     setEditShippingQuantity(Number(auftrag.shipping_quantity) || 1);
+    // Default shipping to selected if there is a shipping cost
+    setShippingSelected((Number(auftrag.shipping_cost) || 0) > 0);
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
@@ -357,10 +361,12 @@ export default function AuftragToRechnungModal({
 
   const selectedItems = items.filter((it) => it.selected && it.qty > 0);
 
-  // Calculate shipping total
-  const shippingTotal = editShippingCost * editShippingQuantity;
+  // Calculate shipping total - only include if selected
+  const shippingTotal = shippingSelected
+    ? editShippingCost * editShippingQuantity
+    : 0;
 
-  // Subtotal includes items + shipping
+  // Subtotal includes items + shipping (if selected)
   const subtotal =
     selectedItems.reduce((acc, it) => acc + it.qty * it.price, 0) +
     shippingTotal;
@@ -500,6 +506,7 @@ export default function AuftragToRechnungModal({
         itemName: it.itemName,
       }));
 
+      // In handleSubmit function:
       const res = await createRechnungFromAuftrag(
         auftrag.id,
         payloadItems,
@@ -507,8 +514,9 @@ export default function AuftragToRechnungModal({
         {
           deliveryDate,
           warehouse: hasStockItems ? stockWhere : undefined,
-          shipping_cost: editShippingCost,
-          shipping_quantity: editShippingQuantity,
+          shipping_cost: shippingSelected ? editShippingCost : 0,
+          shipping_quantity: shippingSelected ? editShippingQuantity : 0,
+          include_shipping: shippingSelected,
         } as any,
       );
 
@@ -538,6 +546,11 @@ export default function AuftragToRechnungModal({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Toggle shipping selection
+  const toggleShippingSelect = () => {
+    setShippingSelected(!shippingSelected);
   };
 
   return (
@@ -1060,10 +1073,18 @@ export default function AuftragToRechnungModal({
                     );
                   })}
 
-                  {/* Shipping row */}
-                  {shippingTotal > 0 && (
+                  {/* Shipping row with checkbox */}
+                  {(editShippingCost > 0 || shippingSelected) && (
                     <tr className="bg-gray-50/80 border-t-2 border-gray-200">
-                      <td className="px-2 py-2"></td>
+                      <td className="px-2 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={shippingSelected}
+                          onChange={toggleShippingSelect}
+                          className="w-4 h-4 rounded border-gray-400 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500"
+                          title="Include shipping in invoice"
+                        />
+                      </td>
                       <td className="px-2 py-2 text-gray-400">
                         {items.length + 1}
                       </td>
