@@ -6,23 +6,27 @@ import ViewEditToggle from "./ViewEditToggle";
 interface ModalHeaderProps {
   entityName: string;
   entityNo?: React.ReactNode;
+  subtitle?: React.ReactNode;
   icon?: React.ComponentType<any>;
   isEditMode: boolean;
   isEditEnabled: boolean;
   onToggleEdit?: () => void;
   onClose: () => void;
   extraHeaderElements?: React.ReactNode;
+  tagSelector?: React.ReactNode;
 }
 
 export const ModalHeader: React.FC<ModalHeaderProps> = ({
   entityName,
   entityNo,
+  subtitle,
   icon: Icon,
   isEditMode,
   isEditEnabled,
   onToggleEdit,
   onClose,
   extraHeaderElements,
+  tagSelector,
 }) => {
   return (
     <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0 select-none sticky top-0 z-20 shadow-xs">
@@ -32,15 +36,23 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
             <Icon className="w-5 h-5 text-[#8CC21B]" />
           </div>
         )}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <h2 className="text-xl font-bold text-gray-900 truncate flex items-center gap-2">
-            <span>{entityName}</span>
-            {entityNo && <span className="inline-flex items-center gap-2">{entityNo}</span>}
-          </h2>
-          {extraHeaderElements}
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <h2 className="text-xl font-bold text-gray-900 truncate flex items-center gap-2">
+              <span>{entityName}</span>
+              {entityNo && <span className="inline-flex items-center gap-2">{entityNo}</span>}
+            </h2>
+            {extraHeaderElements}
+          </div>
+          {subtitle && (
+            <div className="text-xs font-semibold text-gray-500 font-mono mt-0.5">
+              {subtitle}
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-4 flex-shrink-0">
+        {tagSelector}
         {isEditMode && onToggleEdit && (
           <ViewEditToggle
             isEditEnabled={isEditEnabled}

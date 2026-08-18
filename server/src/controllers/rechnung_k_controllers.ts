@@ -808,17 +808,15 @@ export const downloadRechnungKPdf = async (
       outputFilePath: filePath,
     });
 
-    const datePart = (() => {
-      const d = (rechnungK.date_created || rechnungK.created_at) ? new Date(rechnungK.date_created || rechnungK.created_at) : new Date();
-      const yy = String(d.getFullYear()).slice(-2);
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yy}${mm}${dd}`;
-    })();
-    const cleanTitle = ((rechnungK as any).title || "").trim().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+    const cleanTitle = ((rechnungK as any).title || "")
+      .trim()
+      .replace(/[^\w-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const docNo = String(rechnungK.invoice_number || rechnungK.id || "rk").trim().replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
-      ? `RK ${rechnungK.invoice_number || rechnungK.id} ${cleanTitle} ${datePart}.pdf`
-      : `RK ${rechnungK.invoice_number || rechnungK.id} ${datePart}.pdf`;
+      ? `Rechnungskorrektur_${docNo}_GTech_${cleanTitle}.pdf`
+      : `Rechnungskorrektur_${docNo}_GTech.pdf`;
 
     res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "application/pdf");

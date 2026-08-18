@@ -212,7 +212,7 @@ export const downloadCustomerOrderPdf = async (
     if (blob.size === 0) throw new Error("The downloaded PDF is empty.");
     const filename = getFilenameFromResponse(
       response,
-      `Auftrag ${orderNo || id}.pdf`,
+      `Auftrag_${String(orderNo || id).replace(/[\s_]+/g, "_")}_GTech.pdf`,
     );
     downloadBlob(blob, filename);
     toast.dismiss();
@@ -238,6 +238,16 @@ export const closeCustomerOrder = async (
     return response;
   } catch (error: any) {
     handleApiError(error, "Failed to close customer order");
+    throw error;
+  }
+};
+
+export const duplicateCustomerOrder = async (id: number | string) => {
+  try {
+    const response: any = await api.post(`/customer-orders/${id}/duplicate`);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to duplicate Auftrag");
     throw error;
   }
 };

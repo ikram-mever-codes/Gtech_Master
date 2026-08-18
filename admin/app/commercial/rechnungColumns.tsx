@@ -6,13 +6,12 @@ import { downloadRechnungPdf } from "@/api/rechnungen";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
-  dateCreatedColumn,
-  companyColumn,
-  personColumn,
-  postalCodeColumn,
-  cityColumn,
-  buildValueNetColumn,
-  buildItemCountColumn,
+  datumColumn,
+  kundeColumn,
+  titelColumn,
+  lieferortColumn,
+  lieferdatumColumn,
+  buildNettowertColumn,
 } from "./sharedColumns";
 
 interface RechnungColumnsArgs {
@@ -95,10 +94,10 @@ export function buildRechnungColumns({
 }: RechnungColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
-    dateCreatedColumn,
+    datumColumn,
     {
-      header: "No",
-      width: "110px",
+      header: "Nr",
+      width: "80px",
       align: "center",
       render: (row) => (
         <button
@@ -106,33 +105,32 @@ export function buildRechnungColumns({
             e.stopPropagation();
             onViewRechnung(row);
           }}
-          className="truncate max-w-[110px] text-[#8CC21B] font-semibold hover:underline cursor-pointer"
+          className="truncate max-w-[80px] text-green-600 font-semibold hover:underline cursor-pointer"
           title={row.invoiceNumber || row.id}
         >
           {row.invoiceNumber || row.id}
         </button>
       ),
     },
-    companyColumn,
-    personColumn,
-    postalCodeColumn,
-    cityColumn,
-    buildValueNetColumn(valueNetCalc),
-    buildItemCountColumn(itemCountCalc),
+    kundeColumn,
+    titelColumn,
+    lieferortColumn,
+    lieferdatumColumn,
+    buildNettowertColumn(valueNetCalc),
     {
-      header: "Payment",
-      width: "120px",
+      header: "Status",
+      width: "100px",
       align: "center",
       render: (row) => <PaymentStatusBadge row={row} />,
     },
     {
-      header: "Actions",
+      header: "Aktionen",
       width: "100px",
       align: "center",
       render: (row) => {
         const isCreatingRk = creatingRkForId === row.id;
         return (
-          <div className="flex items-center justify-center gap-1.5">
+          <div className="flex items-center justify-center gap-1 font-poppins">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -140,7 +138,7 @@ export function buildRechnungColumns({
                 onCreateRechnungK(row);
               }}
               disabled={isCreatingRk}
-              className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab318] transition shadow-md disabled:opacity-50 flex items-center gap-1"
+              className="px-2 py-0.5 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-[#7ab318] transition shadow-xs disabled:opacity-50 flex items-center gap-1 cursor-pointer"
             >
               {isCreatingRk ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -160,9 +158,9 @@ export function buildRechnungColumns({
                   );
                 } catch (_) {}
               }}
-              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
             >
-              <FileDown className="h-3.5 w-3.5" /> PDF
+              <FileDown className="h-3 w-3" /> PDF
             </button>
           </div>
         );

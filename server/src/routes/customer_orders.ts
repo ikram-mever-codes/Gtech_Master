@@ -13,6 +13,7 @@ import {
   previewOrderLineItemPrice,
   downloadCustomerOrderPdf,
   closeCustomerOrder,
+  duplicateCustomerOrder,
 } from "../controllers/customer_order_controller";
 
 const router = Router();
@@ -20,6 +21,7 @@ router.use(authenticateUser);
 
 router.post("/from-offer/:offerId", createAuftragFromOffer);
 router.post("/from-items", createAuftragFromItems);
+router.post("/:id/duplicate", duplicateCustomerOrder);
 router.get("/", getAllCustomerOrders);
 router.get("/:id/download-pdf", downloadCustomerOrderPdf);
 router.get("/:id", getCustomerOrderById);

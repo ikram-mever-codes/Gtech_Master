@@ -493,7 +493,7 @@ export const downloadOfferPdf = async (id: string, offerNumber?: string) => {
     }
     const filename = getFilenameFromResponse(
       response,
-      `Angebot ${offer.offerNumber || offerNumber || id}.pdf`,
+      `Angebot_${String(offer.offerNumber || offerNumber || id).replace(/[\s_]+/g, "_")}_GTech.pdf`,
     );
     downloadBlob(blob, filename);
     toast.dismiss();

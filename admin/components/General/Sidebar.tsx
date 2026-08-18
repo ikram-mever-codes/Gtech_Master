@@ -113,7 +113,7 @@ const allMenuItems: MenuEntry[] = [
   {
     icon: ShoppingCart,
     text: "Order Processing",
-    path: "/orders",
+    path: "/orders?tab=label_print",
     resource: "Orders",
   },
 
@@ -195,6 +195,7 @@ const Sidebar = () => {
   const isPathActive = useCallback(
     (path?: string) => {
       if (!path) return false;
+      const cleanPath = path.split("?")[0];
       const settingsPaths = [
         "/tags",
         "/payment-methods",
@@ -208,10 +209,10 @@ const Sidebar = () => {
         "/parameters-templates",
         "/settings/parameters-templates",
       ];
-      if (path === "/tags" && settingsPaths.some((sp) => activePath === sp || activePath.startsWith(sp))) {
+      if (cleanPath === "/tags" && settingsPaths.some((sp) => activePath === sp || activePath.startsWith(sp))) {
         return true;
       }
-      return activePath === path || activePath.startsWith(path);
+      return activePath === cleanPath || activePath.startsWith(cleanPath);
     },
     [activePath],
   );

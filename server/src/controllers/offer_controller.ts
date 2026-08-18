@@ -4591,6 +4591,9 @@ export class OfferController {
         console.warn("Database update failed but PDF was created:", dbError);
       }
 
+      const docNo = String(offer.offerNumber || "offer")
+        .trim()
+        .replace(/[\s_]+/g, "_");
       const datePart = (() => {
         const d = offer.createdAt ? new Date(offer.createdAt) : new Date();
         const yy = String(d.getFullYear()).slice(-2);
@@ -4604,8 +4607,8 @@ export class OfferController {
         .replace(/\s+/g, " ")
         .trim();
       const downloadFileName = cleanTitle
-        ? `Angebot ${offer.offerNumber || "offer"} ${cleanTitle} ${datePart}.pdf`
-        : `Angebot ${offer.offerNumber || "offer"} ${datePart}.pdf`;
+        ? `Angebot_${docNo}_GTech_${cleanTitle}.pdf`
+        : `Angebot_${docNo}_GTech.pdf`;
 
       response.setHeader(
         "Access-Control-Expose-Headers",
