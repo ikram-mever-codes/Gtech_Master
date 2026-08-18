@@ -178,13 +178,12 @@ const slugFromWebsite = (website?: string) => {
 };
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
       ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
       : isEmptySelect
         ? "text-gray-400 border-gray-300 bg-white"
         : "text-gray-900 border-gray-300 bg-white"
-  }`;
+    }`;
 };
 
 const CombinedBusinessContactsContent: React.FC = () => {
@@ -1006,18 +1005,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const autoDisplay = displayNameTouched.current
         ? prev.displayName
         : generateDisplayName(
-            prev.companyName,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          allBusinesses,
+          editingBusinessId,
+        );
       const autoStar = starPortalTouched.current
         ? prev.starPortalLinkName
         : generateStarPortalLinkName(
-            prev.companyName,
-            prev.website,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          prev.website,
+          allBusinesses,
+          editingBusinessId,
+        );
       return {
         ...prev,
         displayName: autoDisplay,
@@ -1145,7 +1144,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         defaultShippingMethod: businessForm.defaultShippingMethod || null,
         defaultPaymentDueDays:
           businessForm.defaultPaymentDueDays !== undefined &&
-          businessForm.defaultPaymentDueDays !== null
+            businessForm.defaultPaymentDueDays !== null
             ? parseInt(businessForm.defaultPaymentDueDays)
             : 7,
       };
@@ -1193,7 +1192,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       resetBusinessForm();
       updateBusinessIdInUrl(null);
       fetchData();
-    } catch {}
+    } catch { }
   };
 
   const handleExportContacts = async () => {
@@ -1521,7 +1520,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 }}
                                 title={
                                   !business.contacts ||
-                                  business.contacts.length === 0
+                                    business.contacts.length === 0
                                     ? "No contacts yet"
                                     : expandedBusinessIds.has(business.id)
                                       ? "Hide contacts"
@@ -1546,15 +1545,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
                                       ? sortTags(
-                                          business.tags,
-                                          business.tagOrder,
-                                        ).map((tag: any) => (
-                                          <TagBadge
-                                            key={tag.id}
-                                            tag={tag}
-                                            size="sm"
-                                          />
-                                        ))
+                                        business.tags,
+                                        business.tagOrder,
+                                      ).map((tag: any) => (
+                                        <TagBadge
+                                          key={tag.id}
+                                          tag={tag}
+                                          size="sm"
+                                        />
+                                      ))
                                       : null}
                                   </div>
                                 </div>
@@ -1874,7 +1873,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <ModalHeader
           entityName="Business"
           entityNo={
-            businessModalMode === "edit" ? businessForm.displayName : null
+            businessModalMode === "edit" ? businessForm.displayName || businessForm.companyName : null
+          }
+          subtitle={
+            businessModalMode === "edit" && businessForm.customerNumber
+              ? businessForm.customerNumber
+              : null
           }
           icon={BuildingOfficeIcon}
           isEditMode={businessModalMode === "edit"}
@@ -1911,47 +1915,62 @@ const CombinedBusinessContactsContent: React.FC = () => {
             ) : null
           }
           extraHeaderElements={
-            <button
-              type="button"
-              onClick={() => {
-                const q =
-                  businessForm.legalName || businessForm.companyName || "";
-                window.open(
-                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    q,
-                  )}`,
-                  "_blank",
-                );
-              }}
-              className="text-rose-500 hover:text-rose-700 transition-colors p-1"
-              title="Search on Google Maps"
-            >
-              <MapPinIcon className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const q =
+                    businessForm.legalName || businessForm.companyName || "";
+                  window.open(
+                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      q,
+                    )}`,
+                    "_blank",
+                  );
+                }}
+                className="text-rose-500 hover:text-rose-700 transition-colors p-1"
+                title="Search on Google Maps"
+              >
+                <MapPinIcon className="w-5 h-5" />
+              </button>
+              {businessForm.asanaLink?.trim() && (
+                <a
+                  href={businessForm.asanaLink.trim()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center p-1 rounded-md hover:bg-gray-100 transition-colors"
+                  title="Open Asana link"
+                >
+                  <img src="/asana.svg" alt="Asana" className="w-5 h-5 object-contain" />
+                </a>
+              )}
+            </div>
           }
         />
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="space-y-6">
             <div className="rounded-xl p-4 -mx-4 bg-transparent">
               <div className="grid grid-cols-6 gap-4">
-                <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer No (Leave blank autogenerate)
-                  </label>
-                  <input
-                    type="text"
-                    value={businessForm.customerNumber}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        customerNumber: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium font-mono text-gray-800"
-                    placeholder="Auto-generated if left blank"
-                  />
-                </div>
+                {businessModalMode === "create" && (
+                  <div className="col-span-6 md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Customer No (Leave blank autogenerate)
+                    </label>
+                    <input
+                      type="text"
+                      value={businessForm.customerNumber}
+                      onChange={(e) =>
+                        setBusinessForm({
+                          ...businessForm,
+                          customerNumber: e.target.value,
+                        })
+                      }
+                      disabled={businessFieldDisabled}
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium font-mono text-gray-800"
+                      placeholder="Auto-generated if left blank"
+                    />
+                  </div>
+                )}
 
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1973,7 +1992,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-3 md:col-span-2">
+                <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Display Name
                   </label>
@@ -1992,7 +2011,27 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Auto from first word (unique)"
                   />
                 </div>
-                <div className="col-span-3 md:col-span-2 flex items-end gap-2">
+
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Asana Link
+                  </label>
+                  <input
+                    type="url"
+                    value={businessForm.asanaLink || ""}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        asanaLink: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="https://app.asana.com/..."
+                  />
+                </div>
+
+                <div className="col-span-6 md:col-span-3 flex items-end gap-2">
                   <div className="flex-1">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Star Portal Link Name
@@ -2041,6 +2080,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="c/o, building, floor…"
                   />
                 </div>
+
                 <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Street and Street Number
@@ -2060,7 +2100,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="col-span-2 md:col-span-1">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Postal Code
                   </label>
@@ -2078,7 +2118,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="80331"
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2 md:col-span-1">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     City
                   </label>
@@ -2096,7 +2136,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="München"
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2 md:col-span-1">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Country
                   </label>
@@ -2113,19 +2153,19 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   >
                     {dbCountries.length > 0
                       ? dbCountries.map((c) => (
-                          <option key={c.id} value={c.iso2}>
-                            {c.iso2} - {c.name}
-                          </option>
-                        ))
+                        <option key={c.id} value={c.iso2}>
+                          {c.iso2} - {c.name}
+                        </option>
+                      ))
                       : COUNTRY_OPTIONS.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
-                <div className="col-span-3 md:col-span-2">
+                <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Email
                   </label>
@@ -2143,7 +2183,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="info@muster.de"
                   />
                 </div>
-                <div className="col-span-3 md:col-span-2">
+                <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Phone
                   </label>
@@ -2181,224 +2221,195 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 border-t border-gray-200/60 my-2 pt-4">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                    Invoicing & Tax Details
-                  </h4>
-                  <div className="grid grid-cols-6 gap-4">
-                    <div className="col-span-6 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Debtor Number
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.debtor_no || ""}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            debtor_no: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-                        placeholder="D-99000"
-                      />
-                    </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Debitor No
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.debtor_no || ""}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        debtor_no: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
+                    placeholder="D-99000"
+                  />
+                </div>
 
-                    <div className="col-span-6 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        VAT / Tax ID
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.vatTaxId || ""}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            vatTaxId: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-                        placeholder="DE123456789"
-                      />
-                    </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    VAT / Tax ID
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.vatTaxId || ""}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        vatTaxId: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
+                    placeholder="DE123456789"
+                  />
+                </div>
 
-                    <div className="col-span-6 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        VAT Check Status
-                      </label>
-                      <select
-                        value={businessForm.vat_id_status || "unchecked"}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            vat_id_status: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                      >
-                        <option value="unchecked">Unchecked</option>
-                        <option value="vies_valid">VIES Valid</option>
-                        <option value="vies_invalid">VIES Invalid</option>
-                        <option value="bzst_qualified_valid">
-                          BZSt Qualified Valid
-                        </option>
-                        <option value="bzst_qualified_invalid">
-                          BZSt Qualified Invalid
-                        </option>
-                      </select>
-                    </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    VAT Check Status
+                  </label>
+                  <select
+                    value={businessForm.vat_id_status || "unchecked"}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        vat_id_status: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                  >
+                    <option value="unchecked">Unchecked</option>
+                    <option value="vies_valid">VIES Valid</option>
+                    <option value="vies_invalid">VIES Invalid</option>
+                    <option value="bzst_qualified_valid">
+                      BZSt Qualified Valid
+                    </option>
+                    <option value="bzst_qualified_invalid">
+                      BZSt Qualified Invalid
+                    </option>
+                  </select>
+                </div>
 
-                    <div className="col-span-6 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Default Tax Profile
-                        <span className="text-[10px] font-semibold text-emerald-600 ml-1.5">
-                          (Auto-assigned by tax rules)
-                        </span>
-                      </label>
-                      <select
-                        value={
-                          businessForm.default_tax_profile_id ||
-                          taxProfiles.find(
-                            (tp: any) =>
-                              (tp.tax_case || "").trim().toUpperCase() ===
-                              "DE-VAT",
-                          )?.id ||
-                          taxProfiles[0]?.id ||
-                          ""
-                        }
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            default_tax_profile_id: e.target.value || "",
-                          })
-                        }
-                        disabled={true}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-gray-100 backdrop-blur-sm rounded-lg cursor-not-allowed text-gray-700 font-semibold"
-                      >
-                        {taxProfiles.map((tp) => (
-                          <option key={tp.id} value={tp.id}>
-                            {tp.tax_case || tp.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Default Tax Profile
+                  </label>
+                  <select
+                    value={
+                      businessForm.default_tax_profile_id ||
+                      taxProfiles.find(
+                        (tp: any) =>
+                          (tp.tax_case || "").trim().toUpperCase() ===
+                          "DE-VAT",
+                      )?.id ||
+                      taxProfiles[0]?.id ||
+                      ""
+                    }
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        default_tax_profile_id: e.target.value || "",
+                      })
+                    }
+                    disabled={true}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-gray-100 backdrop-blur-sm rounded-lg cursor-not-allowed text-gray-700 font-semibold"
+                  >
+                    {taxProfiles.map((tp) => (
+                      <option key={tp.id} value={tp.id}>
+                        {tp.tax_case || tp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                    <div className="col-span-6 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Default Payment Method
-                      </label>
-                      <select
-                        value={businessForm.defaultPaymentMethod || ""}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            defaultPaymentMethod: e.target.value || "",
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                      >
-                        <option value="">None / Not Assigned</option>
-                        {(dbPaymentMethods.length > 0
-                          ? dbPaymentMethods.map((pm: any) => pm.name)
-                          : [
-                              "Prepayment",
-                              "Bank transfer",
-                              "Cash on delivery",
-                              "Invoice",
-                              "Credit card",
-                              "PayPal",
-                            ]
-                        ).map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Default Payment Method
+                  </label>
+                  <select
+                    value={businessForm.defaultPaymentMethod || ""}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        defaultPaymentMethod: e.target.value || "",
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                  >
+                    <option value="">None / Not Assigned</option>
+                    {(dbPaymentMethods.length > 0
+                      ? dbPaymentMethods.map((pm: any) => pm.name)
+                      : [
+                        "Prepayment",
+                        "Bank transfer",
+                        "Cash on delivery",
+                        "Invoice",
+                        "Credit card",
+                        "PayPal",
+                      ]
+                    ).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                    <div className="col-span-6 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Default Shipping Method
-                      </label>
-                      <select
-                        value={businessForm.defaultShippingMethod || ""}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            defaultShippingMethod: e.target.value || "",
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                      >
-                        <option value="">None / Not Assigned</option>
-                        {(dbShippingMethods.length > 0
-                          ? dbShippingMethods.map((sm: any) => sm.name)
-                          : [
-                              "Standard shipping",
-                              "Express shipping",
-                              "Freight",
-                              "Courier",
-                              "Pickup",
-                            ]
-                        ).map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Default Shipping Method
+                  </label>
+                  <select
+                    value={businessForm.defaultShippingMethod || ""}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        defaultShippingMethod: e.target.value || "",
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                  >
+                    <option value="">None / Not Assigned</option>
+                    {(dbShippingMethods.length > 0
+                      ? dbShippingMethods.map((sm: any) => sm.name)
+                      : [
+                        "Standard shipping",
+                        "Express shipping",
+                        "Freight",
+                        "Courier",
+                        "Pickup",
+                      ]
+                    ).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                    <div className="col-span-6 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Payment Due (in days)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={
-                          businessForm.defaultPaymentDueDays !== undefined
-                            ? businessForm.defaultPaymentDueDays
-                            : 7
-                        }
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            defaultPaymentDueDays:
-                              e.target.value !== ""
-                                ? parseInt(e.target.value)
-                                : "",
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
-                        placeholder="7"
-                      />
-                    </div>
-
-                    <div className="col-span-6 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Asana Link
-                      </label>
-                      <input
-                        type="url"
-                        value={businessForm.asanaLink || ""}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            asanaLink: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="https://app.asana.com/..."
-                      />
-                    </div>
-                  </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Payment Due (in days)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={
+                      businessForm.defaultPaymentDueDays !== undefined
+                        ? businessForm.defaultPaymentDueDays
+                        : 7
+                    }
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        defaultPaymentDueDays:
+                          e.target.value !== ""
+                            ? parseInt(e.target.value)
+                            : "",
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
+                    placeholder="7"
+                  />
                 </div>
 
                 <div className="col-span-6">
@@ -2461,11 +2472,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 />
                 <label
                   htmlFor="labelLogoInput"
-                  className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${
-                    businessFieldDisabled
+                  className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
                       ? "opacity-50 cursor-not-allowed"
                       : "cursor-pointer hover:bg-white"
-                  }`}
+                    }`}
                 >
                   Upload
                 </label>
@@ -2639,18 +2649,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
               </span>
               <button
                 type="button"
-                className={`${
-                  editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                  } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                 role="switch"
                 aria-checked={editModeEnabled}
                 onClick={() => setEditModeEnabled(!editModeEnabled)}
               >
                 <span
                   aria-hidden="true"
-                  className={`${
-                    editModeEnabled ? "translate-x-5" : "translate-x-0"
-                  } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                  className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
+                    } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                 />
               </button>
             </div>
@@ -3091,11 +3099,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
         }}
         title={
           businessNoteData
-            ? `Note · ${
-                businessNoteData.displayName ||
-                businessNoteData.companyName ||
-                businessNoteData.name
-              }`
+            ? `Note · ${businessNoteData.displayName ||
+            businessNoteData.companyName ||
+            businessNoteData.name
+            }`
             : "Note"
         }
         width="max-w-2xl"
