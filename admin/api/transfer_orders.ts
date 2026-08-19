@@ -4,11 +4,12 @@ import { api, handleApiError } from "@/utils/api";
 export const createBestellungFromAuftrag = async (
   auftragId: number | string,
   selectedItems: any,
+  notes?: string,
 ) => {
   try {
     const response: any = await api.post(
       `/transfer-orders/from-auftrag/${auftragId}`,
-      { selectedItems },
+      { selectedItems, notes },
     );
     return response;
   } catch (error: any) {

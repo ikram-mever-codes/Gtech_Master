@@ -181,7 +181,7 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
 const getLineItemTotal = (item: any): number => {
   const qty = parseFlexibleNumber(item?.qty) ?? 1;
   const price =
-    parseFlexibleNumber(item?.transferPrice ?? item?.purchasePrice ?? 0) ?? 0;
+    parseFlexibleNumber(item?.purchasePrice ?? item?.transferPrice ?? 0) ?? 0;
   return qty * price;
 };
 
@@ -1145,7 +1145,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                         </td>
                         <td className="px-2 py-2 text-right text-gray-600">
                           {item.sourceItemId
-                            ? formatPrice(item.purchasePrice, lineCurrency)
+                            ? formatPrice(
+                                item.purchasePrice ?? item.transferPrice,
+                                lineCurrency,
+                              )
                             : "—"}
                         </td>
                         <td className="px-2 py-2 text-right font-medium">

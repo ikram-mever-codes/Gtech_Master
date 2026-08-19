@@ -55,7 +55,13 @@ export default function AuftragToBestellungModal({
         };
       });
       setItems(mapped);
-      setNotes(auftrag.comment || auftrag.notes || "");
+      setNotes(
+        auftrag.internal_notes ||
+          auftrag.comment_internal ||
+          auftrag.comment ||
+          auftrag.notes ||
+          "",
+      );
     }
   }, [auftrag]);
 
@@ -102,7 +108,11 @@ export default function AuftragToBestellungModal({
         description: it.description,
       }));
 
-      const res = await createBestellungFromAuftrag(auftrag.id, selectedItems);
+      const res = await createBestellungFromAuftrag(
+        auftrag.id,
+        selectedItems,
+        notes,
+      );
       if (res?.success) {
         toast.success(res.message || "Converted to Bestellung successfully!");
         onSuccess();
