@@ -48,6 +48,7 @@ export const updateTransferOrder = async (
     highlightColor?: string;
     receiver?: "Gtech Hong Kong" | "Supplier";
     supplierId?: number | null;
+    zweck?: string;
   },
 ) => {
   try {
@@ -169,6 +170,7 @@ export const createTransferOrder = async (data: {
   receiver?: "Gtech Hong Kong" | "Supplier";
   supplierId?: number | null;
   customerId: string;
+  zweck?: string;
 }) => {
   try {
     const response: any = await api.post("/transfer-orders", data);

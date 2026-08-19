@@ -8,7 +8,7 @@ import { CustomerOrderItem } from "../models/customer_order_items";
 import { Item } from "../models/items";
 import { Supplier } from "../models/suppliers";
 import { SupplierItem } from "../models/supplier_items";
-import { ReceiverType } from "../models/transfer_order";
+import { ReceiverType, TransferOrderZweck } from "../models/transfer_order";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import {
   parseFlexibleNumber,
@@ -200,6 +200,7 @@ export const createTransferOrderFromAuftrag = async (
       date_delivery: auftrag.date_delivery,
       highlight_color: auftrag.highlight_color || "",
       deliveryAddress: auftrag.deliveryAddress || null,
+      zweck: TransferOrderZweck.DIREKT,
     });
 
     const savedOrder: any = await transferOrderRepo.save(transferOrder);
@@ -337,6 +338,7 @@ export const updateTransferOrder = async (
       receiver,
       supplierId,
       customerId, // Add this
+      zweck,
     } = req.body;
 
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
@@ -385,6 +387,7 @@ export const updateTransferOrder = async (
     if (dateDelivery !== undefined) bestellung.date_delivery = dateDelivery;
     if (highlightColor !== undefined)
       bestellung.highlight_color = highlightColor;
+    if (zweck !== undefined) bestellung.zweck = zweck;
 
     let receiverOrSupplierChanged = false;
 
@@ -856,6 +859,7 @@ export const createTransferOrder = async (
       receiver = ReceiverType.GTECH_HK,
       supplierId,
       customerId,
+      zweck = TransferOrderZweck.DIREKT,
     } = req.body;
 
     // Title is now optional - remove the validation
@@ -906,6 +910,7 @@ export const createTransferOrder = async (
       date_delivery: dateDelivery || "",
       receiver: receiver,
       supplier_id: receiver === ReceiverType.SUPPLIER ? supplierId : null,
+      zweck: zweck || TransferOrderZweck.DIREKT,
       date_created: `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`,
     });
 
