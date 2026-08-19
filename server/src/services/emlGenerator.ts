@@ -15,6 +15,13 @@ interface ContactInfo {
 
 export async function generateRechnungLieferscheinEml(
   rechnungId: number | string,
+  options?: {
+    user?: {
+      name?: string;
+      username?: string;
+      email?: string;
+    };
+  },
 ): Promise<{
   emlFilePath: string;
   filename: string;
@@ -47,7 +54,7 @@ export async function generateRechnungLieferscheinEml(
     console.warn("Could not load Lieferschein for EML:", err);
   }
 
-  let auftragTitle = rechnung.notes || rechnung.auftrag_no || `Rechnung ${rechnung.invoice_number || rechnung.id}`;
+  let auftragTitle = rechnung.title || rechnung.notes || rechnung.auftrag_no || `Rechnung ${rechnung.invoice_number || rechnung.id}`;
   let customerId: any = undefined;
 
   if (rechnung.auftrag_id) {
@@ -167,6 +174,13 @@ export async function generateRechnungLieferscheinEml(
     ),
   }));
 
+  const contactPersonName =
+    rechnung.ansprechpartner ||
+    options?.user?.name ||
+    options?.user?.username ||
+    customerSnap.contactName ||
+    "Joschua Stehle";
+
   await generateGtechDocumentPdf({
     documentType: "Rechnung",
     documentNumber: rechnung.invoice_number || String(rechnung.id),
@@ -174,7 +188,7 @@ export async function generateRechnungLieferscheinEml(
     customerEntity: rechnung.customer,
     deliveryAddress: rechnung.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", customerSnap.contactName || "—"],
+      ["Ansprechpartner", contactPersonName],
       ["Kunde", kundeCombined],
       ["Datum", formatDateStr(rechnung.invoice_date || rechnung.date_created || rechnung.created_at)],
     ],
@@ -215,7 +229,7 @@ export async function generateRechnungLieferscheinEml(
     customerEntity: rechnung.customer,
     deliveryAddress: rechnung.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", customerSnap.contactName || "—"],
+      ["Ansprechpartner", contactPersonName],
       ["Kunde", kundeCombined],
       ["Datum", formatDateStr(rechnung.invoice_date || rechnung.created_at)],
       ["Lieferdatum", formatDateStr(rechnung.date_delivery || rechnung.delivery_date)],
@@ -250,8 +264,15 @@ export async function generateRechnungLieferscheinEml(
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+  const senderName =
+    options?.user?.name ||
+    options?.user?.username ||
+    "Joschua Stehle";
+  const senderEmail =
+    options?.user?.email || "joschua.stehle@gtech.de";
+
   let emlContent = "";
-  emlContent += `From: GTech Industries GmbH <sales@gtech-industries.de>\n`;
+  emlContent += `From: ${senderName} <${senderEmail}>\n`;
   if (recipientListStr) {
     emlContent += `To: ${recipientListStr}\n`;
   }
@@ -264,14 +285,28 @@ export async function generateRechnungLieferscheinEml(
   emlContent += `Content-Transfer-Encoding: 8bit\n\n`;
   emlContent += `${bodyText}\n\n`;
 
-  const rechnungFileName = `Rechnung_${rechnung.invoice_number || rechnung.id}.pdf`;
+  const cleanTitle = (auftragTitle || rechnung.title || "")
+    .trim()
+    .replace(/[^\w-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const rechnungDocNo = String(rechnung.invoice_number || rechnung.id || "rechnung").trim().replace(/[\s_]+/g, "_");
+  const lieferscheinDocNo = String(lieferscheinNo || "lieferschein").trim().replace(/[\s_]+/g, "_");
+
+  const rechnungFileName = cleanTitle
+    ? `Rechnung_${rechnungDocNo}_GTech_${cleanTitle}.pdf`
+    : `Rechnung_${rechnungDocNo}_GTech.pdf`;
+
   emlContent += `--${boundary}\n`;
   emlContent += `Content-Type: application/pdf; name="${rechnungFileName}"\n`;
   emlContent += `Content-Transfer-Encoding: base64\n`;
   emlContent += `Content-Disposition: attachment; filename="${rechnungFileName}"\n\n`;
   emlContent += `${rechnungBase64.match(/.{1,76}/g)?.join("\n") || rechnungBase64}\n\n`;
 
-  const lieferscheinFileName = `Lieferschein_${lieferscheinNo}.pdf`;
+  const lieferscheinFileName = cleanTitle
+    ? `Lieferschein_${lieferscheinDocNo}_GTech_${cleanTitle}.pdf`
+    : `Lieferschein_${lieferscheinDocNo}_GTech.pdf`;
+
   emlContent += `--${boundary}\n`;
   emlContent += `Content-Type: application/pdf; name="${lieferscheinFileName}"\n`;
   emlContent += `Content-Transfer-Encoding: base64\n`;
