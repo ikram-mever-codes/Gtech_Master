@@ -167,14 +167,28 @@ export const createRechnungFromAuftrag = async (
       });
     }
 
+    const dispName =
+      auftrag.customerSnapshot?.displayName ||
+      auftrag.customerSnapshot?.display_name ||
+      (originalCust as any)?.displayName ||
+      (originalCust as any)?.display_name ||
+      auftrag.customerSnapshot?.companyName ||
+      originalCust?.companyName ||
+      "Customer";
+    const legName =
+      auftrag.customerSnapshot?.legalName ||
+      auftrag.customerSnapshot?.legal_name ||
+      originalCust?.legalName ||
+      (originalCust as any)?.legal_name ||
+      dispName;
+
     const rechnungCustomerRepo = AppDataSource.getRepository(RechnungCustomer);
     const rechnungCustomer = rechnungCustomerRepo.create({
-      original_customer_id: auftrag.customer_id || undefined,
-      company_name:
-        auftrag.customerSnapshot?.legalName ||
-        originalCust?.legalName ||
-        originalCust?.legalName ||
-        "Customer",
+      original_customer_id:
+        auftrag.customer_id ? String(auftrag.customer_id) : (originalCust?.id ? String(originalCust.id) : undefined),
+      company_name: dispName,
+      display_name: dispName,
+      legal_name: legName,
       email:
         auftrag.customerSnapshot?.email || originalCust?.email || undefined,
       tax_number:
@@ -325,6 +339,8 @@ export const createRechnungFromAuftrag = async (
       status: "open",
       customer: savedCustomerSnapshot,
       rechnung_customer_id: savedCustomerSnapshot.id,
+      customerSnapshot: auftrag.customerSnapshot,
+      deliveryAddress: (auftrag as any).deliveryAddress,
       date_created: dateCreatedStr,
       date_emailed: auftrag.date_emailed || undefined,
       date_delivery: auftrag.date_delivery || undefined,
