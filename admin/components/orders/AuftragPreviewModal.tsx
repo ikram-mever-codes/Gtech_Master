@@ -390,11 +390,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     0,
   );
 
-  // Once a Rechnung or Lieferschein has been generated off this Auftrag,
-  // it can no longer be deleted — it can only be closed from here on.
-  const hasRechnungOrLieferschein =
-    (linkedDocumentsByType.rechnungen?.length || 0) > 0;
-  const isAuftragClosed = order?.auftrag_status === "closed";
+  // Delete/Close visibility is now driven entirely by auftrag_status via
+  // isOpenStatus/isPartiallyDeliveredStatus below (Order Editing Rules) —
+  // these two no longer gate anything, kept as no-ops removed.
 
   const getLinkedDocDisplayNumber = (kind: string, doc: any): string => {
     if (kind === "offers") return doc.offerNumber || doc.id;
@@ -439,21 +437,29 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       if (res.success) {
         setOrder(res.data);
         setForm(buildForm(res.data));
+        // initialEdit is only honored once we actually know the order's
+        // status — a caller requesting edit mode (e.g. "Edit Auftrag" from
+        // the Ausliefern screen) can't force it open on a Delivered/Closed
+        // Auftrag just by asking. Previously setEdit(initialEdit) ran
+        // before this data existed, so it always won.
+        const loadedStatus = res.data.auftrag_status || "open";
+        const loadedCanEnterEdit =
+          loadedStatus === "open" || loadedStatus === "partially_delivered";
+        setEdit(initialEdit && loadedCanEnterEdit);
       }
     } catch (e) {
       console.error("Failed to load Auftrag:", e);
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, initialEdit]);
 
   useEffect(() => {
     if (!isOpen) return;
-    setEdit(initialEdit);
     setShowItemPicker(false);
     setItemPickerSearch("");
     fetchOrder();
-  }, [isOpen, orderId, fetchOrder, initialEdit]);
+  }, [isOpen, orderId, fetchOrder]);
   useEffect(() => {
     if (!showItemPicker || items.length > 0) return;
     (async () => {
@@ -520,7 +526,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     if (updated.success) setOrder(updated.data);
   };
 
-  const handleStartEdit = () => setEdit(true);
+  const handleStartEdit = () => {
+    // Second layer, independent of the ViewEditToggle's disabled prop —
+    // this function itself refuses to enter edit mode outside Open/
+    // Partially Delivered, no matter what calls it.
+    if (!canEnterEditMode) return;
+    setEdit(true);
+  };
   const handleCancelEdit = () => {
     setForm(buildForm(order));
     setEdit(false);
@@ -529,40 +541,57 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
   const handleSave = async () => {
     if (!order) return;
-    if (!form.title?.trim()) {
+    // Defense in depth — the Save button itself is only ever rendered
+    // when effectiveEdit is true, but this stops a stray call regardless.
+    if (!canEnterEditMode) return;
+    if (canEditCommercial && !form.title?.trim()) {
       toast.error("Title can't be empty.", errorStyles);
       return;
     }
     setSaving(true);
     try {
-      const res = await updateCustomerOrder(order.id, {
-        title: form.title,
-        status: form.status,
-        currency: form.currency,
-        taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
-        discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
-        shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
-        shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
-        paymentMethod: form.paymentMethod || undefined,
-        shippingMethod: form.shippingMethod || undefined,
-        paymentTerms: form.paymentTerms,
-        deliveryTerms: form.deliveryTerms,
-        termsConditions: form.termsConditions,
-        notes: form.notes,
-        internalNotes: form.internalNotes,
-        highlightColor: form.highlightColor ?? "",
-        dateDelivery: form.dateDelivery,
-        customerSnapshot: form.customerSnapshot,
-        deliveryAddress: form.deliveryAddress,
-        auftragStatus: form.auftragStatus,
-        realDeliveryDate: form.realDeliveryDate || null,
-        isWeiterversand: form.isWeiterversand,
-        weiterversandServiceProviderId: form.weiterversandServiceProviderId
-          ? Number(form.weiterversandServiceProviderId)
-          : null,
-        weiterversandLabels: form.weiterversandLabels,
-        weiterversandTracking: form.weiterversandTracking,
-      });
+      // Partially Delivered: only comments + highlight color may change —
+      // sending the full commercial payload would just get rejected by
+      // the backend guard (and would be wrong to attempt anyway, since
+      // Menge/Nettowert must stay exactly what the customer ordered).
+      // auftragStatus/status are never sent from here at all — status
+      // transitions only ever happen through delivery (Ausliefern) or the
+      // dedicated Close action, never through this general save.
+      const payload: any = canEditCommercial
+        ? {
+            title: form.title,
+            currency: form.currency,
+            taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
+            discountPercentage:
+              parseFlexibleNumber(form.discountPercentage) ?? 0,
+            shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
+            shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
+            paymentMethod: form.paymentMethod || undefined,
+            shippingMethod: form.shippingMethod || undefined,
+            paymentTerms: form.paymentTerms,
+            deliveryTerms: form.deliveryTerms,
+            termsConditions: form.termsConditions,
+            notes: form.notes,
+            internalNotes: form.internalNotes,
+            highlightColor: form.highlightColor ?? "",
+            dateDelivery: form.dateDelivery,
+            customerSnapshot: form.customerSnapshot,
+            deliveryAddress: form.deliveryAddress,
+            realDeliveryDate: form.realDeliveryDate || null,
+            isWeiterversand: form.isWeiterversand,
+            weiterversandServiceProviderId: form.weiterversandServiceProviderId
+              ? Number(form.weiterversandServiceProviderId)
+              : null,
+            weiterversandLabels: form.weiterversandLabels,
+            weiterversandTracking: form.weiterversandTracking,
+          }
+        : {
+            notes: form.notes,
+            internalNotes: form.internalNotes,
+            highlightColor: form.highlightColor ?? "",
+          };
+
+      const res = await updateCustomerOrder(order.id, payload);
       if (res.success) {
         toast.success("Auftrag updated successfully.", successStyles);
         await refreshLocal();
@@ -628,6 +657,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   };
 
   const persistLine = async (lineItemId: string, payload: any) => {
+    // Defense in depth — the UI already hides/disables these controls
+    // outside Open, but this stops a stray call from reaching the API
+    // (which would reject it anyway with the same rule).
+    if (!canEditCommercial) return;
     try {
       const res: any = await updateOrderLineItem(order.id, lineItemId, payload);
       const updatedItem = res?.data ?? res;
@@ -647,6 +680,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   };
 
   const handleQuantityCommit = async (item: any, raw: string) => {
+    if (!canEditCommercial) return;
     const newQty = raw.trim() || "1";
     if (!item.sourceItemId) {
       await persistLine(item.id, { quantity: newQty });
@@ -687,6 +721,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   };
 
   const addLineItem = async () => {
+    if (!canEditCommercial) return;
     if (!newLine.itemName.trim()) {
       toast.error("Enter a name for the Freizeile first.", errorStyles);
       return;
@@ -725,6 +760,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   };
 
   const addExistingItem = async (it: any) => {
+    if (!canEditCommercial) return;
     try {
       await createOrderLineItem(order.id, {
         itemName: it.item_name || it.itemName || "Item",
@@ -745,6 +781,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   };
 
   const removeLineItem = async (lineItemId: string) => {
+    if (!canEditCommercial) return;
     if (!window.confirm("Remove this line item?")) return;
     try {
       await deleteOrderLineItem(order.id, lineItemId);
@@ -770,6 +807,25 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     .slice()
     .sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
 
+  // --- Order Editing Rules (mirrors the backend guard in
+  // customer_orders_controller.ts) ---
+  //   Open                -> everything editable
+  //   Partially Delivered -> only comments + highlight color
+  //   Delivered / Closed  -> nothing, edit mode can't even be entered
+  const auftragStatus = order.auftrag_status || "open";
+  const isOpenStatus = auftragStatus === "open";
+  const isPartiallyDeliveredStatus = auftragStatus === "partially_delivered";
+  const canEnterEditMode = isOpenStatus || isPartiallyDeliveredStatus;
+  const canEditCommercial = isOpenStatus;
+  // The actual flag every render decision below uses instead of the raw
+  // `edit` state. `edit` alone isn't trustworthy — it can be true because
+  // of a stale initialEdit render, a leftover state from before the order
+  // finished loading, or any future code path that sets it directly.
+  // ANDing with canEnterEditMode here means nothing can ever render as
+  // editable, and Save can never be offered, outside Open/Partially
+  // Delivered — regardless of how `edit` got set.
+  const effectiveEdit = edit && canEnterEditMode;
+
   const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
     const qty = parseFlexibleNumber(li.quantity) ?? 1;
     const weightGrams = parseFlexibleNumber(li.weight) ?? 0;
@@ -783,16 +839,23 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
   // Discount reduces each group's (and shipping's) base proportionally —
   // pulled out here so it can be reused by both vatGroups and displayTotal.
-  const discountPct = edit
-    ? parseFlexibleNumber(form.discountPercentage) || 0
-    : order.discount_percentage || 0;
+  // Only reads from `form` while actually, legitimately mid-edit of
+  // commercial data (effectiveEdit && canEditCommercial) — otherwise
+  // these totals must reflect the saved order, never an in-progress form
+  // value, since Menge/Nettowert/Auftrag value must never appear to
+  // change outside of that one legitimate case.
+  const discountPct =
+    effectiveEdit && canEditCommercial
+      ? parseFlexibleNumber(form.discountPercentage) || 0
+      : order.discount_percentage || 0;
   const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
 
   // Shipping net amount (qty * cost), shared by vatGroups, the summary
   // row, and the total calculation below.
-  const shippingTotalForDisplay = edit
-    ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
-    : (order.shipping_cost || 0) * (order.shipping_quantity || 1);
+  const shippingTotalForDisplay =
+    effectiveEdit && canEditCommercial
+      ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
+      : (order.shipping_cost || 0) * (order.shipping_quantity || 1);
 
   const vatGroups: { rate: number; base: number; tax: number }[] = (() => {
     const byRate = new Map<number, number>();
@@ -828,9 +891,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     shippingTotalForDisplay * discountFactor +
     vatTaxSum;
 
-  const currentDeliveryAddress = edit
-    ? form.deliveryAddress
-    : order.deliveryAddress;
+  const currentDeliveryAddress =
+    effectiveEdit && canEditCommercial
+      ? form.deliveryAddress
+      : order.deliveryAddress;
   const deliverySameAsBilling = isDeliverySameAsBilling(
     currentDeliveryAddress,
     order.customerSnapshot,
@@ -886,12 +950,14 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
             <SystemColourSelect
               value={form.highlightColor ?? order.highlight_color}
               onChange={setHighlightColor}
-              edit={edit}
+              edit={effectiveEdit}
             />
             <ViewEditToggle
-              isEditEnabled={edit}
-              onToggle={() => (edit ? handleCancelEdit() : handleStartEdit())}
-              disabled={saving}
+              isEditEnabled={effectiveEdit}
+              onToggle={() =>
+                effectiveEdit ? handleCancelEdit() : handleStartEdit()
+              }
+              disabled={saving || !canEnterEditMode}
             />
             <button
               type="button"
@@ -907,7 +973,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
             <div className="md:col-span-1 flex flex-col gap-3">
               <div className="block mb-1">
-                {edit ? (
+                {effectiveEdit && canEditCommercial ? (
                   <div className="space-y-1.5">
                     <input
                       className={inputCls}
@@ -1003,12 +1069,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </div>
 
               <div className="block mb-1">
-                {(edit || !deliverySameAsBilling) && (
+                {((effectiveEdit && canEditCommercial) ||
+                  !deliverySameAsBilling) && (
                   <span className="text-sm font-bold text-gray-900">
                     Delivery:
                   </span>
                 )}
-                {edit ? (
+                {effectiveEdit && canEditCommercial ? (
                   <div className="space-y-1.5 mt-1">
                     <input
                       className={inputCls}
@@ -1079,7 +1146,11 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
             </div>
 
             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-              <Field label="TITLE" edit={edit} value={item1Title}>
+              <Field
+                label="TITLE"
+                edit={effectiveEdit && canEditCommercial}
+                value={item1Title}
+              >
                 <input
                   className={inputCls}
                   value={form.title || item1Title}
@@ -1101,7 +1172,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </Field> */}
               <Field
                 label="Delivery Date"
-                edit={edit}
+                edit={effectiveEdit && canEditCommercial}
                 value={
                   order.date_delivery ? formatDate(order.date_delivery) : ""
                 }
@@ -1115,7 +1186,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </Field>
               <Field
                 label="Payment method"
-                edit={edit}
+                edit={effectiveEdit && canEditCommercial}
                 value={order.payment_method}
               >
                 <select
@@ -1136,7 +1207,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </Field>
               <Field
                 label="Payment terms"
-                edit={edit}
+                edit={effectiveEdit && canEditCommercial}
                 value={order.payment_terms}
               >
                 <input
@@ -1148,7 +1219,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </Field>
               <Field
                 label="Shipping method"
-                edit={edit}
+                edit={effectiveEdit && canEditCommercial}
                 value={order.shipping_method}
               >
                 <select
@@ -1174,7 +1245,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                       Weiterversand
                     </label>
-                    {edit ? (
+                    {effectiveEdit && canEditCommercial ? (
                       <select
                         className={inputCls}
                         value={form.isWeiterversand ? "Yes" : "No"}
@@ -1192,7 +1263,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     )}
                   </div>
 
-                  {(edit
+                  {(effectiveEdit && canEditCommercial
                     ? form.isWeiterversand
                     : order.is_weiterversand === true ||
                       order.is_weiterversand === 1 ||
@@ -1204,7 +1275,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                           Service Provider
                         </label>
-                        {edit ? (
+                        {effectiveEdit && canEditCommercial ? (
                           <select
                             className={inputCls}
                             value={form.weiterversandServiceProviderId || ""}
@@ -1232,7 +1303,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                           Tracking No.
                         </label>
-                        {edit ? (
+                        {effectiveEdit && canEditCommercial ? (
                           <input
                             type="text"
                             className={inputCls}
@@ -1249,7 +1320,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         )}
                       </div>
 
-                      {edit && (
+                      {effectiveEdit && canEditCommercial && (
                         <div className="shrink-0 self-end">
                           <label
                             htmlFor="weiterversand-label-file"
@@ -1339,14 +1410,16 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28 whitespace-nowrap">
                       Netto gesamt €
                     </th>
-                    {edit && <th className="w-10" />}
+                    {effectiveEdit && canEditCommercial && (
+                      <th className="w-10" />
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {visibleLineItems.length === 0 && (
                     <tr>
                       <td
-                        colSpan={edit ? 11 : 10}
+                        colSpan={effectiveEdit && canEditCommercial ? 11 : 10}
                         className="text-center py-6 text-sm text-gray-500"
                       >
                         No line items yet.
@@ -1388,7 +1461,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           </div>
                         </td>
                         <td className="px-2 py-2">
-                          {edit ? (
+                          {effectiveEdit && canEditCommercial ? (
                             <TextCellInput
                               value={item.itemNo || item.material}
                               placeholder="Art.-Nr."
@@ -1401,7 +1474,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           )}
                         </td>
                         <td className="px-2 py-2">
-                          {edit ? (
+                          {effectiveEdit && canEditCommercial ? (
                             <TextCellInput
                               value={item.itemName}
                               onCommit={(raw) =>
@@ -1415,7 +1488,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           )}
                         </td>
                         <td className="px-2 py-2">
-                          {edit ? (
+                          {effectiveEdit && canEditCommercial ? (
                             <TextCellInput
                               value={item.notes}
                               placeholder="Remark"
@@ -1430,7 +1503,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           )}
                         </td>
                         <td className="px-2 py-2 text-center text-gray-600">
-                          {edit && freetext ? (
+                          {effectiveEdit && canEditCommercial && freetext ? (
                             <div className="flex items-center justify-center gap-0.5">
                               <DecimalInput
                                 className="w-14 px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
@@ -1470,7 +1543,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           {getQtyOpen(item)}
                         </td>
                         <td className="px-2 py-2">
-                          {edit ? (
+                          {effectiveEdit && canEditCommercial ? (
                             <DecimalInput
                               className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                               value={item.quantity}
@@ -1483,7 +1556,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           )}
                         </td>
                         <td className="px-2 py-2">
-                          {edit ? (
+                          {effectiveEdit && canEditCommercial ? (
                             <DecimalInput
                               className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                               value={item.price}
@@ -1506,7 +1579,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         <td className="px-2 py-2 text-right font-medium">
                           {formatCurrency(total || 0, order?.currency || "EUR")}
                         </td>
-                        {edit && (
+                        {effectiveEdit && canEditCommercial && (
                           <td className="px-2 py-2 text-center">
                             <button
                               onClick={() => removeLineItem(item.id)}
@@ -1529,7 +1602,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2 text-gray-400">—</td>
                       <td className="px-2 py-2">
-                        {edit ? (
+                        {effectiveEdit && canEditCommercial ? (
                           <input
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
                             value={form.shippingMethod || ""}
@@ -1550,7 +1623,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2">
-                        {edit ? (
+                        {effectiveEdit && canEditCommercial ? (
                           <DecimalInput
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
                             value={form.shippingQuantity ?? 1}
@@ -1567,7 +1640,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         )}
                       </td>
                       <td className="px-2 py-2">
-                        {edit ? (
+                        {effectiveEdit && canEditCommercial ? (
                           <DecimalInput
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-right bg-white"
                             value={form.shippingCost ?? 0}
@@ -1593,14 +1666,14 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           order?.currency || "EUR",
                         )}
                       </td>
-                      {edit && <td />}
+                      {effectiveEdit && canEditCommercial && <td />}
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {edit && (
+            {effectiveEdit && canEditCommercial && (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -1692,7 +1765,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               />
               <Field
                 label="Extra weight"
-                edit={edit}
+                edit={effectiveEdit && canEditCommercial}
                 value={formatWeight(extraWeightKg)}
               >
                 <input
@@ -1878,7 +1951,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   Comment intern
                 </h3>
               </div>
-              {edit ? (
+              {effectiveEdit ? (
                 <textarea
                   rows={3}
                   className={inputCls}
@@ -1899,7 +1972,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   Comment extern
                 </h3>
               </div>
-              {edit ? (
+              {effectiveEdit ? (
                 <textarea
                   rows={3}
                   className={inputCls}
@@ -1916,19 +1989,16 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
           <div>
-            {edit &&
-              userRole === UserRole.ADMIN &&
-              !hasRechnungOrLieferschein &&
-              !isAuftragClosed && (
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  Delete Auftrag
-                </button>
-              )}
-            {edit && !isAuftragClosed && (
+            {effectiveEdit && userRole === UserRole.ADMIN && isOpenStatus && (
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Delete Auftrag
+              </button>
+            )}
+            {effectiveEdit && isPartiallyDeliveredStatus && (
               <button
                 onClick={handleCloseAuftrag}
                 disabled={closing}
@@ -1941,12 +2011,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
           </div>
           <div className="flex gap-2">
             <button
-              onClick={edit ? handleCancelEdit : onClose}
+              onClick={effectiveEdit ? handleCancelEdit : onClose}
               className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
             >
-              {edit ? "Cancel" : "Close"}
+              {effectiveEdit ? "Cancel" : "Close"}
             </button>
-            {edit && (
+            {effectiveEdit && (
               <button
                 onClick={handleSave}
                 disabled={saving}

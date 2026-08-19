@@ -476,7 +476,7 @@ export const createAuftragFromOffer = async (
       offer_id: offer.id,
       title: offer.title,
       customer_id: offer.customerId || undefined,
-      status: "Draft",
+      status: "open",
       currency: offer.currency || "EUR",
       tax_rate: taxRate,
       discount_percentage: offer.discountPercentage || 0,
@@ -673,6 +673,19 @@ export const deleteCustomerOrder = async (
 
     if (!order) {
       res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+
+    // Delete is only reachable from Open — see the Auftrag Status state
+    // machine. Once anything has been delivered (or the Auftrag was
+    // closed), it must stay as a record; the only way out of that state
+    // is closing, not deletion.
+    const status = order.auftrag_status || AuftragStatus.OPEN;
+    if (status !== AuftragStatus.OPEN) {
+      res.status(400).json({
+        success: false,
+        message: `Only an Open Auftrag can be deleted (this one is ${status}).`,
+      });
       return;
     }
 
@@ -883,6 +896,24 @@ export const createAuftragFromItems = async (
     next(error);
   }
 };
+// Order Editing Rules (per the Auftrag Status state machine):
+//   Open                -> everything editable
+//   Partially Delivered -> only these two fields (comments never shown to
+//                          the customer as "what they ordered", plus
+//                          highlightColor which is a purely internal
+//                          organizational marker, not commercial content)
+//   Delivered / Closed  -> nothing, request rejected outright
+// auftrag_status itself is deliberately NOT settable through this
+// endpoint at all — it only ever advances via createRechnungFromAuftrag
+// (delivery) or closeCustomerOrder (close), both of which enforce the
+// state machine's legal transitions. Accepting it here would let a
+// client bypass that entirely.
+const ALLOWED_WHEN_PARTIALLY_DELIVERED = new Set([
+  "notes",
+  "internalNotes",
+  "highlightColor",
+]);
+
 export const updateCustomerOrder = async (
   req: Request,
   res: Response,
@@ -890,9 +921,52 @@ export const updateCustomerOrder = async (
 ) => {
   try {
     const { id } = req.params;
+    const body = req.body || {};
+
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const auftrag = await customerOrderRepo.findOne({
+      where: { id: Number(id) },
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
+    });
+
+    if (!auftrag) {
+      res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+
+    const currentStatus = auftrag.auftrag_status || AuftragStatus.OPEN;
+
+    if (
+      currentStatus === AuftragStatus.DELIVERED ||
+      currentStatus === AuftragStatus.CLOSED
+    ) {
+      res.status(400).json({
+        success: false,
+        message: `This Auftrag is ${currentStatus} and can no longer be edited.`,
+      });
+      return;
+    }
+
+    const isPartiallyDelivered =
+      currentStatus === AuftragStatus.PARTIALLY_DELIVERED;
+
+    if (isPartiallyDelivered) {
+      const disallowedKeys = Object.keys(body).filter(
+        (key) => !ALLOWED_WHEN_PARTIALLY_DELIVERED.has(key),
+      );
+      if (disallowedKeys.length > 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "This Auftrag is Partially Delivered — only the internal/external comments and highlight color can be edited. The order must keep showing exactly what the customer originally ordered.",
+          disallowedFields: disallowedKeys,
+        });
+        return;
+      }
+    }
+
     const {
       title,
-      status,
       currency,
       taxRate,
       discountPercentage,
@@ -910,8 +984,6 @@ export const updateCustomerOrder = async (
       termsConditions,
       highlightColor,
       stock_where,
-      auftrag_status,
-      auftragStatus,
       real_delivery_date,
       realDeliveryDate,
       is_weiterversand,
@@ -922,24 +994,18 @@ export const updateCustomerOrder = async (
       weiterversandLabels,
       weiterversand_tracking,
       weiterversandTracking,
-    } = req.body;
+    } = body;
 
-    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
-    const auftrag = await customerOrderRepo.findOne({
-      where: { id: Number(id) },
-      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
-    });
-
-    if (!auftrag) {
-      res.status(404).json({ success: false, message: "Auftrag not found" });
-      return;
-    }
-
-    if (title !== undefined) auftrag.title = title;
-    if (status !== undefined) auftrag.status = status;
-    if (currency !== undefined) auftrag.currency = currency;
+    // Always allowed (Open and Partially Delivered both permit these).
     if (notes !== undefined) auftrag.notes = notes;
     if (internalNotes !== undefined) auftrag.internal_notes = internalNotes;
+    if (highlightColor !== undefined) auftrag.highlight_color = highlightColor;
+
+    // Everything below this point only ever runs for Open — the
+    // isPartiallyDelivered check above already rejected the request if
+    // any of these keys were present while Partially Delivered.
+    if (title !== undefined) auftrag.title = title;
+    if (currency !== undefined) auftrag.currency = currency;
     if (customerSnapshot !== undefined)
       auftrag.customerSnapshot = customerSnapshot;
     if (deliveryAddress !== undefined)
@@ -951,7 +1017,6 @@ export const updateCustomerOrder = async (
     if (deliveryTerms !== undefined) auftrag.delivery_terms = deliveryTerms;
     if (termsConditions !== undefined)
       auftrag.terms_conditions = termsConditions;
-    if (highlightColor !== undefined) auftrag.highlight_color = highlightColor;
     if (shippingCost !== undefined)
       auftrag.shipping_cost = parseFlexibleNumberOrZero(shippingCost);
     if (shippingQuantity !== undefined)
@@ -960,12 +1025,6 @@ export const updateCustomerOrder = async (
     if (discountPercentage !== undefined)
       auftrag.discount_percentage =
         parseFlexibleNumberOrZero(discountPercentage);
-
-    // Extra fields mapping
-    const finalAuftragStatus =
-      auftrag_status !== undefined ? auftrag_status : auftragStatus;
-    if (finalAuftragStatus !== undefined)
-      auftrag.auftrag_status = finalAuftragStatus;
 
     const finalRealDeliveryDate =
       real_delivery_date !== undefined ? real_delivery_date : realDeliveryDate;
@@ -1019,8 +1078,6 @@ export const updateCustomerOrder = async (
       }
     }
 
-    const taxRateChanged =
-      taxRate !== undefined && Number(taxRate) !== Number(auftrag.tax_rate);
     if (taxRate !== undefined)
       auftrag.tax_rate = parseFlexibleNumber(taxRate) ?? 19;
 
@@ -1062,6 +1119,18 @@ export const createOrderLineItem = async (
     });
     if (!order) {
       res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+
+    // Line items are only addable while the Auftrag is Open — per the
+    // Order Editing Rules, they're frozen the moment the first delivery
+    // exists (Partially Delivered) and forever after (Delivered/Closed).
+    const lineItemGuardStatus = order.auftrag_status || AuftragStatus.OPEN;
+    if (lineItemGuardStatus !== AuftragStatus.OPEN) {
+      res.status(400).json({
+        success: false,
+        message: `Line items cannot be changed once the Auftrag is ${lineItemGuardStatus}.`,
+      });
       return;
     }
 
@@ -1184,6 +1253,18 @@ export const updateOrderLineItem = async (
       return;
     }
 
+    // Same freeze as createOrderLineItem — quantities, prices, and every
+    // other line-item field are locked the moment the Auftrag is no
+    // longer Open.
+    const lineItemGuardStatus = order.auftrag_status || AuftragStatus.OPEN;
+    if (lineItemGuardStatus !== AuftragStatus.OPEN) {
+      res.status(400).json({
+        success: false,
+        message: `Line items cannot be changed once the Auftrag is ${lineItemGuardStatus}.`,
+      });
+      return;
+    }
+
     const orderItemRepo = AppDataSource.getRepository(CustomerOrderItem);
     const lineItem = await orderItemRepo.findOne({
       where: { id: lineItemId, customerOrderId: order.id },
@@ -1259,6 +1340,25 @@ export const deleteOrderLineItem = async (
 ) => {
   try {
     const { orderId, lineItemId } = req.params;
+
+    const parentOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const parentOrder = await parentOrderRepo.findOne({
+      where: { id: Number(orderId) },
+    });
+    if (!parentOrder) {
+      res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+    const lineItemGuardStatus =
+      parentOrder.auftrag_status || AuftragStatus.OPEN;
+    if (lineItemGuardStatus !== AuftragStatus.OPEN) {
+      res.status(400).json({
+        success: false,
+        message: `Line items cannot be changed once the Auftrag is ${lineItemGuardStatus}.`,
+      });
+      return;
+    }
+
     const orderItemRepo = AppDataSource.getRepository(CustomerOrderItem);
     const lineItem = await orderItemRepo.findOne({
       where: { id: lineItemId, customerOrderId: Number(orderId) },
@@ -1586,11 +1686,13 @@ export const closeCustomerOrder = async (
       return;
     }
 
-    // Check if order is already closed
-    if (order.auftrag_status === AuftragStatus.CLOSED) {
+    // Close is only a legal transition FROM Partially Delivered — per the
+    // Auftrag Status state machine, Open has no "close" option (it has
+    // "delete" instead), and Delivered/Closed are already final.
+    if (order.auftrag_status !== AuftragStatus.PARTIALLY_DELIVERED) {
       res.status(400).json({
         success: false,
-        message: "Order is already closed",
+        message: `Only a Partially Delivered Auftrag can be closed (this one is ${order.auftrag_status || AuftragStatus.OPEN}).`,
       });
       return;
     }

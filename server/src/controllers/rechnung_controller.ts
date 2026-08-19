@@ -135,6 +135,20 @@ export const createRechnungFromAuftrag = async (
       return;
     }
 
+    // Delivered and Closed are final states in the Auftrag Status state
+    // machine — no further delivery can be generated against them.
+    const preDeliveryStatus = auftrag.auftrag_status || AuftragStatus.OPEN;
+    if (
+      preDeliveryStatus === AuftragStatus.DELIVERED ||
+      preDeliveryStatus === AuftragStatus.CLOSED
+    ) {
+      res.status(400).json({
+        success: false,
+        message: `This Auftrag is ${preDeliveryStatus} and can no longer be delivered.`,
+      });
+      return;
+    }
+
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -383,13 +397,11 @@ export const createRechnungFromAuftrag = async (
       delivery_terms: auftrag.delivery_terms || undefined,
       terms_conditions: auftrag.terms_conditions || undefined,
       internal_notes: auftrag.internal_notes || undefined,
+      highlight_color: auftrag.highlight_color || undefined,
+      customerSnapshot: auftrag.customerSnapshot || undefined,
+      deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: auftrag.shipping_method || undefined,
-      title: auftrag.title || undefined,
-      ansprechpartner:
-        (req as any).user?.name ||
-        (req as any).user?.username ||
-        "Joschua Stehle",
+      shipping_method: include_shipping ? auftrag.shipping_method : undefined,
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
@@ -503,6 +515,7 @@ export const createRechnungFromAuftrag = async (
     next(error);
   }
 };
+
 export const getAllRechnungen = async (
   req: Request,
   res: Response,
