@@ -194,11 +194,12 @@ export const kundeColumn: ColumnDef<any> = {
       row.customerSnapshot?.display_name ||
       row.customer?.displayName ||
       row.customer?.display_name ||
+      row.customerName ||
+      row.customer_name ||
       row.customerSnapshot?.companyName ||
       row.customer?.company_name ||
       row.customer?.companyName ||
       row.customer?.name ||
-      row.customer_name ||
       row.supplier?.displayName ||
       row.supplier?.display_name ||
       row.supplier?.name ||
