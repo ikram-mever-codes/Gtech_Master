@@ -166,7 +166,7 @@ const InvoiceListPage: React.FC = () => {
   }, []);
 
   const [activeInvTab, setActiveInvTab] = useState<InvoiceTab>(
-    () => (searchParams.get("tab") as InvoiceTab) || "angebot",
+    () => (searchParams.get("tab") as InvoiceTab) || "auftrag",
   );
 
   // Fetch each tab's data lazily
