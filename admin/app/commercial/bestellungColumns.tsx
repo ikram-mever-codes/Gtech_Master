@@ -2,7 +2,11 @@
 
 import React from "react";
 import { ColumnDef } from "@/components/UI/DataTable";
-import { buildExpandColumn } from "./sharedColumns";
+import {
+  buildExpandColumn,
+  formatLieferort,
+  formatTitel35,
+} from "./sharedColumns";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 
@@ -89,12 +93,20 @@ export function buildBestellungColumns({
       align: "left",
       render: (row) => {
         const text =
+          row.customerSnapshot?.displayName ||
+          row.customerSnapshot?.display_name ||
+          row.customer?.displayName ||
+          row.customer?.display_name ||
           row.customerSnapshot?.companyName ||
-          row.customerSnapshot?.name ||
           row.customer?.company_name ||
+          row.customer?.companyName ||
           row.customer?.name ||
           row.customer_name ||
+          row.supplier?.displayName ||
+          row.supplier?.display_name ||
           row.supplier?.name ||
+          row.customerSnapshot?.legalName ||
+          row.customer?.legalName ||
           "—";
         return (
           <div
@@ -108,21 +120,23 @@ export function buildBestellungColumns({
     },
     {
       header: "Titel",
-      width: "140px",
+      width: "240px",
       align: "left",
       render: (row) => {
-        const text =
+        const titleStr = String(
           row.title ||
           row.orderItems?.[0]?.itemName ||
           row.items?.[0]?.name ||
           row.items?.[0]?.itemName ||
-          "—";
+          ""
+        ).trim();
+        const displayTitle = formatTitel35(row);
         return (
           <div
-            className="truncate max-w-[140px] text-sm text-gray-600 font-normal"
-            title={text}
+            className="truncate max-w-[240px] text-sm text-gray-600 font-normal"
+            title={titleStr || "—"}
           >
-            {text}
+            {displayTitle}
           </div>
         );
       },
@@ -149,18 +163,13 @@ export function buildBestellungColumns({
     },
     {
       header: "Lieferort",
-      width: "120px",
+      width: "130px",
       align: "left",
       render: (row) => {
-        const city = row.deliveryAddress?.city || "";
-        const country = row.deliveryAddress?.country || "";
-        const text =
-          [city, formatCountryCode(country)].filter(Boolean).join(", ") ||
-          row.deliveryAddress?.addressName ||
-          "—";
+        const text = formatLieferort(row);
         return (
           <div
-            className="truncate max-w-[120px] text-sm text-gray-600 font-normal"
+            className="truncate max-w-[130px] text-sm text-gray-600 font-normal"
             title={text}
           >
             {text}
