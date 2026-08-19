@@ -18,6 +18,13 @@ export enum ReceiverType {
   SUPPLIER = "Supplier",
 }
 
+export enum TransferOrderZweck {
+  DIREKT = "direkt",
+  PERIODISCH = "periodisch",
+  RESERVE_EU = "ReserveEU",
+  RESERVE_CN = "ReserveCN",
+}
+
 @Entity({ name: "transfer_orders" })
 export class TransferOrder {
   @PrimaryGeneratedColumn()
@@ -121,8 +128,13 @@ export class TransferOrder {
   })
   receiver!: ReceiverType;
 
-  // Only meaningful when receiver = ReceiverType.SUPPLIER. Nullable
-  // because it's unset while receiver is Gtech Hong Kong.
+  @Column({
+    type: "varchar",
+    length: 50,
+    default: TransferOrderZweck.DIREKT,
+  })
+  zweck!: string;
+
   @Column({ type: "int", nullable: true })
   supplier_id?: number;
 

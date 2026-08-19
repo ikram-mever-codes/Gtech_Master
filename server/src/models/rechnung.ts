@@ -34,6 +34,12 @@ export class Rechnung {
   @Column({ type: "varchar", length: 100, nullable: true })
   order_number?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  title?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  ansprechpartner?: string;
+
   @Column({ type: "date" })
   invoice_date!: Date;
 

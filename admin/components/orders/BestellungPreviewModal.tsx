@@ -181,7 +181,7 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
 const getLineItemTotal = (item: any): number => {
   const qty = parseFlexibleNumber(item?.qty) ?? 1;
   const price =
-    parseFlexibleNumber(item?.transferPrice ?? item?.purchasePrice ?? 0) ?? 0;
+    parseFlexibleNumber(item?.purchasePrice ?? item?.transferPrice ?? 0) ?? 0;
   return qty * price;
 };
 
@@ -215,13 +215,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerSearch, setCustomerSearch] = useState("");
 
-  // Check if order was created from Auftrag (cannot edit customer)
   const isFromAuftrag =
     order?.auftrag_id !== null && order?.auftrag_id !== undefined;
 
-  // The supplier this Bestellung is locked to, either explicitly chosen or
-  // implied by an already-added catalog item whose supplier hasn't been
-  // persisted to form.supplierId yet.
   const lockedSupplierId = useMemo(() => {
     if (form.supplierId) return Number(form.supplierId);
     const catalogLineItems = (order?.orderItems || []).filter(
@@ -308,8 +304,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
         const itemsData = Array.isArray(itemsRes?.data) ? itemsRes.data : [];
 
-        // Track each line item's primary supplier so we can enforce a
-        // single-supplier Bestellung even before form.supplierId is set.
         const supplierByItemId: Record<string, number | undefined> = {};
         itemsData.forEach((item: any) => {
           supplierByItemId[String(item.id)] = item.supplier_id
@@ -450,6 +444,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       supplierId: o.supplier_id ?? null,
       dateDelivery: o.date_delivery || "",
       customerId: o.customer_id || "",
+      zweck: o.zweck || "direkt",
     };
   }
 
@@ -505,6 +500,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
           receiver: form.receiver,
           supplierId: form.receiver === "Supplier" ? form.supplierId : null,
           customerId: selectedCustomerId,
+          zweck: form.zweck || "direkt",
           // Line items will be added separately
         });
       } else {
@@ -518,6 +514,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
           dateDelivery: form.dateDelivery,
           receiver: form.receiver,
           supplierId: form.receiver === "Supplier" ? form.supplierId : null,
+          zweck: form.zweck || "direkt",
         });
       }
 
@@ -544,14 +541,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       } else {
         toast.error(
           res.message ||
-            `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
+          `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
           errorStyles,
         );
       }
     } catch (e: any) {
       toast.error(
         e.message ||
-          `An error occurred while ${isCreate ? "creating" : "saving"}.`,
+        `An error occurred while ${isCreate ? "creating" : "saving"}.`,
         errorStyles,
       );
     } finally {
@@ -717,8 +714,8 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
   const visibleLineItems = order?.orderItems
     ? [...order.orderItems].sort(
-        (a: any, b: any) => (a.position || 0) - (b.position || 0),
-      )
+      (a: any, b: any) => (a.position || 0) - (b.position || 0),
+    )
     : [];
 
   // Loading state for existing order
@@ -753,6 +750,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     total_weight: 0,
     customer_id: selectedCustomerId,
     orderItems: [],
+    zweck: form.zweck || "direkt",
   };
 
   const title = isCreate
@@ -768,6 +766,20 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               <p className="text-lg font-bold text-gray-900 truncate">
                 {title}
               </p>
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${(form.zweck || displayOrder.zweck) === "direkt"
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : (form.zweck || displayOrder.zweck) === "periodisch"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : (form.zweck || displayOrder.zweck) === "ReserveEU"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : (form.zweck || displayOrder.zweck) === "ReserveCN"
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}
+              >
+                {form.zweck || displayOrder.zweck || "direkt"}
+              </span>
               {isCreate && (
                 <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
                   New
@@ -904,7 +916,22 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 onChange={(e) => patch({ dateDelivery: e.target.value })}
               />
             </Field>
-            {/* Customer - read-only for Auftrag-created orders */}
+            <Field
+              label="Zweck"
+              edit={edit || isCreate}
+              value={displayOrder.zweck || form.zweck || "direkt"}
+            >
+              <select
+                className={inputCls}
+                value={form.zweck || "direkt"}
+                onChange={(e) => patch({ zweck: e.target.value })}
+              >
+                <option value="direkt">direkt</option>
+                <option value="periodisch">periodisch</option>
+                <option value="ReserveEU">ReserveEU</option>
+                <option value="ReserveCN">ReserveCN</option>
+              </select>
+            </Field>
             {!isCreate && !isCustomerEditable && displayOrder.customer_id && (
               <Field
                 label="Customer"
@@ -1118,7 +1145,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                         </td>
                         <td className="px-2 py-2 text-right text-gray-600">
                           {item.sourceItemId
-                            ? formatPrice(item.purchasePrice, lineCurrency)
+                            ? formatPrice(
+                                item.purchasePrice ?? item.transferPrice,
+                                lineCurrency,
+                              )
                             : "—"}
                         </td>
                         <td className="px-2 py-2 text-right font-medium">
@@ -1255,13 +1285,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                    visibleLineItems[0]?.extraWeight === undefined
+                      visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : (
-                          parseFlexibleNumber(
-                            visibleLineItems[0].extraWeight,
-                          ) ?? 0
-                        ).toFixed(1)
+                        parseFlexibleNumber(
+                          visibleLineItems[0].extraWeight,
+                        ) ?? 0
+                      ).toFixed(1)
                   }
                   placeholder="0"
                   disabled={visibleLineItems.length === 0 || isCreate}

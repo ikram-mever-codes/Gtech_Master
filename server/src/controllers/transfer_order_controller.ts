@@ -8,7 +8,7 @@ import { CustomerOrderItem } from "../models/customer_order_items";
 import { Item } from "../models/items";
 import { Supplier } from "../models/suppliers";
 import { SupplierItem } from "../models/supplier_items";
-import { ReceiverType } from "../models/transfer_order";
+import { ReceiverType, TransferOrderZweck } from "../models/transfer_order";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import {
   parseFlexibleNumber,
@@ -77,7 +77,7 @@ export const createTransferOrderFromAuftrag = async (
 ) => {
   try {
     const { auftragId } = req.params;
-    const { selectedItems } = req.body;
+    const { selectedItems, notes: bodyNotes } = req.body;
     console.log("Selected Items:", JSON.stringify(selectedItems, null, 2));
 
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
@@ -148,13 +148,12 @@ export const createTransferOrderFromAuftrag = async (
 
       const qty = Number(selItem.qty ?? selItem.quantity) || 1;
 
-      // IMPORTANT: Use transferPrice if available, otherwise use price from selItem or lineItem
-      // but DO NOT calculate lineTotal yet - it will be calculated after purchase prices are resolved
+      // Use transferPrice if explicitly passed, otherwise 0 initially (resolved by refreshLineItemPurchasePrices)
+      // DO NOT fallback to lineItem.price because that is the Customer Sales Price!
       const transferPrice =
-        selItem.transferPrice || selItem.price || lineItem?.price || 0;
-
-      // Store the price but don't calculate lineTotal yet
-      // lineTotal will be calculated in calculateTransferOrderTotals after purchase prices are resolved
+        selItem.transferPrice !== undefined && selItem.transferPrice !== null
+          ? Number(selItem.transferPrice)
+          : 0;
 
       orderItemsToCreate.push({
         sourceLineItemId: lineItem?.id || selItem.sourceLineItemId || undefined,
@@ -171,10 +170,7 @@ export const createTransferOrderFromAuftrag = async (
         max_qty: qty,
         weight: selItem.weight || lineItem?.weight || undefined,
         extraWeight: selItem.extraWeight || lineItem?.extraWeight || 0,
-        // Set transferPrice from the Auftrag line item
         transferPrice: transferPrice,
-        // DO NOT set lineTotal here - it will be calculated after purchase prices are resolved
-        // lineTotal: 0, // Will be calculated later
         position: idx + 1,
       });
     });
@@ -185,6 +181,12 @@ export const createTransferOrderFromAuftrag = async (
       .toString()
       .padStart(2, "0")}.${now.getFullYear()}`;
 
+    // CEO requirement: OrderRemark for processing (Team Bowang) must be internal comment
+    const finalNotes =
+      bodyNotes !== undefined && bodyNotes !== null && String(bodyNotes).trim() !== ""
+        ? String(bodyNotes).trim()
+        : (auftrag.internal_notes || auftrag.notes || "");
+
     const transferOrderRepo: any = AppDataSource.getRepository(TransferOrder);
     const transferOrder = transferOrderRepo.create({
       order_no: orderNo,
@@ -194,12 +196,13 @@ export const createTransferOrderFromAuftrag = async (
       title: auftrag.title,
       status: "draft",
       currency: auftrag.currency || "EUR",
-      notes: auftrag.notes || "",
+      notes: finalNotes,
       customerSnapshot: auftrag.customerSnapshot || null,
       date_created: dateCreatedStr,
       date_delivery: auftrag.date_delivery,
       highlight_color: auftrag.highlight_color || "",
       deliveryAddress: auftrag.deliveryAddress || null,
+      zweck: TransferOrderZweck.DIREKT,
     });
 
     const savedOrder: any = await transferOrderRepo.save(transferOrder);
@@ -337,6 +340,7 @@ export const updateTransferOrder = async (
       receiver,
       supplierId,
       customerId, // Add this
+      zweck,
     } = req.body;
 
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
@@ -385,6 +389,7 @@ export const updateTransferOrder = async (
     if (dateDelivery !== undefined) bestellung.date_delivery = dateDelivery;
     if (highlightColor !== undefined)
       bestellung.highlight_color = highlightColor;
+    if (zweck !== undefined) bestellung.zweck = zweck;
 
     let receiverOrSupplierChanged = false;
 
@@ -818,6 +823,9 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
       const match = bySourceId.get(String(li.sourceItemId));
       li.purchasePrice = match ? Number(match.price_rmb) || 0 : undefined;
       li.purchaseCurrency = match ? match.currency : undefined;
+      if (li.purchasePrice !== undefined) {
+        li.transferPrice = li.purchasePrice;
+      }
       await orderItemRepo.save(li);
     }
   } else {
@@ -835,6 +843,9 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
         ? Number(match.transfer_price_EUR) || 0
         : undefined;
       li.purchaseCurrency = "EUR";
+      if (li.purchasePrice !== undefined) {
+        li.transferPrice = li.purchasePrice;
+      }
       await orderItemRepo.save(li);
     }
   }
@@ -856,6 +867,7 @@ export const createTransferOrder = async (
       receiver = ReceiverType.GTECH_HK,
       supplierId,
       customerId,
+      zweck = TransferOrderZweck.DIREKT,
     } = req.body;
 
     // Title is now optional - remove the validation
@@ -906,6 +918,7 @@ export const createTransferOrder = async (
       date_delivery: dateDelivery || "",
       receiver: receiver,
       supplier_id: receiver === ReceiverType.SUPPLIER ? supplierId : null,
+      zweck: zweck || TransferOrderZweck.DIREKT,
       date_created: `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`,
     });
 

@@ -2,7 +2,11 @@
 
 import React from "react";
 import { ColumnDef } from "@/components/UI/DataTable";
-import { buildExpandColumn } from "./sharedColumns";
+import {
+  buildExpandColumn,
+  formatLieferort,
+  formatTitel35,
+} from "./sharedColumns";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 
@@ -21,6 +25,21 @@ const valueNetCalc = (row: any) => {
     (sum: number, it: any) => sum + Number(it.price || 0) * Number(it.qty || 0),
     0,
   );
+};
+
+const getZweckBadgeStyle = (zweck: string) => {
+  switch (zweck) {
+    case "direkt":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "periodisch":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "ReserveEU":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "ReserveCN":
+      return "bg-rose-50 text-rose-700 border-rose-200";
+    default:
+      return "bg-blue-50 text-blue-700 border-blue-200";
+  }
 };
 
 const getStatusStyle = (st: string) => {
@@ -48,7 +67,7 @@ export function buildBestellungColumns({
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
     {
       header: "Datum",
-      width: "75px",
+      width: "65px",
       align: "center",
       render: (row) => {
         const rawDate =
@@ -58,10 +77,10 @@ export function buildBestellungColumns({
           /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)
         ) {
           const [d, m] = rawDate.split(".");
-          return <span className="text-sm text-gray-800 font-normal">{`${d}.${m}.`}</span>;
+          return <span className="text-xs text-gray-800 font-normal">{`${d}.${m}.`}</span>;
         }
         return (
-          <span className="text-sm text-gray-800 font-normal">
+          <span className="text-xs text-gray-800 font-normal">
             {rawDate ? formatDate(rawDate) : "—"}
           </span>
         );
@@ -69,7 +88,7 @@ export function buildBestellungColumns({
     },
     {
       header: "Nr",
-      width: "110px",
+      width: "85px",
       align: "center",
       render: (row) => (
         <button
@@ -77,7 +96,8 @@ export function buildBestellungColumns({
             e.stopPropagation();
             onOpenBestellungPreview(row.id);
           }}
-          className="text-green-600 hover:underline font-semibold whitespace-nowrap text-sm cursor-pointer"
+          className="text-green-600 hover:underline font-semibold whitespace-nowrap text-xs cursor-pointer truncate max-w-[85px]"
+          title={row.order_no || "N/A"}
         >
           {row.order_no || "N/A"}
         </button>
@@ -85,20 +105,28 @@ export function buildBestellungColumns({
     },
     {
       header: "Kunde",
-      width: "140px",
+      width: "115px",
       align: "left",
       render: (row) => {
         const text =
+          row.customerSnapshot?.displayName ||
+          row.customerSnapshot?.display_name ||
+          row.customer?.displayName ||
+          row.customer?.display_name ||
           row.customerSnapshot?.companyName ||
-          row.customerSnapshot?.name ||
           row.customer?.company_name ||
+          row.customer?.companyName ||
           row.customer?.name ||
           row.customer_name ||
+          row.supplier?.displayName ||
+          row.supplier?.display_name ||
           row.supplier?.name ||
+          row.customerSnapshot?.legalName ||
+          row.customer?.legalName ||
           "—";
         return (
           <div
-            className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
+            className="truncate max-w-[115px] text-xs font-semibold text-gray-900"
             title={text}
           >
             {text}
@@ -108,59 +136,53 @@ export function buildBestellungColumns({
     },
     {
       header: "Titel",
-      width: "140px",
+      width: "185px",
       align: "left",
       render: (row) => {
-        const text =
+        const titleStr = String(
           row.title ||
           row.orderItems?.[0]?.itemName ||
           row.items?.[0]?.name ||
           row.items?.[0]?.itemName ||
-          "—";
+          ""
+        ).trim();
+        const displayTitle = formatTitel35(row);
         return (
           <div
-            className="truncate max-w-[140px] text-sm text-gray-600 font-normal"
-            title={text}
+            className="truncate max-w-[185px] text-xs text-gray-600 font-normal"
+            title={titleStr || "—"}
           >
-            {text}
+            {displayTitle}
           </div>
         );
       },
     },
     {
       header: "Zweck",
-      width: "110px",
-      align: "left",
+      width: "85px",
+      align: "center",
       render: (row) => {
-        const text =
-          row.receiver ||
-          (row.auftrag_no ? `Auftrag ${row.auftrag_no}` : "") ||
-          row.notes ||
-          "—";
+        const zweck = row.zweck || "direkt";
         return (
-          <div
-            className="truncate max-w-[110px] text-sm text-gray-600 font-normal"
-            title={text}
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold inline-block whitespace-nowrap ${getZweckBadgeStyle(
+              zweck,
+            )}`}
           >
-            {text}
-          </div>
+            {zweck}
+          </span>
         );
       },
     },
     {
       header: "Lieferort",
-      width: "120px",
+      width: "110px",
       align: "left",
       render: (row) => {
-        const city = row.deliveryAddress?.city || "";
-        const country = row.deliveryAddress?.country || "";
-        const text =
-          [city, formatCountryCode(country)].filter(Boolean).join(", ") ||
-          row.deliveryAddress?.addressName ||
-          "—";
+        const text = formatLieferort(row);
         return (
           <div
-            className="truncate max-w-[120px] text-sm text-gray-600 font-normal"
+            className="truncate max-w-[110px] text-xs text-gray-600 font-normal"
             title={text}
           >
             {text}
@@ -170,26 +192,26 @@ export function buildBestellungColumns({
     },
     {
       header: "Lieferdatum",
-      width: "90px",
+      width: "75px",
       align: "center",
       render: (row) => {
         const raw = row.date_delivery || row.deliveryDate;
-        if (!raw) return <span className="text-gray-400 font-normal text-sm">—</span>;
+        if (!raw) return <span className="text-gray-400 font-normal text-xs">—</span>;
         if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw)) {
           const [d, m] = raw.split(".");
-          return <span className="text-sm text-gray-600 font-normal">{`${d}.${m}.`}</span>;
+          return <span className="text-xs text-gray-600 font-normal">{`${d}.${m}.`}</span>;
         }
-        return <span className="text-sm text-gray-600 font-normal">{formatDate(raw)}</span>;
+        return <span className="text-xs text-gray-600 font-normal">{formatDate(raw)}</span>;
       },
     },
     {
       header: "Bestellwert netto",
-      width: "110px",
+      width: "95px",
       align: "right",
       render: (row) => {
         const val = valueNetCalc(row);
         return (
-          <span className="text-sm font-bold text-gray-900">
+          <span className="text-xs font-bold text-gray-900">
             {`${val.toLocaleString("de-DE", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -199,14 +221,33 @@ export function buildBestellungColumns({
       },
     },
     {
+      header: "Receiver",
+      width: "105px",
+      align: "left",
+      render: (row) => {
+        const text =
+          row.receiver === "Supplier"
+            ? row.supplier?.company_name || row.supplier?.name || "Supplier"
+            : row.receiver || "Gtech Hong Kong";
+        return (
+          <div
+            className="truncate max-w-[105px] text-xs text-gray-600 font-normal"
+            title={text}
+          >
+            {text}
+          </div>
+        );
+      },
+    },
+    {
       header: "Status",
-      width: "90px",
+      width: "75px",
       align: "center",
       render: (row: any) => {
         const currentStatus = row.status || "draft";
         return (
           <span
-            className="text-[11px] px-2.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 font-medium capitalize"
+            className="text-[10px] px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 font-medium capitalize whitespace-nowrap"
           >
             {currentStatus}
           </span>
@@ -215,7 +256,7 @@ export function buildBestellungColumns({
     },
     {
       header: "Aktionen",
-      width: "90px",
+      width: "75px",
       align: "center",
       render: (row) => {
         const currentStatus = row.status || "draft";
@@ -227,7 +268,7 @@ export function buildBestellungColumns({
                   e.stopPropagation();
                   onMarkProcessing(row.id);
                 }}
-                className="px-2 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition shadow-xs cursor-pointer"
+                className="px-2 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition shadow-xs cursor-pointer whitespace-nowrap"
               >
                 Processing
               </button>
@@ -237,7 +278,7 @@ export function buildBestellungColumns({
                   e.stopPropagation();
                   onOpenBestellungPreview(row.id);
                 }}
-                className="px-2 py-0.5 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-xs cursor-pointer"
+                className="px-2 py-0.5 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-xs cursor-pointer whitespace-nowrap"
               >
                 View
               </button>

@@ -4,11 +4,12 @@ import { api, handleApiError } from "@/utils/api";
 export const createBestellungFromAuftrag = async (
   auftragId: number | string,
   selectedItems: any,
+  notes?: string,
 ) => {
   try {
     const response: any = await api.post(
       `/transfer-orders/from-auftrag/${auftragId}`,
-      { selectedItems },
+      { selectedItems, notes },
     );
     return response;
   } catch (error: any) {
@@ -48,6 +49,7 @@ export const updateTransferOrder = async (
     highlightColor?: string;
     receiver?: "Gtech Hong Kong" | "Supplier";
     supplierId?: number | null;
+    zweck?: string;
   },
 ) => {
   try {
@@ -169,6 +171,7 @@ export const createTransferOrder = async (data: {
   receiver?: "Gtech Hong Kong" | "Supplier";
   supplierId?: number | null;
   customerId: string;
+  zweck?: string;
 }) => {
   try {
     const response: any = await api.post("/transfer-orders", data);

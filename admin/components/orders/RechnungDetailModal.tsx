@@ -198,7 +198,8 @@ export default function RechnungDetailModal({
   const [addressForm, setAddressForm] = useState<{
     customerSnapshot: any;
     deliveryAddress: any;
-  }>({ customerSnapshot: {}, deliveryAddress: {} });
+    ansprechpartner: string;
+  }>({ customerSnapshot: {}, deliveryAddress: {}, ansprechpartner: "" });
   const [savingAddress, setSavingAddress] = useState(false);
 
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -448,6 +449,7 @@ export default function RechnungDetailModal({
     setAddressForm({
       customerSnapshot: { ...(data.customerSnapshot || {}) },
       deliveryAddress: { ...(data.deliveryAddress || {}) },
+      ansprechpartner: data.ansprechpartner || "",
     });
     setAddressEdit(true);
   };
@@ -474,18 +476,19 @@ export default function RechnungDetailModal({
       const res: any = await updateRechnung(data.id, {
         customerSnapshot: addressForm.customerSnapshot,
         deliveryAddress: addressForm.deliveryAddress,
+        ansprechpartner: addressForm.ansprechpartner,
       });
       const payload = res?.data ?? res;
       if (res?.success && payload) {
         setData(payload);
-        toast.success("Address updated.", successStyles);
+        toast.success("Saved successfully.", successStyles);
         setAddressEdit(false);
         onChanged?.();
       } else {
-        toast.error(res?.message || "Failed to update address.", errorStyles);
+        toast.error(res?.message || "Failed to update.", errorStyles);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update address.", errorStyles);
+      toast.error(err?.message || "Failed to update.", errorStyles);
     } finally {
       setSavingAddress(false);
     }
@@ -824,6 +827,28 @@ export default function RechnungDetailModal({
 
             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
               <Field label="AUFTRAG NO" value={auftragNo} />
+              <div>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                  Ansprechpartner
+                </p>
+                {addressEdit ? (
+                  <input
+                    className={addressInputCls}
+                    placeholder="Ansprechpartner"
+                    value={addressForm.ansprechpartner}
+                    onChange={(e) =>
+                      setAddressForm((f) => ({
+                        ...f,
+                        ansprechpartner: e.target.value,
+                      }))
+                    }
+                  />
+                ) : (
+                  <div className="text-sm text-gray-900 break-words">
+                    {data.ansprechpartner || "—"}
+                  </div>
+                )}
+              </div>
               <Field label="TAX PROFILE" value={`DE-VAT (${taxRate}%)`} />
               <Field
                 label="Delivery Date"

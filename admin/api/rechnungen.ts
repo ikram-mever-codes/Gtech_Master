@@ -78,6 +78,8 @@ export const updateRechnung = async (
     termsConditions?: string;
     customerSnapshot?: any;
     deliveryAddress?: any;
+    ansprechpartner?: string;
+    title?: string;
   },
 ) => {
   try {

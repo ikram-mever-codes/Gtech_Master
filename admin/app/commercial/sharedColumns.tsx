@@ -64,50 +64,81 @@ export function buildExpandColumn(
 }
 
 export const formatLieferort = (row: any): string => {
-  const city = (
-    row.deliveryAddress?.city ||
-    row.delivery_address?.city ||
-    row.customerSnapshot?.city ||
-    row.customer?.city ||
-    row.cargo?.customer?.city ||
-    row.city ||
-    ""
-  ).trim();
-  const postal = (
-    row.deliveryAddress?.postalCode ||
-    row.delivery_address?.postal_code ||
-    row.customerSnapshot?.postalCode ||
-    row.customer?.postalCode ||
-    row.cargo?.customer?.postalCode ||
-    row.postalCode ||
-    row.postal_code ||
-    ""
-  ).trim();
-  const rawCountry = (
-    row.deliveryAddress?.country ||
-    row.delivery_address?.country ||
-    row.customerSnapshot?.country ||
-    row.customer?.country ||
-    row.cargo?.customer?.country ||
-    row.country ||
-    ""
-  ).trim();
+  let city = "";
+  let postal = "";
+  let rawCountry = "";
+
+  const deliv = row.deliveryAddress || row.delivery_address;
+  if (typeof deliv === "object" && deliv !== null) {
+    city = (deliv.city || "").trim();
+    postal = (deliv.postalCode || deliv.postal_code || "").trim();
+    rawCountry = (deliv.country || "").trim();
+  }
+
+  if (!city) {
+    city = (
+      row.customerSnapshot?.city ||
+      row.customer?.city ||
+      row.cargo?.customer?.city ||
+      row.city ||
+      ""
+    ).trim();
+  }
+  if (!postal) {
+    postal = (
+      row.customerSnapshot?.postalCode ||
+      row.customerSnapshot?.postal_code ||
+      row.customer?.postalCode ||
+      row.customer?.postal_code ||
+      row.cargo?.customer?.postalCode ||
+      row.postalCode ||
+      row.postal_code ||
+      ""
+    ).trim();
+  }
+  if (!rawCountry) {
+    rawCountry = (
+      row.customerSnapshot?.country ||
+      row.customer?.country ||
+      row.cargo?.customer?.country ||
+      row.country ||
+      ""
+    ).trim();
+  }
+
+  const upperCountry = rawCountry.toUpperCase();
+  const isGermany =
+    !rawCountry ||
+    ["DE", "GERMANY", "DEUTSCHLAND", "DEU"].includes(upperCountry);
   const countryCode = formatCountryCode(rawCountry);
 
-  if (countryCode && postal && city) {
-    return `${countryCode}-${postal} ${city}`;
+  if (!isGermany && countryCode) {
+    if (postal && city) {
+      return `${countryCode}-${postal} ${city}`;
+    }
+    if (postal) {
+      return `${countryCode}-${postal}`;
+    }
+    if (city) {
+      return `${countryCode}, ${city}`;
+    }
+    return countryCode;
   }
-  if (countryCode && postal) {
-    return `${countryCode}-${postal}`;
-  }
-  if (countryCode && city) {
-    return `${countryCode}, ${city}`;
-  }
+
   if (postal && city) {
     return `${postal} ${city}`;
   }
+  if (city) {
+    return city;
+  }
+  if (postal) {
+    return postal;
+  }
+
   return (
-    city || postal || countryCode || row.deliveryAddress?.addressName || "—"
+    (typeof deliv === "string" && deliv.trim()) ||
+    deliv?.addressName ||
+    "—"
   );
 };
 
@@ -123,7 +154,7 @@ export const formatTitel35 = (row: any): string => {
     "";
   const titleStr = String(rawTitle || "").trim();
   if (!titleStr) return "—";
-  return titleStr.length > 35 ? titleStr.slice(0, 35) + "..." : titleStr;
+  return titleStr.length > 36 ? titleStr.slice(0, 36) + "..." : titleStr;
 };
 
 export const datumColumn: ColumnDef<any> = {
@@ -159,13 +190,20 @@ export const kundeColumn: ColumnDef<any> = {
   align: "left",
   render: (row) => {
     const text =
+      row.customerSnapshot?.displayName ||
+      row.customerSnapshot?.display_name ||
+      row.customer?.displayName ||
+      row.customer?.display_name ||
       row.customerSnapshot?.companyName ||
-      row.customerSnapshot?.name ||
       row.customer?.company_name ||
       row.customer?.companyName ||
       row.customer?.name ||
       row.customer_name ||
+      row.supplier?.displayName ||
+      row.supplier?.display_name ||
       row.supplier?.name ||
+      row.customerSnapshot?.legalName ||
+      row.customer?.legalName ||
       row.bill_to ||
       row.ship_to ||
       "—";
@@ -184,7 +222,7 @@ export const companyColumn: ColumnDef<any> = kundeColumn;
 
 export const titelColumn: ColumnDef<any> = {
   header: "Titel",
-  width: "150px",
+  width: "240px",
   align: "left",
   render: (row) => {
     const rawTitle =
@@ -200,7 +238,7 @@ export const titelColumn: ColumnDef<any> = {
     const displayTitle = formatTitel35(row);
     return (
       <div
-        className="truncate max-w-[150px] text-sm text-gray-600 font-normal"
+        className="truncate max-w-[240px] text-sm text-gray-600 font-normal"
         title={titleStr || "—"}
       >
         {displayTitle}

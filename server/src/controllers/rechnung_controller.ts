@@ -383,11 +383,13 @@ export const createRechnungFromAuftrag = async (
       delivery_terms: auftrag.delivery_terms || undefined,
       terms_conditions: auftrag.terms_conditions || undefined,
       internal_notes: auftrag.internal_notes || undefined,
-      highlight_color: auftrag.highlight_color || undefined,
-      customerSnapshot: auftrag.customerSnapshot || undefined,
-      deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: include_shipping ? auftrag.shipping_method : undefined,
+      shipping_method: auftrag.shipping_method || undefined,
+      title: auftrag.title || undefined,
+      ansprechpartner:
+        (req as any).user?.name ||
+        (req as any).user?.username ||
+        "Joschua Stehle",
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
@@ -685,6 +687,8 @@ export const updateRechnung = async (
       notes,
       internal_notes,
       highlight_color,
+      ansprechpartner,
+      title,
     } = req.body;
 
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
@@ -706,6 +710,9 @@ export const updateRechnung = async (
     if (internal_notes !== undefined) rechnung.internal_notes = internal_notes;
     if (highlight_color !== undefined)
       rechnung.highlight_color = highlight_color;
+    if (ansprechpartner !== undefined)
+      rechnung.ansprechpartner = ansprechpartner;
+    if (title !== undefined) rechnung.title = title;
 
     const addressPatch: Record<string, any> = {};
     if (customerSnapshot !== undefined) {
@@ -837,7 +844,10 @@ export const downloadRechnungPdf = async (
 
     const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
     const contactName =
-      (req as any).user?.name || (req as any).user?.username || "Admin";
+      rechnung.ansprechpartner ||
+      (req as any).user?.name ||
+      (req as any).user?.username ||
+      "Joschua Stehle";
     const customerCompName = (
       customerSnap.company_name ||
       customerSnap.companyName ||
@@ -963,7 +973,9 @@ export const downloadRechnungEml = async (
   try {
     const { id } = req.params;
     console.log("Generating EML for rechnung ID:", id);
-    const emlData = await generateRechnungLieferscheinEml(id);
+    const emlData = await generateRechnungLieferscheinEml(id, {
+      user: (req as any).user,
+    });
 
     res.setHeader("Content-Type", "message/rfc822");
     res.setHeader(
