@@ -100,6 +100,12 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   return result;
 }
 
+// Replacement for createRechnungFromAuftrag. quantity on CustomerOrderItem
+// is never touched anymore — no migration needed. "Open" is computed from
+// existing rechnung_item rows (already-delivered) plus what's being
+// delivered in this call (not yet saved when totalRemainingQty is
+// computed, so it's added in manually from the same loop).
+
 export const createRechnungFromAuftrag = async (
   req: Request,
   res: Response,
@@ -201,10 +207,35 @@ export const createRechnungFromAuftrag = async (
     const savedCustomerSnapshot =
       await rechnungCustomerRepo.save(rechnungCustomer);
 
+    // Already-delivered quantity per Auftrag line, summed from every
+    // Rechnung generated off this Auftrag so far. Used only to compute
+    // the Auftrag's new auftrag_status after this delivery — the source
+    // of truth stays rechnung_item, nothing here is written back onto
+    // CustomerOrderItem.
+    const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
+    const lineItemIds = (auftrag.orderItems || []).map((li) => li.id);
+    const alreadyDeliveredRows = lineItemIds.length
+      ? await rechnungItemRepo
+          .createQueryBuilder("ri")
+          .select("ri.sourceLineItemId", "sourceLineItemId")
+          .addSelect("SUM(ri.quantity)", "delivered")
+          .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
+          .groupBy("ri.sourceLineItemId")
+          .getRawMany()
+      : [];
+    const alreadyDeliveredByLineId = new Map<string, number>(
+      alreadyDeliveredRows.map((r: any) => [
+        String(r.sourceLineItemId),
+        Number(r.delivered) || 0,
+      ]),
+    );
+    // Accumulates what THIS call is about to deliver, per line — added on
+    // top of alreadyDeliveredByLineId below since these rechnung_item rows
+    // don't exist yet at the point totalRemainingQty is computed.
+    const justDeliveredByLineId = new Map<string, number>();
+
     let subtotal = 0;
     const itemsToCreate: Partial<RechnungItem>[] = [];
-    const customerOrderItemRepo =
-      AppDataSource.getRepository(CustomerOrderItem);
 
     for (const selItem of selectedItems) {
       const sourceLine = (auftrag.orderItems || []).find(
@@ -256,19 +287,27 @@ export const createRechnungFromAuftrag = async (
 
       itemsToCreate.push(itemData);
 
+      // quantity on CustomerOrderItem is the fixed ordered amount — it is
+      // NEVER written to here. Track what's being delivered in this call
+      // only for the auftrag_status computation below.
       if (sourceLine) {
-        const currentQty = Number(sourceLine.quantity) || 0;
-        const newRemainingQty = Math.max(0, currentQty - qty);
-        sourceLine.quantity = newRemainingQty;
-        sourceLine.lineTotal = newRemainingQty * Number(sourceLine.price || 0);
-        await customerOrderItemRepo.save(sourceLine);
+        const key = String(sourceLine.id);
+        justDeliveredByLineId.set(
+          key,
+          (justDeliveredByLineId.get(key) || 0) + qty,
+        );
       }
     }
 
-    const totalRemainingQty = (auftrag.orderItems || []).reduce(
-      (sum, li) => sum + Number(li.quantity || 0),
-      0,
-    );
+    // Sum of what's still open across all lines after this delivery:
+    // quantity - (already delivered from past Rechnungen + delivered just
+    // now), floored at 0 per line.
+    const totalRemainingQty = (auftrag.orderItems || []).reduce((sum, li) => {
+      const delivered =
+        (alreadyDeliveredByLineId.get(String(li.id)) || 0) +
+        (justDeliveredByLineId.get(String(li.id)) || 0);
+      return sum + Math.max(0, Number(li.quantity || 0) - delivered);
+    }, 0);
 
     // Advance both the legacy `status` field and the delivery-lifecycle
     // `auftrag_status` field together. `auftrag_status` is what drives the
@@ -356,7 +395,6 @@ export const createRechnungFromAuftrag = async (
     // ============================================
     // SAVE RECHNUNG ITEMS
     // ============================================
-    const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
     const itemEntities = itemsToCreate.map((item) =>
       rechnungItemRepo.create({
         ...item,

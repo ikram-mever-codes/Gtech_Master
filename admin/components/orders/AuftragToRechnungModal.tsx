@@ -162,12 +162,6 @@ export default function AuftragToRechnungModal({
   const [editCountry, setEditCountry] = useState("DE");
   const [editVatId, setEditVatId] = useState("");
 
-  // Shipping cost state - editable in edit mode
-  const [editShippingCost, setEditShippingCost] = useState<number>(0);
-  const [editShippingQuantity, setEditShippingQuantity] = useState<number>(1);
-  // Shipping selection state - whether shipping is included in the invoice
-  const [shippingSelected, setShippingSelected] = useState<boolean>(true);
-
   useEffect(() => {
     if (!isOpen || !auftrag) return;
 
@@ -175,7 +169,17 @@ export default function AuftragToRechnungModal({
 
     const mapped: SelectedItemState[] = sourceItems.map(
       (it: any, index: number) => {
-        const origQty = Number(it.quantity || it.qty) || 1;
+        // it.openQuantity is computed backend-side (quantity minus
+        // everything already delivered via past Rechnungen — see
+        // attachDeliveredQuantityToOrders). Fall back to computing it
+        // locally from deliveredQuantity in case an older cached response
+        // only has that field, and finally to quantity itself for a
+        // response that predates both (nothing delivered yet).
+        const orderedQty = Number(it.quantity || it.qty) || 1;
+        const openQty =
+          it.openQuantity !== undefined
+            ? Number(it.openQuantity) || 0
+            : Math.max(0, orderedQty - (Number(it.deliveredQuantity) || 0));
         const itemPrice = Number(it.price || 0);
         const isStock =
           it.is_stock_item ||
@@ -200,8 +204,11 @@ export default function AuftragToRechnungModal({
             it.itemName || it.item_name || it.item?.item_name || "Line Item",
           hinweis: it.notes || it.remark_de || it.description || "—",
           mwst: Number(it.taxRate || auftrag.tax_rate || 19),
-          max_qty: origQty,
-          qty: origQty,
+          // "QTY Open" column and the ceiling for "Qty Delivered" — this is
+          // what's still open to invoice right now, NOT the original
+          // ordered amount. quantity itself is never mutated once set.
+          max_qty: openQty,
+          qty: openQty,
           price: itemPrice,
           selected: true,
           is_stock_item: isStock,
@@ -267,12 +274,6 @@ export default function AuftragToRechnungModal({
     setEditShippingMethod(sMethod);
     setEditPaymentMethod(pMethod);
     setEditPaymentTerms(pTerms);
-
-    // Set shipping cost and quantity from auftrag
-    setEditShippingCost(Number(auftrag.shipping_cost) || 0);
-    setEditShippingQuantity(Number(auftrag.shipping_quantity) || 1);
-    // Default shipping to selected if there is a shipping cost
-    setShippingSelected((Number(auftrag.shipping_cost) || 0) > 0);
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
@@ -360,17 +361,10 @@ export default function AuftragToRechnungModal({
   };
 
   const selectedItems = items.filter((it) => it.selected && it.qty > 0);
-
-  // Calculate shipping total - only include if selected
-  const shippingTotal = shippingSelected
-    ? editShippingCost * editShippingQuantity
-    : 0;
-
-  // Subtotal includes items + shipping (if selected)
-  const subtotal =
-    selectedItems.reduce((acc, it) => acc + it.qty * it.price, 0) +
-    shippingTotal;
-
+  const subtotal = selectedItems.reduce(
+    (acc, it) => acc + it.qty * it.price,
+    0,
+  );
   const taxRate = Number(auftrag.tax_rate ?? 19);
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
@@ -380,7 +374,7 @@ export default function AuftragToRechnungModal({
     return sum + ((it.weight || 0) / 1000) * it.qty;
   }, 0);
   const extraWeightKg = selectedItems.reduce(
-    // extraWeight is already stored in kg — no conversion.
+    // extraWeight is already stored in kg — no conv  ersion.
     (sum, it) => sum + (it.extraWeight || 0),
     0,
   );
@@ -431,8 +425,6 @@ export default function AuftragToRechnungModal({
         notes,
         internalNotes,
         stock_where: hasStockItems ? stockWhere : undefined,
-        shipping_cost: editShippingCost,
-        shipping_quantity: editShippingQuantity,
         customerSnapshot: {
           ...cust,
           companyName: editCompanyName,
@@ -506,7 +498,6 @@ export default function AuftragToRechnungModal({
         itemName: it.itemName,
       }));
 
-      // In handleSubmit function:
       const res = await createRechnungFromAuftrag(
         auftrag.id,
         payloadItems,
@@ -514,9 +505,6 @@ export default function AuftragToRechnungModal({
         {
           deliveryDate,
           warehouse: hasStockItems ? stockWhere : undefined,
-          shipping_cost: shippingSelected ? editShippingCost : 0,
-          shipping_quantity: shippingSelected ? editShippingQuantity : 0,
-          include_shipping: shippingSelected,
         } as any,
       );
 
@@ -546,11 +534,6 @@ export default function AuftragToRechnungModal({
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // Toggle shipping selection
-  const toggleShippingSelect = () => {
-    setShippingSelected(!shippingSelected);
   };
 
   return (
@@ -768,42 +751,6 @@ export default function AuftragToRechnungModal({
                   ))}
                 </select>
               </Field>
-
-              {/* Shipping Cost - editable in edit mode */}
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-                  SHIPPING COST
-                </p>
-                {isEditingAuftrag ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={editShippingCost}
-                      onChange={(e) =>
-                        setEditShippingCost(Number(e.target.value) || 0)
-                      }
-                      className={inputCls}
-                    />
-                    <span className="text-xs text-gray-500">×</span>
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={editShippingQuantity}
-                      onChange={(e) =>
-                        setEditShippingQuantity(Number(e.target.value) || 1)
-                      }
-                      className="w-16 px-2 py-1 text-xs border border-gray-300 bg-white rounded focus:ring-2 focus:ring-emerald-500 font-medium"
-                    />
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-900">
-                    {shippingTotal > 0 ? formatDeCurrency(shippingTotal) : "—"}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
@@ -1072,45 +1019,6 @@ export default function AuftragToRechnungModal({
                       </tr>
                     );
                   })}
-
-                  {/* Shipping row with checkbox */}
-                  {(editShippingCost > 0 || shippingSelected) && (
-                    <tr className="bg-gray-50/80 border-t-2 border-gray-200">
-                      <td className="px-2 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={shippingSelected}
-                          onChange={toggleShippingSelect}
-                          className="w-4 h-4 rounded border-gray-400 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500"
-                          title="Include shipping in invoice"
-                        />
-                      </td>
-                      <td className="px-2 py-2 text-gray-400">
-                        {items.length + 1}
-                      </td>
-                      <td className="px-2 py-2 text-gray-400"></td>
-                      <td className="px-2 py-2 text-gray-400">—</td>
-                      <td className="px-2 py-2 font-medium text-gray-700">
-                        {editShippingMethod || "Shipping"}
-                      </td>
-                      <td className="px-2 py-2 text-gray-400"></td>
-                      <td className="px-2 py-2 text-center text-gray-600">
-                        {taxRate}%
-                      </td>
-                      <td className="px-2 py-2 text-gray-400"></td>
-                      <td className="px-2 py-2 text-gray-400"></td>
-                      <td className="px-2 py-2 text-right text-gray-700">
-                        {editShippingQuantity}
-                      </td>
-                      <td className="px-2 py-2 text-right text-gray-700">
-                        {formatDeCurrency(editShippingCost)}
-                      </td>
-                      <td className="px-2 py-2 text-right font-bold text-gray-800">
-                        {formatDeCurrency(shippingTotal)}
-                      </td>
-                      {isEditingAuftrag && <td />}
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>

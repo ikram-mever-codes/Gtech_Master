@@ -24,6 +24,7 @@ import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { Rechnung } from "../models/rechnung";
 import { Rechnung_k } from "../models/rechnung_k";
 import { TransferOrder } from "../models/transfer_order";
+import { RechnungItem } from "../models/rechnung_items";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
 
@@ -475,7 +476,7 @@ export const createAuftragFromOffer = async (
       offer_id: offer.id,
       title: offer.title,
       customer_id: offer.customerId || undefined,
-      status: "open",
+      status: "Draft",
       currency: offer.currency || "EUR",
       tax_rate: taxRate,
       discount_percentage: offer.discountPercentage || 0,
@@ -527,6 +528,56 @@ export const createAuftragFromOffer = async (
     next(error);
   }
 };
+
+/**
+ * Attaches computed delivered/open quantity to every order item across the
+ * given orders, in a single batched query against rechnung_item — same
+ * pattern as attachStockInfoToOrders below.
+ *
+ * quantity on CustomerOrderItem is the fixed ordered amount and is never
+ * mutated. "Delivered" is derived by summing rechnung_item.quantity for
+ * every Rechnung line that traces back to this order line
+ * (sourceLineItemId), and "open" is quantity - delivered, floored at 0.
+ * This is computed on every read rather than stored, so it can't drift out
+ * of sync with the actual Rechnungen the way a stored counter could.
+ */
+async function attachDeliveredQuantityToOrders(
+  orders: CustomerOrder[],
+): Promise<void> {
+  const lineItemIds = orders
+    .flatMap((o) => o.orderItems || [])
+    .map((li: any) => li.id)
+    .filter(Boolean);
+
+  let deliveredByLineId = new Map<string, number>();
+  if (lineItemIds.length > 0) {
+    const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
+    const rows = await rechnungItemRepo
+      .createQueryBuilder("ri")
+      .select("ri.sourceLineItemId", "sourceLineItemId")
+      .addSelect("SUM(ri.quantity)", "delivered")
+      .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
+      .groupBy("ri.sourceLineItemId")
+      .getRawMany();
+
+    deliveredByLineId = new Map(
+      rows.map((r: any) => [
+        String(r.sourceLineItemId),
+        Number(r.delivered) || 0,
+      ]),
+    );
+  }
+
+  for (const order of orders) {
+    for (const li of (order.orderItems || []) as any[]) {
+      const delivered = deliveredByLineId.get(String(li.id)) || 0;
+      const ordered = Number(li.quantity) || 0;
+      li.deliveredQuantity = delivered;
+      li.openQuantity = Math.max(0, ordered - delivered);
+    }
+  }
+}
+
 export const getAllCustomerOrders = async (
   _req: Request,
   res: Response,
@@ -540,6 +591,7 @@ export const getAllCustomerOrders = async (
     });
 
     await attachStockInfoToOrders(orders);
+    await attachDeliveredQuantityToOrders(orders);
 
     const auftragIds = orders.map((o) => o.id);
     const offerIdByAuftragId = new Map(orders.map((o) => [o.id, o.offer_id]));
@@ -595,6 +647,7 @@ export const getCustomerOrderById = async (
     }
 
     await attachStockInfoToOrders([order]);
+    await attachDeliveredQuantityToOrders([order]);
 
     const linkedDocuments = await getLinkedDocumentsForAuftrag(
       order.id,
@@ -791,7 +844,7 @@ export const createAuftragFromItems = async (
       order_no: auftragNo,
       title: orderTitle,
       customer_id: customer.id,
-      status: "Draft",
+      status: "open",
       currency: "EUR",
       tax_rate: taxRate,
       payment_method: paymentMethod,
@@ -1622,7 +1675,7 @@ export const duplicateCustomerOrder = async (
       customer_id: originalOrder.customer_id,
       offer_id: originalOrder.offer_id,
       title: originalOrder.title,
-      status: "Draft",
+      status: "open",
       auftrag_status: AuftragStatus.OPEN,
       currency: originalOrder.currency || "EUR",
       tax_rate: originalOrder.tax_rate ?? 19,
@@ -1658,6 +1711,11 @@ export const duplicateCustomerOrder = async (
     const savedOrder = await customerOrderRepo.save(duplicatedOrder);
 
     if (originalOrder.orderItems && originalOrder.orderItems.length > 0) {
+      // Deliberately NOT copying delivered/open state — this is a brand
+      // new Auftrag with its own quantity, and delivered quantity is
+      // computed from rechnung_item.sourceLineItemId, which naturally
+      // starts at 0 for these new line items since nothing references
+      // them yet.
       const itemsToCreate = originalOrder.orderItems.map((it, idx) =>
         customerOrderItemRepo.create({
           customerOrderId: savedOrder.id,

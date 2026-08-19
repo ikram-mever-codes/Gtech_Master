@@ -313,11 +313,21 @@ const getLineItemTotal = (item: any): number => {
   return qty * price;
 };
 
-/** Mirrors the "QTY Open" calculation in AuftragToRechnungModal
- * (`Number(it.quantity || it.qty) || 1`) so both views agree on what's
- * still open to deliver for a line. */
-const getQtyOpen = (item: any): number =>
-  Number(item?.quantity ?? item?.qty) || 1;
+/** quantity is the fixed ordered amount; it is never mutated once set.
+ * openQuantity is computed backend-side (getCustomerOrderById ->
+ * attachDeliveredQuantityToOrders in customer_orders_controller.ts) from
+ * rechnung_item — summed delivered quantity across every Rechnung
+ * generated off this line, subtracted from quantity. Falls back to
+ * deriving it locally from deliveredQuantity, and finally to quantity
+ * itself, in case a cached/stale response predates that field. */
+const getQtyOpen = (item: any): number => {
+  if (item?.openQuantity !== undefined) {
+    return Number(item.openQuantity) || 0;
+  }
+  const ordered = Number(item?.quantity ?? item?.qty) || 0;
+  const delivered = Number(item?.deliveredQuantity) || 0;
+  return Math.max(0, ordered - delivered);
+};
 
 export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   isOpen,

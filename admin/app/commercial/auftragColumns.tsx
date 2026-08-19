@@ -52,18 +52,23 @@ const valueNetCalc = (row: any) => {
 const itemCountCalc = (row: any) => row.items?.length || 0;
 
 /**
- * Total ordered quantity across all line items on this Auftrag — the
- * "QTY Open" column. There's no per-line delivered/shipped-quantity field
- * on CustomerOrderItem to net against (unlike Rechnung, which tracks that
- * explicitly via getRechnungOpenQuantities), so this is the sum of
- * ordered quantities, not (ordered - delivered). If a per-line delivered
- * quantity gets added later, update this to net it out instead.
+ * Sum of open quantity across all line items on this Auftrag — the
+ * "QTY Open" column. openQuantity is computed backend-side
+ * (getAllCustomerOrders -> attachDeliveredQuantityToOrders in
+ * customer_orders_controller.ts) from rechnung_item — quantity itself is
+ * the fixed ordered amount and is never mutated. Falls back to deriving
+ * it locally from deliveredQuantity, and finally to quantity itself, in
+ * case a cached/stale row predates that field.
  */
 const qtyOpenCalc = (row: any) =>
-  (row.items || []).reduce(
-    (sum: number, it: any) => sum + (Number(it.quantity ?? it.qty) || 0),
-    0,
-  );
+  (row.items || []).reduce((sum: number, it: any) => {
+    if (it.openQuantity !== undefined) {
+      return sum + (Number(it.openQuantity) || 0);
+    }
+    const ordered = Number(it.quantity ?? it.qty) || 0;
+    const delivered = Number(it.deliveredQuantity) || 0;
+    return sum + Math.max(0, ordered - delivered);
+  }, 0);
 
 /**
  * Row-background color per Auftrag status, used for the status highlighting
@@ -406,7 +411,7 @@ export function buildAuftragColumns({
         };
         return (
           <span
-            className={`text-[11px] px-2.5 py-0.5 text-nowrap rounded-full border font-medium ${
+            className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${
               colorClasses[status] || "bg-blue-50 text-blue-600 border-blue-200"
             }`}
           >
