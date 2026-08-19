@@ -33,9 +33,9 @@ async function calculateTransferOrderTotals(orderId: number): Promise<void> {
 
   for (const it of items) {
     const qty = Number(it.qty) || 1;
-    // Use transferPrice if available, otherwise fallback to purchasePrice
+    // Use purchasePrice if available, otherwise fallback to transferPrice
     // This ensures we use the correct price after refreshLineItemPurchasePrices
-    const price = Number(it.transferPrice ?? it.purchasePrice ?? 0);
+    const price = Number(it.purchasePrice ?? it.transferPrice ?? 0);
     const lineTotal = qty * price;
 
     // Update the line item's lineTotal
