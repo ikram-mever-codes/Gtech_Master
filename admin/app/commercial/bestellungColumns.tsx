@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { ChevronRight, FileText } from "lucide-react";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -10,6 +11,102 @@ import {
 } from "./sharedColumns";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
+
+const BestellungActionMenu: React.FC<{
+  row: any;
+  rowIndex?: number;
+  onOpenBestellungPreview: (id: string | number) => void;
+  onMarkProcessing: (id: string | number) => void;
+}> = ({
+  row,
+  rowIndex,
+  onOpenBestellungPreview,
+  onMarkProcessing,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  const currentStatus = row.status || "draft";
+  const isBottom = rowIndex !== undefined && rowIndex >= 5;
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
+          isOpen
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+        }`}
+        title="Aktionen"
+      >
+        <ChevronRight
+          className={`w-4 h-4 transition-transform duration-150 ${
+            isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute right-0 ${
+            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+        >
+          {currentStatus === "draft" && (
+            <div className="p-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  onMarkProcessing(row.id);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+              >
+                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] shrink-0">
+                  Processing
+                </span>
+                <span className="text-xs font-semibold">Mark Processing</span>
+              </button>
+            </div>
+          )}
+
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onOpenBestellungPreview(row.id);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <FileText className="w-4 h-4 text-gray-500 shrink-0" />
+              <span className="text-xs font-semibold">Bestellung öffnen</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface BestellungColumnsArgs {
   expandedDocIds: Set<string | number>;
@@ -259,37 +356,17 @@ export function buildBestellungColumns({
       },
     },
     {
-      header: "Aktionen",
-      width: "75px",
+      header: "",
+      width: "45px",
       align: "center",
-      render: (row) => {
-        const currentStatus = row.status || "draft";
-        return (
-          <div className="flex items-center justify-center gap-1 font-poppins">
-            {currentStatus === "draft" ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMarkProcessing(row.id);
-                }}
-                className="px-2 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition shadow-xs cursor-pointer whitespace-nowrap"
-              >
-                Processing
-              </button>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenBestellungPreview(row.id);
-                }}
-                className="px-2 py-0.5 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-xs cursor-pointer whitespace-nowrap"
-              >
-                View
-              </button>
-            )}
-          </div>
-        );
-      },
+      render: (row, index) => (
+        <BestellungActionMenu
+          row={row}
+          rowIndex={index}
+          onOpenBestellungPreview={onOpenBestellungPreview}
+          onMarkProcessing={onMarkProcessing}
+        />
+      ),
     },
   ];
 }

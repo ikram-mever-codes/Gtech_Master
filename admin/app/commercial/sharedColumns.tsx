@@ -423,11 +423,11 @@ export function buildItemCountColumn(
 
 export function buildViewActionColumn(
   onView: (row: any) => void,
-  header: string = "Aktionen",
+  header: string = "",
 ): ColumnDef<any> {
   return {
     header,
-    width: "90px",
+    width: "45px",
     align: "center",
     render: (row) => (
       <div className="flex items-center justify-center gap-1">

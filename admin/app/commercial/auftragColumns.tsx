@@ -440,8 +440,8 @@ export function buildAuftragColumns({
       },
     },
     {
-      header: "Aktionen",
-      width: "55px",
+      header: "",
+      width: "45px",
       align: "center",
       render: (row, index) => (
         <AuftragActionMenu

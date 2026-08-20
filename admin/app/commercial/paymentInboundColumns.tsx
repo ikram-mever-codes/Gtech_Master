@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { ChevronRight, Pencil, Trash2, Link } from "lucide-react";
 import { ColumnDef } from "@/components/UI/DataTable";
 import { formatDate } from "@/utils/date";
 
@@ -9,6 +10,116 @@ interface PaymentInboundColumnsArgs {
   onDelete: (row: any) => void;
   onAssign: (row: any) => void;
 }
+
+const PaymentInboundActionMenu: React.FC<{
+  row: any;
+  rowIndex?: number;
+  onOpenDetails: (row: any) => void;
+  onDelete: (row: any) => void;
+  onAssign: (row: any) => void;
+}> = ({ row, rowIndex, onOpenDetails, onDelete, onAssign }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  const total = Number(row.amount ?? row.grossTotal ?? 0);
+  const openAmount =
+    row.open_amount !== undefined && row.open_amount !== null
+      ? Number(row.open_amount)
+      : total;
+  const canAssign = openAmount > 0.005;
+  const isBottom = rowIndex !== undefined && rowIndex >= 5;
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
+          isOpen
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+        }`}
+        title="Aktionen"
+      >
+        <ChevronRight
+          className={`w-4 h-4 transition-transform duration-150 ${
+            isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute right-0 ${
+            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+        >
+          {canAssign && (
+            <div className="p-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  onAssign(row);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+              >
+                <Link className="w-4 h-4 text-amber-500 shrink-0" />
+                <span className="text-xs font-semibold">Assign Payment</span>
+              </button>
+            </div>
+          )}
+
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onOpenDetails(row);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <Pencil className="w-4 h-4 text-gray-500 shrink-0" />
+              <span className="text-xs font-semibold">Edit Payment</span>
+            </button>
+          </div>
+
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onDelete(row);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-red-50 text-rose-600 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+              <span className="text-xs font-semibold">Delete Payment</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const formatMoney = (val: number, currencyCode: string) => {
   const curr = currencyCode || "EUR";
@@ -139,52 +250,18 @@ export function buildPaymentInboundColumns({
       },
     },
     {
-      header: "Actions",
-      width: "220px",
+      header: "",
+      width: "45px",
       align: "center",
-      render: (row) => {
-        const total = Number(row.amount ?? row.grossTotal ?? 0);
-        const openAmount =
-          row.open_amount !== undefined && row.open_amount !== null
-            ? Number(row.open_amount)
-            : total;
-        const canAssign = openAmount > 0.005;
-
-        return (
-          <div className="flex items-center justify-center gap-2">
-            {canAssign && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAssign(row);
-                }}
-                title="Assign this payment to an Auftrag or Rechnung"
-                className="px-2.5 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-[4px] transition shadow-sm"
-              >
-                Assign
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenDetails(row);
-              }}
-              className="px-2.5 py-1 text-[11px] font-bold bg-[#2F6B46] hover:bg-[#255638] text-white rounded-[4px] transition shadow-sm"
-            >
-              Edit
-            </button>
-            <button
-              onClick={async (e) => {
-                e.stopPropagation();
-                onDelete(row);
-              }}
-              className="px-2.5 py-1 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-[4px] transition shadow-sm"
-            >
-              Delete
-            </button>
-          </div>
-        );
-      },
+      render: (row, index) => (
+        <PaymentInboundActionMenu
+          row={row}
+          rowIndex={index}
+          onOpenDetails={onOpenDetails}
+          onDelete={onDelete}
+          onAssign={onAssign}
+        />
+      ),
     },
   ];
 }
