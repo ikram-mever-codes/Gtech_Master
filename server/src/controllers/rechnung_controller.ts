@@ -201,8 +201,11 @@ export const createRechnungFromAuftrag = async (
 
     const rechnungCustomerRepo = AppDataSource.getRepository(RechnungCustomer);
     const rechnungCustomer = rechnungCustomerRepo.create({
-      original_customer_id:
-        auftrag.customer_id ? String(auftrag.customer_id) : (originalCust?.id ? String(originalCust.id) : undefined),
+      original_customer_id: auftrag.customer_id
+        ? String(auftrag.customer_id)
+        : originalCust?.id
+          ? String(originalCust.id)
+          : undefined,
       company_name: dispName,
       display_name: dispName,
       legal_name: legName,
@@ -399,8 +402,6 @@ export const createRechnungFromAuftrag = async (
       status: "open",
       customer: savedCustomerSnapshot,
       rechnung_customer_id: savedCustomerSnapshot.id,
-      customerSnapshot: auftrag.customerSnapshot,
-      deliveryAddress: (auftrag as any).deliveryAddress,
       date_created: dateCreatedStr,
       date_emailed: auftrag.date_emailed || undefined,
       date_delivery: auftrag.date_delivery || undefined,
