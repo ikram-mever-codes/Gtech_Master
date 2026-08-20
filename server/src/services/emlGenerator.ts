@@ -290,7 +290,12 @@ export async function generateRechnungLieferscheinEml(
   emlContent += `Content-Transfer-Encoding: 8bit\n\n`;
   emlContent += `${bodyText}\n\n`;
 
-  const cleanTitle = (auftragTitle || rechnung.title || "")
+  const rawTitle =
+    auftragTitle ||
+    (rechnung as any).title ||
+    (rechnung as any).items?.[0]?.item_name ||
+    "";
+  const cleanTitle = String(rawTitle || "")
     .trim()
     .replace(/[^\w-]/g, "_")
     .replace(/_+/g, "_")
@@ -320,8 +325,9 @@ export async function generateRechnungLieferscheinEml(
 
   emlContent += `--${boundary}--\n`;
 
-  const safeTitle = (auftragTitle || "Document").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const emlFileName = `Rechnung_Lieferschein_${rechnung.invoice_number || rechnung.id}_${safeTitle}.eml`;
+  const emlFileName = cleanTitle
+    ? `Rechnung_Lieferschein_${rechnungDocNo}_GTech_${cleanTitle}.eml`
+    : `Rechnung_Lieferschein_${rechnungDocNo}_GTech.eml`;
   const emlFilePath = path.join(uploadsDir, emlFileName);
 
   fs.writeFileSync(emlFilePath, emlContent, "utf-8");
@@ -577,7 +583,13 @@ export async function generateAuftragEml(
   emlContent += `Content-Transfer-Encoding: 8bit\n\n`;
   emlContent += `${bodyText}\n\n`;
 
-  const cleanTitle = (auftragTitle || auftrag.title || "")
+  const rawTitle =
+    auftragTitle ||
+    (auftrag as any)?.title ||
+    (auftrag as any)?.order_items?.[0]?.item_name ||
+    (auftrag as any)?.items?.[0]?.item_name ||
+    "";
+  const cleanTitle = String(rawTitle || "")
     .trim()
     .replace(/[^\w-]/g, "_")
     .replace(/_+/g, "_")
@@ -596,8 +608,9 @@ export async function generateAuftragEml(
 
   emlContent += `--${boundary}--\n`;
 
-  const safeTitle = (auftragTitle || "Document").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const emlFileName = `Auftrag_${auftrag.order_no || auftrag.id}_${safeTitle}.eml`;
+  const emlFileName = cleanTitle
+    ? `Auftrag_${docNo}_GTech_${cleanTitle}.eml`
+    : `Auftrag_${docNo}_GTech.eml`;
   const emlFilePath = path.join(uploadsDir, emlFileName);
 
   fs.writeFileSync(emlFilePath, emlContent, "utf-8");

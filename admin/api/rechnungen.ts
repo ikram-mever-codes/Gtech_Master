@@ -159,17 +159,13 @@ export const downloadRechnungEml = async (
     });
     const blob = new Blob([response.data], { type: "message/rfc822" });
     if (blob.size === 0) throw new Error("The downloaded EML file is empty.");
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Rechnung_Lieferschein_${invoiceNo || id}.eml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-      toast.dismiss();
-    }, 1000);
+    const filename = getFilenameFromResponse(
+      response,
+      `Rechnung_Lieferschein_${String(invoiceNo || id).replace(/[\s_]+/g, "_")}_GTech.eml`,
+    );
+    downloadBlob(blob, filename, false);
+    toast.dismiss();
+    toast.success("Outlook email draft downloaded (.eml)");
     return true;
   } catch (error) {
     toast.dismiss();

@@ -808,7 +808,13 @@ export const downloadRechnungKPdf = async (
       outputFilePath: filePath,
     });
 
-    const cleanTitle = ((rechnungK as any).title || "")
+    const rawTitle =
+      (rechnungK as any).title ||
+      (rechnungK as any).auftrag?.title ||
+      (rawItems?.[0] as any)?.item_name ||
+      (rawItems?.[0] as any)?.description ||
+      "";
+    const cleanTitle = String(rawTitle || "")
       .trim()
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")
