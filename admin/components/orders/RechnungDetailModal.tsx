@@ -6,6 +6,7 @@ import {
   XMarkIcon,
   TrashIcon,
   PencilIcon,
+  ClipboardDocumentIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
@@ -630,8 +631,20 @@ export default function RechnungDetailModal({
                   </span>
                 )}
             </div>
-            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {companyName}
+            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
+              <span>{companyName}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(companyName !== "—" ? companyName : "");
+                  toast.success("Title copied to clipboard!");
+                }}
+                className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
+                title="Copy Title"
+              >
+                <ClipboardDocumentIcon className="w-4 h-4" />
+              </button>
             </h2>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -657,11 +670,10 @@ export default function RechnungDetailModal({
               <button
                 type="button"
                 onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                  isEditMode
-                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${isEditMode
+                  ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
               >
                 {isEditMode ? (
                   <>
@@ -1003,11 +1015,10 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${
-                                  isFullyCorrected
-                                    ? "text-green-600"
-                                    : "text-amber-600"
-                                }`}
+                                className={`font-semibold ${isFullyCorrected
+                                  ? "text-green-600"
+                                  : "text-amber-600"
+                                  }`}
                               >
                                 {openQty}
                               </span>
@@ -1239,11 +1250,10 @@ export default function RechnungDetailModal({
                         ⚠ Not uploaded yet
                       </span>
                       <label
-                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                          uploadingDoc
-                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                            : "bg-amber-600 text-white hover:bg-amber-700"
-                        }`}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          : "bg-amber-600 text-white hover:bg-amber-700"
+                          }`}
                       >
                         {uploadingDoc ? (
                           <>
@@ -1271,133 +1281,183 @@ export default function RechnungDetailModal({
             </div>
           )}
 
-          <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
-            <div className="flex items-center gap-2 mb-3">
-              <LinkIcon className="h-4 w-4 text-gray-500" />
-              <h3 className="text-sm font-bold text-gray-900">
-                Linked documents
-              </h3>
-            </div>
-            {auftragDocs.length === 0 &&
-            rechnungenKDocs.length === 0 &&
-            rechnungDocs.length === 0 ? (
-              <p className="text-sm text-gray-500">No linked documents yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {!isCorrection && auftragDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Auftrag
-                    </p>
-                    {auftragDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToAuftrag?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.order_no}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {!isCorrection && rechnungenKDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      RK
-                    </p>
-                    {rechnungenKDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToRechnungK?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.invoice_number}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {isCorrection && rechnungDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Rechnung
-                    </p>
-                    {rechnungDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToRechnung?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.invoice_number}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {isCorrection && auftragDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Auftrag
-                    </p>
-                    {auftragDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToAuftrag?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.order_no}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Linked documents
+                </h3>
               </div>
-            )}
+              {auftragDocs.length === 0 &&
+                rechnungenKDocs.length === 0 &&
+                rechnungDocs.length === 0 ? (
+                <p className="text-sm text-gray-500">No linked documents yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {!isCorrection && auftragDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Auftrag
+                      </p>
+                      {auftragDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToAuftrag?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.order_no}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!isCorrection && rechnungenKDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        RK
+                      </p>
+                      {rechnungenKDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToRechnungK?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.invoice_number}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {isCorrection && rechnungDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Rechnung
+                      </p>
+                      {rechnungDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToRechnung?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.invoice_number}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {isCorrection && auftragDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Auftrag
+                      </p>
+                      {auftragDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToAuftrag?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.order_no}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Pencil className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment intern
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(data.internal_notes || data.internalNotes || "");
+                      toast.success("Internal comment copied to clipboard!");
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                    title="Copy Internal Comment"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  </button>
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                {data.internal_notes || data.internalNotes || "—"}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Pencil className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment extern
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(data.notes || data.comment || data.notes_external || "");
+                      toast.success("External comment copied to clipboard!");
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                    title="Copy External Comment"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  </button>
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                {data.notes || data.comment || data.notes_external || "—"}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -1419,11 +1479,10 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-                  hasCorrections && !isCreating
-                    ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
+                  ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  }`}
               >
                 {isCreating ? (
                   <>

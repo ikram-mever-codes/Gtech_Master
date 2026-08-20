@@ -1640,7 +1640,13 @@ export const downloadCustomerOrderPdf = async (
       outputFilePath: filePath,
     });
 
-    const cleanTitle = (order.title || "")
+    const rawTitle =
+      order.title ||
+      (order as any).order_items?.[0]?.item_name ||
+      (order as any).items?.[0]?.item_name ||
+      (order as any).items?.[0]?.itemName ||
+      "";
+    const cleanTitle = String(rawTitle || "")
       .trim()
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")
@@ -1694,7 +1700,7 @@ export const downloadCustomerOrderEml = async (
       console.warn("Could not update date_emailed on Auftrag:", updateErr);
     }
 
-    const downloadFileName = `Auftrag_${orderNo || id}.eml`;
+    const downloadFileName = filename;
     res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "message/rfc822");
     res.setHeader(

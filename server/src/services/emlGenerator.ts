@@ -247,6 +247,8 @@ export async function generateRechnungLieferscheinEml(
   const rechnungBase64 = rechnungPdfBuffer.toString("base64");
   const lieferscheinBase64 = lieferscheinPdfBuffer.toString("base64");
 
+  const primaryEmail = contactPersons[0]?.email || rechnung.customer?.email || "";
+
   let contactGreetingName = "";
   if (
     contactPersons.length > 0 &&
@@ -263,17 +265,31 @@ export async function generateRechnungLieferscheinEml(
     ? `Hallo guten Tag ${contactGreetingName},`
     : `Hallo guten Tag,`;
 
-  let bodyText = `${greetingLine}\n\nanbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) und den Lieferschein (${lieferscheinNo}) zu Ihrer Bestellung "${auftragTitle}".\n\n`;
+  const rawTitle =
+    auftragTitle ||
+    (rechnung as any).title ||
+    (rechnung as any).items?.[0]?.item_name ||
+    "";
+  const cleanTitle = String(rawTitle || "")
+    .trim()
+    .replace(/[^\w-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const rechnungDocNo = String(rechnung.invoice_number || rechnung.id || "rechnung").trim().replace(/[\s_]+/g, "_");
+  const lieferscheinDocNo = String(lieferscheinNo || "lieferschein").trim().replace(/[\s_]+/g, "_");
 
-  if (contactPersons.length > 0) {
-    bodyText += `Ansprechpartner / Contact Persons:\n`;
-    contactPersons.forEach((cp) => {
-      bodyText += `- ${cp.name}: ${cp.email}\n`;
-    });
-    bodyText += `\n`;
+  const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";
+  const emlSubject = subjectTitle
+    ? `Rechnung Lieferschein ${rechnungDocNo} GTech ${subjectTitle}`
+    : `Rechnung Lieferschein ${rechnungDocNo} GTech`;
+
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  if (primaryEmail) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
   }
-
-  bodyText += `Mit freundlichen Grüßen,\nGTech Industries GmbH`;
+  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) und den Lieferschein (${lieferscheinNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
+  bodyHtml += `</body>\n</html>`;
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 11)}@gtech-industries.de>`;
@@ -281,22 +297,14 @@ export async function generateRechnungLieferscheinEml(
   let emlContent = "";
   emlContent += `X-Unsent: 1\n`;
   emlContent += `Message-ID: ${messageId}\n`;
-  emlContent += `Subject: Rechnung & Lieferschein: ${auftragTitle}\n`;
+  emlContent += `Subject: ${emlSubject}\n`;
   emlContent += `MIME-Version: 1.0\n`;
   emlContent += `Content-Type: multipart/mixed; boundary="${boundary}"\n\n`;
 
   emlContent += `--${boundary}\n`;
-  emlContent += `Content-Type: text/plain; charset="utf-8"\n`;
+  emlContent += `Content-Type: text/html; charset="utf-8"\n`;
   emlContent += `Content-Transfer-Encoding: 8bit\n\n`;
-  emlContent += `${bodyText}\n\n`;
-
-  const cleanTitle = (auftragTitle || rechnung.title || "")
-    .trim()
-    .replace(/[^\w-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  const rechnungDocNo = String(rechnung.invoice_number || rechnung.id || "rechnung").trim().replace(/[\s_]+/g, "_");
-  const lieferscheinDocNo = String(lieferscheinNo || "lieferschein").trim().replace(/[\s_]+/g, "_");
+  emlContent += `${bodyHtml}\n\n`;
 
   const rechnungFileName = cleanTitle
     ? `Rechnung_${rechnungDocNo}_GTech_${cleanTitle}.pdf`
@@ -320,8 +328,9 @@ export async function generateRechnungLieferscheinEml(
 
   emlContent += `--${boundary}--\n`;
 
-  const safeTitle = (auftragTitle || "Document").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const emlFileName = `Rechnung_Lieferschein_${rechnung.invoice_number || rechnung.id}_${safeTitle}.eml`;
+  const emlFileName = cleanTitle
+    ? `Rechnung_Lieferschein_${rechnungDocNo}_GTech_${cleanTitle}.eml`
+    : `Rechnung_Lieferschein_${rechnungDocNo}_GTech.eml`;
   const emlFilePath = path.join(uploadsDir, emlFileName);
 
   fs.writeFileSync(emlFilePath, emlContent, "utf-8");
@@ -534,6 +543,8 @@ export async function generateAuftragEml(
   const auftragPdfBuffer = fs.readFileSync(auftragPdfPath);
   const auftragBase64 = auftragPdfBuffer.toString("base64");
 
+  const primaryEmail = contactPersons[0]?.email || customerSnap.email || "";
+
   let contactGreetingName = "";
   if (
     contactPersons.length > 0 &&
@@ -550,17 +561,31 @@ export async function generateAuftragEml(
     ? `Hallo guten Tag ${contactGreetingName},`
     : `Hallo guten Tag,`;
 
-  let bodyText = `${greetingLine}\n\nanbei erhalten Sie die Auftragsbestätigung (${auftrag.order_no || auftrag.id}) zu Ihrer Bestellung "${auftragTitle}".\n\n`;
+  const rawTitle =
+    auftragTitle ||
+    (auftrag as any)?.title ||
+    (auftrag as any)?.order_items?.[0]?.item_name ||
+    (auftrag as any)?.items?.[0]?.item_name ||
+    "";
+  const cleanTitle = String(rawTitle || "")
+    .trim()
+    .replace(/[^\w-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const docNo = String(auftrag.order_no || auftrag.id || "order").trim().replace(/[\s_]+/g, "_");
 
-  if (contactPersons.length > 0) {
-    bodyText += `Ansprechpartner / Contact Persons:\n`;
-    contactPersons.forEach((cp) => {
-      bodyText += `- ${cp.name}: ${cp.email}\n`;
-    });
-    bodyText += `\n`;
+  const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";
+  const emlSubject = subjectTitle
+    ? `Auftrag ${docNo} GTech ${subjectTitle}`
+    : `Auftrag ${docNo} GTech`;
+
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  if (primaryEmail) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
   }
-
-  bodyText += `Mit freundlichen Grüßen,\nGTech Industries GmbH`;
+  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Auftragsbestätigung (${docNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
+  bodyHtml += `</body>\n</html>`;
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 11)}@gtech-industries.de>`;
@@ -568,25 +593,18 @@ export async function generateAuftragEml(
   let emlContent = "";
   emlContent += `X-Unsent: 1\n`;
   emlContent += `Message-ID: ${messageId}\n`;
-  emlContent += `Subject: Auftragsbestätigung: ${auftragTitle}\n`;
+  emlContent += `Subject: ${emlSubject}\n`;
   emlContent += `MIME-Version: 1.0\n`;
   emlContent += `Content-Type: multipart/mixed; boundary="${boundary}"\n\n`;
 
   emlContent += `--${boundary}\n`;
-  emlContent += `Content-Type: text/plain; charset="utf-8"\n`;
+  emlContent += `Content-Type: text/html; charset="utf-8"\n`;
   emlContent += `Content-Transfer-Encoding: 8bit\n\n`;
-  emlContent += `${bodyText}\n\n`;
-
-  const cleanTitle = (auftragTitle || auftrag.title || "")
-    .trim()
-    .replace(/[^\w-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  const docNo = String(auftrag.order_no || auftrag.id || "order").trim().replace(/[\s_]+/g, "_");
+  emlContent += `${bodyHtml}\n\n`;
 
   const auftragFileName = cleanTitle
-    ? `Auftragsbestaetigung_${docNo}_GTech_${cleanTitle}.pdf`
-    : `Auftragsbestaetigung_${docNo}_GTech.pdf`;
+    ? `Auftrag_${docNo}_GTech_${cleanTitle}.pdf`
+    : `Auftrag_${docNo}_GTech.pdf`;
 
   emlContent += `--${boundary}\n`;
   emlContent += `Content-Type: application/pdf; name="${auftragFileName}"\n`;
@@ -596,8 +614,9 @@ export async function generateAuftragEml(
 
   emlContent += `--${boundary}--\n`;
 
-  const safeTitle = (auftragTitle || "Document").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const emlFileName = `Auftrag_${auftrag.order_no || auftrag.id}_${safeTitle}.eml`;
+  const emlFileName = cleanTitle
+    ? `Auftrag_${docNo}_GTech_${cleanTitle}.eml`
+    : `Auftrag_${docNo}_GTech.eml`;
   const emlFilePath = path.join(uploadsDir, emlFileName);
 
   fs.writeFileSync(emlFilePath, emlContent, "utf-8");

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   ArrowPathIcon,
   PlusIcon,
@@ -16,6 +22,7 @@ import {
   ChevronDown,
   Filter,
   MoveRight,
+  FileText,
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
@@ -278,6 +285,125 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+};
+
+const OfferActionMenu: React.FC<{
+  row: any;
+  rowIndex?: number;
+  onConvert: (row: any, e?: React.MouseEvent) => void;
+  onOpenDetail: (row: any) => void;
+}> = ({ row, rowIndex, onConvert, onOpenDetail }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  const conversionCount =
+    Number(row.conversionCount) || (row.highlightColor === "#ECEAE6" ? 1 : 0);
+  const isConverted = conversionCount > 0;
+  const isBottom = rowIndex !== undefined && rowIndex >= 5;
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
+          isOpen
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+        }`}
+        title="Aktionen"
+      >
+        <ChevronRight
+          className={`w-4 h-4 transition-transform duration-150 ${
+            isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute right-0 ${
+            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+        >
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onConvert(row, e);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <span
+                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-[4px] shrink-0 text-white flex items-center justify-center ${isConverted ? "bg-gray-500" : "bg-[#2F6B46]"}`}
+              >
+                <MoveRight className="h-3 w-3" />
+              </span>
+              <div className="flex-1 min-w-0 flex items-center justify-between">
+                <span className="text-xs font-semibold">
+                  In Auftrag umwandeln
+                </span>
+                {conversionCount > 0 && (
+                  <span className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300">
+                    {conversionCount}
+                  </span>
+                )}
+              </div>
+            </button>
+          </div>
+
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                try {
+                  await downloadOfferPdf(row.id, row.offerNumber);
+                } catch (_) {}
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <FileDown className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="text-xs font-semibold">PDF öffnen</span>
+            </button>
+          </div>
+
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onOpenDetail(row);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <FileText className="w-4 h-4 text-gray-500 shrink-0" />
+              <span className="text-xs font-semibold">Angebot öffnen</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -562,57 +688,20 @@ const OffersPage: React.FC<any> = ({
         ),
       },
       {
-        header: "Aktionen",
-        width: "90px",
+        header: "",
+        width: "45px",
         align: "center",
-        render: (row: any) => {
-          const conversionCount =
-            Number(row.conversionCount) ||
-            (row.highlightColor === "#ECEAE6" ? 1 : 0);
-          const isConverted = conversionCount > 0;
-          return (
-            <div className="flex items-center justify-center gap-1 font-poppins">
-              <button
-                title={
-                  isConverted
-                    ? `Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""} to Auftrag (Click to convert again)`
-                    : "Convert Offer to Auftrag Order"
-                }
-                onClick={(e) => handleConvertOfferToAuftrag(row, e)}
-                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded-[4px] transition shadow-xs whitespace-nowrap cursor-pointer ${
-                  isConverted
-                    ? "bg-gray-500 hover:bg-gray-600 text-white"
-                    : "bg-[#2F6B46] hover:bg-[#255638] text-white"
-                }`}
-              >
-                <MoveRight className="h-3 w-3" />
-              </button>
-              {conversionCount > 0 && (
-                <span
-                  title={`Converted ${conversionCount} time${conversionCount > 1 ? "s" : ""}`}
-                  className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300 shadow-xs shrink-0"
-                >
-                  {conversionCount}
-                </span>
-              )}
-              <button
-                title="Download Angebot PDF"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                    await downloadOfferPdf(row.id, row.offerNumber);
-                  } catch (_) {}
-                }}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
-              >
-                <FileDown className="h-3 w-3" /> PDF
-              </button>
-            </div>
-          );
-        },
+        render: (row: any, index: number) => (
+          <OfferActionMenu
+            row={row}
+            rowIndex={index}
+            onConvert={handleConvertOfferToAuftrag}
+            onOpenDetail={openDetail}
+          />
+        ),
       },
     ],
-    [expandedOfferIds],
+    [expandedOfferIds, handleConvertOfferToAuftrag],
   );
 
   const mainContent = (

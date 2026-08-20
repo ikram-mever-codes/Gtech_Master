@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, ClipboardDocumentIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, FileText, Pencil, Save, X, Truck } from "lucide-react";
@@ -232,8 +232,20 @@ export default function LieferscheinDetailModal({
                 </span>
               )}
             </div>
-            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {companyName}
+            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
+              <span>{companyName}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(companyName !== "—" ? companyName : "");
+                  toast.success("Title copied to clipboard!");
+                }}
+                className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
+                title="Copy Title"
+              >
+                <ClipboardDocumentIcon className="w-4 h-4" />
+              </button>
             </h2>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
@@ -436,20 +448,60 @@ export default function LieferscheinDetailModal({
               <Field label="Total weight" value={formatWeight(totalWeightKg)} />
             </div>
             <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
-              {/* <div className="flex justify-between">
-                <span className="text-gray-600">Status</span>
-                <span
-                  className={`font-semibold px-2 py-0.5 rounded-full text-xs ${getStatusColor(
-                    status,
-                  )}`}
-                >
-                  {status}
-                </span>
-              </div> */}
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Items</span>
                 <span className="font-medium">{items.length}</span>
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Pencil className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment intern
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(data.internal_notes || data.internalNotes || "");
+                      toast.success("Internal comment copied to clipboard!");
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                    title="Copy Internal Comment"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  </button>
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                {data.internal_notes || data.internalNotes || "—"}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Pencil className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment extern
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(data.notes || data.comment || data.notes_external || data.remark || "");
+                      toast.success("External comment copied to clipboard!");
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                    title="Copy External Comment"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  </button>
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                {data.notes || data.comment || data.notes_external || data.remark || "—"}
+              </p>
             </div>
           </div>
         </div>

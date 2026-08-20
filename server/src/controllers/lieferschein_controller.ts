@@ -423,7 +423,14 @@ export const downloadLieferscheinPdf = async (
       outputFilePath: filePath,
     });
 
-    const cleanTitle = ((lieferschein as any)?.title || (rechnung as any)?.title || "")
+    const rawTitle =
+      (lieferschein as any)?.title ||
+      (rechnung as any)?.title ||
+      (lieferschein as any)?.items?.[0]?.itemName ||
+      (lieferschein as any)?.items?.[0]?.item_name ||
+      (rechnung as any)?.items?.[0]?.item_name ||
+      "";
+    const cleanTitle = String(rawTitle || "")
       .trim()
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")

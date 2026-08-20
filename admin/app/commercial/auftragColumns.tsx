@@ -110,8 +110,6 @@ const getRowStatus = (row: any): string => {
   return row.auftrag_status || row.status || "open";
 };
 
-/** Human-readable labels for the four Auftrag statuses, for filter
- * dropdowns and any other UI that needs to present them to a user. */
 export const AUFTRAG_STATUS_LABELS: Record<string, string> = {
   partially_delivered: "Partially Delivered",
   open: "Open",
@@ -119,7 +117,6 @@ export const AUFTRAG_STATUS_LABELS: Record<string, string> = {
   closed: "Closed",
 };
 
-/** Options list (in table sort order) for an Auftrag-status filter dropdown. */
 export const AUFTRAG_STATUS_FILTER_OPTIONS = [
   "partially_delivered",
   "open",
@@ -363,6 +360,7 @@ const AuftragActionMenu: React.FC<{
             </button>
           </div>
 
+          {/* Option 5: PDF in Email (.eml) */}
           <div className="p-1">
             <button
               type="button"
@@ -453,8 +451,8 @@ export function buildAuftragColumns({
       },
     },
     {
-      header: "Aktionen",
-      width: "55px",
+      header: "",
+      width: "45px",
       align: "center",
       render: (row, index) => (
         <AuftragActionMenu

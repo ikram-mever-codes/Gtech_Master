@@ -1868,7 +1868,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         title=""
         showHeader={false}
         noPadding={true}
-        width="max-w-4xl"
+        width="max-w-6xl"
       >
         <ModalHeader
           entityName="Business"
@@ -1959,12 +1959,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
             </div>
           }
         />
-        <div className="p-6 flex-1 overflow-y-auto">
-          <div className="space-y-6">
+        <div className="p-6 pt-0 flex-1 overflow-y-auto">
+          <div className="space-y-4">
             <div className="rounded-xl p-4 -mx-4 bg-transparent">
-              <div className="grid grid-cols-12 gap-4">
-                {/* ROW 1: Main Business Info (4 fields in one line) */}
-                <div className="col-span-12 md:col-span-5">
+              <div className="grid grid-cols-12 gap-3">
+                <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Company Name (full legal name) *
                   </label>
@@ -2024,7 +2023,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-3 flex items-end gap-1.5">
+                <div className="col-span-12 md:col-span-4 flex items-end gap-1.5">
                   <div className="flex-1 min-w-0">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Asana Link
@@ -2054,7 +2053,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </button>
                 </div>
 
-                {/* ROW 2: Address Fields (5 fields in one single line - Address Additional first) */}
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Address Additional Line
@@ -2093,9 +2091,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-4 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Postal Code
+                <div className="col-span-4 md:col-span-1">
+                  <label className="block text-[11px] font-medium text-gray-700 mb-1 whitespace-nowrap">
+                    Pos-Code
                   </label>
                   <input
                     type="text"
@@ -2107,12 +2105,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       })
                     }
                     disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-1 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium text-center"
                     placeholder="80331"
                   />
                 </div>
 
-                <div className="col-span-4 md:col-span-2">
+                <div className="col-span-8 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     City
                   </label>
@@ -2131,7 +2129,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-4 md:col-span-2">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Country
                   </label>
@@ -2160,7 +2158,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                {/* ROW 3: Contact Fields (3 fields in one line) */}
                 <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Email
@@ -2219,7 +2216,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                {/* ROW 4: Tax Fields (4 fields in one line) */}
+                {/* ROW 4: Tax Fields + Note field shifted to top-right corner */}
                 <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Debitor No
@@ -2260,6 +2257,59 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
                 <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Default Tax Profile
+                  </label>
+                  <select
+                    value={
+                      businessForm.default_tax_profile_id ||
+                      taxProfiles.find(
+                        (tp: any) =>
+                          (tp.tax_case || "").trim().toUpperCase() ===
+                          "DE-VAT",
+                      )?.id ||
+                      taxProfiles[0]?.id ||
+                      ""
+                    }
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        default_tax_profile_id: e.target.value || "",
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
+                  >
+                    {taxProfiles.map((tp) => (
+                      <option key={tp.id} value={tp.id}>
+                        {tp.tax_case || tp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Right side Note box starting from Row 4 spanning across Rows 4 & 5 */}
+                <div className="col-span-12 md:col-span-3 md:row-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Note
+                  </label>
+                  <textarea
+                    value={businessForm.note}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        note: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    rows={4}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed resize-none h-[calc(100%-24px)] min-h-[92px]"
+                    placeholder="Internal note…"
+                  />
+                </div>
+
+                {/* ROW 5: VAT Check Status, Payment, Shipping & Company Label Print Logo */}
+                <div className="col-span-6 md:col-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
                     VAT Check Status
                   </label>
                   <select
@@ -2285,40 +2335,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-6 md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Default Tax Profile
-                  </label>
-                  <select
-                    value={
-                      businessForm.default_tax_profile_id ||
-                      taxProfiles.find(
-                        (tp: any) =>
-                          (tp.tax_case || "").trim().toUpperCase() ===
-                          "DE-VAT",
-                      )?.id ||
-                      taxProfiles[0]?.id ||
-                      ""
-                    }
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        default_tax_profile_id: e.target.value || "",
-                      })
-                    }
-                    disabled={true}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-gray-100 backdrop-blur-sm rounded-lg cursor-not-allowed text-gray-700 font-semibold"
-                  >
-                    {taxProfiles.map((tp) => (
-                      <option key={tp.id} value={tp.id}>
-                        {tp.tax_case || tp.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* ROW 5: Payment & Shipping (3 fields in one line, equal width) */}
-                <div className="col-span-12 md:col-span-4">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Payment Method
                   </label>
@@ -2352,33 +2369,48 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-4">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Payment Due (in days)
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={
-                      businessForm.defaultPaymentDueDays !== undefined
-                        ? businessForm.defaultPaymentDueDays
-                        : 7
-                    }
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        defaultPaymentDueDays:
-                          e.target.value !== ""
-                            ? parseInt(e.target.value)
-                            : "",
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
-                    placeholder="7"
-                  />
+                  {(() => {
+                    const pmLower = (businessForm.defaultPaymentMethod || "").toLowerCase();
+                    const isKaufAufRechnung = pmLower.includes("rechnung") || pmLower.includes("invoice") || pmLower.includes("account");
+                    return (
+                      <input
+                        type="number"
+                        min="0"
+                        value={
+                          businessForm.defaultPaymentDueDays !== undefined
+                            ? businessForm.defaultPaymentDueDays
+                            : 7
+                        }
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            defaultPaymentDueDays:
+                              e.target.value !== ""
+                                ? parseInt(e.target.value)
+                                : "",
+                          })
+                        }
+                        disabled={businessFieldDisabled || !isKaufAufRechnung}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg transition-all font-medium ${businessFieldDisabled || !isKaufAufRechnung
+                          ? "bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed"
+                          : "bg-white/70 text-gray-900 border-gray-300/80 focus:ring-2 focus:ring-gray-500/50 focus:border-transparent"
+                          }`}
+                        placeholder="7"
+                        title={
+                          !isKaufAufRechnung
+                            ? "Payment Due Days is only editable when Default Payment Method is Kauf auf Rechnung"
+                            : undefined
+                        }
+                      />
+                    );
+                  })()}
                 </div>
 
+                {/* ROW 6: Default Shipping Method & Company Label Print Logo */}
                 <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Shipping Method
@@ -2412,160 +2444,146 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                {/* ROW 6: Note */}
-                <div className="col-span-12">
+                <div className="col-span-12 md:col-span-5">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Note
+                    Company Label Print Logo
                   </label>
-                  <textarea
-                    value={businessForm.note}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        note: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    rows={3}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="Internal note…"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="col-span-6">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Company Label Print Logo
-              </label>
-              <div className="flex items-center gap-3">
-                {businessForm.companyLabelPrintLogo ? (
-                  <img
-                    src={businessForm.companyLabelPrintLogo}
-                    alt="Label logo"
-                    className="h-12 w-12 object-contain rounded border border-gray-200 bg-white"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded border border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400">
-                    No logo
-                  </div>
-                )}
-                <input
-                  id="labelLogoInput"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  disabled={businessFieldDisabled}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="labelLogoInput"
-                  className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer hover:bg-white"
-                    }`}
-                >
-                  Upload
-                </label>
-                {businessForm.companyLabelPrintLogo &&
-                  !businessFieldDisabled && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setBusinessForm({
-                          ...businessForm,
-                          companyLabelPrintLogo: "",
-                        })
-                      }
-                      className="text-xs text-red-600 hover:text-red-800"
+                  <div className="flex items-center gap-3 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
+                    {businessForm.companyLabelPrintLogo ? (
+                      <img
+                        src={businessForm.companyLabelPrintLogo}
+                        alt="Label logo"
+                        className="h-6 w-6 object-contain rounded border border-gray-200 bg-white shrink-0"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 shrink-0">
+                        No
+                      </div>
+                    )}
+                    <input
+                      id="labelLogoInput"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={businessFieldDisabled}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="labelLogoInput"
+                      className={`px-3 py-1 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-white"
+                        }`}
                     >
-                      Remove
-                    </button>
-                  )}
+                      Upload
+                    </label>
+                    {businessForm.companyLabelPrintLogo &&
+                      !businessFieldDisabled && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBusinessForm({
+                              ...businessForm,
+                              companyLabelPrintLogo: "",
+                            })
+                          }
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
+                      )}
+                  </div>
+                </div>
               </div>
             </div>
 
             {businessModalMode === "edit" && (
-              <div className="rounded-xl p-4 -mx-4 bg-green-50 border border-green-200/70">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <UserGroupIcon className="h-5 w-5 text-gray-500" />
-                    <span>Contacts</span>
-                    <span className="text-xs font-normal text-gray-500">
-                      ({modalContacts.length})
-                    </span>
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const biz = allBusinesses.find(
-                        (b) => b.id === editingBusinessId,
-                      );
-                      if (biz) handleAddContactForBusiness(biz);
-                    }}
-                    className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-all flex items-center gap-1"
-                  >
-                    <UserPlusIcon className="h-3 w-3" />
-                    Add Contact
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {modalContacts.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      No contacts for this business yet.
-                    </p>
-                  ) : (
-                    modalContacts.map((contact: any) => (
-                      <div
-                        key={contact.id}
-                        className="flex items-center justify-between bg-white border border-green-200 rounded-lg px-3 py-2"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                {editingBusinessId ? (
+                  <ShippingAddressManager
+                    companyId={editingBusinessId}
+                    countries={dbCountries}
+                    displayName={businessForm.displayName}
+                  />
+                ) : (
+                  <div />
+                )}
+
+                <div className="rounded-xl p-4 bg-green-50/60 border border-green-200/70 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                        <UserGroupIcon className="h-5 w-5 text-gray-500" />
+                        <span>Contacts</span>
+                        <span className="text-xs font-normal text-gray-500">
+                          ({modalContacts.length})
+                        </span>
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const biz = allBusinesses.find(
+                            (b) => b.id === editingBusinessId,
+                          );
+                          if (biz) handleAddContactForBusiness(biz);
+                        }}
+                        className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-all flex items-center gap-1 font-medium"
                       >
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {contact.name} {contact.familyName}
-                            {contact.contact && (
-                              <span className="ml-2 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                                {contact.contact}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            {contact.position}
-                            {contact.email ? ` · ${contact.email}` : ""}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openContactModal(contact, true)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors"
-                            title="Edit contact"
+                        <UserPlusIcon className="h-3 w-3" />
+                        Add Contact
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {modalContacts.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">
+                          No contacts for this business yet.
+                        </p>
+                      ) : (
+                        modalContacts.map((contact: any) => (
+                          <div
+                            key={contact.id}
+                            className="flex items-center justify-between bg-white border border-green-200/80 rounded-lg px-3 py-2 shadow-2xs"
                           >
-                            <PencilIcon className="h-4 w-4" />
-                          </button>
-                          {user?.role === UserRole.ADMIN && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteContact(contact.id)}
-                              title="Delete contact"
-                            >
-                              <Delete sx={{ fontSize: 16, color: "red" }} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">
+                                {contact.name} {contact.familyName}
+                                {contact.contact && (
+                                  <span className="ml-2 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                                    {contact.contact}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {contact.position}
+                                {contact.email ? ` · ${contact.email}` : ""}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => openContactModal(contact, true)}
+                                className="text-blue-600 hover:text-blue-800 transition-colors"
+                                title="Edit contact"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </button>
+                              {user?.role === UserRole.ADMIN && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteContact(contact.id)}
+                                  title="Delete contact"
+                                >
+                                  <Delete sx={{ fontSize: 16, color: "red" }} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
-
-            {businessModalMode === "edit" && editingBusinessId && (
-              <ShippingAddressManager
-                companyId={editingBusinessId}
-                countries={dbCountries}
-                displayName={businessForm.displayName}
-              />
             )}
           </div>
         </div>
@@ -3148,5 +3166,4 @@ const CombinedBusinessContactsPage: React.FC = () => (
     <CombinedBusinessContactsContent />
   </Suspense>
 );
-
 export default CombinedBusinessContactsPage;

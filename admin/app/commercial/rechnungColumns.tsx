@@ -252,8 +252,8 @@ export function buildRechnungColumns({
       render: (row) => <PaymentStatusBadge row={row} />,
     },
     {
-      header: "Aktionen",
-      width: "55px",
+      header: "",
+      width: "45px",
       align: "center",
       render: (row, index) => (
         <RechnungActionMenu

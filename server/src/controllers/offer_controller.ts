@@ -4601,11 +4601,17 @@ export class OfferController {
         const dd = String(d.getDate()).padStart(2, "0");
         return `${yy}${mm}${dd}`;
       })();
-      const cleanTitle = (offer.title || "")
+      const rawTitle =
+        offer.title ||
+        offer.items?.[0]?.item_name ||
+        offer.items?.[0]?.itemName ||
+        offer.items?.[0]?.description ||
+        "";
+      const cleanTitle = String(rawTitle || "")
         .trim()
-        .replace(/[\\/:*?"<>|]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+        .replace(/[^\w-]/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "");
       const downloadFileName = cleanTitle
         ? `Angebot_${docNo}_GTech_${cleanTitle}.pdf`
         : `Angebot_${docNo}_GTech.pdf`;

@@ -8,6 +8,7 @@ import {
   PlusIcon,
   LinkIcon,
   UserIcon,
+  ClipboardDocumentIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
@@ -782,8 +783,20 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 </span>
               )}
             </div>
-            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {displayOrder.title}
+            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
+              <span>{displayOrder.title}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(displayOrder.title || "");
+                  toast.success("Title copied to clipboard!");
+                }}
+                className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
+                title="Copy Title"
+              >
+                <ClipboardDocumentIcon className="w-4 h-4" />
+              </button>
             </h2>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
@@ -1142,9 +1155,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                         <td className="px-2 py-2 text-right text-gray-600">
                           {item.sourceItemId
                             ? formatPrice(
-                                item.purchasePrice ?? item.transferPrice,
-                                lineCurrency,
-                              )
+                              item.purchasePrice ?? item.transferPrice,
+                              lineCurrency,
+                            )
                             : "—"}
                         </td>
                         <td className="px-2 py-2 text-right font-medium">
@@ -1314,7 +1327,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
             </div>
           </div>
 
-          {/* Comment */}
           <div className="grid grid-cols-2 gap-2 mt-4">
             <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
               <div className="flex items-center gap-2 mb-3">
@@ -1329,7 +1341,21 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
             <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
               <div className="flex items-center gap-2 mb-3">
                 <PencilIcon className="h-4 w-4 text-gray-500" />
-                <h3 className="text-sm font-bold text-gray-900">Comment</h3>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment intern
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(form.notes || displayOrder.notes || "");
+                      toast.success("Comment copied to clipboard!");
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                    title="Copy Comment"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  </button>
+                </h3>
               </div>
               {edit || isCreate ? (
                 <textarea

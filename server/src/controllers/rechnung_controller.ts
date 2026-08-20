@@ -971,7 +971,13 @@ export const downloadRechnungPdf = async (
       outputFilePath: filePath,
     });
 
-    const cleanTitle = ((rechnung as any).title || "")
+    const rawTitle =
+      (rechnung as any).title ||
+      (rechnung as any).auftrag?.title ||
+      (rawItems?.[0] as any)?.item_name ||
+      (rawItems?.[0] as any)?.description ||
+      "";
+    const cleanTitle = String(rawTitle || "")
       .trim()
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")
@@ -1007,10 +1013,11 @@ export const downloadRechnungEml = async (
       user: (req as any).user,
     });
 
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "message/rfc822");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${emlData.filename}"`,
+      `attachment; filename="${emlData.filename}"; filename*=UTF-8''${encodeURIComponent(emlData.filename)}`,
     );
     fs.createReadStream(emlData.emlFilePath).pipe(res);
   } catch (err) {

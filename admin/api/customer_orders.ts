@@ -238,7 +238,7 @@ export const downloadCustomerOrderEml = async (
     if (blob.size === 0) throw new Error("The downloaded EML file is empty.");
     const filename = getFilenameFromResponse(
       response,
-      `Auftrag_${String(orderNo || id).replace(/[\s_]+/g, "_")}.eml`,
+      `Auftrag_${String(orderNo || id).replace(/[\s_]+/g, "_")}_GTech.eml`,
     );
     downloadBlob(blob, filename);
     toast.dismiss();
