@@ -2267,7 +2267,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </div>
                 </div>
 
-                {/* ROW 4: Tax Fields (Left 9 cols) */}
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Debitor No
@@ -2365,7 +2364,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Right side Note box starting from Row 4 spanning across Rows 4 & 5 */}
                 <div className="col-span-12 md:col-span-3 md:row-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Note
@@ -2385,7 +2383,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                {/* ROW 5: Payment & Shipping (Left 9 cols) */}
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Payment Method
