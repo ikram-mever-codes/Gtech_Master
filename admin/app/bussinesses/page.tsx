@@ -2158,7 +2158,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-4">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Email
                   </label>
@@ -2177,7 +2177,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-12 md:col-span-4">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Phone
                   </label>
@@ -2196,7 +2196,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-12 md:col-span-4">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Web URL
                   </label>
@@ -2216,8 +2216,59 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                {/* ROW 4: Tax Fields + Note field shifted to top-right corner */}
-                <div className="col-span-6 md:col-span-3">
+                <div className="col-span-12 md:col-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Company Label Print Logo">
+                    Company Label Print Logo
+                  </label>
+                  <div className="flex items-center gap-2 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
+                    {businessForm.companyLabelPrintLogo ? (
+                      <img
+                        src={businessForm.companyLabelPrintLogo}
+                        alt="Label logo"
+                        className="h-6 w-6 object-contain rounded border border-gray-200 bg-white shrink-0"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 shrink-0">
+                        No
+                      </div>
+                    )}
+                    <input
+                      id="labelLogoInput"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={businessFieldDisabled}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="labelLogoInput"
+                      className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-white"
+                        }`}
+                    >
+                      Upload
+                    </label>
+                    {businessForm.companyLabelPrintLogo &&
+                      !businessFieldDisabled && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBusinessForm({
+                              ...businessForm,
+                              companyLabelPrintLogo: "",
+                            })
+                          }
+                          className="text-xs text-red-600 hover:text-red-800 shrink-0"
+                        >
+                          Remove
+                        </button>
+                      )}
+                  </div>
+                </div>
+
+                {/* ROW 4: Tax Fields (Left 9 cols) */}
+                <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Debitor No
                   </label>
@@ -2255,8 +2306,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Default Tax Profile">
                     Default Tax Profile
                   </label>
                   <select
@@ -2277,13 +2328,40 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       })
                     }
                     disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
+                    className="w-full px-2 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
                   >
                     {taxProfiles.map((tp) => (
                       <option key={tp.id} value={tp.id}>
                         {tp.tax_case || tp.name}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="VAT Check Status">
+                    VAT Check Status
+                  </label>
+                  <select
+                    value={businessForm.vat_id_status || "unchecked"}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        vat_id_status: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-2 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                  >
+                    <option value="unchecked">Unchecked</option>
+                    <option value="vies_valid">VIES Valid</option>
+                    <option value="vies_invalid">VIES Invalid</option>
+                    <option value="bzst_qualified_valid">
+                      BZSt Qualified Valid
+                    </option>
+                    <option value="bzst_qualified_invalid">
+                      BZSt Qualified Invalid
+                    </option>
                   </select>
                 </div>
 
@@ -2307,34 +2385,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                {/* ROW 5: VAT Check Status, Payment, Shipping & Company Label Print Logo */}
-                <div className="col-span-6 md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    VAT Check Status
-                  </label>
-                  <select
-                    value={businessForm.vat_id_status || "unchecked"}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        vat_id_status: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                  >
-                    <option value="unchecked">Unchecked</option>
-                    <option value="vies_valid">VIES Valid</option>
-                    <option value="vies_invalid">VIES Invalid</option>
-                    <option value="bzst_qualified_valid">
-                      BZSt Qualified Valid
-                    </option>
-                    <option value="bzst_qualified_invalid">
-                      BZSt Qualified Invalid
-                    </option>
-                  </select>
-                </div>
-
+                {/* ROW 5: Payment & Shipping (Left 9 cols) */}
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Payment Method
@@ -2369,9 +2420,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Payment Due (in days)
+                <div className="col-span-12 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Payment Due (in days)">
+                    Payment Due (days)
                   </label>
                   {(() => {
                     const pmLower = (businessForm.defaultPaymentMethod || "").toLowerCase();
@@ -2410,7 +2461,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   })()}
                 </div>
 
-                {/* ROW 6: Default Shipping Method & Company Label Print Logo */}
                 <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Shipping Method
@@ -2442,59 +2492,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div className="col-span-12 md:col-span-5">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Company Label Print Logo
-                  </label>
-                  <div className="flex items-center gap-3 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
-                    {businessForm.companyLabelPrintLogo ? (
-                      <img
-                        src={businessForm.companyLabelPrintLogo}
-                        alt="Label logo"
-                        className="h-6 w-6 object-contain rounded border border-gray-200 bg-white shrink-0"
-                      />
-                    ) : (
-                      <div className="h-6 w-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 shrink-0">
-                        No
-                      </div>
-                    )}
-                    <input
-                      id="labelLogoInput"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={businessFieldDisabled}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="labelLogoInput"
-                      className={`px-3 py-1 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
-                        ? "opacity-50 cursor-not-allowed"
-                        : "cursor-pointer hover:bg-white"
-                        }`}
-                    >
-                      Upload
-                    </label>
-                    {businessForm.companyLabelPrintLogo &&
-                      !businessFieldDisabled && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBusinessForm({
-                              ...businessForm,
-                              companyLabelPrintLogo: "",
-                            })
-                          }
-                          className="text-xs text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      )}
-                  </div>
-                </div>
-              </div>
+                </div>      </div>
             </div>
 
             {businessModalMode === "edit" && (
