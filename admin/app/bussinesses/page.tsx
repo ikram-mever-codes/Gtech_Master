@@ -2216,7 +2216,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                {/* ROW 4: Tax Fields - Default Tax Profile right next to VAT / Tax ID */}
+                {/* ROW 4: Tax Fields + Note field shifted to top-right corner */}
                 <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Debitor No
@@ -2287,6 +2287,27 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
+                {/* Right side Note box starting from Row 4 spanning across Rows 4 & 5 */}
+                <div className="col-span-12 md:col-span-3 md:row-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Note
+                  </label>
+                  <textarea
+                    value={businessForm.note}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        note: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    rows={4}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed resize-none h-[calc(100%-24px)] min-h-[92px]"
+                    placeholder="Internal note…"
+                  />
+                </div>
+
+                {/* ROW 5: VAT Check Status, Payment, Shipping & Company Label Print Logo */}
                 <div className="col-span-6 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     VAT Check Status
@@ -2314,7 +2335,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                {/* ROW 5: Payment, Shipping & Company Label Print Logo */}
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Payment Method
@@ -2349,7 +2369,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-2">
+                <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Payment Due (in days)
                   </label>
@@ -2390,7 +2410,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   })()}
                 </div>
 
-                <div className="col-span-12 md:col-span-3">
+                {/* ROW 6: Default Shipping Method & Company Label Print Logo */}
+                <div className="col-span-12 md:col-span-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Shipping Method
                   </label>
@@ -2423,11 +2444,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-4">
+                <div className="col-span-12 md:col-span-5">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Company Label Print Logo
                   </label>
-                  <div className="flex items-center gap-2 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
+                  <div className="flex items-center gap-3 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
                     {businessForm.companyLabelPrintLogo ? (
                       <img
                         src={businessForm.companyLabelPrintLogo}
@@ -2449,7 +2470,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     />
                     <label
                       htmlFor="labelLogoInput"
-                      className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
+                      className={`px-3 py-1 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
                         ? "opacity-50 cursor-not-allowed"
                         : "cursor-pointer hover:bg-white"
                         }`}
@@ -2472,26 +2493,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         </button>
                       )}
                   </div>
-                </div>
-
-                {/* ROW 6: Note */}
-                <div className="col-span-12">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Note
-                  </label>
-                  <textarea
-                    value={businessForm.note}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        note: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    rows={2}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed resize-none max-h-[55px]"
-                    placeholder="Internal note…"
-                  />
                 </div>
               </div>
             </div>
@@ -3165,5 +3166,4 @@ const CombinedBusinessContactsPage: React.FC = () => (
     <CombinedBusinessContactsContent />
   </Suspense>
 );
-
 export default CombinedBusinessContactsPage;
