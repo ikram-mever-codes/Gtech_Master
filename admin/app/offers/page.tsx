@@ -544,13 +544,13 @@ const OffersPage: React.FC<any> = ({
           );
         },
       },
-      buildNettowertColumn((row: any) =>
-        Number(
-          row.subtotal !== undefined && row.subtotal !== null
-            ? row.subtotal
-            : row.totalAmount || 0,
-        ),
-      ),
+      buildNettowertColumn((row: any) => {
+        if (row.subtotal !== undefined && row.subtotal !== null) {
+          return Number(row.subtotal) + Number(row.shippingCost || 0);
+        }
+        // totalAmount already includes shippingCost (see Offer.calculateTotals())
+        return Number(row.totalAmount || 0);
+      }),
       {
         header: "Status",
         width: "90px",
@@ -731,58 +731,58 @@ const OffersPage: React.FC<any> = ({
         />
       </div>
 
-        {totalPages > 1 && (
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Showing {(currentPage - 1) * itemsPerPage + 1}–
-              {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
-              {totalRecords}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const p = Math.max(1, currentPage - 1);
-                  setCurrentPage(p);
-                  setFilters({ ...filters, page: p });
-                }}
-                disabled={currentPage === 1}
-                className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                const p = i + 1;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      setCurrentPage(p);
-                      setFilters({ ...filters, page: p });
-                    }}
-                    className={`px-2 py-1 text-sm rounded-lg ${
-                      currentPage === p
-                        ? "bg-gray-600 text-white"
-                        : "bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => {
-                  const p = Math.min(totalPages, currentPage + 1);
-                  setCurrentPage(p);
-                  setFilters({ ...filters, page: p });
-                }}
-                disabled={currentPage === totalPages}
-                className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
+      {totalPages > 1 && (
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+          <div className="text-sm text-gray-700">
+            Showing {(currentPage - 1) * itemsPerPage + 1}–
+            {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
+            {totalRecords}
           </div>
-        )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const p = Math.max(1, currentPage - 1);
+                setCurrentPage(p);
+                setFilters({ ...filters, page: p });
+              }}
+              disabled={currentPage === 1}
+              className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            {[...Array(Math.min(5, totalPages))].map((_, i) => {
+              const p = i + 1;
+              return (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setCurrentPage(p);
+                    setFilters({ ...filters, page: p });
+                  }}
+                  className={`px-2 py-1 text-sm rounded-lg ${
+                    currentPage === p
+                      ? "bg-gray-600 text-white"
+                      : "bg-white border border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => {
+                const p = Math.min(totalPages, currentPage + 1);
+                setCurrentPage(p);
+                setFilters({ ...filters, page: p });
+              }}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 
