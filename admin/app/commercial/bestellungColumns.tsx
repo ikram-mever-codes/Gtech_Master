@@ -6,6 +6,7 @@ import {
   buildExpandColumn,
   formatLieferort,
   formatTitel35,
+  CommentIcons,
 } from "./sharedColumns";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
@@ -148,11 +149,14 @@ export function buildBestellungColumns({
         ).trim();
         const displayTitle = formatTitel35(row);
         return (
-          <div
-            className="truncate max-w-[185px] text-xs text-gray-600 font-normal"
-            title={titleStr || "—"}
-          >
-            {displayTitle}
+          <div className="flex items-center gap-1 max-w-[185px] truncate">
+            <span
+              className="truncate text-xs text-gray-600 font-normal"
+              title={titleStr || "—"}
+            >
+              {displayTitle}
+            </span>
+            <CommentIcons row={row} />
           </div>
         );
       },

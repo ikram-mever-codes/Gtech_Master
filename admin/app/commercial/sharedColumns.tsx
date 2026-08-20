@@ -214,6 +214,47 @@ export const kundeColumn: ColumnDef<any> = {
 
 export const companyColumn: ColumnDef<any> = kundeColumn;
 
+export const CommentIcons: React.FC<{ row: any }> = ({ row }) => {
+  const internalComment = String(
+    row.internalNotes ||
+    row.internal_notes ||
+    row.internalComment ||
+    ""
+  ).trim();
+
+  const externalComment = String(
+    row.notes ||
+    row.comment ||
+    row.notes_external ||
+    row.external_notes ||
+    row.remarks ||
+    ""
+  ).trim();
+
+  if (!internalComment && !externalComment) return null;
+
+  return (
+    <span className="inline-flex items-center gap-1 ml-1.5 align-middle shrink-0 select-none">
+      {internalComment && (
+        <span
+          className="cursor-help text-xs leading-none hover:scale-125 transition-transform"
+          title={`Intern: ${internalComment}`}
+        >
+          📝
+        </span>
+      )}
+      {externalComment && (
+        <span
+          className="cursor-help text-xs leading-none hover:scale-125 transition-transform"
+          title={`Extern: ${externalComment}`}
+        >
+          💬
+        </span>
+      )}
+    </span>
+  );
+};
+
 export const titelColumn: ColumnDef<any> = {
   header: "Titel",
   width: "240px",
@@ -231,11 +272,14 @@ export const titelColumn: ColumnDef<any> = {
     const titleStr = String(rawTitle || "").trim();
     const displayTitle = formatTitel35(row);
     return (
-      <div
-        className="truncate max-w-[240px] text-sm text-gray-600 font-normal"
-        title={titleStr || "—"}
-      >
-        {displayTitle}
+      <div className="flex items-center gap-1 max-w-[240px] truncate">
+        <span
+          className="truncate text-sm text-gray-600 font-normal"
+          title={titleStr || "—"}
+        >
+          {displayTitle}
+        </span>
+        <CommentIcons row={row} />
       </div>
     );
   },
