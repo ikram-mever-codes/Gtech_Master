@@ -902,10 +902,17 @@ export async function generateGtechDocumentPdf(
   if (opts.deliveryTime) notesHeight += 15;
   if (opts.deliveryTerms) notesHeight += 15;
   if (opts.notes) {
-    notesHeight +=
-      doc.heightOfString(`Hinweise: ${opts.notes}`, {
-        width: CONTENT_WIDTH,
-      }) + 5;
+    const rawNotes = String(opts.notes).trim();
+    if (rawNotes) {
+      doc.font(SB).fontSize(8.5);
+      const labelWidth = doc.widthOfString("Hinweise: ");
+      doc.font(R).fontSize(8.5);
+      notesHeight +=
+        doc.heightOfString(rawNotes, {
+          width: CONTENT_WIDTH - labelWidth,
+          lineGap: 2,
+        }) + 10;
+    }
   }
 
   if (yPos + notesHeight > MM(272)) {
@@ -982,9 +989,44 @@ export async function generateGtechDocumentPdf(
     yPos += 14;
   }
   if (opts.notes) {
-    doc.text(`Hinweise: ${opts.notes}`, LEFT_X, yPos, {
-      width: CONTENT_WIDTH,
-    });
+    const rawNotes = String(opts.notes).trim();
+    if (rawNotes) {
+      yPos += 4;
+      doc.font(SB).fontSize(8.5);
+      const labelWidth = doc.widthOfString("Hinweise: ");
+
+      doc.font(R).fontSize(8.5);
+      const noteTextHeight = doc.heightOfString(rawNotes, {
+        width: CONTENT_WIDTH - labelWidth,
+        lineGap: 2,
+      });
+
+      if (yPos + noteTextHeight + 10 > MM(272)) {
+        doc.addPage();
+        await drawCustomerSvgBackground(doc);
+        doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+        yPos = MM(25);
+      }
+
+      doc
+        .font(SB)
+        .fontSize(8.5)
+        .fillColor("#1A202C")
+        .text("Hinweise: ", LEFT_X, yPos, {
+          lineBreak: false,
+        });
+
+      doc
+        .font(R)
+        .fontSize(8.5)
+        .fillColor("#2D3748")
+        .text(rawNotes, LEFT_X + labelWidth, yPos, {
+          width: CONTENT_WIDTH - labelWidth,
+          lineGap: 2,
+        });
+
+      yPos += noteTextHeight + 8;
+    }
   }
 
   const pageRange = doc.bufferedPageRange();

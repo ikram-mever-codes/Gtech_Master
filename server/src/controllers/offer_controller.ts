@@ -4558,9 +4558,18 @@ export class OfferController {
         yPos += 14;
       }
       if (offer.notes) {
-        doc.text(`Hinweise: ${offer.notes}`, LEFT_X, yPos, {
-          width: CONTENT_WIDTH,
-        });
+        const rawNotes = String(offer.notes).trim();
+        if (rawNotes) {
+          doc.font(SB).fontSize(8.5);
+          const labelWidth = doc.widthOfString("Hinweise: ");
+          doc.font(SB).fontSize(8.5).fillColor("#1A202C").text("Hinweise: ", LEFT_X, yPos, {
+            lineBreak: false,
+          });
+          doc.font(R).fontSize(8.5).fillColor("#2D3748").text(rawNotes, LEFT_X + labelWidth, yPos, {
+            width: CONTENT_WIDTH - labelWidth,
+            lineGap: 2,
+          });
+        }
       }
 
       const pages = doc.bufferedPageRange();
