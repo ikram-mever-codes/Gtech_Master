@@ -19,6 +19,8 @@ import CustomModal from "@/components/UI/CustomModal";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SalesPriceSection from "@/components/Item/SalesPriceSection";
+import DecimalInput from "@/components/UI/DecimalInput";
+import { parseFlexibleNumber } from "@/utils/decimal";
 
 import { EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import {
@@ -386,7 +388,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
       ...p,
       dimensions: {
         ...p.dimensions,
-        [key]: key === "is_dim_weight_estimated" ? val : parseFloat(val) || 0,
+        [key]: val,
       },
     }));
 
@@ -417,16 +419,16 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             ? parseInt(previewItem.category_id)
             : undefined,
           isActive: previewItem.isActive ? "Y" : "N",
-          weight: parseFloat(previewItem.dimensions?.weight) || 0,
-          length: parseFloat(previewItem.dimensions?.length) || 0,
-          width: parseFloat(previewItem.dimensions?.width) || 0,
-          height: parseFloat(previewItem.dimensions?.height) || 0,
+          weight: parseFlexibleNumber(previewItem.dimensions?.weight) || 0,
+          length: parseFlexibleNumber(previewItem.dimensions?.length) || 0,
+          width: parseFlexibleNumber(previewItem.dimensions?.width) || 0,
+          height: parseFlexibleNumber(previewItem.dimensions?.height) || 0,
           is_dim_weight_estimated:
             !!previewItem.dimensions?.is_dim_weight_estimated,
           supplier_id: previewItem.supplier_id
             ? parseInt(previewItem.supplier_id)
             : undefined,
-          purchasePrice: parseFloat(previewItem.price) || 0,
+          purchasePrice: parseFlexibleNumber(previewItem.price) || 0,
           currency: previewItem.currency || "EUR",
           itemNo: previewItem.de_no,
           qty: previewItem.qty,
@@ -450,10 +452,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             ? parseInt(previewItem.category_id)
             : null,
           isActive: previewItem.isActive ? "Y" : "N",
-          weight: parseFloat(previewItem.dimensions?.weight) || 0,
-          length: parseFloat(previewItem.dimensions?.length) || 0,
-          width: parseFloat(previewItem.dimensions?.width) || 0,
-          height: parseFloat(previewItem.dimensions?.height) || 0,
+          weight: parseFlexibleNumber(previewItem.dimensions?.weight) || 0,
+          length: parseFlexibleNumber(previewItem.dimensions?.length) || 0,
+          width: parseFlexibleNumber(previewItem.dimensions?.width) || 0,
+          height: parseFlexibleNumber(previewItem.dimensions?.height) || 0,
           is_dim_weight_estimated:
             !!previewItem.dimensions?.is_dim_weight_estimated,
 
@@ -474,28 +476,42 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           supplierItems: previewItem.supplierItems,
           sales_price:
             previewItem.sales_price === "" ||
-            previewItem.sales_price === undefined
+            previewItem.sales_price === undefined ||
+            previewItem.sales_price === null
               ? null
-              : Math.round(parseFloat(previewItem.sales_price) * 100) / 100,
+              : (() => {
+                  const num = parseFlexibleNumber(previewItem.sales_price);
+                  return num !== null ? Math.round(num * 100) / 100 : null;
+                })(),
           supplierItem: {
-            price_rmb: parseFloat(previewItem.supplierItem?.priceRMB) || 0,
+            price_rmb:
+              parseFlexibleNumber(
+                previewItem.supplierItem?.priceRMB ??
+                  previewItem.priceRMB,
+              ) || 0,
             is_po: previewItem.supplierItem?.isPO,
-            moq: parseInt(previewItem.supplierItem?.moq) || 0,
-            oi: parseInt(previewItem.supplierItem?.interval) || 0,
+            moq:
+              Math.round(
+                parseFlexibleNumber(previewItem.supplierItem?.moq) || 0,
+              ),
+            oi:
+              Math.round(
+                parseFlexibleNumber(previewItem.supplierItem?.interval) || 0,
+              ),
             lead_time: previewItem.supplierItem?.leadTime,
             note_cn: previewItem.supplierItem?.noteCN,
             url: previewItem.supplierItem?.url,
           },
-          price: parseFloat(previewItem.price) || 0,
-          transfer_price_EUR: parseFloat(previewItem.price) || 0,
+          price: parseFlexibleNumber(previewItem.price) || 0,
+          transfer_price_EUR: parseFlexibleNumber(previewItem.price) || 0,
           photo: previewItem.pictures?.shopPicture,
           pix_path: previewItem.pictures?.pixPath,
           pix_path_eBay: previewItem.pictures?.ebayPictures,
           is_stock_item: previewItem.is_stock_item || "N",
-          stockEU: parseInt(previewItem.stockEU) || 0,
-          MSQ_EU: parseInt(previewItem.MSQ_EU) || 0,
-          stockCN: parseInt(previewItem.stockCN) || 0,
-          MSQ_CN: parseInt(previewItem.MSQ_CN) || 0,
+          stockEU: Math.round(parseFlexibleNumber(previewItem.stockEU) || 0),
+          MSQ_EU: Math.round(parseFlexibleNumber(previewItem.MSQ_EU) || 0),
+          stockCN: Math.round(parseFlexibleNumber(previewItem.stockCN) || 0),
+          MSQ_CN: Math.round(parseFlexibleNumber(previewItem.MSQ_CN) || 0),
         };
         await updateItem(Number(itemId), payload);
       }
@@ -1018,13 +1034,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       >
                         {previewEdit ? (
                           <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              step="0.01"
+                            <DecimalInput
                               className={inputCls}
+                              placeholder="0.00"
                               value={val ?? ""}
-                              onChange={(e) =>
-                                patchPreviewDim(dim, e.target.value)
+                              onChange={(raw) =>
+                                patchPreviewDim(dim, raw)
                               }
                             />
                             <span className="text-xs font-semibold text-gray-700 shrink-0">
@@ -1116,14 +1131,14 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
                 <Field label="Stock EU">
                   {previewEdit ? (
-                    <input
-                      type="number"
+                    <DecimalInput
                       disabled={previewItem.is_stock_item !== "Y"}
                       className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
-                      value={previewItem.stockEU ?? 0}
-                      onChange={(e) =>
-                        patchPreview({ stockEU: e.target.value })
+                      value={previewItem.stockEU ?? ""}
+                      onChange={(raw) =>
+                        patchPreview({ stockEU: raw })
                       }
+                      placeholder="0"
                     />
                   ) : (
                     (previewItem.stockEU ?? 0)
@@ -1131,12 +1146,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
                 <Field label="MSQ EU">
                   {previewEdit ? (
-                    <input
-                      type="number"
+                    <DecimalInput
                       disabled={previewItem.is_stock_item !== "Y"}
                       className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
-                      value={previewItem.MSQ_EU ?? 0}
-                      onChange={(e) => patchPreview({ MSQ_EU: e.target.value })}
+                      value={previewItem.MSQ_EU ?? ""}
+                      onChange={(raw) => patchPreview({ MSQ_EU: raw })}
+                      placeholder="0"
                     />
                   ) : (
                     (previewItem.MSQ_EU ?? 0)
@@ -1144,14 +1159,14 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
                 <Field label="Stock CN">
                   {previewEdit ? (
-                    <input
-                      type="number"
+                    <DecimalInput
                       disabled={previewItem.is_stock_item !== "Y"}
                       className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
-                      value={previewItem.stockCN ?? 0}
-                      onChange={(e) =>
-                        patchPreview({ stockCN: e.target.value })
+                      value={previewItem.stockCN ?? ""}
+                      onChange={(raw) =>
+                        patchPreview({ stockCN: raw })
                       }
+                      placeholder="0"
                     />
                   ) : (
                     (previewItem.stockCN ?? 0)
@@ -1159,12 +1174,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
                 <Field label="MSQ CN">
                   {previewEdit ? (
-                    <input
-                      type="number"
+                    <DecimalInput
                       disabled={previewItem.is_stock_item !== "Y"}
                       className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
-                      value={previewItem.MSQ_CN ?? 0}
-                      onChange={(e) => patchPreview({ MSQ_CN: e.target.value })}
+                      value={previewItem.MSQ_CN ?? ""}
+                      onChange={(raw) => patchPreview({ MSQ_CN: raw })}
+                      placeholder="0"
                     />
                   ) : (
                     (previewItem.MSQ_CN ?? 0)
@@ -1210,17 +1225,16 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 <Field label="Purchase Price">
                   {previewEdit ? (
                     <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        step="0.01"
+                      <DecimalInput
                         className={inputCls}
+                        placeholder="0.00"
                         value={
                           previewItem.supplierItem?.priceRMB ??
                           previewItem.priceRMB ??
                           ""
                         }
-                        onChange={(e) =>
-                          patchPreviewSupplierItem({ priceRMB: e.target.value })
+                        onChange={(raw) =>
+                          patchPreviewSupplierItem({ priceRMB: raw })
                         }
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
@@ -1241,13 +1255,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 <Field label="Transfer Price">
                   {previewEdit ? (
                     <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        step="0.01"
+                      <DecimalInput
                         className={inputCls}
+                        placeholder="0.00"
                         value={previewItem.price ?? ""}
-                        onChange={(e) =>
-                          patchPreview({ price: e.target.value })
+                        onChange={(raw) =>
+                          patchPreview({ price: raw })
                         }
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
@@ -1267,13 +1280,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 <Field label="Sales Price">
                   {previewEdit ? (
                     <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        step="0.01"
+                      <DecimalInput
                         className={inputCls}
+                        placeholder="0.00"
                         value={previewItem.sales_price ?? ""}
-                        onChange={(e) =>
-                          patchPreview({ sales_price: e.target.value })
+                        onChange={(raw) =>
+                          patchPreview({ sales_price: raw })
                         }
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">

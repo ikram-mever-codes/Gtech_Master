@@ -15,6 +15,8 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { TagPickerInput, type Tag } from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
+import DecimalInput from "@/components/UI/DecimalInput";
+import { parseFlexibleNumber } from "@/utils/decimal";
 
 interface ItemCreateModalProps {
   isOpen: boolean;
@@ -175,14 +177,14 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           taric_id: itemFormData.taric_id || undefined,
           cat_id: itemFormData.cat_id || undefined,
           supplier_id: itemFormData.supplier_id || undefined,
-          weight: itemFormData.weight || undefined,
-          length: itemFormData.length || undefined,
-          width: itemFormData.width || undefined,
-          height: itemFormData.height || undefined,
+          weight: parseFlexibleNumber(itemFormData.weight) ?? undefined,
+          length: parseFlexibleNumber(itemFormData.length) ?? undefined,
+          width: parseFlexibleNumber(itemFormData.width) ?? undefined,
+          height: parseFlexibleNumber(itemFormData.height) ?? undefined,
           remark: itemFormData.remark,
           extraNote: itemFormData.remark,
           model: itemFormData.model,
-          purchasePrice: Number(itemFormData.price) || 0,
+          purchasePrice: parseFlexibleNumber(itemFormData.price) || 0,
           currency: itemFormData.currency || "EUR",
           isActive: itemFormData.isActive ? "Y" : "N",
           itemNo: itemFormData.item_no_de || undefined,
@@ -194,10 +196,10 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           requestStatus: itemFormData.requestStatus,
           // NEW: Stock and MSQ fields
           is_stock_item: itemFormData.is_stock_item || "N",
-          stockEU: parseInt(itemFormData.stockEU) || 0,
-          MSQ_EU: parseInt(itemFormData.MSQ_EU) || 0,
-          stockCN: parseInt(itemFormData.stockCN) || 0,
-          MSQ_CN: parseInt(itemFormData.MSQ_CN) || 0,
+          stockEU: Math.round(parseFlexibleNumber(itemFormData.stockEU) || 0),
+          MSQ_EU: Math.round(parseFlexibleNumber(itemFormData.MSQ_EU) || 0),
+          stockCN: Math.round(parseFlexibleNumber(itemFormData.stockCN) || 0),
+          MSQ_CN: Math.round(parseFlexibleNumber(itemFormData.MSQ_CN) || 0),
         });
       } else {
         result = await createItem({
@@ -209,25 +211,28 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           taric_id: itemFormData.taric_id || undefined,
           cat_id: itemFormData.cat_id || undefined,
           supplier_id: itemFormData.supplier_id || undefined,
-          weight: itemFormData.weight || undefined,
-          length: itemFormData.length || undefined,
-          width: itemFormData.width || undefined,
-          height: itemFormData.height || undefined,
+          weight: parseFlexibleNumber(itemFormData.weight) ?? undefined,
+          length: parseFlexibleNumber(itemFormData.length) ?? undefined,
+          width: parseFlexibleNumber(itemFormData.width) ?? undefined,
+          height: parseFlexibleNumber(itemFormData.height) ?? undefined,
           remark: itemFormData.remark,
           remark_ex: itemFormData.remark_ex,
           model: itemFormData.model,
-          RMB_Price: Number(itemFormData.price) || 0,
-          price_rmb: Number(itemFormData.price) || 0,
-          priceRMB: Number(itemFormData.price) || 0,
-          rmbPrice: Number(itemFormData.price) || 0,
-          price: Number(itemFormData.price) || 0,
+          RMB_Price: parseFlexibleNumber(itemFormData.price) || 0,
+          price_rmb: parseFlexibleNumber(itemFormData.price) || 0,
+          priceRMB: parseFlexibleNumber(itemFormData.price) || 0,
+          rmbPrice: parseFlexibleNumber(itemFormData.price) || 0,
+          price: parseFlexibleNumber(itemFormData.price) || 0,
 
           sales_price:
             itemFormData.sales_price === "" ||
             itemFormData.sales_price === undefined ||
             itemFormData.sales_price === null
               ? null
-              : Math.round(parseFloat(itemFormData.sales_price) * 100) / 100,
+              : (() => {
+                  const num = parseFlexibleNumber(itemFormData.sales_price);
+                  return num !== null ? Math.round(num * 100) / 100 : null;
+                })(),
           currency: itemFormData.currency || "CNY",
           isActive: itemFormData.isActive ? "Y" : "N",
           item_no_de: itemFormData.item_no_de || undefined,
@@ -235,10 +240,10 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
           // NEW: Stock and MSQ fields
           is_stock_item: itemFormData.is_stock_item || "N",
-          stockEU: parseInt(itemFormData.stockEU) || 0,
-          MSQ_EU: parseInt(itemFormData.MSQ_EU) || 0,
-          stockCN: parseInt(itemFormData.stockCN) || 0,
-          MSQ_CN: parseInt(itemFormData.MSQ_CN) || 0,
+          stockEU: Math.round(parseFlexibleNumber(itemFormData.stockEU) || 0),
+          MSQ_EU: Math.round(parseFlexibleNumber(itemFormData.MSQ_EU) || 0),
+          stockCN: Math.round(parseFlexibleNumber(itemFormData.stockCN) || 0),
+          MSQ_CN: Math.round(parseFlexibleNumber(itemFormData.MSQ_CN) || 0),
         });
       }
       const createdId =
@@ -547,17 +552,16 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                       {dim[0].toUpperCase() + dim.slice(1)} ({unit})
                     </label>
                     <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        step="0.01"
+                      <DecimalInput
                         value={(itemFormData as any)[dim]}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setItemFormData({
                             ...itemFormData,
-                            [dim]: Number(e.target.value),
+                            [dim]: val,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
                         {unit}
@@ -585,18 +589,15 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Transfer Price
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
+                <DecimalInput
                   value={itemFormData.price}
-                  onChange={(e) =>
+                  onChange={(val) =>
                     setItemFormData({
                       ...itemFormData,
-                      price:
-                        e.target.value === "" ? 0 : parseFloat(e.target.value),
+                      price: val,
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   placeholder="0.00"
                 />
               </div>
@@ -605,17 +606,15 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Sales Price
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <DecimalInput
                     value={itemFormData.sales_price}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setItemFormData({
                         ...itemFormData,
-                        sales_price: e.target.value,
+                        sales_price: val,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                     placeholder="0.00"
                   />
                 </div>
@@ -684,72 +683,68 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Stock EU
                     </label>
-                    <input
-                      type="number"
-                      min="0"
+                    <DecimalInput
                       disabled={itemFormData.is_stock_item !== "Y"}
-                      value={itemFormData.stockEU || 0}
-                      onChange={(e) =>
+                      value={itemFormData.stockEU ?? ""}
+                      onChange={(val) =>
                         setItemFormData({
                           ...itemFormData,
-                          stockEU: parseInt(e.target.value) || 0,
+                          stockEU: val,
                         })
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
+                      placeholder="0"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       MSQ EU
                     </label>
-                    <input
-                      type="number"
-                      min="0"
+                    <DecimalInput
                       disabled={itemFormData.is_stock_item !== "Y"}
-                      value={itemFormData.MSQ_EU || 0}
-                      onChange={(e) =>
+                      value={itemFormData.MSQ_EU ?? ""}
+                      onChange={(val) =>
                         setItemFormData({
                           ...itemFormData,
-                          MSQ_EU: parseInt(e.target.value) || 0,
+                          MSQ_EU: val,
                         })
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
+                      placeholder="0"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Stock CN
                     </label>
-                    <input
-                      type="number"
-                      min="0"
+                    <DecimalInput
                       disabled={itemFormData.is_stock_item !== "Y"}
-                      value={itemFormData.stockCN || 0}
-                      onChange={(e) =>
+                      value={itemFormData.stockCN ?? ""}
+                      onChange={(val) =>
                         setItemFormData({
                           ...itemFormData,
-                          stockCN: parseInt(e.target.value) || 0,
+                          stockCN: val,
                         })
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
+                      placeholder="0"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       MSQ CN
                     </label>
-                    <input
-                      type="number"
-                      min="0"
+                    <DecimalInput
                       disabled={itemFormData.is_stock_item !== "Y"}
-                      value={itemFormData.MSQ_CN || 0}
-                      onChange={(e) =>
+                      value={itemFormData.MSQ_CN ?? ""}
+                      onChange={(val) =>
                         setItemFormData({
                           ...itemFormData,
-                          MSQ_CN: parseInt(e.target.value) || 0,
+                          MSQ_CN: val,
                         })
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-sm"
+                      placeholder="0"
                     />
                   </div>
                 </div>

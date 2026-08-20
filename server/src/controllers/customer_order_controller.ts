@@ -21,6 +21,7 @@ import { WarehouseItem } from "../models/warehouse_items";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
+import { generateAuftragEml } from "../services/emlGenerator";
 import { Rechnung } from "../models/rechnung";
 import { Rechnung_k } from "../models/rechnung_k";
 import { TransferOrder } from "../models/transfer_order";
@@ -1658,6 +1659,51 @@ export const downloadCustomerOrderPdf = async (
       `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
     );
     fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const downloadCustomerOrderEml = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+
+    const { emlFilePath, filename, orderNo } = await generateAuftragEml(id, {
+      user: user ? { name: user.name, username: user.username, email: user.email } : undefined,
+    });
+
+    if (!fs.existsSync(emlFilePath)) {
+      res.status(500).json({ success: false, message: "EML file generation failed" });
+      return;
+    }
+
+    try {
+      const now = new Date();
+      const dateEmailedStr = `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`;
+      const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+      await customerOrderRepo.update(
+        { id: Number(id) || 0 } as any,
+        { date_emailed: dateEmailedStr },
+      );
+    } catch (updateErr) {
+      console.warn("Could not update date_emailed on Auftrag:", updateErr);
+    }
+
+    const downloadFileName = `Auftrag_${orderNo || id}.eml`;
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+    res.setHeader("Content-Type", "message/rfc822");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
+    );
+
+    const stream = fs.createReadStream(emlFilePath);
+    stream.pipe(res);
   } catch (err) {
     next(err);
   }

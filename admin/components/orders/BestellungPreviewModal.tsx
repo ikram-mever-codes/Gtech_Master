@@ -689,11 +689,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     let allSameCurrency = true;
 
     items.forEach((item: any) => {
-      const qty = parseFlexibleNumber(item?.qty) ?? 1;
-      const price =
-        parseFlexibleNumber(item?.transferPrice ?? item?.purchasePrice ?? 0) ??
-        0;
-      const lineTotal = qty * price;
+      const lineTotal = getLineItemTotal(item);
       total += lineTotal;
 
       const itemCurrency =

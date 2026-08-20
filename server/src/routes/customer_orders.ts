@@ -12,6 +12,7 @@ import {
   deleteOrderLineItem,
   previewOrderLineItemPrice,
   downloadCustomerOrderPdf,
+  downloadCustomerOrderEml,
   closeCustomerOrder,
   duplicateCustomerOrder,
 } from "../controllers/customer_order_controller";
@@ -24,6 +25,7 @@ router.post("/from-items", createAuftragFromItems);
 router.post("/:id/duplicate", duplicateCustomerOrder);
 router.get("/", getAllCustomerOrders);
 router.get("/:id/download-pdf", downloadCustomerOrderPdf);
+router.get("/:id/download-eml", downloadCustomerOrderEml);
 router.get("/:id", getCustomerOrderById);
 router.put("/:id", updateCustomerOrder);
 router.delete("/:id", deleteCustomerOrder);

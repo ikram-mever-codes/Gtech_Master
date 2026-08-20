@@ -225,6 +225,33 @@ export const downloadCustomerOrderPdf = async (
   }
 };
 
+export const downloadCustomerOrderEml = async (
+  id: string | number,
+  orderNo?: string,
+) => {
+  try {
+    toast.loading("Preparing Outlook email (.eml)...", loadingStyles);
+    const response: any = await api.get(`/customer-orders/${id}/download-eml`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([response.data], { type: "message/rfc822" });
+    if (blob.size === 0) throw new Error("The downloaded EML file is empty.");
+    const filename = getFilenameFromResponse(
+      response,
+      `Auftrag_${String(orderNo || id).replace(/[\s_]+/g, "_")}.eml`,
+    );
+    downloadBlob(blob, filename);
+    toast.dismiss();
+    toast.success("Outlook email draft downloaded (.eml)");
+    return true;
+  } catch (error) {
+    toast.dismiss();
+    console.error("Error downloading EML:", error);
+    toast.error("Failed to download EML for Outlook");
+    throw error;
+  }
+};
+
 export const closeCustomerOrder = async (
   id: number | string,
   real_delivery_date?: string,
