@@ -14,6 +14,7 @@ import {
   BuildingOfficeIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { Copy } from "lucide-react";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
@@ -1955,8 +1956,22 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     </span>
                   )}
                 </div>
-                <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-                  {offer.title}
+                <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
+                  <span>{offer.title}</span>
+                  {offer.title && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(offer.title);
+                        toast.success("Title copied to clipboard!");
+                      }}
+                      className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
+                      title="Copy Title"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </h2>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
@@ -3110,8 +3125,22 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 <div className="bg-white rounded-lg px-2 p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <PencilIcon className="h-4 w-4 text-gray-500" />
-                    <h3 className="text-sm font-bold text-gray-900">
+                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
                       Comment intern
+                      {(offer.internalNotes || form.internalNotes) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(offer.internalNotes || form.internalNotes || "");
+                            toast.success("Internal comment copied to clipboard!");
+                          }}
+                          className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                          title="Copy Internal Comment"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </h3>
                   </div>
                   {edit ? (
@@ -3137,8 +3166,22 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 <div className="bg-white rounded-lg px-2 p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <PencilIcon className="h-4 w-4 text-gray-500" />
-                    <h3 className="text-sm font-bold text-gray-900">
+                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
                       Comment extern
+                      {(offer.notes || form.notes) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(offer.notes || form.notes || "");
+                            toast.success("External comment copied to clipboard!");
+                          }}
+                          className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                          title="Copy External Comment"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </h3>
                   </div>
                   {edit ? (

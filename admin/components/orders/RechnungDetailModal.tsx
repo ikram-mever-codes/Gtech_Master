@@ -17,6 +17,7 @@ import {
   X,
   AlertCircle,
   Mail,
+  Copy,
 } from "lucide-react";
 import {
   downloadRechnungEml,
@@ -630,8 +631,22 @@ export default function RechnungDetailModal({
                   </span>
                 )}
             </div>
-            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
-              {companyName}
+            <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
+              <span>{companyName}</span>
+              {companyName && companyName !== "—" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(companyName);
+                    toast.success("Title copied to clipboard!");
+                  }}
+                  className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
+                  title="Copy Title"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              )}
             </h2>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -1271,133 +1286,187 @@ export default function RechnungDetailModal({
             </div>
           )}
 
-          <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
-            <div className="flex items-center gap-2 mb-3">
-              <LinkIcon className="h-4 w-4 text-gray-500" />
-              <h3 className="text-sm font-bold text-gray-900">
-                Linked documents
-              </h3>
-            </div>
-            {auftragDocs.length === 0 &&
-            rechnungenKDocs.length === 0 &&
-            rechnungDocs.length === 0 ? (
-              <p className="text-sm text-gray-500">No linked documents yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {!isCorrection && auftragDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Auftrag
-                    </p>
-                    {auftragDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToAuftrag?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.order_no}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {!isCorrection && rechnungenKDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      RK
-                    </p>
-                    {rechnungenKDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToRechnungK?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.invoice_number}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {isCorrection && rechnungDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Rechnung
-                    </p>
-                    {rechnungDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToRechnung?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.invoice_number}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {isCorrection && auftragDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Auftrag
-                    </p>
-                    {auftragDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToAuftrag?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.order_no}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Linked documents
+                </h3>
               </div>
-            )}
+              {auftragDocs.length === 0 &&
+              rechnungenKDocs.length === 0 &&
+              rechnungDocs.length === 0 ? (
+                <p className="text-sm text-gray-500">No linked documents yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {!isCorrection && auftragDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Auftrag
+                      </p>
+                      {auftragDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToAuftrag?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.order_no}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!isCorrection && rechnungenKDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        RK
+                      </p>
+                      {rechnungenKDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToRechnungK?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.invoice_number}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {isCorrection && rechnungDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Rechnung
+                      </p>
+                      {rechnungDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToRechnung?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.invoice_number}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {isCorrection && auftragDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Auftrag
+                      </p>
+                      {auftragDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToAuftrag?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.order_no}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Pencil className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment intern
+                  {(data.internal_notes || data.internalNotes) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(data.internal_notes || data.internalNotes || "");
+                        toast.success("Internal comment copied to clipboard!");
+                      }}
+                      className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                      title="Copy Internal Comment"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                {data.internal_notes || data.internalNotes || "—"}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Pencil className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment extern
+                  {(data.notes || data.comment || data.notes_external) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(data.notes || data.comment || data.notes_external || "");
+                        toast.success("External comment copied to clipboard!");
+                      }}
+                      className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                      title="Copy External Comment"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                {data.notes || data.comment || data.notes_external || "—"}
+              </p>
+            </div>
           </div>
         </div>
 
