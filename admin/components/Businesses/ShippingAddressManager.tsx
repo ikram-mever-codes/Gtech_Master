@@ -133,11 +133,11 @@ export const ShippingAddressManager: React.FC<ShippingAddressManagerProps> = ({
   };
 
   return (
-    <div className="rounded-xl p-4 -mx-4 mt-4 bg-blue-50 border border-blue-200/70 space-y-4">
+    <div className="rounded-xl p-4 bg-blue-50/60 border border-blue-200/70 space-y-4 h-full flex flex-col justify-between">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
           <MapPin className="h-5 w-5 text-gray-500" />
-          <span>Shipping Addresses {displayName ? `${displayName} ` : ""}</span>
+          <span>Shipping Addresses</span>
           <span className="text-xs font-normal text-gray-500">
             ({shippingAddresses.length})
           </span>
