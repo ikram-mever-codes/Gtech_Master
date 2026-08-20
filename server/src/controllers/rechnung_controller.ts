@@ -1013,10 +1013,11 @@ export const downloadRechnungEml = async (
       user: (req as any).user,
     });
 
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
     res.setHeader("Content-Type", "message/rfc822");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${emlData.filename}"`,
+      `attachment; filename="${emlData.filename}"; filename*=UTF-8''${encodeURIComponent(emlData.filename)}`,
     );
     fs.createReadStream(emlData.emlFilePath).pipe(res);
   } catch (err) {
