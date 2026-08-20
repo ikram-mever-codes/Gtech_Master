@@ -190,23 +190,16 @@ export const kundeColumn: ColumnDef<any> = {
   align: "left",
   render: (row) => {
     const text =
-      row.customerSnapshot?.displayName ||
-      row.customerSnapshot?.display_name ||
-      row.customer?.displayName ||
       row.customer?.display_name ||
-      row.customerName ||
-      row.customer_name ||
+      row.customerSnapshot?.displayName ||
+      row.customer?.displayName ||
       row.customerSnapshot?.companyName ||
       row.customer?.company_name ||
       row.customer?.companyName ||
-      row.customer?.name ||
+      row.customerName ||
       row.supplier?.displayName ||
-      row.supplier?.display_name ||
+      row.supplier?.company_name ||
       row.supplier?.name ||
-      row.customerSnapshot?.legalName ||
-      row.customer?.legalName ||
-      row.bill_to ||
-      row.ship_to ||
       "—";
     return (
       <div
