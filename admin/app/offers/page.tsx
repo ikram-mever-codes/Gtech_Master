@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   ArrowPathIcon,
   PlusIcon,
@@ -57,11 +63,12 @@ import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 // Item Number
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
-  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
+  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
   }`;
 
 const getContrastTextColor = (hex: string): string => {
@@ -217,8 +224,8 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                           alt="thumb"
                           className="w-full h-full object-contain"
                           onError={(e) =>
-                          ((e.target as HTMLImageElement).style.display =
-                            "none")
+                            ((e.target as HTMLImageElement).style.display =
+                              "none")
                           }
                         />
                       ) : (
@@ -303,8 +310,7 @@ const OfferActionMenu: React.FC<{
   }, [isOpen]);
 
   const conversionCount =
-    Number(row.conversionCount) ||
-    (row.highlightColor === "#ECEAE6" ? 1 : 0);
+    Number(row.conversionCount) || (row.highlightColor === "#ECEAE6" ? 1 : 0);
   const isConverted = conversionCount > 0;
   const isBottom = rowIndex !== undefined && rowIndex >= 5;
 
@@ -316,23 +322,26 @@ const OfferActionMenu: React.FC<{
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
-          ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
-          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
-          }`}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
+          isOpen
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+        }`}
         title="Aktionen"
       >
         <ChevronRight
-          className={`w-4 h-4 transition-transform duration-150 ${isOpen ? "rotate-90 text-[#8CC21B]" : ""
-            }`}
+          className={`w-4 h-4 transition-transform duration-150 ${
+            isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          }`}
         />
       </button>
 
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
-            } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+          className={`absolute right-0 ${
+            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
         >
           <div className="p-1">
             <button
@@ -344,11 +353,15 @@ const OfferActionMenu: React.FC<{
               }}
               className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
             >
-              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-[4px] shrink-0 text-white flex items-center justify-center ${isConverted ? "bg-gray-500" : "bg-[#2F6B46]"}`}>
+              <span
+                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-[4px] shrink-0 text-white flex items-center justify-center ${isConverted ? "bg-gray-500" : "bg-[#2F6B46]"}`}
+              >
                 <MoveRight className="h-3 w-3" />
               </span>
               <div className="flex-1 min-w-0 flex items-center justify-between">
-                <span className="text-xs font-semibold">In Auftrag umwandeln</span>
+                <span className="text-xs font-semibold">
+                  In Auftrag umwandeln
+                </span>
                 {conversionCount > 0 && (
                   <span className="px-1 py-0.5 text-[9px] font-black bg-gray-200 text-gray-700 rounded-full border border-gray-300">
                     {conversionCount}
@@ -366,7 +379,7 @@ const OfferActionMenu: React.FC<{
                 setIsOpen(false);
                 try {
                   await downloadOfferPdf(row.id, row.offerNumber);
-                } catch (_) { }
+                } catch (_) {}
               }}
               className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
             >
@@ -513,10 +526,10 @@ const OffersPage: React.FC<any> = ({
         prevOffers.map((o) =>
           o.id === offer.id
             ? {
-              ...o,
-              highlightColor: "#ECEAE6",
-              conversionCount: nextCount,
-            }
+                ...o,
+                highlightColor: "#ECEAE6",
+                conversionCount: nextCount,
+              }
             : o,
         ),
       );
@@ -526,7 +539,7 @@ const OffersPage: React.FC<any> = ({
           highlightColor: "#ECEAE6",
           conversionCount: nextCount,
         } as any);
-      } catch (_) { }
+      } catch (_) {}
 
       fetchOffers();
       onOrderConverted?.();
@@ -578,18 +591,18 @@ const OffersPage: React.FC<any> = ({
       if (customerNo) {
         const cNo = String(
           offer.customerSnapshot?.customerNumber ||
-          (offer as any).customer?.customer_number ||
-          "",
+            (offer as any).customer?.customer_number ||
+            "",
         );
         if (!cNo.toLowerCase().includes(customerNo.toLowerCase())) return false;
       }
       if (customerName) {
         const name = String(
           offer.customerSnapshot?.companyName ||
-          offer.customerSnapshot?.name ||
-          (offer as any).customer?.company_name ||
-          (offer as any).customer?.name ||
-          "",
+            offer.customerSnapshot?.name ||
+            (offer as any).customer?.company_name ||
+            (offer as any).customer?.name ||
+            "",
         );
         if (!name.toLowerCase().includes(customerName.toLowerCase()))
           return false;
@@ -657,13 +670,13 @@ const OffersPage: React.FC<any> = ({
           );
         },
       },
-      buildNettowertColumn((row: any) =>
-        Number(
-          row.subtotal !== undefined && row.subtotal !== null
-            ? row.subtotal
-            : row.totalAmount || 0,
-        ),
-      ),
+      buildNettowertColumn((row: any) => {
+        if (row.subtotal !== undefined && row.subtotal !== null) {
+          return Number(row.subtotal) + Number(row.shippingCost || 0);
+        }
+        // totalAmount already includes shippingCost (see Offer.calculateTotals())
+        return Number(row.totalAmount || 0);
+      }),
       {
         header: "Status",
         width: "90px",
@@ -835,10 +848,11 @@ const OffersPage: React.FC<any> = ({
                     setCurrentPage(p);
                     setFilters({ ...filters, page: p });
                   }}
-                  className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
-                    ? "bg-gray-600 text-white"
-                    : "bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
+                  className={`px-2 py-1 text-sm rounded-lg ${
+                    currentPage === p
+                      ? "bg-gray-600 text-white"
+                      : "bg-white border border-gray-300 hover:bg-gray-50"
+                  }`}
                 >
                   {p}
                 </button>
