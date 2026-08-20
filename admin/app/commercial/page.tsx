@@ -1286,25 +1286,38 @@ const InvoiceListPage: React.FC = () => {
         items: b.orderItems || b.items || [],
       }));
     } else if (activeInvTab === "rechnung") {
-      list = (tabData.rechnungen || []).map((r: any) => ({
-        ...r,
-        invoiceNumber: r.invoice_number || r.invoiceNumber || r.id,
-        invoiceDate: r.invoice_date || r.invoiceDate,
-        createdAt: r.created_at || r.createdAt || r.invoice_date,
-        netTotal: r.subtotal,
-        grossTotal: r.total_amount || r.grossTotal,
-        customer_name:
-          r.customer?.company_name ||
-          r.customer?.name ||
-          r.customer_name ||
-          "—",
-        customerSnapshot: {
-          companyName: r.customer?.company_name || r.customer?.name || "—",
-          email: r.customer?.email || "—",
-          country: r.customer?.country || "",
-          city: r.customer?.city || "",
-        },
-      }));
+      list = (tabData.rechnungen || []).map((r: any) => {
+        const cust = r.customer || {};
+        const snap = r.customerSnapshot || {};
+        const dispName =
+          cust.display_name ||
+          cust.displayName ||
+          snap.displayName ||
+          snap.display_name ||
+          cust.company_name ||
+          cust.companyName ||
+          cust.name ||
+          "";
+        return {
+          ...r,
+          invoiceNumber: r.invoice_number || r.invoiceNumber || r.id,
+          invoiceDate: r.invoice_date || r.invoiceDate,
+          createdAt: r.created_at || r.createdAt || r.invoice_date,
+          netTotal: r.subtotal,
+          grossTotal: r.total_amount || r.grossTotal,
+          customer_name: dispName || "—",
+          customerSnapshot: {
+            ...snap,
+            displayName: dispName,
+            display_name: dispName,
+            companyName: cust.company_name || cust.companyName || cust.name || snap.companyName || "—",
+            email: cust.email || snap.email || "—",
+            country: cust.country || snap.country || "",
+            city: cust.city || snap.city || "",
+            postalCode: cust.postal_code || cust.postalCode || snap.postalCode || snap.postal_code || "",
+          },
+        };
+      });
 
       const auditFilter = searchParams.get("filter");
       if (auditFilter === "missing_gelangenheitsbestaetigung") {
@@ -1338,48 +1351,76 @@ const InvoiceListPage: React.FC = () => {
         },
       }));
     } else if (activeInvTab === "rk") {
-      list = (tabData.rechnungenK || []).map((rk: any) => ({
-        ...rk,
-        invoiceNumber:
-          rk.rk_number || rk.invoice_number || rk.invoiceNumber || rk.id,
-        invoiceDate: rk.rk_date || rk.invoice_date || rk.invoiceDate,
-        createdAt:
-          rk.created_at || rk.createdAt || rk.rk_date || rk.invoice_date,
-        netTotal: rk.subtotal,
-        grossTotal: rk.total_amount || rk.grossTotal,
-        customer_name:
-          rk.customer?.company_name ||
-          rk.customer?.name ||
-          rk.customer_name ||
-          "—",
-        customerSnapshot: {
-          companyName: rk.customer?.company_name || rk.customer?.name || "—",
-          email: rk.customer?.email || "—",
-          country: rk.customer?.country || "",
-          city: rk.customer?.city || "",
-        },
-      }));
+      list = (tabData.rechnungenK || []).map((rk: any) => {
+        const cust = rk.customer || {};
+        const snap = rk.customerSnapshot || {};
+        const dispName =
+          cust.display_name ||
+          cust.displayName ||
+          snap.displayName ||
+          snap.display_name ||
+          cust.company_name ||
+          cust.companyName ||
+          cust.name ||
+          "";
+        return {
+          ...rk,
+          invoiceNumber:
+            rk.rk_number || rk.invoice_number || rk.invoiceNumber || rk.id,
+          invoiceDate: rk.rk_date || rk.invoice_date || rk.invoiceDate,
+          createdAt:
+            rk.created_at || rk.createdAt || rk.rk_date || rk.invoice_date,
+          netTotal: rk.subtotal,
+          grossTotal: rk.total_amount || rk.grossTotal,
+          customer_name: dispName || "—",
+          customerSnapshot: {
+            ...snap,
+            displayName: dispName,
+            display_name: dispName,
+            companyName: cust.company_name || cust.companyName || cust.name || snap.companyName || "—",
+            email: cust.email || snap.email || "—",
+            country: cust.country || snap.country || "",
+            city: cust.city || snap.city || "",
+            postalCode: cust.postal_code || cust.postalCode || snap.postalCode || snap.postal_code || "",
+          },
+        };
+      });
     } else if (activeInvTab === "lieferschein") {
-      list = (tabData.lieferscheine || []).map((ls: any) => ({
-        ...ls,
-        invoiceNumber:
-          ls.invoiceNumber || ls.deliveryNoteNo || ls.order_no || ls.id,
-        order_no: ls.orderNumber || ls.order_no || ls.invoiceNumber || ls.id,
-        createdAt: ls.date || ls.createdAt || ls.created_at || ls.invoiceDate,
-        customerSnapshot: {
-          companyName:
-            ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
-          contactEmail:
-            ls.customer?.email || ls.customer?.contactEmail || ls.email || "—",
-          postalCode: ls.customer?.postalCode || ls.postalCode || "",
-          city: ls.city || ls.customer?.city || "",
-          country: ls.country || ls.customer?.country || "",
-        },
-        customer_name:
-          ls.customerName || ls.customer?.companyName || ls.bill_to || "—",
-        items: ls.items || ls.lineItems || [],
-        customItemCount: ls.itemCount ?? ls.items?.length ?? 0,
-      }));
+      list = (tabData.lieferscheine || []).map((ls: any) => {
+        const cust = ls.customer || {};
+        const snap = ls.customerSnapshot || {};
+        const dispName =
+          cust.display_name ||
+          cust.displayName ||
+          snap.displayName ||
+          snap.display_name ||
+          ls.customerName ||
+          cust.companyName ||
+          cust.company_name ||
+          "";
+        return {
+          ...ls,
+          invoiceNumber:
+            ls.invoiceNumber || ls.deliveryNoteNo || ls.order_no || ls.id,
+          order_no: ls.orderNumber || ls.order_no || ls.invoiceNumber || ls.id,
+          createdAt: ls.date || ls.createdAt || ls.created_at || ls.invoiceDate,
+          customerSnapshot: {
+            ...snap,
+            displayName: dispName,
+            display_name: dispName,
+            companyName:
+              ls.customerName || cust.companyName || cust.company_name || ls.bill_to || "—",
+            contactEmail:
+              cust.email || cust.contactEmail || ls.email || "—",
+            postalCode: cust.postalCode || cust.postal_code || ls.postalCode || snap.postalCode || "",
+            city: ls.city || cust.city || snap.city || "",
+            country: ls.country || cust.country || snap.country || "",
+          },
+          customer_name: dispName || ls.customerName || "—",
+          items: ls.items || ls.lineItems || [],
+          customItemCount: ls.itemCount ?? ls.items?.length ?? 0,
+        };
+      });
     }
 
     list.sort((a: any, b: any) => {
