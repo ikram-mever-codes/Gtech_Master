@@ -708,7 +708,7 @@ const CombinedInquiriesPageContent = () => {
   };
   const fetchContactPersons = async () => {
     try {
-      const response = await getAllContactPersons();
+      const response = await getAllContactPersons({ limit: 1000 });
       console.log(response);
       if (response?.data?.contactPersons) {
         setContactPersons(response.data.contactPersons);
@@ -2292,7 +2292,11 @@ const CombinedInquiriesPageContent = () => {
                   showEmptyText={false}
                 />
               </div>
-            ) : inquiryModalMode === "edit" && editingInquiryId && (editModeEnabled || ((inquiryFormData as any).tags && (inquiryFormData as any).tags.length > 0)) ? (
+            ) : inquiryModalMode === "edit" &&
+              editingInquiryId &&
+              (editModeEnabled ||
+                ((inquiryFormData as any).tags &&
+                  (inquiryFormData as any).tags.length > 0)) ? (
               <div className="flex items-center gap-2">
                 {editModeEnabled && (
                   <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
@@ -2475,7 +2479,9 @@ const CombinedInquiriesPageContent = () => {
                             owner_user_id: e.target.value,
                           })
                         }
-                        disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          inquiryModalMode === "edit" && !editModeEnabled
+                        }
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">Select Owner</option>
@@ -2495,8 +2501,8 @@ const CombinedInquiriesPageContent = () => {
                         value={
                           inquiryFormData.next_followup_at
                             ? new Date(inquiryFormData.next_followup_at)
-                              .toISOString()
-                              .split("T")[0]
+                                .toISOString()
+                                .split("T")[0]
                             : ""
                         }
                         onChange={(e) =>
@@ -2505,7 +2511,9 @@ const CombinedInquiriesPageContent = () => {
                             next_followup_at: e.target.value || undefined,
                           })
                         }
-                        disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          inquiryModalMode === "edit" && !editModeEnabled
+                        }
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -2522,7 +2530,9 @@ const CombinedInquiriesPageContent = () => {
                             next_action: e.target.value,
                           })
                         }
-                        disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          inquiryModalMode === "edit" && !editModeEnabled
+                        }
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="e.g. Call client"
                       />
