@@ -8,9 +8,9 @@ import {
   PlusIcon,
   LinkIcon,
   UserIcon,
+  ClipboardDocumentIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { Copy } from "lucide-react";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import {
@@ -796,7 +796,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
                   title="Copy Title"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <ClipboardDocumentIcon className="w-4 h-4" />
                 </button>
               )}
             </h2>
@@ -1357,7 +1357,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                       className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
                       title="Copy Comment"
                     >
-                      <Copy className="w-3.5 h-3.5" />
+                      <ClipboardDocumentIcon className="w-4 h-4" />
                     </button>
                   )}
                 </h3>

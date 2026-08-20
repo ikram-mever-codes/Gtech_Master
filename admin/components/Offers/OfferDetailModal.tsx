@@ -12,9 +12,9 @@ import {
   LinkIcon,
   CubeIcon,
   BuildingOfficeIcon,
+  ClipboardDocumentIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { Copy } from "lucide-react";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
@@ -1969,7 +1969,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
                       title="Copy Title"
                     >
-                      <Copy className="w-3.5 h-3.5" />
+                      <ClipboardDocumentIcon className="w-4 h-4" />
                     </button>
                   )}
                 </h2>
@@ -3138,7 +3138,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
                           title="Copy Internal Comment"
                         >
-                          <Copy className="w-3.5 h-3.5" />
+                          <ClipboardDocumentIcon className="w-4 h-4" />
                         </button>
                       )}
                     </h3>
@@ -3179,7 +3179,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
                           title="Copy External Comment"
                         >
-                          <Copy className="w-3.5 h-3.5" />
+                          <ClipboardDocumentIcon className="w-4 h-4" />
                         </button>
                       )}
                     </h3>

@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, ClipboardDocumentIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, FileText, Pencil, Save, X, Truck, Copy } from "lucide-react";
+import { Loader2, FileText, Pencil, Save, X, Truck } from "lucide-react";
 import { formatDate } from "@/utils/date";
 import { updateLieferscheinStatus } from "@/api/lieferscheine";
 
@@ -245,7 +245,7 @@ export default function LieferscheinDetailModal({
                   className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
                   title="Copy Title"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <ClipboardDocumentIcon className="w-4 h-4" />
                 </button>
               )}
             </h2>
@@ -474,7 +474,7 @@ export default function LieferscheinDetailModal({
                       className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
                       title="Copy Internal Comment"
                     >
-                      <Copy className="w-3.5 h-3.5" />
+                      <ClipboardDocumentIcon className="w-4 h-4" />
                     </button>
                   )}
                 </h3>
@@ -500,7 +500,7 @@ export default function LieferscheinDetailModal({
                       className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
                       title="Copy External Comment"
                     >
-                      <Copy className="w-3.5 h-3.5" />
+                      <ClipboardDocumentIcon className="w-4 h-4" />
                     </button>
                   )}
                 </h3>
