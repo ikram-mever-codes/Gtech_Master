@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronRight, FileText } from "lucide-react";
+import { ChevronRight, FileText, FileDown, Mail } from "lucide-react";
+import { downloadCustomerOrderPdf, downloadCustomerOrderEml } from "@/api/customer_orders";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -87,6 +88,40 @@ const BestellungActionMenu: React.FC<{
               </button>
             </div>
           )}
+
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                try {
+                  await downloadCustomerOrderPdf(row.id, row.order_no);
+                } catch (_) {}
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <FileDown className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="text-xs font-semibold">PDF öffnen</span>
+            </button>
+          </div>
+
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                try {
+                  await downloadCustomerOrderEml(row.id, row.order_no);
+                } catch (_) {}
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
+              <span className="text-xs font-semibold">PDF in Email</span>
+            </button>
+          </div>
 
           <div className="p-1">
             <button
