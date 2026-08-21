@@ -1409,9 +1409,9 @@ const InvoiceListPage: React.FC = () => {
           cust.displayName ||
           snap.displayName ||
           snap.display_name ||
-          ls.customerName ||
           snap.companyName ||
           cust.companyName ||
+          ls.customerName ||
           cust.company_name ||
           "";
         return {
