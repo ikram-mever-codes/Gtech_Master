@@ -12,6 +12,7 @@ import {
   getRechnungOpenQuantities,
   getAllRechnungenK,
   deleteRechnungK,
+  updateRechnungK,
 } from "@/api/rechnungen_k";
 
 import { Plus, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
@@ -303,6 +304,7 @@ const InvoiceListPage: React.FC = () => {
     new Set(),
   );
   const [invoiceEditForm, setInvoiceEditForm] = useState({
+    title: "",
     description: "",
     freightCost: "",
     remark: "",
@@ -313,6 +315,7 @@ const InvoiceListPage: React.FC = () => {
     setShowInvoiceDetailsModal(true);
     setModalActiveTab("taric");
     setInvoiceEditForm({
+      title: invoice.title || "",
       description: invoice.description || "",
       freightCost: invoice.freightCost?.toString() || "",
       remark: invoice.remark || "",
@@ -1228,16 +1231,25 @@ const InvoiceListPage: React.FC = () => {
 
     try {
       setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: true }));
-      await updateInvoice({
-        id: invoiceId,
-        description: invoiceEditForm.description,
-        freightCost: invoiceEditForm.freightCost,
-        remark: invoiceEditForm.remark,
-      });
+      if (activeInvTab === "rk") {
+        await updateRechnungK(invoiceId, {
+          title: invoiceEditForm.title,
+          notes: invoiceEditForm.description || invoiceEditForm.remark,
+        });
+      } else {
+        await updateInvoice({
+          id: invoiceId,
+          title: invoiceEditForm.title,
+          description: invoiceEditForm.description,
+          freightCost: invoiceEditForm.freightCost,
+          remark: invoiceEditForm.remark,
+        });
+      }
       setSelectedInvoice((prev: any) =>
         prev
           ? {
             ...prev,
+            title: invoiceEditForm.title,
             description: invoiceEditForm.description,
             freightCost: invoiceEditForm.freightCost,
             remark: invoiceEditForm.remark,

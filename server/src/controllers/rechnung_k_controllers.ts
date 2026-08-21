@@ -23,13 +23,13 @@ async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
     rechnungK.original_rechnung_id
       ? rechnungRepo.findOne({
         where: { id: rechnungK.original_rechnung_id },
-        select: ["id", "invoice_number", "created_at"],
+        select: ["id", "invoice_number", "title", "created_at"],
       })
       : Promise.resolve(null),
     rechnungK.auftrag_id
       ? customerOrderRepo.findOne({
         where: { id: rechnungK.auftrag_id },
-        select: ["id", "order_no", "created_at"],
+        select: ["id", "order_no", "title", "created_at"],
       })
       : Promise.resolve(null),
   ]);
@@ -71,13 +71,13 @@ async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
     originalRechnungIds.length
       ? rechnungRepo.find({
         where: { id: In(originalRechnungIds) },
-        select: ["id", "invoice_number", "created_at"],
+        select: ["id", "invoice_number", "title", "created_at"],
       })
       : Promise.resolve([]),
     auftragIds.length
       ? customerOrderRepo.find({
         where: { id: In(auftragIds) },
-        select: ["id", "order_no", "created_at"],
+        select: ["id", "order_no", "title", "created_at"],
       })
       : Promise.resolve([]),
   ]);
@@ -392,6 +392,7 @@ export const createRechnungKFromRechnung = async (
 
     const rechnungK = rechnungKRepo.create({
       invoice_number: correctionNo,
+      title: original.title,
       original_rechnung_id: original.id,
       auftrag_id: original.auftrag_id,
       auftrag_no: original.auftrag_no,
@@ -498,13 +499,22 @@ export const getAllRechnungenK = async (
     const linkedDocumentsByRechnungKId =
       await getLinkedDocumentsForRechnungenK(rechnungenK);
 
-    const rechnungenKWithLinkedDocuments = rechnungenK.map((rk: any) => ({
-      ...rk,
-      linkedDocuments: linkedDocumentsByRechnungKId.get(rk.id) || {
+    const rechnungenKWithLinkedDocuments = rechnungenK.map((rk: any) => {
+      const linkedDocs = linkedDocumentsByRechnungKId.get(rk.id) || {
         rechnung: [],
         auftrag: [],
-      },
-    }));
+      };
+      const title =
+        rk.title ||
+        linkedDocs.rechnung[0]?.title ||
+        linkedDocs.auftrag[0]?.title ||
+        undefined;
+      return {
+        ...rk,
+        title,
+        linkedDocuments: linkedDocs,
+      };
+    });
 
     res.json({ success: true, data: rechnungenKWithLinkedDocuments });
   } catch (error) {
@@ -533,8 +543,13 @@ export const getRechnungKById = async (
     }
 
     const linkedDocuments = await getLinkedDocumentsForRechnungK(rechnungK);
+    const title =
+      rechnungK.title ||
+      linkedDocuments.rechnung[0]?.title ||
+      linkedDocuments.auftrag[0]?.title ||
+      undefined;
 
-    res.json({ success: true, data: { ...rechnungK, linkedDocuments } });
+    res.json({ success: true, data: { ...rechnungK, title, linkedDocuments } });
   } catch (error) {
     next(error);
   }
@@ -833,5 +848,52 @@ export const downloadRechnungKPdf = async (
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);
+  }
+};
+
+export const updateRechnungK = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const {
+      customerSnapshot,
+      deliveryAddress,
+      notes,
+      internal_notes,
+      highlight_color,
+      title,
+    } = req.body;
+
+    const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
+    const rechnungK = await rechnungKRepo.findOne({
+      where: { id },
+      relations: ["items", "customer"],
+    });
+
+    if (!rechnungK) {
+      res.status(404).json({ success: false, message: "Correction invoice not found" });
+      return;
+    }
+
+    if (notes !== undefined) rechnungK.notes = notes;
+    if (internal_notes !== undefined) rechnungK.internal_notes = internal_notes;
+    if (highlight_color !== undefined) rechnungK.highlight_color = highlight_color;
+    if (title !== undefined) rechnungK.title = title;
+    if (customerSnapshot !== undefined) rechnungK.customerSnapshot = { ...customerSnapshot };
+    if (deliveryAddress !== undefined) rechnungK.deliveryAddress = { ...deliveryAddress };
+
+    await rechnungKRepo.save(rechnungK);
+
+    res.json({
+      success: true,
+      message: "Correction invoice updated successfully",
+      data: rechnungK,
+    });
+  } catch (error) {
+    console.error("[updateRechnungK] error:", error);
+    next(error);
   }
 };

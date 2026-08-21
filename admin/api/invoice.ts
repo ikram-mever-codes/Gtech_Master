@@ -32,6 +32,7 @@ interface CreateInvoicePayload {
 
 interface UpdateInvoicePayload extends Partial<CreateInvoicePayload> {
   id: string;
+  title?: string;
   description?: string;
   freightCost?: number | string;
   remark?: string;

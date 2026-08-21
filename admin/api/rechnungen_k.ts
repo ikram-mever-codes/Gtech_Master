@@ -55,6 +55,19 @@ export const updateRechnungKItem = async (
   }
 };
 
+export const updateRechnungK = async (
+  id: string | number,
+  data: { title?: string; notes?: string; internal_notes?: string; highlight_color?: string },
+) => {
+  try {
+    const response: any = await api.patch(`/rechnungen-k/${id}`, data);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to update correction invoice");
+    throw error;
+  }
+};
+
 export const deleteRechnungK = async (id: string | number) => {
   try {
     const response: any = await api.delete(`/rechnungen-k/${id}`);

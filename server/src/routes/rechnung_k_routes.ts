@@ -5,6 +5,7 @@ import {
   getAllRechnungenK,
   getRechnungKById,
   updateRechnungKItem,
+  updateRechnungK,
   deleteRechnungK,
   getRechnungOpenQuantities,
   downloadRechnungKPdf,
@@ -22,6 +23,8 @@ router.get("/", getAllRechnungenK);
 router.get("/:id/download-pdf", downloadRechnungKPdf);
 
 router.get("/:id", getRechnungKById);
+
+router.patch("/:id", updateRechnungK);
 
 router.patch("/:rechnungKId/items/:itemId", updateRechnungKItem);
 

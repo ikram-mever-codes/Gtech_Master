@@ -25,6 +25,9 @@ export class Rechnung_k {
   @Column({ type: "varchar", length: 100, unique: true })
   invoice_number!: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  title?: string;
+
   @Column({ type: "integer", nullable: true })
   auftrag_id?: number;
 
