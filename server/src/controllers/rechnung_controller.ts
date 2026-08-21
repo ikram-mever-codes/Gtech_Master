@@ -622,6 +622,7 @@ export const getLieferscheine = async (
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
       const customer = rechnung?.customer;
+      const customerSnapshot = rechnung?.customerSnapshot;
       const items = rechnung?.items || [];
       const auftragId = rechnung?.auftrag_id || ls.auftrag_id;
       const title =
@@ -629,6 +630,14 @@ export const getLieferscheine = async (
         rechnung?.title ||
         (auftragId ? auftragTitleById.get(auftragId) : undefined) ||
         undefined;
+
+      const custName =
+        customerSnapshot?.displayName ||
+        customerSnapshot?.display_name ||
+        customer?.display_name ||
+        customer?.company_name ||
+        customerSnapshot?.companyName ||
+        "—";
 
       return {
         id: ls.id,
@@ -638,16 +647,16 @@ export const getLieferscheine = async (
         title,
         date: ls.delivery_date,
         status: ls.status,
-        customerName:
-          customer?.display_name ||
-          customer?.company_name ||
-          "—",
-        city: customer?.city || "",
+        customerName: custName,
+        customer: customer || customerSnapshot,
+        customerSnapshot: customerSnapshot,
+        city: customer?.city || customerSnapshot?.city || "",
         postalCode:
-          (rechnung?.customerSnapshot as any)?.postalCode ||
-          (rechnung?.customerSnapshot as any)?.postal_code ||
+          (customerSnapshot as any)?.postalCode ||
+          (customerSnapshot as any)?.postal_code ||
+          customer?.city ||
           "",
-        country: customer?.country || "",
+        country: customer?.country || customerSnapshot?.country || "",
         itemCount: items.length,
         items: items.map((item) => ({
           id: item.id,
