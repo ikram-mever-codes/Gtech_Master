@@ -827,6 +827,18 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   // Delivered — regardless of how `edit` got set.
   const effectiveEdit = edit && canEnterEditMode;
 
+  // Same read as OfferDetailModal's `offer?.taxProfile`: a customer-level
+  // tax profile object ({ name, taxRate }) that Offer expects its backend
+  // to attach to the response, resolved fresh from the customer on every
+  // load — not a field stored on the entity itself (neither Offer nor
+  // CustomerOrder declares a taxProfile relation in the entity classes
+  // I've seen). I don't have customer_orders_controller.ts's
+  // getCustomerOrderById in this conversation, so I can't confirm it
+  // attaches the same object to the Auftrag response. If it doesn't yet,
+  // this will just always show the fallback text below — that's a
+  // backend gap to close there, not something fixable from this file.
+  const taxProfile = order?.taxProfile || null;
+
   const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
     const qty = parseFlexibleNumber(li.quantity) ?? 1;
     const weightGrams = parseFlexibleNumber(li.weight) ?? 0;
@@ -1170,6 +1182,19 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   onChange={(e) => patch({ title: e.target.value })}
                 />
               </Field>
+              {/* Tax profile — added to mirror OfferDetailModal's field of
+                  the same name and position (right after Title). Always
+                  read-only, same as Offer's — there is no edit affordance
+                  for it there either. */}
+              <Field
+                label="Tax profile"
+                edit={false}
+                value={
+                  taxProfile
+                    ? `${taxProfile.name} (${taxProfile.taxRate}%)`
+                    : "No tax profile assigned to this customer"
+                }
+              />
               {/* <Field label="Status" edit={edit} value={order.status}>
                 <select
                   className={inputCls}
@@ -1966,7 +1991,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(form.internalNotes || order.internal_notes || "");
+                      navigator.clipboard.writeText(
+                        form.internalNotes || order.internal_notes || "",
+                      );
                       toast.success("Internal comment copied to clipboard!");
                     }}
                     className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
@@ -1999,7 +2026,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(form.notes || order.notes || "");
+                      navigator.clipboard.writeText(
+                        form.notes || order.notes || "",
+                      );
                       toast.success("External comment copied to clipboard!");
                     }}
                     className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"

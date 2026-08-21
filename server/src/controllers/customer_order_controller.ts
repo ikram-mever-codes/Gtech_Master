@@ -26,8 +26,11 @@ import { Rechnung } from "../models/rechnung";
 import { Rechnung_k } from "../models/rechnung_k";
 import { TransferOrder } from "../models/transfer_order";
 import { RechnungItem } from "../models/rechnung_items";
+import { TaxProfile } from "../models/tax_profile";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
+const customerRepo = AppDataSource.getRepository(Customer);
+const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
 
 /**
  * Helper function to check if any of the order's line items are stock items
@@ -579,43 +582,65 @@ async function attachDeliveredQuantityToOrders(
   }
 }
 
-export const getAllCustomerOrders = async (
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
-    const orders = await customerOrderRepo.find({
-      order: { created_at: "DESC" },
-      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
-    });
+/** Same shape OfferController.mapTaxProfile produces — see the earlier
+ * fix for why this has to match field-for-field, not just carry name/rate. */
+function mapTaxProfile(tp: any): any {
+  if (!tp) return null;
+  return {
+    id: tp.id,
+    name: tp.name,
+    taxCase: tp.tax_case || undefined,
+    taxRate: Number(tp.tax_rate) || 0,
+    taxCode: tp.tax_code || undefined,
+    requiresVatId: !!tp.requires_vat_id,
+    requiresConfirmedVatId: !!tp.requires_confirmed_vat_id,
+    description: tp.description || undefined,
+  };
+}
 
-    await attachStockInfoToOrders(orders);
-    await attachDeliveredQuantityToOrders(orders);
+/**
+ * Auftrag-specific fallback for an unassigned customer — deliberately NOT
+ * mirrored from Offer, which shows "No tax profile assigned" instead. You
+ * asked for Auftrag specifically to default to DE here. Tries a few
+ * plausible identifiers for your seeded default DE row; verify which one
+ * actually matches and trim the rest.
+ */
+async function getDefaultDeTaxProfile(): Promise<any> {
+  const candidates = await taxProfileRepo.find({
+    where: [
+      { tax_code: "DE_VAT" },
+      { tax_code: "DE" },
+      { name: "DE_VAT" },
+      { name: "DE-VAT" },
+      { name: "Germany" },
+      { name: "Deutschland" },
+    ],
+  });
+  const match = candidates.find((tp: any) => tp.is_active) || candidates[0];
 
-    const auftragIds = orders.map((o) => o.id);
-    const offerIdByAuftragId = new Map(orders.map((o) => [o.id, o.offer_id]));
-    const linkedDocumentsByAuftragId = await getLinkedDocumentsForAuftraege(
-      auftragIds,
-      offerIdByAuftragId,
-    );
+  return match
+    ? mapTaxProfile(match)
+    : {
+        id: null,
+        name: "DE_VAT",
+        taxCase: undefined,
+        taxRate: 19,
+        taxCode: "DE_VAT",
+      };
+}
 
-    const ordersWithLinkedDocuments = orders.map((order: any) => ({
-      ...order,
-      linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
-        offers: [],
-        rechnungen: [],
-        rechnungenK: [],
-        bestellungen: [],
-      },
-    }));
-
-    res.json({ success: true, data: ordersWithLinkedDocuments });
-  } catch (error) {
-    next(error);
-  }
-};
+/** Live lookup via the customer's `defaultTaxProfile` relation, same as
+ * Offer — but falls back to the DE default (instead of null) whenever
+ * there's no customer or no profile assigned. */
+async function getCustomerTaxProfile(customerId?: string | null): Promise<any> {
+  if (!customerId) return getDefaultDeTaxProfile();
+  const customer = await customerRepo.findOne({
+    where: { id: customerId },
+    relations: ["defaultTaxProfile"],
+  });
+  const resolved = mapTaxProfile(customer?.defaultTaxProfile);
+  return resolved || getDefaultDeTaxProfile();
+}
 
 export const getCustomerOrderById = async (
   req: Request,
@@ -655,11 +680,84 @@ export const getCustomerOrderById = async (
       order.offer_id,
     );
 
-    res.json({ success: true, data: { ...order, linkedDocuments } });
+    // Same call OfferController.getOfferById makes for offer.taxProfile —
+    // resolved from order.customer_id, the stored FK, not the loaded
+    // `customer` relation, matching Offer's own pattern exactly.
+    const taxProfile = await getCustomerTaxProfile(order.customer_id);
+
+    res.json({
+      success: true,
+      data: { ...order, linkedDocuments, taxProfile },
+    });
   } catch (error) {
     next(error);
   }
 };
+
+export const getAllCustomerOrders = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const orders = await customerOrderRepo.find({
+      order: { created_at: "DESC" },
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
+    });
+
+    await attachStockInfoToOrders(orders);
+    await attachDeliveredQuantityToOrders(orders);
+
+    const auftragIds = orders.map((o) => o.id);
+    const offerIdByAuftragId = new Map(orders.map((o) => [o.id, o.offer_id]));
+    const linkedDocumentsByAuftragId = await getLinkedDocumentsForAuftraege(
+      auftragIds,
+      offerIdByAuftragId,
+    );
+
+    // Batched tax profile lookup — one query for every distinct customer
+    // on the page, same pattern as OfferController.getAllOffers rather
+    // than N lookups (one per row).
+    const customerIds = Array.from(
+      new Set(
+        orders.map((o) => o.customer_id).filter((id): id is string => !!id),
+      ),
+    );
+
+    let taxProfileByCustomerId = new Map<string, any>();
+    if (customerIds.length > 0) {
+      const customersWithTax = await customerRepo.find({
+        where: { id: In(customerIds) },
+        relations: ["defaultTaxProfile"],
+      });
+      taxProfileByCustomerId = new Map(
+        customersWithTax.map((c: any) => [
+          c.id,
+          mapTaxProfile(c.defaultTaxProfile),
+        ]),
+      );
+    }
+
+    const ordersWithLinkedDocuments = orders.map((order: any) => ({
+      ...order,
+      taxProfile: order.customer_id
+        ? taxProfileByCustomerId.get(order.customer_id) || null
+        : null,
+      linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
+        offers: [],
+        rechnungen: [],
+        rechnungenK: [],
+        bestellungen: [],
+      },
+    }));
+
+    res.json({ success: true, data: ordersWithLinkedDocuments });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteCustomerOrder = async (
   req: Request,
   res: Response,
