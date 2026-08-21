@@ -3,6 +3,7 @@ import { AppDataSource } from "../config/database";
 import { Lieferschein } from "../models/lieferscheine";
 import { Rechnung } from "../models/rechnung";
 import { CustomerOrder } from "../models/customer_orders";
+import { Cargo } from "../models/cargos";
 import { In } from "typeorm";
 import path from "path";
 import fs from "fs";
@@ -424,6 +425,41 @@ export const downloadLieferscheinPdf = async (
       return `${day}.${month}.${year}`;
     };
 
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const auftragId = rechnung?.auftrag_id || lieferschein.auftrag_id;
+    let customerOrder: CustomerOrder | null = null;
+    if (auftragId) {
+      customerOrder = await customerOrderRepo.findOne({
+        where: { id: Number(auftragId) },
+        relations: ["weiterversandServiceProvider"],
+      });
+    }
+
+    const trackingList: string[] = [];
+    const customerId = rechnung?.customer?.id || customerSnap?.id || (lieferschein as any)?.customer_id;
+    if (customerId) {
+      const cargoRepo = AppDataSource.getRepository(Cargo);
+      const cargoList = await cargoRepo.find({
+        where: [{ customer_id: String(customerId) }],
+        order: { created_at: "DESC" },
+        take: 3,
+      });
+      cargoList.forEach((c) => {
+        const trackVal = c.cargo_no || c.online_track;
+        if (trackVal) {
+          trackingList.push(`Bahnfracht · ${trackVal}`);
+        }
+      });
+    }
+
+    const isWeiterversand = customerOrder?.is_weiterversand;
+    if (isWeiterversand && customerOrder?.weiterversand_tracking) {
+      const providerName = customerOrder.weiterversandServiceProvider?.name || "UPS";
+      trackingList.push(`${providerName} · ${customerOrder.weiterversand_tracking}`);
+    }
+
+    const effectiveShippingMethod = customerOrder?.shipping_method || rechnung?.shipping_method;
+
     await generateGtechDocumentPdf({
       documentType: "Lieferschein",
       documentNumber: lieferschein.delivery_note_number,
@@ -431,26 +467,19 @@ export const downloadLieferscheinPdf = async (
       customerEntity: rechnung?.customer,
       deliveryAddress: rechnung?.deliveryAddress,
       metadataItems: [
+        ["Status", "bestätigt"],
         ["Ansprechpartner", contactName],
         ["Kunde", kundeCombined],
         [
           "Datum",
           formatDateStr(lieferschein.date_created || lieferschein.created_at),
         ],
-        [
-          "Lieferdatum",
-          formatDateStr(
-            lieferschein.delivery_date ||
-            (lieferschein as any).date_delivery ||
-            rechnung?.date_delivery ||
-            rechnung?.delivery_date,
-          ),
-        ],
       ],
       isDelivered: true,
       lineItems: items,
       showPrices: false,
-      shippingMethod: rechnung?.shipping_method,
+      shippingMethod: effectiveShippingMethod,
+      trackingNumbers: trackingList,
       notes: lieferschein.notes || rechnung?.notes,
       deliveryTime:
         lieferschein.delivery_date ||

@@ -216,6 +216,7 @@ export interface PdfDocumentOptions {
   paymentMethod?: string;
   outputFilePath: string;
   vatBreakdown?: Array<{ rate: number; amount: number }>;
+  trackingNumbers?: string | string[];
 }
 
 export async function generateGtechDocumentPdf(
@@ -999,6 +1000,25 @@ export async function generateGtechDocumentPdf(
   if (opts.deliveryTerms) {
     doc.text(`Lieferbedingungen: ${opts.deliveryTerms}`, LEFT_X, yPos);
     yPos += 14;
+  }
+  if (opts.shippingMethod && opts.documentType === "Lieferschein") {
+    doc.text(`Versandart: ${opts.shippingMethod}`, LEFT_X, yPos);
+    yPos += 14;
+  }
+  if (opts.trackingNumbers && opts.documentType === "Lieferschein") {
+    const trackings = Array.isArray(opts.trackingNumbers)
+      ? opts.trackingNumbers
+      : [opts.trackingNumbers];
+    const validTrackings = trackings.filter(Boolean);
+    if (validTrackings.length > 0) {
+      doc.text("Tracking(s):", LEFT_X, yPos, { lineBreak: false });
+      const labelW = doc.widthOfString("Tracking(s): ");
+      validTrackings.forEach((trk, idx) => {
+        const curY = yPos + idx * 14;
+        doc.text(trk, LEFT_X + labelW, curY);
+      });
+      yPos += 14 * validTrackings.length;
+    }
   }
   if (opts.notes) {
     const rawNotes = String(opts.notes).trim();
