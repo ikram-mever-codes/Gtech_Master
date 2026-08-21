@@ -31,9 +31,9 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const [auftrag, rechnungenK] = await Promise.all([
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
-          where: { id: rechnung.auftrag_id },
-          select: ["id", "order_no", "title", "created_at"],
-        })
+        where: { id: rechnung.auftrag_id },
+        select: ["id", "order_no", "title", "created_at"],
+      })
       : Promise.resolve(null),
     rechnungKRepo.find({
       where: { original_rechnung_id: rechnung.id },
@@ -48,8 +48,6 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   };
 }
 
-/** Same as above, batched for many Rechnungen at once. Returns a Map keyed
- * by rechnung id. */
 async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const empty = () => ({ auftrag: [] as any[], rechnungenK: [] as any[] });
   const result = new Map<string, ReturnType<typeof empty>>();
@@ -72,9 +70,9 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const [auftraege, rechnungenK] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "order_no", "title", "created_at"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "title", "created_at"],
+      })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
@@ -247,12 +245,12 @@ export const createRechnungFromAuftrag = async (
     const lineItemIds = (auftrag.orderItems || []).map((li) => li.id);
     const alreadyDeliveredRows = lineItemIds.length
       ? await rechnungItemRepo
-          .createQueryBuilder("ri")
-          .select("ri.sourceLineItemId", "sourceLineItemId")
-          .addSelect("SUM(ri.quantity)", "delivered")
-          .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
-          .groupBy("ri.sourceLineItemId")
-          .getRawMany()
+        .createQueryBuilder("ri")
+        .select("ri.sourceLineItemId", "sourceLineItemId")
+        .addSelect("SUM(ri.quantity)", "delivered")
+        .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
+        .groupBy("ri.sourceLineItemId")
+        .getRawMany()
       : [];
     const alreadyDeliveredByLineId = new Map<string, number>(
       alreadyDeliveredRows.map((r: any) => [
@@ -612,9 +610,9 @@ export const getLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "title"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "title"],
+      })
       : [];
     const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
 
@@ -913,7 +911,7 @@ export const downloadRechnungPdf = async (
 
     const defaultTaxRate =
       rechnung.tax_profile_case === "EU_IGL" ||
-      rechnung.tax_profile_case === "third_country"
+        rechnung.tax_profile_case === "third_country"
         ? 0
         : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
           ? Number(rechnung.tax_rate)

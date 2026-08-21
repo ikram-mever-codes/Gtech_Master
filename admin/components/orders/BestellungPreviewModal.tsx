@@ -654,6 +654,21 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
         itemNo: it.de_no,
         weight: it.weight,
         sourceItemId: String(it.id),
+        notes: it.remarkEX || it.remark_ex || it.remarkEx || "",
+        transferPrice:
+          it.transfer_price_EUR !== undefined && it.transfer_price_EUR !== null
+            ? Number(it.transfer_price_EUR)
+            : it.transfer_price !== undefined && it.transfer_price !== null
+              ? Number(it.transfer_price)
+              : it.transferPrice !== undefined && it.transferPrice !== null
+                ? Number(it.transferPrice)
+                : undefined,
+        purchasePrice:
+          it.purchase_price !== undefined && it.purchase_price !== null
+            ? Number(it.purchase_price)
+            : it.purchasePrice !== undefined && it.purchasePrice !== null
+              ? Number(it.purchasePrice)
+              : undefined,
       });
 
       // Do NOT auto-change receiver/supplier here — that's a user-driven

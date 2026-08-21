@@ -489,6 +489,36 @@ export const createTransferOrderLineItem = async (
 
     const qty = parseFlexibleNumber(body.qty) || 1;
 
+    let notes = body.notes;
+    let transferPrice =
+      body.transferPrice !== undefined
+        ? (parseFlexibleNumber(body.transferPrice) ?? undefined)
+        : undefined;
+    let purchasePrice =
+      body.purchasePrice !== undefined
+        ? (parseFlexibleNumber(body.purchasePrice) ?? undefined)
+        : undefined;
+
+    if (body.sourceItemId && (notes === undefined || notes === "" || transferPrice === undefined)) {
+      try {
+        const itemRepo = AppDataSource.getRepository(Item);
+        const sourceItem = await itemRepo.findOne({
+          where: { id: Number(body.sourceItemId) },
+          select: ["id", "remark_ex", "transfer_price_EUR"],
+        });
+        if (sourceItem) {
+          if ((notes === undefined || notes === "") && (sourceItem.remark_ex || (sourceItem as any).remarkEX)) {
+            notes = sourceItem.remark_ex || (sourceItem as any).remarkEX;
+          }
+          if (transferPrice === undefined && sourceItem.transfer_price_EUR !== undefined) {
+            transferPrice = Number(sourceItem.transfer_price_EUR);
+          }
+        }
+      } catch (err) {
+        console.error("Error looking up item defaults for line item:", err);
+      }
+    }
+
     const orderItemRepo = AppDataSource.getRepository(TransferOrderItem);
     const lineItem = orderItemRepo.create({
       transferOrder: order,
@@ -504,21 +534,16 @@ export const createTransferOrderLineItem = async (
           : undefined,
       qty,
       max_qty: qty,
-      transferPrice:
-        body.transferPrice !== undefined
-          ? (parseFlexibleNumber(body.transferPrice) ?? undefined)
-          : undefined,
-      purchasePrice:
-        body.purchasePrice !== undefined
-          ? (parseFlexibleNumber(body.purchasePrice) ?? undefined)
-          : undefined,
+      transferPrice,
+      purchasePrice: purchasePrice ?? transferPrice,
       remark_order_item: body.remark_order_item || "",
       position: nextPosition,
       sourceItemId: body.sourceItemId || undefined,
-      notes: body.notes,
+      notes,
     });
 
     const saved = await orderItemRepo.save(lineItem);
+    await refreshLineItemPurchasePrices(order.id);
     await calculateTransferOrderTotals(order.id);
 
     res
@@ -773,11 +798,10 @@ export const updateTransferOrderStatus = async (
     let message = "Bestellung status updated successfully";
     if (previousStatus === "draft" && status === "to be processed") {
       if (conversionResult) {
-        message += ` — Order created${
-          conversionResult.skippedCount > 0
-            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
-            : ""
-        }.`;
+        message += ` — Order created${conversionResult.skippedCount > 0
+          ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
+          : ""
+          }.`;
       } else {
         message +=
           " — no Order was created (no catalog line items found on this Bestellung).";
