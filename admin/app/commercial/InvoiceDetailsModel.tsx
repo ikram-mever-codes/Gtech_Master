@@ -70,9 +70,10 @@ interface InvoiceDetailsModalProps {
     string,
     { taric?: boolean; items?: boolean; data?: any; loading?: boolean }
   >;
-  invoiceEditForm: { description: string; freightCost: string; remark: string };
+  invoiceEditForm: { title: string; description: string; freightCost: string; remark: string };
   setInvoiceEditForm: React.Dispatch<
     React.SetStateAction<{
+      title: string;
       description: string;
       freightCost: string;
       remark: string;
@@ -137,6 +138,12 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                 ? `| Invoice No: ${selectedInvoice.invoiceNumber}`
                 : ""}
             </p>
+            {(selectedInvoice.title || invoiceEditForm.title) && (
+              <p className="text-xs font-bold text-gray-700 mt-1 flex items-center gap-1">
+                <span className="text-gray-400 font-normal">Titel:</span>{" "}
+                {selectedInvoice.title || invoiceEditForm.title}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span
@@ -285,7 +292,24 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                 Edit Invoice Details
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                    Titel
+                  </label>
+                  <input
+                    type="text"
+                    value={invoiceEditForm.title || ""}
+                    onChange={(e) =>
+                      setInvoiceEditForm({
+                        ...invoiceEditForm,
+                        title: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
+                    placeholder="Document Title"
+                  />
+                </div>
                 <div>
                   <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
                     Description *

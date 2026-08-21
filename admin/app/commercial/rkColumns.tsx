@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { FileDown, ChevronRight, FileText } from "lucide-react";
+import { FileDown, ChevronRight, FileText, Mail } from "lucide-react";
 import { downloadRechnungKPdf } from "@/api/rechnungen_k";
+import { downloadRechnungEml } from "@/api/rechnungen";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -43,28 +44,24 @@ const RkActionMenu: React.FC<{
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
-          isOpen
-            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
-            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
-        }`}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
+          ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+          }`}
         title="Aktionen"
       >
         <ChevronRight
-          className={`w-4 h-4 transition-transform duration-150 ${
-            isOpen ? "rotate-90 text-[#8CC21B]" : ""
-          }`}
+          className={`w-4 h-4 transition-transform duration-150 ${isOpen ? "rotate-90 text-[#8CC21B]" : ""
+            }`}
         />
       </button>
 
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute right-0 ${
-            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+          className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+            } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
         >
-          {/* Option 1: PDF öffnen */}
           <div className="p-1">
             <button
               type="button"
@@ -76,7 +73,7 @@ const RkActionMenu: React.FC<{
                     row.id,
                     row.invoiceNumber || row.invoice_number,
                   );
-                } catch (_) {}
+                } catch (_) { }
               }}
               className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
             >
@@ -85,7 +82,27 @@ const RkActionMenu: React.FC<{
             </button>
           </div>
 
-          {/* Option 2: Rechnungskorrektur öffnen */}
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                try {
+                  const targetId = row.original_rechnung_id || row.id;
+                  await downloadRechnungEml(
+                    targetId,
+                    row.invoiceNumber || row.invoice_number,
+                  );
+                } catch (_) { }
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
+              <span className="text-xs font-semibold">PDF in Email</span>
+            </button>
+          </div>
+
           <div className="p-1">
             <button
               type="button"

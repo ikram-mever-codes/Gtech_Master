@@ -32,7 +32,7 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
           where: { id: rechnung.auftrag_id },
-          select: ["id", "order_no", "created_at"],
+          select: ["id", "order_no", "title", "created_at"],
         })
       : Promise.resolve(null),
     rechnungKRepo.find({
@@ -73,7 +73,7 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
     auftragIds.length
       ? customerOrderRepo.find({
           where: { id: In(auftragIds) },
-          select: ["id", "order_no", "created_at"],
+          select: ["id", "order_no", "title", "created_at"],
         })
       : Promise.resolve([]),
     rechnungKRepo.find({
@@ -388,6 +388,7 @@ export const createRechnungFromAuftrag = async (
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = rechnungRepo.create({
       invoice_number: invoiceNo,
+      title: auftrag.title,
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,
@@ -567,13 +568,18 @@ export const getAllRechnungen = async (
     // any write path to remember to update them.
     await attachPaymentStatusToRechnungen(rechnungen);
 
-    const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => ({
-      ...r,
-      linkedDocuments: linkedDocumentsByRechnungId.get(r.id) || {
+    const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => {
+      const linkedDocs = linkedDocumentsByRechnungId.get(r.id) || {
         auftrag: [],
         rechnungenK: [],
-      },
-    }));
+      };
+      const title = r.title || linkedDocs.auftrag[0]?.title || undefined;
+      return {
+        ...r,
+        title,
+        linkedDocuments: linkedDocs,
+      };
+    });
 
     res.json({
       success: true,
@@ -609,8 +615,15 @@ export const getLieferscheine = async (
         orderNumber: ls.auftrag_no || ls.order_number,
         date: ls.delivery_date,
         status: ls.status,
-        customerName: customer?.company_name || "—",
+        customerName:
+          customer?.display_name ||
+          customer?.company_name ||
+          "—",
         city: customer?.city || "",
+        postalCode:
+          (rechnung?.customerSnapshot as any)?.postalCode ||
+          (rechnung?.customerSnapshot as any)?.postal_code ||
+          "",
         country: customer?.country || "",
         itemCount: items.length,
         items: items.map((item) => ({
@@ -659,9 +672,11 @@ export const getRechnungById = async (
     const linkedDocuments = await getLinkedDocumentsForRechnung(rechnung);
     await attachPaymentStatusToRechnungen([rechnung]);
 
+    const title = rechnung.title || linkedDocuments.auftrag[0]?.title || undefined;
+
     res.json({
       success: true,
-      data: { ...rechnung, linkedDocuments },
+      data: { ...rechnung, title, linkedDocuments },
     });
   } catch (error) {
     next(error);
