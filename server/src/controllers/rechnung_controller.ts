@@ -602,17 +602,40 @@ export const getLieferscheine = async (
       relations: ["rechnung", "rechnung.items", "rechnung.customer"],
     });
 
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const auftragIds = Array.from(
+      new Set(
+        lieferscheine
+          .map((ls) => ls.rechnung?.auftrag_id || ls.auftrag_id)
+          .filter((v): v is number => typeof v === "number"),
+      ),
+    );
+    const auftraege = auftragIds.length
+      ? await customerOrderRepo.find({
+          where: { id: In(auftragIds) },
+          select: ["id", "title"],
+        })
+      : [];
+    const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
+
     // Transform to frontend-friendly format
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
       const customer = rechnung?.customer;
       const items = rechnung?.items || [];
+      const auftragId = rechnung?.auftrag_id || ls.auftrag_id;
+      const title =
+        (ls as any).title ||
+        rechnung?.title ||
+        (auftragId ? auftragTitleById.get(auftragId) : undefined) ||
+        undefined;
 
       return {
         id: ls.id,
         deliveryNoteNo: ls.delivery_note_number,
         invoiceNumber: ls.invoice_number,
         orderNumber: ls.auftrag_no || ls.order_number,
+        title,
         date: ls.delivery_date,
         status: ls.status,
         customerName:

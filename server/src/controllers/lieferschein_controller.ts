@@ -1,8 +1,9 @@
-// src/controllers/lieferschein_controller.ts
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { Lieferschein } from "../models/lieferscheine";
 import { Rechnung } from "../models/rechnung";
+import { CustomerOrder } from "../models/customer_orders";
+import { In } from "typeorm";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
@@ -58,6 +59,22 @@ export const getAllLieferscheine = async (
       relations: ["rechnung", "rechnung.items", "rechnung.customer"],
     });
 
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const auftragIds = Array.from(
+      new Set(
+        lieferscheine
+          .map((ls) => ls.rechnung?.auftrag_id || ls.auftrag_id)
+          .filter((v): v is number => typeof v === "number"),
+      ),
+    );
+    const auftraege = auftragIds.length
+      ? await customerOrderRepo.find({
+          where: { id: In(auftragIds) },
+          select: ["id", "title"],
+        })
+      : [];
+    const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
+
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
       const customer = rechnung?.customer;
@@ -71,11 +88,19 @@ export const getAllLieferscheine = async (
         customerSnapshot?.companyName ||
         "—";
 
+      const auftragId = rechnung?.auftrag_id || ls.auftrag_id;
+      const title =
+        (ls as any).title ||
+        rechnung?.title ||
+        (auftragId ? auftragTitleById.get(auftragId) : undefined) ||
+        undefined;
+
       return {
         id: ls.id,
         deliveryNoteNo: ls.delivery_note_number,
         invoiceNumber: ls.invoice_number,
         orderNumber: ls.auftrag_no || ls.order_number,
+        title,
         date: ls.delivery_date,
         status: ls.status,
         customerName: custName,
@@ -138,11 +163,29 @@ export const getLieferscheinById = async (
     const customer = rechnung?.customer;
     const items = rechnung?.items || [];
 
+    const auftragId = rechnung?.auftrag_id || lieferschein.auftrag_id;
+    let auftragTitle = undefined;
+    if (auftragId && !rechnung?.title && !(lieferschein as any).title) {
+      const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+      const auftrag = await customerOrderRepo.findOne({
+        where: { id: auftragId },
+        select: ["id", "title"],
+      });
+      auftragTitle = auftrag?.title;
+    }
+
+    const title =
+      (lieferschein as any).title ||
+      rechnung?.title ||
+      auftragTitle ||
+      undefined;
+
     const response = {
       id: lieferschein.id,
       deliveryNoteNo: lieferschein.delivery_note_number,
       invoiceNumber: lieferschein.invoice_number,
       orderNumber: lieferschein.auftrag_no || lieferschein.order_number,
+      title,
       date: lieferschein.delivery_date,
       status: lieferschein.status,
       notes: lieferschein.notes,
