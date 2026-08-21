@@ -139,6 +139,18 @@ function formatGermanNum(val: number | string | undefined | null, decimals = 2):
   });
 }
 
+function formatGermanPrice(val: number | string | undefined | null): string {
+  const num = Number(val) || 0;
+  const rounded3 = Math.round(num * 1000) / 1000;
+  const rounded2 = Math.round(num * 100) / 100;
+  const has3rdDec = Math.abs(rounded3 - rounded2) > 0.0001;
+  const decimals = has3rdDec ? 3 : 2;
+  return num.toLocaleString("de-DE", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
 function formatCountry(code?: string | null): string {
   if (!code) return "";
   const upper = code.trim().toUpperCase();
@@ -636,7 +648,7 @@ export async function generateGtechDocumentPdf(
           itemNameStr,
           `${formatGermanNum(item.vatRate ?? opts.taxRate ?? 0, 2)}%`,
           String(item.quantity ?? 1),
-          formatGermanNum(item.unitPrice, 3),
+          formatGermanPrice(item.unitPrice),
           formatGermanNum(item.lineTotal ?? (item.quantity * (item.unitPrice || 0)), 2),
         ]
         : [

@@ -1296,7 +1296,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <span className="font-medium text-gray-900">
                       {previewItem.sales_price !== null &&
                       previewItem.sales_price !== undefined
-                        ? Number(previewItem.sales_price).toFixed(2)
+                        ? Math.abs(
+                            Math.round(Number(previewItem.sales_price) * 1000) / 1000 -
+                              Math.round(Number(previewItem.sales_price) * 100) / 100
+                          ) > 0.0001
+                          ? Number(previewItem.sales_price).toFixed(3)
+                          : Number(previewItem.sales_price).toFixed(2)
                         : "0.00"}{" "}
                       <span className="font-semibold text-gray-700">
                         {previewItem.currency || "EUR"}

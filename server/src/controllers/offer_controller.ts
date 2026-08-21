@@ -4080,6 +4080,18 @@ export class OfferController {
         });
       };
 
+      const formatGermanPrice = (numVal: any): string => {
+        const num = getSafeNumber(numVal);
+        const rounded3 = Math.round(num * 1000) / 1000;
+        const rounded2 = Math.round(num * 100) / 100;
+        const has3rdDec = Math.abs(rounded3 - rounded2) > 0.0001;
+        const decimals = has3rdDec ? 3 : 2;
+        return num.toLocaleString("de-DE", {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        });
+      };
+
       doc.font(R).fontSize(8.5).fillColor("#3F4446");
 
       let currentY = tableY + headerHeight;
@@ -4226,7 +4238,7 @@ export class OfferController {
             itemNameStr,
             `${formatGermanNum(itemTaxRate, 2)}%`,
             qtyStr,
-            formatGermanNum(unitPriceNum, offer.unitPriceDecimalPlaces || 3),
+            formatGermanPrice(unitPriceNum),
             formatGermanNum(netTotalNum, 2),
           ];
 
