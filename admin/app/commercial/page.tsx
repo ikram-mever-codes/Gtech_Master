@@ -1294,6 +1294,7 @@ const InvoiceListPage: React.FC = () => {
           cust.displayName ||
           snap.displayName ||
           snap.display_name ||
+          snap.companyName ||
           cust.company_name ||
           cust.companyName ||
           cust.name ||
@@ -1359,6 +1360,7 @@ const InvoiceListPage: React.FC = () => {
           cust.displayName ||
           snap.displayName ||
           snap.display_name ||
+          snap.companyName ||
           cust.company_name ||
           cust.companyName ||
           cust.name ||
@@ -1395,6 +1397,7 @@ const InvoiceListPage: React.FC = () => {
           snap.displayName ||
           snap.display_name ||
           ls.customerName ||
+          snap.companyName ||
           cust.companyName ||
           cust.company_name ||
           "";
@@ -1412,7 +1415,7 @@ const InvoiceListPage: React.FC = () => {
               ls.customerName || cust.companyName || cust.company_name || ls.bill_to || "—",
             contactEmail:
               cust.email || cust.contactEmail || ls.email || "—",
-            postalCode: cust.postalCode || cust.postal_code || ls.postalCode || snap.postalCode || "",
+            postalCode: ls.postalCode || cust.postalCode || cust.postal_code || snap.postalCode || "",
             city: ls.city || cust.city || snap.city || "",
             country: ls.country || cust.country || snap.country || "",
           },
@@ -1608,6 +1611,7 @@ const InvoiceListPage: React.FC = () => {
             setSelectedAuftragForRechnungModal(row);
             setShowAuftragToRechnungModal(true);
           },
+
           onDuplicateAuftrag: handleDuplicateAuftrag,
           invoices: legacyInvoices,
         });

@@ -609,8 +609,15 @@ export const getLieferscheine = async (
         orderNumber: ls.auftrag_no || ls.order_number,
         date: ls.delivery_date,
         status: ls.status,
-        customerName: customer?.company_name || "—",
+        customerName:
+          customer?.display_name ||
+          customer?.company_name ||
+          "—",
         city: customer?.city || "",
+        postalCode:
+          (rechnung?.customerSnapshot as any)?.postalCode ||
+          (rechnung?.customerSnapshot as any)?.postal_code ||
+          "",
         country: customer?.country || "",
         itemCount: items.length,
         items: items.map((item) => ({
