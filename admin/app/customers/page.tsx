@@ -971,19 +971,6 @@ const CustomersPage = () => {
             <Settings className="mr-2" size={18} color="#5f6368" />
             <Typography variant="body2">Change Status</Typography>
           </MenuItem>
-
-          <Divider sx={{ my: 0.5 }} />
-
-          <MenuItem
-            onClick={() => {
-              setDeleteDialogOpen(true);
-              handleActionClose();
-            }}
-            sx={{ color: "#c62828", "&:hover": { backgroundColor: "#ffebee" } }}
-          >
-            <LucideTrash2 className="mr-2" size={18} />
-            <Typography variant="body2">Delete Customer</Typography>
-          </MenuItem>
         </Menu>
         <Dialog
           open={approveDialogOpen}

@@ -971,7 +971,7 @@ export const SuppliersPage = React.forwardRef<
                         <ModalFooter
                             isEditMode={modalMode === "edit"}
                             isEditEnabled={isEditEnabled}
-                            onDelete={() => handleDelete(editingId!)}
+                            showDelete={false}
                             onCancel={() => setShowModal(false)}
                             onSave={handleSubmit}
                             saveLabel={modalMode === "edit" ? "Update Supplier" : "Create Supplier"}

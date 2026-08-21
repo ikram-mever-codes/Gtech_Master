@@ -4546,7 +4546,7 @@ export class OfferController {
               const year = parsed.getFullYear();
               formattedDate = `${day}.${month}.${year}`;
             }
-            doc.text(`Lieferdatum: geschätzt ${formattedDate}`, LEFT_X, yPos);
+            doc.text(`Lieferdatum: voraussichtlich ${formattedDate}`, LEFT_X, yPos);
           } else {
             doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
           }

@@ -21,6 +21,11 @@ import { Invoice } from "../models/invoice";
 import { RequestedItem } from "../models/requested_items";
 import { Country } from "../models/country";
 import { NumberSequenceService } from "../services/number_sequence_service";
+import { Item } from "../models/items";
+import { Offer } from "../models/offer";
+import { CustomerOrder } from "../models/customer_orders";
+import { RechnungCustomer } from "../models/rechnung_customer";
+import { TransferOrder } from "../models/transfer_order";
 
 export const BUSINESS_SOURCE = {
   GOOGLE_MAPS: "Google Maps",
@@ -2295,6 +2300,38 @@ export const deleteBusiness = async (
           );
         }
       }
+    }
+
+    const itemRepo = AppDataSource.getRepository(Item);
+    const offerRepo = AppDataSource.getRepository(Offer);
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const rechnungCustomerRepo = AppDataSource.getRepository(RechnungCustomer);
+    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+
+    const [itemCount, offerCount, auftragCount, rechnungCustomerCount, bestellungCount] = await Promise.all([
+      itemRepo.count({ where: { customer_id: id } }),
+      offerRepo.count({ where: { customerId: id } }),
+      customerOrderRepo.count({ where: { customer_id: id } }),
+      rechnungCustomerRepo.count({ where: { original_customer_id: id } }),
+      transferOrderRepo.count({ where: { customer_id: id } }),
+    ]);
+
+    const totalLinkedDocs = offerCount + auftragCount + rechnungCustomerCount + bestellungCount;
+
+    if (itemCount > 0 || totalLinkedDocs > 0) {
+      const details: string[] = [];
+      if (itemCount > 0) details.push(`${itemCount} assigned item(s)`);
+      if (offerCount > 0) details.push(`${offerCount} offer(s)`);
+      if (auftragCount > 0) details.push(`${auftragCount} order(s)`);
+      if (rechnungCustomerCount > 0) details.push(`${rechnungCustomerCount} invoice/RK record(s)`);
+      if (bestellungCount > 0) details.push(`${bestellungCount} transfer order(s)`);
+
+      return next(
+        new ErrorHandler(
+          `Cannot delete business. This company has linked records: ${details.join(", ")}. Deleting an active business with assigned items or documents is not allowed.`,
+          400,
+        ),
+      );
     }
 
     const queryRunner = AppDataSource.createQueryRunner();

@@ -974,7 +974,7 @@ export async function generateGtechDocumentPdf(
 
           const label =
             isOffer || (isAuftrag && !isDelivered)
-              ? "Lieferdatum: geschätzt"
+              ? "Lieferdatum: voraussichtlich"
               : "Lieferdatum:";
           doc.text(`${label} ${formatDate(rawDelivery)}`, LEFT_X, yPos);
         } else {

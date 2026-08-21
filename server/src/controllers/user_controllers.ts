@@ -16,6 +16,11 @@ import { CustomerCreator, List, LIST_STATUS, ListItem } from "../models/list";
 import { Invoice, InvoiceItem } from "../models/invoice";
 import { StarCustomerDetails } from "../models/star_customer_details";
 import { cookieOptions } from "../utils/cookieOptions";
+import { Item } from "../models/items";
+import { Offer } from "../models/offer";
+import { CustomerOrder } from "../models/customer_orders";
+import { RechnungCustomer } from "../models/rechnung_customer";
+import { TransferOrder } from "../models/transfer_order";
 
 export const createUser = async (
   req: Request,
@@ -1301,6 +1306,38 @@ export const deleteCustomer = async (
       return next(
         new ErrorHandler(
           "Cannot delete customer. Customer has lists with items. Please delete all items first.",
+          400,
+        ),
+      );
+    }
+
+    const itemRepo = AppDataSource.getRepository(Item);
+    const offerRepo = AppDataSource.getRepository(Offer);
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const rechnungCustomerRepo = AppDataSource.getRepository(RechnungCustomer);
+    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+
+    const [itemCount, offerCount, auftragCount, rechnungCustomerCount, bestellungCount] = await Promise.all([
+      itemRepo.count({ where: { customer_id: customerId } }),
+      offerRepo.count({ where: { customerId: customerId } }),
+      customerOrderRepo.count({ where: { customer_id: customerId } }),
+      rechnungCustomerRepo.count({ where: { original_customer_id: customerId } }),
+      transferOrderRepo.count({ where: { customer_id: customerId } }),
+    ]);
+
+    const totalLinkedDocs = offerCount + auftragCount + rechnungCustomerCount + bestellungCount;
+
+    if (itemCount > 0 || totalLinkedDocs > 0) {
+      const details: string[] = [];
+      if (itemCount > 0) details.push(`${itemCount} assigned item(s)`);
+      if (offerCount > 0) details.push(`${offerCount} offer(s)`);
+      if (auftragCount > 0) details.push(`${auftragCount} order(s)`);
+      if (rechnungCustomerCount > 0) details.push(`${rechnungCustomerCount} invoice/RK record(s)`);
+      if (bestellungCount > 0) details.push(`${bestellungCount} transfer order(s)`);
+
+      return next(
+        new ErrorHandler(
+          `Cannot delete business. This company has linked records: ${details.join(", ")}. Deleting an active business with assigned items or documents is not allowed.`,
           400,
         ),
       );

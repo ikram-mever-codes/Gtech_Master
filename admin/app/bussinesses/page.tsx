@@ -1192,7 +1192,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
       resetBusinessForm();
       updateBusinessIdInUrl(null);
       fetchData();
-    } catch { }
+      toast.success("Business deleted successfully");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete business");
+    }
   };
 
   const handleExportContacts = async () => {
@@ -2582,9 +2585,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <ModalFooter
           isEditMode={businessModalMode === "edit"}
           isEditEnabled={businessEditMode}
-          onDelete={() => {
-            if (editingBusinessId) handleDeleteBusiness(editingBusinessId);
-          }}
+          showDelete={false}
           onCancel={handleCloseBusinessModal}
           onSave={handleBusinessSubmit}
           saveLabel={
@@ -2592,7 +2593,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
           }
           loading={loading}
           saveDisabled={!businessForm.companyName?.trim() || loading}
-          showDelete={user?.role === UserRole.ADMIN}
         />
       </CustomModal>
 

@@ -573,7 +573,6 @@ const CustomersPage = () => {
   return (
     <Box sx={{ backgroundColor: "#fafafa", minHeight: "100vh", pb: 4 }}>
       <Box sx={{ maxWidth: "1400px", mx: "auto", px: 3, pt: 3 }}>
-        {/* Header Section */}
         <Box sx={{ mb: 4 }}>
           <Stack
             direction="row"
@@ -604,7 +603,6 @@ const CustomersPage = () => {
             </CustomButton>
           </Stack>
 
-          {/* Stats Cards */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
@@ -823,7 +821,6 @@ const CustomersPage = () => {
             </Grid>
           </Grid>
 
-          {/* Filters and Search Section */}
           <Paper
             elevation={0}
             sx={{
@@ -925,7 +922,6 @@ const CustomersPage = () => {
           </Paper>
         </Box>
 
-        {/* Alerts */}
         {error && (
           <Alert
             severity="error"
@@ -958,7 +954,6 @@ const CustomersPage = () => {
           </Alert>
         )}
 
-        {/* Customers Table */}
         <Card
           elevation={0}
           sx={{
@@ -978,7 +973,6 @@ const CustomersPage = () => {
           />
         </Card>
 
-        {/* Action Menu */}
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
@@ -1027,22 +1021,8 @@ const CustomersPage = () => {
             <Settings className="mr-2" size={18} color="#5f6368" />
             <Typography variant="body2">Change Status</Typography>
           </MenuItem>
-
-          <Divider sx={{ my: 0.5 }} />
-
-          <MenuItem
-            onClick={() => {
-              setDeleteDialogOpen(true);
-              handleActionClose();
-            }}
-            sx={{ color: "#c62828", "&:hover": { backgroundColor: "#ffebee" } }}
-          >
-            <LucideTrash2 className="mr-2" size={18} />
-            <Typography variant="body2">Delete Customer</Typography>
-          </MenuItem>
         </Menu>
 
-        {/* Dialogs */}
         <Dialog
           open={approveDialogOpen}
           onClose={() => setApproveDialogOpen(false)}
@@ -1312,7 +1292,6 @@ const CustomersPage = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={6000}

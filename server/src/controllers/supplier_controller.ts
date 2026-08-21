@@ -4,6 +4,7 @@ import { Supplier } from "../models/suppliers";
 import { SupplierItem } from "../models/supplier_items";
 import { Like, ILike, Brackets } from "typeorm";
 import { Item } from "../models/items";
+import { TransferOrder } from "../models/transfer_order";
 
 export const getAllSuppliers = async (
   req: Request,
@@ -248,6 +249,31 @@ export const deleteSupplier = async (
       });
       return;
     }
+
+    const supplierIdNum = Number(id);
+    const itemRepo = AppDataSource.getRepository(Item);
+    const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+
+    const [itemCount, supplierItemCount, bestellungCount] = await Promise.all([
+      itemRepo.count({ where: { supplier_id: supplierIdNum } }),
+      supplierItemRepo.count({ where: { supplier_id: supplierIdNum } }),
+      transferOrderRepo.count({ where: { supplier_id: supplierIdNum } }),
+    ]);
+
+    const totalItems = itemCount + supplierItemCount;
+    if (totalItems > 0 || bestellungCount > 0) {
+      const details: string[] = [];
+      if (totalItems > 0) details.push(`${totalItems} assigned item(s)`);
+      if (bestellungCount > 0) details.push(`${bestellungCount} transfer order(s)`);
+
+      res.status(400).json({
+        success: false,
+        message: `Cannot delete supplier. This company has linked records: ${details.join(", ")}. Deleting an active supplier with assigned items or documents is not allowed.`,
+      });
+      return;
+    }
+
     await supplierRepo.remove(supplier);
     res.status(200).json({
       success: true,
