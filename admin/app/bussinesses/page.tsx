@@ -2158,7 +2158,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-3">
+                {/* Row 3: Email | Phone | Web URL | Company Label Print Logo | Note (wider, spans rows 3-4) */}
+                <div className="col-span-12 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Email
                   </label>
@@ -2177,7 +2178,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-12 md:col-span-3">
+                <div className="col-span-12 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Phone
                   </label>
@@ -2196,7 +2197,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-12 md:col-span-3">
+                <div className="col-span-12 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Web URL
                   </label>
@@ -2216,7 +2217,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-12 md:col-span-3">
+                <div className="col-span-12 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Company Label Print Logo">
                     Company Label Print Logo
                   </label>
@@ -2267,6 +2268,26 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="col-span-12 md:col-span-4 md:row-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Note
+                  </label>
+                  <textarea
+                    value={businessForm.note}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        note: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    rows={4}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed resize-none h-[calc(100%-24px)] min-h-[92px]"
+                    placeholder="Internal note…"
+                  />
+                </div>
+
+                {/* Row 4: Debitor No | VAT/Tax ID | VAT Check Status | Tax Profile (read-only, small) */}
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Debitor No
@@ -2286,7 +2307,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-6 md:col-span-3">
+                <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     VAT / Tax ID
                   </label>
@@ -2303,38 +2324,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
                     placeholder="DE123456789"
                   />
-                </div>
-
-                <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Default Tax Profile">
-                    Default Tax Profile
-                  </label>
-                  <select
-                    value={
-                      businessForm.default_tax_profile_id ||
-                      taxProfiles.find(
-                        (tp: any) =>
-                          (tp.tax_case || "").trim().toUpperCase() ===
-                          "DE-VAT",
-                      )?.id ||
-                      taxProfiles[0]?.id ||
-                      ""
-                    }
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        default_tax_profile_id: e.target.value || "",
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-2 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white font-medium"
-                  >
-                    {taxProfiles.map((tp) => (
-                      <option key={tp.id} value={tp.id}>
-                        {tp.tax_case || tp.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="col-span-6 md:col-span-2">
@@ -2364,23 +2353,64 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-3 md:row-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Note
+                {/* Tax Profile — read-only plain text, small field */}
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Default Tax Profile">
+                    Default Tax Profile
                   </label>
-                  <textarea
-                    value={businessForm.note}
+                  <div className="w-full px-3 py-2 text-sm border border-gray-200 bg-gray-100 rounded-lg text-gray-700 font-medium truncate h-[38px] flex items-center">
+                    {taxProfiles.find(
+                      (tp: any) =>
+                        tp.id === (
+                          businessForm.default_tax_profile_id ||
+                          taxProfiles.find(
+                            (t: any) =>
+                              (t.tax_case || "").trim().toUpperCase() === "DE-VAT",
+                          )?.id ||
+                          taxProfiles[0]?.id
+                        ),
+                    )?.tax_case ||
+                      taxProfiles.find(
+                        (tp: any) =>
+                          (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
+                      )?.tax_case ||
+                      taxProfiles[0]?.tax_case ||
+                      "—"}
+                  </div>
+                </div>
+
+                {/* Row 5: Shipping Method | Payment Method | Due Days */}
+                <div className="col-span-12 md:col-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Default Shipping Method
+                  </label>
+                  <select
+                    value={businessForm.defaultShippingMethod || ""}
                     onChange={(e) =>
                       setBusinessForm({
                         ...businessForm,
-                        note: e.target.value,
+                        defaultShippingMethod: e.target.value || "",
                       })
                     }
                     disabled={businessFieldDisabled}
-                    rows={4}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed resize-none h-[calc(100%-24px)] min-h-[92px]"
-                    placeholder="Internal note…"
-                  />
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                  >
+                    <option value="">None / Not Assigned</option>
+                    {(dbShippingMethods.length > 0
+                      ? dbShippingMethods.map((sm: any) => sm.name)
+                      : [
+                        "Standard shipping",
+                        "Express shipping",
+                        "Freight",
+                        "Courier",
+                        "Pickup",
+                      ]
+                    ).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="col-span-12 md:col-span-3">
@@ -2417,9 +2447,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="col-span-12 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Payment Due (in days)">
-                    Payment Due (days)
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Due Days">
+                    Due Days
                   </label>
                   {(() => {
                     const pmLower = (businessForm.defaultPaymentMethod || "").toLowerCase();
@@ -2450,45 +2480,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="7"
                         title={
                           !isKaufAufRechnung
-                            ? "Payment Due Days is only editable when Default Payment Method is Kauf auf Rechnung"
+                            ? "Due Days is only editable when Default Payment Method is Kauf auf Rechnung"
                             : undefined
                         }
                       />
                     );
                   })()}
-                </div>
-
-                <div className="col-span-12 md:col-span-4">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Default Shipping Method
-                  </label>
-                  <select
-                    value={businessForm.defaultShippingMethod || ""}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        defaultShippingMethod: e.target.value || "",
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                  >
-                    <option value="">None / Not Assigned</option>
-                    {(dbShippingMethods.length > 0
-                      ? dbShippingMethods.map((sm: any) => sm.name)
-                      : [
-                        "Standard shipping",
-                        "Express shipping",
-                        "Freight",
-                        "Courier",
-                        "Pickup",
-                      ]
-                    ).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
                 </div>      </div>
             </div>
 
