@@ -5,6 +5,7 @@ import {
   getLieferscheinById,
   updateLieferscheinStatus,
   updateLieferscheinDeliveryDate,
+  confirmLieferscheinDelivery,
   deleteLieferschein,
   downloadLieferscheinPdf,
 } from "../controllers/lieferschein_controller";
@@ -21,6 +22,8 @@ router.get("/:id", getLieferscheinById);
 router.patch("/:id/status", updateLieferscheinStatus);
 
 router.patch("/:id/delivery-date", updateLieferscheinDeliveryDate);
+
+router.patch("/:id/confirm-delivery", confirmLieferscheinDelivery);
 
 router.delete("/:id", deleteLieferschein);
 

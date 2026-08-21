@@ -46,7 +46,7 @@ export class Lieferschein {
   rechnung!: Rechnung;
 
   // --- Status ---
-  @Column({ type: "varchar", length: 50, default: "open" })
+  @Column({ type: "varchar", length: 50, default: "vorläufig" })
   status!: string;
 
   @Column({ type: "text", nullable: true })
@@ -55,6 +55,13 @@ export class Lieferschein {
   // --- UI ---
   @Column({ type: "varchar", length: 20, nullable: true })
   highlight_color?: string;
+
+  // --- Confirmation Audit ---
+  @Column({ type: "timestamp", nullable: true })
+  confirmed_at?: Date;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  confirmed_by?: string;
 
   // --- Timestamps ---
   @CreateDateColumn()

@@ -10,9 +10,6 @@ import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { NumberSequenceService } from "../services/number_sequence_service";
 
-/**
- * Create Lieferschein from Rechnung (called after Rechnung is created)
- */
 export const createLieferscheinFromRechnung = async (
   rechnung: Rechnung,
   deliveryNoteNo: string,
@@ -26,7 +23,6 @@ export const createLieferscheinFromRechnung = async (
     .toString()
     .padStart(2, "0")}.${now.getFullYear()}`;
 
-  // Create Lieferschein
   const lieferschein = lieferscheinRepo.create({
     delivery_note_number: deliveryNoteNo,
     invoice_number: rechnung.invoice_number,
@@ -36,7 +32,7 @@ export const createLieferscheinFromRechnung = async (
     delivery_date: rechnung.delivery_date || now,
     date_created: dateCreatedStr,
     rechnung_id: rechnung.id,
-    status: "open",
+    status: "vorläufig",
     notes: rechnung.notes,
     highlight_color: rechnung.highlight_color,
   });
@@ -70,9 +66,9 @@ export const getAllLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "title"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "title"],
+      })
       : [];
     const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
 
@@ -159,7 +155,6 @@ export const getLieferscheinById = async (
       return;
     }
 
-    // Build response with Rechnung data
     const rechnung = lieferschein.rechnung;
     const customer = rechnung?.customer;
     const items = rechnung?.items || [];
@@ -267,6 +262,14 @@ export const updateLieferscheinStatus = async (
       return;
     }
 
+    if (status === "storniert" && lieferschein.status !== "vorläufig") {
+      res.status(400).json({
+        success: false,
+        message: `Stornieren is only possible when status is 'vorläufig'. Current status: '${lieferschein.status}'.`,
+      });
+      return;
+    }
+
     lieferschein.status = status;
     await lieferscheinRepo.save(lieferschein);
 
@@ -325,6 +328,46 @@ export const updateLieferscheinDeliveryDate = async (
     next(error);
   }
 };
+
+/**
+ * Confirm Lieferschein delivery: sets delivery date, status to bestätigt, and records who confirmed + when.
+ */
+export const confirmLieferscheinDelivery = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { deliveryDate } = req.body;
+
+    const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
+    const lieferschein = await lieferscheinRepo.findOne({ where: { id } });
+
+    if (!lieferschein) {
+      res.status(404).json({ success: false, message: "Lieferschein not found" });
+      return;
+    }
+
+    const confirmedDate = deliveryDate ? new Date(deliveryDate) : new Date();
+    const confirmedBy = (req as any).user?.name || (req as any).user?.username || (req as any).user?.email || "Admin";
+
+    lieferschein.delivery_date = confirmedDate;
+    lieferschein.status = "bestätigt";
+    lieferschein.confirmed_at = new Date();
+    lieferschein.confirmed_by = confirmedBy;
+    await lieferscheinRepo.save(lieferschein);
+
+    res.json({
+      success: true,
+      message: "Lieferschein successfully confirmed.",
+      data: lieferschein,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 /**
  * Delete Lieferschein

@@ -64,6 +64,7 @@ import {
 } from "@/api/payment_accounts";
 import { formatDate } from "@/utils/date";
 import DocumentLineItemsSubTable from "@/components/UI/DocumentLineItemsSubTable";
+import CommercialLineItemsSubTable from "@/components/UI/CommercialLineItemsSubTable";
 import {
   CommercialFilters,
   initialCommercialFilters,
@@ -1960,6 +1961,22 @@ const InvoiceListPage: React.FC = () => {
                 } else {
                   handleOpenInvoiceDetails(row);
                 }
+              }}
+              expandedRowIds={expandedDocIds}
+              renderRowDetails={(row) => {
+                const lineItems =
+                  row.items ||
+                  row.lineItems ||
+                  row.orderItems ||
+                  [];
+                const currency = row.currency || "EUR";
+                return (
+                  <CommercialLineItemsSubTable
+                    items={lineItems}
+                    currency={currency}
+                    docType={activeInvTab}
+                  />
+                );
               }}
             />
 

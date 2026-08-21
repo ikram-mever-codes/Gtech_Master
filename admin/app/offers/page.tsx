@@ -174,9 +174,6 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
               <th className="px-2 py-2 text-left font-semibold text-gray-600">
                 Bezeichnung
               </th>
-              <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
-                Hinweis
-              </th>
               <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
                 MwSt.
               </th>
@@ -195,7 +192,7 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
             {sortedLineItems.length === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={8}
                   className="text-center py-6 text-sm text-gray-500"
                 >
                   No line items yet.
@@ -238,10 +235,10 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                     <span>{item.itemNo || item.material || "—"}</span>
                   </td>
                   <td className="px-2 py-2">
-                    <span>{item.itemName || "—"}</span>
-                  </td>
-                  <td className="px-2 py-2">
-                    <span className="text-gray-600">{item.notes || "—"}</span>
+                    <div className="font-medium text-gray-900">{item.itemName || "—"}</div>
+                    {item.notes && (
+                      <div className="text-xs text-gray-500 mt-0.5 leading-snug">{item.notes}</div>
+                    )}
                   </td>
                   <td className="px-2 py-2 text-center text-gray-600">
                     {lineTaxRate}%
@@ -271,7 +268,6 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
               <td className="px-2 py-2 text-gray-700">
                 {offer.shippingMethod || "No shipping method set"}
               </td>
-              <td className="px-0 py-2 text-center text-gray-400"></td>
               <td className="px-2 py-2 text-center text-gray-600">
                 {getShippingTaxRate(offer)}%
               </td>

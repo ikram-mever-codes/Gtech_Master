@@ -56,6 +56,35 @@ export const updateLieferscheinDeliveryDate = async (
   }
 };
 
+export const confirmLieferscheinDelivery = async (
+  id: string | number,
+  deliveryDate?: string,
+) => {
+  try {
+    const response: any = await api.patch(
+      `/lieferscheine/${id}/confirm-delivery`,
+      { deliveryDate },
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to confirm delivery");
+    throw error;
+  }
+};
+
+export const stornierLieferschein = async (id: string | number) => {
+  try {
+    const response: any = await api.patch(`/lieferscheine/${id}/status`, {
+      status: "storniert",
+    });
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to stornieren Lieferschein");
+    throw error;
+  }
+};
+
+
 export const deleteLieferschein = async (id: string | number) => {
   try {
     const response: any = await api.delete(`/lieferscheine/${id}`);
