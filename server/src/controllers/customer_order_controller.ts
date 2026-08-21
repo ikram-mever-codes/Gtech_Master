@@ -1680,11 +1680,15 @@ export const downloadCustomerOrderEml = async (
     const user = (req as any).user;
 
     const { emlFilePath, filename, orderNo } = await generateAuftragEml(id, {
-      user: user ? { name: user.name, username: user.username, email: user.email } : undefined,
+      user: user
+        ? { name: user.name, username: user.username, email: user.email }
+        : undefined,
     });
 
     if (!fs.existsSync(emlFilePath)) {
-      res.status(500).json({ success: false, message: "EML file generation failed" });
+      res
+        .status(500)
+        .json({ success: false, message: "EML file generation failed" });
       return;
     }
 
@@ -1692,10 +1696,9 @@ export const downloadCustomerOrderEml = async (
       const now = new Date();
       const dateEmailedStr = `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`;
       const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
-      await customerOrderRepo.update(
-        { id: Number(id) || 0 } as any,
-        { date_emailed: dateEmailedStr },
-      );
+      await customerOrderRepo.update({ id: Number(id) || 0 } as any, {
+        date_emailed: dateEmailedStr,
+      });
     } catch (updateErr) {
       console.warn("Could not update date_emailed on Auftrag:", updateErr);
     }
