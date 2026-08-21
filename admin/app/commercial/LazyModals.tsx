@@ -45,6 +45,12 @@ export const AuftragToRechnungModal = dynamic(
   { ssr: false },
 );
 
+export const RechnungOhneAusliefernModal = dynamic(
+  () => import("@/components/orders/RechnungOhneAusliefernModal"),
+  { ssr: false },
+);
+
+
 export const RechnungDetailModal = dynamic(
   () => import("@/components/orders/RechnungDetailModal"),
   { ssr: false },

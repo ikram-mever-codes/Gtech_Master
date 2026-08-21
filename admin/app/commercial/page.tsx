@@ -85,6 +85,7 @@ import {
   AuftragToBestellungModal,
   AuftragCreateModal,
   AuftragToRechnungModal,
+  RechnungOhneAusliefernModal,
   LieferscheinDetailModal,
   AuftragPreviewModal,
   BestellungPreviewModal,
@@ -388,6 +389,15 @@ const InvoiceListPage: React.FC = () => {
     useState<any>(null);
   const [showAuftragToRechnungModal, setShowAuftragToRechnungModal] =
     useState(false);
+
+  const [
+    selectedAuftragForRechnungOhneAusliefernModal,
+    setSelectedAuftragForRechnungOhneAusliefernModal,
+  ] = useState<any>(null);
+  const [
+    showRechnungOhneAusliefernModal,
+    setShowRechnungOhneAusliefernModal,
+  ] = useState(false);
 
   const [showRechnungDetailModal, setShowRechnungDetailModal] = useState(false);
   const [selectedRechnungForDetail, setSelectedRechnungForDetail] =
@@ -1624,6 +1634,10 @@ const InvoiceListPage: React.FC = () => {
             setSelectedAuftragForRechnungModal(row);
             setShowAuftragToRechnungModal(true);
           },
+          onRechnungOhneAusliefern: (row: any) => {
+            setSelectedAuftragForRechnungOhneAusliefernModal(row);
+            setShowRechnungOhneAusliefernModal(true);
+          },
 
           onDuplicateAuftrag: handleDuplicateAuftrag,
           invoices: legacyInvoices,
@@ -2295,6 +2309,20 @@ const InvoiceListPage: React.FC = () => {
               setShowAuftragToRechnungModal(false);
               setSelectedAuftragForRechnungModal(null);
               handleOpenAuftragPreview(auftragToEdit.id, true);
+            }}
+          />
+        )}
+        {showRechnungOhneAusliefernModal && selectedAuftragForRechnungOhneAusliefernModal && (
+          <RechnungOhneAusliefernModal
+            isOpen={showRechnungOhneAusliefernModal}
+            onClose={() => {
+              setShowRechnungOhneAusliefernModal(false);
+              setSelectedAuftragForRechnungOhneAusliefernModal(null);
+            }}
+            auftrag={selectedAuftragForRechnungOhneAusliefernModal}
+            onSuccess={() => {
+              tabData.refetchOrders();
+              tabData.refetchRechnungen();
             }}
           />
         )}

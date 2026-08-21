@@ -26,6 +26,28 @@ export const createRechnungFromAuftrag = async (
   }
 };
 
+export const createRechnungOhneAusliefern = async (
+  auftragId: string | number,
+  payload: {
+    amountType: "full" | "partial";
+    calculationType?: "percentage" | "fixed";
+    value?: number;
+    notes?: string;
+  },
+) => {
+  try {
+    const response: any = await api.post(
+      `/rechnungen/from-auftrag-ohne-ausliefern/${auftragId}`,
+      payload,
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to create Rechnung ohne Ausliefern");
+    throw error;
+  }
+};
+
+
 export const getAllRechnungen = async () => {
   try {
     const response: any = await api.get("/rechnungen");

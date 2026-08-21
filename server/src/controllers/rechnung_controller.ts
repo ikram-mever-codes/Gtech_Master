@@ -532,6 +532,209 @@ export const createRechnungFromAuftrag = async (
   }
 };
 
+export const createRechnungOhneAusliefern = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { auftragId } = req.params;
+    const { amountType, calculationType, value, notes } = req.body;
+
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const auftrag = await customerOrderRepo.findOne({
+      where: { id: Number(auftragId) },
+      relations: ["orderItems", "customer"],
+    });
+
+    if (!auftrag) {
+      res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+
+    const orderItems = auftrag.orderItems || [];
+    const auftragSubtotal = orderItems.reduce(
+      (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+      0,
+    );
+
+    let invoiceSubtotal = auftragSubtotal;
+    let descriptionText = `Rechnung ohne Ausliefern zu Auftrag ${auftrag.order_no}`;
+
+    const parsedValue = Number(value) || 0;
+
+    if (amountType === "partial") {
+      if (calculationType === "percentage") {
+        const pct = Math.min(100, Math.max(0.01, parsedValue));
+        invoiceSubtotal = (auftragSubtotal * pct) / 100;
+        descriptionText = `${pct}% Teilrechnung zu Auftrag ${auftrag.order_no}`;
+      } else if (calculationType === "fixed") {
+        invoiceSubtotal = parsedValue > 0 ? parsedValue : auftragSubtotal;
+        descriptionText = `Teilrechnung zu Auftrag ${auftrag.order_no}`;
+      }
+    }
+
+    const taxRate = Number(auftrag.tax_rate ?? 19);
+    const taxAmount = (invoiceSubtotal * taxRate) / 100;
+    const totalAmount = invoiceSubtotal + taxAmount;
+
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+
+    let invoiceNo = "";
+    try {
+      invoiceNo = await NumberSequenceService.getNextNumber("invoice");
+    } catch (err) {
+      console.warn("Could not generate sequence number for invoice:", err);
+      invoiceNo = `R${yy}${mm}-${Date.now().toString().slice(-4)}`;
+    }
+
+    const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`;
+
+    const custRepo = AppDataSource.getRepository(Customer);
+    let originalCust: Customer | null = null;
+    if (auftrag.customer_id) {
+      originalCust = await custRepo.findOne({
+        where: { id: auftrag.customer_id },
+        relations: ["businessDetails"],
+      });
+    }
+
+    const dispName =
+      auftrag.customerSnapshot?.displayName ||
+      auftrag.customerSnapshot?.display_name ||
+      (originalCust as any)?.displayName ||
+      (originalCust as any)?.display_name ||
+      auftrag.customerSnapshot?.companyName ||
+      originalCust?.companyName ||
+      "Customer";
+    const legName =
+      auftrag.customerSnapshot?.legalName ||
+      auftrag.customerSnapshot?.legal_name ||
+      originalCust?.legalName ||
+      (originalCust as any)?.legal_name ||
+      dispName;
+
+    const rechnungCustomerRepo = AppDataSource.getRepository(RechnungCustomer);
+    const rechnungCustomer = rechnungCustomerRepo.create({
+      original_customer_id: auftrag.customer_id
+        ? String(auftrag.customer_id)
+        : originalCust?.id
+          ? String(originalCust.id)
+          : undefined,
+      company_name: dispName,
+      display_name: dispName,
+      legal_name: legName,
+      email: auftrag.customerSnapshot?.email || originalCust?.email || undefined,
+      tax_number:
+        auftrag.customerSnapshot?.vatId ||
+        originalCust?.vatTaxId ||
+        originalCust?.taxNumber ||
+        undefined,
+      bill_to_address:
+        auftrag.customerSnapshot?.address ||
+        originalCust?.businessDetails?.address ||
+        undefined,
+      ship_to_address:
+        auftrag.customerSnapshot?.street ||
+        originalCust?.businessDetails?.address ||
+        undefined,
+      city:
+        auftrag.customerSnapshot?.city ||
+        originalCust?.businessDetails?.city ||
+        undefined,
+      country:
+        auftrag.customerSnapshot?.country || originalCust?.country || undefined,
+      phone:
+        auftrag.customerSnapshot?.contactPhoneNumber ||
+        originalCust?.contactPhoneNumber ||
+        undefined,
+    });
+    const savedCustomerSnapshot = await rechnungCustomerRepo.save(rechnungCustomer);
+
+    const rechnungRepo = AppDataSource.getRepository(Rechnung);
+    const rechnung = rechnungRepo.create({
+      invoice_number: invoiceNo,
+      title: auftrag.title,
+      auftrag_id: auftrag.id,
+      auftrag_no: auftrag.order_no,
+      invoice_date: now,
+      subtotal: invoiceSubtotal,
+      tax_rate: taxRate,
+      tax_amount: taxAmount,
+      total_amount: totalAmount,
+      currency: auftrag.currency || "EUR",
+      notes: notes || auftrag.notes || "",
+      status: "open",
+      customer: savedCustomerSnapshot,
+      rechnung_customer_id: savedCustomerSnapshot.id,
+      date_created: dateCreatedStr,
+      customerSnapshot: auftrag.customerSnapshot || undefined,
+      deliveryAddress: auftrag.deliveryAddress || undefined,
+      payment_method: auftrag.payment_method || undefined,
+      shipping_method: auftrag.shipping_method || undefined,
+    });
+
+    const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
+
+    const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
+
+    if (amountType === "full" && orderItems.length > 0) {
+      const itemsToCreate = orderItems.map((item, index) => {
+        const qty = Number(item.quantity) || 1;
+        const price = Number(item.price || 0);
+        const lineTotal = qty * price;
+        return rechnungItemRepo.create({
+          rechnungId: savedRechnung.id,
+          item_name: item.itemName || "Item",
+          itemNo: item.itemNo || item.material || undefined,
+          material: item.material || undefined,
+          photo: item.photo || undefined,
+          specification: item.specification || undefined,
+          description: item.description || undefined,
+          quantity: qty,
+          price: price,
+          unit_price_eur: price,
+          total_price: lineTotal,
+          order_no: auftrag.order_no,
+          position: index + 1,
+          lineTotal: lineTotal,
+        });
+      });
+      await rechnungItemRepo.save(itemsToCreate);
+    } else {
+      const itemEntity = rechnungItemRepo.create({
+        rechnungId: savedRechnung.id,
+        item_name: descriptionText,
+        quantity: 1,
+        price: invoiceSubtotal,
+        unit_price_eur: invoiceSubtotal,
+        total_price: invoiceSubtotal,
+        order_no: auftrag.order_no,
+        position: 1,
+        lineTotal: invoiceSubtotal,
+      });
+      await rechnungItemRepo.save(itemEntity);
+    }
+
+    const fullRechnung = await rechnungRepo.findOne({
+      where: { id: savedRechnung.id },
+      relations: ["items", "customer"],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Rechnung ${invoiceNo} (ohne Ausliefern) generated successfully.`,
+      data: fullRechnung,
+    });
+  } catch (error) {
+    console.error("Error creating Rechnung ohne Ausliefern:", error);
+    next(error);
+  }
+};
+
+
 export const getAllRechnungen = async (
   req: Request,
   res: Response,
@@ -560,10 +763,6 @@ export const getAllRechnungen = async (
     const linkedDocumentsByRechnungId =
       await getLinkedDocumentsForRechnungen(rechnungen);
 
-    // Derived, not stored: paid_amount / open_amount / payment_status
-    // are computed fresh from PaymentAllocation sums (plus due-date
-    // logic) on every read, so they're always accurate without needing
-    // any write path to remember to update them.
     await attachPaymentStatusToRechnungen(rechnungen);
 
     const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => {
@@ -616,7 +815,6 @@ export const getLieferscheine = async (
       : [];
     const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
 
-    // Transform to frontend-friendly format
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
       const customer = rechnung?.customer;
