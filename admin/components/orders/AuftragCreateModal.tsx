@@ -114,6 +114,8 @@ export default function AuftragCreateModal({
   const [shippingMethod, setShippingMethod] = useState("");
   const [notes, setNotes] = useState("");
 
+  console.log(selectedItems);
+
   const performSearch = async (
     fields: { ean: string; itemNo: string; name: string },
     companyId?: string,

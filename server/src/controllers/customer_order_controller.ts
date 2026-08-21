@@ -26,8 +26,11 @@ import { Rechnung } from "../models/rechnung";
 import { Rechnung_k } from "../models/rechnung_k";
 import { TransferOrder } from "../models/transfer_order";
 import { RechnungItem } from "../models/rechnung_items";
+import { TaxProfile } from "../models/tax_profile";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
+const customerRepo = AppDataSource.getRepository(Customer);
+const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
 
 /**
  * Helper function to check if any of the order's line items are stock items
@@ -321,215 +324,6 @@ async function calculateOrderTotals(orderId: number): Promise<void> {
   await customerOrderRepo.save(order);
 }
 
-export const createAuftragFromOffer = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { offerId } = req.params;
-    const { selectedItems, stock_where } = req.body;
-
-    if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
-      res.status(400).json({
-        success: false,
-        message: "Minimum 1 item MUST be selected for Auftrag",
-      });
-      return;
-    }
-
-    const offerRepo = AppDataSource.getRepository(Offer);
-    const offer = await offerRepo.findOne({
-      where: { id: offerId },
-      relations: ["lineItems"],
-    });
-
-    if (!offer) {
-      res.status(404).json({ success: false, message: "Offer not found" });
-      return;
-    }
-
-    const itemRepository = AppDataSource.getRepository(Item);
-
-    const sourceItemIds = Array.from(
-      new Set(
-        (offer.lineItems || [])
-          .filter((li: any) => li.sourceItemId)
-          .map((li: any) => Number(li.sourceItemId))
-          .filter((id: number) => !isNaN(id)),
-      ),
-    );
-
-    let sourceItemById = new Map<string, any>();
-    if (sourceItemIds.length > 0) {
-      const sourceItems = await itemRepository.find({
-        where: { id: In(sourceItemIds) },
-        relations: ["parent"],
-      });
-      sourceItemById = new Map(
-        sourceItems.map((it: any) => [String(it.id), it]),
-      );
-    }
-
-    // item_no_de and ItemID_DE now live on Item directly — no more
-    // WarehouseItem lookup needed here.
-    const getDeNo = (it: any): string =>
-      it.item_no_de || it.parent?.de_no || "";
-
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const defaultPrefix = `B${yy}${mm}-`;
-
-    let auftragNo = "";
-    try {
-      auftragNo = await NumberSequenceService.getNextNumber("customer_order");
-    } catch (err) {
-      console.warn(
-        "Could not generate sequence number for customer_order:",
-        err,
-      );
-      auftragNo = `${defaultPrefix}${Date.now().toString().slice(-4)}`;
-    }
-
-    const orderItemsToCreate: Partial<CustomerOrderItem>[] = [];
-    const hasStockItem = selectedItems.some((selItem: any) => {
-      const lineItem = (offer.lineItems || []).find(
-        (li) => li.id === selItem.lineItemId,
-      );
-      if (lineItem?.sourceItemId) {
-        const src = sourceItemById.get(String(lineItem.sourceItemId));
-        return src?.is_stock_item === "Y";
-      }
-      return false;
-    });
-
-    selectedItems.forEach((selItem: any, idx: number) => {
-      const lineItem = (offer.lineItems || []).find(
-        (li) => li.id === selItem.lineItemId,
-      );
-
-      const qty = Number(selItem.quantity) || 1;
-      const price = Number(selItem.price) || 0;
-      const lineTotal = qty * price;
-
-      // Seed material/itemNo/photo from the source Item whenever the
-      // line's own stored values are missing — same fallback order as
-      // OfferController's backfill (material -> item_no_de, photo ->
-      // Item.photo).
-      const src = lineItem?.sourceItemId
-        ? sourceItemById.get(String(lineItem.sourceItemId))
-        : undefined;
-
-      const material =
-        lineItem?.material && lineItem.material !== ""
-          ? lineItem.material
-          : src
-            ? getDeNo(src)
-            : "";
-      const photo =
-        lineItem?.photo && lineItem.photo !== ""
-          ? lineItem.photo
-          : src?.photo || undefined;
-
-      orderItemsToCreate.push({
-        itemName: lineItem ? lineItem.itemName : selItem.itemName || "Item",
-        material,
-        itemNo: material,
-        photo,
-        specification: lineItem?.specification || "",
-        description: lineItem?.description || "",
-        weight: lineItem?.weight || undefined,
-        quantity: qty,
-        price: price,
-        // Only Freizeile lines carry their own taxRate; catalog lines
-        // always follow the Auftrag's own tax_rate, so leave theirs unset.
-        taxRate:
-          lineItem && !lineItem.sourceItemId && !lineItem.requestedItemId
-            ? (lineItem.taxRate ?? undefined)
-            : undefined,
-        lineTotal: lineTotal,
-        position: idx + 1,
-        sourceLineItemId: lineItem?.id || undefined,
-        sourceItemId: lineItem?.sourceItemId || undefined,
-        notes: lineItem?.notes || "",
-      });
-    });
-
-    const taxRate = Number(offer.taxRate ?? 19);
-    const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
-      now.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}.${now.getFullYear()}`;
-
-    const customerOrderRepo: any = AppDataSource.getRepository(CustomerOrder);
-
-    let finalStockWhere = null;
-    if (hasStockItem && stock_where) {
-      finalStockWhere = stock_where;
-    } else if (hasStockItem && !stock_where) {
-      finalStockWhere = StockWhere.CN;
-    }
-
-    const customerOrder = customerOrderRepo.create({
-      order_no: auftragNo,
-      offer_id: offer.id,
-      title: offer.title,
-      customer_id: offer.customerId || undefined,
-      status: "open",
-      currency: offer.currency || "EUR",
-      tax_rate: taxRate,
-      discount_percentage: offer.discountPercentage || 0,
-      discount_amount: offer.discountAmount || 0,
-      shipping_cost: offer.shippingCost || 0,
-      shipping_quantity: offer.shippingQuantity || 1,
-      payment_method: offer.paymentMethod,
-      shipping_method: offer.shippingMethod,
-      payment_terms: offer.paymentDueDays ? String(offer.paymentDueDays) : "30",
-      delivery_terms: offer.deliveryTerms,
-      terms_conditions: offer.termsConditions,
-      notes: offer.notes || "",
-      internal_notes: offer.internalNotes || "",
-      customerSnapshot: offer.customerSnapshot || null,
-      deliveryAddress: offer.deliveryAddress || null,
-      date_created: dateCreatedStr,
-      date_delivery: offer.deliveryTime,
-      ...(finalStockWhere && { stock_where: finalStockWhere }),
-    });
-
-    const savedOrder: any = await customerOrderRepo.save(customerOrder);
-
-    const customerOrderItemRepo =
-      AppDataSource.getRepository(CustomerOrderItem);
-    const itemEntities = orderItemsToCreate.map((item) =>
-      customerOrderItemRepo.create({
-        ...item,
-        customerOrder: savedOrder,
-        customerOrderId: savedOrder.id,
-      }),
-    );
-    await customerOrderItemRepo.save(itemEntities);
-    await calculateOrderTotals(savedOrder.id);
-
-    offer.conversionCount = (offer.conversionCount || 0) + 1;
-    await offerRepo.save(offer);
-
-    const fullOrder = await customerOrderRepo.findOne({
-      where: { id: savedOrder.id },
-      relations: ["orderItems", "customer"],
-    });
-
-    res.status(201).json({
-      success: true,
-      message: `Auftrag ${auftragNo} created successfully`,
-      data: fullOrder,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 /**
  * Attaches computed delivered/open quantity to every order item across the
  * given orders, in a single batched query against rechnung_item — same
@@ -579,6 +373,66 @@ async function attachDeliveredQuantityToOrders(
   }
 }
 
+/** Same shape OfferController.mapTaxProfile produces — see the earlier
+ * fix for why this has to match field-for-field, not just carry name/rate. */
+function mapTaxProfile(tp: any): any {
+  if (!tp) return null;
+  return {
+    id: tp.id,
+    name: tp.name,
+    taxCase: tp.tax_case || undefined,
+    taxRate: Number(tp.tax_rate) || 0,
+    taxCode: tp.tax_code || undefined,
+    requiresVatId: !!tp.requires_vat_id,
+    requiresConfirmedVatId: !!tp.requires_confirmed_vat_id,
+    description: tp.description || undefined,
+  };
+}
+
+/**
+ * Auftrag-specific fallback for an unassigned customer — deliberately NOT
+ * mirrored from Offer, which shows "No tax profile assigned" instead. You
+ * asked for Auftrag specifically to default to DE here. Tries a few
+ * plausible identifiers for your seeded default DE row; verify which one
+ * actually matches and trim the rest.
+ */
+async function getDefaultDeTaxProfile(): Promise<any> {
+  const candidates = await taxProfileRepo.find({
+    where: [
+      { tax_code: "DE_VAT" },
+      { tax_code: "DE" },
+      { name: "DE_VAT" },
+      { name: "DE-VAT" },
+      { name: "Germany" },
+      { name: "Deutschland" },
+    ],
+  });
+  const match = candidates.find((tp: any) => tp.is_active) || candidates[0];
+
+  return match
+    ? mapTaxProfile(match)
+    : {
+        id: null,
+        name: "DE_VAT",
+        taxCase: undefined,
+        taxRate: 19,
+        taxCode: "DE_VAT",
+      };
+}
+
+/** Live lookup via the customer's `defaultTaxProfile` relation, same as
+ * Offer — but falls back to the DE default (instead of null) whenever
+ * there's no customer or no profile assigned. */
+async function getCustomerTaxProfile(customerId?: string | null): Promise<any> {
+  if (!customerId) return getDefaultDeTaxProfile();
+  const customer = await customerRepo.findOne({
+    where: { id: customerId },
+    relations: ["defaultTaxProfile"],
+  });
+  const resolved = mapTaxProfile(customer?.defaultTaxProfile);
+  return resolved || getDefaultDeTaxProfile();
+}
+
 export const getAllCustomerOrders = async (
   _req: Request,
   res: Response,
@@ -601,8 +455,34 @@ export const getAllCustomerOrders = async (
       offerIdByAuftragId,
     );
 
+    // Batched tax profile lookup — one query for every distinct customer
+    // on the page, same pattern as OfferController.getAllOffers rather
+    // than N lookups (one per row).
+    const customerIds = Array.from(
+      new Set(
+        orders.map((o) => o.customer_id).filter((id): id is string => !!id),
+      ),
+    );
+
+    let taxProfileByCustomerId = new Map<string, any>();
+    if (customerIds.length > 0) {
+      const customersWithTax = await customerRepo.find({
+        where: { id: In(customerIds) },
+        relations: ["defaultTaxProfile"],
+      });
+      taxProfileByCustomerId = new Map(
+        customersWithTax.map((c: any) => [
+          c.id,
+          mapTaxProfile(c.defaultTaxProfile),
+        ]),
+      );
+    }
+
     const ordersWithLinkedDocuments = orders.map((order: any) => ({
       ...order,
+      taxProfile: order.customer_id
+        ? taxProfileByCustomerId.get(order.customer_id) || null
+        : null,
       linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
         offers: [],
         rechnungen: [],
@@ -617,49 +497,6 @@ export const getAllCustomerOrders = async (
   }
 };
 
-export const getCustomerOrderById = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { id } = req.params;
-    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
-    const order = await customerOrderRepo.findOne({
-      where: { id: Number(id) },
-      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
-    });
-
-    if (!order) {
-      res.status(404).json({ success: false, message: "Auftrag not found" });
-      return;
-    }
-
-    if (Number(order.subtotal) === 0 && Number(order.total_amount) === 0) {
-      await calculateOrderTotals(order.id);
-      const updated = await customerOrderRepo.findOne({
-        where: { id: order.id },
-      });
-      if (updated) {
-        order.subtotal = updated.subtotal;
-        order.tax_amount = updated.tax_amount;
-        order.total_amount = updated.total_amount;
-      }
-    }
-
-    await attachStockInfoToOrders([order]);
-    await attachDeliveredQuantityToOrders([order]);
-
-    const linkedDocuments = await getLinkedDocumentsForAuftrag(
-      order.id,
-      order.offer_id,
-    );
-
-    res.json({ success: true, data: { ...order, linkedDocuments } });
-  } catch (error) {
-    next(error);
-  }
-};
 export const deleteCustomerOrder = async (
   req: Request,
   res: Response,
@@ -729,8 +566,8 @@ export const createAuftragFromItems = async (
       return;
     }
 
-    const customerRepo = AppDataSource.getRepository(Customer);
-    const customer = await customerRepo.findOne({
+    const customerRepoLocal = AppDataSource.getRepository(Customer);
+    const customer = await customerRepoLocal.findOne({
       where: { id: customerId },
       relations: ["businessDetails"],
     });
@@ -897,6 +734,291 @@ export const createAuftragFromItems = async (
     next(error);
   }
 };
+
+// ============================================================================
+// FIXED — taxRate now resolved live from the customer's defaultTaxProfile
+// instead of trusting the stale offer.taxRate column. Everything else in
+// this function is unchanged from what you pasted.
+// ============================================================================
+async function resolveLiveTaxRate(customerId?: string | null): Promise<number> {
+  if (!customerId) return 19;
+  const customer = await customerRepo.findOne({
+    where: { id: customerId },
+    relations: ["defaultTaxProfile"],
+  });
+  const rate = customer?.defaultTaxProfile?.tax_rate;
+  return rate !== undefined && rate !== null ? Number(rate) : 19;
+}
+export const createAuftragFromOffer = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { offerId } = req.params;
+    const { selectedItems, stock_where } = req.body;
+
+    if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: "Minimum 1 item MUST be selected for Auftrag",
+      });
+      return;
+    }
+
+    const offerRepo = AppDataSource.getRepository(Offer);
+    const offer = await offerRepo.findOne({
+      where: { id: offerId },
+      relations: ["lineItems"],
+    });
+
+    if (!offer) {
+      res.status(404).json({ success: false, message: "Offer not found" });
+      return;
+    }
+
+    const itemRepository = AppDataSource.getRepository(Item);
+
+    const sourceItemIds = Array.from(
+      new Set(
+        (offer.lineItems || [])
+          .filter((li: any) => li.sourceItemId)
+          .map((li: any) => Number(li.sourceItemId))
+          .filter((id: number) => !isNaN(id)),
+      ),
+    );
+
+    let sourceItemById = new Map<string, any>();
+    if (sourceItemIds.length > 0) {
+      const sourceItems = await itemRepository.find({
+        where: { id: In(sourceItemIds) },
+        relations: ["parent"],
+      });
+      sourceItemById = new Map(
+        sourceItems.map((it: any) => [String(it.id), it]),
+      );
+    }
+
+    // item_no_de and ItemID_DE now live on Item directly — no more
+    // WarehouseItem lookup needed here.
+    const getDeNo = (it: any): string =>
+      it.item_no_de || it.parent?.de_no || "";
+
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const defaultPrefix = `B${yy}${mm}-`;
+
+    let auftragNo = "";
+    try {
+      auftragNo = await NumberSequenceService.getNextNumber("customer_order");
+    } catch (err) {
+      console.warn(
+        "Could not generate sequence number for customer_order:",
+        err,
+      );
+      auftragNo = `${defaultPrefix}${Date.now().toString().slice(-4)}`;
+    }
+
+    const orderItemsToCreate: Partial<CustomerOrderItem>[] = [];
+    const hasStockItem = selectedItems.some((selItem: any) => {
+      const lineItem = (offer.lineItems || []).find(
+        (li) => li.id === selItem.lineItemId,
+      );
+      if (lineItem?.sourceItemId) {
+        const src = sourceItemById.get(String(lineItem.sourceItemId));
+        return src?.is_stock_item === "Y";
+      }
+      return false;
+    });
+
+    selectedItems.forEach((selItem: any, idx: number) => {
+      const lineItem = (offer.lineItems || []).find(
+        (li) => li.id === selItem.lineItemId,
+      );
+
+      const qty = Number(selItem.quantity) || 1;
+      const price = Number(selItem.price) || 0;
+      const lineTotal = qty * price;
+
+      // Seed material/itemNo/photo from the source Item whenever the
+      // line's own stored values are missing — same fallback order as
+      // OfferController's backfill (material -> item_no_de, photo ->
+      // Item.photo).
+      const src = lineItem?.sourceItemId
+        ? sourceItemById.get(String(lineItem.sourceItemId))
+        : undefined;
+
+      const material =
+        lineItem?.material && lineItem.material !== ""
+          ? lineItem.material
+          : src
+            ? getDeNo(src)
+            : "";
+      const photo =
+        lineItem?.photo && lineItem.photo !== ""
+          ? lineItem.photo
+          : src?.photo || undefined;
+
+      orderItemsToCreate.push({
+        itemName: lineItem ? lineItem.itemName : selItem.itemName || "Item",
+        material,
+        itemNo: material,
+        photo,
+        specification: lineItem?.specification || "",
+        description: lineItem?.description || "",
+        weight: lineItem?.weight || undefined,
+        quantity: qty,
+        price: price,
+        // Only Freizeile lines carry their own taxRate; catalog lines
+        // always follow the Auftrag's own tax_rate, so leave theirs unset.
+        taxRate:
+          lineItem && !lineItem.sourceItemId && !lineItem.requestedItemId
+            ? (lineItem.taxRate ?? undefined)
+            : undefined,
+        lineTotal: lineTotal,
+        position: idx + 1,
+        sourceLineItemId: lineItem?.id || undefined,
+        sourceItemId: lineItem?.sourceItemId || undefined,
+        notes: lineItem?.notes || "",
+      });
+    });
+
+    // FIXED: was `Number(offer.taxRate ?? 19)` — offer.taxRate is a stored
+    // column that defaults to 19 at Offer creation and is never kept in
+    // sync with the customer's actual tax profile. The 21% shown on the
+    // Offer screen comes from offer.taxProfile.taxRate (resolved live via
+    // customer.defaultTaxProfile) — a different value entirely. Resolving
+    // the same live value here is what makes the Auftrag match what was
+    // actually displayed.
+    const taxRate = await resolveLiveTaxRate(offer.customerId);
+
+    const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
+      now.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}.${now.getFullYear()}`;
+
+    const customerOrderRepo: any = AppDataSource.getRepository(CustomerOrder);
+
+    let finalStockWhere = null;
+    if (hasStockItem && stock_where) {
+      finalStockWhere = stock_where;
+    } else if (hasStockItem && !stock_where) {
+      finalStockWhere = StockWhere.CN;
+    }
+
+    const customerOrder = customerOrderRepo.create({
+      order_no: auftragNo,
+      offer_id: offer.id,
+      title: offer.title,
+      customer_id: offer.customerId || undefined,
+      status: "open",
+      currency: offer.currency || "EUR",
+      tax_rate: taxRate,
+      discount_percentage: offer.discountPercentage || 0,
+      discount_amount: offer.discountAmount || 0,
+      shipping_cost: offer.shippingCost || 0,
+      shipping_quantity: offer.shippingQuantity || 1,
+      payment_method: offer.paymentMethod,
+      shipping_method: offer.shippingMethod,
+      payment_terms: offer.paymentDueDays ? String(offer.paymentDueDays) : "30",
+      delivery_terms: offer.deliveryTerms,
+      terms_conditions: offer.termsConditions,
+      notes: offer.notes || "",
+      internal_notes: offer.internalNotes || "",
+      customerSnapshot: offer.customerSnapshot || null,
+      deliveryAddress: offer.deliveryAddress || null,
+      date_created: dateCreatedStr,
+      date_delivery: offer.deliveryTime,
+      ...(finalStockWhere && { stock_where: finalStockWhere }),
+    });
+
+    const savedOrder: any = await customerOrderRepo.save(customerOrder);
+
+    const customerOrderItemRepo =
+      AppDataSource.getRepository(CustomerOrderItem);
+    const itemEntities = orderItemsToCreate.map((item) =>
+      customerOrderItemRepo.create({
+        ...item,
+        customerOrder: savedOrder,
+        customerOrderId: savedOrder.id,
+      }),
+    );
+    await customerOrderItemRepo.save(itemEntities);
+    await calculateOrderTotals(savedOrder.id);
+
+    offer.conversionCount = (offer.conversionCount || 0) + 1;
+    await offerRepo.save(offer);
+
+    const fullOrder = await customerOrderRepo.findOne({
+      where: { id: savedOrder.id },
+      relations: ["orderItems", "customer"],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Auftrag ${auftragNo} created successfully`,
+      data: fullOrder,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// From earlier in this conversation — tax-profile attachment + DE default
+// fallback already applied. Unchanged since that fix.
+// ============================================================================
+export const getCustomerOrderById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+    const order = await customerOrderRepo.findOne({
+      where: { id: Number(id) },
+      relations: ["orderItems", "customer", "weiterversandServiceProvider"],
+    });
+
+    if (!order) {
+      res.status(404).json({ success: false, message: "Auftrag not found" });
+      return;
+    }
+
+    if (Number(order.subtotal) === 0 && Number(order.total_amount) === 0) {
+      await calculateOrderTotals(order.id);
+      const updated = await customerOrderRepo.findOne({
+        where: { id: order.id },
+      });
+      if (updated) {
+        order.subtotal = updated.subtotal;
+        order.tax_amount = updated.tax_amount;
+        order.total_amount = updated.total_amount;
+      }
+    }
+
+    await attachStockInfoToOrders([order]);
+    await attachDeliveredQuantityToOrders([order]);
+
+    const linkedDocuments = await getLinkedDocumentsForAuftrag(
+      order.id,
+      order.offer_id,
+    );
+
+    const taxProfile = await getCustomerTaxProfile(order.customer_id);
+
+    res.json({
+      success: true,
+      data: { ...order, linkedDocuments, taxProfile },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Order Editing Rules (per the Auftrag Status state machine):
 //   Open                -> everything editable
 //   Partially Delivered -> only these two fields (comments never shown to
@@ -1680,11 +1802,15 @@ export const downloadCustomerOrderEml = async (
     const user = (req as any).user;
 
     const { emlFilePath, filename, orderNo } = await generateAuftragEml(id, {
-      user: user ? { name: user.name, username: user.username, email: user.email } : undefined,
+      user: user
+        ? { name: user.name, username: user.username, email: user.email }
+        : undefined,
     });
 
     if (!fs.existsSync(emlFilePath)) {
-      res.status(500).json({ success: false, message: "EML file generation failed" });
+      res
+        .status(500)
+        .json({ success: false, message: "EML file generation failed" });
       return;
     }
 
@@ -1692,10 +1818,9 @@ export const downloadCustomerOrderEml = async (
       const now = new Date();
       const dateEmailedStr = `${now.getDate().toString().padStart(2, "0")}.${(now.getMonth() + 1).toString().padStart(2, "0")}.${now.getFullYear()}`;
       const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
-      await customerOrderRepo.update(
-        { id: Number(id) || 0 } as any,
-        { date_emailed: dateEmailedStr },
-      );
+      await customerOrderRepo.update({ id: Number(id) || 0 } as any, {
+        date_emailed: dateEmailedStr,
+      });
     } catch (updateErr) {
       console.warn("Could not update date_emailed on Auftrag:", updateErr);
     }
