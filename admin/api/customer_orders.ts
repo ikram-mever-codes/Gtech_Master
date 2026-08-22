@@ -24,6 +24,39 @@ export const createAuftragFromOffer = async (
   }
 };
 
+/**
+ * For an Angebot that has draft items (inquiry-request lines never linked
+ * to a real catalog Item), sends the user's per-line convert/skip
+ * decisions and edited item info. The backend creates a real Item for
+ * every line marked `convert: true`, then creates the Auftrag exactly
+ * like createAuftragFromOffer — this is the single call the
+ * DraftItemConversionModal submit button makes.
+ */
+export const convertDraftItemsAndCreateAuftrag = async (
+  offerId: string,
+  draftDecisions: Array<{
+    lineItemId: string;
+    convert: boolean;
+    itemName: string;
+    material?: string;
+    ean?: string;
+    weightKg?: number;
+    price: number;
+    notes?: string;
+  }>,
+) => {
+  try {
+    const response: any = await api.post(
+      `/customer-orders/from-offer/${offerId}/convert-draft-items`,
+      { draftDecisions },
+    );
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to convert draft items and create Auftrag");
+    throw error;
+  }
+};
+
 export const createAuftragFromInquiry = async (
   inquiryId: string,
   payload?: {
