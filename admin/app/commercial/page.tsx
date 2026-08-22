@@ -1989,6 +1989,10 @@ const InvoiceListPage: React.FC = () => {
                     items={lineItems}
                     currency={currency}
                     docType={activeInvTab}
+                    shippingMethod={row.shipping_method || row.shippingMethod}
+                    shippingCost={row.shipping_cost ?? row.shippingCost}
+                    shippingQuantity={row.shipping_quantity ?? row.shippingQuantity ?? 1}
+                    taxRate={row.tax_rate ?? row.taxRate}
                   />
                 );
               }}
