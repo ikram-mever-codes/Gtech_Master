@@ -92,6 +92,12 @@ export const getAllLieferscheine = async (
         (auftragId ? auftragTitleById.get(auftragId) : undefined) ||
         undefined;
 
+      const shippingMethod =
+        (ls as any).shipping_method ||
+        (ls as any).shippingMethod ||
+        rechnung?.shipping_method ||
+        undefined;
+
       return {
         id: ls.id,
         deliveryNoteNo: ls.delivery_note_number,
@@ -105,6 +111,8 @@ export const getAllLieferscheine = async (
         customerSnapshot: customerSnapshot,
         city: customer?.city || customerSnapshot?.city || "",
         country: customer?.country || customerSnapshot?.country || "",
+        shippingMethod,
+        shipping_method: shippingMethod,
         itemCount: items.length,
         items: items.map((item: any) => ({
           id: item.id,
