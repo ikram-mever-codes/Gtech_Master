@@ -11,6 +11,7 @@ import {
   confirmLieferscheinDelivery,
   stornierLieferschein,
 } from "@/api/lieferscheine";
+import ViewEditToggle from "@/components/UI/ViewEditToggle";
 
 const formatDeCurrency = (val: number) => {
   const num = isNaN(val) || !isFinite(val) ? 0 : val;
@@ -211,7 +212,13 @@ export default function LieferscheinDetailModal({
     customer.display_name ||
     customer.displayName ||
     companyName;
-  const docTitle = data.title || "";
+  const docTitle =
+    data.title ||
+    data.auftragTitle ||
+    data.orderTitle ||
+    items[0]?.itemName ||
+    items[0]?.item_name ||
+    "";
   const deliveryNoteNo = data.deliveryNoteNo || data.id;
   const invoiceNumber = data.invoiceNumber || "—";
   const orderNumber = data.orderNumber || "—";
@@ -226,7 +233,7 @@ export default function LieferscheinDetailModal({
     return sum + (Number(it.weight) || 0) * qty / 1000;
   }, 0);
   const extraWeightKg = items.reduce(
-    (sum: number, it: any) => sum + (Number(it.extraWeight) || 0) / 1000,
+    (sum: number, it: any) => sum + (Number(it.extraWeight) || 0),
     0,
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
@@ -393,12 +400,12 @@ export default function LieferscheinDetailModal({
                 )}
               </div>
               <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
-                <span>{docTitle || companyName}</span>
+                <span>{docTitle || "—"}</span>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigator.clipboard.writeText(docTitle || companyName);
+                    navigator.clipboard.writeText(docTitle || "");
                     toast.success("Copied to clipboard!");
                   }}
                   className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
@@ -450,26 +457,10 @@ export default function LieferscheinDetailModal({
                   </div>
                 </>
               )}
-              <button
-                type="button"
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${isEditMode
-                  ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                {isEditMode ? (
-                  <>
-                    <X className="w-4 h-4" />
-                    Exit Edit
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="w-4 h-4" />
-                    Edit Mode
-                  </>
-                )}
-              </button>
+              <ViewEditToggle
+                isEditEnabled={isEditMode}
+                onToggle={() => setIsEditMode(!isEditMode)}
+              />
               <button
                 type="button"
                 onClick={onClose}
@@ -525,7 +516,7 @@ export default function LieferscheinDetailModal({
                 )}
               </div>
 
-              <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+              <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-x-6 gap-y-4">
                 <Field label="Invoice No" value={invoiceNumber} />
                 <Field label="Order No" value={orderNumber} />
                 <div>
@@ -558,7 +549,6 @@ export default function LieferscheinDetailModal({
                     </div>
                   )}
                 </div>
-                <Field label="Items Count" value={items.length || "—"} />
               </div>
             </div>
 
@@ -647,21 +637,13 @@ export default function LieferscheinDetailModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Field
-                  label="Net weight (items)"
-                  value={formatWeight(netWeightKg)}
-                />
-                <Field label="Extra weight" value={formatWeight(extraWeightKg)} />
-                <Field label="Total weight" value={formatWeight(totalWeightKg)} />
-              </div>
-              <div className="max-w-sm ml-auto w-full space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Items</span>
-                  <span className="font-medium">{items.length}</span>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field
+                label="Net weight (items)"
+                value={formatWeight(netWeightKg)}
+              />
+              <Field label="Extra weight" value={formatWeight(extraWeightKg)} />
+              <Field label="Total weight" value={formatWeight(totalWeightKg)} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
