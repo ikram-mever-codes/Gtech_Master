@@ -30,7 +30,10 @@ import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { toast } from "react-hot-toast";
-import { createAuftragFromOffer } from "@/api/customer_orders";
+import {
+  createAuftragFromOffer,
+  getOfferDraftItemsPreview,
+} from "@/api/customer_orders";
 import {
   getAllOffers,
   updateOffer,
@@ -443,9 +446,15 @@ const OffersPage: React.FC<any> = ({
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const itemsPerPage = 20;
+
+  // Draft-item conversion flow state. draftConversionOffer holds the
+  // offer currently being converted (once we know it has draft items);
+  // draftItemsPreview holds the resolved draft-item rows fetched from
+  // getOfferDraftItemsPreview for that offer.
   const [draftConversionOffer, setDraftConversionOffer] = useState<any | null>(
     null,
   );
+  const [draftItemsPreview, setDraftItemsPreview] = useState<any[]>([]);
 
   const [filters, setFilters] = useState<OfferSearchFilters>({
     search: "",
@@ -457,15 +466,6 @@ const OffersPage: React.FC<any> = ({
   const [detailOfferId, setDetailOfferId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [expandedOfferIds, setExpandedOfferIds] = useState<any>(new Set());
-
-  /**
-   * A line counts as a "draft item" if it came from an inquiry request
-   * (requestedItemId set) but was never linked to a real catalog Item
-   * (sourceItemId still empty). Same working definition used in
-   * DraftItemConversionModal — keep both in sync if this changes.
-   */
-  const isDraftItem = (li: any): boolean =>
-    !!li?.requestedItemId && !li?.sourceItemId;
 
   const toggleExpandOffer = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -507,23 +507,35 @@ const OffersPage: React.FC<any> = ({
   };
 
   /**
-   * Runs the existing direct-conversion path — unchanged from before.
-   * Only reached once we already know the offer has no draft items to
-   * resolve, or after the draft conversion modal has finished its own
-   * job (in which case this function isn't called again — the modal
-   * creates the Auftrag itself via convertDraftItemsAndCreateAuftrag).
+   * Creates the Auftrag from an offer. `selectedItemsOverride` — when
+   * supplied by DraftItemConversionModal — carries every non-component
+   * line plus a `convertDraft` flag on whichever lines are backed by a
+   * draft Item; the backend (createAuftragFromOffer) resolves each
+   * line's backing Item, applies the sales_price fallback, and flips
+   * isDraft to false for every line where convertDraft !== false.
+   * Without an override (the plain, no-draft-items path), it's built the
+   * same way it always was: one entry per non-component line, straight
+   * from the offer's own current values.
+   *
+   * Returns true on success so callers (including the draft modal) know
+   * whether to close/reset their own state.
    */
-  const runDirectConversion = async (offer: any) => {
+  const runDirectConversion = async (
+    offer: any,
+    selectedItemsOverride?: any[],
+  ): Promise<boolean> => {
     try {
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
 
-      const selectedItems = lineItems.map((x: any) => ({
-        lineItemId: x.id,
-        quantity: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
-        price: Number(x.basePrice || x.unitPrice || x.price || 0),
-        itemName: x.itemName || x.notes || x.description || "Line Item",
-      }));
+      const selectedItems =
+        selectedItemsOverride ||
+        lineItems.map((x: any) => ({
+          lineItemId: x.id,
+          quantity: Number(x.baseQuantity || x.quantity || x.qty || 1) || 1,
+          price: Number(x.basePrice || x.unitPrice || x.price || 0),
+          itemName: x.itemName || x.notes || x.description || "Line Item",
+        }));
 
       if (selectedItems.length === 0) {
         toast.error(
@@ -532,7 +544,7 @@ const OffersPage: React.FC<any> = ({
             id: "convert-offer-toast",
           },
         );
-        return;
+        return false;
       }
 
       const res = await createAuftragFromOffer(offer.id, selectedItems);
@@ -570,11 +582,13 @@ const OffersPage: React.FC<any> = ({
       if (createdAuftragId) {
         onAuftragCreated?.(createdAuftragId);
       }
+      return true;
     } catch (err) {
       console.error(err);
       toast.error("Failed to convert offer to Auftrag", {
         id: "convert-offer-toast",
       });
+      return false;
     }
   };
 
@@ -595,17 +609,19 @@ const OffersPage: React.FC<any> = ({
     );
     if (!prompt) return;
 
-    const lineItemsForDraftCheck =
-      offer.lineItems?.filter((li: any) => !li.isComponent) || [];
-    const hasDraftItems = lineItemsForDraftCheck.some(isDraftItem);
-
-    if (hasDraftItems) {
-      // Draft items need explicit conversion decisions first — hand off
-      // to the conversion window instead of creating the Auftrag here.
-      // DraftItemConversionModal creates the Auftrag itself once the
-      // user confirms, then reports back via onConverted below.
-      setDraftConversionOffer(offer);
-      return;
+    try {
+      const draftRes = await getOfferDraftItemsPreview(offer.id);
+      const draftItems = draftRes?.data || [];
+      if (draftItems.length > 0) {
+        setDraftItemsPreview(draftItems);
+        setDraftConversionOffer(offer);
+        return;
+      }
+    } catch (err) {
+      console.error(
+        "Couldn't check for draft items, proceeding directly:",
+        err,
+      );
     }
 
     await runDirectConversion(offer);
@@ -957,12 +973,21 @@ const OffersPage: React.FC<any> = ({
         <DraftItemConversionModal
           isOpen={!!draftConversionOffer}
           offer={draftConversionOffer}
-          onClose={() => setDraftConversionOffer(null)}
-          onConverted={(auftragId) => {
+          draftItems={draftItemsPreview}
+          onClose={() => {
             setDraftConversionOffer(null);
-            fetchOffers();
-            onOrderConverted?.();
-            onAuftragCreated?.(auftragId);
+            setDraftItemsPreview([]);
+          }}
+          onSubmit={async (selectedItems) => {
+            const ok = await runDirectConversion(
+              draftConversionOffer,
+              selectedItems,
+            );
+            if (ok) {
+              setDraftConversionOffer(null);
+              setDraftItemsPreview([]);
+            }
+            return ok;
           }}
         />
       )}

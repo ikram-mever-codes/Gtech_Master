@@ -788,7 +788,7 @@ export default function AuftragToRechnungModal({
                       Stock
                     </th>
                     <th className="px-2 py-2 text-right font-semibold w-28">
-                      Qty Delivered
+                      Qty
                     </th>
                     <th className="px-2 py-2 text-right font-semibold w-28">
                       Netto-Preis

@@ -573,6 +573,7 @@ export const getItems = async (
         name_en: parentData?.name_en || null,
         name_cn: parentData?.name_cn || null,
         item_name: item.item_name,
+        nameCN: item.item_name_cn || "",
         item_name_cn: item.item_name_cn,
         item_name_de: item.item_name_de || null,
         ean: item.ean || null,

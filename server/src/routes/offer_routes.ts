@@ -2,6 +2,7 @@ import { Router } from "express";
 import { OfferController } from "../controllers/offer_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { UserRole } from "../models/users";
+import { getOfferDraftItemsPreview } from "../controllers/customer_order_controller";
 
 const router: any = Router();
 const offerController = new OfferController();
@@ -27,6 +28,8 @@ router.post(
   authorize(UserRole.SALES),
   offerController.createOfferFromItem.bind(offerController),
 );
+
+router.get("/from-offer/:offerId/draft-items", getOfferDraftItemsPreview);
 
 // ---------------------------------------------------------------------------
 // Customer shipping addresses (for the delivery-address picker)

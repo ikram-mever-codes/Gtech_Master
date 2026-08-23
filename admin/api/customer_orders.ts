@@ -32,27 +32,14 @@ export const createAuftragFromOffer = async (
  * like createAuftragFromOffer — this is the single call the
  * DraftItemConversionModal submit button makes.
  */
-export const convertDraftItemsAndCreateAuftrag = async (
-  offerId: string,
-  draftDecisions: Array<{
-    lineItemId: string;
-    convert: boolean;
-    itemName: string;
-    material?: string;
-    ean?: string;
-    weightKg?: number;
-    price: number;
-    notes?: string;
-  }>,
-) => {
+export const getOfferDraftItemsPreview = async (offerId: string) => {
   try {
-    const response: any = await api.post(
-      `/customer-orders/from-offer/${offerId}/convert-draft-items`,
-      { draftDecisions },
+    const response: any = await api.get(
+      `/offers/from-offer/${offerId}/draft-items`,
     );
     return response;
   } catch (error: any) {
-    handleApiError(error, "Failed to convert draft items and create Auftrag");
+    handleApiError(error, "Failed to load draft items for this offer");
     throw error;
   }
 };
