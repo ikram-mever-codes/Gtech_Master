@@ -1443,6 +1443,8 @@ const InvoiceListPage: React.FC = () => {
             country: ls.country || cust.country || snap.country || "",
           },
           customer_name: dispName || ls.customerName || "—",
+          shipping_method: ls.shipping_method || ls.shippingMethod || "",
+          shippingMethod: ls.shippingMethod || ls.shipping_method || "",
           items: ls.items || ls.lineItems || [],
           customItemCount: ls.itemCount ?? ls.items?.length ?? 0,
         };

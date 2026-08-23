@@ -810,10 +810,13 @@ export const getLieferscheine = async (
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
         where: { id: In(auftragIds) },
-        select: ["id", "title"],
+        select: ["id", "title", "shipping_method"],
       })
       : [];
     const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
+    const auftragShippingMethodById = new Map(
+      auftraege.map((a: any) => [a.id, a.shipping_method]),
+    );
 
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
@@ -825,6 +828,13 @@ export const getLieferscheine = async (
         (ls as any).title ||
         rechnung?.title ||
         (auftragId ? auftragTitleById.get(auftragId) : undefined) ||
+        undefined;
+
+      const shippingMethod =
+        (ls as any).shipping_method ||
+        (ls as any).shippingMethod ||
+        rechnung?.shipping_method ||
+        (auftragId ? auftragShippingMethodById.get(auftragId) : undefined) ||
         undefined;
 
       const custName =
@@ -853,6 +863,8 @@ export const getLieferscheine = async (
           customer?.city ||
           "",
         country: customer?.country || customerSnapshot?.country || "",
+        shippingMethod,
+        shipping_method: shippingMethod,
         itemCount: items.length,
         items: items.map((item) => ({
           id: item.id,
