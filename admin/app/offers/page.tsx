@@ -45,6 +45,7 @@ import { formatDate } from "@/utils/offers";
 import { parseFlexibleNumber } from "@/utils/decimal";
 import { BASE_URL } from "@/utils/constants";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
+import DraftItemConversionModal from "@/components/orders/DraftItemConversionModal";
 import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import {
@@ -235,9 +236,13 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                     <span>{item.itemNo || item.material || "—"}</span>
                   </td>
                   <td className="px-2 py-2">
-                    <div className="font-medium text-gray-900">{item.itemName || "—"}</div>
+                    <div className="font-medium text-gray-900">
+                      {item.itemName || "—"}
+                    </div>
                     {item.notes && (
-                      <div className="text-xs text-gray-500 mt-0.5 leading-snug">{item.notes}</div>
+                      <div className="text-xs text-gray-500 mt-0.5 leading-snug">
+                        {item.notes}
+                      </div>
                     )}
                   </td>
                   <td className="px-2 py-2 text-center text-gray-600">
@@ -438,6 +443,9 @@ const OffersPage: React.FC<any> = ({
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const itemsPerPage = 20;
+  const [draftConversionOffer, setDraftConversionOffer] = useState<any | null>(
+    null,
+  );
 
   const [filters, setFilters] = useState<OfferSearchFilters>({
     search: "",
@@ -448,13 +456,20 @@ const OffersPage: React.FC<any> = ({
 
   const [detailOfferId, setDetailOfferId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
-  const [expandedOfferIds, setExpandedOfferIds] = useState<
-    Set<string | number>
-  >(new Set());
+  const [expandedOfferIds, setExpandedOfferIds] = useState<any>(new Set());
+
+  /**
+   * A line counts as a "draft item" if it came from an inquiry request
+   * (requestedItemId set) but was never linked to a real catalog Item
+   * (sourceItemId still empty). Same working definition used in
+   * DraftItemConversionModal — keep both in sync if this changes.
+   */
+  const isDraftItem = (li: any): boolean =>
+    !!li?.requestedItemId && !li?.sourceItemId;
 
   const toggleExpandOffer = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedOfferIds((prev) => {
+    setExpandedOfferIds((prev: any) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -491,23 +506,14 @@ const OffersPage: React.FC<any> = ({
     setShowDetail(true);
   };
 
-  const handleConvertOfferToAuftrag = async (
-    offer: any,
-    e?: React.MouseEvent,
-  ) => {
-    if (e) e.stopPropagation();
-    const companyName =
-      offer.customerSnapshot?.companyName ||
-      offer.customerSnapshot?.legalName ||
-      offer.customerSnapshot?.name ||
-      offer.customer?.companyName ||
-      "";
-
-    const prompt = window.confirm(
-      `Auftrag erstellen für ${companyName} aus Angebot ${offer.offerNumber} ?`,
-    );
-    if (!prompt) return;
-
+  /**
+   * Runs the existing direct-conversion path — unchanged from before.
+   * Only reached once we already know the offer has no draft items to
+   * resolve, or after the draft conversion modal has finished its own
+   * job (in which case this function isn't called again — the modal
+   * creates the Auftrag itself via convertDraftItemsAndCreateAuftrag).
+   */
+  const runDirectConversion = async (offer: any) => {
     try {
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
@@ -570,6 +576,39 @@ const OffersPage: React.FC<any> = ({
         id: "convert-offer-toast",
       });
     }
+  };
+
+  const handleConvertOfferToAuftrag = async (
+    offer: any,
+    e?: React.MouseEvent,
+  ) => {
+    if (e) e.stopPropagation();
+    const companyName =
+      offer.customerSnapshot?.companyName ||
+      offer.customerSnapshot?.legalName ||
+      offer.customerSnapshot?.name ||
+      offer.customer?.companyName ||
+      "";
+
+    const prompt = window.confirm(
+      `Auftrag erstellen für ${companyName} aus Angebot ${offer.offerNumber} ?`,
+    );
+    if (!prompt) return;
+
+    const lineItemsForDraftCheck =
+      offer.lineItems?.filter((li: any) => !li.isComponent) || [];
+    const hasDraftItems = lineItemsForDraftCheck.some(isDraftItem);
+
+    if (hasDraftItems) {
+      // Draft items need explicit conversion decisions first — hand off
+      // to the conversion window instead of creating the Auftrag here.
+      // DraftItemConversionModal creates the Auftrag itself once the
+      // user confirms, then reports back via onConverted below.
+      setDraftConversionOffer(offer);
+      return;
+    }
+
+    await runDirectConversion(offer);
   };
 
   const getContrastTextColor = (bgColor?: string) => {
@@ -911,6 +950,20 @@ const OffersPage: React.FC<any> = ({
           onChanged={fetchOffers}
           userRole={user?.role}
           onSwitchToAuftrag={onSwitchToAuftrag}
+        />
+      )}
+
+      {draftConversionOffer && (
+        <DraftItemConversionModal
+          isOpen={!!draftConversionOffer}
+          offer={draftConversionOffer}
+          onClose={() => setDraftConversionOffer(null)}
+          onConverted={(auftragId) => {
+            setDraftConversionOffer(null);
+            fetchOffers();
+            onOrderConverted?.();
+            onAuftragCreated?.(auftragId);
+          }}
         />
       )}
     </>

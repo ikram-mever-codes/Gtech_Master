@@ -6,6 +6,7 @@ import {
   PencilIcon,
   TrashIcon,
   PlusIcon,
+  CheckCircleIcon,
   LinkIcon,
   UserIcon,
   ClipboardDocumentIcon,
@@ -22,7 +23,7 @@ import {
   deleteTransferOrderLineItem,
   createTransferOrder,
 } from "@/api/transfer_orders";
-import { getItems } from "@/api/items";
+import { getItems, autocompleteItems } from "@/api/items";
 import { getAllCustomers } from "@/api/customers";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { UserRole } from "@/utils/interfaces";
@@ -149,23 +150,51 @@ const TextCellInput: React.FC<{
   );
 };
 
-const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
-  item,
-  onClick,
-}) => {
-  const name = item.item_name || item.itemName || "Unnamed item";
+const getItemCompany = (item: any): string =>
+  item?.customer_name ||
+  item?.company_display_name ||
+  item?.companyDisplayName ||
+  item?.customer?.companyName ||
+  item?.customer?.company_name ||
+  item?.customer?.name ||
+  item?.company_name ||
+  item?.company ||
+  "";
+
+// Byte-for-byte OfferDetailModal's real ItemRow (verified against its
+// actual source) — item_name_de as the display name, company + LABEL
+// badge in the subtitle row. The picker always passes selected={false}
+// here (same as Offer's own "add existing item" picker does), so the
+// highlighted/checkmark state never shows in this context.
+const ItemRow: React.FC<{
+  item: any;
+  selected: boolean;
+  onClick: () => void;
+}> = ({ item, selected, onClick }) => {
+  const thumb = item.photo;
+  const name = item.item_name_de || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
+  const company = getItemCompany(item);
+  const isLabel = item.isLabelPrint || item.isLabel === "Y";
+
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all border-gray-200 hover:bg-gray-50"
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
+          ? "border-primary bg-primary/5"
+          : "border-gray-200 hover:bg-gray-50"
+      }`}
     >
       <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
-        {item.photo ? (
+        {thumb ? (
           <img
-            src={item.photo}
+            src={thumb}
             alt="thumb"
             className="w-full h-full object-cover"
+            onError={(e) =>
+              ((e.target as HTMLImageElement).style.display = "none")
+            }
           />
         ) : (
           <span className="text-gray-300 text-xs">—</span>
@@ -173,8 +202,25 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-gray-900 truncate">{name}</div>
-        <div className="text-xs text-gray-500 mt-0.5">{itemNo || "—"}</div>
+        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold text-gray-700">{itemNo || "—"}</span>
+          <span>-</span>
+          <span className="text-blue-600 font-medium truncate max-w-[10rem]">
+            {company || "—"}
+          </span>
+          {isLabel && (
+            <>
+              <span>-</span>
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded uppercase tracking-wider">
+                LABEL
+              </span>
+            </>
+          )}
+        </div>
       </div>
+      {selected && (
+        <CheckCircleIcon className="h-5 w-5 text-primary shrink-0" />
+      )}
     </div>
   );
 };
@@ -202,10 +248,29 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState<any>({});
   const [showItemPicker, setShowItemPicker] = useState(false);
-  const [itemPickerSearch, setItemPickerSearch] = useState("");
   const [items, setItems] = useState<any[]>([]);
   const [newLine, setNewLine] = useState({ itemName: "", qty: 0 });
   const [customers, setCustomers] = useState<any[]>([]);
+
+  // Three-field item search — field/handler names (searchEan,
+  // searchItemNo, searchName, handleFieldSearchChange) match the real JSX
+  // given. Now backed by a genuine debounced call to the new
+  // autocompleteItems endpoint (strict AND-across-words match) instead of
+  // filtering a client-side 1000-item cache — see the effect below for
+  // exactly how the three fields combine into one query.
+  const [searchEan, setSearchEan] = useState("");
+  const [searchItemNo, setSearchItemNo] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [itemSearchLoading, setItemSearchLoading] = useState(false);
+
+  const handleFieldSearchChange = (
+    field: "ean" | "itemNo" | "name",
+    value: string,
+  ) => {
+    if (field === "ean") setSearchEan(value);
+    if (field === "itemNo") setSearchItemNo(value);
+    if (field === "name") setSearchName(value);
+  };
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
@@ -230,13 +295,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     }
     return null;
   }, [form.supplierId, order?.orderItems, orderItemSupplierById]);
-
-  const pickerItems = useMemo(() => {
-    if (!lockedSupplierId) return items;
-    return items.filter(
-      (it) => Number(it.supplier_id) === Number(lockedSupplierId),
-    );
-  }, [items, lockedSupplierId]);
 
   const fetchOrder = useCallback(async () => {
     console.log("fetchOrder called", { orderId, isCreate });
@@ -275,7 +333,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       console.log("View/Edit mode - fetching order", orderId);
       setEdit(initialEdit);
       setShowItemPicker(false);
-      setItemPickerSearch("");
+      setSearchEan("");
+      setSearchItemNo("");
+      setSearchName("");
       fetchOrder();
     }
   }, [isOpen, orderId, fetchOrder, initialEdit, isCreate]);
@@ -420,17 +480,42 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     })();
   }, [isOpen, isCreate, order?.orderItems]);
 
+  // Debounced call to the new autocompleteItems endpoint. The three
+  // fields combine into one space-joined query — the backend's
+  // AND-across-words matching means filling more than one field still
+  // narrows results the same way the old client-side AND logic did, just
+  // now against the full catalog instead of a capped 1000-item preload,
+  // with strict letter-for-letter matching and ranked results.
+  // No query -> no request; the picker starts empty and asks the user to
+  // type, rather than eagerly loading everything the way it used to.
   useEffect(() => {
-    if (!showItemPicker || items.length > 0) return;
-    (async () => {
+    if (!showItemPicker) return;
+
+    const combined = [searchEan, searchItemNo, searchName]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" ");
+
+    if (!combined) {
+      setItems([]);
+      return;
+    }
+
+    setItemSearchLoading(true);
+    const timer = setTimeout(async () => {
       try {
-        const res: any = await getItems({ limit: 1000 });
-        setItems(Array.isArray(res?.data) ? res.data : res?.data?.items || []);
+        const res: any = await autocompleteItems(combined, { limit: 30 });
+        setItems(Array.isArray(res?.data) ? res.data : []);
       } catch (e) {
-        console.error("Error loading items:", e);
+        console.error("Error searching items:", e);
+        setItems([]);
+      } finally {
+        setItemSearchLoading(false);
       }
-    })();
-  }, [showItemPicker, items.length]);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [showItemPicker, searchEan, searchItemNo, searchName]);
 
   if (!isOpen) return null;
 
@@ -478,6 +563,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     setForm(buildForm(order));
     setEdit(false);
     setShowItemPicker(false);
+    setSearchEan("");
+    setSearchItemNo("");
+    setSearchName("");
   };
 
   const handleSave = async () => {
@@ -542,14 +630,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       } else {
         toast.error(
           res.message ||
-          `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
+            `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
           errorStyles,
         );
       }
     } catch (e: any) {
       toast.error(
         e.message ||
-        `An error occurred while ${isCreate ? "creating" : "saving"}.`,
+          `An error occurred while ${isCreate ? "creating" : "saving"}.`,
         errorStyles,
       );
     } finally {
@@ -649,7 +737,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       }
 
       await createTransferOrderLineItem(orderIdToUse, {
-        itemName: it.item_name || it.itemName || "Item",
+        itemName: it.item_name_de || it.item_name || it.itemName || "Item",
         material: it.model || "",
         itemNo: it.de_no,
         weight: it.weight,
@@ -672,13 +760,15 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       });
 
       // Do NOT auto-change receiver/supplier here — that's a user-driven
-      // decision made via the Receiver/Supplier dropdowns. The item's
-      // supplier is still enforced for the picker via lockedSupplierId,
-      // which is derived from orderItemSupplierById once refreshLocal()
-      // reloads the order below — no server-side receiver update needed.
+      // decision made via the Receiver/Supplier dropdowns. lockedSupplierId
+      // (derived from orderItemSupplierById, refreshed below) still blocks
+      // *adding* a conflicting-supplier item via the check above — it just
+      // no longer narrows what the picker's search can find.
 
       setShowItemPicker(false);
-      setItemPickerSearch("");
+      setSearchEan("");
+      setSearchItemNo("");
+      setSearchName("");
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -726,8 +816,8 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
   const visibleLineItems = order?.orderItems
     ? [...order.orderItems].sort(
-      (a: any, b: any) => (a.position || 0) - (b.position || 0),
-    )
+        (a: any, b: any) => (a.position || 0) - (b.position || 0),
+      )
     : [];
 
   // Loading state for existing order
@@ -769,6 +859,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     ? "Create Bestellung"
     : `Bestellung ${displayOrder.order_no}`;
 
+  // No client-side filtering needed any more — `items` is already the
+  // exact, ranked result of the debounced autocompleteItems call above.
+  // No supplier-lock restriction here either (removed per your earlier
+  // instruction): the search covers every item. The "different supplier"
+  // check in addExistingItem below is untouched — it still blocks
+  // *adding* a conflicting-supplier item, it just doesn't hide those
+  // items from being found.
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
@@ -779,16 +877,17 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 {title}
               </p>
               <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${(form.zweck || displayOrder.zweck) === "direkt"
-                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                  : (form.zweck || displayOrder.zweck) === "periodisch"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : (form.zweck || displayOrder.zweck) === "ReserveEU"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : (form.zweck || displayOrder.zweck) === "ReserveCN"
-                        ? "bg-rose-50 text-rose-700 border-rose-200"
-                        : "bg-blue-50 text-blue-700 border-blue-200"
-                  }`}
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                  (form.zweck || displayOrder.zweck) === "direkt"
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : (form.zweck || displayOrder.zweck) === "periodisch"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : (form.zweck || displayOrder.zweck) === "ReserveEU"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : (form.zweck || displayOrder.zweck) === "ReserveCN"
+                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
               >
                 {form.zweck || displayOrder.zweck || "direkt"}
               </span>
@@ -1170,9 +1269,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                         <td className="px-2 py-2 text-right text-gray-600">
                           {item.sourceItemId
                             ? formatPrice(
-                              item.purchasePrice ?? item.transferPrice,
-                              lineCurrency,
-                            )
+                                item.purchasePrice ?? item.transferPrice,
+                                lineCurrency,
+                              )
                             : "—"}
                         </td>
                         <td className="px-2 py-2 text-right font-medium">
@@ -1200,82 +1299,83 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => setShowItemPicker((s) => !s)}
+                    onClick={() => {
+                      setShowItemPicker((s) => !s);
+                    }}
                     className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1 whitespace-nowrap"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     Add existing item
                   </button>
-                  {/* <div className="flex-1 min-w-[200px]">
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1">
-                        <input
-                          className={inputCls}
-                          value={newLine.itemName}
-                          placeholder="Freizeile — text"
-                          onChange={(e) =>
-                            setNewLine((n) => ({
-                              ...n,
-                              itemName: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <button
-                        onClick={addLineItem}
-                        className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
-                      >
-                        <PlusIcon className="h-4 w-4" />
-                        Add Freizeile
-                      </button>
-                    </div>
-                  </div> */}
                 </div>
 
                 {showItemPicker && (
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
-                    {lockedSupplierId && (
-                      <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1">
-                        Showing items from the locked supplier only.
-                      </p>
-                    )}
-                    <input
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      placeholder="Search items…"
-                      value={itemPickerSearch}
-                      onChange={(e) => setItemPickerSearch(e.target.value)}
-                    />
+                    <div className="w-[70%] flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          EAN
+                        </label>
+                        <input
+                          value={searchEan}
+                          onChange={(e) =>
+                            handleFieldSearchChange("ean", e.target.value)
+                          }
+                          placeholder="Exact EAN..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Item No.
+                        </label>
+                        <input
+                          value={searchItemNo}
+                          onChange={(e) =>
+                            handleFieldSearchChange("itemNo", e.target.value)
+                          }
+                          placeholder="Exact item no..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Item Name (EN/DE)
+                        </label>
+                        <input
+                          value={searchName}
+                          onChange={(e) =>
+                            handleFieldSearchChange("name", e.target.value)
+                          }
+                          placeholder="Item name..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
                     <div className="max-h-48 overflow-y-auto space-y-1.5">
-                      {pickerItems.filter((it) => {
-                        if (!itemPickerSearch) return true;
-                        const q = itemPickerSearch.toLowerCase();
-                        const name = it.item_name || it.itemName || "";
-                        return (
-                          name.toLowerCase().includes(q) ||
-                          String(it.ean || "").includes(itemPickerSearch)
-                        );
-                      }).length === 0 ? (
+                      {itemSearchLoading ? (
+                        <div className="text-center text-sm text-gray-400 py-3">
+                          Searching…
+                        </div>
+                      ) : !searchEan.trim() &&
+                        !searchItemNo.trim() &&
+                        !searchName.trim() ? (
+                        <div className="text-center text-sm text-gray-400 py-3">
+                          Type in EAN, Item No., or Item Name to search.
+                        </div>
+                      ) : items.length === 0 ? (
                         <div className="text-center text-sm text-gray-500 py-3">
                           No items match.
                         </div>
                       ) : (
-                        pickerItems
-                          .filter((it) => {
-                            if (!itemPickerSearch) return true;
-                            const q = itemPickerSearch.toLowerCase();
-                            const name = it.item_name || it.itemName || "";
-                            return (
-                              name.toLowerCase().includes(q) ||
-                              String(it.ean || "").includes(itemPickerSearch)
-                            );
-                          })
-                          .map((it) => (
-                            <ItemRow
-                              key={it.id}
-                              item={it}
-                              onClick={() => addExistingItem(it)}
-                            />
-                          ))
+                        items.map((it) => (
+                          <ItemRow
+                            key={it.id}
+                            item={it}
+                            selected={false}
+                            onClick={() => addExistingItem(it)}
+                          />
+                        ))
                       )}
                     </div>
                   </div>
@@ -1309,13 +1409,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                      visibleLineItems[0]?.extraWeight === undefined
+                    visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : (
-                        parseFlexibleNumber(
-                          visibleLineItems[0].extraWeight,
-                        ) ?? 0
-                      ).toFixed(1)
+                          parseFlexibleNumber(
+                            visibleLineItems[0].extraWeight,
+                          ) ?? 0
+                        ).toFixed(1)
                   }
                   placeholder="0"
                   disabled={visibleLineItems.length === 0 || isCreate}
@@ -1362,7 +1462,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(form.notes || displayOrder.notes || "");
+                      navigator.clipboard.writeText(
+                        form.notes || displayOrder.notes || "",
+                      );
                       toast.success("Comment copied to clipboard!");
                     }}
                     className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
