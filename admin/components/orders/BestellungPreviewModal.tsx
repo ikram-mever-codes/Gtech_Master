@@ -23,7 +23,7 @@ import {
   deleteTransferOrderLineItem,
   createTransferOrder,
 } from "@/api/transfer_orders";
-import { getItems } from "@/api/items";
+import { getItems, autocompleteItems } from "@/api/items";
 import { getAllCustomers } from "@/api/customers";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { UserRole } from "@/utils/interfaces";
@@ -252,15 +252,16 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const [newLine, setNewLine] = useState({ itemName: "", qty: 0 });
   const [customers, setCustomers] = useState<any[]>([]);
 
-  // Three-field item search — verified field/handler names (searchEan,
-  // searchItemNo, searchName, handleFieldSearchChange) from the real JSX.
-  // The handler body wasn't part of what was shared, so this filters the
-  // same client-side item list Offer's picker already loads once (not a
-  // per-keystroke backend call) — see handleFieldSearchChange below for
-  // exactly what each field matches against.
+  // Three-field item search — field/handler names (searchEan,
+  // searchItemNo, searchName, handleFieldSearchChange) match the real JSX
+  // given. Now backed by a genuine debounced call to the new
+  // autocompleteItems endpoint (strict AND-across-words match) instead of
+  // filtering a client-side 1000-item cache — see the effect below for
+  // exactly how the three fields combine into one query.
   const [searchEan, setSearchEan] = useState("");
   const [searchItemNo, setSearchItemNo] = useState("");
   const [searchName, setSearchName] = useState("");
+  const [itemSearchLoading, setItemSearchLoading] = useState(false);
 
   const handleFieldSearchChange = (
     field: "ean" | "itemNo" | "name",
@@ -479,19 +480,42 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     })();
   }, [isOpen, isCreate, order?.orderItems]);
 
-  // Same effect Offer's real ItemRow picker and AuftragPreviewModal both
-  // use: load the catalog once, the first time the picker opens.
+  // Debounced call to the new autocompleteItems endpoint. The three
+  // fields combine into one space-joined query — the backend's
+  // AND-across-words matching means filling more than one field still
+  // narrows results the same way the old client-side AND logic did, just
+  // now against the full catalog instead of a capped 1000-item preload,
+  // with strict letter-for-letter matching and ranked results.
+  // No query -> no request; the picker starts empty and asks the user to
+  // type, rather than eagerly loading everything the way it used to.
   useEffect(() => {
-    if (!showItemPicker || items.length > 0) return;
-    (async () => {
+    if (!showItemPicker) return;
+
+    const combined = [searchEan, searchItemNo, searchName]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" ");
+
+    if (!combined) {
+      setItems([]);
+      return;
+    }
+
+    setItemSearchLoading(true);
+    const timer = setTimeout(async () => {
       try {
-        const res: any = await getItems({ limit: 1000 });
-        setItems(Array.isArray(res?.data) ? res.data : res?.data?.items || []);
+        const res: any = await autocompleteItems(combined, { limit: 30 });
+        setItems(Array.isArray(res?.data) ? res.data : []);
       } catch (e) {
-        console.error("Error loading items:", e);
+        console.error("Error searching items:", e);
+        setItems([]);
+      } finally {
+        setItemSearchLoading(false);
       }
-    })();
-  }, [showItemPicker, items.length]);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [showItemPicker, searchEan, searchItemNo, searchName]);
 
   if (!isOpen) return null;
 
@@ -835,31 +859,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     ? "Create Bestellung"
     : `Bestellung ${displayOrder.order_no}`;
 
-  // Each filled field is an additional constraint (AND, not OR) — typical
-  // UX for separate labeled search fields. No supplier-lock restriction
-  // here (removed per your last message): the picker searches every item.
-  // The "different supplier" check in addExistingItem below is untouched
-  // — it still blocks *adding* a conflicting-supplier item, it just
-  // doesn't hide those items from being found.
-  const itemPickerList = items.filter((it) => {
-    if (searchEan.trim()) {
-      const ean = String(it.ean || "");
-      if (!ean.includes(searchEan.trim())) return false;
-    }
-    if (searchItemNo.trim()) {
-      const q = searchItemNo.trim().toLowerCase();
-      const itemNo = String(
-        it.item_no_de || it.de_no || it.ItemID_DE || it.itemNo || "",
-      ).toLowerCase();
-      if (!itemNo.includes(q)) return false;
-    }
-    if (searchName.trim()) {
-      const q = searchName.trim().toLowerCase();
-      const name = String(it.item_name_de || it.item_name || "").toLowerCase();
-      if (!name.includes(q)) return false;
-    }
-    return true;
-  });
+  // No client-side filtering needed any more — `items` is already the
+  // exact, ranked result of the debounced autocompleteItems call above.
+  // No supplier-lock restriction here either (removed per your earlier
+  // instruction): the search covers every item. The "different supplier"
+  // check in addExistingItem below is untouched — it still blocks
+  // *adding* a conflicting-supplier item, it just doesn't hide those
+  // items from being found.
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -1347,12 +1353,22 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                       </div>
                     </div>
                     <div className="max-h-48 overflow-y-auto space-y-1.5">
-                      {itemPickerList.length === 0 ? (
+                      {itemSearchLoading ? (
+                        <div className="text-center text-sm text-gray-400 py-3">
+                          Searching…
+                        </div>
+                      ) : !searchEan.trim() &&
+                        !searchItemNo.trim() &&
+                        !searchName.trim() ? (
+                        <div className="text-center text-sm text-gray-400 py-3">
+                          Type in EAN, Item No., or Item Name to search.
+                        </div>
+                      ) : items.length === 0 ? (
                         <div className="text-center text-sm text-gray-500 py-3">
                           No items match.
                         </div>
                       ) : (
-                        itemPickerList.map((it) => (
+                        items.map((it) => (
                           <ItemRow
                             key={it.id}
                             item={it}

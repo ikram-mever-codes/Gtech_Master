@@ -1149,3 +1149,20 @@ export const getUnusedPictures = async () => {
     throw error;
   }
 };
+
+export const autocompleteItems = async (
+  query: string,
+  options?: { limit?: number; supplier?: string | number },
+) => {
+  try {
+    const params = new URLSearchParams();
+    params.set("q", query);
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.supplier) params.set("supplier", String(options.supplier));
+    const response = await api.get(`/items/autocomplete?${params.toString()}`);
+    return response;
+  } catch (error: any) {
+    handleApiError(error, "Failed to search items");
+    throw error;
+  }
+};

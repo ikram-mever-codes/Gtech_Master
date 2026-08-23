@@ -42,6 +42,7 @@ import {
   syncCustomerPrices,
   migrateItemNoDeFromWarehouse,
   getUnusedPictures,
+  autocompleteItems,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -52,6 +53,7 @@ import { In } from "typeorm";
 
 const router: any = express.Router();
 
+router.get("/autocomplete", autocompleteItems);
 router.get("/pricing/transfer-prices", feedTransferPrices);
 router.get("/cat/fix", syncSuppCatWithCategoryName);
 

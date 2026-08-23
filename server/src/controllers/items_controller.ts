@@ -4901,3 +4901,124 @@ export const getUnusedPictures = async (
     return next(error);
   }
 };
+
+/**
+ * Add this function to src/controllers/itemManagementController.ts —
+ * I've placed it right after `searchItems` in the version below since
+ * they're conceptually related; put it wherever fits your file.
+ *
+ * Distinct from `searchItems` (which already exists in this file): that
+ * one ORs a single term across name/ean/parent-name/id with no per-word
+ * AND logic — fine for one word, gets noisy fast with more. This
+ * requires every word typed to match, ranks exact/prefix matches first,
+ * and returns the fields BestellungPreviewModal's addExistingItem
+ * actually needs (weight, remark_ex, transfer_price_EUR) so nothing gets
+ * silently dropped when an item is added via this search.
+ */
+export const autocompleteItems = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const q = ((req.query.q as string) || "").trim();
+    const limitNum = Math.min(
+      parseInt((req.query.limit as string) || "30", 10) || 30,
+      50,
+    );
+    const supplierId = ((req.query.supplier as string) || "").trim();
+
+    if (!q) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const itemRepository = AppDataSource.getRepository(Item);
+
+    // Cap word count so a pasted paragraph can't blow up the query with
+    // dozens of ANDed ILIKE clauses.
+    const words = q.split(/\s+/).filter(Boolean).slice(0, 6);
+
+    const qb = itemRepository
+      .createQueryBuilder("item")
+      .leftJoin("item.parent", "parent")
+      .select("item.id", "id")
+      .addSelect("item.item_name_de", "item_name_de")
+      .addSelect("item.item_name", "item_name")
+      .addSelect("item.ean", "ean")
+      .addSelect("item.item_no_de", "item_no_de")
+      .addSelect("parent.de_no", "parent_de_no")
+      .addSelect("item.model", "model")
+      .addSelect("item.photo", "photo")
+      .addSelect("item.supplier_id", "supplier_id")
+      .addSelect("item.weight", "weight")
+      .addSelect("item.remark_ex", "remark_ex")
+      .addSelect("item.transfer_price_EUR", "transfer_price_EUR")
+      .addSelect("item.isActive", "is_active");
+
+    const searchFields = [
+      "item.item_name_de",
+      "item.item_name",
+      "item.item_name_cn",
+      "item.ean",
+      "item.item_no_de",
+      "item.model",
+      "parent.de_no",
+    ];
+
+    // Strict AND-across-words: every word must appear (plain substring,
+    // letter-for-letter — no fuzzy/trigram matching) in at least one of
+    // the fields above.
+    words.forEach((word, idx) => {
+      const param = `w${idx}`;
+      const orClause = searchFields
+        .map((f) => `${f} ILIKE :${param}`)
+        .join(" OR ");
+      qb.andWhere(`(${orClause})`, { [param]: `%${word}%` });
+    });
+
+    if (supplierId) {
+      qb.andWhere("item.supplier_id = :supplierId", { supplierId });
+    }
+
+    // Ranking: exact EAN/item-no match first, then "name starts with the
+    // full query", then everything else that satisfied the AND clauses
+    // above — so a short precise query puts the right item at the top
+    // instead of wherever alphabetical/created_at order happens to put it.
+    qb.addSelect(
+      `CASE
+         WHEN item.ean = :exactQ THEN 0
+         WHEN item.item_no_de = :exactQ THEN 0
+         WHEN item.item_name_de ILIKE :prefixQ THEN 1
+         WHEN item.item_name ILIKE :prefixQ THEN 1
+         ELSE 2
+       END`,
+      "match_rank",
+    )
+      .setParameter("exactQ", q)
+      .setParameter("prefixQ", `${q}%`)
+      .orderBy("match_rank", "ASC")
+      .addOrderBy("item.item_name_de", "ASC")
+      .limit(limitNum);
+
+    const rows = await qb.getRawMany();
+
+    const data = rows.map((r) => ({
+      id: r.id,
+      item_name_de: r.item_name_de || r.item_name || "",
+      item_name: r.item_name || "",
+      ean: r.ean || "",
+      de_no: r.item_no_de || r.parent_de_no || "",
+      model: r.model || "",
+      photo: r.photo || null,
+      supplier_id: r.supplier_id || null,
+      weight: r.weight,
+      remark_ex: r.remark_ex,
+      transfer_price_EUR: r.transfer_price_EUR,
+      isActive: r.is_active || "N",
+    }));
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
