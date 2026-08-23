@@ -12,6 +12,7 @@ import {
   deleteGelangenheitsbestaetigung,
   downloadRechnungPdf,
   downloadRechnungEml,
+  downloadRechnungEmlOnly,
 } from "../controllers/rechnung_controller";
 import { uploadSingleFile } from "../middlewares/multer";
 const router = Router();
@@ -23,6 +24,7 @@ router.get("/", getAllRechnungen);
 router.get("/lieferscheine", getLieferscheine);
 router.get("/:id/download-pdf", downloadRechnungPdf);
 router.get("/:id/download-eml", downloadRechnungEml);
+router.get("/:id/download-eml-only", downloadRechnungEmlOnly);
 router.get("/:id", getRechnungById);
 router.put("/:id", updateRechnung);
 router.patch("/:id", updateRechnung);

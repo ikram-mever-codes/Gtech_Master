@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { Loader2, Receipt, CheckCircle, Percent, DollarSign } from "lucide-react";
-import { createRechnungOhneAusliefern, downloadRechnungEml } from "@/api/rechnungen";
+import { createRechnungOhneAusliefern, downloadRechnungOnlyEml } from "@/api/rechnungen";
 import { errorStyles, successStyles } from "@/utils/constants";
 
 interface RechnungOhneAusliefernModalProps {
@@ -97,7 +97,7 @@ export default function RechnungOhneAusliefernModal({
         const newRechnungId = res?.data?.id;
         if (newRechnungId) {
           try {
-            await downloadRechnungEml(newRechnungId, res?.data?.invoice_number);
+            await downloadRechnungOnlyEml(newRechnungId, res?.data?.invoice_number);
           } catch (emlErr) {
             console.warn("Could not auto-download EML:", emlErr);
           }
@@ -262,7 +262,7 @@ export default function RechnungOhneAusliefernModal({
 
           <div>
             <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">
-              Bemerkung / Notes (Optional)
+              Rechnung Comment Extern
             </label>
             <textarea
               rows={2}

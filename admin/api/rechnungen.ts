@@ -196,3 +196,30 @@ export const downloadRechnungEml = async (
     throw error;
   }
 };
+
+export const downloadRechnungOnlyEml = async (
+  id: string | number,
+  invoiceNo?: string,
+) => {
+  try {
+    toast.loading("Preparing Outlook email (.eml)...", loadingStyles);
+    const response: any = await api.get(`/rechnungen/${id}/download-eml-only`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([response.data], { type: "message/rfc822" });
+    if (blob.size === 0) throw new Error("The downloaded EML file is empty.");
+    const filename = getFilenameFromResponse(
+      response,
+      `Rechnung_${String(invoiceNo || id).replace(/[\s_]+/g, "_")}_GTech.eml`,
+    );
+    downloadBlob(blob, filename, false);
+    toast.dismiss();
+    toast.success("Outlook email draft downloaded (.eml)");
+    return true;
+  } catch (error) {
+    toast.dismiss();
+    console.error("Error downloading EML:", error);
+    toast.error("Failed to download EML for Outlook");
+    throw error;
+  }
+};

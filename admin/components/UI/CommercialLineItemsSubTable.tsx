@@ -36,6 +36,10 @@ interface CommercialLineItemsSubTableProps {
   items: CommercialLineItem[];
   currency?: string;
   docType?: "auftrag" | "rechnung" | "rk" | "lieferschein" | "bestellung" | "offer" | string;
+  shippingMethod?: string;
+  shippingCost?: number | string;
+  shippingQuantity?: number | string;
+  taxRate?: number | string;
 }
 
 const formatPrice = (val: number | string | undefined, currency = "EUR"): string => {
@@ -46,6 +50,10 @@ const formatPrice = (val: number | string | undefined, currency = "EUR"): string
 export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTableProps> = ({
   items = [],
   currency = "EUR",
+  shippingMethod,
+  shippingCost,
+  shippingQuantity = 1,
+  taxRate,
 }) => {
   const visibleItems = items.filter((it) => !it.isComponent);
 
@@ -81,7 +89,12 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
     return `${Number(v)}%`;
   };
 
-  if (visibleItems.length === 0) {
+  const hasShipping = !!(shippingMethod && String(shippingMethod).trim());
+  const shippingCostNum = Number(shippingCost ?? 0);
+  const shippingQtyNum = Number(shippingQuantity ?? 1);
+  const shippingTaxRate = taxRate !== undefined && taxRate !== null ? Number(taxRate) : 0;
+
+  if (visibleItems.length === 0 && !hasShipping) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-center text-xs text-gray-400 italic">
         No line items in this document.
@@ -160,6 +173,25 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
                 </tr>
               );
             })}
+
+            {hasShipping && (
+              <tr className="bg-gray-100/80">
+                <td className="px-2 py-2 text-gray-400">{visibleItems.length + 1}</td>
+                <td className="px-2 py-2 text-gray-400"></td>
+                <td className="px-2 py-2 text-gray-400">—</td>
+                <td className="px-2 py-2 text-gray-700">{shippingMethod}</td>
+                <td className="px-2 py-2 text-center text-gray-600">
+                  {shippingTaxRate}%
+                </td>
+                <td className="px-2 py-2 text-right text-gray-600">{shippingQtyNum}</td>
+                <td className="px-2 py-2 text-right text-gray-600">
+                  {formatPrice(shippingCostNum, currency)}
+                </td>
+                <td className="px-2 py-2 text-right font-medium text-gray-700">
+                  {formatPrice(shippingCostNum * shippingQtyNum, currency)}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

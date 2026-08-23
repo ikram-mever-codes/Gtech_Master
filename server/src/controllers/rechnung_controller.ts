@@ -9,7 +9,7 @@ import { Customer } from "../models/customers";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
-import { generateRechnungLieferscheinEml } from "../services/emlGenerator";
+import { generateRechnungLieferscheinEml, generateRechnungOnlyEml } from "../services/emlGenerator";
 import { CCIInvoice } from "../models/cci_invoice";
 import { CCICustomer } from "../models/cci_customer";
 import { CCIItem } from "../models/cci_items";
@@ -1265,6 +1265,30 @@ export const downloadRechnungEml = async (
     fs.createReadStream(emlData.emlFilePath).pipe(res);
   } catch (err) {
     console.error("Error in downloadRechnungEml:", err);
+    next(err);
+  }
+};
+
+export const downloadRechnungEmlOnly = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const emlData = await generateRechnungOnlyEml(id, {
+      user: (req as any).user,
+    });
+
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+    res.setHeader("Content-Type", "message/rfc822");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${emlData.filename}"; filename*=UTF-8''${encodeURIComponent(emlData.filename)}`,
+    );
+    fs.createReadStream(emlData.emlFilePath).pipe(res);
+  } catch (err) {
+    console.error("Error in downloadRechnungEmlOnly:", err);
     next(err);
   }
 };
