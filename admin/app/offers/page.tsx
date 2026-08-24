@@ -848,7 +848,7 @@ const OffersPage: React.FC<any> = ({
           data={displayOffers}
           columns={offerColumns}
           loading={loading}
-          emptyMessage="No offers found"
+          emptyMessage="Kein Angebot gefunden"
           onRowClick={(row) => openDetail(row)}
           expandedRowIds={expandedOfferIds}
           renderRowDetails={(row) => (

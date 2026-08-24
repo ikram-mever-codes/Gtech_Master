@@ -122,7 +122,7 @@ const invoiceTabs = [
   { id: "bestellung", label: "Bestellung" },
   { id: "rechnung", label: "Rechnung" },
   { id: "rk", label: "RK" },
-  { id: "payment_inbound", label: "Payment Inbounds" },
+  { id: "payment_inbound", label: "Zahlung" },
   { id: "lieferschein", label: "Lieferschein" },
 ] as const;
 
@@ -1863,10 +1863,24 @@ const InvoiceListPage: React.FC = () => {
               data={currentItems}
               columns={commercialColumns}
               loading={dataTableLoading}
-              emptyMessage={`No ${activeInvTab === "auftrag" || activeInvTab === "bestellung"
-                ? "Orders"
-                : "Invoices"
-                } Found`}
+              emptyMessage={(() => {
+                switch (activeInvTab) {
+                  case "auftrag":
+                    return "Keinen Auftrag gefunden";
+                  case "bestellung":
+                    return "Keine Bestellung gefunden";
+                  case "rechnung":
+                    return "Keine Rechnung gefunden";
+                  case "rk":
+                    return "Keine RK gefunden";
+                  case "payment_inbound":
+                    return "Keine Zahlung gefunden";
+                  case "lieferschein":
+                    return "Keinen Lieferschein gefunden";
+                  default:
+                    return "Kein Angebot gefunden";
+                }
+              })()}
               getRowClassName={(row) => {
                 if (activeInvTab === "rechnung") {
                   const rowOpenQuantities = allOpenQuantities[row.id] || {};
