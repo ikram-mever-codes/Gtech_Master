@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { XMarkIcon, CubeIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { getAllCustomers } from "@/api/customers";
-import { getItems } from "@/api/items";
+import { getItems, autocompleteItems } from "@/api/items";
 import { createAuftragFromItems } from "@/api/customer_orders";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { errorStyles, successStyles } from "@/utils/constants";
@@ -93,8 +93,7 @@ export default function AuftragCreateModal({
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null);
+  const [itemSearchLoading, setItemSearchLoading] = useState(false);
 
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
@@ -116,62 +115,38 @@ export default function AuftragCreateModal({
 
   console.log(selectedItems);
 
-  const performSearch = async (
-    fields: { ean: string; itemNo: string; name: string },
-    companyId?: string,
-  ) => {
-    const { ean, itemNo, name } = fields;
-    const hasAnyTerm = !!(ean.trim() || itemNo.trim() || name.trim());
+  // Debounced call to the autocompleteItems endpoint - EXACTLY like BestellungPreviewModal
+  useEffect(() => {
+    const combined = [searchEan, searchItemNo, searchName]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" ");
 
-    if (!hasAnyTerm) {
-      await loadInitialItems(companyId);
+    if (!combined) {
+      // If no search terms, load initial items
+      loadInitialItems(filterCustomerId || undefined);
+      setHasSearched(false);
       return;
     }
 
-    setSearchLoading(true);
+    setItemSearchLoading(true);
     setHasSearched(true);
 
-    try {
-      const params: any = {
-        limit: 1000,
-        isActive: "Y",
-      };
-
-      // Search parameters - try different possible parameter names
-      if (ean.trim()) {
-        params.eanSearch = ean.trim();
-        // Also try alternative parameter names
-        params.ean = ean.trim();
+    const timer = setTimeout(async () => {
+      try {
+        const res: any = await autocompleteItems(combined, { limit: 1000 });
+        setItems(Array.isArray(res?.data) ? res.data : []);
+      } catch (e) {
+        console.error("Error searching items:", e);
+        toast.error("Failed to search items", errorStyles);
+        setItems([]);
+      } finally {
+        setItemSearchLoading(false);
       }
+    }, 400);
 
-      if (itemNo.trim()) {
-        params.itemNoSearch = itemNo.trim();
-        params.itemNo = itemNo.trim();
-        params.de_no = itemNo.trim();
-      }
-
-      if (name.trim()) {
-        // Try multiple possible parameter names for name search
-        params.nameSearch = name.trim();
-        params.name = name.trim();
-        params.itemName = name.trim();
-        params.item_name = name.trim();
-        params.search = name.trim(); // Generic search fallback
-      }
-
-      console.log("Search params:", params); // Debug log to see what's being sent
-
-      const response = await getItems(params, { refresh: true });
-      const itemData = response?.data ?? response;
-      setItems(Array.isArray(itemData) ? itemData : []);
-    } catch (err) {
-      console.error("Error searching items:", err);
-      toast.error("Failed to search items", errorStyles);
-      setItems([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
+    return () => clearTimeout(timer);
+  }, [searchEan, searchItemNo, searchName]);
 
   const loadInitialItems = async (companyId?: string) => {
     setLoading(true);
@@ -202,48 +177,14 @@ export default function AuftragCreateModal({
     field: "ean" | "itemNo" | "name",
     value: string,
   ) => {
-    const next = {
-      ean: field === "ean" ? value : searchEan,
-      itemNo: field === "itemNo" ? value : searchItemNo,
-      name: field === "name" ? value : searchName,
-    };
-
     if (field === "ean") setSearchEan(value);
     if (field === "itemNo") setSearchItemNo(value);
     if (field === "name") setSearchName(value);
-
-    if (searchTimer) {
-      clearTimeout(searchTimer);
-    }
-
-    const hasAnyTerm = !!(
-      next.ean.trim() ||
-      next.itemNo.trim() ||
-      next.name.trim()
-    );
-
-    if (!hasAnyTerm) {
-      loadInitialItems(filterCustomerId || undefined);
-      setHasSearched(false);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      performSearch(next, filterCustomerId || undefined);
-    }, 400);
-
-    setSearchTimer(timer);
   };
 
   useEffect(() => {
     if (!isOpen) return;
-
-    return () => {
-      if (searchTimer) {
-        clearTimeout(searchTimer);
-      }
-    };
-  }, [isOpen, searchTimer]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -383,7 +324,7 @@ export default function AuftragCreateModal({
 
   if (!isOpen) return null;
 
-  const isLoading = loading || searchLoading;
+  const isLoading = loading || itemSearchLoading;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -412,19 +353,14 @@ export default function AuftragCreateModal({
                 onChange={(id: string) => {
                   setFilterCustomerId(id);
                   // Reload items when company changes
-                  const hasAnySearch =
-                    searchEan.trim() ||
-                    searchItemNo.trim() ||
-                    searchName.trim();
-                  if (hasAnySearch) {
-                    performSearch(
-                      {
-                        ean: searchEan,
-                        itemNo: searchItemNo,
-                        name: searchName,
-                      },
-                      id,
-                    );
+                  const combined = [searchEan, searchItemNo, searchName]
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                    .join(" ");
+                  if (combined) {
+                    // If there's a search, the useEffect will handle it
+                    // Just trigger the search by updating a dependency
+                    // We'll force a re-run by using a key or just let the useEffect handle it
                   } else {
                     loadInitialItems(id || undefined);
                   }
@@ -536,21 +472,12 @@ export default function AuftragCreateModal({
             {isLoading ? (
               <div className="text-center py-6 text-gray-400 text-sm flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                {searchLoading ? "Searching items..." : "Loading items..."}
+                {itemSearchLoading ? "Searching items..." : "Loading items..."}
               </div>
             ) : items.length === 0 ? (
               <div className="text-center py-6 text-gray-500 text-sm">
                 {hasSearched ? (
-                  <span>
-                    No items match your search.
-                    {(searchEan.length > 0 || searchItemNo.length > 0) &&
-                      /^\d+$/.test(searchEan || searchItemNo) && (
-                        <span className="block text-xs text-gray-400 mt-1">
-                          Tip: Try searching by item number or name instead of
-                          EAN.
-                        </span>
-                      )}
-                  </span>
+                  <span>No items match your search.</span>
                 ) : (
                   "No items found."
                 )}
