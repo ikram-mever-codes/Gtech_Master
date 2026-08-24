@@ -44,7 +44,9 @@ interface CommercialLineItemsSubTableProps {
 
 const formatPrice = (val: number | string | undefined, currency = "EUR"): string => {
   const n = Number(val ?? 0);
-  return `${n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency === "EUR" ? "€" : currency}`;
+  const has3Decimals = Math.abs(n - Math.round(n * 100) / 100) > 0.0001;
+  const digits = has3Decimals ? 3 : 2;
+  return `${n.toLocaleString("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: 3 })} ${currency === "EUR" ? "€" : currency}`;
 };
 
 export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTableProps> = ({

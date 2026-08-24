@@ -100,7 +100,7 @@ export class Item {
   @Column({ type: "text", nullable: true })
   remark_ex?: string;
 
-  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  @Column({ type: "decimal", precision: 10, scale: 4, nullable: true })
   price?: number;
 
   @Column({ type: "varchar", length: 10, nullable: true })
@@ -136,7 +136,7 @@ export class Item {
   @Column({
     type: "decimal",
     precision: 10,
-    scale: 2,
+    scale: 4,
     nullable: true,
   })
   sales_price?: number | null;

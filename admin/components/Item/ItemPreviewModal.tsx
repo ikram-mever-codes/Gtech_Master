@@ -479,10 +479,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             previewItem.sales_price === undefined ||
             previewItem.sales_price === null
               ? null
-              : (() => {
-                  const num = parseFlexibleNumber(previewItem.sales_price);
-                  return num !== null ? Math.round(num * 100) / 100 : null;
-                })(),
+              : parseFlexibleNumber(previewItem.sales_price),
           supplierItem: {
             price_rmb:
               parseFlexibleNumber(
@@ -1269,7 +1266,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
-                      {previewItem.price || "0.00"}{" "}
+                      {previewItem.price !== null && previewItem.price !== undefined && previewItem.price !== ""
+                        ? Math.abs(Number(previewItem.price) - Math.round(Number(previewItem.price) * 100) / 100) > 0.0001
+                          ? Number(previewItem.price).toFixed(3)
+                          : Number(previewItem.price).toFixed(2)
+                        : "0.00"}{" "}
                       <span className="font-semibold text-gray-700">
                         {previewItem.currency || "EUR"}
                       </span>
@@ -1294,12 +1295,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
-                      {previewItem.sales_price !== null &&
-                      previewItem.sales_price !== undefined
-                        ? Math.abs(
-                            Math.round(Number(previewItem.sales_price) * 1000) / 1000 -
-                              Math.round(Number(previewItem.sales_price) * 100) / 100
-                          ) > 0.0001
+                      {previewItem.sales_price !== null && previewItem.sales_price !== undefined && previewItem.sales_price !== ""
+                        ? Math.abs(Number(previewItem.sales_price) - Math.round(Number(previewItem.sales_price) * 100) / 100) > 0.0001
                           ? Number(previewItem.sales_price).toFixed(3)
                           : Number(previewItem.sales_price).toFixed(2)
                         : "0.00"}{" "}

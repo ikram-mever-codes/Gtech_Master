@@ -581,13 +581,16 @@ export const getAvailableCurrenciesFromApi = async () => {
 };
 
 export const formatCurrency = (amount: any, currency: any) => {
+  const num = Number(amount ?? 0);
+  const has3Decimals = Math.abs(num - Math.round(num * 100) / 100) > 0.0001;
+  const digits = has3Decimals ? 3 : 2;
   const formatter = new Intl.NumberFormat("de-DE", {
     style: "currency",
     currency: currency === "EUR" ? "EUR" : "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: 3,
   });
-  return formatter.format(amount);
+  return formatter.format(num);
 };
 
 export const formatUnitPrice = (price: number, decimalPlaces = 3): string => {
