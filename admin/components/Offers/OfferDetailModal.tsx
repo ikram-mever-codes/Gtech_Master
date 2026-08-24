@@ -42,7 +42,7 @@ import {
 } from "@/api/offers";
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
-import { getItems, autocompleteItems } from "@/api/items";
+import { autocompleteItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 import { UserRole } from "@/utils/interfaces";
@@ -525,7 +525,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
 
   const [showItemPicker, setShowItemPicker] = useState(false);
-  // Three-field search for "add existing item" picker - using autocompleteItems
+  // Three-field search for "add existing item" picker - using autocompleteItems.
+  // Shared by both the edit-mode "Add existing item" picker (gated by
+  // showItemPicker) AND the create-mode "Customer + item(s)" source picker
+  // (gated by isCreate && sourceType === "item") — same fields, same
+  // debounced call, same result list, no separate implementation.
   const [searchEan, setSearchEan] = useState("");
   const [searchItemNo, setSearchItemNo] = useState("");
   const [searchName, setSearchName] = useState("");
@@ -539,38 +543,14 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [selectedShippingAddressId, setSelectedShippingAddressId] =
     useState("__same__");
 
-  // Debounced search for the item picker using autocompleteItems - EXACTLY like BestellungPreviewModal
-  useEffect(() => {
-    if (!showItemPicker) {
-      setPickerItems([]);
-      return;
-    }
+  // Moved up from further down in the original file so the debounce effect
+  // below (which needs to know whether we're in create mode) can reference
+  // it without a reference-before-declaration error.
+  const isCreate = !offerId && !offer;
 
-    const combined = [searchEan, searchItemNo, searchName]
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .join(" ");
-
-    if (!combined) {
-      setPickerItems([]);
-      return;
-    }
-
-    setItemSearchLoading(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res: any = await autocompleteItems(combined, { limit: 30 });
-        setPickerItems(Array.isArray(res?.data) ? res.data : []);
-      } catch (e) {
-        console.error("Error searching items:", e);
-        setPickerItems([]);
-      } finally {
-        setItemSearchLoading(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [showItemPicker, searchEan, searchItemNo, searchName]);
+  // Debounced search for the item picker using autocompleteItems — drives
+  // BOTH the edit-mode "Add existing item" picker and the create-mode item
+  // source picker. Active whenever either context is showing.
 
   const handleFieldSearchChange = (
     field: "ean" | "itemNo" | "name",
@@ -605,8 +585,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     })();
   }, [isOpen]);
 
-  const isCreate = !offerId && !offer;
-
   const [form, setForm] = useState<any>({});
   const [showCopyPaste, setShowCopyPaste] = useState(false);
   const [copyPasteData, setCopyPasteData] = useState("");
@@ -627,7 +605,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [sourceType, setSourceType] = useState<SourceType>("inquiry");
   const [inquiries, setInquiries] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
-  const [items, setItems] = useState<any[]>([]);
   const [filterCustomerId, setFilterCustomerId] = useState("");
   const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
@@ -694,10 +671,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     if (!isOpen || offerId) return;
     (async () => {
       try {
-        const [inqRes, custRes, itemRes]: any = await Promise.all([
+        const [inqRes, custRes]: any = await Promise.all([
           getAllInquiries({ limit: 1000 }),
           getAllCustomers({ limit: 1000 }),
-          getItems({ limit: 1000 }).catch(() => ({ data: [] })),
         ]);
 
         setInquiries(
@@ -710,31 +686,53 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
             ? custRes.data
             : custRes?.data?.customers || custRes?.data?.businesses || [],
         );
-        setItems(
-          Array.isArray(itemRes?.data)
-            ? itemRes.data
-            : itemRes?.data?.items || [],
-        );
       } catch (e) {
         console.error("Error loading sources:", e);
       }
     })();
   }, [isOpen, offerId]);
 
-  // Load the item catalog lazily for the "add existing item" picker when
-  // editing an existing offer (the effect above only runs during creation).
   useEffect(() => {
-    if (!showItemPicker || items.length > 0) return;
-    (async () => {
-      try {
-        const res: any = await getItems({ limit: 1000 });
-        setItems(Array.isArray(res?.data) ? res.data : res?.data?.items || []);
-      } catch (e) {
-        console.error("Error loading items:", e);
-      }
-    })();
-  }, [showItemPicker, items.length]);
+    const itemPickerActive =
+      showItemPicker || (isCreate && sourceType === "item");
 
+    if (!itemPickerActive) {
+      setPickerItems([]);
+      return;
+    }
+
+    const combined = [searchEan, searchItemNo, searchName]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" ");
+
+    if (!combined) {
+      setPickerItems([]);
+      return;
+    }
+
+    setItemSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res: any = await autocompleteItems(combined, { limit: 30 });
+        setPickerItems(Array.isArray(res?.data) ? res.data : []);
+      } catch (e) {
+        console.error("Error searching items:", e);
+        setPickerItems([]);
+      } finally {
+        setItemSearchLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [
+    showItemPicker,
+    isCreate,
+    sourceType,
+    searchEan,
+    searchItemNo,
+    searchName,
+  ]);
   // Saved shipping addresses for this offer's customer — only fetched while
   // editing, since that's the only place the picker is shown.
   useEffect(() => {
@@ -756,6 +754,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setSelectedInquiry(null);
     setSelectedItems([]);
     setItemQuantities({});
+    setSearchEan("");
+    setSearchItemNo("");
+    setSearchName("");
+    setPickerItems([]);
     setCreateForm({
       title: "",
       currency: "EUR",
@@ -935,22 +937,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       ? i.name?.toLowerCase().includes(sourceSearch.toLowerCase())
       : true;
     return matchCust && matchSearch;
-  });
-
-  const visibleItems = items.filter((it) => {
-    const name = it.item_name_de || "";
-    if (!sourceSearch) return true;
-    const q = sourceSearch.toLowerCase();
-    return (
-      name.toLowerCase().includes(q) ||
-      String(it.ean || "").includes(sourceSearch) ||
-      String(it.model || "")
-        .toLowerCase()
-        .includes(q) ||
-      String(it.customer?.companyName || "")
-        .toLowerCase()
-        .includes(q)
-    );
   });
 
   const selectedCustomer = customers.find(
@@ -1554,6 +1540,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSelectedInquiry(null);
                       setSelectedItems([]);
                       setItemQuantities({});
+                      setSearchEan("");
+                      setSearchItemNo("");
+                      setSearchName("");
+                      setPickerItems([]);
                     }}
                     className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
                       sourceType === t.key
@@ -1625,22 +1615,68 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     className="w-full"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Search
-                  </label>
-                  <input
-                    value={sourceSearch}
-                    onChange={(e) => setSourceSearch(e.target.value)}
-                    placeholder={
-                      sourceType === "inquiry"
-                        ? "Search inquiries…"
-                        : "Search items or EAN…"
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                  />
-                </div>
+                {sourceType === "inquiry" && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Search
+                    </label>
+                    <input
+                      value={sourceSearch}
+                      onChange={(e) => setSourceSearch(e.target.value)}
+                      placeholder="Search inquiries…"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                )}
               </div>
+
+              {/* Three-field item search — identical to the edit-mode
+                  "Add existing item" picker (same fields, same debounced
+                  autocompleteItems call, same result list via pickerItems). */}
+              {sourceType === "item" && (
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      EAN
+                    </label>
+                    <input
+                      value={searchEan}
+                      onChange={(e) =>
+                        handleFieldSearchChange("ean", e.target.value)
+                      }
+                      placeholder="EAN..."
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Item No.
+                    </label>
+                    <input
+                      value={searchItemNo}
+                      onChange={(e) =>
+                        handleFieldSearchChange("itemNo", e.target.value)
+                      }
+                      placeholder="Item no..."
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Item Name (EN/DE)
+                    </label>
+                    <input
+                      value={searchName}
+                      onChange={(e) =>
+                        handleFieldSearchChange("name", e.target.value)
+                      }
+                      placeholder="Item name..."
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              )}
+
               {sourceType === "item" && selectedCustomer && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
@@ -1834,14 +1870,22 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   ))}
 
                 {sourceType === "item" &&
-                  (visibleItems.length === 0 ? (
+                  (itemSearchLoading ? (
+                    <div className="text-center text-sm text-gray-400 py-3">
+                      Searching…
+                    </div>
+                  ) : !searchEan.trim() &&
+                    !searchItemNo.trim() &&
+                    !searchName.trim() ? (
+                    <div className="text-center text-sm text-gray-400 py-3">
+                      Type in EAN, Item No., or Item Name to search.
+                    </div>
+                  ) : pickerItems.length === 0 ? (
                     <div className="text-center py-4 text-gray-500 text-sm">
-                      {sourceSearch
-                        ? "No items match your search."
-                        : "No items found."}
+                      No items match.
                     </div>
                   ) : (
-                    visibleItems.map((it) => (
+                    pickerItems.map((it) => (
                       <ItemRow
                         key={it.id}
                         item={it}
