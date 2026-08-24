@@ -45,6 +45,39 @@ interface BestellungPreviewModalProps {
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 
+export const formatSupplierDisplayName = (s: any): string => {
+  if (!s) return "—";
+  const idStr = s.supplierId || s.supplier_id || s.id || "";
+  const idPrefix = idStr ? `${idStr} - ` : "";
+
+  const nameEn = (
+    s.company_name_en ||
+    s.companyNameEn ||
+    s.name_en ||
+    s.nameEn ||
+    s.name ||
+    s.supplierName ||
+    s.supplier_name ||
+    ""
+  ).trim();
+
+  const nameCn = (
+    s.company_name_cn ||
+    s.companyNameCn ||
+    s.name_cn ||
+    s.nameCn ||
+    s.company_name ||
+    s.companyName ||
+    ""
+  ).trim();
+
+  if (nameEn && nameCn && nameEn.toLowerCase() !== nameCn.toLowerCase()) {
+    return `${idPrefix}${nameEn} / ${nameCn}`;
+  }
+  const mainName = nameEn || nameCn || (idStr ? `Supplier #${idStr}` : "—");
+  return idPrefix && mainName ? `${idPrefix}${mainName}` : mainName;
+};
+
 const ORDER_STATUSES = [
   "draft",
   "to be processed",
@@ -986,7 +1019,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               edit={edit || isCreate}
               value={
                 displayOrder.receiver === "Supplier"
-                  ? `Supplier — ${displayOrder.supplier?.company_name || displayOrder.supplier?.name || "—"}`
+                  ? `Supplier — ${formatSupplierDisplayName(displayOrder.supplier)}`
                   : displayOrder.receiver
               }
             >
@@ -1067,10 +1100,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               <Field
                 label="Supplier"
                 edit={edit || isCreate}
-                value={
-                  displayOrder.supplier?.company_name ||
-                  displayOrder.supplier?.name
-                }
+                value={formatSupplierDisplayName(displayOrder.supplier)}
               >
                 <select
                   className={inputCls}
@@ -1107,7 +1137,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   </option>
                   {suppliers.map((s: any) => (
                     <option key={s.id} value={s.id}>
-                      {s.company_name || s.name || `Supplier #${s.id}`}
+                      {formatSupplierDisplayName(s)}
                     </option>
                   ))}
                 </select>

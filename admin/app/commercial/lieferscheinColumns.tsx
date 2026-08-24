@@ -296,34 +296,54 @@ export function buildLieferscheinColumns({
     titelColumn,
     lieferortColumn,
     lieferdatumColumn,
-    buildNettowertColumn((row) =>
-      Number(row.subtotal || row.netTotal || row.total_amount || 0),
-    ),
+    {
+      header: "Versandart",
+      width: "110px",
+      align: "center",
+      render: (row) => {
+        const text =
+          row.shipping_method ||
+          row.shippingMethod ||
+          row.shipping_provider ||
+          "—";
+        return (
+          <div
+            className="truncate max-w-[110px] text-sm text-gray-600 font-normal"
+            title={text}
+          >
+            {text}
+          </div>
+        );
+      },
+    },
     {
       header: "Status",
       width: "110px",
       align: "center",
       render: (row) => {
-        const status = row.status || "vorläufig";
+        const rawStatus = (row.status || "vorläufig").toLowerCase();
+        let displayStatus = row.status || "vorläufig";
+        if (rawStatus === "open") {
+          displayStatus = "bestätigt";
+        }
         const getStatusColor = (s: string) => {
           switch (s?.toLowerCase()) {
             case "vorläufig":
               return "bg-blue-50 text-blue-700 border-blue-200";
             case "bestätigt":
+            case "open":
               return "bg-emerald-50 text-emerald-700 border-emerald-200";
             case "storniert":
               return "bg-rose-50 text-rose-700 border-rose-200";
-            case "open":
-              return "bg-blue-50 text-blue-700 border-blue-200";
             default:
               return "bg-gray-100 text-gray-700 border-gray-200";
           }
         };
         return (
           <span
-            className={`text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium ${getStatusColor(status)}`}
+            className={`text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium ${getStatusColor(rawStatus)}`}
           >
-            {status}
+            {displayStatus}
           </span>
         );
       },

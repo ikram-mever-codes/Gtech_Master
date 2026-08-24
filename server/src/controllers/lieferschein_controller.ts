@@ -462,7 +462,7 @@ export const downloadLieferscheinPdf = async (
       position: it.position || idx + 1,
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
-      remarks: it.remark || it.notes || it.specification || it.remark_ex || "-",
+      remarks: it.notes || it.remark_ex || "-",
       quantity: it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1,
     }));
 

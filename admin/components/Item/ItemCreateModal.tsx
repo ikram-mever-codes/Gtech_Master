@@ -229,10 +229,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
             itemFormData.sales_price === undefined ||
             itemFormData.sales_price === null
               ? null
-              : (() => {
-                  const num = parseFlexibleNumber(itemFormData.sales_price);
-                  return num !== null ? Math.round(num * 100) / 100 : null;
-                })(),
+              : parseFlexibleNumber(itemFormData.sales_price),
           currency: itemFormData.currency || "CNY",
           isActive: itemFormData.isActive ? "Y" : "N",
           item_no_de: itemFormData.item_no_de || undefined,

@@ -827,7 +827,7 @@ export const getItemById = async (
       price: item.price ?? null,
       transfer_price_EUR: item.transfer_price_EUR ?? null,
       transfer_price: item.transfer_price_EUR
-        ? Number(item.transfer_price_EUR).toFixed(2)
+        ? Number(item.transfer_price_EUR).toFixed(3)
         : "null",
       is_stock_item: item.is_stock_item || "N",
       stockEU: item.stockEU || 0,
@@ -1150,7 +1150,7 @@ export const createItem = async (
       item_no_de: resolvedItemNoDe,
       sales_price:
         sales_price !== undefined && sales_price !== null && sales_price !== ""
-          ? Math.round(parseFloat(sales_price) * 100) / 100
+          ? parseFloat(sales_price)
           : null,
       taric_id,
       cat_id,
@@ -4432,7 +4432,7 @@ export const syncItemData = async (
         // Sales price EUR -> item.sales_price
         const salesPrice = parseFlexibleNumber(row.salesPriceEur);
         if (salesPrice !== null) {
-          item.sales_price = Math.round(salesPrice * 100) / 100;
+          item.sales_price = salesPrice;
         }
 
         // RemarkDE/EN -> appended to item.remark, never overwriting

@@ -73,7 +73,35 @@ export const SupplierSearchInput: React.FC<SupplierSearchInputProps> = ({
 
   const getSupplierDisplayName = (item: any) => {
     if (!item) return "";
-    return item.company_name || item.name || `ID: ${item.id}`;
+    const idStr = item.supplierId || item.supplier_id || item.id || "";
+    const idPrefix = idStr ? `${idStr} - ` : "";
+
+    const nameEn = (
+      item.company_name_en ||
+      item.companyNameEn ||
+      item.name_en ||
+      item.nameEn ||
+      item.name ||
+      item.supplierName ||
+      item.supplier_name ||
+      ""
+    ).trim();
+
+    const nameCn = (
+      item.company_name_cn ||
+      item.companyNameCn ||
+      item.name_cn ||
+      item.nameCn ||
+      item.company_name ||
+      item.companyName ||
+      ""
+    ).trim();
+
+    if (nameEn && nameCn && nameEn.toLowerCase() !== nameCn.toLowerCase()) {
+      return `${idPrefix}${nameEn} / ${nameCn}`;
+    }
+    const mainName = nameEn || nameCn || (idStr ? `Supplier #${idStr}` : "");
+    return idPrefix && mainName ? `${idPrefix}${mainName}` : mainName;
   };
 
   const displayLabel = selectedItem ? getSupplierDisplayName(selectedItem) : initialLabel;
