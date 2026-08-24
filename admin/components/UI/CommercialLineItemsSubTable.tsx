@@ -50,6 +50,7 @@ const formatPrice = (val: number | string | undefined, currency = "EUR"): string
 export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTableProps> = ({
   items = [],
   currency = "EUR",
+  docType,
   shippingMethod,
   shippingCost,
   shippingQuantity = 1,
@@ -181,14 +182,14 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
                 <td className="px-2 py-2 text-gray-400">—</td>
                 <td className="px-2 py-2 text-gray-700">{shippingMethod}</td>
                 <td className="px-2 py-2 text-center text-gray-600">
-                  {shippingTaxRate}%
+                  {docType === "lieferschein" ? "—" : `${shippingTaxRate}%`}
                 </td>
                 <td className="px-2 py-2 text-right text-gray-600">{shippingQtyNum}</td>
                 <td className="px-2 py-2 text-right text-gray-600">
-                  {formatPrice(shippingCostNum, currency)}
+                  {docType === "lieferschein" ? "—" : formatPrice(shippingCostNum, currency)}
                 </td>
                 <td className="px-2 py-2 text-right font-medium text-gray-700">
-                  {formatPrice(shippingCostNum * shippingQtyNum, currency)}
+                  {docType === "lieferschein" ? "—" : formatPrice(shippingCostNum * shippingQtyNum, currency)}
                 </td>
               </tr>
             )}

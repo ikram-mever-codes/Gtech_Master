@@ -312,6 +312,7 @@ export const lieferdatumColumn: ColumnDef<any> = {
       row.deliveryDate ||
       row.delivery_date ||
       row.real_delivery_date ||
+      row.date ||
       row.due_date ||
       row.dueDate;
     if (!rawDate) return <span className="text-gray-400 font-normal text-sm">—</span>;
