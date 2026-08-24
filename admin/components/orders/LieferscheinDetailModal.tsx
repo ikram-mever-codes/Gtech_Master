@@ -23,8 +23,8 @@ const formatDeCurrency = (val: number) => {
 
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   })} kg`;
 
 const formatFullDate = (val: any): string => {
