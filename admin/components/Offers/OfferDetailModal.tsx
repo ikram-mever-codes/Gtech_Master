@@ -532,6 +532,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [itemSearchLoading, setItemSearchLoading] = useState(false);
   const [pickerItems, setPickerItems] = useState<any[]>([]);
 
+  // Three-field search for create mode
+  const [sourceSearchEan, setSourceSearchEan] = useState("");
+  const [sourceSearchItemNo, setSourceSearchItemNo] = useState("");
+  const [sourceSearchName, setSourceSearchName] = useState("");
+
   // Saved shipping addresses for the offer's customer, used by the
   // delivery-address dropdown below (only fetched once editing starts).
   const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
@@ -639,7 +644,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [itemQuantities, setItemQuantities] = useState<Record<string, string>>(
     {},
   );
-  const [sourceSearch, setSourceSearch] = useState("");
   const [createForm, setCreateForm] = useState<any>({
     title: "",
     currency: "EUR",
@@ -682,6 +686,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setSearchItemNo("");
     setSearchName("");
     setPickerItems([]);
+    setSourceSearchEan("");
+    setSourceSearchItemNo("");
+    setSourceSearchName("");
     if (offerId) {
       fetchOffer();
     } else {
@@ -752,7 +759,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   function resetCreatePicker() {
     setSourceType("inquiry");
     setFilterCustomerId("");
-    setSourceSearch("");
+    setSourceSearchEan("");
+    setSourceSearchItemNo("");
+    setSourceSearchName("");
     setSelectedInquiry(null);
     setSelectedItems([]);
     setItemQuantities({});
@@ -931,26 +940,26 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     const matchCust = filterCustomerId
       ? i.customer?.id === filterCustomerId
       : true;
-    const matchSearch = sourceSearch
-      ? i.name?.toLowerCase().includes(sourceSearch.toLowerCase())
+    const matchSearch = sourceSearchName
+      ? i.name?.toLowerCase().includes(sourceSearchName.toLowerCase())
       : true;
     return matchCust && matchSearch;
   });
 
   const visibleItems = items.filter((it) => {
     const name = it.item_name_de || "";
-    if (!sourceSearch) return true;
-    const q = sourceSearch.toLowerCase();
-    return (
-      name.toLowerCase().includes(q) ||
-      String(it.ean || "").includes(sourceSearch) ||
-      String(it.model || "")
-        .toLowerCase()
-        .includes(q) ||
-      String(it.customer?.companyName || "")
-        .toLowerCase()
-        .includes(q)
-    );
+    const ean = String(it.ean || "");
+    const itemNo = String(it.de_no || it.ItemID_DE || it.itemNo || "");
+
+    const matchEan = sourceSearchEan ? ean.includes(sourceSearchEan) : true;
+    const matchItemNo = sourceSearchItemNo
+      ? itemNo.includes(sourceSearchItemNo)
+      : true;
+    const matchName = sourceSearchName
+      ? name.toLowerCase().includes(sourceSearchName.toLowerCase())
+      : true;
+
+    return matchEan && matchItemNo && matchName;
   });
 
   const selectedCustomer = customers.find(
@@ -1550,7 +1559,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     key={t.key}
                     onClick={() => {
                       setSourceType(t.key);
-                      setSourceSearch("");
+                      setSourceSearchEan("");
+                      setSourceSearchItemNo("");
+                      setSourceSearchName("");
                       setSelectedInquiry(null);
                       setSelectedItems([]);
                       setItemQuantities({});
@@ -1606,7 +1617,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     {sourceType === "item"
@@ -1627,20 +1638,39 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Search
+                    EAN
                   </label>
                   <input
-                    value={sourceSearch}
-                    onChange={(e) => setSourceSearch(e.target.value)}
-                    placeholder={
-                      sourceType === "inquiry"
-                        ? "Search inquiries…"
-                        : "Search items or EAN…"
-                    }
+                    value={sourceSearchEan}
+                    onChange={(e) => setSourceSearchEan(e.target.value)}
+                    placeholder="EAN..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Item No.
+                  </label>
+                  <input
+                    value={sourceSearchItemNo}
+                    onChange={(e) => setSourceSearchItemNo(e.target.value)}
+                    placeholder="Item no..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Item Name (EN/DE)
+                  </label>
+                  <input
+                    value={sourceSearchName}
+                    onChange={(e) => setSourceSearchName(e.target.value)}
+                    placeholder="Item name..."
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                   />
                 </div>
               </div>
+
               {sourceType === "item" && selectedCustomer && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
@@ -1836,7 +1866,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 {sourceType === "item" &&
                   (visibleItems.length === 0 ? (
                     <div className="text-center py-4 text-gray-500 text-sm">
-                      {sourceSearch
+                      {sourceSearchEan || sourceSearchItemNo || sourceSearchName
                         ? "No items match your search."
                         : "No items found."}
                     </div>
