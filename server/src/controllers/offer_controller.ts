@@ -4481,7 +4481,62 @@ export class OfferController {
         { align: "right", width: TOTALS_VAL_W },
       );
 
-      yPos += 30;
+      yPos += 22;
+
+      const rawTaxProfileKey = String(
+        customerTaxProfile?.key ||
+          customerTaxProfile?.name ||
+          (customer as any)?.tax_profile_case ||
+          (customer as any)?.taxProfile ||
+          (customer as any)?.tax_profile ||
+          "",
+      ).trim();
+
+      const rawCountry = String(
+        customer?.country ||
+          customerEntity?.country ||
+          "",
+      ).trim().toUpperCase();
+
+      let isEuIgl = /EU_IGL|EU-IGL|IGL/i.test(rawTaxProfileKey);
+      let isThirdCountry = /third_country|thirdcountry|drittland|3rd_country/i.test(rawTaxProfileKey);
+
+      const isGermany = !rawCountry || ["DE", "GERMANY", "DEUTSCHLAND", "DEU"].includes(rawCountry);
+      const euCountries = ["AT", "ÖSTERREICH", "AUSTRIA", "BE", "BELGIUM", "BG", "CY", "CZ", "DK", "EE", "FI", "FR", "FRANCE", "GR", "GREECE", "HR", "HU", "IE", "IRELAND", "IT", "ITALY", "LT", "LU", "LV", "MT", "NL", "NETHERLANDS", "PL", "POLAND", "PT", "RO", "SE", "SWEDEN", "SI", "SK"];
+
+      if (!isEuIgl && !isThirdCountry && !isGermany && calcVatTotal === 0) {
+        if (euCountries.includes(rawCountry)) {
+          isEuIgl = true;
+        } else {
+          isThirdCountry = true;
+        }
+      }
+
+      if (isEuIgl || isThirdCountry) {
+        const line1 = isEuIgl
+          ? "Steuerfreie innergemeinschaftliche Lieferung gemäß"
+          : "Steuerfreie Ausfuhrlieferung gemäß";
+        const line2 = isEuIgl
+          ? "§ 4 Nr. 1 Buchst. b i. V. m. § 6a UStG."
+          : "§ 4 Nr. 1 Buchst. a i. V. m. § 6 UStG.";
+
+        doc
+          .font(R)
+          .fontSize(9)
+          .fillColor("#1A202C")
+          .text(line1, bruttoBoxX, yPos, {
+            align: "right",
+            width: bruttoBoxW,
+          })
+          .text(line2, bruttoBoxX, yPos + 11, {
+            align: "right",
+            width: bruttoBoxW,
+          });
+
+        yPos += 26;
+      } else {
+        yPos += 8;
+      }
       let notesHeight = 15;
       if (offer.paymentMethod || offer.paymentTerms) notesHeight += 15;
       if (offer.deliveryTime) notesHeight += 15;

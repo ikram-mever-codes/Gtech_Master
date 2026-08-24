@@ -1222,6 +1222,12 @@ export const downloadRechnungPdf = async (
         ? `Zahlungsziel: ${rechnung.payment_terms} Tage`
         : undefined,
       paymentMethod: rechnung.payment_method,
+      taxProfile:
+        rechnung.tax_profile_case ||
+        (rechnung.customer as any)?.tax_profile_case ||
+        (rechnung.customer as any)?.defaultTaxProfile?.key ||
+        customerSnap?.tax_profile_case ||
+        customerSnap?.taxProfile,
       outputFilePath: filePath,
     });
 

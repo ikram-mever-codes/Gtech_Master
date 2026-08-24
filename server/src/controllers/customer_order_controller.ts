@@ -1758,6 +1758,12 @@ export const downloadCustomerOrderPdf = async (
         ? `Zahlungsziel: ${order.payment_terms} Tage`
         : undefined,
       paymentMethod: order.payment_method,
+      taxProfile:
+        (order as any).tax_profile_case ||
+        (order.customer as any)?.tax_profile_case ||
+        (order.customer as any)?.defaultTaxProfile?.key ||
+        customerSnap?.tax_profile_case ||
+        customerSnap?.taxProfile,
       outputFilePath: filePath,
     });
 
