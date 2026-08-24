@@ -101,11 +101,10 @@ const getStatusColor = (status: string) => {
     case "vorläufig":
       return "bg-blue-100 text-blue-700 border-blue-200";
     case "bestätigt":
+    case "open":
       return "bg-emerald-100 text-emerald-700 border-emerald-200";
     case "storniert":
       return "bg-rose-100 text-rose-700 border-rose-200";
-    case "open":
-      return "bg-blue-100 text-blue-700 border-blue-200";
     default:
       return "bg-gray-100 text-gray-700 border-gray-200";
   }
@@ -388,7 +387,7 @@ export default function LieferscheinDetailModal({
                   Lieferschein {deliveryNoteNo}
                 </p>
                 <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getStatusColor(status)}`}>
-                  {status}
+                  {status === "open" ? "bestätigt" : status}
                 </span>
                 {highlightColor && (
                   <span
