@@ -34,16 +34,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -54,7 +54,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -1186,9 +1186,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-                createOfferDto.defaultPriceMatrix,
-                createOfferDto.totalPriceDecimalPlaces || 2,
-              )
+              createOfferDto.defaultPriceMatrix,
+              createOfferDto.totalPriceDecimalPlaces || 2,
+            )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -1219,7 +1219,7 @@ export class OfferController {
         // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         paymentMethod: createOfferDto.paymentMethod,
@@ -1507,7 +1507,7 @@ export class OfferController {
         paymentMethod: body.paymentMethod,
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         shippingMethod: body.shippingMethod,
@@ -3117,10 +3117,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                    totalPriceDecimalPlaces,
-                  ),
-                );
+                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                  totalPriceDecimalPlaces,
+                ),
+              );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -3330,11 +3330,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-                ...tpl,
-                price: match.price,
-                total: match.total,
-                isActive: match.isActive,
-              }
+              ...tpl,
+              price: match.price,
+              total: match.total,
+              isActive: match.isActive,
+            }
             : { ...tpl };
         });
 
@@ -3583,7 +3583,7 @@ export class OfferController {
 
       const resolvedDefaultTaxRate: number =
         customerTaxProfile?.taxRate !== undefined &&
-        customerTaxProfile?.taxRate !== null
+          customerTaxProfile?.taxRate !== null
           ? getSafeNumber(customerTaxProfile.taxRate)
           : offer.taxRate !== undefined && offer.taxRate !== null
             ? getSafeNumber(offer.taxRate)
@@ -3639,7 +3639,7 @@ export class OfferController {
         if (shippingTotal > 0) {
           const shipRate =
             offerData.shippingTaxRate !== undefined &&
-            offerData.shippingTaxRate !== null
+              offerData.shippingTaxRate !== null
               ? getSafeNumber(offerData.shippingTaxRate)
               : resolvedDefaultTaxRate;
           taxAmount += shippingTotal * (shipRate / 100);
@@ -3932,10 +3932,7 @@ export class OfferController {
 
       const bannerW = MM(67);
       const bannerX = TABLE_END_X - bannerW;
-      const primaryNameHeight = primaryName
-        ? doc.fontSize(9.5).heightOfString(primaryName, { width: MM(80) })
-        : 12;
-      const bannerY = MM(52) + primaryNameHeight;
+      const bannerY = MM(48);
       const bannerH = 16;
 
       doc.rect(bannerX, bannerY - 4, bannerW, bannerH).fill("#ECEAE6");
@@ -4103,14 +4100,14 @@ export class OfferController {
           .sort((a: any, b: any) => {
             const orderA =
               a.position !== undefined &&
-              a.position !== null &&
-              a.position !== 0
+                a.position !== null &&
+                a.position !== 0
                 ? Number(a.position)
                 : Number(a.sortOrder) || Number(a.index) || 0;
             const orderB =
               b.position !== undefined &&
-              b.position !== null &&
-              b.position !== 0
+                b.position !== null &&
+                b.position !== 0
                 ? Number(b.position)
                 : Number(b.sortOrder) || Number(b.index) || 0;
             return orderA - orderB;
@@ -4149,11 +4146,11 @@ export class OfferController {
             : cleanPdfText(item.material) || item.id?.substring(0, 8) || "—";
           const rawRemarks = cleanPdfText(
             item.notes ||
-              item.remarks ||
-              item.specification ||
-              item.remark_ex ||
-              item.remark ||
-              "",
+            item.remarks ||
+            item.specification ||
+            item.remark_ex ||
+            item.remark ||
+            "",
           );
           const hasRemark = !!(
             rawRemarks &&
@@ -4172,9 +4169,9 @@ export class OfferController {
           });
           const remarkHeight = hasRemark
             ? doc.font(R).fontSize(8).heightOfString(rawRemarks, {
-                width: remarkWidth,
-                lineGap: 2,
-              }) + halfRowGap
+              width: remarkWidth,
+              lineGap: 2,
+            }) + halfRowGap
             : 0;
 
           const computedRowHeight = Math.max(
@@ -4407,7 +4404,7 @@ export class OfferController {
       const discountFactor =
         Number(totals.subtotal) > 0
           ? (Number(totals.subtotal) - Number(totals.discountAmount || 0)) /
-            Number(totals.subtotal)
+          Number(totals.subtotal)
           : 1;
 
       (offer.lineItems || (offer as any).items || []).forEach((it: any) => {

@@ -181,14 +181,14 @@ export interface PdfLineItem {
 
 export interface PdfDocumentOptions {
   documentType:
-    | "Angebot"
-    | "Auftragsbestätigung"
-    | "Auftrag"
-    | "Rechnung"
-    | "Rechnungskorrektur"
-    | "RK"
-    | "Lieferschein"
-    | string;
+  | "Angebot"
+  | "Auftragsbestätigung"
+  | "Auftrag"
+  | "Rechnung"
+  | "Rechnungskorrektur"
+  | "RK"
+  | "Lieferschein"
+  | string;
   documentNumber: string;
   customerSnapshot: any;
   customerEntity?: any;
@@ -474,10 +474,7 @@ export async function generateGtechDocumentPdf(
 
   const bannerW = MM(67);
   const bannerX = TABLE_END_X - bannerW;
-  const primaryNameHeight = primaryName
-    ? doc.fontSize(9.5).heightOfString(primaryName, { width: MM(80) })
-    : 12;
-  const bannerY = MM(52) + primaryNameHeight;
+  const bannerY = MM(48);
   const bannerH = 16;
 
   doc.rect(bannerX, bannerY - 4, bannerW, bannerH).fill("#ECEAE6");
