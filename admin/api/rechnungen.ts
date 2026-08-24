@@ -47,7 +47,6 @@ export const createRechnungOhneAusliefern = async (
   }
 };
 
-
 export const getAllRechnungen = async () => {
   try {
     const response: any = await api.get("/rechnungen");
@@ -222,4 +221,9 @@ export const downloadRechnungOnlyEml = async (
     toast.error("Failed to download EML for Outlook");
     throw error;
   }
+};
+
+export const getPrepaymentsForAuftrag = async (auftragId: string | number) => {
+  const res = await api.get(`/rechnungen/prepayments/auftrag/${auftragId}`);
+  return res;
 };

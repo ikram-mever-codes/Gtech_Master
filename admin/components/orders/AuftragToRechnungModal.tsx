@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import {
   createRechnungFromAuftrag,
   downloadRechnungEml,
+  getPrepaymentsForAuftrag,
 } from "@/api/rechnungen";
 import {
   updateCustomerOrder,
@@ -32,6 +33,16 @@ interface SelectedItemState {
   stock_cn?: number | null;
   weight?: number;
   extraWeight?: number;
+}
+
+interface PrepaymentInfo {
+  available: number;
+  prepayments: {
+    id: string;
+    invoice_number: string;
+    total_amount: number;
+    invoice_date?: string;
+  }[];
 }
 
 interface AuftragToRechnungModalProps {
@@ -144,6 +155,15 @@ export default function AuftragToRechnungModal({
   // was split across two states ("warehouse" and "stockWhere"), which let
   // the selector and the validation drift out of sync.
   const [stockWhere, setStockWhere] = useState<"CN" | "EU">("CN");
+
+  // Prepayment credit ("Rechnung ohne Ausliefern") outstanding on this
+  // Auftrag — fetched fresh every time the modal opens for it. Purely
+  // informational on the client: the server recomputes and applies the
+  // deduction independently when the Rechnung is generated.
+  const [prepaymentInfo, setPrepaymentInfo] = useState<PrepaymentInfo | null>(
+    null,
+  );
+  const [loadingPrepayments, setLoadingPrepayments] = useState(false);
 
   // Inline Edit Mode state (matching OfferDetailModal)
   const [isEditingAuftrag, setIsEditingAuftrag] = useState(false);
@@ -301,6 +321,25 @@ export default function AuftragToRechnungModal({
     setStockWhere((auftrag.stock_where as "CN" | "EU") || "CN");
 
     setIsEditingAuftrag(false);
+
+    // Fetch any outstanding prepayment credit ("Rechnung ohne
+    // Ausliefern") for this Auftrag, to preview the deduction in the
+    // totals section below before generating the delivery Rechnung.
+    setPrepaymentInfo(null);
+    setLoadingPrepayments(true);
+    getPrepaymentsForAuftrag(auftrag.id)
+      .then((res: any) => {
+        if (res?.success) {
+          setPrepaymentInfo({
+            available: Number(res.data.available) || 0,
+            prepayments: res.data.prepayments || [],
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Could not load prepayments for Auftrag:", err);
+      })
+      .finally(() => setLoadingPrepayments(false));
   }, [isOpen, auftrag]);
 
   if (!isOpen || !auftrag) return null;
@@ -368,6 +407,17 @@ export default function AuftragToRechnungModal({
   const taxRate = Number(auftrag.tax_rate ?? 19);
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
+
+  // Prepayment credit applied to THIS delivery — capped at what's
+  // actually available and at the invoice total itself (never negative,
+  // never more than what's owed). Purely a client-side preview; the
+  // server recomputes and applies this independently from auftrag.id
+  // when the Rechnung is generated.
+  const prepaymentAmount = Math.min(
+    prepaymentInfo?.available || 0,
+    totalAmount,
+  );
+  const restbetrag = Math.max(0, totalAmount - prepaymentAmount);
 
   const netWeightKg = selectedItems.reduce((sum, it) => {
     // it.weight is in grams — convert to kg here.
@@ -549,6 +599,11 @@ export default function AuftragToRechnungModal({
               {auftrag.offerNumber && (
                 <span className="text-sm font-bold text-gray-600">
                   Angebot {auftrag.offerNumber}
+                </span>
+              )}
+              {prepaymentAmount > 0 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full border font-semibold bg-amber-50 text-amber-700 border-amber-200">
+                  Anzahlung vorhanden
                 </span>
               )}
             </div>
@@ -1048,9 +1103,32 @@ export default function AuftragToRechnungModal({
                   {formatDeCurrency(taxAmount)}
                 </span>
               </div>
+
+              {loadingPrepayments && (
+                <div className="flex justify-between text-gray-400 text-xs italic">
+                  <span>Anzahlung wird geprüft…</span>
+                </div>
+              )}
+
+              {!loadingPrepayments && prepaymentAmount > 0 && (
+                <div className="flex justify-between text-amber-700">
+                  <span>
+                    Rechnung
+                    {prepaymentInfo!.prepayments.length === 1
+                      ? ` ${prepaymentInfo!.prepayments[0].invoice_number}`
+                      : prepaymentInfo!.prepayments.length > 1
+                        ? ` (${prepaymentInfo!.prepayments.length}x)`
+                        : ""}
+                  </span>
+                  <span className="font-medium">
+                    - {formatDeCurrency(prepaymentAmount)}
+                  </span>
+                </div>
+              )}
+
               <div className="border-t border-gray-900 pt-2 flex justify-between font-bold text-lg text-gray-900">
-                <span>Total</span>
-                <span>{formatDeCurrency(totalAmount)}</span>
+                <span>{prepaymentAmount > 0 ? "Restbetrag" : "Total"}</span>
+                <span>{formatDeCurrency(restbetrag)}</span>
               </div>
             </div>
           </div>

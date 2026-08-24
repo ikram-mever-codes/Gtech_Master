@@ -156,6 +156,9 @@ export class Rechnung {
   @Column({ type: "varchar", length: 255, nullable: true })
   shipping_method?: string;
 
+  @Column({ type: "boolean", default: false })
+  is_prepayment: boolean;
+
   @Column({ type: "text", nullable: true })
   delivery_terms?: string;
 
