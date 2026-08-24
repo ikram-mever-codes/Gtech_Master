@@ -42,7 +42,7 @@ import {
 } from "@/api/offers";
 import { getAllInquiries } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
-import { getItems } from "@/api/items";
+import { getItems, autocompleteItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 import { UserRole } from "@/utils/interfaces";
@@ -525,7 +525,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
 
   const [showItemPicker, setShowItemPicker] = useState(false);
-  const [itemPickerSearch, setItemPickerSearch] = useState("");
+  // Three-field search for "add existing item" picker - using autocompleteItems
+  const [searchEan, setSearchEan] = useState("");
+  const [searchItemNo, setSearchItemNo] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [itemSearchLoading, setItemSearchLoading] = useState(false);
+  const [pickerItems, setPickerItems] = useState<any[]>([]);
 
   // Saved shipping addresses for the offer's customer, used by the
   // delivery-address dropdown below (only fetched once editing starts).
@@ -533,6 +538,48 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   // "__same__" = use billing address; otherwise a CompanyShippingAddress id.
   const [selectedShippingAddressId, setSelectedShippingAddressId] =
     useState("__same__");
+
+  // Debounced search for the item picker using autocompleteItems
+  useEffect(() => {
+    if (!showItemPicker) {
+      setPickerItems([]);
+      return;
+    }
+
+    const combined = [searchEan, searchItemNo, searchName]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" ");
+
+    if (!combined) {
+      setPickerItems([]);
+      return;
+    }
+
+    setItemSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res: any = await autocompleteItems(combined, { limit: 30 });
+        setPickerItems(Array.isArray(res?.data) ? res.data : []);
+      } catch (e) {
+        console.error("Error searching items:", e);
+        setPickerItems([]);
+      } finally {
+        setItemSearchLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [showItemPicker, searchEan, searchItemNo, searchName]);
+
+  const handleFieldSearchChange = (
+    field: "ean" | "itemNo" | "name",
+    value: string,
+  ) => {
+    if (field === "ean") setSearchEan(value);
+    if (field === "itemNo") setSearchItemNo(value);
+    if (field === "name") setSearchName(value);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -631,7 +678,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setShowCopyPaste(false);
     setCopyPasteData("");
     setShowItemPicker(false);
-    setItemPickerSearch("");
+    setSearchEan("");
+    setSearchItemNo("");
+    setSearchName("");
+    setPickerItems([]);
     if (offerId) {
       fetchOffer();
     } else {
@@ -903,19 +953,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     );
   });
 
-  const itemPickerList = items.filter((it) => {
-    if (!itemPickerSearch) return true;
-    const q = itemPickerSearch.toLowerCase();
-    const name = it.item_name_de || "";
-    return (
-      name.toLowerCase().includes(q) ||
-      String(it.ean || "").includes(itemPickerSearch) ||
-      String(it.model || "")
-        .toLowerCase()
-        .includes(q)
-    );
-  });
-
   const selectedCustomer = customers.find(
     (c: any) => String(c.id) === String(filterCustomerId),
   );
@@ -1137,6 +1174,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     setEdit(false);
     setShowCopyPaste(false);
     setShowItemPicker(false);
+    setSearchEan("");
+    setSearchItemNo("");
+    setSearchName("");
+    setPickerItems([]);
     setSelectedShippingAddressId("__same__");
   };
 
@@ -1292,7 +1333,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         sourceItemId: String(it.id),
       });
       setShowItemPicker(false);
-      setItemPickerSearch("");
+      setSearchEan("");
+      setSearchItemNo("");
+      setSearchName("");
+      setPickerItems([]);
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -2698,21 +2742,70 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
                       {showItemPicker && (
                         <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
-                          <input
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                            placeholder="Search items…"
-                            value={itemPickerSearch}
-                            onChange={(e) =>
-                              setItemPickerSearch(e.target.value)
-                            }
-                          />
+                          <div className="w-[70%] flex justify-between items-start gap-2">
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                EAN
+                              </label>
+                              <input
+                                value={searchEan}
+                                onChange={(e) =>
+                                  handleFieldSearchChange("ean", e.target.value)
+                                }
+                                placeholder="Exact EAN..."
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Item No.
+                              </label>
+                              <input
+                                value={searchItemNo}
+                                onChange={(e) =>
+                                  handleFieldSearchChange(
+                                    "itemNo",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Exact item no..."
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Item Name (EN/DE)
+                              </label>
+                              <input
+                                value={searchName}
+                                onChange={(e) =>
+                                  handleFieldSearchChange(
+                                    "name",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Item name..."
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
                           <div className="max-h-48 overflow-y-auto space-y-1.5">
-                            {itemPickerList.length === 0 ? (
+                            {itemSearchLoading ? (
+                              <div className="text-center text-sm text-gray-400 py-3">
+                                Searching…
+                              </div>
+                            ) : !searchEan.trim() &&
+                              !searchItemNo.trim() &&
+                              !searchName.trim() ? (
+                              <div className="text-center text-sm text-gray-400 py-3">
+                                Type in EAN, Item No., or Item Name to search.
+                              </div>
+                            ) : pickerItems.length === 0 ? (
                               <div className="text-center text-sm text-gray-500 py-3">
                                 No items match.
                               </div>
                             ) : (
-                              itemPickerList.map((it) => (
+                              pickerItems.map((it) => (
                                 <ItemRow
                                   key={it.id}
                                   item={it}
@@ -3129,8 +3222,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigator.clipboard.writeText(form.internalNotes || offer.internalNotes || "");
-                          toast.success("Internal comment copied to clipboard!");
+                          navigator.clipboard.writeText(
+                            form.internalNotes || offer.internalNotes || "",
+                          );
+                          toast.success(
+                            "Internal comment copied to clipboard!",
+                          );
                         }}
                         className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
                         title="Copy Internal Comment"
@@ -3168,8 +3265,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigator.clipboard.writeText(form.notes || offer.notes || "");
-                          toast.success("External comment copied to clipboard!");
+                          navigator.clipboard.writeText(
+                            form.notes || offer.notes || "",
+                          );
+                          toast.success(
+                            "External comment copied to clipboard!",
+                          );
                         }}
                         className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
                         title="Copy External Comment"
