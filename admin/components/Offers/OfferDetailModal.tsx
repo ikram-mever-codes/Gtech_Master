@@ -539,7 +539,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [selectedShippingAddressId, setSelectedShippingAddressId] =
     useState("__same__");
 
-  // Debounced search for the item picker using autocompleteItems
+  // Debounced search for the item picker using autocompleteItems - EXACTLY like BestellungPreviewModal
   useEffect(() => {
     if (!showItemPicker) {
       setPickerItems([]);
@@ -567,7 +567,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       } finally {
         setItemSearchLoading(false);
       }
-    }, 400);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [showItemPicker, searchEan, searchItemNo, searchName]);
@@ -2739,8 +2739,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </div>
                         </div>
                       </div>
-                      // In OfferDetailModal, find the showItemPicker section
-                      and replace it with this:
+
                       {showItemPicker && (
                         <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
                           <div className="w-[70%] flex justify-between items-start gap-2">
