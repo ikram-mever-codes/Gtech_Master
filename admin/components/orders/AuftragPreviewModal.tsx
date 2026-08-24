@@ -25,7 +25,7 @@ import {
   previewOrderLineItemPrice,
   formatCurrency,
 } from "@/api/customer_orders";
-import { getItems } from "@/api/items";
+import { autocompleteItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 import {
@@ -247,7 +247,8 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
   item,
   onClick,
 }) => {
-  const name = item.item_name || item.itemName || "Unnamed item";
+  const name =
+    item.item_name_de || item.item_name || item.itemName || "Unnamed item";
   const itemNo = item.de_no || item.ItemID_DE || item.itemNo || "";
   return (
     <div
@@ -351,7 +352,24 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
   const [showItemPicker, setShowItemPicker] = useState(false);
-  const [itemPickerSearch, setItemPickerSearch] = useState("");
+  // Three-field item search backed by the new autocompleteItems endpoint
+  // — same pattern just implemented in BestellungPreviewModal (strict
+  // AND-across-words match, debounced, ranked results). Replaces the old
+  // single itemPickerSearch client-side filter over a 1000-item preload.
+  const [searchEan, setSearchEan] = useState("");
+  const [searchItemNo, setSearchItemNo] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [itemSearchLoading, setItemSearchLoading] = useState(false);
+
+  const handleFieldSearchChange = (
+    field: "ean" | "itemNo" | "name",
+    value: string,
+  ) => {
+    if (field === "ean") setSearchEan(value);
+    if (field === "itemNo") setSearchItemNo(value);
+    if (field === "name") setSearchName(value);
+  };
+
   const [items, setItems] = useState<any[]>([]);
   const [newLine, setNewLine] = useState({
     itemName: "",
@@ -458,20 +476,47 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setShowItemPicker(false);
-    setItemPickerSearch("");
+    setSearchEan("");
+    setSearchItemNo("");
+    setSearchName("");
     fetchOrder();
   }, [isOpen, orderId, fetchOrder]);
+
+  // Debounced call to autocompleteItems, combining the three fields into
+  // one space-joined query — same effect as BestellungPreviewModal's.
+  // Filling more than one field still narrows results together (the
+  // backend ANDs every word), just against the full catalog now instead
+  // of a capped 1000-item preload, with strict letter-for-letter matching
+  // and ranked results. No query -> no request; empty fields show a
+  // "type to search" prompt instead of eagerly loading everything.
   useEffect(() => {
-    if (!showItemPicker || items.length > 0) return;
-    (async () => {
+    if (!showItemPicker) return;
+
+    const combined = [searchEan, searchItemNo, searchName]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" ");
+
+    if (!combined) {
+      setItems([]);
+      return;
+    }
+
+    setItemSearchLoading(true);
+    const timer = setTimeout(async () => {
       try {
-        const res: any = await getItems({ limit: 1000 });
-        setItems(Array.isArray(res?.data) ? res.data : res?.data?.items || []);
+        const res: any = await autocompleteItems(combined, { limit: 30 });
+        setItems(Array.isArray(res?.data) ? res.data : []);
       } catch (e) {
-        console.error("Error loading items:", e);
+        console.error("Error searching items:", e);
+        setItems([]);
+      } finally {
+        setItemSearchLoading(false);
       }
-    })();
-  }, [showItemPicker, items.length]);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [showItemPicker, searchEan, searchItemNo, searchName]);
 
   if (!isOpen) return null;
 
@@ -764,7 +809,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     if (!canEditCommercial) return;
     try {
       await createOrderLineItem(order.id, {
-        itemName: it.item_name || it.itemName || "Item",
+        // item_name_de checked first — the autocomplete response's
+        // primary display field; item_name/itemName kept as fallbacks
+        // for anything still passing the old shape.
+        itemName: it.item_name_de || it.item_name || it.itemName || "Item",
         material: it.model || (it.ean ? String(it.ean) : undefined),
         itemNo: it.model || undefined,
         price: 0,
@@ -773,7 +821,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         sourceItemId: String(it.id),
       });
       setShowItemPicker(false);
-      setItemPickerSearch("");
+      setSearchEan("");
+      setSearchItemNo("");
+      setSearchName("");
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -1749,43 +1799,70 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
                 {showItemPicker && (
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
-                    <input
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      placeholder="Search items…"
-                      value={itemPickerSearch}
-                      onChange={(e) => setItemPickerSearch(e.target.value)}
-                    />
+                    <div className="w-[70%] flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          EAN
+                        </label>
+                        <input
+                          value={searchEan}
+                          onChange={(e) =>
+                            handleFieldSearchChange("ean", e.target.value)
+                          }
+                          placeholder="Exact EAN..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Item No.
+                        </label>
+                        <input
+                          value={searchItemNo}
+                          onChange={(e) =>
+                            handleFieldSearchChange("itemNo", e.target.value)
+                          }
+                          placeholder="Exact item no..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Item Name (EN/DE)
+                        </label>
+                        <input
+                          value={searchName}
+                          onChange={(e) =>
+                            handleFieldSearchChange("name", e.target.value)
+                          }
+                          placeholder="Item name..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
                     <div className="max-h-48 overflow-y-auto space-y-1.5">
-                      {items.filter((it) => {
-                        if (!itemPickerSearch) return true;
-                        const q = itemPickerSearch.toLowerCase();
-                        const name = it.item_name || it.itemName || "";
-                        return (
-                          name.toLowerCase().includes(q) ||
-                          String(it.ean || "").includes(itemPickerSearch)
-                        );
-                      }).length === 0 ? (
+                      {itemSearchLoading ? (
+                        <div className="text-center text-sm text-gray-400 py-3">
+                          Searching…
+                        </div>
+                      ) : !searchEan.trim() &&
+                        !searchItemNo.trim() &&
+                        !searchName.trim() ? (
+                        <div className="text-center text-sm text-gray-400 py-3">
+                          Type in EAN, Item No., or Item Name to search.
+                        </div>
+                      ) : items.length === 0 ? (
                         <div className="text-center text-sm text-gray-500 py-3">
                           No items match.
                         </div>
                       ) : (
-                        items
-                          .filter((it) => {
-                            if (!itemPickerSearch) return true;
-                            const q = itemPickerSearch.toLowerCase();
-                            const name = it.item_name || it.itemName || "";
-                            return (
-                              name.toLowerCase().includes(q) ||
-                              String(it.ean || "").includes(itemPickerSearch)
-                            );
-                          })
-                          .map((it) => (
-                            <ItemRow
-                              key={it.id}
-                              item={it}
-                              onClick={() => addExistingItem(it)}
-                            />
-                          ))
+                        items.map((it) => (
+                          <ItemRow
+                            key={it.id}
+                            item={it}
+                            onClick={() => addExistingItem(it)}
+                          />
+                        ))
                       )}
                     </div>
                   </div>
