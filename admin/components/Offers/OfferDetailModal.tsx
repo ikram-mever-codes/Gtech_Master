@@ -2739,7 +2739,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           </div>
                         </div>
                       </div>
-
+                      // In OfferDetailModal, find the showItemPicker section
+                      and replace it with this:
                       {showItemPicker && (
                         <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
                           <div className="w-[70%] flex justify-between items-start gap-2">
@@ -2752,7 +2753,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 onChange={(e) =>
                                   handleFieldSearchChange("ean", e.target.value)
                                 }
-                                placeholder="Exact EAN..."
+                                placeholder="EAN..."
                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                               />
                             </div>
@@ -2768,7 +2769,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     e.target.value,
                                   )
                                 }
-                                placeholder="Exact item no..."
+                                placeholder="Item no..."
                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                               />
                             </div>
