@@ -62,12 +62,10 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
 
   const getRemarkEx = (it: CommercialLineItem): string => {
     return (
-      it.notes ||
       it.remark_ex ||
       it.remarkEX ||
       it.remarkEx ||
-      it.remark ||
-      it.description ||
+      it.notes ||
       ""
     );
   };

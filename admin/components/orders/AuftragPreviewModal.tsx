@@ -769,7 +769,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         itemNo: it.model || undefined,
         price: 0,
         weight: it.weight,
-        notes: it.remark_ex || it.remark || undefined,
+        notes: it.remark_ex || undefined,
         sourceItemId: String(it.id),
       });
       setShowItemPicker(false);

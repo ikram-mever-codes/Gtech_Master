@@ -640,8 +640,8 @@ export const createAuftragFromItems = async (
         material,
         itemNo: matchedItem?.item_no_de || undefined,
         photo: matchedItem?.photo || matchedItem?.pix_path || undefined,
-        specification: matchedItem?.remark || undefined,
-        description: selItem.notes || matchedItem?.remark || undefined,
+        specification: matchedItem?.remark_ex || undefined,
+        description: selItem.notes || matchedItem?.remark_ex || undefined,
         notes: matchedItem?.remark_ex || undefined,
         weight: matchedItem?.weight || undefined,
         quantity: qty,
@@ -1699,8 +1699,7 @@ export const downloadCustomerOrderPdf = async (
         position: it.position || idx + 1,
         artNr: it.itemNo || it.material || "—",
         bezeichnung: it.itemName || it.description || "Item",
-        remarks:
-          it.notes || it.specification || it.remark || it.remark_ex || "-",
+        remarks: it.notes || it.remark_ex || "-",
         vatRate:
           it.taxRate !== undefined && it.taxRate !== null
             ? Number(it.taxRate)

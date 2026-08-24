@@ -738,7 +738,7 @@ export async function generateAuftragEml(
       position: it.position || idx + 1,
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.itemName || it.description || "Item",
-      remarks: it.notes || it.specification || it.remark || it.remark_ex || "-",
+      remarks: it.notes || it.remark_ex || "-",
       vatRate:
         it.taxRate !== undefined && it.taxRate !== null
           ? Number(it.taxRate)
