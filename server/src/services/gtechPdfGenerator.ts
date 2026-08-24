@@ -486,7 +486,7 @@ export async function generateGtechDocumentPdf(
 
   let displayDocType = opts.documentType;
   if (displayDocType === "Auftragsbestätigung") displayDocType = "Auftrag" as any;
-  if (displayDocType === "Rechnungskorrektur") displayDocType = "RK" as any;
+  if (displayDocType === "RK") displayDocType = "Rechnungskorrektur" as any;
 
   doc
     .font(SB)
