@@ -12,6 +12,7 @@ import {
 } from "./sharedColumns";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
+import { formatSupplierDisplayName } from "@/components/orders/BestellungPreviewModal";
 
 const BestellungActionMenu: React.FC<{
   row: any;
@@ -148,6 +149,7 @@ interface BestellungColumnsArgs {
   setExpandedDocIds: React.Dispatch<React.SetStateAction<Set<string | number>>>;
   onOpenBestellungPreview: (id: string | number) => void;
   onMarkProcessing: (id: string | number) => void;
+  gtechHkDisplayName?: string;
 }
 
 const valueNetCalc = (row: any) => {
@@ -195,6 +197,7 @@ export function buildBestellungColumns({
   setExpandedDocIds,
   onOpenBestellungPreview,
   onMarkProcessing,
+  gtechHkDisplayName,
 }: BestellungColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
@@ -358,16 +361,16 @@ export function buildBestellungColumns({
     },
     {
       header: "Receiver",
-      width: "105px",
+      width: "145px",
       align: "left",
       render: (row) => {
         const text =
           row.receiver === "Supplier"
-            ? row.supplier?.company_name || row.supplier?.name || "Supplier"
-            : row.receiver || "Gtech Hong Kong";
+            ? formatSupplierDisplayName(row.supplier)
+            : gtechHkDisplayName || row.receiver || "";
         return (
           <div
-            className="truncate max-w-[105px] text-xs text-gray-600 font-normal"
+            className="truncate max-w-[145px] text-xs text-gray-600 font-normal"
             title={text}
           >
             {text}

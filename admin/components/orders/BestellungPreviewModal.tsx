@@ -334,7 +334,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
           (c.legal_name && c.legal_name.toLowerCase().includes("hong kong")) ||
           (c.country && c.country.toLowerCase().includes("hong kong")),
       ) || gtechCompanies[0];
-    return hk?.display_name || hk?.legal_name || "Gtech Hong Kong";
+    return hk?.display_name || hk?.legal_name || "";
   }, [gtechCompanies]);
 
   const isFromAuftrag =
