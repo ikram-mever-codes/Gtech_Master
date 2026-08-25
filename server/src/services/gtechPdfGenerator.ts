@@ -360,7 +360,7 @@ export async function generateGtechDocumentPdf(
     customer.country,
   );
 
-  const ADDR_X = MM(23.5);
+  const ADDR_X = MM(24.0);
   mainAddrLines.forEach((lineText, idx) => {
     if (idx === 0) {
       doc
@@ -909,21 +909,21 @@ export async function generateGtechDocumentPdf(
 
     const rawTaxProfileKey = String(
       opts.taxProfile ||
-        opts.customerSnapshot?.taxProfile ||
-        opts.customerSnapshot?.tax_profile ||
-        opts.customerSnapshot?.tax_profile_case ||
-        opts.customerSnapshot?.taxProfileKey ||
-        opts.customerEntity?.defaultTaxProfile?.key ||
-        opts.customerEntity?.defaultTaxProfile?.name ||
-        opts.customerEntity?.taxProfile?.key ||
-        opts.customerEntity?.tax_profile ||
-        "",
+      opts.customerSnapshot?.taxProfile ||
+      opts.customerSnapshot?.tax_profile ||
+      opts.customerSnapshot?.tax_profile_case ||
+      opts.customerSnapshot?.taxProfileKey ||
+      opts.customerEntity?.defaultTaxProfile?.key ||
+      opts.customerEntity?.defaultTaxProfile?.name ||
+      opts.customerEntity?.taxProfile?.key ||
+      opts.customerEntity?.tax_profile ||
+      "",
     ).trim();
 
     const rawCountry = String(
       opts.customerSnapshot?.country ||
-        opts.customerEntity?.country ||
-        "",
+      opts.customerEntity?.country ||
+      "",
     ).trim().toUpperCase();
 
     let isEuIgl = /EU_IGL|EU-IGL|IGL/i.test(rawTaxProfileKey);

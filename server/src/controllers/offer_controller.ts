@@ -3798,7 +3798,7 @@ export class OfferController {
         customer.country,
       );
 
-      const ADDR_X = MM(23.5);
+      const ADDR_X = MM(24.0);
 
       mainAddrLines.forEach((lineText, idx) => {
         if (idx === 0) {
@@ -4485,17 +4485,17 @@ export class OfferController {
 
       const rawTaxProfileKey = String(
         customerTaxProfile?.key ||
-          customerTaxProfile?.name ||
-          (customer as any)?.tax_profile_case ||
-          (customer as any)?.taxProfile ||
-          (customer as any)?.tax_profile ||
-          "",
+        customerTaxProfile?.name ||
+        (customer as any)?.tax_profile_case ||
+        (customer as any)?.taxProfile ||
+        (customer as any)?.tax_profile ||
+        "",
       ).trim();
 
       const rawCountry = String(
         customer?.country ||
-          customerEntity?.country ||
-          "",
+        customerEntity?.country ||
+        "",
       ).trim().toUpperCase();
 
       let isEuIgl = /EU_IGL|EU-IGL|IGL/i.test(rawTaxProfileKey);
