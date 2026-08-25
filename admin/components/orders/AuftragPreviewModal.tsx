@@ -380,6 +380,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const [dbServiceProviders, setDbServiceProviders] = useState<
     WeiterversandServiceProvider[]
   >([]);
+  const [sameAsBusiness, setSameAsBusiness] = useState(true);
 
   /** Sorts an array of linked-document records by created_at, newest first. */
   const sortByCreatedAtDesc = (docs: any[]): any[] =>
@@ -456,6 +457,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       if (res.success) {
         setOrder(res.data);
         setForm(buildForm(res.data));
+        setSameAsBusiness(
+          isDeliverySameAsBilling(res.data.deliveryAddress, res.data.customerSnapshot),
+        );
         // initialEdit is only honored once we actually know the order's
         // status — a caller requesting edit mode (e.g. "Edit Auftrag" from
         // the Ausliefern screen) can't force it open on a Delivered/Closed
@@ -1049,7 +1053,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
             <div className="md:col-span-1 flex flex-col gap-3">
               <div className="block mb-1">
                 {effectiveEdit && canEditCommercial ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1 text-xs">
                     <input
                       className={inputCls}
                       placeholder="Legal name"
@@ -1063,24 +1067,44 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         })
                       }
                     />
-                    <input
-                      className={inputCls}
-                      placeholder="Street"
-                      value={
-                        form.customerSnapshot?.address ||
-                        form.customerSnapshot?.street ||
-                        ""
-                      }
-                      onChange={(e) =>
-                        patch({
-                          customerSnapshot: {
-                            ...form.customerSnapshot,
-                            address: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                    <div className="flex gap-1.5">
+                    <div className="grid grid-cols-2 gap-1">
+                      <input
+                        className={inputCls}
+                        placeholder="Street & No."
+                        value={
+                          form.customerSnapshot?.address ||
+                          form.customerSnapshot?.street ||
+                          ""
+                        }
+                        onChange={(e) =>
+                          patch({
+                            customerSnapshot: {
+                              ...form.customerSnapshot,
+                              address: e.target.value,
+                              street: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                      <input
+                        className={inputCls}
+                        placeholder="Additional line (c/o, floor)"
+                        value={
+                          form.customerSnapshot?.addressAdditional ||
+                          form.customerSnapshot?.address_additional ||
+                          ""
+                        }
+                        onChange={(e) =>
+                          patch({
+                            customerSnapshot: {
+                              ...form.customerSnapshot,
+                              addressAdditional: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
                       <input
                         className={inputCls}
                         placeholder="Postal code"
@@ -1107,20 +1131,20 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           })
                         }
                       />
+                      <input
+                        className={inputCls}
+                        placeholder="Country"
+                        value={form.customerSnapshot?.country || ""}
+                        onChange={(e) =>
+                          patch({
+                            customerSnapshot: {
+                              ...form.customerSnapshot,
+                              country: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
-                    <input
-                      className={inputCls}
-                      placeholder="Country"
-                      value={form.customerSnapshot?.country || ""}
-                      onChange={(e) =>
-                        patch({
-                          customerSnapshot: {
-                            ...form.customerSnapshot,
-                            country: e.target.value,
-                          },
-                        })
-                      }
-                    />
                     <input
                       className={inputCls}
                       placeholder="VAT ID"
@@ -1143,73 +1167,115 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 )}
               </div>
 
-              <div className="block mb-1">
-                {((effectiveEdit && canEditCommercial) ||
-                  !deliverySameAsBilling) && (
-                  <span className="text-sm font-bold text-gray-900">
+              <div className="block mt-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-gray-900">
                     Delivery:
                   </span>
-                )}
+                  {effectiveEdit && canEditCommercial && (
+                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={sameAsBusiness}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSameAsBusiness(checked);
+                          if (checked) {
+                            patch({ deliveryAddress: {} });
+                          }
+                        }}
+                        className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                      />
+                      Same as business
+                    </label>
+                  )}
+                </div>
+
                 {effectiveEdit && canEditCommercial ? (
-                  <div className="space-y-1.5 mt-1">
-                    <input
-                      className={inputCls}
-                      placeholder="Street"
-                      value={form.deliveryAddress?.street || ""}
-                      onChange={(e) =>
-                        patch({
-                          deliveryAddress: {
-                            ...form.deliveryAddress,
-                            street: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                    <div className="flex gap-1.5">
-                      <input
-                        className={inputCls}
-                        placeholder="Postal code"
-                        value={form.deliveryAddress?.postalCode || ""}
-                        onChange={(e) =>
-                          patch({
-                            deliveryAddress: {
-                              ...form.deliveryAddress,
-                              postalCode: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                      <input
-                        className={inputCls}
-                        placeholder="City"
-                        value={form.deliveryAddress?.city || ""}
-                        onChange={(e) =>
-                          patch({
-                            deliveryAddress: {
-                              ...form.deliveryAddress,
-                              city: e.target.value,
-                            },
-                          })
-                        }
-                      />
+                  sameAsBusiness ? (
+                    <div className="p-1.5 bg-gray-50 border border-gray-200 rounded text-xs text-gray-500 font-medium italic">
+                      Same as business address (blocked from editing)
                     </div>
-                    <input
-                      className={inputCls}
-                      placeholder="Country"
-                      value={form.deliveryAddress?.country || ""}
-                      onChange={(e) =>
-                        patch({
-                          deliveryAddress: {
-                            ...form.deliveryAddress,
-                            country: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
+                  ) : (
+                    <div className="space-y-1 text-xs mt-1">
+                      <div className="grid grid-cols-2 gap-1">
+                        <input
+                          className={inputCls}
+                          placeholder="Street & No."
+                          value={form.deliveryAddress?.street || ""}
+                          onChange={(e) =>
+                            patch({
+                              deliveryAddress: {
+                                ...form.deliveryAddress,
+                                street: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                        <input
+                          className={inputCls}
+                          placeholder="Additional line (c/o, floor)"
+                          value={
+                            form.deliveryAddress?.addressAdditional ||
+                            form.deliveryAddress?.address_additional ||
+                            ""
+                          }
+                          onChange={(e) =>
+                            patch({
+                              deliveryAddress: {
+                                ...form.deliveryAddress,
+                                addressAdditional: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <input
+                          className={inputCls}
+                          placeholder="Postal code"
+                          value={form.deliveryAddress?.postalCode || ""}
+                          onChange={(e) =>
+                            patch({
+                              deliveryAddress: {
+                                ...form.deliveryAddress,
+                                postalCode: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                        <input
+                          className={inputCls}
+                          placeholder="City"
+                          value={form.deliveryAddress?.city || ""}
+                          onChange={(e) =>
+                            patch({
+                              deliveryAddress: {
+                                ...form.deliveryAddress,
+                                city: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                        <input
+                          className={inputCls}
+                          placeholder="Country"
+                          value={form.deliveryAddress?.country || ""}
+                          onChange={(e) =>
+                            patch({
+                              deliveryAddress: {
+                                ...form.deliveryAddress,
+                                country: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )
                 ) : deliverySameAsBilling ? (
-                  <div className="text-sm text-gray-500">
-                    Same Delivery Address
+                  <div className="text-xs text-gray-500 italic">
+                    Same as billing address
                   </div>
                 ) : (
                   <AddressBlock

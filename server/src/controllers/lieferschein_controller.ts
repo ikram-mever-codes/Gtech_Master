@@ -511,6 +511,18 @@ export const downloadLieferscheinPdf = async (
 
     const effectiveShippingMethod = customerOrder?.shipping_method || rechnung?.shipping_method;
 
+    const rawStatus = String(lieferschein.status || "").toLowerCase().trim();
+    let displayStatus = "bestätigt";
+    if (rawStatus === "vorläufig" || rawStatus === "open" || rawStatus === "draft") {
+      displayStatus = "vorläufig";
+    } else if (rawStatus === "storniert" || rawStatus === "cancelled") {
+      displayStatus = "storniert";
+    } else if (rawStatus === "bestätigt" || rawStatus === "confirmed" || rawStatus === "closed") {
+      displayStatus = "bestätigt";
+    } else if (rawStatus) {
+      displayStatus = lieferschein.status;
+    }
+
     await generateGtechDocumentPdf({
       documentType: "Lieferschein",
       documentNumber: lieferschein.delivery_note_number,
@@ -518,7 +530,7 @@ export const downloadLieferscheinPdf = async (
       customerEntity: rechnung?.customer,
       deliveryAddress: rechnung?.deliveryAddress,
       metadataItems: [
-        ["Status", "bestätigt"],
+        ["Status", displayStatus],
         ["Ansprechpartner", contactName],
         ["Kunde", kundeCombined],
         [

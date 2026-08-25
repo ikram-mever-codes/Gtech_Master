@@ -1687,20 +1687,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <div className="md:col-span-1 flex flex-col gap-3">
                       <div className="block mb-1">
                         {edit ? (
-                          <div className="space-y-1.5">
-                            <input
-                              className={inputCls}
-                              placeholder="Company name"
-                              value={form.customerSnapshot?.companyName || ""}
-                              onChange={(e) =>
-                                patch({
-                                  customerSnapshot: {
-                                    ...form.customerSnapshot,
-                                    companyName: e.target.value,
-                                  },
-                                })
-                              }
-                            />
+                          <div className="space-y-1 text-xs">
                             <input
                               className={inputCls}
                               placeholder="Legal name"
@@ -1714,24 +1701,44 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 })
                               }
                             />
-                            <input
-                              className={inputCls}
-                              placeholder="Street"
-                              value={
-                                form.customerSnapshot?.address ||
-                                form.customerSnapshot?.street ||
-                                ""
-                              }
-                              onChange={(e) =>
-                                patch({
-                                  customerSnapshot: {
-                                    ...form.customerSnapshot,
-                                    address: e.target.value,
-                                  },
-                                })
-                              }
-                            />
-                            <div className="flex gap-1.5">
+                            <div className="grid grid-cols-2 gap-1">
+                              <input
+                                className={inputCls}
+                                placeholder="Street & No."
+                                value={
+                                  form.customerSnapshot?.address ||
+                                  form.customerSnapshot?.street ||
+                                  ""
+                                }
+                                onChange={(e) =>
+                                  patch({
+                                    customerSnapshot: {
+                                      ...form.customerSnapshot,
+                                      address: e.target.value,
+                                      street: e.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                              <input
+                                className={inputCls}
+                                placeholder="Additional line (c/o, floor)"
+                                value={
+                                  form.customerSnapshot?.addressAdditional ||
+                                  form.customerSnapshot?.address_additional ||
+                                  ""
+                                }
+                                onChange={(e) =>
+                                  patch({
+                                    customerSnapshot: {
+                                      ...form.customerSnapshot,
+                                      addressAdditional: e.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-1">
                               <input
                                 className={inputCls}
                                 placeholder="Postal code"
@@ -1758,20 +1765,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   })
                                 }
                               />
+                              <input
+                                className={inputCls}
+                                placeholder="Country"
+                                value={form.customerSnapshot?.country || ""}
+                                onChange={(e) =>
+                                  patch({
+                                    customerSnapshot: {
+                                      ...form.customerSnapshot,
+                                      country: e.target.value,
+                                    },
+                                  })
+                                }
+                              />
                             </div>
-                            <input
-                              className={inputCls}
-                              placeholder="Country"
-                              value={form.customerSnapshot?.country || ""}
-                              onChange={(e) =>
-                                patch({
-                                  customerSnapshot: {
-                                    ...form.customerSnapshot,
-                                    country: e.target.value,
-                                  },
-                                })
-                              }
-                            />
                             <input
                               className={inputCls}
                               placeholder="VAT ID"
@@ -2089,7 +2096,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   <div className="md:col-span-1 flex flex-col gap-3">
                     <div className="block mb-1">
                       {edit ? (
-                        <div className="space-y-1.5">
+                        <div className="space-y-1 text-xs">
                           <input
                             className={inputCls}
                             placeholder="Legal name"
@@ -2103,24 +2110,44 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               })
                             }
                           />
-                          <input
-                            className={inputCls}
-                            placeholder="Street"
-                            value={
-                              form.customerSnapshot?.address ||
-                              form.customerSnapshot?.street ||
-                              ""
-                            }
-                            onChange={(e) =>
-                              patch({
-                                customerSnapshot: {
-                                  ...form.customerSnapshot,
-                                  address: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                          <div className="flex gap-1.5">
+                          <div className="grid grid-cols-2 gap-1">
+                            <input
+                              className={inputCls}
+                              placeholder="Street & No."
+                              value={
+                                form.customerSnapshot?.address ||
+                                form.customerSnapshot?.street ||
+                                ""
+                              }
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    address: e.target.value,
+                                    street: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <input
+                              className={inputCls}
+                              placeholder="Additional line (c/o, floor)"
+                              value={
+                                form.customerSnapshot?.addressAdditional ||
+                                form.customerSnapshot?.address_additional ||
+                                ""
+                              }
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    addressAdditional: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
                             <input
                               className={inputCls}
                               placeholder="Postal code"
@@ -2147,20 +2174,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                 })
                               }
                             />
+                            <input
+                              className={inputCls}
+                              placeholder="Country"
+                              value={form.customerSnapshot?.country || ""}
+                              onChange={(e) =>
+                                patch({
+                                  customerSnapshot: {
+                                    ...form.customerSnapshot,
+                                    country: e.target.value,
+                                  },
+                                })
+                              }
+                            />
                           </div>
-                          <input
-                            className={inputCls}
-                            placeholder="Country"
-                            value={form.customerSnapshot?.country || ""}
-                            onChange={(e) =>
-                              patch({
-                                customerSnapshot: {
-                                  ...form.customerSnapshot,
-                                  country: e.target.value,
-                                },
-                              })
-                            }
-                          />
                           <input
                             className={inputCls}
                             placeholder="VAT ID"
