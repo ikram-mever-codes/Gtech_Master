@@ -221,10 +221,15 @@ export default function RechnungDetailModal({
     setIsEditMode(false);
     setAddressEdit(false);
 
-    // Initialize shipping cost from rechnung data
     setEditShippingCost(Number(rechnung?.shipping_cost) || 0);
     setEditShippingQuantity(Number(rechnung?.shipping_quantity) || 1);
-    setEditShippingMethod(rechnung?.shipping_method || "");
+    setEditShippingMethod(
+      rechnung?.shipping_method ||
+      rechnung?.auftrag?.shipping_method ||
+      (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
+      (rechnung?.customerSnapshot as any)?.shipping_method ||
+      "",
+    );
 
     // Initialize corrections with default values for items that have open quantity
     if (rechnung?.items) {
@@ -648,15 +653,6 @@ export default function RechnungDetailModal({
             </h2>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => downloadRechnungEml(data.id, invoiceNumber)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-semibold border border-blue-200 transition-all shadow-2xs"
-              title="Open Outlook Draft (.eml)"
-            >
-              <Mail className="w-4 h-4 text-blue-600" />
-              Outlook (.eml)
-            </button>
             {!isCorrection && (
               <ViewEditToggle
                 isEditEnabled={addressEdit}
@@ -838,7 +834,6 @@ export default function RechnungDetailModal({
             </div>
 
             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-              <Field label="AUFTRAG NO" value={auftragNo} />
               <div>
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
                   Ansprechpartner
@@ -867,14 +862,11 @@ export default function RechnungDetailModal({
                 value={deliveryDate ? formatDate(deliveryDate) : ""}
               />
               <Field label="Payment method" value={data.payment_method} />
-              <Field label="Payment terms" value={data.payment_terms} />
-              <Field label="Shipping method" value={data.shipping_method} />
-              {shippingTotal > 0 && (
-                <Field
-                  label="Shipping Cost"
-                  value={formatDeCurrency(shippingTotal)}
-                />
-              )}
+              <Field label="Payment Due Days" value={data.payment_terms} />
+              <Field
+                label="Shipping method"
+                value={editShippingMethod || data.shipping_method || "—"}
+              />
             </div>
           </div>
 

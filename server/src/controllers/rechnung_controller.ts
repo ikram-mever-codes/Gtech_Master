@@ -516,7 +516,7 @@ export const createRechnungFromAuftrag = async (
       customerSnapshot: auftrag.customerSnapshot || undefined,
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: include_shipping ? auftrag.shipping_method : undefined,
+      shipping_method: auftrag.shipping_method || (auftrag.customerSnapshot as any)?.defaultShippingMethod || (auftrag.customerSnapshot as any)?.shipping_method || undefined,
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
@@ -592,7 +592,7 @@ export const createRechnungFromAuftrag = async (
         discount_percentage: discountPercentage,
         discount_amount: discountAmount,
         payment_terms: auftrag.payment_terms || undefined,
-        shipping_method: include_shipping ? auftrag.shipping_method : undefined,
+        shipping_method: auftrag.shipping_method || (auftrag.customerSnapshot as any)?.defaultShippingMethod || (auftrag.customerSnapshot as any)?.shipping_method || undefined,
       });
       const savedCciInv = await cciInvRepo.save(cciInv);
 
