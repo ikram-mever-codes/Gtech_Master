@@ -1722,15 +1722,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               {contact.email && (
                                                 <a
                                                   href={`mailto:${contact.email}`}
-                                                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                                                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 break-all"
                                                   onClick={(e) =>
                                                     e.stopPropagation()
                                                   }
+                                                  title={contact.email}
                                                 >
-                                                  <EnvelopeIcon className="h-3 w-3" />
-                                                  {contact.email.length > 20
-                                                    ? `${contact.email.substring(0, 15)}...`
-                                                    : contact.email}
+                                                  <EnvelopeIcon className="h-3.5 w-3.5 shrink-0" />
+                                                  <span>
+                                                    {contact.email.length > 40
+                                                      ? `${contact.email.substring(0, 36)}...`
+                                                      : contact.email}
+                                                  </span>
                                                 </a>
                                               )}
                                               {contact.phone && (
@@ -1741,37 +1744,43 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                                     e.stopPropagation()
                                                   }
                                                 >
-                                                  <PhoneIcon className="h-3 w-3" />
-                                                  {contact.phone}
+                                                  <PhoneIcon className="h-3.5 w-3.5 shrink-0" />
+                                                  <span>{contact.phone}</span>
                                                 </a>
                                               )}
                                             </div>
                                           </td>
-                                          <td className="px-4 py-3">
-                                            {contact.note ? (
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleOpenNotesModal(contact);
-                                                }}
-                                                className="flex items-center gap-1 text-left hover:bg-gray-100 p-1 rounded"
-                                                title="Click to view note"
-                                              >
-                                                <span
-                                                  className="text-blue-500"
-                                                  title="General Note"
+                                          <td className="px-4 py-3 max-w-[320px]">
+                                            {(() => {
+                                              const noteText =
+                                                (contact.note || "").trim() ||
+                                                (contact.notes || "").trim() ||
+                                                (contact.noteContactPreference || "").trim() ||
+                                                (contact.decisionMakerNote || "").trim() ||
+                                                (contact.description || "").trim() ||
+                                                (contact.remark || "").trim();
+
+                                              if (!noteText) {
+                                                return (
+                                                  <span className="text-gray-400 text-xs">
+                                                    -
+                                                  </span>
+                                                );
+                                              }
+
+                                              return (
+                                                <div
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenNotesModal(contact);
+                                                  }}
+                                                  className="text-xs text-gray-700 break-words leading-relaxed cursor-pointer hover:bg-gray-100/80 p-1 rounded transition-colors"
+                                                  title="Click to view full note"
                                                 >
-                                                  📝
-                                                </span>
-                                                <span className="text-sm text-gray-600 max-w-[220px] truncate">
-                                                  {contact.note}
-                                                </span>
-                                              </button>
-                                            ) : (
-                                              <span className="text-gray-400 text-xs">
-                                                -
-                                              </span>
-                                            )}
+                                                  {noteText}
+                                                </div>
+                                              );
+                                            })()}
                                           </td>
                                         </tr>
                                       ))}
