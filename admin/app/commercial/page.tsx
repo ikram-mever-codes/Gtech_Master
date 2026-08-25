@@ -394,10 +394,8 @@ const InvoiceListPage: React.FC = () => {
     selectedAuftragForRechnungOhneAusliefernModal,
     setSelectedAuftragForRechnungOhneAusliefernModal,
   ] = useState<any>(null);
-  const [
-    showRechnungOhneAusliefernModal,
-    setShowRechnungOhneAusliefernModal,
-  ] = useState(false);
+  const [showRechnungOhneAusliefernModal, setShowRechnungOhneAusliefernModal] =
+    useState(false);
 
   const [showRechnungDetailModal, setShowRechnungDetailModal] = useState(false);
   const [selectedRechnungForDetail, setSelectedRechnungForDetail] =
@@ -1259,12 +1257,12 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev: any) =>
         prev
           ? {
-            ...prev,
-            title: invoiceEditForm.title,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              title: invoiceEditForm.title,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1334,11 +1332,21 @@ const InvoiceListPage: React.FC = () => {
             ...snap,
             displayName: dispName,
             display_name: dispName,
-            companyName: cust.company_name || cust.companyName || cust.name || snap.companyName || "—",
+            companyName:
+              cust.company_name ||
+              cust.companyName ||
+              cust.name ||
+              snap.companyName ||
+              "—",
             email: cust.email || snap.email || "—",
             country: cust.country || snap.country || "",
             city: cust.city || snap.city || "",
-            postalCode: cust.postal_code || cust.postalCode || snap.postalCode || snap.postal_code || "",
+            postalCode:
+              cust.postal_code ||
+              cust.postalCode ||
+              snap.postalCode ||
+              snap.postal_code ||
+              "",
           },
         };
       });
@@ -1402,11 +1410,21 @@ const InvoiceListPage: React.FC = () => {
             ...snap,
             displayName: dispName,
             display_name: dispName,
-            companyName: cust.company_name || cust.companyName || cust.name || snap.companyName || "—",
+            companyName:
+              cust.company_name ||
+              cust.companyName ||
+              cust.name ||
+              snap.companyName ||
+              "—",
             email: cust.email || snap.email || "—",
             country: cust.country || snap.country || "",
             city: cust.city || snap.city || "",
-            postalCode: cust.postal_code || cust.postalCode || snap.postalCode || snap.postal_code || "",
+            postalCode:
+              cust.postal_code ||
+              cust.postalCode ||
+              snap.postalCode ||
+              snap.postal_code ||
+              "",
           },
         };
       });
@@ -1435,10 +1453,18 @@ const InvoiceListPage: React.FC = () => {
             displayName: dispName,
             display_name: dispName,
             companyName:
-              ls.customerName || cust.companyName || cust.company_name || ls.bill_to || "—",
-            contactEmail:
-              cust.email || cust.contactEmail || ls.email || "—",
-            postalCode: ls.postalCode || cust.postalCode || cust.postal_code || snap.postalCode || "",
+              ls.customerName ||
+              cust.companyName ||
+              cust.company_name ||
+              ls.bill_to ||
+              "—",
+            contactEmail: cust.email || cust.contactEmail || ls.email || "—",
+            postalCode:
+              ls.postalCode ||
+              cust.postalCode ||
+              cust.postal_code ||
+              snap.postalCode ||
+              "",
             city: ls.city || cust.city || snap.city || "",
             country: ls.country || cust.country || snap.country || "",
           },
@@ -1511,11 +1537,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-          item.customer?.id ||
-          item.customer_id ||
-          item.customerSnapshot?.customerNumber ||
-          item.customerSnapshot?.id ||
-          "",
+            item.customer?.id ||
+            item.customer_id ||
+            item.customerSnapshot?.customerNumber ||
+            item.customerSnapshot?.id ||
+            "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1523,12 +1549,12 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-          item.customer_name ||
-          item.bill_to ||
-          item.ship_to ||
-          item.customerSnapshot?.companyName ||
-          item.customerSnapshot?.name ||
-          "",
+            item.customer_name ||
+            item.bill_to ||
+            item.ship_to ||
+            item.customerSnapshot?.companyName ||
+            item.customerSnapshot?.name ||
+            "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -1614,7 +1640,7 @@ const InvoiceListPage: React.FC = () => {
       if (res?.success) {
         toast.success(
           res.message ||
-          `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
+            `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
           successStyles,
         );
         await tabData.refetchOrders();
@@ -1806,7 +1832,7 @@ const InvoiceListPage: React.FC = () => {
                 size="small"
                 startIcon={<Plus className="h-4 w-4" />}
               >
-                Payment Inbound
+                Zahlungen{" "}
               </CustomButton>
             )}
           </div>
@@ -1819,10 +1845,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </button>
@@ -1995,10 +2022,7 @@ const InvoiceListPage: React.FC = () => {
               expandedRowIds={expandedDocIds}
               renderRowDetails={(row) => {
                 const lineItems =
-                  row.items ||
-                  row.lineItems ||
-                  row.orderItems ||
-                  [];
+                  row.items || row.lineItems || row.orderItems || [];
                 const currency = row.currency || "EUR";
                 return (
                   <CommercialLineItemsSubTable
@@ -2007,7 +2031,9 @@ const InvoiceListPage: React.FC = () => {
                     docType={activeInvTab}
                     shippingMethod={row.shipping_method || row.shippingMethod}
                     shippingCost={row.shipping_cost ?? row.shippingCost}
-                    shippingQuantity={row.shipping_quantity ?? row.shippingQuantity ?? 1}
+                    shippingQuantity={
+                      row.shipping_quantity ?? row.shippingQuantity ?? 1
+                    }
                     taxRate={row.tax_rate ?? row.taxRate}
                   />
                 );
@@ -2033,10 +2059,11 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                        ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                        : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                        }`}
+                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                        currentPage === i + 1
+                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                      }`}
                     >
                       {i + 1}
                     </button>
@@ -2332,20 +2359,21 @@ const InvoiceListPage: React.FC = () => {
             }}
           />
         )}
-        {showRechnungOhneAusliefernModal && selectedAuftragForRechnungOhneAusliefernModal && (
-          <RechnungOhneAusliefernModal
-            isOpen={showRechnungOhneAusliefernModal}
-            onClose={() => {
-              setShowRechnungOhneAusliefernModal(false);
-              setSelectedAuftragForRechnungOhneAusliefernModal(null);
-            }}
-            auftrag={selectedAuftragForRechnungOhneAusliefernModal}
-            onSuccess={() => {
-              tabData.refetchOrders();
-              tabData.refetchRechnungen();
-            }}
-          />
-        )}
+        {showRechnungOhneAusliefernModal &&
+          selectedAuftragForRechnungOhneAusliefernModal && (
+            <RechnungOhneAusliefernModal
+              isOpen={showRechnungOhneAusliefernModal}
+              onClose={() => {
+                setShowRechnungOhneAusliefernModal(false);
+                setSelectedAuftragForRechnungOhneAusliefernModal(null);
+              }}
+              auftrag={selectedAuftragForRechnungOhneAusliefernModal}
+              onSuccess={() => {
+                tabData.refetchOrders();
+                tabData.refetchRechnungen();
+              }}
+            />
+          )}
         {showInboundModal && (
           <CustomModal
             isOpen={showInboundModal}

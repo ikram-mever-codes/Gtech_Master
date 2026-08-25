@@ -9,7 +9,7 @@ import {
 import { CustomerOrderItem } from "../models/customer_order_items";
 import { Customer } from "../models/customers";
 import { Item } from "../models/items";
-import { Offer } from "../models/offer";
+import { Offer, OfferLineItem } from "../models/offer";
 import { Inquiry } from "../models/inquiry";
 import { SalesPrice } from "../models/sales_prices";
 import { NumberSequenceService } from "../services/number_sequence_service";
@@ -27,6 +27,7 @@ import { Rechnung_k } from "../models/rechnung_k";
 import { TransferOrder } from "../models/transfer_order";
 import { RechnungItem } from "../models/rechnung_items";
 import { TaxProfile } from "../models/tax_profile";
+import { RequestedItem } from "../models/requested_items";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
 const customerRepo = AppDataSource.getRepository(Customer);
@@ -433,6 +434,90 @@ async function getCustomerTaxProfile(customerId?: string | null): Promise<any> {
   return resolved || getDefaultDeTaxProfile();
 }
 
+async function resolveBackingItem(
+  lineItem: any,
+  offer: any,
+  itemRepo: any,
+  requestedItemRepo: any,
+): Promise<any | null> {
+  if (lineItem.sourceItemId) {
+    const id = parseInt(lineItem.sourceItemId, 10);
+    if (isNaN(id)) return null;
+    return itemRepo.findOne({ where: { id } });
+  }
+  if (lineItem.isAssemblyItem) {
+    if (!offer.inquiry?.itemId) return null;
+    return itemRepo.findOne({ where: { id: offer.inquiry.itemId } });
+  }
+  if (lineItem.requestedItemId) {
+    const requestedItem = await requestedItemRepo.findOne({
+      where: { id: lineItem.requestedItemId },
+    });
+    if (!requestedItem?.itemId) return null;
+    return itemRepo.findOne({ where: { id: requestedItem.itemId } });
+  }
+  return null;
+}
+
+export const getOfferDraftItemsPreview = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { offerId } = req.params;
+    const offerRepo = AppDataSource.getRepository(Offer);
+    const offer = await offerRepo.findOne({
+      where: { id: offerId },
+      relations: ["lineItems", "inquiry"],
+    });
+    if (!offer) {
+      res.status(404).json({ success: false, message: "Offer not found" });
+      return;
+    }
+
+    const itemRepository = AppDataSource.getRepository(Item);
+    const requestedItemRepo = AppDataSource.getRepository(RequestedItem);
+
+    const lines = (offer.lineItems || []).filter((li: any) => !li.isComponent);
+    const results: any[] = [];
+
+    for (const li of lines) {
+      const backingItem = await resolveBackingItem(
+        li,
+        offer,
+        itemRepository,
+        requestedItemRepo,
+      );
+      if (backingItem?.isDraft) {
+        results.push({
+          lineItemId: li.id,
+          itemId: backingItem.id,
+          position: li.position,
+          photo: li.photo || backingItem.photo || undefined,
+          itemName: li.itemName,
+          material: li.material,
+          // NEW — Art.-Nr. should show the Item's real item_no_de, not
+          // the offer line's own `material` string. Falls back to the
+          // line's material only if the backing Item has no item_no_de
+          // set yet (still a draft with no number assigned).
+          itemNoDe: backingItem.item_no_de || null,
+          quantity: li.baseQuantity,
+          price: li.basePrice,
+          taric: backingItem.taricCode || null,
+          weight: backingItem.weight ?? null,
+          salesPrice: backingItem.sales_price ?? null,
+          isDimWeightEstimated: backingItem.is_dim_weight_estimated,
+        });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAllCustomerOrders = async (
   _req: Request,
   res: Response,
@@ -749,6 +834,7 @@ async function resolveLiveTaxRate(customerId?: string | null): Promise<number> {
   const rate = customer?.defaultTaxProfile?.tax_rate;
   return rate !== undefined && rate !== null ? Number(rate) : 19;
 }
+
 export const createAuftragFromOffer = async (
   req: Request,
   res: Response,
@@ -769,7 +855,7 @@ export const createAuftragFromOffer = async (
     const offerRepo = AppDataSource.getRepository(Offer);
     const offer = await offerRepo.findOne({
       where: { id: offerId },
-      relations: ["lineItems"],
+      relations: ["lineItems", "inquiry"],
     });
 
     if (!offer) {
@@ -778,6 +864,8 @@ export const createAuftragFromOffer = async (
     }
 
     const itemRepository = AppDataSource.getRepository(Item);
+    const requestedItemRepo = AppDataSource.getRepository(RequestedItem);
+    const lineItemRepo = AppDataSource.getRepository(OfferLineItem);
 
     const sourceItemIds = Array.from(
       new Set(
@@ -799,10 +887,74 @@ export const createAuftragFromOffer = async (
       );
     }
 
-    // item_no_de and ItemID_DE now live on Item directly — no more
-    // WarehouseItem lookup needed here.
     const getDeNo = (it: any): string =>
       it.item_no_de || it.parent?.de_no || "";
+
+    // ------------------------------------------------------------------
+    // Draft-item resolution and conversion.
+    //
+    // For every selected line, resolve its backing Item (via sourceItemId,
+    // an assembly Inquiry link, or a RequestedItem link). If that Item is
+    // still isDraft === true and the caller didn't explicitly decline
+    // conversion for this line (selItem.convertDraft === false, set by
+    // the DraftItemConversionModal when a draft row is left unchecked),
+    // graduate it:
+    //   - price fallback: if item.sales_price is 0/null, take the price
+    //     being used for this Auftrag line (selItem.price); otherwise
+    //     keep the Item's existing sales_price untouched.
+    //   - flip isDraft to false.
+    //   - link it onto the OfferLineItem (sourceItemId) so the Offer
+    //     itself reflects the link on next read/conversion.
+    //
+    // Any other field edits (name, material, weight, etc.) are already
+    // persisted on the Item by this point — DraftItemConversionModal
+    // opens the real ItemPreviewModal, which saves directly via
+    // updateItem, not through this endpoint.
+    // ------------------------------------------------------------------
+    const backingItemByLineItemId = new Map<string, any>();
+    const linesToSave: any[] = [];
+    const itemsToSave: any[] = [];
+
+    for (const selItem of selectedItems) {
+      const lineItem = (offer.lineItems || []).find(
+        (li: any) => li.id === selItem.lineItemId,
+      );
+      if (!lineItem) continue;
+
+      const backingItem = await resolveBackingItem(
+        lineItem,
+        offer,
+        itemRepository,
+        requestedItemRepo,
+      );
+      if (!backingItem) continue;
+
+      backingItemByLineItemId.set(lineItem.id, backingItem);
+
+      const declinedConversion = selItem.convertDraft === false;
+      if (backingItem.isDraft && !declinedConversion) {
+        const fallbackPrice = Number(selItem.price) || 0;
+        const currentSalesPrice = Number(backingItem.sales_price) || 0;
+        if (currentSalesPrice === 0 && fallbackPrice > 0) {
+          backingItem.sales_price = fallbackPrice;
+        }
+        backingItem.isDraft = false;
+        itemsToSave.push(backingItem);
+
+        if (lineItem.sourceItemId !== String(backingItem.id)) {
+          lineItem.sourceItemId = String(backingItem.id);
+          linesToSave.push(lineItem);
+        }
+      }
+    }
+
+    if (itemsToSave.length > 0) {
+      await itemRepository.save(itemsToSave);
+    }
+    if (linesToSave.length > 0) {
+      await lineItemRepo.save(linesToSave);
+    }
+    // ------------------------------------------------------------------
 
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
@@ -822,18 +974,19 @@ export const createAuftragFromOffer = async (
 
     const orderItemsToCreate: Partial<CustomerOrderItem>[] = [];
     const hasStockItem = selectedItems.some((selItem: any) => {
-      const lineItem = (offer.lineItems || []).find(
+      const lineItem: any = (offer.lineItems || []).find(
         (li) => li.id === selItem.lineItemId,
       );
-      if (lineItem?.sourceItemId) {
-        const src = sourceItemById.get(String(lineItem.sourceItemId));
-        return src?.is_stock_item === "Y";
-      }
-      return false;
+      const src =
+        backingItemByLineItemId.get(lineItem?.id) ||
+        (lineItem?.sourceItemId
+          ? sourceItemById.get(String(lineItem.sourceItemId))
+          : undefined);
+      return src?.is_stock_item === "Y";
     });
 
     selectedItems.forEach((selItem: any, idx: number) => {
-      const lineItem = (offer.lineItems || []).find(
+      const lineItem: any = (offer.lineItems || []).find(
         (li) => li.id === selItem.lineItemId,
       );
 
@@ -841,13 +994,11 @@ export const createAuftragFromOffer = async (
       const price = Number(selItem.price) || 0;
       const lineTotal = qty * price;
 
-      // Seed material/itemNo/photo from the source Item whenever the
-      // line's own stored values are missing — same fallback order as
-      // OfferController's backfill (material -> item_no_de, photo ->
-      // Item.photo).
-      const src = lineItem?.sourceItemId
-        ? sourceItemById.get(String(lineItem.sourceItemId))
-        : undefined;
+      const src =
+        backingItemByLineItemId.get(lineItem?.id) ||
+        (lineItem?.sourceItemId
+          ? sourceItemById.get(String(lineItem.sourceItemId))
+          : undefined);
 
       const material =
         lineItem?.material && lineItem.material !== ""
@@ -870,8 +1021,6 @@ export const createAuftragFromOffer = async (
         weight: lineItem?.weight || undefined,
         quantity: qty,
         price: price,
-        // Only Freizeile lines carry their own taxRate; catalog lines
-        // always follow the Auftrag's own tax_rate, so leave theirs unset.
         taxRate:
           lineItem && !lineItem.sourceItemId && !lineItem.requestedItemId
             ? (lineItem.taxRate ?? undefined)
@@ -884,13 +1033,6 @@ export const createAuftragFromOffer = async (
       });
     });
 
-    // FIXED: was `Number(offer.taxRate ?? 19)` — offer.taxRate is a stored
-    // column that defaults to 19 at Offer creation and is never kept in
-    // sync with the customer's actual tax profile. The 21% shown on the
-    // Offer screen comes from offer.taxProfile.taxRate (resolved live via
-    // customer.defaultTaxProfile) — a different value entirely. Resolving
-    // the same live value here is what makes the Auftrag match what was
-    // actually displayed.
     const taxRate = await resolveLiveTaxRate(offer.customerId);
 
     const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
@@ -965,7 +1107,6 @@ export const createAuftragFromOffer = async (
     next(error);
   }
 };
-
 // ============================================================================
 // From earlier in this conversation — tax-profile attachment + DE default
 // fallback already applied. Unchanged since that fix.

@@ -13,13 +13,18 @@ import {
   downloadRechnungPdf,
   downloadRechnungEml,
   downloadRechnungEmlOnly,
+  getPrepaymentsForAuftrag,
 } from "../controllers/rechnung_controller";
 import { uploadSingleFile } from "../middlewares/multer";
 const router = Router();
 router.use(authenticateUser);
 router.post("/from-auftrag/:auftragId", createRechnungFromAuftrag);
-router.post("/from-auftrag-ohne-ausliefern/:auftragId", createRechnungOhneAusliefern);
+router.post(
+  "/from-auftrag-ohne-ausliefern/:auftragId",
+  createRechnungOhneAusliefern,
+);
 
+router.get("/prepayments/auftrag/:auftragId", getPrepaymentsForAuftrag);
 router.get("/", getAllRechnungen);
 router.get("/lieferscheine", getLieferscheine);
 router.get("/:id/download-pdf", downloadRechnungPdf);
@@ -29,7 +34,14 @@ router.get("/:id", getRechnungById);
 router.put("/:id", updateRechnung);
 router.patch("/:id", updateRechnung);
 router.delete("/:id", deleteRechnung);
-router.post("/:id/gelangenheitsbestaetigung", uploadSingleFile, uploadGelangenheitsbestaetigung);
-router.delete("/:id/gelangenheitsbestaetigung", deleteGelangenheitsbestaetigung);
+router.post(
+  "/:id/gelangenheitsbestaetigung",
+  uploadSingleFile,
+  uploadGelangenheitsbestaetigung,
+);
+router.delete(
+  "/:id/gelangenheitsbestaetigung",
+  deleteGelangenheitsbestaetigung,
+);
 
 export default router;

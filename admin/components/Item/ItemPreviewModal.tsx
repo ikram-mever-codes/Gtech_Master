@@ -216,6 +216,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             : null,
           item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
+          remarkCN: raw.remark_cn || "",
           price: raw.purchasePrice || 0,
           currency: raw.currency || "EUR",
           isActive: toBool(raw.isActive),
@@ -324,6 +325,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           },
           attachments: raw.attachments || [],
           remark_ex: raw.remark_ex || "",
+          remarkCN: raw.remark_cn || "",
           is_stock_item: raw.is_stock_item || "N",
           stockEU: raw.stockEU || 0,
           MSQ_EU: raw.MSQ_EU || 0,
@@ -415,6 +417,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           model: previewItem.model,
           extraNote: previewItem.remark,
           remark: previewItem.remark,
+          remark_cn: previewItem.remarkCN || "",
           cat_id: previewItem.category_id
             ? parseInt(previewItem.category_id)
             : undefined,
@@ -444,10 +447,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           item_name: previewItem.name ?? previewItem.item_name,
           item_name_cn: previewItem.nameCN ?? previewItem.item_name_cn,
           item_name_de: previewItem.item_name_de || "",
+          item_no_de: previewItem.de_no || "",
           ean: (previewItem.ean || "").toString(),
           model: previewItem.model,
           remark: previewItem.remark,
           remark_ex: previewItem.remark_ex,
+          remark_cn: previewItem.remarkCN || "",
           cat_id: previewItem.category_id
             ? parseInt(previewItem.category_id)
             : null,
@@ -483,18 +488,15 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           supplierItem: {
             price_rmb:
               parseFlexibleNumber(
-                previewItem.supplierItem?.priceRMB ??
-                  previewItem.priceRMB,
+                previewItem.supplierItem?.priceRMB ?? previewItem.priceRMB,
               ) || 0,
             is_po: previewItem.supplierItem?.isPO,
-            moq:
-              Math.round(
-                parseFlexibleNumber(previewItem.supplierItem?.moq) || 0,
-              ),
-            oi:
-              Math.round(
-                parseFlexibleNumber(previewItem.supplierItem?.interval) || 0,
-              ),
+            moq: Math.round(
+              parseFlexibleNumber(previewItem.supplierItem?.moq) || 0,
+            ),
+            oi: Math.round(
+              parseFlexibleNumber(previewItem.supplierItem?.interval) || 0,
+            ),
             lead_time: previewItem.supplierItem?.leadTime,
             note_cn: previewItem.supplierItem?.noteCN,
             url: previewItem.supplierItem?.url,
@@ -1035,9 +1037,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                               className={inputCls}
                               placeholder="0.00"
                               value={val ?? ""}
-                              onChange={(raw) =>
-                                patchPreviewDim(dim, raw)
-                              }
+                              onChange={(raw) => patchPreviewDim(dim, raw)}
                             />
                             <span className="text-xs font-semibold text-gray-700 shrink-0">
                               {unit}
@@ -1132,9 +1132,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       disabled={previewItem.is_stock_item !== "Y"}
                       className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.stockEU ?? ""}
-                      onChange={(raw) =>
-                        patchPreview({ stockEU: raw })
-                      }
+                      onChange={(raw) => patchPreview({ stockEU: raw })}
                       placeholder="0"
                     />
                   ) : (
@@ -1160,9 +1158,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       disabled={previewItem.is_stock_item !== "Y"}
                       className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
                       value={previewItem.stockCN ?? ""}
-                      onChange={(raw) =>
-                        patchPreview({ stockCN: raw })
-                      }
+                      onChange={(raw) => patchPreview({ stockCN: raw })}
                       placeholder="0"
                     />
                   ) : (
@@ -1256,9 +1252,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         className={inputCls}
                         placeholder="0.00"
                         value={previewItem.price ?? ""}
-                        onChange={(raw) =>
-                          patchPreview({ price: raw })
-                        }
+                        onChange={(raw) => patchPreview({ price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
                         {previewItem.currency || "EUR"}
@@ -1266,8 +1260,13 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
-                      {previewItem.price !== null && previewItem.price !== undefined && previewItem.price !== ""
-                        ? Math.abs(Number(previewItem.price) - Math.round(Number(previewItem.price) * 100) / 100) > 0.0001
+                      {previewItem.price !== null &&
+                      previewItem.price !== undefined &&
+                      previewItem.price !== ""
+                        ? Math.abs(
+                            Number(previewItem.price) -
+                              Math.round(Number(previewItem.price) * 100) / 100,
+                          ) > 0.0001
                           ? Number(previewItem.price).toFixed(3)
                           : Number(previewItem.price).toFixed(2)
                         : "0.00"}{" "}
@@ -1285,9 +1284,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         className={inputCls}
                         placeholder="0.00"
                         value={previewItem.sales_price ?? ""}
-                        onChange={(raw) =>
-                          patchPreview({ sales_price: raw })
-                        }
+                        onChange={(raw) => patchPreview({ sales_price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
                         {previewItem.currency || "EUR"}
@@ -1295,8 +1292,16 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
-                      {previewItem.sales_price !== null && previewItem.sales_price !== undefined && previewItem.sales_price !== ""
-                        ? Math.abs(Number(previewItem.sales_price) - Math.round(Number(previewItem.sales_price) * 100) / 100) > 0.0001
+                      {previewItem.sales_price !== null &&
+                      previewItem.sales_price !== undefined
+                        ? Math.abs(
+                            Math.round(Number(previewItem.sales_price) * 1000) /
+                              1000 -
+                              Math.round(
+                                Number(previewItem.sales_price) * 100,
+                              ) /
+                                100,
+                          ) > 0.0001
                           ? Number(previewItem.sales_price).toFixed(3)
                           : Number(previewItem.sales_price).toFixed(2)
                         : "0.00"}{" "}

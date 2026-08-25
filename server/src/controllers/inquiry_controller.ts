@@ -103,11 +103,12 @@ export class BaseItemConversionDto {
 
 export class ConvertInquiryToItemDto extends BaseItemConversionDto {}
 
-export class ConvertRequestToItemDto extends BaseItemConversionDto {
-  @IsOptional()
-  @IsString()
-  extraItemsDescriptions?: string;
-}
+// REMOVED: ConvertRequestToItemDto — was the DTO for
+// InquiryController.convertRequestToItem, which is deleted below. See the
+// removal note at the top of this response for what still needs a follow-up
+// pass (route registration, api/inquiry.ts, and the three frontend call
+// sites that depended on this endpoint).
+
 export class ItemGenerator {
   static async generateTaricCode(): Promise<string> {
     const taricRepository = AppDataSource.getRepository(Taric);
@@ -1445,163 +1446,32 @@ export class InquiryController {
     }
   }
 
-  async convertRequestToItem(request: Request, response: Response) {
-    try {
-      const { requestId } = request.params;
-      const conversionData = plainToInstance(
-        ConvertRequestToItemDto,
-        request.body,
-      );
-
-      const errors = await validate(conversionData);
-      if (errors.length > 0) {
-        return response.status(400).json({
-          success: false,
-          errors: errors.map((error: any) => ({
-            property: error.property,
-            constraints: error.constraints,
-          })),
-        });
-      }
-
-      const requestedItemRepository =
-        AppDataSource.getRepository(RequestedItem);
-      const itemRepository = AppDataSource.getRepository(Item);
-      const taricRepository = AppDataSource.getRepository(Taric);
-      const inquiryRepository = AppDataSource.getRepository(Inquiry);
-
-      const requestedItem = await requestedItemRepository.findOne({
-        where: { id: requestId },
-        relations: ["inquiry", "business"],
-      });
-
-      if (!requestedItem) {
-        return response.status(404).json({
-          success: false,
-          message: "Requested item not found",
-        });
-      }
-
-      const itemId = await ItemGenerator.generateItemId();
-      const ean = ItemGenerator.generateEAN(itemId);
-
-      let taric: Taric | null = null;
-
-      if (conversionData.taricId) {
-        taric = await taricRepository.findOne({
-          where: { id: conversionData.taricId },
-        });
-
-        if (!taric) {
-          taric = taricRepository.create({
-            id: conversionData.taricId,
-            code: undefined,
-            name_de: requestedItem.itemName,
-            name_en: requestedItem.itemName,
-            name_cn: conversionData.itemNameCN || requestedItem.specification,
-            description_de: requestedItem.specification,
-            description_en: requestedItem.specification,
-            reguler_artikel: "Y",
-            duty_rate: 0,
-          });
-          await taricRepository.save(taric);
-        }
-      }
-
-      if (!taric) {
-        taric = await ItemGenerator.createTaricForItem(requestedItem.itemName);
-      }
-
-      const itemData: any = {
-        id: itemId,
-        ean: ean,
-        taric_id: taric.id,
-        taric: taric,
-        category: null,
-        parent: null,
-        item_name: requestedItem.itemName,
-        item_name_cn: conversionData.itemNameCN || requestedItem.specification,
-        model: conversionData.model,
-        supp_cat: conversionData.suppCat,
-        material: requestedItem.material,
-        specification: requestedItem.specification,
-        photo: "",
-        isEstimated: requestedItem.isEstimated,
-        weight: conversionData.weight || requestedItem.weight,
-        width: conversionData.width || requestedItem.width,
-        height: conversionData.height || requestedItem.height,
-        length: conversionData.length || requestedItem.length,
-        FOQ:
-          conversionData.FOQ ||
-          (requestedItem.qty ? parseInt(requestedItem.qty) || 0 : 0),
-        FSQ:
-          conversionData.FSQ ||
-          (requestedItem.sampleQty
-            ? parseInt(requestedItem.sampleQty) || 0
-            : 0),
-        remark: conversionData.remark || requestedItem.comment,
-        note: conversionData.note || requestedItem.extraNote,
-        RMB_Price: conversionData.RMBPrice || requestedItem.purchasePrice || 0,
-        painPoints: conversionData.painPoints || requestedItem.painPoints || [],
-        cat_id: conversionData.catId || null,
-        is_dimension_special: "N",
-        is_qty_dividable: "Y",
-        ISBN: 0,
-        is_npr: "N",
-        is_rmb_special: "N",
-        is_eur_special: "N",
-        is_pu_item: 0,
-        is_meter_item: 0,
-        is_new: "Y",
-        isActive: "Y",
-      };
-
-      const item = itemRepository.create(itemData);
-      const savedItem = await itemRepository.save(item);
-
-      requestedItem.requestStatus = "Converted to Item";
-      await requestedItemRepository.save(requestedItem);
-
-      if (requestedItem.inquiry) {
-        const inquiry = await inquiryRepository.findOne({
-          where: { id: requestedItem.inquiry.id },
-          relations: ["requests"],
-        });
-
-        if (inquiry) {
-          const allConverted = inquiry.requests.every(
-            (req) => req.requestStatus === "Converted to Item",
-          );
-
-          if (allConverted) {
-            inquiry.status = "completed";
-            await inquiryRepository.save(inquiry);
-          }
-        }
-      }
-
-      return response.status(201).json({
-        success: true,
-        message: "Item created successfully from requested item",
-        data: {
-          item: savedItem,
-          taric: taric,
-          originalRequest: {
-            id: requestedItem.id,
-            itemName: requestedItem.itemName,
-            status: requestedItem.requestStatus,
-          },
-        },
-      });
-    } catch (error) {
-      console.error("Error converting requested item to item:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
+  // REMOVED: convertRequestToItem
+  //
+  // This used to take a RequestedItem and mint a brand-new Item (new id,
+  // new EAN, new/looked-up Taric) from its fields, then mark the request
+  // "Converted to Item". That model assumed a RequestedItem could exist
+  // without a linked Item until this ran.
+  //
+  // That assumption no longer holds: RequestedItemController.createRequestedItem
+  // and .updateRequestedItem now call ItemLinkService.resolveItem /
+  // .syncItemFields on every create/update, so every RequestedItem already
+  // has `item`/`itemId` populated from the moment it's created. Running the
+  // old logic today would create a second, disconnected Item next to the
+  // one that's already linked, and would silently orphan whatever the new
+  // draft-item-conversion flow (DraftItemConversionModal /
+  // convertDraftItemsAndCreateAuftrag) does with that same RequestedItem's
+  // existing linked Item.
+  //
+  // Not yet done, needs a follow-up pass once you confirm scope:
+  //   - the route file wiring POST .../convert-request/:requestId (or
+  //     whatever it's actually called) to this method — untouched, will
+  //     fail to compile until repointed or removed
+  //   - api/inquiry.ts's convertRequestToItem export on the frontend
+  //   - CombinedInquiriesPage's "Convert" button / conversion form modal
+  //     for request items (handleConvertRequestClick, showConversionModal
+  //     when conversionType === "request")
+  //   - ItemPreviewModal's onConvert prop / "Convert to Item" button
 
   async removeRequestFromInquiry(request: Request, response: Response) {
     try {

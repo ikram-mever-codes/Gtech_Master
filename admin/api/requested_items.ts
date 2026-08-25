@@ -158,6 +158,7 @@ export interface RequestedItemCreatePayload {
 export interface RequestedItemUpdatePayload extends Partial<RequestedItemCreatePayload> {
   requestStatus?: RequestStatus;
   priority?: Priority;
+  remark_cn?: any;
 }
 
 export interface BulkRequestedItemsOperationPayload {

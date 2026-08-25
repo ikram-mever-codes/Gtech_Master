@@ -1351,7 +1351,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           onChange={(e) =>
                             handleFieldSearchChange("ean", e.target.value)
                           }
-                          placeholder="Exact EAN..."
+                          placeholder="EAN..."
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                         />
                       </div>
@@ -1364,7 +1364,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           onChange={(e) =>
                             handleFieldSearchChange("itemNo", e.target.value)
                           }
-                          placeholder="Exact item no..."
+                          placeholder="Item no..."
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                         />
                       </div>

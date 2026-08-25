@@ -4610,7 +4610,11 @@ export class OfferController {
               const year = parsed.getFullYear();
               formattedDate = `${day}.${month}.${year}`;
             }
-            doc.text(`Lieferdatum: voraussichtlich ${formattedDate}`, LEFT_X, yPos);
+            doc.text(
+              `Lieferdatum: voraussichtlich ${formattedDate}`,
+              LEFT_X,
+              yPos,
+            );
           } else {
             doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
           }
@@ -4626,13 +4630,21 @@ export class OfferController {
         if (rawNotes) {
           doc.font(SB).fontSize(8.5);
           const labelWidth = doc.widthOfString("Hinweise: ");
-          doc.font(SB).fontSize(8.5).fillColor("#1A202C").text("Hinweise: ", LEFT_X, yPos, {
-            lineBreak: false,
-          });
-          doc.font(R).fontSize(8.5).fillColor("#2D3748").text(rawNotes, LEFT_X + labelWidth, yPos, {
-            width: CONTENT_WIDTH - labelWidth,
-            lineGap: 2,
-          });
+          doc
+            .font(SB)
+            .fontSize(8.5)
+            .fillColor("#1A202C")
+            .text("Hinweise: ", LEFT_X, yPos, {
+              lineBreak: false,
+            });
+          doc
+            .font(R)
+            .fontSize(8.5)
+            .fillColor("#2D3748")
+            .text(rawNotes, LEFT_X + labelWidth, yPos, {
+              width: CONTENT_WIDTH - labelWidth,
+              lineGap: 2,
+            });
         }
       }
 

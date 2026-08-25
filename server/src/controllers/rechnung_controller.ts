@@ -9,7 +9,10 @@ import { Customer } from "../models/customers";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
-import { generateRechnungLieferscheinEml, generateRechnungOnlyEml } from "../services/emlGenerator";
+import {
+  generateRechnungLieferscheinEml,
+  generateRechnungOnlyEml,
+} from "../services/emlGenerator";
 import { CCIInvoice } from "../models/cci_invoice";
 import { CCICustomer } from "../models/cci_customer";
 import { CCIItem } from "../models/cci_items";
@@ -31,9 +34,9 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const [auftrag, rechnungenK] = await Promise.all([
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
-        where: { id: rechnung.auftrag_id },
-        select: ["id", "order_no", "title", "created_at"],
-      })
+          where: { id: rechnung.auftrag_id },
+          select: ["id", "order_no", "title", "created_at"],
+        })
       : Promise.resolve(null),
     rechnungKRepo.find({
       where: { original_rechnung_id: rechnung.id },
@@ -70,9 +73,9 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const [auftraege, rechnungenK] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "order_no", "title", "created_at"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "order_no", "title", "created_at"],
+        })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
@@ -97,6 +100,69 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
 
   return result;
 }
+
+/**
+ * Prepayment credit available for an Auftrag: every "Rechnung ohne
+ * Ausliefern" (is_prepayment = true) issued against it whose total_amount
+ * is still > 0. total_amount on a prepayment Rechnung doubles as its
+ * remaining unapplied balance — applying credit decrements it directly
+ * (see createRechnungFromAuftrag below), so a fully-consumed prepayment
+ * naturally reads 0 and drops out of `available` on its own, with no
+ * separate "applied" bookkeeping needed.
+ */
+async function getAvailablePrepaymentCredit(auftragId: number): Promise<{
+  available: number;
+  prepayments: Rechnung[];
+}> {
+  const rechnungRepo = AppDataSource.getRepository(Rechnung);
+  const prepayments = await rechnungRepo.find({
+    where: { auftrag_id: auftragId, is_prepayment: true },
+    order: { invoice_date: "ASC" },
+  });
+
+  const available = prepayments.reduce(
+    (sum, r) => sum + Number(r.total_amount || 0),
+    0,
+  );
+
+  return { available, prepayments };
+}
+
+/**
+ * Read-only prepayment summary for an Auftrag — used by the Ausliefern
+ * modal to preview the deduction before generating the delivery Rechnung.
+ * The deduction itself is always recomputed and applied server-side in
+ * createRechnungFromAuftrag; this endpoint never writes anything.
+ */
+export const getPrepaymentsForAuftrag = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { auftragId } = req.params;
+    const { available, prepayments } = await getAvailablePrepaymentCredit(
+      Number(auftragId),
+    );
+
+    res.json({
+      success: true,
+      data: {
+        available,
+        prepayments: prepayments
+          .filter((r) => Number(r.total_amount) > 0)
+          .map((r) => ({
+            id: r.id,
+            invoice_number: r.invoice_number,
+            total_amount: r.total_amount,
+            invoice_date: r.invoice_date,
+          })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Replacement for createRechnungFromAuftrag. quantity on CustomerOrderItem
 // is never touched anymore — no migration needed. "Open" is computed from
@@ -245,12 +311,12 @@ export const createRechnungFromAuftrag = async (
     const lineItemIds = (auftrag.orderItems || []).map((li) => li.id);
     const alreadyDeliveredRows = lineItemIds.length
       ? await rechnungItemRepo
-        .createQueryBuilder("ri")
-        .select("ri.sourceLineItemId", "sourceLineItemId")
-        .addSelect("SUM(ri.quantity)", "delivered")
-        .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
-        .groupBy("ri.sourceLineItemId")
-        .getRawMany()
+          .createQueryBuilder("ri")
+          .select("ri.sourceLineItemId", "sourceLineItemId")
+          .addSelect("SUM(ri.quantity)", "delivered")
+          .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
+          .groupBy("ri.sourceLineItemId")
+          .getRawMany()
       : [];
     const alreadyDeliveredByLineId = new Map<string, number>(
       alreadyDeliveredRows.map((r: any) => [
@@ -381,6 +447,39 @@ export const createRechnungFromAuftrag = async (
     const discountAmount = Number(auftrag.discount_amount ?? 0);
 
     // ============================================
+    // APPLY PREPAYMENT CREDIT
+    // ============================================
+    // totalAmount above is the full commercial value of this delivery
+    // (subtotal + shipping + tax). It stays as-is for the CCI mirror
+    // further below, which must reflect the true goods value for customs
+    // regardless of any payment arrangement. The Rechnung actually sent
+    // to the customer only asks for what's still open after deducting
+    // any prepayment credit for this Auftrag.
+    const { available: prepaymentCredit, prepayments } =
+      await getAvailablePrepaymentCredit(auftrag.id);
+    const appliedPrepayment = Math.min(prepaymentCredit, totalAmount);
+    const amountDueNow = Math.max(0, totalAmount - appliedPrepayment);
+
+    // Draw the prepayment invoices down oldest-first, decrementing each
+    // one's total_amount by what's consumed here. total_amount on a
+    // prepayment Rechnung IS its remaining unapplied balance — an invoice
+    // not fully drained keeps its leftover balance available for the next
+    // partial delivery against the same Auftrag.
+    let remainingToApply = appliedPrepayment;
+    const prepaymentsToSave: Rechnung[] = [];
+    for (const p of prepayments) {
+      if (remainingToApply <= 0) break;
+      const take = Math.min(Number(p.total_amount || 0), remainingToApply);
+      if (take <= 0) continue;
+      p.total_amount = Number(p.total_amount) - take;
+      remainingToApply -= take;
+      prepaymentsToSave.push(p);
+    }
+    if (prepaymentsToSave.length > 0) {
+      await AppDataSource.getRepository(Rechnung).save(prepaymentsToSave);
+    }
+
+    // ============================================
     // CREATE RECHNUNG
     // ============================================
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
@@ -395,7 +494,7 @@ export const createRechnungFromAuftrag = async (
       subtotal: totalSubtotal,
       tax_rate: taxRate,
       tax_amount: taxAmount,
-      total_amount: totalAmount,
+      total_amount: amountDueNow,
       currency: auftrag.currency || "EUR",
       notes: notes || auftrag.notes || "",
       status: "open",
@@ -454,6 +553,9 @@ export const createRechnungFromAuftrag = async (
     // ============================================
     // CREATE CCI INVOICE (Mirror to CCI tables)
     // ============================================
+    // NOTE: intentionally uses totalAmount (full goods value), not
+    // amountDueNow — the CCI mirror is for customs, not AR, and must not
+    // be affected by prepayment deductions.
     try {
       const cciCustRepo = AppDataSource.getRepository(CCICustomer);
       const cciCust = cciCustRepo.create({
@@ -523,7 +625,10 @@ export const createRechnungFromAuftrag = async (
 
     res.status(201).json({
       success: true,
-      message: `Rechnung ${invoiceNo} created successfully`,
+      message:
+        appliedPrepayment > 0
+          ? `Rechnung ${invoiceNo} created — €${appliedPrepayment.toFixed(2)} deducted from prior Anzahlung.`
+          : `Rechnung ${invoiceNo} created successfully`,
       data: fullRechnung,
     });
   } catch (error) {
@@ -626,7 +731,8 @@ export const createRechnungOhneAusliefern = async (
       company_name: dispName,
       display_name: dispName,
       legal_name: legName,
-      email: auftrag.customerSnapshot?.email || originalCust?.email || undefined,
+      email:
+        auftrag.customerSnapshot?.email || originalCust?.email || undefined,
       tax_number:
         auftrag.customerSnapshot?.vatId ||
         originalCust?.vatTaxId ||
@@ -651,7 +757,8 @@ export const createRechnungOhneAusliefern = async (
         originalCust?.contactPhoneNumber ||
         undefined,
     });
-    const savedCustomerSnapshot = await rechnungCustomerRepo.save(rechnungCustomer);
+    const savedCustomerSnapshot =
+      await rechnungCustomerRepo.save(rechnungCustomer);
 
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = rechnungRepo.create({
@@ -664,6 +771,7 @@ export const createRechnungOhneAusliefern = async (
       tax_rate: taxRate,
       tax_amount: taxAmount,
       total_amount: totalAmount,
+      is_prepayment: true,
       currency: auftrag.currency || "EUR",
       notes: notes || auftrag.notes || "",
       status: "open",
@@ -733,7 +841,6 @@ export const createRechnungOhneAusliefern = async (
     next(error);
   }
 };
-
 
 export const getAllRechnungen = async (
   req: Request,
@@ -809,11 +916,13 @@ export const getLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "title", "shipping_method"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "title", "shipping_method"],
+        })
       : [];
-    const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
+    const auftragTitleById = new Map(
+      auftraege.map((a: any) => [a.id, a.title]),
+    );
     const auftragShippingMethodById = new Map(
       auftraege.map((a: any) => [a.id, a.shipping_method]),
     );
@@ -912,7 +1021,8 @@ export const getRechnungById = async (
     const linkedDocuments = await getLinkedDocumentsForRechnung(rechnung);
     await attachPaymentStatusToRechnungen([rechnung]);
 
-    const title = rechnung.title || linkedDocuments.auftrag[0]?.title || undefined;
+    const title =
+      rechnung.title || linkedDocuments.auftrag[0]?.title || undefined;
 
     res.json({
       success: true,
@@ -1121,7 +1231,7 @@ export const downloadRechnungPdf = async (
 
     const defaultTaxRate =
       rechnung.tax_profile_case === "EU_IGL" ||
-        rechnung.tax_profile_case === "third_country"
+      rechnung.tax_profile_case === "third_country"
         ? 0
         : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
           ? Number(rechnung.tax_rate)
