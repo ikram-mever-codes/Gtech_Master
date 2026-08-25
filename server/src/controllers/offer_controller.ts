@@ -91,6 +91,7 @@ const { createCanvas } = getCanvas();
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
+import { generateOfferEml } from "../services/emlGenerator";
 import { v4 as uuidv4 } from "uuid";
 import { ConvertInquiryToItemDto, ItemGenerator } from "./inquiry_controller";
 import { Item } from "../models/items";
@@ -5053,6 +5054,30 @@ export class OfferController {
         success: false,
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  static async downloadOfferEml(req: Request, res: Response): Promise<any> {
+    try {
+      const { id } = req.params;
+      console.log("Generating EML for offer ID:", id);
+      const emlData = await generateOfferEml(id, {
+        user: (req as any).user,
+      });
+
+      res.setHeader("Content-Type", "message/rfc822");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${emlData.filename}"; filename*=UTF-8''${encodeURIComponent(emlData.filename)}`,
+      );
+      fs.createReadStream(emlData.emlFilePath).pipe(res);
+    } catch (err) {
+      console.error("Error in downloadOfferEml:", err);
+      return res.status(500).json({
+        success: false,
+        message:
+          err instanceof Error ? err.message : "Failed to generate EML file",
       });
     }
   }

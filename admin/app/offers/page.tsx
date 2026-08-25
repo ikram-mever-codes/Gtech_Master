@@ -41,6 +41,7 @@ import {
   getOfferStatuses,
   getOfferStatusColor,
   downloadOfferPdf,
+  downloadOfferEml,
   type Offer,
   type OfferSearchFilters,
 } from "@/api/offers";
@@ -400,7 +401,7 @@ const OfferActionMenu: React.FC<{
                 e.stopPropagation();
                 setIsOpen(false);
                 try {
-                  await downloadOfferPdf(row.id, row.offerNumber);
+                  await downloadOfferEml(row.id, row.offerNumber);
                 } catch (_) {}
               }}
               className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"

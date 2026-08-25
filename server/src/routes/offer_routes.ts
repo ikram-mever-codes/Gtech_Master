@@ -68,13 +68,11 @@ router.get(
   "/:offerId/line-items/:lineItemId/price-preview",
   offerController.previewLineItemPrice.bind(offerController),
 );
-// Offer revisions
 router.post(
   "/:id/revisions",
   offerController.createRevision.bind(offerController),
 );
 
-// Offer PDF generation
 router.post(
   "/:id/generate-pdf",
   offerController.generatePdf.bind(offerController),
@@ -82,6 +80,10 @@ router.post(
 router.get(
   "/:id/download-pdf",
   offerController.generateAndDownloadPdf.bind(offerController),
+);
+router.get(
+  "/:id/download-eml",
+  OfferController.downloadOfferEml,
 );
 
 // ---------------------------------------------------------------------------

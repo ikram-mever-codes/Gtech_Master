@@ -10,6 +10,7 @@ import { AppDataSource } from "../config/database";
 import { PaymentMethod } from "../models/payment_methods";
 import { ShippingMethod } from "../models/shipping_methods";
 import { GtechCompany } from "../models/gtech_company";
+import { Lieferschein } from "../models/lieferscheine";
 
 export const seedDatabase = async () => {
     try {
@@ -127,6 +128,18 @@ export const seedDatabase = async () => {
             }
             console.log("  ✓ Seeded default GTech companies");
         }
+
+        const lieferscheinRepository = AppDataSource.getRepository(Lieferschein);
+        await lieferscheinRepository
+            .createQueryBuilder()
+            .update(Lieferschein)
+            .set({ status: "vorläufig" })
+            .where("status = :openStatus OR status = :draftStatus OR status IS NULL OR status = ''", {
+                openStatus: "open",
+                draftStatus: "draft",
+            })
+            .execute();
+        console.log("  ✓ Updated existing Lieferschein statuses to 'vorläufig'");
         // 
         //         const existingCustomers = await customerRepository.count();
         //         const existingItems = await itemRepository.count();

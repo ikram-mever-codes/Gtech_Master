@@ -4,9 +4,11 @@ import { AppDataSource } from "../config/database";
 import { Rechnung } from "../models/rechnung";
 import { Lieferschein } from "../models/lieferscheine";
 import { CustomerOrder } from "../models/customer_orders";
+import { Offer } from "../models/offer";
 import { Customer } from "../models/customers";
 import { ContactPerson } from "../models/contact_person";
 import { generateGtechDocumentPdf } from "./gtechPdfGenerator";
+import { parseFlexibleNumber } from "../utils/decimal";
 
 interface ContactInfo {
   name: string;
@@ -879,6 +881,256 @@ export async function generateAuftragEml(
     emlFilePath,
     filename: emlFileName,
     orderNo: auftrag.order_no || String(auftrag.id),
+    contactPersons,
+  };
+}
+
+export async function generateOfferEml(
+  offerId: string | number,
+  options?: {
+    user?: {
+      name?: string;
+      username?: string;
+      email?: string;
+    };
+  },
+): Promise<{
+  emlFilePath: string;
+  filename: string;
+  offerNumber: string;
+  contactPersons: ContactInfo[];
+}> {
+  const offerRepo = AppDataSource.getRepository(Offer);
+  const offer = await offerRepo.findOne({
+    where: [{ id: String(offerId) }, { offerNumber: String(offerId) }] as any,
+    relations: ["lineItems"],
+  });
+
+  if (!offer) {
+    throw new Error(`Offer with ID ${offerId} not found`);
+  }
+
+  const offerTitle = offer.title || `Angebot ${offer.offerNumber}`;
+  const customerId = offer.customerId;
+
+  const contactPersons: ContactInfo[] = [];
+  if (customerId) {
+    try {
+      const customerRepo = AppDataSource.getRepository(Customer);
+      const customer = await customerRepo.findOne({
+        where: { id: customerId } as any,
+        relations: ["starBusinessDetails"],
+      });
+
+      if (customer?.starBusinessDetails?.id) {
+        const contactPersonRepo = AppDataSource.getRepository(ContactPerson);
+        const contacts = await contactPersonRepo.find({
+          where: { starBusinessDetailsId: customer.starBusinessDetails.id } as any,
+        });
+
+        contacts.forEach((c) => {
+          const fullName = [c.name, c.familyName].filter(Boolean).join(" ");
+          if (c.email) {
+            contactPersons.push({
+              name: fullName || "Contact Person",
+              email: c.email.trim(),
+            });
+          }
+        });
+      }
+
+      if (contactPersons.length === 0 && customer?.email) {
+        contactPersons.push({
+          name: customer.companyName || customer.legalName || "Customer",
+          email: customer.email.trim(),
+        });
+      }
+    } catch (custErr) {
+      console.warn("Could not load Customer ContactPersons for Offer EML:", custErr);
+    }
+  }
+
+  if (contactPersons.length === 0 && offer.customerSnapshot?.email) {
+    contactPersons.push({
+      name:
+        (offer.customerSnapshot as any)?.contactName ||
+        (offer.customerSnapshot as any)?.displayName ||
+        (offer.customerSnapshot as any)?.companyName ||
+        "Customer",
+      email: String((offer.customerSnapshot as any).email).trim(),
+    });
+  }
+
+  const uploadsDir = path.join(__dirname, "../../uploads/eml");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+  const offersDir = path.join(__dirname, "../../uploads/offers");
+  if (!fs.existsSync(offersDir)) fs.mkdirSync(offersDir, { recursive: true });
+
+  const customerSnap = offer.customerSnapshot || {};
+  const customerCompName = String(
+    (customerSnap as any).companyName ||
+      (customerSnap as any).company_name ||
+      (customerSnap as any).legalName ||
+      (customerSnap as any).displayName ||
+      ""
+  ).trim();
+  const customerNum = String((customerSnap as any).customerNumber || "").trim();
+  let kundeCombined = "—";
+  if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+  else if (customerCompName) kundeCombined = customerCompName;
+  else if (customerNum) kundeCombined = customerNum;
+
+  const contactPersonName =
+    options?.user?.name ||
+    options?.user?.username ||
+    (customerSnap as any).contactName ||
+    "Joschua Stehle";
+
+  const offerPdfPath = path.join(
+    offersDir,
+    `angebot_${offer.offerNumber || offer.id}.pdf`
+  );
+
+  const rawItems = (offer.lineItems || [])
+    .slice()
+    .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+
+  const items = rawItems.map((it: any, idx: number) => {
+    const qty = parseFlexibleNumber(it.baseQuantity) || 1;
+    const unitPrice = Number(it.basePrice || 0);
+    const lineTotal = Number(it.lineTotal || qty * unitPrice);
+    return {
+      position: it.position || idx + 1,
+      artNr: (it as any).sourceItemId || (it as any).material || "—",
+      bezeichnung: it.itemName || (it as any).description || "Item",
+      remarks: it.notes || "-",
+      vatRate: Number(it.taxRate ?? offer.taxRate ?? 19),
+      quantity: qty,
+      unitPrice: unitPrice,
+      lineTotal: lineTotal,
+    };
+  });
+
+  const formatDateStr = (dateVal: any): string => {
+    if (!dateVal) return "—";
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+  };
+
+  await generateGtechDocumentPdf({
+    documentType: "Angebot" as any,
+    documentNumber: offer.offerNumber,
+    customerSnapshot: customerSnap,
+    deliveryAddress: offer.deliveryAddress,
+    metadataItems: [
+      ["Ansprechpartner", contactPersonName],
+      ["Kunde", kundeCombined],
+      ["Datum", formatDateStr(offer.createdAt)],
+    ],
+    lineItems: items,
+    showPrices: true,
+    shippingMethod: offer.shippingMethod,
+    shippingCost: Number(offer.shippingCost || 0),
+    shippingQuantity: Number(offer.shippingQuantity || 1),
+    shippingTaxRate: Number(offer.shippingTaxRate ?? offer.taxRate ?? 19),
+    discountPercentage: Number(offer.discountPercentage || 0),
+    discountAmount: Number(offer.discountAmount || 0),
+    subtotal: Number(offer.subtotal || 0),
+    taxAmount: Number(offer.taxAmount || 0),
+    totalAmount: Number(offer.totalAmount || 0),
+    taxRate: Number(offer.taxRate || 19),
+    currency: offer.currency || "EUR",
+    notes: offer.notes,
+    deliveryTime: offer.deliveryTime,
+    deliveryTerms: offer.deliveryTerms,
+    paymentTerms: offer.paymentDueDays
+      ? `Zahlungsziel: ${offer.paymentDueDays} Tage`
+      : undefined,
+    paymentMethod: offer.paymentMethod,
+    outputFilePath: offerPdfPath,
+  });
+
+  const offerPdfBuffer = fs.readFileSync(offerPdfPath);
+  const offerBase64 = offerPdfBuffer.toString("base64");
+
+  const primaryEmail = contactPersons[0]?.email || (customerSnap as any).email || "";
+
+  let contactGreetingName = "";
+  if (
+    contactPersons.length > 0 &&
+    contactPersons[0].name &&
+    contactPersons[0].name !== "Customer" &&
+    contactPersons[0].name !== "Contact Person"
+  ) {
+    contactGreetingName = contactPersons[0].name;
+  } else if ((customerSnap as any).contactName) {
+    contactGreetingName = (customerSnap as any).contactName;
+  }
+
+  const greetingLine = contactGreetingName
+    ? `Hallo guten Tag ${contactGreetingName},`
+    : `Hallo guten Tag,`;
+
+  const rawTitle = offerTitle || "";
+  const cleanTitle = String(rawTitle || "")
+    .trim()
+    .replace(/[^\w-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const docNo = String(offer.offerNumber || offer.id || "angebot").trim().replace(/[\s_]+/g, "_");
+
+  const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";
+  const emlSubject = subjectTitle
+    ? `Angebot ${docNo} GTech ${subjectTitle}`
+    : `Angebot ${docNo} GTech`;
+
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  if (primaryEmail) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
+  }
+  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie das Angebot (${docNo}) zu Ihrer Anfrage "${offerTitle}".</p>\n`;
+  bodyHtml += `</body>\n</html>`;
+
+  const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 11)}@gtech-industries.de>`;
+
+  let emlContent = "";
+  emlContent += `X-Unsent: 1\n`;
+  emlContent += `Message-ID: ${messageId}\n`;
+  emlContent += `Subject: ${emlSubject}\n`;
+  emlContent += `MIME-Version: 1.0\n`;
+  emlContent += `Content-Type: multipart/mixed; boundary="${boundary}"\n\n`;
+
+  emlContent += `--${boundary}\n`;
+  emlContent += `Content-Type: text/html; charset="utf-8"\n`;
+  emlContent += `Content-Transfer-Encoding: 8bit\n\n`;
+  emlContent += `${bodyHtml}\n\n`;
+
+  const offerFileName = cleanTitle
+    ? `Angebot_${docNo}_GTech_${cleanTitle}.pdf`
+    : `Angebot_${docNo}_GTech.pdf`;
+
+  emlContent += `--${boundary}\n`;
+  emlContent += `Content-Type: application/pdf; name="${offerFileName}"\n`;
+  emlContent += `Content-Transfer-Encoding: base64\n`;
+  emlContent += `Content-Disposition: attachment; filename="${offerFileName}"\n\n`;
+  emlContent += `${offerBase64.match(/.{1,76}/g)?.join("\n") || offerBase64}\n\n`;
+
+  emlContent += `--${boundary}--\n`;
+
+  const emlFileName = cleanTitle
+    ? `Angebot_${docNo}_GTech_${cleanTitle}.eml`
+    : `Angebot_${docNo}_GTech.eml`;
+  const emlFilePath = path.join(uploadsDir, emlFileName);
+
+  fs.writeFileSync(emlFilePath, emlContent, "utf-8");
+  return {
+    emlFilePath,
+    filename: emlFileName,
+    offerNumber: offer.offerNumber || String(offer.id),
     contactPersons,
   };
 }

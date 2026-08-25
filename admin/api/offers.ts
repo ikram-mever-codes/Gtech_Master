@@ -147,13 +147,13 @@ export interface Offer {
   customerSnapshot: CustomerSnapshot;
   deliveryAddress: DeliveryAddress;
   status:
-    | "Draft"
-    | "Submitted"
-    | "Negotiation"
-    | "Accepted"
-    | "Rejected"
-    | "Expired"
-    | "Cancelled";
+  | "Draft"
+  | "Submitted"
+  | "Negotiation"
+  | "Accepted"
+  | "Rejected"
+  | "Expired"
+  | "Cancelled";
   validUntil: Date;
   termsConditions?: string;
   deliveryTerms?: string;
@@ -502,6 +502,32 @@ export const downloadOfferPdf = async (id: string, offerNumber?: string) => {
     toast.dismiss();
     console.error("Error downloading PDF:", error);
     toast.error("Failed to download PDF");
+    throw error;
+  }
+};
+
+export const downloadOfferEml = async (id: string, offerNumber?: string) => {
+  try {
+    toast.loading("Preparing Outlook email (.eml)...", loadingStyles);
+    const response: any = await api.get(`/offers/${id}/download-eml`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([response.data], { type: "message/rfc822" });
+    if (blob.size === 0) {
+      throw new Error("The downloaded EML file is empty.");
+    }
+    const filename = getFilenameFromResponse(
+      response,
+      `Angebot_${String(offerNumber || id).replace(/[\s_]+/g, "_")}_GTech.eml`,
+    );
+    downloadBlob(blob, filename);
+    toast.dismiss();
+    toast.success("Outlook email draft downloaded (.eml)", successStyles);
+    return true;
+  } catch (error) {
+    toast.dismiss();
+    console.error("Error downloading EML:", error);
+    toast.error("Failed to download EML for Outlook");
     throw error;
   }
 };
