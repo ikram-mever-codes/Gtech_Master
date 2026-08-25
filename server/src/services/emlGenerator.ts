@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { AppDataSource } from "../config/database";
 import { Rechnung } from "../models/rechnung";
+import { Rechnung_k as RechnungK } from "../models/rechnung_k";
 import { Lieferschein } from "../models/lieferscheine";
 import { CustomerOrder } from "../models/customer_orders";
 import { Offer } from "../models/offer";
@@ -1131,6 +1132,271 @@ export async function generateOfferEml(
     emlFilePath,
     filename: emlFileName,
     offerNumber: offer.offerNumber || String(offer.id),
+    contactPersons,
+  };
+}
+
+export async function generateRechnungKEml(
+  rechnungKId: number | string,
+  options?: {
+    user?: {
+      name?: string;
+      username?: string;
+      email?: string;
+    };
+  },
+): Promise<{
+  emlFilePath: string;
+  filename: string;
+  rkNo: string;
+  contactPersons: ContactInfo[];
+}> {
+  const rechnungKRepo = AppDataSource.getRepository(RechnungK);
+  const rechnungK = await rechnungKRepo.findOne({
+    where: [{ id: String(rechnungKId) }, { invoice_number: String(rechnungKId) }] as any,
+    relations: ["items", "customer"],
+  });
+
+  if (!rechnungK) {
+    throw new Error(`Rechnungskorrektur with ID ${rechnungKId} not found`);
+  }
+
+  const rkTitle = rechnungK.title || rechnungK.notes || rechnungK.auftrag_no || `Rechnungskorrektur ${rechnungK.invoice_number || rechnungK.id}`;
+  let customerId: any = (rechnungK as any).customer_id || rechnungK.customer?.id;
+
+  if (!customerId && rechnungK.customer?.original_customer_id) {
+    customerId = rechnungK.customer.original_customer_id;
+  }
+
+  const contactPersons: ContactInfo[] = [];
+  if (customerId) {
+    try {
+      const customerRepo = AppDataSource.getRepository(Customer);
+      const customer = await customerRepo.findOne({
+        where: { id: customerId } as any,
+        relations: ["starBusinessDetails"],
+      });
+
+      if (customer?.starBusinessDetails?.id) {
+        const contactPersonRepo = AppDataSource.getRepository(ContactPerson);
+        const contacts = await contactPersonRepo.find({
+          where: { starBusinessDetailsId: customer.starBusinessDetails.id } as any,
+        });
+
+        contacts.forEach((c) => {
+          const fullName = [c.name, c.familyName].filter(Boolean).join(" ");
+          if (c.email) {
+            contactPersons.push({
+              name: fullName || "Contact Person",
+              email: c.email.trim(),
+            });
+          }
+        });
+      }
+
+      if (contactPersons.length === 0 && customer?.email) {
+        contactPersons.push({
+          name: customer.companyName || customer.legalName || "Customer",
+          email: customer.email.trim(),
+        });
+      }
+    } catch (custErr) {
+      console.warn("Could not load Customer ContactPersons for RK EML:", custErr);
+    }
+  }
+
+  if (contactPersons.length === 0 && rechnungK.customer?.email) {
+    contactPersons.push({
+      name: rechnungK.customer.company_name || "Customer",
+      email: rechnungK.customer.email.trim(),
+    });
+  }
+
+  const uploadsDir = path.join(__dirname, "../../uploads/eml");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+  const rkDir = path.join(__dirname, "../../uploads/rechnungen_k");
+  if (!fs.existsSync(rkDir)) fs.mkdirSync(rkDir, { recursive: true });
+
+  const customerSnap = rechnungK.customerSnapshot || rechnungK.customer || {};
+  const customerCompName = String(
+    customerSnap.company_name || customerSnap.companyName || customerSnap.legalName || ""
+  ).trim();
+  const customerNum = String(customerSnap.customerNumber || "").trim();
+  let kundeCombined = "—";
+  if (customerCompName && customerNum) kundeCombined = `${customerCompName} · ${customerNum}`;
+  else if (customerCompName) kundeCombined = customerCompName;
+  else if (customerNum) kundeCombined = customerNum;
+
+  const defaultTaxRate =
+    rechnungK.tax_rate !== undefined && rechnungK.tax_rate !== null
+      ? Number(rechnungK.tax_rate)
+      : (rechnungK.customer as any)?.defaultTaxProfile?.tax_rate !== undefined &&
+        (rechnungK.customer as any)?.defaultTaxProfile?.tax_rate !== null
+        ? Number((rechnungK.customer as any).defaultTaxProfile.tax_rate)
+        : 19;
+
+  const contactPersonName =
+    (rechnungK as any).ansprechpartner ||
+    options?.user?.name ||
+    options?.user?.username ||
+    customerSnap.contactName ||
+    "Joschua Stehle";
+
+  const rkPdfPath = path.join(
+    rkDir,
+    `rechnung_k_${rechnungK.invoice_number || rechnungK.id}.pdf`
+  );
+
+  const items = (rechnungK.items || []).map((it: any, idx: number) => {
+    const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
+    const unitPrice = Number(it.unit_price_eur || it.price || 0);
+    const lineTotal =
+      it.total_price !== undefined && it.total_price !== null
+        ? Number(it.total_price)
+        : it.lineTotal !== undefined && it.lineTotal !== null
+          ? Number(it.lineTotal)
+          : qty * unitPrice;
+    return {
+      position: it.position || idx + 1,
+      artNr: it.itemNo || it.material || "—",
+      bezeichnung: it.item_name || it.description || "Item",
+      remarks: it.notes || it.remark_ex || "-",
+      vatRate:
+        it.taxRate !== undefined && it.taxRate !== null
+          ? Number(it.taxRate)
+          : defaultTaxRate,
+      quantity: qty,
+      unitPrice: unitPrice,
+      lineTotal: lineTotal,
+    };
+  });
+
+  const formatDateStr = (dateVal: any): string => {
+    if (!dateVal) return "—";
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+  };
+
+  await generateGtechDocumentPdf({
+    documentType: "RK" as any,
+    documentNumber: rechnungK.invoice_number,
+    customerSnapshot: customerSnap,
+    customerEntity: rechnungK.customer,
+    deliveryAddress: rechnungK.deliveryAddress,
+    metadataItems: [
+      ["Ansprechpartner", contactPersonName],
+      ["Kunde", kundeCombined],
+      [
+        "Datum",
+        formatDateStr(rechnungK.date_created || rechnungK.created_at || rechnungK.invoice_date),
+      ],
+    ],
+    isDelivered: true,
+    lineItems: items,
+    showPrices: true,
+    shippingMethod: rechnungK.shipping_method,
+    shippingCost: Number(rechnungK.shipping_cost || 0),
+    shippingQuantity: Number(rechnungK.shipping_quantity || 1),
+    shippingTaxRate: defaultTaxRate,
+    discountPercentage: Number(rechnungK.discount_percentage || 0),
+    discountAmount: Number(rechnungK.discount_amount || 0),
+    subtotal: Number(rechnungK.subtotal || 0),
+    taxAmount: Number(rechnungK.tax_amount || 0),
+    totalAmount: Number(rechnungK.total_amount || 0),
+    taxRate: defaultTaxRate,
+    currency: rechnungK.currency || "EUR",
+    notes: rechnungK.notes,
+    deliveryTime: (rechnungK as any).delivery_date || rechnungK.date_delivery,
+    deliveryDate: (rechnungK as any).delivery_date || rechnungK.date_delivery,
+    deliveryTerms: rechnungK.delivery_terms,
+    paymentTerms: rechnungK.payment_terms
+      ? `Zahlungsziel: ${rechnungK.payment_terms} Tage`
+      : undefined,
+    paymentMethod: rechnungK.payment_method,
+    outputFilePath: rkPdfPath,
+  });
+
+  const rkPdfBuffer = fs.readFileSync(rkPdfPath);
+  const rkBase64 = rkPdfBuffer.toString("base64");
+
+  const primaryEmail = contactPersons[0]?.email || rechnungK.customer?.email || "";
+
+  let contactGreetingName = "";
+  if (
+    contactPersons.length > 0 &&
+    contactPersons[0].name &&
+    contactPersons[0].name !== "Customer" &&
+    contactPersons[0].name !== "Contact Person"
+  ) {
+    contactGreetingName = contactPersons[0].name;
+  } else if (customerSnap.contactName) {
+    contactGreetingName = customerSnap.contactName;
+  }
+
+  const greetingLine = contactGreetingName
+    ? `Hallo guten Tag ${contactGreetingName},`
+    : `Hallo guten Tag,`;
+
+  const rawTitle = rkTitle || "";
+  const cleanTitle = String(rawTitle || "")
+    .trim()
+    .replace(/[^\w-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const docNo = String(rechnungK.invoice_number || rechnungK.id || "rechnungskorrektur").trim().replace(/[\s_]+/g, "_");
+
+  const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";
+  const emlSubject = subjectTitle
+    ? `Rechnungskorrektur ${docNo} GTech ${subjectTitle}`
+    : `Rechnungskorrektur ${docNo} GTech`;
+
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  if (primaryEmail) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
+  }
+  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnungskorrektur (${docNo}) zu Ihrer Bestellung "${rkTitle}".</p>\n`;
+  bodyHtml += `</body>\n</html>`;
+
+  const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 11)}@gtech-industries.de>`;
+
+  let emlContent = "";
+  emlContent += `X-Unsent: 1\n`;
+  emlContent += `Message-ID: ${messageId}\n`;
+  emlContent += `Subject: ${emlSubject}\n`;
+  emlContent += `MIME-Version: 1.0\n`;
+  emlContent += `Content-Type: multipart/mixed; boundary="${boundary}"\n\n`;
+
+  emlContent += `--${boundary}\n`;
+  emlContent += `Content-Type: text/html; charset="utf-8"\n`;
+  emlContent += `Content-Transfer-Encoding: 8bit\n\n`;
+  emlContent += `${bodyHtml}\n\n`;
+
+  const rkFileName = cleanTitle
+    ? `Rechnungskorrektur_${docNo}_GTech_${cleanTitle}.pdf`
+    : `Rechnungskorrektur_${docNo}_GTech.pdf`;
+
+  emlContent += `--${boundary}\n`;
+  emlContent += `Content-Type: application/pdf; name="${rkFileName}"\n`;
+  emlContent += `Content-Transfer-Encoding: base64\n`;
+  emlContent += `Content-Disposition: attachment; filename="${rkFileName}"\n\n`;
+  emlContent += `${rkBase64.match(/.{1,76}/g)?.join("\n") || rkBase64}\n\n`;
+
+  emlContent += `--${boundary}--\n`;
+
+  const emlFileName = cleanTitle
+    ? `Rechnungskorrektur_${docNo}_GTech_${cleanTitle}.eml`
+    : `Rechnungskorrektur_${docNo}_GTech.eml`;
+  const emlFilePath = path.join(uploadsDir, emlFileName);
+
+  fs.writeFileSync(emlFilePath, emlContent, "utf-8");
+  return {
+    emlFilePath,
+    filename: emlFileName,
+    rkNo: rechnungK.invoice_number || String(rechnungK.id),
     contactPersons,
   };
 }

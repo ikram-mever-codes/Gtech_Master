@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { FileDown, ChevronRight, FileText, Mail } from "lucide-react";
-import { downloadRechnungKPdf } from "@/api/rechnungen_k";
-import { downloadRechnungEml } from "@/api/rechnungen";
+import { downloadRechnungKPdf, downloadRechnungKEml } from "@/api/rechnungen_k";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -89,9 +88,8 @@ const RkActionMenu: React.FC<{
                 e.stopPropagation();
                 setIsOpen(false);
                 try {
-                  const targetId = row.original_rechnung_id || row.id;
-                  await downloadRechnungEml(
-                    targetId,
+                  await downloadRechnungKEml(
+                    row.id,
                     row.invoiceNumber || row.invoice_number,
                   );
                 } catch (_) { }

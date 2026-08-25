@@ -9,6 +9,7 @@ import {
   deleteRechnungK,
   getRechnungOpenQuantities,
   downloadRechnungKPdf,
+  downloadRechnungKEml,
 } from "../controllers/rechnung_k_controllers";
 
 const router = Router();
@@ -21,6 +22,7 @@ router.post("/from-rechnung/:rechnungId", createRechnungKFromRechnung);
 router.get("/", getAllRechnungenK);
 
 router.get("/:id/download-pdf", downloadRechnungKPdf);
+router.get("/:id/download-eml", downloadRechnungKEml);
 
 router.get("/:id", getRechnungKById);
 

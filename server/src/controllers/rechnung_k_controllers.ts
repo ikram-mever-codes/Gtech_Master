@@ -9,6 +9,7 @@ import { numericTransformer } from "../utils/numeric-transformer";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
+import { generateRechnungKEml } from "../services/emlGenerator";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
 
@@ -900,6 +901,30 @@ export const updateRechnungK = async (
     });
   } catch (error) {
     console.error("[updateRechnungK] error:", error);
+    next(error);
+  }
+};
+
+export const downloadRechnungKEml = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    console.log("Generating EML for RechnungK ID:", id);
+    const emlData = await generateRechnungKEml(id, {
+      user: (req as any).user,
+    });
+
+    res.setHeader("Content-Type", "message/rfc822");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${emlData.filename}"; filename*=UTF-8''${encodeURIComponent(emlData.filename)}`,
+    );
+    fs.createReadStream(emlData.emlFilePath).pipe(res);
+  } catch (error) {
+    console.error("[downloadRechnungKEml] error:", error);
     next(error);
   }
 };

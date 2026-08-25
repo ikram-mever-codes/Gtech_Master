@@ -134,9 +134,8 @@ export const seedDatabase = async () => {
             .createQueryBuilder()
             .update(Lieferschein)
             .set({ status: "vorläufig" })
-            .where("status = :openStatus OR status = :draftStatus OR status IS NULL OR status = ''", {
-                openStatus: "open",
-                draftStatus: "draft",
+            .where("status != :storniertStatus OR status IS NULL", {
+                storniertStatus: "storniert",
             })
             .execute();
         console.log("  ✓ Updated existing Lieferschein statuses to 'vorläufig'");

@@ -117,3 +117,30 @@ export const downloadRechnungKPdf = async (
     throw error;
   }
 };
+
+export const downloadRechnungKEml = async (
+  id: string | number,
+  rkNo?: string,
+) => {
+  try {
+    toast.loading("Preparing Outlook email (.eml)...", loadingStyles);
+    const response: any = await api.get(`/rechnungen-k/${id}/download-eml`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([response.data], { type: "message/rfc822" });
+    if (blob.size === 0) throw new Error("The downloaded EML file is empty.");
+    const filename = getFilenameFromResponse(
+      response,
+      `Rechnungskorrektur_${String(rkNo || id).replace(/[\s_]+/g, "_")}_GTech.eml`,
+    );
+    downloadBlob(blob, filename);
+    toast.dismiss();
+    toast.success("Outlook email draft downloaded (.eml)");
+    return true;
+  } catch (error) {
+    toast.dismiss();
+    console.error("Error downloading EML:", error);
+    toast.error("Failed to download EML for Outlook");
+    throw error;
+  }
+};
