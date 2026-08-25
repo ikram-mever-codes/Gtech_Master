@@ -25,6 +25,7 @@ import {
 } from "@/api/transfer_orders";
 import { getItems, autocompleteItems } from "@/api/items";
 import { getAllCustomers } from "@/api/customers";
+import { getAllGtechCompanies, GtechCompany } from "@/api/gtech_companies";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
@@ -313,6 +314,28 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   // For create mode
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerSearch, setCustomerSearch] = useState("");
+  const [gtechCompanies, setGtechCompanies] = useState<GtechCompany[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    getAllGtechCompanies()
+      .then((res: any) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setGtechCompanies(list);
+      })
+      .catch(() => setGtechCompanies([]));
+  }, [isOpen]);
+
+  const gtechHkDisplayName = useMemo(() => {
+    const hk =
+      gtechCompanies.find(
+        (c) =>
+          (c.display_name && c.display_name.toLowerCase().includes("hong kong")) ||
+          (c.legal_name && c.legal_name.toLowerCase().includes("hong kong")) ||
+          (c.country && c.country.toLowerCase().includes("hong kong")),
+      ) || gtechCompanies[0];
+    return hk?.display_name || hk?.legal_name || "Gtech Hong Kong";
+  }, [gtechCompanies]);
 
   const isFromAuftrag =
     order?.auftrag_id !== null && order?.auftrag_id !== undefined;
@@ -1020,7 +1043,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               value={
                 displayOrder.receiver === "Supplier"
                   ? `Supplier — ${formatSupplierDisplayName(displayOrder.supplier)}`
-                  : displayOrder.receiver
+                  : gtechHkDisplayName
               }
             >
               <select
@@ -1041,7 +1064,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   });
                 }}
               >
-                <option value="Gtech Hong Kong">Gtech Hong Kong</option>
+                <option value="Gtech Hong Kong">{gtechHkDisplayName}</option>
                 <option value="Supplier">Supplier</option>
               </select>
             </Field>
