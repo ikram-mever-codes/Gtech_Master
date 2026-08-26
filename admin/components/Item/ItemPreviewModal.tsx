@@ -20,7 +20,7 @@ import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SalesPriceSection from "@/components/Item/SalesPriceSection";
 import DecimalInput from "@/components/UI/DecimalInput";
-import { parseFlexibleNumber } from "@/utils/decimal";
+import { parseFlexibleNumber, formatMax3Decimals } from "@/utils/decimal";
 
 import { EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import {
@@ -150,10 +150,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-        item?.pix_path_eBay ||
-        item?.pictures?.shopPicture ||
-        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-        null,
+      item?.pix_path_eBay ||
+      item?.pictures?.shopPicture ||
+      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+      null,
     );
 
   const getCompany = (item: any) =>
@@ -209,10 +209,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           parent_id: raw.parent_id || null,
           parent: raw.parent
             ? {
-                ...raw.parent,
-                de_no: raw.parent.de_no,
-                name_de: raw.parent.name_de,
-              }
+              ...raw.parent,
+              de_no: raw.parent.de_no,
+              name_de: raw.parent.name_de,
+            }
             : null,
           item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
@@ -279,6 +279,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           category_id:
             raw.cat_id ?? raw.category_id ?? raw.category?.id ?? null,
           category: catName,
+          taric_id: raw.taric_id ?? raw.taric?.id ?? raw.parent?.taric_id ?? null,
           supplier_id: activeSupplierId,
           supplier_name: supplierName,
           customer_id: raw.customer_id ?? raw.customer?.id ?? null,
@@ -291,23 +292,23 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             raw.supplierItem ||
             (def
               ? {
-                  priceRMB: def.priceRMB || "0",
-                  isPO: def.isPO || "No",
-                  moq: def.moq || "0",
-                  interval: def.interval || "0",
-                  leadTime: def.leadTime || "",
-                  noteCN: def.noteCN || "",
-                  url: def.url || "",
-                }
+                priceRMB: def.priceRMB || "0",
+                isPO: def.isPO || "No",
+                moq: def.moq || "0",
+                interval: def.interval || "0",
+                leadTime: def.leadTime || "",
+                noteCN: def.noteCN || "",
+                url: def.url || "",
+              }
               : {
-                  priceRMB: "0",
-                  isPO: "No",
-                  moq: "0",
-                  interval: "0",
-                  leadTime: "",
-                  noteCN: "",
-                  url: "",
-                }),
+                priceRMB: "0",
+                isPO: "No",
+                moq: "0",
+                interval: "0",
+                leadTime: "",
+                noteCN: "",
+                url: "",
+              }),
           parent: raw.parent
             ? { ...raw.parent, isActive: toBool(raw.parent?.isActive) }
             : null,
@@ -407,7 +408,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
     //   return;
     // }
     setPreviewSaving(true);
-    const tid = toast.loading("Saving changes...", loadingStyles);
     try {
       if (isRequest) {
         await updateRequestedItem(String(itemId), {
@@ -430,6 +430,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             !!previewItem.dimensions?.is_dim_weight_estimated,
           supplier_id: previewItem.supplier_id
             ? parseInt(previewItem.supplier_id)
+            : undefined,
+          taric_id: previewItem.taric_id
+            ? parseInt(previewItem.taric_id)
             : undefined,
           purchasePrice: parseFlexibleNumber(previewItem.price) || 0,
           currency: previewItem.currency || "EUR",
@@ -477,12 +480,15 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           supplier_id: previewItem.supplier_id
             ? parseInt(previewItem.supplier_id)
             : null,
+          taric_id: previewItem.taric_id
+            ? parseInt(previewItem.taric_id)
+            : null,
           customer_id: previewItem.customer_id ?? null,
           supplierItems: previewItem.supplierItems,
           sales_price:
             previewItem.sales_price === "" ||
-            previewItem.sales_price === undefined ||
-            previewItem.sales_price === null
+              previewItem.sales_price === undefined ||
+              previewItem.sales_price === null
               ? null
               : parseFlexibleNumber(previewItem.sales_price),
           supplierItem: {
@@ -518,10 +524,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
       fetchItemDetails();
       if (onSaved) onSaved();
     } catch (e: any) {
-      toast.error(e.message || "Failed to update item", {
-        id: tid,
-        ...errorStyles,
-      });
+      toast.error(e.message || "Failed to update item", errorStyles);
     } finally {
       setPreviewSaving(false);
     }
@@ -775,11 +778,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       </select>
                     ) : (
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
-                          previewItem.isActive
-                            ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                            : "bg-red-100 text-red-700 border border-red-200"
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${previewItem.isActive
+                          ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                          : "bg-red-100 text-red-700 border border-red-200"
+                          }`}
                       >
                         {previewItem.isActive ? "Active" : "Inactive"}
                       </span>
@@ -794,31 +796,31 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
               <div className="flex items-center gap-4 flex-shrink-0">
                 {(previewEdit ||
                   (previewItem?.tags && previewItem.tags.length > 0)) && (
-                  <div className="flex items-center gap-2">
-                    {previewEdit && (
-                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                        TAGS
-                      </span>
-                    )}
-                    <EntityTagSelector
-                      entityId={previewItem.id}
-                      entityType={isRequest ? "request_item" : "item"}
-                      initialTags={previewItem.tags || []}
-                      tagOrder={previewItem.tagOrder}
-                      disabled={!previewEdit}
-                      onTagsUpdated={(newTags: any[]) =>
-                        setPreviewItem((p: any) =>
-                          p
-                            ? {
+                    <div className="flex items-center gap-2">
+                      {previewEdit && (
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                          TAGS
+                        </span>
+                      )}
+                      <EntityTagSelector
+                        entityId={previewItem.id}
+                        entityType={isRequest ? "request_item" : "item"}
+                        initialTags={previewItem.tags || []}
+                        tagOrder={previewItem.tagOrder}
+                        disabled={!previewEdit}
+                        onTagsUpdated={(newTags: any[]) =>
+                          setPreviewItem((p: any) =>
+                            p
+                              ? {
                                 ...p,
                                 tags: newTags,
                               }
-                            : p,
-                        )
-                      }
-                    />
-                  </div>
-                )}
+                              : p,
+                          )
+                        }
+                      />
+                    </div>
+                  )}
 
                 <ViewEditToggle
                   isEditEnabled={previewEdit}
@@ -835,7 +837,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
                 <Field label="Item No">
                   {previewEdit ? (
                     <input
@@ -925,7 +927,95 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     previewItem.ean || "—"
                   )}
                 </Field>
-                <Field label="ID (system)">{previewItem.id}</Field>
+                <div className="md:col-span-3">
+                  <Field label="TARIC">
+                    {previewEdit ? (
+                      <ReactSelect
+                        options={
+                          refTarics?.map((t: any) => ({
+                            value: t.id,
+                            label: `${t.code}${t.duty_rate !== null && t.duty_rate !== undefined ? ` (${t.duty_rate}%)` : ""} - ${t.name_de || t.name_en || t.code}`,
+                          })) || []
+                        }
+                        value={
+                          previewItem.taric_id
+                            ? (() => {
+                              const t = refTarics?.find(
+                                (x: any) => String(x.id) === String(previewItem.taric_id),
+                              );
+                              return t
+                                ? {
+                                  value: t.id,
+                                  label: `${t.code}${t.duty_rate !== null && t.duty_rate !== undefined ? ` (${t.duty_rate}%)` : ""} - ${t.name_de || t.name_en || t.code}`,
+                                }
+                                : null;
+                            })()
+                            : null
+                        }
+                        onChange={(opt: any) =>
+                          patchPreview({
+                            taric_id: opt ? opt.value : null,
+                          })
+                        }
+                        isClearable
+                        isSearchable
+                        placeholder="Select TARIC..."
+                        className="text-xs"
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: "32px",
+                            height: "32px",
+                            fontSize: "12px",
+                            borderColor: "#D1D5DB",
+                            borderRadius: "0.375rem",
+                          }),
+                          valueContainer: (base) => ({
+                            ...base,
+                            height: "32px",
+                            padding: "0 6px",
+                          }),
+                          input: (base) => ({
+                            ...base,
+                            margin: "0px",
+                          }),
+                          indicatorsContainer: (base) => ({
+                            ...base,
+                            height: "32px",
+                          }),
+                          menu: (base) => ({
+                            ...base,
+                            zIndex: 9999,
+                            fontSize: "12px",
+                          }),
+                        }}
+                      />
+                    ) : (
+                      (() => {
+                        const sel =
+                          refTarics.find(
+                            (t: any) =>
+                              String(t.id) === String(previewItem.taric_id),
+                          ) || previewItem.taric;
+                        if (!sel && !previewItem.taric_id && !previewItem.taric_code) {
+                          return "—";
+                        }
+                        const code = sel?.code || previewItem.taric_code || previewItem.taric?.code || previewItem.taric_id || "—";
+                        const duty = sel?.duty_rate ?? previewItem.taric?.duty_rate;
+                        const nameDe = sel?.name_de || sel?.description_de || previewItem.taric?.name_de || previewItem.taric?.description_de || "";
+                        const dutyStr = duty !== null && duty !== undefined ? ` (${duty}%)` : "";
+                        const nameStr = nameDe ? ` - ${nameDe}` : "";
+                        return (
+                          <div className="font-semibold text-gray-900 truncate">
+                            {code}
+                            {dutyStr}
+                            {nameStr}
+                          </div>
+                        );
+                      })()
+                    )}
+                  </Field>
+                </div>
               </div>
 
               <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
@@ -1078,11 +1168,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </select>
                   ) : (
                     <span
-                      className={`font-bold ${
-                        previewItem.dimensions?.is_dim_weight_estimated
-                          ? "text-[#8CC21B]"
-                          : "text-gray-900"
-                      }`}
+                      className={`font-bold ${previewItem.dimensions?.is_dim_weight_estimated
+                        ? "text-[#8CC21B]"
+                        : "text-gray-900"
+                        }`}
                     >
                       {previewItem.dimensions?.is_dim_weight_estimated
                         ? "YES"
@@ -1201,14 +1290,13 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     ) : (
                       <div className="font-semibold text-gray-900 truncate">
                         {previewItem.supplier_id
-                          ? `[ID: ${previewItem.supplier_id}] ${
-                              previewItem.supplier_name
-                                ? previewItem.supplier_name.replace(
-                                    /^Supplier\s*/i,
-                                    "",
-                                  )
-                                : getSupplierName(previewItem.supplier_id)
-                            }`
+                          ? `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name
+                            ? previewItem.supplier_name.replace(
+                              /^Supplier\s*/i,
+                              "",
+                            )
+                            : getSupplierName(previewItem.supplier_id)
+                          }`
                           : "—"}
                       </div>
                     )}
@@ -1221,11 +1309,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
-                        value={
+                        value={formatMax3Decimals(
                           previewItem.supplierItem?.priceRMB ??
                           previewItem.priceRMB ??
                           ""
-                        }
+                        )}
                         onChange={(raw) =>
                           patchPreviewSupplierItem({ priceRMB: raw })
                         }
@@ -1236,9 +1324,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
-                      {previewItem.supplierItem?.priceRMB ||
+                      {formatMax3Decimals(
+                        previewItem.supplierItem?.priceRMB ||
                         previewItem.priceRMB ||
-                        "0.00"}{" "}
+                        0
+                      )}{" "}
                       <span className="font-semibold text-gray-700">
                         {previewItem.supplierItem?.currency || "RMB"}
                       </span>
@@ -1251,7 +1341,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
-                        value={previewItem.price ?? ""}
+                        value={formatMax3Decimals(previewItem.price ?? "")}
                         onChange={(raw) => patchPreview({ price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
@@ -1260,16 +1350,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
-                      {previewItem.price !== null &&
-                      previewItem.price !== undefined &&
-                      previewItem.price !== ""
-                        ? Math.abs(
-                            Number(previewItem.price) -
-                              Math.round(Number(previewItem.price) * 100) / 100,
-                          ) > 0.0001
-                          ? Number(previewItem.price).toFixed(3)
-                          : Number(previewItem.price).toFixed(2)
-                        : "0.00"}{" "}
+                      {formatMax3Decimals(previewItem.price ?? 0)}{" "}
                       <span className="font-semibold text-gray-700">
                         {previewItem.currency || "EUR"}
                       </span>
@@ -1283,7 +1364,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
-                        value={previewItem.sales_price ?? ""}
+                        value={formatMax3Decimals(previewItem.sales_price ?? "")}
                         onChange={(raw) => patchPreview({ sales_price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
@@ -1292,19 +1373,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
-                      {previewItem.sales_price !== null &&
-                      previewItem.sales_price !== undefined
-                        ? Math.abs(
-                            Math.round(Number(previewItem.sales_price) * 1000) /
-                              1000 -
-                              Math.round(
-                                Number(previewItem.sales_price) * 100,
-                              ) /
-                                100,
-                          ) > 0.0001
-                          ? Number(previewItem.sales_price).toFixed(3)
-                          : Number(previewItem.sales_price).toFixed(2)
-                        : "0.00"}{" "}
+                      {formatMax3Decimals(previewItem.sales_price ?? 0)}{" "}
                       <span className="font-semibold text-gray-700">
                         {previewItem.currency || "EUR"}
                       </span>
@@ -1652,8 +1721,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                               window.open(resolveUrl(url)!, "_blank")
                             }
                             onError={(e) =>
-                              ((e.target as HTMLImageElement).src =
-                                "https://placehold.co/200x200?text=—")
+                            ((e.target as HTMLImageElement).src =
+                              "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>

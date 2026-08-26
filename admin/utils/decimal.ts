@@ -42,3 +42,13 @@ export function formatMatrixPrice(
   if (price === null || price === undefined) return ".";
   return price.toFixed(decimals);
 }
+
+export function formatMax3Decimals(val: number | string | null | undefined): string {
+  if (val === null || val === undefined || val === "") return "";
+  const num = typeof val === "number" ? val : parseFlexibleNumber(val);
+  if (num === null || isNaN(num)) return String(val);
+
+  const rounded = Math.round(num * 1000) / 1000;
+  const has3rdDecimal = Math.abs(Math.round(rounded * 1000) - Math.round(rounded * 100) * 10) > 0;
+  return rounded.toFixed(has3rdDecimal ? 3 : 2);
+}
