@@ -408,6 +408,15 @@ export default function AuftragToRechnungModal({
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
 
+  // Tax profile display — the Auftrag's taxProfile is resolved
+  // server-side: live from the customer while status is OPEN, frozen
+  // (matched only by rate, never re-derived) once Partially
+  // Delivered/Delivered/Closed. This is purely a display label; taxRate
+  // above always drives the actual calculation.
+  const taxProfileLabel = auftrag.taxProfile?.name
+    ? `${auftrag.taxProfile.name} (${taxRate}%)`
+    : `${taxRate}%`;
+
   // Prepayment credit applied to THIS delivery — capped at what's
   // actually available and at the invoice total itself (never negative,
   // never more than what's owed). Purely a client-side preview; the
@@ -735,7 +744,7 @@ export default function AuftragToRechnungModal({
                 />
               </Field>
 
-              <Field label="TAX PROFILE" value={`DE-VAT (${taxRate}%)`} />
+              <Field label="TAX PROFILE" value={taxProfileLabel} />
 
               {/* Delivery Date */}
               <div>
