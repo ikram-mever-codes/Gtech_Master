@@ -383,7 +383,11 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     getAllGtechCompanies()
       .then((res: any) => {
-        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+            ? res
+            : [];
         setGtechCompanies(list);
       })
       .catch(() => setGtechCompanies([]));
@@ -393,7 +397,8 @@ const InvoiceListPage: React.FC = () => {
     const hk =
       gtechCompanies.find(
         (c) =>
-          (c.display_name && c.display_name.toLowerCase().includes("hong kong")) ||
+          (c.display_name &&
+            c.display_name.toLowerCase().includes("hong kong")) ||
           (c.legal_name && c.legal_name.toLowerCase().includes("hong kong")) ||
           (c.country && c.country.toLowerCase().includes("hong kong")),
       ) || gtechCompanies[0];
@@ -1054,7 +1059,8 @@ const InvoiceListPage: React.FC = () => {
     )
       return;
     try {
-      const items = (auftrag.orderItems || auftrag.items || [])
+      const sourceLineItems = auftrag.orderItems || auftrag.items || [];
+      const items = sourceLineItems
         .filter((it: any) => it.sourceItemId)
         .map((it: any) => ({
           sourceLineItemId: String(it.id),
@@ -1077,6 +1083,24 @@ const InvoiceListPage: React.FC = () => {
           purchaseCurrency: it.purchaseCurrency || "EUR",
           position: it.position || 1,
         }));
+
+      // The filter above only keeps catalog-linked lines (sourceItemId
+      // present) — a Bestellung line needs a linkable Item to order from a
+      // supplier. If ALL of the Auftrag's lines are Freizeile/freetext, this
+      // comes out empty even though the Auftrag itself isn't. Catch that
+      // here with a clear message instead of letting the generic backend
+      // "Minimum 1 item" error confuse the user into thinking the Auftrag
+      // has no items at all.
+      if (items.length === 0) {
+        const droppedCount = sourceLineItems.length;
+        toast.error(
+          droppedCount > 0
+            ? `This Auftrag has ${droppedCount} line item(s), but none are linked to a catalog item (sourceItemId). Freizeile/freetext lines can't be converted to a Bestellung — link them to an Item first.`
+            : "This Auftrag has no line items to convert.",
+          errorStyles,
+        );
+        return;
+      }
 
       const res: any = await createBestellungFromAuftrag(auftrag.id, items);
       if (res?.success) {
@@ -1280,12 +1304,12 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev: any) =>
         prev
           ? {
-            ...prev,
-            title: invoiceEditForm.title,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              title: invoiceEditForm.title,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1560,11 +1584,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-          item.customer?.id ||
-          item.customer_id ||
-          item.customerSnapshot?.customerNumber ||
-          item.customerSnapshot?.id ||
-          "",
+            item.customer?.id ||
+            item.customer_id ||
+            item.customerSnapshot?.customerNumber ||
+            item.customerSnapshot?.id ||
+            "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1572,12 +1596,12 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-          item.customer_name ||
-          item.bill_to ||
-          item.ship_to ||
-          item.customerSnapshot?.companyName ||
-          item.customerSnapshot?.name ||
-          "",
+            item.customer_name ||
+            item.bill_to ||
+            item.ship_to ||
+            item.customerSnapshot?.companyName ||
+            item.customerSnapshot?.name ||
+            "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -1663,7 +1687,7 @@ const InvoiceListPage: React.FC = () => {
       if (res?.success) {
         toast.success(
           res.message ||
-          `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
+            `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
           successStyles,
         );
         await tabData.refetchOrders();
@@ -1869,10 +1893,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </button>
@@ -2082,10 +2107,11 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                        ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                        : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                        }`}
+                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                        currentPage === i + 1
+                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                      }`}
                     >
                       {i + 1}
                     </button>
