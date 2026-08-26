@@ -118,12 +118,7 @@ export const createTransferOrderFromAuftrag = async (
     const orderItemsToCreate: Partial<TransferOrderItem>[] = [];
 
     // Filter selectedItems to only include catalog items (those with sourceItemId)
-    const catalogItems = selectedItems.filter((selItem: any) => {
-      const lineItem = (auftrag.orderItems || []).find(
-        (li) => String(li.id) === String(selItem.sourceLineItemId),
-      );
-      return lineItem && lineItem.sourceItemId;
-    });
+    const catalogItems = selectedItems;
 
     if (catalogItems.length === 0) {
       res.status(400).json({
@@ -183,9 +178,11 @@ export const createTransferOrderFromAuftrag = async (
 
     // CEO requirement: OrderRemark for processing (Team Bowang) must be internal comment
     const finalNotes =
-      bodyNotes !== undefined && bodyNotes !== null && String(bodyNotes).trim() !== ""
+      bodyNotes !== undefined &&
+      bodyNotes !== null &&
+      String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
-        : (auftrag.internal_notes || auftrag.notes || "");
+        : auftrag.internal_notes || auftrag.notes || "";
 
     const transferOrderRepo: any = AppDataSource.getRepository(TransferOrder);
     const transferOrder = transferOrderRepo.create({
@@ -499,7 +496,10 @@ export const createTransferOrderLineItem = async (
         ? (parseFlexibleNumber(body.purchasePrice) ?? undefined)
         : undefined;
 
-    if (body.sourceItemId && (notes === undefined || notes === "" || transferPrice === undefined)) {
+    if (
+      body.sourceItemId &&
+      (notes === undefined || notes === "" || transferPrice === undefined)
+    ) {
       try {
         const itemRepo = AppDataSource.getRepository(Item);
         const sourceItem = await itemRepo.findOne({
@@ -507,10 +507,16 @@ export const createTransferOrderLineItem = async (
           select: ["id", "remark_ex", "transfer_price_EUR"],
         });
         if (sourceItem) {
-          if ((notes === undefined || notes === "") && (sourceItem.remark_ex || (sourceItem as any).remarkEX)) {
+          if (
+            (notes === undefined || notes === "") &&
+            (sourceItem.remark_ex || (sourceItem as any).remarkEX)
+          ) {
             notes = sourceItem.remark_ex || (sourceItem as any).remarkEX;
           }
-          if (transferPrice === undefined && sourceItem.transfer_price_EUR !== undefined) {
+          if (
+            transferPrice === undefined &&
+            sourceItem.transfer_price_EUR !== undefined
+          ) {
             transferPrice = Number(sourceItem.transfer_price_EUR);
           }
         }
@@ -798,10 +804,11 @@ export const updateTransferOrderStatus = async (
     let message = "Bestellung status updated successfully";
     if (previousStatus === "draft" && status === "to be processed") {
       if (conversionResult) {
-        message += ` — Order created${conversionResult.skippedCount > 0
-          ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
-          : ""
-          }.`;
+        message += ` — Order created${
+          conversionResult.skippedCount > 0
+            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
+            : ""
+        }.`;
       } else {
         message +=
           " — no Order was created (no catalog line items found on this Bestellung).";

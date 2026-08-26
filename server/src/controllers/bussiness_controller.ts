@@ -26,6 +26,7 @@ import { Offer } from "../models/offer";
 import { CustomerOrder } from "../models/customer_orders";
 import { RechnungCustomer } from "../models/rechnung_customer";
 import { TransferOrder } from "../models/transfer_order";
+import { TaxProfile } from "../models/tax_profile";
 
 export const BUSINESS_SOURCE = {
   GOOGLE_MAPS: "Google Maps",
@@ -465,6 +466,118 @@ const normalizeWebsite = (website: string): string => {
   }
   return normalized;
 };
+
+function determineTaxCase(
+  countryEntity: Country | null | undefined,
+  vatTaxId: string | null | undefined,
+  vatIdStatus: string | null | undefined,
+): string {
+  const iso2 = (countryEntity?.iso2 || "").trim().toUpperCase();
+
+  if (!countryEntity || iso2 === "DE") {
+    return "DE-VAT";
+  }
+
+  const isIgl = Boolean(countryEntity.is_igl_country || countryEntity.is_eu);
+
+  if (isIgl) {
+    const trimmedVatId = (vatTaxId || "").trim();
+    const trimmedStatus = (vatIdStatus || "").trim();
+    const isValidStatus =
+      trimmedStatus === "vies_valid" ||
+      trimmedStatus === "bzst_qualified_valid";
+    return trimmedVatId && isValidStatus ? "EU_IGL" : "EU_no_valid_VAT_ID";
+  }
+
+  return "third_country";
+}
+
+/**
+ * Matches a tax case against the tax_profiles table: exact tax_case
+ * match first, then the same name/rate heuristics the frontend used for
+ * profiles set up with slightly different labels, finally falling back
+ * to the first configured profile so a customer never ends up with no
+ * tax profile at all.
+ */
+function matchTaxProfileForCase(
+  targetCase: string,
+  taxProfiles: TaxProfile[],
+): TaxProfile | null {
+  if (!taxProfiles || taxProfiles.length === 0) return null;
+
+  const exact = taxProfiles.find(
+    (tp) => (tp.tax_case || "").trim() === targetCase,
+  );
+  if (exact) return exact;
+
+  const heuristic = taxProfiles.find((tp) => {
+    const caseStr = (tp.tax_case || "").trim().toLowerCase();
+    const nameStr = (tp.name || "").toLowerCase();
+
+    if (targetCase === "DE-VAT") {
+      return (
+        caseStr === "de-vat" ||
+        caseStr === "de_vat" ||
+        nameStr.includes("standard vat") ||
+        Number(tp.tax_rate ?? 0) === 19
+      );
+    }
+    if (targetCase === "EU_IGL") {
+      return (
+        caseStr === "eu_igl" ||
+        caseStr === "eu-igl" ||
+        nameStr.includes("eu_igl") ||
+        nameStr.includes("reverse charge")
+      );
+    }
+    if (targetCase === "EU_no_valid_VAT_ID") {
+      return (
+        caseStr === "eu_no_valid_vat_id" ||
+        caseStr === "eu_no_valid" ||
+        nameStr.includes("no_valid") ||
+        nameStr.includes("no valid")
+      );
+    }
+    if (targetCase === "third_country") {
+      return (
+        caseStr === "third_country" ||
+        caseStr === "third country" ||
+        nameStr.includes("third") ||
+        nameStr.includes("export")
+      );
+    }
+    return false;
+  });
+
+  return heuristic || taxProfiles[0] || null;
+}
+
+/**
+ * Resolves and persists default_tax_profile_id on a Customer, using its
+ * resolved country_id relation (not the raw country string) plus vatTaxId
+ * and vat_id_status. This is the single source of truth for "which tax
+ * profile applies to this business" — createBusiness/updateBusiness call
+ * it automatically, and the sync endpoints below expose it for other
+ * pages (Auftrag, Offer, etc.) to trigger on demand instead of each
+ * re-implementing the matching logic themselves.
+ *
+ * Expects `customer` to have its `countryEntity` relation loaded. Mutates
+ * customer.default_tax_profile_id in place and does NOT save — callers
+ * decide when to persist (so it can be folded into an existing save).
+ */
+function resolveTaxProfileForCustomer(
+  customer: Customer,
+  taxProfiles: TaxProfile[],
+): TaxProfile | null {
+  const targetCase = determineTaxCase(
+    (customer as any).countryEntity,
+    customer.vatTaxId,
+    customer.vat_id_status,
+  );
+  const matched = matchTaxProfileForCase(targetCase, taxProfiles);
+  customer.default_tax_profile_id = matched?.id || undefined;
+  return matched;
+}
 
 const sanitizeNumber = (value: any): number | undefined => {
   if (value === undefined || value === null || value === "") {
@@ -957,12 +1070,23 @@ export const createBusiness = async (
         "starBusinessDetails",
         "starBusinessDetails.convertedBy",
         "starCustomerDetails",
+        "countryEntity",
       ],
     });
 
     if (!finalCustomer) {
       return next(new ErrorHandler("Business not found after creation", 404));
     }
+
+    const taxProfileRepositoryForCreate =
+      AppDataSource.getRepository(TaxProfile);
+    const activeTaxProfilesForCreate = await taxProfileRepositoryForCreate.find(
+      {
+        where: { is_active: true },
+      },
+    );
+    resolveTaxProfileForCustomer(finalCustomer, activeTaxProfilesForCreate);
+    await customerRepository.save(finalCustomer);
 
     const { id: detailsId, ...businessDetailsWithoutId } =
       finalCustomer.businessDetails || {};
@@ -1560,12 +1684,23 @@ export const updateBusiness = async (
         "starBusinessDetails.convertedBy",
         "starCustomerDetails",
         "tags",
+        "countryEntity",
       ],
     });
 
     if (!finalCustomer) {
       return next(new ErrorHandler("Business not found after update", 404));
     }
+
+    const taxProfileRepositoryForUpdate =
+      AppDataSource.getRepository(TaxProfile);
+    const activeTaxProfilesForUpdate = await taxProfileRepositoryForUpdate.find(
+      {
+        where: { is_active: true },
+      },
+    );
+    resolveTaxProfileForCustomer(finalCustomer, activeTaxProfilesForUpdate);
+    await customerRepository.save(finalCustomer);
 
     const { id: detailsId, ...businessDetailsWithoutId } =
       finalCustomer.businessDetails || {};
@@ -2308,7 +2443,13 @@ export const deleteBusiness = async (
     const rechnungCustomerRepo = AppDataSource.getRepository(RechnungCustomer);
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
 
-    const [itemCount, offerCount, auftragCount, rechnungCustomerCount, bestellungCount] = await Promise.all([
+    const [
+      itemCount,
+      offerCount,
+      auftragCount,
+      rechnungCustomerCount,
+      bestellungCount,
+    ] = await Promise.all([
       itemRepo.count({ where: { customer_id: id } }),
       offerRepo.count({ where: { customerId: id } }),
       customerOrderRepo.count({ where: { customer_id: id } }),
@@ -2316,15 +2457,18 @@ export const deleteBusiness = async (
       transferOrderRepo.count({ where: { customer_id: id } }),
     ]);
 
-    const totalLinkedDocs = offerCount + auftragCount + rechnungCustomerCount + bestellungCount;
+    const totalLinkedDocs =
+      offerCount + auftragCount + rechnungCustomerCount + bestellungCount;
 
     if (itemCount > 0 || totalLinkedDocs > 0) {
       const details: string[] = [];
       if (itemCount > 0) details.push(`${itemCount} assigned item(s)`);
       if (offerCount > 0) details.push(`${offerCount} offer(s)`);
       if (auftragCount > 0) details.push(`${auftragCount} order(s)`);
-      if (rechnungCustomerCount > 0) details.push(`${rechnungCustomerCount} invoice/RK record(s)`);
-      if (bestellungCount > 0) details.push(`${bestellungCount} transfer order(s)`);
+      if (rechnungCustomerCount > 0)
+        details.push(`${rechnungCustomerCount} invoice/RK record(s)`);
+      if (bestellungCount > 0)
+        details.push(`${bestellungCount} transfer order(s)`);
 
       return next(
         new ErrorHandler(
@@ -2365,5 +2509,53 @@ export const deleteBusiness = async (
   } catch (error: any) {
     console.error("Error deleting business:", error);
     return next(new ErrorHandler("Failed to delete business", 500));
+  }
+};
+export const syncAllBusinessTaxProfiles = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { ids } = req.body || {};
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+
+    const taxProfiles = await taxProfileRepository.find({
+      where: { is_active: true },
+    });
+
+    const queryBuilder = customerRepository
+      .createQueryBuilder("customer")
+      .leftJoinAndSelect("customer.countryEntity", "countryEntity");
+
+    if (Array.isArray(ids) && ids.length > 0) {
+      queryBuilder.where("customer.id IN (:...ids)", { ids });
+    }
+
+    const customers = await queryBuilder.getMany();
+
+    let updatedCount = 0;
+    for (const customer of customers) {
+      const before = customer.default_tax_profile_id;
+      resolveTaxProfileForCustomer(customer, taxProfiles);
+      if (customer.default_tax_profile_id !== before) updatedCount++;
+    }
+
+    if (customers.length > 0) {
+      await customerRepository.save(customers);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Synced tax profiles for ${customers.length} business(es), ${updatedCount} changed`,
+      data: {
+        total: customers.length,
+        changed: updatedCount,
+      },
+    });
+  } catch (error) {
+    console.error("Error bulk-syncing tax profiles:", error);
+    return next(new ErrorHandler("Failed to bulk-sync tax profiles", 500));
   }
 };

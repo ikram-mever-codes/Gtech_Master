@@ -1060,29 +1060,27 @@ const InvoiceListPage: React.FC = () => {
       return;
     try {
       const sourceLineItems = auftrag.orderItems || auftrag.items || [];
-      const items = sourceLineItems
-        .filter((it: any) => it.sourceItemId)
-        .map((it: any) => ({
-          sourceLineItemId: String(it.id),
-          sourceItemId: it.sourceItemId || undefined,
-          qty: Number(it.quantity || it.qty) || 1,
-          max_qty: Number(it.quantity || it.qty) || 1,
-          itemName: it.itemName || it.item_name || "Line Item",
-          itemNo: it.itemNo || it.material || "",
-          material: it.material || "",
-          photo: it.photo || undefined,
-          specification: it.specification || "",
-          description: it.description || "",
-          weight: it.weight || undefined,
-          extraWeight: it.extraWeight || 0,
-          notes: it.notes || "",
-          remark_order_item: it.remark_order_item || "",
-          price: Number(it.price) || 0,
-          transferPrice: Number(it.price) || 0,
-          purchasePrice: it.purchasePrice || undefined,
-          purchaseCurrency: it.purchaseCurrency || "EUR",
-          position: it.position || 1,
-        }));
+      const items = sourceLineItems.map((it: any) => ({
+        sourceLineItemId: String(it.id),
+        sourceItemId: it.sourceItemId || undefined,
+        qty: Number(it.quantity || it.qty) || 1,
+        max_qty: Number(it.quantity || it.qty) || 1,
+        itemName: it.itemName || it.item_name || "Line Item",
+        itemNo: it.itemNo || it.material || "",
+        material: it.material || "",
+        photo: it.photo || undefined,
+        specification: it.specification || "",
+        description: it.description || "",
+        weight: it.weight || undefined,
+        extraWeight: it.extraWeight || 0,
+        notes: it.notes || "",
+        remark_order_item: it.remark_order_item || "",
+        price: Number(it.price) || 0,
+        transferPrice: Number(it.price) || 0,
+        purchasePrice: it.purchasePrice || undefined,
+        purchaseCurrency: it.purchaseCurrency || "EUR",
+        position: it.position || 1,
+      }));
 
       // The filter above only keeps catalog-linked lines (sourceItemId
       // present) — a Bestellung line needs a linkable Item to order from a
@@ -1091,16 +1089,16 @@ const InvoiceListPage: React.FC = () => {
       // here with a clear message instead of letting the generic backend
       // "Minimum 1 item" error confuse the user into thinking the Auftrag
       // has no items at all.
-      if (items.length === 0) {
-        const droppedCount = sourceLineItems.length;
-        toast.error(
-          droppedCount > 0
-            ? `This Auftrag has ${droppedCount} line item(s), but none are linked to a catalog item (sourceItemId). Freizeile/freetext lines can't be converted to a Bestellung — link them to an Item first.`
-            : "This Auftrag has no line items to convert.",
-          errorStyles,
-        );
-        return;
-      }
+      // if (items.length === 0) {
+      //   const droppedCount = sourceLineItems.length;
+      //   toast.error(
+      //     droppedCount > 0
+      //       ? `This Auftrag has ${droppedCount} line item(s), but none are linked to a catalog item (sourceItemId). Freizeile/freetext lines can't be converted to a Bestellung — link them to an Item first.`
+      //       : "This Auftrag has no line items to convert.",
+      //     errorStyles,
+      //   );
+      //   return;
+      // }
 
       const res: any = await createBestellungFromAuftrag(auftrag.id, items);
       if (res?.success) {

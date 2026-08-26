@@ -10,8 +10,13 @@ import {
   searchBusinessesByLocation,
   getBusinessStatistics,
   bulkUpdateStatus,
+  syncAllBusinessTaxProfiles,
 } from "../controllers/bussiness_controller";
-import { authenticateUser, isAdmin, authorize } from "../middlewares/authorized";
+import {
+  authenticateUser,
+  isAdmin,
+  authorize,
+} from "../middlewares/authorized";
 import { UserRole } from "../models/users";
 
 const router: any = Router();
@@ -23,7 +28,7 @@ router.use(authorize(UserRole.SALES, UserRole.PURCHASING));
 router.post("/bulk-import", bulkImportBusinesses);
 router.post("/bulk-delete", isAdmin, bulkDeleteBusinesses);
 router.post("/bulk-update-status", bulkUpdateStatus);
-
+router.get("/tax/sync-tax-profiles", syncAllBusinessTaxProfiles);
 router.post("/", createBusiness);
 router.get("/", getAllBusinesses);
 router.get("/statistics", getBusinessStatistics);

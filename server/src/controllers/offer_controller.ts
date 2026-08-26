@@ -2173,41 +2173,41 @@ export class OfferController {
   }
 
   /**
-   * Single-customer resolution path (used by getOfferById). Loads the
-   * customer, every active tax profile, and every active country, then
-   * runs the same matching heuristic as matchTaxProfileForCustomer.
-   * customerId can be null/undefined (no custome
-   * r on the offer yet) — in
-   * that case we still return a sane default (DE-VAT if present, else the
-   * first configured profile) so the offer never shows "no tax profile".
+   * Angebot always shows the customer's CURRENT tax profile — read
+   * straight off Customer.default_tax_profile_id, which the Business
+   * controller (createBusiness/updateBusiness) keeps in sync from the
+   * customer's actual country_id relation + VAT status. No re-matching
+   * happens here; this is a display-time read of an already-resolved
+   * value. Falls back to a DE-VAT (or first active) profile only when
+   * the customer has no resolved profile yet (e.g. never saved through
+   * the Business page) or no customer is attached to the offer.
    */
+  private async getDefaultFallbackTaxProfile(): Promise<any> {
+    const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+    const profiles = await taxProfileRepository.find({
+      where: { is_active: true },
+    });
+    if (!profiles.length) return null;
+    return (
+      profiles.find(
+        (tp: any) => (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
+      ) || profiles[0]
+    );
+  }
+
   private async getCustomerTaxProfile(
     customerId?: string | null,
   ): Promise<any> {
-    const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
-    const countryRepository = AppDataSource.getRepository(Country);
-
-    const [taxProfiles, countries] = await Promise.all([
-      taxProfileRepository.find({ where: { is_active: true } }),
-      countryRepository.find({ where: { is_active: true } }),
-    ]);
-
-    if (!taxProfiles || taxProfiles.length === 0) return null;
-
-    let customer: any = null;
     if (customerId) {
-      customer = await this.customerRepository.findOne({
+      const customer = await this.customerRepository.findOne({
         where: { id: customerId },
+        relations: ["defaultTaxProfile"],
       });
+      if (customer?.defaultTaxProfile) {
+        return this.mapTaxProfile(customer.defaultTaxProfile);
+      }
     }
-
-    const matched = this.matchTaxProfileForCustomer(
-      customer || { country: "DE" },
-      taxProfiles,
-      countries,
-    );
-
-    return this.mapTaxProfile(matched);
+    return this.mapTaxProfile(await this.getDefaultFallbackTaxProfile());
   }
 
   async getOfferById(request: Request, response: Response) {
