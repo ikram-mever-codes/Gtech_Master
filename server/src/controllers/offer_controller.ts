@@ -2429,13 +2429,10 @@ export class OfferController {
           sourceItems.map((it: any) => [String(it.id), it.photo || undefined]),
         );
       }
-
-      // Live-resolved tax profiles, batched: one query for every distinct
-      // customer on the page, plus the full tax-profile and country
-      // tables (both small, safe to load once per request), then matched
-      // per customer with the exact same heuristic as
-      // getCustomerTaxProfile / the Business page — NOT read off a
-      // defaultTaxProfile relation, which is what was producing null.
+      // Tax profiles for every distinct customer on the page — read
+      // directly from Customer.default_tax_profile_id (kept in sync by
+      // createBusiness/updateBusiness), one batched query, no re-matching
+      // against country/VAT data here.
       const customerIds: any = Array.from(
         new Set(
           offers
@@ -2444,40 +2441,28 @@ export class OfferController {
         ),
       );
 
-      const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
-      const countryRepository = AppDataSource.getRepository(Country);
-      const [allTaxProfiles, allCountries] = await Promise.all([
-        taxProfileRepository.find({ where: { is_active: true } }),
-        countryRepository.find({ where: { is_active: true } }),
-      ]);
-
       let customersById = new Map<string, any>();
       if (customerIds.length > 0) {
         const customersOnPage = await this.customerRepository.find({
           where: { id: In(customerIds) },
+          relations: ["defaultTaxProfile"],
         });
         customersById = new Map(customersOnPage.map((c: any) => [c.id, c]));
       }
 
+      const fallbackTaxProfile = await this.getDefaultFallbackTaxProfile();
+      const defaultTaxProfile = this.mapTaxProfile(fallbackTaxProfile);
+
       const taxProfileByCustomerId = new Map<string, any>();
       for (const customerId of customerIds) {
-        const customer = customersById.get(customerId) || { country: "DE" };
-        const matched = this.matchTaxProfileForCustomer(
-          customer,
-          allTaxProfiles,
-          allCountries,
+        const customer = customersById.get(customerId);
+        taxProfileByCustomerId.set(
+          customerId,
+          customer?.defaultTaxProfile
+            ? this.mapTaxProfile(customer.defaultTaxProfile)
+            : defaultTaxProfile,
         );
-        taxProfileByCustomerId.set(customerId, this.mapTaxProfile(matched));
       }
-      // Default profile for offers with no customer assigned yet — same
-      // DE-first fallback as the single-offer path.
-      const defaultTaxProfile = this.mapTaxProfile(
-        this.matchTaxProfileForCustomer(
-          { country: "DE" },
-          allTaxProfiles,
-          allCountries,
-        ),
-      );
 
       // Linked Aufträge (CustomerOrder records) for every offer on this
       // page, batched into a single query rather than one per offer.

@@ -476,103 +476,53 @@ export const getOfferDraftItemsPreview = async (
   }
 };
 
-function matchTaxProfileForCustomer(
-  customer: any,
-  taxProfiles: any[],
-  countries: any[],
-): any {
-  if (!taxProfiles || taxProfiles.length === 0) return null;
-
-  const countryCode = (customer?.country || "DE").trim().toUpperCase();
-  const vatTaxId = (customer?.vatTaxId || "").trim();
-  const vatIdStatus = (customer?.vat_id_status || "").trim();
-
-  let targetCase = "third_country";
-
-  if (countryCode === "DE" || "GERMANY") {
-    targetCase = "DE-VAT";
-  } else {
-    const matchedCountry = countries.find(
-      (c: any) => (c.iso2 || "").trim().toUpperCase() === countryCode,
-    );
-    const isIgl = Boolean(
-      matchedCountry?.is_igl_country || matchedCountry?.is_eu,
-    );
-
-    if (isIgl) {
-      const isValidStatus =
-        vatIdStatus === "vies_valid" || vatIdStatus === "bzst_qualified_valid";
-      targetCase = vatTaxId && isValidStatus ? "EU_IGL" : "EU_no_valid_VAT_ID";
-    } else {
-      targetCase = "third_country";
-    }
-  }
-
-  const exact = taxProfiles.find(
-    (tp: any) => (tp.tax_case || "").trim() === targetCase,
+/**
+ * DE-VAT (or first active) profile — used only when a customer has no
+ * resolved default_tax_profile_id yet.
+ */
+async function getDefaultFallbackTaxProfile(): Promise<any> {
+  const profiles = await taxProfileRepo.find({ where: { is_active: true } });
+  if (!profiles.length) return null;
+  return (
+    profiles.find(
+      (tp: any) => (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
+    ) || profiles[0]
   );
-  if (exact) return exact;
-
-  const heuristic = taxProfiles.find((tp: any) => {
-    const caseStr = (tp.tax_case || "").trim().toLowerCase();
-    const nameStr = (tp.name || "").toLowerCase();
-
-    if (targetCase === "DE-VAT") {
-      return (
-        caseStr === "de-vat" ||
-        caseStr === "de_vat" ||
-        nameStr.includes("standard vat") ||
-        Number(tp.tax_rate ?? 0) === 19
-      );
-    }
-    if (targetCase === "EU_IGL") {
-      return (
-        caseStr === "eu_igl" ||
-        caseStr === "eu-igl" ||
-        nameStr.includes("eu_igl") ||
-        nameStr.includes("reverse charge")
-      );
-    }
-    if (targetCase === "EU_no_valid_VAT_ID") {
-      return (
-        caseStr === "eu_no_valid_vat_id" ||
-        caseStr === "eu_no_valid" ||
-        nameStr.includes("no_valid") ||
-        nameStr.includes("no valid")
-      );
-    }
-    if (targetCase === "third_country") {
-      return (
-        caseStr === "third_country" ||
-        caseStr === "third country" ||
-        nameStr.includes("third") ||
-        nameStr.includes("export")
-      );
-    }
-    return false;
-  });
-
-  return heuristic || taxProfiles[0];
 }
 
-async function loadTaxMatchingData(): Promise<{
-  taxProfiles: any[];
-  countries: any[];
-}> {
-  const [taxProfiles, countries] = await Promise.all([
-    taxProfileRepo.find({ where: { is_active: true } }),
-    countryRepo.find({ where: { is_active: true } }),
-  ]);
-  return { taxProfiles, countries };
+/**
+ * Reads the customer's resolved tax profile straight off
+ * Customer.default_tax_profile_id (kept in sync by
+ * createBusiness/updateBusiness from the customer's actual country + VAT
+ * status). No country/VAT re-matching happens here — this is purely a
+ * lookup of an already-resolved value, with a DE-VAT fallback only for
+ * customers that predate the sync or have none set.
+ */
+async function resolveCustomerTaxProfile(
+  customerId?: string | null,
+): Promise<any> {
+  if (customerId) {
+    const customer = await customerRepo.findOne({
+      where: { id: customerId },
+      relations: ["defaultTaxProfile"],
+    });
+    if (customer?.defaultTaxProfile) return customer.defaultTaxProfile;
+  }
+  return getDefaultFallbackTaxProfile();
 }
 
 async function resolveAuftragTaxProfile(
   order: CustomerOrder,
 ): Promise<{ profile: any; changed: boolean }> {
-  const { taxProfiles, countries } = await loadTaxMatchingData();
   const status = order.auftrag_status || AuftragStatus.OPEN;
 
   if (status !== AuftragStatus.OPEN) {
+    // Frozen: never re-read from the customer. Only match the stored
+    // tax_rate against tax_profiles to get a display name — tax_rate
+    // itself is never touched here.
+    const taxProfiles = await taxProfileRepo.find({
+      where: { is_active: true },
+    });
     const frozenMatch = taxProfiles.find(
       (tp: any) => Number(tp.tax_rate) === Number(order.tax_rate ?? 19),
     );
@@ -590,17 +540,9 @@ async function resolveAuftragTaxProfile(
     };
   }
 
-  let customer: any = null;
-  if (order.customer_id) {
-    customer = await customerRepo.findOne({ where: { id: order.customer_id } });
-  }
-
-  const matched = matchTaxProfileForCustomer(
-    customer || { country: "DE" },
-    taxProfiles,
-    countries,
-  );
-  const mapped = mapTaxProfile(matched);
+  // OPEN: live-read from the customer's resolved default_tax_profile_id.
+  const resolved = await resolveCustomerTaxProfile(order.customer_id);
+  const mapped = mapTaxProfile(resolved);
 
   const changed =
     !!mapped && Number(mapped.taxRate) !== Number(order.tax_rate ?? 19);
@@ -632,8 +574,9 @@ export const getAllCustomerOrders = async (
       offerIdByAuftragId,
     );
 
-    const { taxProfiles: allTaxProfiles, countries: allCountries } =
-      await loadTaxMatchingData();
+    const allTaxProfiles = await taxProfileRepo.find({
+      where: { is_active: true },
+    });
 
     const customerIds = Array.from(
       new Set(
@@ -645,6 +588,7 @@ export const getAllCustomerOrders = async (
     if (customerIds.length > 0) {
       const customersOnPage = await customerRepo.find({
         where: { id: In(customerIds) },
+        relations: ["defaultTaxProfile"],
       });
       customersById = new Map(customersOnPage.map((c: any) => [c.id, c]));
     }
@@ -678,15 +622,12 @@ export const getAllCustomerOrders = async (
         continue;
       }
 
+      // OPEN — read the customer's already-resolved tax profile directly,
+      // no country/VAT re-matching.
       const customer = order.customer_id
         ? customersById.get(order.customer_id)
         : null;
-      const matched = matchTaxProfileForCustomer(
-        customer || { country: "DE" },
-        allTaxProfiles,
-        allCountries,
-      );
-      const mapped = mapTaxProfile(matched);
+      const mapped = mapTaxProfile(customer?.defaultTaxProfile);
       taxProfileByOrderId.set(order.id, mapped);
 
       if (mapped && Number(mapped.taxRate) !== Number(order.tax_rate ?? 19)) {
@@ -973,18 +914,10 @@ export const createAuftragFromItems = async (
 };
 
 async function resolveLiveTaxRate(customerId?: string | null): Promise<number> {
-  const { taxProfiles, countries } = await loadTaxMatchingData();
-  let customer: any = null;
-  if (customerId) {
-    customer = await customerRepo.findOne({ where: { id: customerId } });
-  }
-  const matched = matchTaxProfileForCustomer(
-    customer || { country: "DE" },
-    taxProfiles,
-    countries,
-  );
-  return matched ? Number(matched.tax_rate) : 19;
+  const profile = await resolveCustomerTaxProfile(customerId);
+  return profile ? Number(profile.tax_rate) : 19;
 }
+
 export const createAuftragFromOffer = async (
   req: Request,
   res: Response,
