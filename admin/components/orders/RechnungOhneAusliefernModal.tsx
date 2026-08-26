@@ -3,8 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { Loader2, Receipt, CheckCircle, Percent, DollarSign } from "lucide-react";
-import { createRechnungOhneAusliefern, downloadRechnungOnlyEml } from "@/api/rechnungen";
+import {
+  Loader2,
+  Receipt,
+  CheckCircle,
+  Percent,
+  DollarSign,
+} from "lucide-react";
+import {
+  createRechnungOhneAusliefern,
+  downloadRechnungOnlyEml,
+} from "@/api/rechnungen";
 import { errorStyles, successStyles } from "@/utils/constants";
 
 interface RechnungOhneAusliefernModalProps {
@@ -21,7 +30,9 @@ export default function RechnungOhneAusliefernModal({
   onSuccess,
 }: RechnungOhneAusliefernModalProps) {
   const [amountType, setAmountType] = useState<"full" | "partial">("full");
-  const [calculationType, setCalculationType] = useState<"percentage" | "fixed">("percentage");
+  const [calculationType, setCalculationType] = useState<
+    "percentage" | "fixed"
+  >("percentage");
   const [value, setValue] = useState<string>("30");
   const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
@@ -40,10 +51,18 @@ export default function RechnungOhneAusliefernModal({
   const orderItems = auftrag.orderItems || auftrag.items || [];
   const totalSubtotal = orderItems.reduce(
     (sum: number, item: any) =>
-      sum + (Number(item.price) || 0) * (Number(item.quantity || item.qty) || 1),
+      sum +
+      (Number(item.price) || 0) * (Number(item.quantity || item.qty) || 1),
     0,
   );
   const taxRate = Number(auftrag.tax_rate ?? 19);
+  // Auftrag already carries a live-resolved (while OPEN) or frozen (once
+  // Partially Delivered/Delivered/Closed) taxProfile from the backend —
+  // same object the Ausliefern window reads. Purely informational here;
+  // the Rechnung this modal creates always copies auftrag.tax_rate as-is.
+  const taxProfileLabel = auftrag.taxProfile?.name
+    ? `${auftrag.taxProfile.name} (${taxRate}%)`
+    : `${taxRate}%`;
 
   let netAmount = totalSubtotal;
 
@@ -91,13 +110,17 @@ export default function RechnungOhneAusliefernModal({
 
       if (res?.success) {
         toast.success(
-          res.message || `Rechnung created successfully for ${auftrag.order_no}!`,
+          res.message ||
+            `Rechnung created successfully for ${auftrag.order_no}!`,
           successStyles,
         );
         const newRechnungId = res?.data?.id;
         if (newRechnungId) {
           try {
-            await downloadRechnungOnlyEml(newRechnungId, res?.data?.invoice_number);
+            await downloadRechnungOnlyEml(
+              newRechnungId,
+              res?.data?.invoice_number,
+            );
           } catch (emlErr) {
             console.warn("Could not auto-download EML:", emlErr);
           }
@@ -140,16 +163,22 @@ export default function RechnungOhneAusliefernModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div className="space-y-3">
-            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
-              Betrag Auswählen
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                Betrag Auswählen
+              </label>
+              <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5">
+                Tax profile: {taxProfileLabel}
+              </span>
+            </div>
 
             <div className="grid grid-cols-1 gap-3">
               <label
-                className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${amountType === "full"
-                  ? "border-emerald-500 bg-emerald-50/40 ring-2 ring-emerald-500/20"
-                  : "border-gray-200 hover:border-gray-300 bg-white"
-                  }`}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                  amountType === "full"
+                    ? "border-emerald-500 bg-emerald-50/40 ring-2 ring-emerald-500/20"
+                    : "border-gray-200 hover:border-gray-300 bg-white"
+                }`}
               >
                 <input
                   type="radio"
@@ -170,10 +199,11 @@ export default function RechnungOhneAusliefernModal({
               </label>
 
               <label
-                className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${amountType === "partial"
-                  ? "border-emerald-500 bg-emerald-50/40 ring-2 ring-emerald-500/20"
-                  : "border-gray-200 hover:border-gray-300 bg-white"
-                  }`}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                  amountType === "partial"
+                    ? "border-emerald-500 bg-emerald-50/40 ring-2 ring-emerald-500/20"
+                    : "border-gray-200 hover:border-gray-300 bg-white"
+                }`}
               >
                 <input
                   type="radio"
@@ -203,10 +233,11 @@ export default function RechnungOhneAusliefernModal({
                             setCalculationType("percentage");
                             setValue("30");
                           }}
-                          className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${calculationType === "percentage"
-                            ? "bg-white text-gray-900 shadow-xs"
-                            : "text-gray-600 hover:text-gray-900"
-                            }`}
+                          className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                            calculationType === "percentage"
+                              ? "bg-white text-gray-900 shadow-xs"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
                         >
                           <Percent className="w-3.5 h-3.5" />
                           Percentage (%)
@@ -219,10 +250,11 @@ export default function RechnungOhneAusliefernModal({
                               (totalSubtotal * 0.3).toFixed(2).toString(),
                             );
                           }}
-                          className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${calculationType === "fixed"
-                            ? "bg-white text-gray-900 shadow-xs"
-                            : "text-gray-600 hover:text-gray-900"
-                            }`}
+                          className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                            calculationType === "fixed"
+                              ? "bg-white text-gray-900 shadow-xs"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
                         >
                           <DollarSign className="w-3.5 h-3.5" />
                           Fixed Amount (€)
@@ -240,7 +272,11 @@ export default function RechnungOhneAusliefernModal({
                             type="number"
                             step="any"
                             min="0.01"
-                            max={calculationType === "percentage" ? "100" : undefined}
+                            max={
+                              calculationType === "percentage"
+                                ? "100"
+                                : undefined
+                            }
                             value={value}
                             onChange={(e) => setValue(e.target.value)}
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent font-bold pr-8"
