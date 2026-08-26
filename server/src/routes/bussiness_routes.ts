@@ -28,7 +28,7 @@ router.use(authorize(UserRole.SALES, UserRole.PURCHASING));
 router.post("/bulk-import", bulkImportBusinesses);
 router.post("/bulk-delete", isAdmin, bulkDeleteBusinesses);
 router.post("/bulk-update-status", bulkUpdateStatus);
-router.get("/tax/sync-tax-profiles", syncAllBusinessTaxProfiles);
+// router.get("/tax/sync-tax-profiles", syncAllBusinessTaxProfiles);
 router.post("/", createBusiness);
 router.get("/", getAllBusinesses);
 router.get("/statistics", getBusinessStatistics);
