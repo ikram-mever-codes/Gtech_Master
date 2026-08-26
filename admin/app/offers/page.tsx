@@ -868,6 +868,14 @@ const OffersPage: React.FC<any> = ({
           emptyMessage="Kein Angebot gefunden"
           onRowClick={(row) => openDetail(row)}
           expandedRowIds={expandedOfferIds}
+          summaryCount={displayOffers.length}
+          summaryTotal={displayOffers.reduce((sum: number, off: any) => {
+            const val =
+              typeof off.totalAmount === "number"
+                ? off.totalAmount
+                : parseFloat(off.totalAmount || off.total || "0");
+            return sum + (isNaN(val) ? 0 : val);
+          }, 0)}
           renderRowDetails={(row) => (
             <OfferLineItemsTable
               offer={row}

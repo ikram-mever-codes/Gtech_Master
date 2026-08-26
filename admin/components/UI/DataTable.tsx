@@ -36,6 +36,10 @@ export type DataTableProps<T> = {
   sortColumn?: string | null;
   sortDirection?: "ASC" | "DESC" | null;
   onSort?: (sortKey: string, direction: "ASC" | "DESC" | null) => void;
+  summaryCount?: number;
+  summaryTotal?: number | string | null;
+  summaryCurrency?: string;
+  showSummaryBox?: boolean;
 };
 
 export function DataTable<T>({
@@ -58,6 +62,10 @@ export function DataTable<T>({
   sortColumn,
   sortDirection,
   onSort,
+  summaryCount,
+  summaryTotal,
+  summaryCurrency = "EUR",
+  showSummaryBox,
 }: DataTableProps<T>) {
   const [internalSortColumn, setInternalSortColumn] = useState<string | null>(
     null,
@@ -289,6 +297,32 @@ export function DataTable<T>({
         </tbody>
         {tfoot}
       </table>
+      {(showSummaryBox ||
+        summaryCount !== undefined ||
+        (summaryTotal !== undefined && summaryTotal !== null)) && (
+          <div className="flex flex-wrap justify-between items-center px-4 py-2.5 bg-gray-50 border-t border-gray-200 text-xs font-medium text-gray-700 font-poppins gap-2">
+            <div className="text-gray-600 font-semibold">
+              {summaryCount !== undefined
+                ? summaryCount
+                : processedData.length}{" "}
+              Einträge geladen
+            </div>
+            {summaryTotal !== undefined && summaryTotal !== null && (
+              <div className="bg-white px-3 py-1 rounded-md border border-gray-300 shadow-sm text-gray-900 font-bold flex items-center gap-1.5">
+                <span className="text-gray-500 font-normal">Summe:</span>
+                <span className="text-[#8CC21B]">
+                  {typeof summaryTotal === "number"
+                    ? summaryTotal.toLocaleString("de-DE", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                    : summaryTotal}{" "}
+                  {summaryCurrency}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
     </div>
   );
 }
