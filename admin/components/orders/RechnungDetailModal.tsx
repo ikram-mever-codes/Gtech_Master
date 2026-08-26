@@ -225,10 +225,10 @@ export default function RechnungDetailModal({
     setEditShippingQuantity(Number(rechnung?.shipping_quantity) || 1);
     setEditShippingMethod(
       rechnung?.shipping_method ||
-      rechnung?.auftrag?.shipping_method ||
-      (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
-      (rechnung?.customerSnapshot as any)?.shipping_method ||
-      "",
+        rechnung?.auftrag?.shipping_method ||
+        (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
+        (rechnung?.customerSnapshot as any)?.shipping_method ||
+        "",
     );
 
     // Initialize corrections with default values for items that have open quantity
@@ -642,7 +642,9 @@ export default function RechnungDetailModal({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigator.clipboard.writeText(companyName !== "—" ? companyName : "");
+                  navigator.clipboard.writeText(
+                    companyName !== "—" ? companyName : "",
+                  );
                   toast.success("Title copied to clipboard!");
                 }}
                 className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer shrink-0"
@@ -666,10 +668,11 @@ export default function RechnungDetailModal({
               <button
                 type="button"
                 onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${isEditMode
-                  ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  isEditMode
+                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
               >
                 {isEditMode ? (
                   <>
@@ -1007,10 +1010,11 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${isFullyCorrected
-                                  ? "text-green-600"
-                                  : "text-amber-600"
-                                  }`}
+                                className={`font-semibold ${
+                                  isFullyCorrected
+                                    ? "text-green-600"
+                                    : "text-amber-600"
+                                }`}
                               >
                                 {openQty}
                               </span>
@@ -1242,10 +1246,11 @@ export default function RechnungDetailModal({
                         ⚠ Not uploaded yet
                       </span>
                       <label
-                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-amber-600 text-white hover:bg-amber-700"
-                          }`}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          uploadingDoc
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-amber-600 text-white hover:bg-amber-700"
+                        }`}
                       >
                         {uploadingDoc ? (
                           <>
@@ -1282,9 +1287,11 @@ export default function RechnungDetailModal({
                 </h3>
               </div>
               {auftragDocs.length === 0 &&
-                rechnungenKDocs.length === 0 &&
-                rechnungDocs.length === 0 ? (
-                <p className="text-sm text-gray-500">No linked documents yet.</p>
+              rechnungenKDocs.length === 0 &&
+              rechnungDocs.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No linked documents yet.
+                </p>
               ) : (
                 <div className="space-y-3">
                   {!isCorrection && auftragDocs.length > 0 && (
@@ -1412,7 +1419,9 @@ export default function RechnungDetailModal({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(data.internal_notes || data.internalNotes || "");
+                      navigator.clipboard.writeText(
+                        data.internal_notes || data.internalNotes || "",
+                      );
                       toast.success("Internal comment copied to clipboard!");
                     }}
                     className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
@@ -1436,7 +1445,9 @@ export default function RechnungDetailModal({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(data.notes || data.comment || data.notes_external || "");
+                      navigator.clipboard.writeText(
+                        data.notes || data.comment || data.notes_external || "",
+                      );
                       toast.success("External comment copied to clipboard!");
                     }}
                     className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
@@ -1471,10 +1482,11 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
-                  ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+                  hasCorrections && !isCreating
+                    ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
               >
                 {isCreating ? (
                   <>

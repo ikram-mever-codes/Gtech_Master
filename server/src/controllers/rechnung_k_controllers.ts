@@ -12,10 +12,33 @@ import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { generateRechnungKEml } from "../services/emlGenerator";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
+import { TaxProfile } from "../models/tax_profile";
 
 /** Fetches documents linked to a correction invoice (Rechnung_k): the
  * original Rechnung it was created from, and the originating Auftrag
  * (CustomerOrder). Full records, not just ids. */
+
+async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
+  const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
+  const profiles = await taxProfileRepo.find({ where: { is_active: true } });
+  const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
+  return match
+    ? {
+        id: match.id,
+        name: match.name,
+        taxCase: match.tax_case || undefined,
+        taxRate: Number(match.tax_rate),
+        taxCode: match.tax_code || undefined,
+      }
+    : {
+        id: null,
+        name: "Frozen",
+        taxCase: undefined,
+        taxRate: Number(taxRate) || 19,
+        taxCode: undefined,
+      };
+}
+
 async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
   const rechnungRepo = AppDataSource.getRepository(Rechnung);
   const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
@@ -23,15 +46,15 @@ async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
   const [originalRechnung, auftrag] = await Promise.all([
     rechnungK.original_rechnung_id
       ? rechnungRepo.findOne({
-        where: { id: rechnungK.original_rechnung_id },
-        select: ["id", "invoice_number", "title", "created_at"],
-      })
+          where: { id: rechnungK.original_rechnung_id },
+          select: ["id", "invoice_number", "title", "created_at"],
+        })
       : Promise.resolve(null),
     rechnungK.auftrag_id
       ? customerOrderRepo.findOne({
-        where: { id: rechnungK.auftrag_id },
-        select: ["id", "order_no", "title", "created_at"],
-      })
+          where: { id: rechnungK.auftrag_id },
+          select: ["id", "order_no", "title", "created_at"],
+        })
       : Promise.resolve(null),
   ]);
 
@@ -71,15 +94,15 @@ async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
   const [rechnungen, auftraege] = await Promise.all([
     originalRechnungIds.length
       ? rechnungRepo.find({
-        where: { id: In(originalRechnungIds) },
-        select: ["id", "invoice_number", "title", "created_at"],
-      })
+          where: { id: In(originalRechnungIds) },
+          select: ["id", "invoice_number", "title", "created_at"],
+        })
       : Promise.resolve([]),
     auftragIds.length
       ? customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "order_no", "title", "created_at"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "order_no", "title", "created_at"],
+        })
       : Promise.resolve([]),
   ]);
 
@@ -499,6 +522,13 @@ export const getAllRechnungenK = async (
 
     const linkedDocumentsByRechnungKId =
       await getLinkedDocumentsForRechnungenK(rechnungenK);
+    const distinctRates = Array.from(
+      new Set(rechnungenK.map((rk) => Number(rk.tax_rate) || 19)),
+    );
+    const taxProfileByRate = new Map<number, any>();
+    for (const rate of distinctRates) {
+      taxProfileByRate.set(rate, await resolveFrozenTaxProfile(rate));
+    }
 
     const rechnungenKWithLinkedDocuments = rechnungenK.map((rk: any) => {
       const linkedDocs = linkedDocumentsByRechnungKId.get(rk.id) || {
@@ -514,6 +544,7 @@ export const getAllRechnungenK = async (
         ...rk,
         title,
         linkedDocuments: linkedDocs,
+        taxProfile: taxProfileByRate.get(Number(rk.tax_rate) || 19),
       };
     });
 
@@ -549,8 +580,12 @@ export const getRechnungKById = async (
       linkedDocuments.rechnung[0]?.title ||
       linkedDocuments.auftrag[0]?.title ||
       undefined;
+    const taxProfile = await resolveFrozenTaxProfile(rechnungK.tax_rate);
 
-    res.json({ success: true, data: { ...rechnungK, title, linkedDocuments } });
+    res.json({
+      success: true,
+      data: { ...rechnungK, title, linkedDocuments, taxProfile },
+    });
   } catch (error) {
     next(error);
   }
@@ -755,10 +790,16 @@ export const downloadRechnungKPdf = async (
 
     const rawItems = (rechnungK.items || [])
       .slice()
-      .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+      .sort(
+        (a: any, b: any) =>
+          (Number(a.position) || 0) - (Number(b.position) || 0),
+      );
 
     const items = rawItems.map((it: any, idx: number) => {
-      const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
+      const qty =
+        it.quantity !== undefined && it.quantity !== null
+          ? Number(it.quantity)
+          : 1;
       const unitPrice = Number(it.unit_price_eur || it.price || 0);
       const lineTotal =
         it.total_price !== undefined && it.total_price !== null
@@ -793,8 +834,8 @@ export const downloadRechnungKPdf = async (
         [
           "Datum",
           rechnungK.date_created ||
-          rechnungK.created_at ||
-          rechnungK.invoice_date,
+            rechnungK.created_at ||
+            rechnungK.invoice_date,
         ],
       ],
       isDelivered: true,
@@ -812,10 +853,8 @@ export const downloadRechnungKPdf = async (
       taxRate: defaultTaxRate,
       currency: rechnungK.currency || "EUR",
       notes: rechnungK.notes,
-      deliveryTime:
-        (rechnungK as any).delivery_date || rechnungK.date_delivery,
-      deliveryDate:
-        (rechnungK as any).delivery_date || rechnungK.date_delivery,
+      deliveryTime: (rechnungK as any).delivery_date || rechnungK.date_delivery,
+      deliveryDate: (rechnungK as any).delivery_date || rechnungK.date_delivery,
       deliveryTerms: rechnungK.delivery_terms,
       paymentTerms: rechnungK.payment_terms
         ? `Zahlungsziel: ${rechnungK.payment_terms} Tage`
@@ -841,7 +880,9 @@ export const downloadRechnungKPdf = async (
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")
       .replace(/^_+|_+$/g, "");
-    const docNo = String(rechnungK.invoice_number || rechnungK.id || "rk").trim().replace(/[\s_]+/g, "_");
+    const docNo = String(rechnungK.invoice_number || rechnungK.id || "rk")
+      .trim()
+      .replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
       ? `Rechnungskorrektur_${docNo}_GTech_${cleanTitle}.pdf`
       : `Rechnungskorrektur_${docNo}_GTech.pdf`;
@@ -881,16 +922,21 @@ export const updateRechnungK = async (
     });
 
     if (!rechnungK) {
-      res.status(404).json({ success: false, message: "Correction invoice not found" });
+      res
+        .status(404)
+        .json({ success: false, message: "Correction invoice not found" });
       return;
     }
 
     if (notes !== undefined) rechnungK.notes = notes;
     if (internal_notes !== undefined) rechnungK.internal_notes = internal_notes;
-    if (highlight_color !== undefined) rechnungK.highlight_color = highlight_color;
+    if (highlight_color !== undefined)
+      rechnungK.highlight_color = highlight_color;
     if (title !== undefined) rechnungK.title = title;
-    if (customerSnapshot !== undefined) rechnungK.customerSnapshot = { ...customerSnapshot };
-    if (deliveryAddress !== undefined) rechnungK.deliveryAddress = { ...deliveryAddress };
+    if (customerSnapshot !== undefined)
+      rechnungK.customerSnapshot = { ...customerSnapshot };
+    if (deliveryAddress !== undefined)
+      rechnungK.deliveryAddress = { ...deliveryAddress };
 
     await rechnungKRepo.save(rechnungK);
 

@@ -22,11 +22,41 @@ import { Lieferschein } from "../models/lieferscheine";
 import { In } from "typeorm/find-options/operator/In";
 import { Rechnung_k } from "../models/rechnung_k";
 import { attachPaymentStatusToRechnungen } from "./payment_allocations_controller";
+import { TaxProfile } from "../models/tax_profile";
 
 /** Fetches documents linked to a Rechnung: the originating Auftrag
  * (CustomerOrder, via auftrag_id) and every correction invoice
  * (Rechnung_k) created against it (via original_rechnung_id). Full
  * records, not just ids. */
+
+/**
+ * Resolves the display-only tax profile for a frozen Rechnung/RK: matched
+ * by rate against tax_profiles, never against the customer. Rechnung and
+ * RK tax_rate is set once at creation (copied from the Auftrag) and never
+ * recomputed — this only looks up a human-readable name for whatever rate
+ * is already stored, it never changes tax_rate itself.
+ */
+async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
+  const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
+  const profiles = await taxProfileRepo.find({ where: { is_active: true } });
+  const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
+  return match
+    ? {
+        id: match.id,
+        name: match.name,
+        taxCase: match.tax_case || undefined,
+        taxRate: Number(match.tax_rate),
+        taxCode: match.tax_code || undefined,
+      }
+    : {
+        id: null,
+        name: "Frozen",
+        taxCase: undefined,
+        taxRate: Number(taxRate) || 19,
+        taxCode: undefined,
+      };
+}
+
 async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
   const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
@@ -516,7 +546,11 @@ export const createRechnungFromAuftrag = async (
       customerSnapshot: auftrag.customerSnapshot || undefined,
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: auftrag.shipping_method || (auftrag.customerSnapshot as any)?.defaultShippingMethod || (auftrag.customerSnapshot as any)?.shipping_method || undefined,
+      shipping_method:
+        auftrag.shipping_method ||
+        (auftrag.customerSnapshot as any)?.defaultShippingMethod ||
+        (auftrag.customerSnapshot as any)?.shipping_method ||
+        undefined,
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
@@ -592,7 +626,11 @@ export const createRechnungFromAuftrag = async (
         discount_percentage: discountPercentage,
         discount_amount: discountAmount,
         payment_terms: auftrag.payment_terms || undefined,
-        shipping_method: auftrag.shipping_method || (auftrag.customerSnapshot as any)?.defaultShippingMethod || (auftrag.customerSnapshot as any)?.shipping_method || undefined,
+        shipping_method:
+          auftrag.shipping_method ||
+          (auftrag.customerSnapshot as any)?.defaultShippingMethod ||
+          (auftrag.customerSnapshot as any)?.shipping_method ||
+          undefined,
       });
       const savedCciInv = await cciInvRepo.save(cciInv);
 
@@ -872,6 +910,14 @@ export const getAllRechnungen = async (
 
     await attachPaymentStatusToRechnungen(rechnungen);
 
+    const distinctRates = Array.from(
+      new Set(rechnungen.map((r) => Number(r.tax_rate) || 19)),
+    );
+    const taxProfileByRate = new Map<number, any>();
+    for (const rate of distinctRates) {
+      taxProfileByRate.set(rate, await resolveFrozenTaxProfile(rate));
+    }
+
     const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => {
       const linkedDocs = linkedDocumentsByRechnungId.get(r.id) || {
         auftrag: [],
@@ -882,9 +928,9 @@ export const getAllRechnungen = async (
         ...r,
         title,
         linkedDocuments: linkedDocs,
+        taxProfile: taxProfileByRate.get(Number(r.tax_rate) || 19),
       };
     });
-
     res.json({
       success: true,
       data: rechnungenWithLinkedDocuments,
@@ -1023,10 +1069,11 @@ export const getRechnungById = async (
 
     const title =
       rechnung.title || linkedDocuments.auftrag[0]?.title || undefined;
+    const taxProfile = await resolveFrozenTaxProfile(rechnung.tax_rate);
 
     res.json({
       success: true,
-      data: { ...rechnung, title, linkedDocuments },
+      data: { ...rechnung, title, linkedDocuments, taxProfile },
     });
   } catch (error) {
     next(error);

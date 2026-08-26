@@ -34,16 +34,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => { },
-      IsEnum: () => () => { },
-      IsNumber: () => () => { },
-      IsObject: () => () => { },
-      IsOptional: () => () => { },
-      IsString: () => () => { },
-      Max: () => () => { },
-      Min: () => () => { },
-      IsBoolean: () => () => { },
-      IsArray: () => () => { },
+      IsDate: () => () => {},
+      IsEnum: () => () => {},
+      IsNumber: () => () => {},
+      IsObject: () => () => {},
+      IsOptional: () => () => {},
+      IsString: () => () => {},
+      Max: () => () => {},
+      Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -54,7 +54,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => { },
+      Type: () => () => {},
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -116,6 +116,8 @@ import { getActiveTemplateFilePath } from "./system_parameter_controller";
 import * as pdfLib from "pdf-lib";
 import { CustomerOrder } from "../models/customer_orders";
 import { ItemLinkService } from "../services/item_link_service";
+import { TaxProfile } from "../models/tax_profile";
+import { Country } from "../models/country";
 
 let cachedCustomerSvg: string | null = null;
 let cachedTemplatePath: string | null = null;
@@ -924,16 +926,6 @@ export class OfferController {
     }
     return merged;
   }
-  private async getCustomerTaxProfile(
-    customerId?: string | null,
-  ): Promise<any> {
-    if (!customerId) return null;
-    const customer = await this.customerRepository.findOne({
-      where: { id: customerId },
-      relations: ["defaultTaxProfile"],
-    });
-    return this.mapTaxProfile(customer?.defaultTaxProfile);
-  }
 
   private async generateOfferNumber(): Promise<string> {
     try {
@@ -1187,9 +1179,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-              createOfferDto.defaultPriceMatrix,
-              createOfferDto.totalPriceDecimalPlaces || 2,
-            )
+                createOfferDto.defaultPriceMatrix,
+                createOfferDto.totalPriceDecimalPlaces || 2,
+              )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -1220,7 +1212,7 @@ export class OfferController {
         // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-            customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         paymentMethod: createOfferDto.paymentMethod,
@@ -1508,7 +1500,7 @@ export class OfferController {
         paymentMethod: body.paymentMethod,
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-            customer.defaultPaymentDueDays !== null
+          customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         shippingMethod: body.shippingMethod,
@@ -2099,6 +2091,125 @@ export class OfferController {
     }
   }
 
+  private matchTaxProfileForCustomer(
+    customer: any,
+    taxProfiles: any[],
+    countries: any[],
+  ): any {
+    if (!taxProfiles || taxProfiles.length === 0) return null;
+
+    const countryCode = (customer?.country || "DE").trim().toUpperCase();
+    const vatTaxId = (customer?.vatTaxId || "").trim();
+    const vatIdStatus = (customer?.vat_id_status || "").trim();
+
+    let targetCase = "third_country";
+
+    if (countryCode === "DE" || "GERMANY") {
+      targetCase = "DE-VAT";
+    } else {
+      const matchedCountry = countries.find(
+        (c: any) => (c.iso2 || "").trim().toUpperCase() === countryCode,
+      );
+      const isIgl = Boolean(
+        matchedCountry?.is_igl_country || matchedCountry?.is_eu,
+      );
+
+      if (isIgl) {
+        const isValidStatus =
+          vatIdStatus === "vies_valid" ||
+          vatIdStatus === "bzst_qualified_valid";
+        targetCase =
+          vatTaxId && isValidStatus ? "EU_IGL" : "EU_no_valid_VAT_ID";
+      } else {
+        targetCase = "third_country";
+      }
+    }
+
+    const exact = taxProfiles.find(
+      (tp: any) => (tp.tax_case || "").trim() === targetCase,
+    );
+    if (exact) return exact;
+
+    const heuristic = taxProfiles.find((tp: any) => {
+      const caseStr = (tp.tax_case || "").trim().toLowerCase();
+      const nameStr = (tp.name || "").toLowerCase();
+
+      if (targetCase === "DE-VAT") {
+        return (
+          caseStr === "de-vat" ||
+          caseStr === "de_vat" ||
+          nameStr.includes("standard vat") ||
+          Number(tp.tax_rate ?? 0) === 19
+        );
+      }
+      if (targetCase === "EU_IGL") {
+        return (
+          caseStr === "eu_igl" ||
+          caseStr === "eu-igl" ||
+          nameStr.includes("eu_igl") ||
+          nameStr.includes("reverse charge")
+        );
+      }
+      if (targetCase === "EU_no_valid_VAT_ID") {
+        return (
+          caseStr === "eu_no_valid_vat_id" ||
+          caseStr === "eu_no_valid" ||
+          nameStr.includes("no_valid") ||
+          nameStr.includes("no valid")
+        );
+      }
+      if (targetCase === "third_country") {
+        return (
+          caseStr === "third_country" ||
+          caseStr === "third country" ||
+          nameStr.includes("third") ||
+          nameStr.includes("export")
+        );
+      }
+      return false;
+    });
+
+    return heuristic || taxProfiles[0];
+  }
+
+  /**
+   * Single-customer resolution path (used by getOfferById). Loads the
+   * customer, every active tax profile, and every active country, then
+   * runs the same matching heuristic as matchTaxProfileForCustomer.
+   * customerId can be null/undefined (no custome
+   * r on the offer yet) — in
+   * that case we still return a sane default (DE-VAT if present, else the
+   * first configured profile) so the offer never shows "no tax profile".
+   */
+  private async getCustomerTaxProfile(
+    customerId?: string | null,
+  ): Promise<any> {
+    const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+    const countryRepository = AppDataSource.getRepository(Country);
+
+    const [taxProfiles, countries] = await Promise.all([
+      taxProfileRepository.find({ where: { is_active: true } }),
+      countryRepository.find({ where: { is_active: true } }),
+    ]);
+
+    if (!taxProfiles || taxProfiles.length === 0) return null;
+
+    let customer: any = null;
+    if (customerId) {
+      customer = await this.customerRepository.findOne({
+        where: { id: customerId },
+      });
+    }
+
+    const matched = this.matchTaxProfileForCustomer(
+      customer || { country: "DE" },
+      taxProfiles,
+      countries,
+    );
+
+    return this.mapTaxProfile(matched);
+  }
+
   async getOfferById(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -2210,7 +2321,10 @@ export class OfferController {
         }));
       }
 
-      // Live-resolved tax profile
+      // Live-resolved tax profile — matched from the customer's country
+      // and VAT ID status against tax_profiles, same logic as the
+      // Relationships/Business page. Angebot always shows the customer's
+      // CURRENT profile, recomputed on every load.
       const taxProfile = await this.getCustomerTaxProfile(offer.customerId);
 
       // Linked Aufträge (CustomerOrder records) for this offer — full
@@ -2316,8 +2430,13 @@ export class OfferController {
         );
       }
 
-      // Live-resolved tax profiles
-      const customerIds = Array.from(
+      // Live-resolved tax profiles, batched: one query for every distinct
+      // customer on the page, plus the full tax-profile and country
+      // tables (both small, safe to load once per request), then matched
+      // per customer with the exact same heuristic as
+      // getCustomerTaxProfile / the Business page — NOT read off a
+      // defaultTaxProfile relation, which is what was producing null.
+      const customerIds: any = Array.from(
         new Set(
           offers
             .map((o: any) => o.customerId)
@@ -2325,19 +2444,40 @@ export class OfferController {
         ),
       );
 
-      let taxProfileByCustomerId = new Map<string, any>();
+      const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+      const countryRepository = AppDataSource.getRepository(Country);
+      const [allTaxProfiles, allCountries] = await Promise.all([
+        taxProfileRepository.find({ where: { is_active: true } }),
+        countryRepository.find({ where: { is_active: true } }),
+      ]);
+
+      let customersById = new Map<string, any>();
       if (customerIds.length > 0) {
-        const customersWithTax = await this.customerRepository.find({
+        const customersOnPage = await this.customerRepository.find({
           where: { id: In(customerIds) },
-          relations: ["defaultTaxProfile"],
         });
-        taxProfileByCustomerId = new Map(
-          customersWithTax.map((c: any) => [
-            c.id,
-            this.mapTaxProfile(c.defaultTaxProfile),
-          ]),
-        );
+        customersById = new Map(customersOnPage.map((c: any) => [c.id, c]));
       }
+
+      const taxProfileByCustomerId = new Map<string, any>();
+      for (const customerId of customerIds) {
+        const customer = customersById.get(customerId) || { country: "DE" };
+        const matched = this.matchTaxProfileForCustomer(
+          customer,
+          allTaxProfiles,
+          allCountries,
+        );
+        taxProfileByCustomerId.set(customerId, this.mapTaxProfile(matched));
+      }
+      // Default profile for offers with no customer assigned yet — same
+      // DE-first fallback as the single-offer path.
+      const defaultTaxProfile = this.mapTaxProfile(
+        this.matchTaxProfileForCustomer(
+          { country: "DE" },
+          allTaxProfiles,
+          allCountries,
+        ),
+      );
 
       // Linked Aufträge (CustomerOrder records) for every offer on this
       // page, batched into a single query rather than one per offer.
@@ -2367,8 +2507,8 @@ export class OfferController {
         return {
           ...offer,
           taxProfile: offer.customerId
-            ? taxProfileByCustomerId.get(offer.customerId) || null
-            : null,
+            ? taxProfileByCustomerId.get(offer.customerId) || defaultTaxProfile
+            : defaultTaxProfile,
           lineItems: (offer.lineItems || []).map((item: any) => ({
             ...item,
             itemNo: item.material,
@@ -3118,10 +3258,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                  totalPriceDecimalPlaces,
-                ),
-              );
+                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                    totalPriceDecimalPlaces,
+                  ),
+                );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -3331,11 +3471,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-              ...tpl,
-              price: match.price,
-              total: match.total,
-              isActive: match.isActive,
-            }
+                ...tpl,
+                price: match.price,
+                total: match.total,
+                isActive: match.isActive,
+              }
             : { ...tpl };
         });
 
@@ -3584,7 +3724,7 @@ export class OfferController {
 
       const resolvedDefaultTaxRate: number =
         customerTaxProfile?.taxRate !== undefined &&
-          customerTaxProfile?.taxRate !== null
+        customerTaxProfile?.taxRate !== null
           ? getSafeNumber(customerTaxProfile.taxRate)
           : offer.taxRate !== undefined && offer.taxRate !== null
             ? getSafeNumber(offer.taxRate)
@@ -3640,7 +3780,7 @@ export class OfferController {
         if (shippingTotal > 0) {
           const shipRate =
             offerData.shippingTaxRate !== undefined &&
-              offerData.shippingTaxRate !== null
+            offerData.shippingTaxRate !== null
               ? getSafeNumber(offerData.shippingTaxRate)
               : resolvedDefaultTaxRate;
           taxAmount += shippingTotal * (shipRate / 100);
@@ -4101,14 +4241,14 @@ export class OfferController {
           .sort((a: any, b: any) => {
             const orderA =
               a.position !== undefined &&
-                a.position !== null &&
-                a.position !== 0
+              a.position !== null &&
+              a.position !== 0
                 ? Number(a.position)
                 : Number(a.sortOrder) || Number(a.index) || 0;
             const orderB =
               b.position !== undefined &&
-                b.position !== null &&
-                b.position !== 0
+              b.position !== null &&
+              b.position !== 0
                 ? Number(b.position)
                 : Number(b.sortOrder) || Number(b.index) || 0;
             return orderA - orderB;
@@ -4147,11 +4287,11 @@ export class OfferController {
             : cleanPdfText(item.material) || item.id?.substring(0, 8) || "—";
           const rawRemarks = cleanPdfText(
             item.notes ||
-            item.remarks ||
-            item.specification ||
-            item.remark_ex ||
-            item.remark ||
-            "",
+              item.remarks ||
+              item.specification ||
+              item.remark_ex ||
+              item.remark ||
+              "",
           );
           const hasRemark = !!(
             rawRemarks &&
@@ -4170,9 +4310,9 @@ export class OfferController {
           });
           const remarkHeight = hasRemark
             ? doc.font(R).fontSize(8).heightOfString(rawRemarks, {
-              width: remarkWidth,
-              lineGap: 2,
-            }) + halfRowGap
+                width: remarkWidth,
+                lineGap: 2,
+              }) + halfRowGap
             : 0;
 
           const computedRowHeight = Math.max(
@@ -4405,7 +4545,7 @@ export class OfferController {
       const discountFactor =
         Number(totals.subtotal) > 0
           ? (Number(totals.subtotal) - Number(totals.discountAmount || 0)) /
-          Number(totals.subtotal)
+            Number(totals.subtotal)
           : 1;
 
       (offer.lineItems || (offer as any).items || []).forEach((it: any) => {
@@ -4486,24 +4626,65 @@ export class OfferController {
 
       const rawTaxProfileKey = String(
         customerTaxProfile?.key ||
-        customerTaxProfile?.name ||
-        (customer as any)?.tax_profile_case ||
-        (customer as any)?.taxProfile ||
-        (customer as any)?.tax_profile ||
-        "",
+          customerTaxProfile?.name ||
+          (customer as any)?.tax_profile_case ||
+          (customer as any)?.taxProfile ||
+          (customer as any)?.tax_profile ||
+          "",
       ).trim();
 
       const rawCountry = String(
-        customer?.country ||
-        customerEntity?.country ||
-        "",
-      ).trim().toUpperCase();
+        customer?.country || customerEntity?.country || "",
+      )
+        .trim()
+        .toUpperCase();
 
       let isEuIgl = /EU_IGL|EU-IGL|IGL/i.test(rawTaxProfileKey);
-      let isThirdCountry = /third_country|thirdcountry|drittland|3rd_country/i.test(rawTaxProfileKey);
+      let isThirdCountry =
+        /third_country|thirdcountry|drittland|3rd_country/i.test(
+          rawTaxProfileKey,
+        );
 
-      const isGermany = !rawCountry || ["DE", "GERMANY", "DEUTSCHLAND", "DEU"].includes(rawCountry);
-      const euCountries = ["AT", "ÖSTERREICH", "AUSTRIA", "BE", "BELGIUM", "BG", "CY", "CZ", "DK", "EE", "FI", "FR", "FRANCE", "GR", "GREECE", "HR", "HU", "IE", "IRELAND", "IT", "ITALY", "LT", "LU", "LV", "MT", "NL", "NETHERLANDS", "PL", "POLAND", "PT", "RO", "SE", "SWEDEN", "SI", "SK"];
+      const isGermany =
+        !rawCountry ||
+        ["DE", "GERMANY", "DEUTSCHLAND", "DEU"].includes(rawCountry);
+      const euCountries = [
+        "AT",
+        "ÖSTERREICH",
+        "AUSTRIA",
+        "BE",
+        "BELGIUM",
+        "BG",
+        "CY",
+        "CZ",
+        "DK",
+        "EE",
+        "FI",
+        "FR",
+        "FRANCE",
+        "GR",
+        "GREECE",
+        "HR",
+        "HU",
+        "IE",
+        "IRELAND",
+        "IT",
+        "ITALY",
+        "LT",
+        "LU",
+        "LV",
+        "MT",
+        "NL",
+        "NETHERLANDS",
+        "PL",
+        "POLAND",
+        "PT",
+        "RO",
+        "SE",
+        "SWEDEN",
+        "SI",
+        "SK",
+      ];
 
       if (!isEuIgl && !isThirdCountry && !isGermany && calcVatTotal === 0) {
         if (euCountries.includes(rawCountry)) {

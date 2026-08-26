@@ -28,10 +28,12 @@ import { TransferOrder } from "../models/transfer_order";
 import { RechnungItem } from "../models/rechnung_items";
 import { TaxProfile } from "../models/tax_profile";
 import { RequestedItem } from "../models/requested_items";
+import { Country } from "../models/country";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
 const customerRepo = AppDataSource.getRepository(Customer);
 const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
+const countryRepo = AppDataSource.getRepository(Country);
 
 /**
  * Helper function to check if any of the order's line items are stock items
@@ -390,50 +392,6 @@ function mapTaxProfile(tp: any): any {
   };
 }
 
-/**
- * Auftrag-specific fallback for an unassigned customer — deliberately NOT
- * mirrored from Offer, which shows "No tax profile assigned" instead. You
- * asked for Auftrag specifically to default to DE here. Tries a few
- * plausible identifiers for your seeded default DE row; verify which one
- * actually matches and trim the rest.
- */
-async function getDefaultDeTaxProfile(): Promise<any> {
-  const candidates = await taxProfileRepo.find({
-    where: [
-      { tax_code: "DE_VAT" },
-      { tax_code: "DE" },
-      { name: "DE_VAT" },
-      { name: "DE-VAT" },
-      { name: "Germany" },
-      { name: "Deutschland" },
-    ],
-  });
-  const match = candidates.find((tp: any) => tp.is_active) || candidates[0];
-
-  return match
-    ? mapTaxProfile(match)
-    : {
-        id: null,
-        name: "DE_VAT",
-        taxCase: undefined,
-        taxRate: 19,
-        taxCode: "DE_VAT",
-      };
-}
-
-/** Live lookup via the customer's `defaultTaxProfile` relation, same as
- * Offer — but falls back to the DE default (instead of null) whenever
- * there's no customer or no profile assigned. */
-async function getCustomerTaxProfile(customerId?: string | null): Promise<any> {
-  if (!customerId) return getDefaultDeTaxProfile();
-  const customer = await customerRepo.findOne({
-    where: { id: customerId },
-    relations: ["defaultTaxProfile"],
-  });
-  const resolved = mapTaxProfile(customer?.defaultTaxProfile);
-  return resolved || getDefaultDeTaxProfile();
-}
-
 async function resolveBackingItem(
   lineItem: any,
   offer: any,
@@ -518,6 +476,140 @@ export const getOfferDraftItemsPreview = async (
   }
 };
 
+function matchTaxProfileForCustomer(
+  customer: any,
+  taxProfiles: any[],
+  countries: any[],
+): any {
+  if (!taxProfiles || taxProfiles.length === 0) return null;
+
+  const countryCode = (customer?.country || "DE").trim().toUpperCase();
+  const vatTaxId = (customer?.vatTaxId || "").trim();
+  const vatIdStatus = (customer?.vat_id_status || "").trim();
+
+  let targetCase = "third_country";
+
+  if (countryCode === "DE" || "GERMANY") {
+    targetCase = "DE-VAT";
+  } else {
+    const matchedCountry = countries.find(
+      (c: any) => (c.iso2 || "").trim().toUpperCase() === countryCode,
+    );
+    const isIgl = Boolean(
+      matchedCountry?.is_igl_country || matchedCountry?.is_eu,
+    );
+
+    if (isIgl) {
+      const isValidStatus =
+        vatIdStatus === "vies_valid" || vatIdStatus === "bzst_qualified_valid";
+      targetCase = vatTaxId && isValidStatus ? "EU_IGL" : "EU_no_valid_VAT_ID";
+    } else {
+      targetCase = "third_country";
+    }
+  }
+
+  const exact = taxProfiles.find(
+    (tp: any) => (tp.tax_case || "").trim() === targetCase,
+  );
+  if (exact) return exact;
+
+  const heuristic = taxProfiles.find((tp: any) => {
+    const caseStr = (tp.tax_case || "").trim().toLowerCase();
+    const nameStr = (tp.name || "").toLowerCase();
+
+    if (targetCase === "DE-VAT") {
+      return (
+        caseStr === "de-vat" ||
+        caseStr === "de_vat" ||
+        nameStr.includes("standard vat") ||
+        Number(tp.tax_rate ?? 0) === 19
+      );
+    }
+    if (targetCase === "EU_IGL") {
+      return (
+        caseStr === "eu_igl" ||
+        caseStr === "eu-igl" ||
+        nameStr.includes("eu_igl") ||
+        nameStr.includes("reverse charge")
+      );
+    }
+    if (targetCase === "EU_no_valid_VAT_ID") {
+      return (
+        caseStr === "eu_no_valid_vat_id" ||
+        caseStr === "eu_no_valid" ||
+        nameStr.includes("no_valid") ||
+        nameStr.includes("no valid")
+      );
+    }
+    if (targetCase === "third_country") {
+      return (
+        caseStr === "third_country" ||
+        caseStr === "third country" ||
+        nameStr.includes("third") ||
+        nameStr.includes("export")
+      );
+    }
+    return false;
+  });
+
+  return heuristic || taxProfiles[0];
+}
+
+async function loadTaxMatchingData(): Promise<{
+  taxProfiles: any[];
+  countries: any[];
+}> {
+  const [taxProfiles, countries] = await Promise.all([
+    taxProfileRepo.find({ where: { is_active: true } }),
+    countryRepo.find({ where: { is_active: true } }),
+  ]);
+  return { taxProfiles, countries };
+}
+
+async function resolveAuftragTaxProfile(
+  order: CustomerOrder,
+): Promise<{ profile: any; changed: boolean }> {
+  const { taxProfiles, countries } = await loadTaxMatchingData();
+  const status = order.auftrag_status || AuftragStatus.OPEN;
+
+  if (status !== AuftragStatus.OPEN) {
+    const frozenMatch = taxProfiles.find(
+      (tp: any) => Number(tp.tax_rate) === Number(order.tax_rate ?? 19),
+    );
+    return {
+      profile: frozenMatch
+        ? mapTaxProfile(frozenMatch)
+        : {
+            id: null,
+            name: "Frozen",
+            taxCase: undefined,
+            taxRate: Number(order.tax_rate) || 19,
+            taxCode: undefined,
+          },
+      changed: false,
+    };
+  }
+
+  let customer: any = null;
+  if (order.customer_id) {
+    customer = await customerRepo.findOne({ where: { id: order.customer_id } });
+  }
+
+  const matched = matchTaxProfileForCustomer(
+    customer || { country: "DE" },
+    taxProfiles,
+    countries,
+  );
+  const mapped = mapTaxProfile(matched);
+
+  const changed =
+    !!mapped && Number(mapped.taxRate) !== Number(order.tax_rate ?? 19);
+  if (changed) {
+    order.tax_rate = mapped.taxRate;
+  }
+
+  return { profile: mapped, changed };
+}
 export const getAllCustomerOrders = async (
   _req: Request,
   res: Response,
@@ -540,34 +632,94 @@ export const getAllCustomerOrders = async (
       offerIdByAuftragId,
     );
 
-    // Batched tax profile lookup — one query for every distinct customer
-    // on the page, same pattern as OfferController.getAllOffers rather
-    // than N lookups (one per row).
+    const { taxProfiles: allTaxProfiles, countries: allCountries } =
+      await loadTaxMatchingData();
+
     const customerIds = Array.from(
       new Set(
         orders.map((o) => o.customer_id).filter((id): id is string => !!id),
       ),
     );
 
-    let taxProfileByCustomerId = new Map<string, any>();
+    let customersById = new Map<string, any>();
     if (customerIds.length > 0) {
-      const customersWithTax = await customerRepo.find({
+      const customersOnPage = await customerRepo.find({
         where: { id: In(customerIds) },
-        relations: ["defaultTaxProfile"],
       });
-      taxProfileByCustomerId = new Map(
-        customersWithTax.map((c: any) => [
-          c.id,
-          mapTaxProfile(c.defaultTaxProfile),
-        ]),
+      customersById = new Map(customersOnPage.map((c: any) => [c.id, c]));
+    }
+
+    // Only OPEN orders get their tax_rate live-refreshed and persisted here —
+    // Partially Delivered / Delivered / Closed are frozen and must not be
+    // touched, matching the same rule as resolveAuftragTaxProfile.
+    const ordersToSave: CustomerOrder[] = [];
+    const idsNeedingRecalc: number[] = [];
+    const taxProfileByOrderId = new Map<number, any>();
+
+    for (const order of orders as any[]) {
+      const status = order.auftrag_status || AuftragStatus.OPEN;
+
+      if (status !== AuftragStatus.OPEN) {
+        const frozenMatch = allTaxProfiles.find(
+          (tp: any) => Number(tp.tax_rate) === Number(order.tax_rate ?? 19),
+        );
+        taxProfileByOrderId.set(
+          order.id,
+          frozenMatch
+            ? mapTaxProfile(frozenMatch)
+            : {
+                id: null,
+                name: "Frozen",
+                taxCase: undefined,
+                taxRate: Number(order.tax_rate) || 19,
+                taxCode: undefined,
+              },
+        );
+        continue;
+      }
+
+      const customer = order.customer_id
+        ? customersById.get(order.customer_id)
+        : null;
+      const matched = matchTaxProfileForCustomer(
+        customer || { country: "DE" },
+        allTaxProfiles,
+        allCountries,
       );
+      const mapped = mapTaxProfile(matched);
+      taxProfileByOrderId.set(order.id, mapped);
+
+      if (mapped && Number(mapped.taxRate) !== Number(order.tax_rate ?? 19)) {
+        order.tax_rate = mapped.taxRate;
+        ordersToSave.push(order);
+        idsNeedingRecalc.push(order.id);
+      }
+    }
+
+    if (ordersToSave.length > 0) {
+      await customerOrderRepo.save(ordersToSave);
+      for (const id of idsNeedingRecalc) {
+        await calculateOrderTotals(id);
+      }
+      const refreshed = await customerOrderRepo.find({
+        where: { id: In(idsNeedingRecalc) },
+        select: ["id", "subtotal", "tax_amount", "total_amount", "tax_rate"],
+      });
+      const refreshedById = new Map(refreshed.map((r: any) => [r.id, r]));
+      for (const order of orders as any[]) {
+        const fresh = refreshedById.get(order.id);
+        if (fresh) {
+          order.subtotal = fresh.subtotal;
+          order.tax_amount = fresh.tax_amount;
+          order.total_amount = fresh.total_amount;
+          order.tax_rate = fresh.tax_rate;
+        }
+      }
     }
 
     const ordersWithLinkedDocuments = orders.map((order: any) => ({
       ...order,
-      taxProfile: order.customer_id
-        ? taxProfileByCustomerId.get(order.customer_id) || null
-        : null,
+      taxProfile: taxProfileByOrderId.get(order.id) || null,
       linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
         offers: [],
         rechnungen: [],
@@ -737,7 +889,7 @@ export const createAuftragFromItems = async (
       });
     }
 
-    const taxRate = 19;
+    const taxRate = await resolveLiveTaxRate(customer.id);
     const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
       now.getMonth() + 1
     )
@@ -820,21 +972,19 @@ export const createAuftragFromItems = async (
   }
 };
 
-// ============================================================================
-// FIXED — taxRate now resolved live from the customer's defaultTaxProfile
-// instead of trusting the stale offer.taxRate column. Everything else in
-// this function is unchanged from what you pasted.
-// ============================================================================
 async function resolveLiveTaxRate(customerId?: string | null): Promise<number> {
-  if (!customerId) return 19;
-  const customer = await customerRepo.findOne({
-    where: { id: customerId },
-    relations: ["defaultTaxProfile"],
-  });
-  const rate = customer?.defaultTaxProfile?.tax_rate;
-  return rate !== undefined && rate !== null ? Number(rate) : 19;
+  const { taxProfiles, countries } = await loadTaxMatchingData();
+  let customer: any = null;
+  if (customerId) {
+    customer = await customerRepo.findOne({ where: { id: customerId } });
+  }
+  const matched = matchTaxProfileForCustomer(
+    customer || { country: "DE" },
+    taxProfiles,
+    countries,
+  );
+  return matched ? Number(matched.tax_rate) : 19;
 }
-
 export const createAuftragFromOffer = async (
   req: Request,
   res: Response,
@@ -1149,7 +1299,21 @@ export const getCustomerOrderById = async (
       order.offer_id,
     );
 
-    const taxProfile = await getCustomerTaxProfile(order.customer_id);
+    const { profile: taxProfile, changed } =
+      await resolveAuftragTaxProfile(order);
+    if (changed) {
+      await customerOrderRepo.save(order);
+      await calculateOrderTotals(order.id);
+      const refreshed = await customerOrderRepo.findOne({
+        where: { id: order.id },
+      });
+      if (refreshed) {
+        order.subtotal = refreshed.subtotal;
+        order.tax_amount = refreshed.tax_amount;
+        order.total_amount = refreshed.total_amount;
+        order.tax_rate = refreshed.tax_rate;
+      }
+    }
 
     res.json({
       success: true,
@@ -1160,18 +1324,6 @@ export const getCustomerOrderById = async (
   }
 };
 
-// Order Editing Rules (per the Auftrag Status state machine):
-//   Open                -> everything editable
-//   Partially Delivered -> only these two fields (comments never shown to
-//                          the customer as "what they ordered", plus
-//                          highlightColor which is a purely internal
-//                          organizational marker, not commercial content)
-//   Delivered / Closed  -> nothing, request rejected outright
-// auftrag_status itself is deliberately NOT settable through this
-// endpoint at all — it only ever advances via createRechnungFromAuftrag
-// (delivery) or closeCustomerOrder (close), both of which enforce the
-// state machine's legal transitions. Accepting it here would let a
-// client bypass that entirely.
 const ALLOWED_WHEN_PARTIALLY_DELIVERED = new Set([
   "notes",
   "internalNotes",
