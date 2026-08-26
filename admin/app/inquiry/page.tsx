@@ -548,30 +548,112 @@ const CombinedInquiriesPageContent = () => {
       console.error("Error fetching tarics:", error);
     }
   };
+  const isNumericSortField = (field: string) => {
+    return [
+      "total_potential_k_eur",
+      "requests.length",
+      "annualPotentialKEur",
+      "targetPrice",
+      "qty",
+    ].includes(field);
+  };
+
   const handleSort = (field: string) => {
     setInquiryFilters((prev: any) => {
       const isSameField = prev.sortBy === field;
+      const isNumeric = isNumericSortField(field);
+
       if (isSameField) {
-        if (prev.sortOrder === "ASC") {
-          return {
-            ...prev,
-            sortOrder: "DESC",
-          };
+        if (isNumeric) {
+          // For numeric/VP fields: 1st click DESC (highest->lowest), 2nd click ASC (lowest->highest), 3rd click RESET
+          if (prev.sortOrder === "DESC") {
+            return { ...prev, sortOrder: "ASC" };
+          } else {
+            return { ...prev, sortBy: "createdAt", sortOrder: "DESC" };
+          }
         } else {
-          return {
-            ...prev,
-            sortBy: "createdAt",
-            sortOrder: "DESC",
-          };
+          // For text fields: 1st click ASC (A->Z), 2nd click DESC (Z->A), 3rd click RESET
+          if (prev.sortOrder === "ASC") {
+            return { ...prev, sortOrder: "DESC" };
+          } else {
+            return { ...prev, sortBy: "createdAt", sortOrder: "DESC" };
+          }
         }
       } else {
+        // First click on new field: Numeric starts DESC (highest->lowest), Text starts ASC (A->Z)
         return {
           ...prev,
           sortBy: field,
-          sortOrder: "ASC",
+          sortOrder: isNumeric ? "DESC" : "ASC",
         };
       }
     });
+  };
+
+  const [requestSortConfig, setRequestSortConfig] = useState<{
+    sortBy: string;
+    sortOrder: "ASC" | "DESC";
+  } | null>(null);
+
+  const handleRequestSort = (field: string) => {
+    const isNumeric = [
+      "annualPotentialKEur",
+      "targetPrice",
+      "qty",
+    ].includes(field);
+
+    setRequestSortConfig((prev) => {
+      if (prev?.sortBy === field) {
+        if (isNumeric) {
+          if (prev.sortOrder === "DESC") return { sortBy: field, sortOrder: "ASC" };
+          return null;
+        } else {
+          if (prev.sortOrder === "ASC") return { sortBy: field, sortOrder: "DESC" };
+          return null;
+        }
+      } else {
+        return {
+          sortBy: field,
+          sortOrder: isNumeric ? "DESC" : "ASC",
+        };
+      }
+    });
+  };
+
+  const renderRequestSortableHeader = (
+    field: string,
+    label: string,
+    align: "left" | "center" | "right" = "center",
+  ) => {
+    const isSorted = requestSortConfig?.sortBy === field;
+    const isAsc = requestSortConfig?.sortOrder === "ASC";
+
+    return (
+      <th
+        className={`px-4 py-3 text-${align} text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 transition-colors group`}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleRequestSort(field);
+        }}
+      >
+        <div className="inline-flex items-center gap-1 whitespace-nowrap">
+          <span>{label}</span>
+          {isSorted ? (
+            isAsc ? (
+              <ChevronUpIcon className="h-3.5 w-3.5 text-[#8CC21B] stroke-[3px]" />
+            ) : (
+              <ChevronDownIcon className="h-3.5 w-3.5 text-[#8CC21B] stroke-[3px]" />
+            )
+          ) : (
+            <span className="text-gray-300 opacity-40 group-hover:opacity-100 transition-opacity">
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+              </svg>
+            </span>
+          )}
+        </div>
+      </th>
+    );
   };
   useEffect(() => {
     fetchInquiries();
@@ -766,6 +848,7 @@ const CombinedInquiriesPageContent = () => {
         // Client-side sorting using sortData helper
         if (inquiryFilters.sortBy && inquiryFilters.sortOrder) {
           const customSortValues: Record<string, (row: any) => any> = {
+            total_potential_k_eur: (row) => Number(row.total_potential_k_eur || 0),
             "requests.length": (row) => row.requests?.length || 0,
             highestPriority: (row) => {
               const requests = row.requests || [];
@@ -1875,27 +1958,15 @@ const CombinedInquiriesPageContent = () => {
                                   <table className="w-full text-sm">
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
                                       <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Request Item
-                                        </th>
+                                        {renderRequestSortableHeader("itemName", "Request Item", "left")}
                                         <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                                           Pic
                                         </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Qty &amp; Interval
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Target Price
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          VP
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Status
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Priority
-                                        </th>
+                                        {renderRequestSortableHeader("qty", "Qty & Interval", "center")}
+                                        {renderRequestSortableHeader("targetPrice", "Target Price", "center")}
+                                        {renderRequestSortableHeader("annualPotentialKEur", "VP", "center")}
+                                        {renderRequestSortableHeader("requestStatus", "Status", "center")}
+                                        {renderRequestSortableHeader("priority", "Priority", "center")}
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           Asana
                                         </th>
@@ -1905,8 +1976,25 @@ const CombinedInquiriesPageContent = () => {
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
-                                      {inquiry.requests.map(
-                                        (request: any, index: number) => (
+                                      {(() => {
+                                        let reqList = [...(inquiry.requests || [])];
+                                        if (requestSortConfig) {
+                                          reqList = sortData(
+                                            reqList,
+                                            requestSortConfig.sortBy,
+                                            requestSortConfig.sortOrder,
+                                            {
+                                              annualPotentialKEur: (r: any) => Number(r.annualPotentialKEur || 0),
+                                              targetPrice: (r: any) => Number(r.targetPrice || 0),
+                                              qty: (r: any) => Number(r.qty || 0),
+                                              priority: (r: any) => {
+                                                const pMap: Record<string, number> = { Low: 1, Normal: 2, Medium: 3, High: 4, Urgent: 5 };
+                                                return pMap[r.priority] || 2;
+                                              },
+                                            }
+                                          );
+                                        }
+                                        return reqList.map((request: any, index: number) => (
                                           <tr
                                             key={request.id}
                                             onClick={() => {
@@ -2152,8 +2240,8 @@ const CombinedInquiriesPageContent = () => {
                                               </div>
                                             </td>
                                           </tr>
-                                        ),
-                                      )}
+                                        ));
+                                      })()}
                                     </tbody>
                                   </table>
                                 </div>
