@@ -218,6 +218,9 @@ export interface PdfDocumentOptions {
   vatBreakdown?: Array<{ rate: number; amount: number }>;
   trackingNumbers?: string | string[];
   taxProfile?: string;
+  payments?: Array<{ amount: number; receivedDate?: string | Date; paymentMethod?: string }>;
+  rks?: Array<{ amount: number; createdDate?: string | Date; rkNumber?: string }>;
+  outstandingAmount?: number;
 }
 
 export async function generateGtechDocumentPdf(
@@ -906,6 +909,69 @@ export async function generateGtechDocumentPdf(
     );
 
     yPos += 22;
+
+    let totalPaidInPdf = 0;
+    let totalRkInPdf = 0;
+
+    if (opts.payments && opts.payments.length > 0) {
+      doc.font(R).fontSize(8.5).fillColor("#3F4446");
+      opts.payments.forEach((p) => {
+        const pAmt = Number(p.amount || 0);
+        totalPaidInPdf += pAmt;
+        const pMethod = p.paymentMethod || "Überweisung";
+        const pDate = formatDate(p.receivedDate);
+        const pText = `Zahlung (${pMethod}) vom ${pDate}`;
+
+        doc.text(pText, TOTALS_LABEL_X - 60, yPos, { width: TOTALS_LABEL_W + 60 });
+        doc.text(
+          `${formatGermanNum(pAmt, 2)} ${currency}`,
+          TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+          yPos,
+          { align: "right", width: TOTALS_VAL_W },
+        );
+        yPos += 14;
+      });
+    }
+
+    if (opts.rks && opts.rks.length > 0) {
+      doc.font(R).fontSize(8.5).fillColor("#3F4446");
+      opts.rks.forEach((rk) => {
+        const rkAmt = Number(rk.amount || 0);
+        totalRkInPdf += rkAmt;
+        const rkDate = formatDate(rk.createdDate);
+        const rkText = `Rechnungskorrektur vom ${rkDate}`;
+
+        doc.text(rkText, TOTALS_LABEL_X - 60, yPos, { width: TOTALS_LABEL_W + 60 });
+        doc.text(
+          `-${formatGermanNum(rkAmt, 2)} ${currency}`,
+          TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+          yPos,
+          { align: "right", width: TOTALS_VAL_W },
+        );
+        yPos += 14;
+      });
+    }
+
+    const calcOutstanding = opts.outstandingAmount !== undefined
+      ? opts.outstandingAmount
+      : Math.max(0, finalBrutto - totalPaidInPdf - totalRkInPdf);
+
+    if ((opts.payments && opts.payments.length > 0) || (opts.rks && opts.rks.length > 0) || opts.outstandingAmount !== undefined) {
+      yPos += 8;
+      const offenerBoxX = TOTALS_LABEL_X - 6;
+      const offenerBoxW = TABLE_END_X - offenerBoxX;
+      doc.rect(offenerBoxX, yPos - 4, offenerBoxW, 20).fill("#ECEAE6");
+
+      doc.font(SB).fontSize(10).fillColor("#1A202C");
+      doc.text("offener Betrag", TOTALS_LABEL_X, yPos);
+      doc.text(
+        `${formatGermanNum(calcOutstanding, 2)} ${currency}`,
+        TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+        yPos,
+        { align: "right", width: TOTALS_VAL_W },
+      );
+      yPos += 20;
+    }
 
     const rawTaxProfileKey = String(
       opts.taxProfile ||

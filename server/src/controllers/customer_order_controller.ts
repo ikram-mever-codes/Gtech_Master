@@ -28,6 +28,7 @@ import { TransferOrder } from "../models/transfer_order";
 import { RechnungItem } from "../models/rechnung_items";
 import { TaxProfile } from "../models/tax_profile";
 import { RequestedItem } from "../models/requested_items";
+import { PaymentAllocation, PaymentAllocationTargetType } from "../models/payment_allocations";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
 const customerRepo = AppDataSource.getRepository(Customer);
@@ -532,6 +533,7 @@ export const getAllCustomerOrders = async (
 
     await attachStockInfoToOrders(orders);
     await attachDeliveredQuantityToOrders(orders);
+    await attachPaymentsToOrders(orders);
 
     const auftragIds = orders.map((o) => o.id);
     const offerIdByAuftragId = new Map(orders.map((o) => [o.id, o.offer_id]));
@@ -1143,6 +1145,7 @@ export const getCustomerOrderById = async (
 
     await attachStockInfoToOrders([order]);
     await attachDeliveredQuantityToOrders([order]);
+    await attachPaymentsToOrders([order]);
 
     const linkedDocuments = await getLinkedDocumentsForAuftrag(
       order.id,
@@ -1769,6 +1772,39 @@ async function attachStockInfoToOrders(orders: CustomerOrder[]): Promise<void> {
   }
 }
 
+export async function attachPaymentsToOrders(orders: CustomerOrder[]): Promise<void> {
+  if (orders.length === 0) return;
+  const orderIds = orders.map((o) => o.id);
+  const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
+
+  const allocations = await allocationRepo.find({
+    where: {
+      target_type: PaymentAllocationTargetType.AUFTRAG,
+      auftrag_id: In(orderIds),
+    },
+    relations: ["paymentInbound"],
+    order: { created_at: "ASC" },
+  });
+
+  const paymentsByOrder = new Map<number, any[]>();
+  allocations.forEach((a) => {
+    if (!a.auftrag_id) return;
+    const list = paymentsByOrder.get(a.auftrag_id) || [];
+    list.push({
+      id: a.id,
+      amount: Number(a.amount || 0),
+      receivedDate: a.paymentInbound?.received_date || a.created_at,
+      paymentMethod: a.paymentInbound?.source || "Überweisung",
+      notes: a.notes,
+    });
+    paymentsByOrder.set(a.auftrag_id, list);
+  });
+
+  for (const order of orders as any[]) {
+    order.payments = paymentsByOrder.get(order.id) || [];
+  }
+}
+
 export const downloadCustomerOrderPdf = async (
   req: Request,
   res: Response,
@@ -1866,6 +1902,26 @@ export const downloadCustomerOrderPdf = async (
       order.date_delivery ||
       order.delivery_terms;
 
+    const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
+    const allocations = await allocationRepo.find({
+      where: {
+        target_type: PaymentAllocationTargetType.AUFTRAG,
+        auftrag_id: order.id,
+      },
+      relations: ["paymentInbound"],
+      order: { created_at: "ASC" },
+    });
+
+    const pdfPayments = allocations.map((a) => ({
+      amount: Number(a.amount || 0),
+      receivedDate: a.paymentInbound?.received_date || a.created_at,
+      paymentMethod: a.paymentInbound?.source || "Überweisung",
+    }));
+
+    const totalPaid = pdfPayments.reduce((s, p) => s + p.amount, 0);
+    const orderTotal = Number(order.total_amount || 0);
+    const outstandingAmount = Math.max(0, orderTotal - totalPaid);
+
     await generateGtechDocumentPdf({
       documentType: "Auftrag" as any,
       documentNumber: order.order_no,
@@ -1899,6 +1955,8 @@ export const downloadCustomerOrderPdf = async (
         ? `Zahlungsziel: ${order.payment_terms} Tage`
         : undefined,
       paymentMethod: order.payment_method,
+      payments: pdfPayments.length > 0 ? pdfPayments : undefined,
+      outstandingAmount: pdfPayments.length > 0 ? outstandingAmount : undefined,
       taxProfile:
         (order as any).tax_profile_case ||
         (order.customer as any)?.tax_profile_case ||

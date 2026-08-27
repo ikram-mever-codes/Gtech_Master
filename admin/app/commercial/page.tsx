@@ -1731,7 +1731,12 @@ const InvoiceListPage: React.FC = () => {
         });
       case "payment_inbound":
         return buildPaymentInboundColumns({
-          onOpenDetails: handleOpenInvoiceDetails,
+          onOpenDetails: (row: any) => {
+            setSelectedInboundForAssign(row);
+            tabData.ensureLoaded("auftrag");
+            tabData.ensureLoaded("rechnung");
+            setShowAssignInboundModal(true);
+          },
           onAssign: (row: any) => {
             setSelectedInboundForAssign(row);
             tabData.ensureLoaded("auftrag");
@@ -2039,6 +2044,11 @@ const InvoiceListPage: React.FC = () => {
                 } else if (activeInvTab === "lieferschein") {
                   setSelectedLieferscheinForDetail(row);
                   setShowLieferscheinDetailModal(true);
+                } else if (activeInvTab === "payment_inbound" || activeInvTab === "payments") {
+                  setSelectedInboundForAssign(row);
+                  tabData.ensureLoaded("auftrag");
+                  tabData.ensureLoaded("rechnung");
+                  setShowAssignInboundModal(true);
                 } else {
                   handleOpenInvoiceDetails(row);
                 }
