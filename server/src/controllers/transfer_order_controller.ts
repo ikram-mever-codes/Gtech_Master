@@ -641,7 +641,6 @@ export const deleteTransferOrderLineItem = async (
     next(error);
   }
 };
-
 async function createOrderFromBestellung(
   bestellung: TransferOrder,
 ): Promise<{ createdOrderId: number; skippedCount: number } | null> {
@@ -653,20 +652,13 @@ async function createOrderFromBestellung(
 
   const itemRepo = AppDataSource.getRepository(Item);
 
-  // Resolve each line to a real catalog Item id:
-  //   1. sourceItemId, if it parses to a valid integer.
-  //   2. Otherwise, look up by item_no_de using itemNo, falling back to
-  //      material (some Bestellung lines carry the DE number in either
-  //      field depending on how they were created).
-  // Lines that resolve neither way have no catalog Item to attach to and
-  // are skipped rather than inserted with a bogus item_id.
+  // Look up every line's Item by item_no_de — using itemNo first, falling
+  // back to material — regardless of whether sourceItemId is set. Nothing
+  // is skipped: a line with no matching Item still becomes an OrderItem,
+  // just with item_id left unset (OrderItem.item_id is nullable).
   const lookupCodes = Array.from(
     new Set(
       allItems
-        .filter((li) => {
-          const parsed = li.sourceItemId ? parseInt(li.sourceItemId, 10) : NaN;
-          return isNaN(parsed);
-        })
         .map((li) => (li.itemNo || li.material || "").trim())
         .filter((code) => code.length > 0),
     ),
@@ -680,34 +672,15 @@ async function createOrderFromBestellung(
     itemByDeNo = new Map(foundItems.map((it) => [it.item_no_de as string, it]));
   }
 
-  const resolved: { line: TransferOrderItem; itemId: number }[] = [];
-  let skippedCount = 0;
+  const resolved: { line: TransferOrderItem; itemId?: number }[] = allItems.map(
+    (li) => {
+      const code = (li.itemNo || li.material || "").trim();
+      const matched = code ? itemByDeNo.get(code) : undefined;
+      return { line: li, itemId: matched?.id };
+    },
+  );
 
-  for (const li of allItems) {
-    const parsedSourceId = li.sourceItemId
-      ? parseInt(li.sourceItemId, 10)
-      : NaN;
-
-    if (!isNaN(parsedSourceId)) {
-      resolved.push({ line: li, itemId: parsedSourceId });
-      continue;
-    }
-
-    const code = (li.itemNo || li.material || "").trim();
-    const matched = code ? itemByDeNo.get(code) : undefined;
-    if (matched) {
-      resolved.push({ line: li, itemId: matched.id });
-    } else {
-      skippedCount++;
-    }
-  }
-
-  if (resolved.length === 0) {
-    console.warn(
-      `Bestellung ${bestellung.order_no}: no line items could be resolved to a catalog Item — skipping Order creation (${skippedCount} line(s) skipped).`,
-    );
-    return null;
-  }
+  const skippedCount = resolved.filter((r) => r.itemId === undefined).length;
 
   const now = new Date();
   const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
@@ -749,12 +722,16 @@ async function createOrderFromBestellung(
     const savedOrder = await orderRepo.save(order);
     createdOrderId = savedOrder.id;
 
+    // Every line becomes an OrderItem — item_id is set when a catalog
+    // match was found, left undefined otherwise. remark_de always
+    // includes the line's own itemName so an unresolved line is still
+    // identifiable in the created Order.
     const orderItemEntities = resolved.map(({ line: li, itemId }) =>
       orderItemRepo.create({
         item_id: itemId,
         order_id: savedOrder.id,
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
-        remark_de: li.remark_order_item || li.notes || undefined,
+        remark_de: li.remark_order_item || li.notes || li.itemName || undefined,
         price:
           li.transferPrice !== undefined && li.transferPrice !== null
             ? li.transferPrice
@@ -767,7 +744,7 @@ async function createOrderFromBestellung(
   });
 
   console.log(
-    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${resolved.length} item(s), ${skippedCount} line(s) skipped.`,
+    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${resolved.length} item(s), ${skippedCount} line(s) had no matching catalog Item.`,
   );
 
   return { createdOrderId, skippedCount };
