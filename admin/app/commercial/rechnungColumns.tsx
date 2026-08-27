@@ -20,6 +20,8 @@ interface RechnungColumnsArgs {
   onViewRechnung: (row: any) => void;
   onCreateRechnungK: (row: any) => void; // This will open the modal with correction form
   creatingRkForId: string | null;
+  allOpenQuantities?: Record<string, Record<string, number>>;
+  rechnungenK?: any[];
 }
 
 const valueNetCalc = (row: any) => Number(row.netTotal || row.grossTotal || 0);
@@ -235,26 +237,57 @@ export function buildRechnungColumns({
   onViewRechnung,
   onCreateRechnungK,
   creatingRkForId,
+  allOpenQuantities,
+  rechnungenK,
 }: RechnungColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
     datumColumn,
     {
       header: "Nr",
-      width: "80px",
+      width: "110px",
       align: "center",
-      render: (row) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewRechnung(row);
-          }}
-          className="truncate max-w-[80px] text-green-600 font-semibold hover:underline cursor-pointer"
-          title={row.invoiceNumber || row.id}
-        >
-          {row.invoiceNumber || row.id}
-        </button>
-      ),
+      render: (row) => {
+        const rowOpenQuantities = allOpenQuantities?.[row.id] || {};
+        const isFullyCorrected =
+          row.items?.length > 0 &&
+          row.items?.every((item: any) => {
+            const itemOpenQty = rowOpenQuantities[item.id] || 0;
+            return itemOpenQty <= 0;
+          });
+
+        const hasRk =
+          isFullyCorrected ||
+          row.hasRk ||
+          row.has_rk ||
+          (rechnungenK || []).some(
+            (rk: any) =>
+              String(rk.rechnungId || rk.rechnung_id || rk.invoiceId || rk.invoice_id) === String(row.id)
+          );
+
+        return (
+          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+            {hasRk && (
+              <span
+                className="px-1.5 py-0.5 text-[10px] font-extrabold bg-[#FF6B00] text-white rounded-[4px] uppercase tracking-wider shrink-0 shadow-xs"
+                title="Rechnungskorrektur vorhanden"
+              >
+                RK
+              </span>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewRechnung(row);
+              }}
+              className="truncate text-green-600 font-semibold hover:underline cursor-pointer"
+              title={row.invoiceNumber || row.id}
+            >
+              {row.invoiceNumber || row.id}
+            </button>
+          </div>
+        );
+      },
     },
     kundeColumn,
     titelColumn,

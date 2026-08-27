@@ -1709,6 +1709,8 @@ const InvoiceListPage: React.FC = () => {
           onCreateRechnungK: handleCreateRechnungK,
           creatingRkForId,
           onViewRechnung: handleOpenRechnungView,
+          allOpenQuantities,
+          rechnungenK: tabData.rechnungenK,
         });
 
       // 7. In the "rk" case, drop onDelete:
@@ -1958,17 +1960,6 @@ const InvoiceListPage: React.FC = () => {
                 }
               })()}
               getRowClassName={(row) => {
-                if (activeInvTab === "rechnung") {
-                  const rowOpenQuantities = allOpenQuantities[row.id] || {};
-                  const isFullyCorrected =
-                    row.items?.every((item: any) => {
-                      const itemOpenQty = rowOpenQuantities[item.id] || 0;
-                      return itemOpenQty <= 0;
-                    }) ?? false;
-
-                  return isFullyCorrected ? "bg-gray-100 opacity-60" : "";
-                }
-
                 if (
                   activeInvTab === "auftrag" ||
                   activeInvTab === "bestellung"
@@ -1981,22 +1972,6 @@ const InvoiceListPage: React.FC = () => {
                 return "";
               }}
               getRowStyle={(row: any) => {
-                if (activeInvTab === "rechnung") {
-                  const rowOpenQuantities = allOpenQuantities[row.id] || {};
-                  const isFullyCorrected =
-                    row.items?.every((item: any) => {
-                      const itemOpenQty = rowOpenQuantities[item.id] || 0;
-                      return itemOpenQty <= 0;
-                    }) ?? false;
-
-                  if (isFullyCorrected) {
-                    return {
-                      backgroundColor: "#f3f4f6",
-                      color: "#9ca3af",
-                      opacity: 0.6,
-                    };
-                  }
-                }
 
                 // A manually chosen highlight_color (SystemColourSelect on
                 // the order) always wins over the automatic status colour
