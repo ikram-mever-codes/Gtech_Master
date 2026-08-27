@@ -646,12 +646,7 @@ async function createOrderFromBestellung(
   bestellung: TransferOrder,
 ): Promise<{ createdOrderId: number; skippedCount: number } | null> {
   const allItems = bestellung.orderItems || [];
-  const catalogItems = allItems.filter(
-    (li) =>
-      li.sourceItemId !== undefined &&
-      li.sourceItemId !== null &&
-      !isNaN(parseInt(li.sourceItemId, 10)),
-  );
+  const catalogItems = allItems;
   const skippedCount = allItems.length - catalogItems.length;
 
   if (catalogItems.length === 0) {
