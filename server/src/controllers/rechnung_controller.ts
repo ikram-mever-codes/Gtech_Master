@@ -23,6 +23,10 @@ import { In } from "typeorm/find-options/operator/In";
 import { Rechnung_k } from "../models/rechnung_k";
 import { attachPaymentStatusToRechnungen } from "./payment_allocations_controller";
 import { TaxProfile } from "../models/tax_profile";
+import {
+  PaymentAllocation,
+  PaymentAllocationTargetType,
+} from "../models/payment_allocations";
 
 /** Fetches documents linked to a Rechnung: the originating Auftrag
  * (CustomerOrder, via auftrag_id) and every correction invoice
@@ -880,6 +884,60 @@ export const createRechnungOhneAusliefern = async (
   }
 };
 
+export async function attachPaymentsAndRksToRechnungen(
+  rechnungen: Rechnung[],
+): Promise<void> {
+  if (rechnungen.length === 0) return;
+  const rechnungIds = rechnungen.map((r) => r.id);
+
+  const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
+  const allocations = await allocationRepo.find({
+    where: {
+      target_type: PaymentAllocationTargetType.RECHNUNG,
+      rechnung_id: In(rechnungIds),
+    },
+    relations: ["paymentInbound"],
+    order: { created_at: "ASC" },
+  });
+
+  const paymentsByRechnung = new Map<string, any[]>();
+  allocations.forEach((a) => {
+    if (!a.rechnung_id) return;
+    const list = paymentsByRechnung.get(a.rechnung_id) || [];
+    list.push({
+      id: a.id,
+      amount: Number(a.amount || 0),
+      receivedDate: a.paymentInbound?.received_date || a.created_at,
+      paymentMethod: a.paymentInbound?.source || "Überweisung",
+      notes: a.notes,
+    });
+    paymentsByRechnung.set(a.rechnung_id, list);
+  });
+
+  const rkRepo = AppDataSource.getRepository(Rechnung_k);
+  const rks = await rkRepo.find({
+    where: { original_rechnung_id: In(rechnungIds) },
+  });
+
+  const rksByRechnung = new Map<string, any[]>();
+  rks.forEach((rk) => {
+    if (!rk.original_rechnung_id) return;
+    const list = rksByRechnung.get(rk.original_rechnung_id) || [];
+    list.push({
+      id: rk.id,
+      rkNumber: rk.invoice_number,
+      createdAt: rk.created_at,
+      totalAmount: Number(rk.total_amount || 0),
+    });
+    rksByRechnung.set(rk.original_rechnung_id, list);
+  });
+
+  for (const rechnung of rechnungen as any[]) {
+    rechnung.payments = paymentsByRechnung.get(rechnung.id) || [];
+    rechnung.rks = rksByRechnung.get(rechnung.id) || [];
+  }
+}
+
 export const getAllRechnungen = async (
   req: Request,
   res: Response,
@@ -909,6 +967,7 @@ export const getAllRechnungen = async (
       await getLinkedDocumentsForRechnungen(rechnungen);
 
     await attachPaymentStatusToRechnungen(rechnungen);
+    await attachPaymentsAndRksToRechnungen(rechnungen);
 
     const distinctRates = Array.from(
       new Set(rechnungen.map((r) => Number(r.tax_rate) || 19)),
@@ -1066,6 +1125,7 @@ export const getRechnungById = async (
 
     const linkedDocuments = await getLinkedDocumentsForRechnung(rechnung);
     await attachPaymentStatusToRechnungen([rechnung]);
+    await attachPaymentsAndRksToRechnungen([rechnung]);
 
     const title =
       rechnung.title || linkedDocuments.auftrag[0]?.title || undefined;
@@ -1343,6 +1403,38 @@ export const downloadRechnungPdf = async (
       };
     });
 
+    const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
+    const allocations = await allocationRepo.find({
+      where: {
+        target_type: PaymentAllocationTargetType.RECHNUNG,
+        rechnung_id: rechnung.id,
+      },
+      relations: ["paymentInbound"],
+      order: { created_at: "ASC" },
+    });
+
+    const pdfPayments = allocations.map((a) => ({
+      amount: Number(a.amount || 0),
+      receivedDate: a.paymentInbound?.received_date || a.created_at,
+      paymentMethod: a.paymentInbound?.source || "Überweisung",
+    }));
+
+    const rkRepo = AppDataSource.getRepository(Rechnung_k);
+    const rks = await rkRepo.find({
+      where: { original_rechnung_id: rechnung.id },
+    });
+
+    const pdfRks = rks.map((rk) => ({
+      amount: Number(rk.total_amount || 0),
+      createdDate: rk.created_at,
+      rkNumber: rk.invoice_number,
+    }));
+
+    const totalPaid = pdfPayments.reduce((s, p) => s + p.amount, 0);
+    const totalRk = pdfRks.reduce((s, r) => s + r.amount, 0);
+    const invoiceTotal = Number(rechnung.total_amount || 0);
+    const outstandingAmount = Math.max(0, invoiceTotal - totalPaid - totalRk);
+
     await generateGtechDocumentPdf({
       documentType: "Rechnung",
       documentNumber: rechnung.invoice_number,
@@ -1379,6 +1471,12 @@ export const downloadRechnungPdf = async (
         ? `Zahlungsziel: ${rechnung.payment_terms} Tage`
         : undefined,
       paymentMethod: rechnung.payment_method,
+      payments: pdfPayments.length > 0 ? pdfPayments : undefined,
+      rks: pdfRks.length > 0 ? pdfRks : undefined,
+      outstandingAmount:
+        pdfPayments.length > 0 || pdfRks.length > 0
+          ? outstandingAmount
+          : undefined,
       taxProfile:
         rechnung.tax_profile_case ||
         (rechnung.customer as any)?.tax_profile_case ||

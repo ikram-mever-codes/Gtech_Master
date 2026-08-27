@@ -1200,10 +1200,57 @@ export default function RechnungDetailModal({
                 <span>Total</span>
                 <span>{formatDeCurrency(grossTotal)}</span>
               </div>
+
+              {(() => {
+                const paymentsList = data?.payments || [];
+                const rksList = data?.rks || [];
+                if (paymentsList.length === 0 && rksList.length === 0) return null;
+
+                const totalPaid = paymentsList.reduce(
+                  (sum: number, p: any) => sum + Number(p.amount || 0),
+                  0,
+                );
+                const totalRk = rksList.reduce(
+                  (sum: number, r: any) => sum + Number(r.totalAmount || r.total || 0),
+                  0,
+                );
+                const openAmount = Math.max(0, grossTotal - totalPaid - totalRk);
+
+                return (
+                  <div className="pt-2 space-y-1.5 text-xs border-t border-dashed border-gray-200">
+                    {paymentsList.map((p: any, idx: number) => (
+                      <div key={p.id || idx} className="flex justify-between text-gray-600">
+                        <span>
+                          Zahlung ({p.paymentMethod || "Überweisung"}) vom{" "}
+                          {formatDate(p.receivedDate || p.createdAt)}
+                        </span>
+                        <span className="font-medium text-emerald-700">
+                          {formatDeCurrency(p.amount || 0)}
+                        </span>
+                      </div>
+                    ))}
+                    {rksList.map((rk: any, idx: number) => (
+                      <div key={rk.id || idx} className="flex justify-between text-amber-700">
+                        <span>
+                          Rechnungskorrektur vom {formatDate(rk.createdAt)}
+                        </span>
+                        <span className="font-medium">
+                          -{formatDeCurrency(rk.totalAmount || rk.total || 0)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between font-bold text-sm pt-1 text-gray-900">
+                      <span>offener Betrag</span>
+                      <span className={openAmount > 0 ? "text-rose-600" : "text-emerald-700"}>
+                        {formatDeCurrency(openAmount)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
-          {/* ── Gelangenheitsbestätigung section (EU_IGL / third_country only) ── */}
           {isExportInvoice && !isCorrection && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
