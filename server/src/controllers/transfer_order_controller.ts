@@ -646,12 +646,65 @@ async function createOrderFromBestellung(
   bestellung: TransferOrder,
 ): Promise<{ createdOrderId: number; skippedCount: number } | null> {
   const allItems = bestellung.orderItems || [];
-  const catalogItems = allItems;
-  const skippedCount = allItems.length - catalogItems.length;
 
-  if (catalogItems.length === 0) {
+  if (allItems.length === 0) {
+    return null;
+  }
+
+  const itemRepo = AppDataSource.getRepository(Item);
+
+  // Resolve each line to a real catalog Item id:
+  //   1. sourceItemId, if it parses to a valid integer.
+  //   2. Otherwise, look up by item_no_de using itemNo, falling back to
+  //      material (some Bestellung lines carry the DE number in either
+  //      field depending on how they were created).
+  // Lines that resolve neither way have no catalog Item to attach to and
+  // are skipped rather than inserted with a bogus item_id.
+  const lookupCodes = Array.from(
+    new Set(
+      allItems
+        .filter((li) => {
+          const parsed = li.sourceItemId ? parseInt(li.sourceItemId, 10) : NaN;
+          return isNaN(parsed);
+        })
+        .map((li) => (li.itemNo || li.material || "").trim())
+        .filter((code) => code.length > 0),
+    ),
+  );
+
+  let itemByDeNo = new Map<string, Item>();
+  if (lookupCodes.length > 0) {
+    const foundItems = await itemRepo.find({
+      where: { item_no_de: In(lookupCodes) },
+    });
+    itemByDeNo = new Map(foundItems.map((it) => [it.item_no_de as string, it]));
+  }
+
+  const resolved: { line: TransferOrderItem; itemId: number }[] = [];
+  let skippedCount = 0;
+
+  for (const li of allItems) {
+    const parsedSourceId = li.sourceItemId
+      ? parseInt(li.sourceItemId, 10)
+      : NaN;
+
+    if (!isNaN(parsedSourceId)) {
+      resolved.push({ line: li, itemId: parsedSourceId });
+      continue;
+    }
+
+    const code = (li.itemNo || li.material || "").trim();
+    const matched = code ? itemByDeNo.get(code) : undefined;
+    if (matched) {
+      resolved.push({ line: li, itemId: matched.id });
+    } else {
+      skippedCount++;
+    }
+  }
+
+  if (resolved.length === 0) {
     console.warn(
-      `Bestellung ${bestellung.order_no}: no catalog line items with a valid sourceItemId — skipping Order creation (${skippedCount} Freizeile line(s) present).`,
+      `Bestellung ${bestellung.order_no}: no line items could be resolved to a catalog Item — skipping Order creation (${skippedCount} line(s) skipped).`,
     );
     return null;
   }
@@ -669,10 +722,6 @@ async function createOrderFromBestellung(
     const orderRepo = manager.getRepository(Order);
     const orderItemRepo = manager.getRepository(OrderItem);
 
-    // Order.order_no is unique — check for a pre-existing Order with the
-    // same order_no before insert, since a Bestellung could theoretically
-    // be reprocessed. Guards against a duplicate-key failure instead of
-    // silently colliding.
     const existing = await orderRepo.findOne({
       where: { order_no: bestellung.order_no },
     });
@@ -685,14 +734,9 @@ async function createOrderFromBestellung(
     }
 
     const order = orderRepo.create({
-      // Reuse the Bestellung's own order_no rather than generating a new
-      // sequence number — it's already unique and identifies the same
-      // commercial document.
       order_no: bestellung.order_no,
       customer_id: bestellung.customer_id || undefined,
       category_id: undefined,
-      // 1 = Draft/New, matching the status codes already used in the
-      // Order status filter dropdown on the frontend.
       status: 1,
       comment:
         [bestellung.title, bestellung.notes].filter(Boolean).join(" — ") ||
@@ -705,12 +749,10 @@ async function createOrderFromBestellung(
     const savedOrder = await orderRepo.save(order);
     createdOrderId = savedOrder.id;
 
-    const orderItemEntities = catalogItems.map((li) =>
+    const orderItemEntities = resolved.map(({ line: li, itemId }) =>
       orderItemRepo.create({
-        item_id: parseInt(li.sourceItemId as string, 10),
+        item_id: itemId,
         order_id: savedOrder.id,
-        // OrderItem.qty is an integer column; TransferOrderItem.qty is
-        // decimal, so round rather than truncate, and never drop below 1.
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
         remark_de: li.remark_order_item || li.notes || undefined,
         price:
@@ -725,12 +767,11 @@ async function createOrderFromBestellung(
   });
 
   console.log(
-    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${catalogItems.length} item(s), ${skippedCount} Freizeile line(s) skipped.`,
+    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${resolved.length} item(s), ${skippedCount} line(s) skipped.`,
   );
 
   return { createdOrderId, skippedCount };
 }
-
 export const updateTransferOrderStatus = async (
   req: Request,
   res: Response,
