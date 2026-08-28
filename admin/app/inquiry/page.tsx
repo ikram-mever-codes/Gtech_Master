@@ -596,19 +596,19 @@ const CombinedInquiriesPageContent = () => {
   } | null>(null);
 
   const handleRequestSort = (field: string) => {
-    const isNumeric = [
-      "annualPotentialKEur",
-      "targetPrice",
-      "qty",
-    ].includes(field);
+    const isNumeric = ["annualPotentialKEur", "targetPrice", "qty"].includes(
+      field,
+    );
 
     setRequestSortConfig((prev) => {
       if (prev?.sortBy === field) {
         if (isNumeric) {
-          if (prev.sortOrder === "DESC") return { sortBy: field, sortOrder: "ASC" };
+          if (prev.sortOrder === "DESC")
+            return { sortBy: field, sortOrder: "ASC" };
           return null;
         } else {
-          if (prev.sortOrder === "ASC") return { sortBy: field, sortOrder: "DESC" };
+          if (prev.sortOrder === "ASC")
+            return { sortBy: field, sortOrder: "DESC" };
           return null;
         }
       } else {
@@ -646,8 +646,18 @@ const CombinedInquiriesPageContent = () => {
             )
           ) : (
             <span className="text-gray-300 opacity-40 group-hover:opacity-100 transition-opacity">
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+              <svg
+                className="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 10l5-5 5 5M7 14l5 5 5-5"
+                />
               </svg>
             </span>
           )}
@@ -848,7 +858,8 @@ const CombinedInquiriesPageContent = () => {
         // Client-side sorting using sortData helper
         if (inquiryFilters.sortBy && inquiryFilters.sortOrder) {
           const customSortValues: Record<string, (row: any) => any> = {
-            total_potential_k_eur: (row) => Number(row.total_potential_k_eur || 0),
+            total_potential_k_eur: (row) =>
+              Number(row.total_potential_k_eur || 0),
             "requests.length": (row) => row.requests?.length || 0,
             highestPriority: (row) => {
               const requests = row.requests || [];
@@ -1958,270 +1969,309 @@ const CombinedInquiriesPageContent = () => {
                                   <table className="w-full text-sm">
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
                                       <tr>
-                                        {renderRequestSortableHeader("itemName", "Request Item", "left")}
+                                        {renderRequestSortableHeader(
+                                          "itemName",
+                                          "Request Item",
+                                          "left",
+                                        )}
                                         <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                                           Pic
                                         </th>
-                                        {renderRequestSortableHeader("qty", "Qty & Interval", "center")}
-                                        {renderRequestSortableHeader("targetPrice", "Target Price", "center")}
-                                        {renderRequestSortableHeader("annualPotentialKEur", "VP", "center")}
-                                        {renderRequestSortableHeader("requestStatus", "Status", "center")}
-                                        {renderRequestSortableHeader("priority", "Priority", "center")}
+                                        {renderRequestSortableHeader(
+                                          "qty",
+                                          "Qty & Interval",
+                                          "center",
+                                        )}
+                                        {renderRequestSortableHeader(
+                                          "targetPrice",
+                                          "Target Price",
+                                          "center",
+                                        )}
+                                        {renderRequestSortableHeader(
+                                          "annualPotentialKEur",
+                                          "VP",
+                                          "center",
+                                        )}
+                                        {renderRequestSortableHeader(
+                                          "requestStatus",
+                                          "Status",
+                                          "center",
+                                        )}
+                                        {renderRequestSortableHeader(
+                                          "priority",
+                                          "Priority",
+                                          "center",
+                                        )}
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           Asana
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Actions
                                         </th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
                                       {(() => {
-                                        let reqList = [...(inquiry.requests || [])];
+                                        let reqList = [
+                                          ...(inquiry.requests || []),
+                                        ];
                                         if (requestSortConfig) {
                                           reqList = sortData(
                                             reqList,
                                             requestSortConfig.sortBy,
                                             requestSortConfig.sortOrder,
                                             {
-                                              annualPotentialKEur: (r: any) => Number(r.annualPotentialKEur || 0),
-                                              targetPrice: (r: any) => Number(r.targetPrice || 0),
-                                              qty: (r: any) => Number(r.qty || 0),
+                                              annualPotentialKEur: (r: any) =>
+                                                Number(
+                                                  r.annualPotentialKEur || 0,
+                                                ),
+                                              targetPrice: (r: any) =>
+                                                Number(r.targetPrice || 0),
+                                              qty: (r: any) =>
+                                                Number(r.qty || 0),
                                               priority: (r: any) => {
-                                                const pMap: Record<string, number> = { Low: 1, Normal: 2, Medium: 3, High: 4, Urgent: 5 };
+                                                const pMap: Record<
+                                                  string,
+                                                  number
+                                                > = {
+                                                  Low: 1,
+                                                  Normal: 2,
+                                                  Medium: 3,
+                                                  High: 4,
+                                                  Urgent: 5,
+                                                };
                                                 return pMap[r.priority] || 2;
                                               },
-                                            }
+                                            },
                                           );
                                         }
-                                        return reqList.map((request: any, index: number) => (
-                                          <tr
-                                            key={request.id}
-                                            onClick={() => {
-                                              setSelectedRequestForDetail(
-                                                request,
-                                              );
-                                              setSelectedRequestInquiryId(
-                                                inquiry.id,
-                                              );
-                                              setShowRequestDetailModal(true);
-                                            }}
-                                            className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${
-                                              request.priority === "High"
-                                                ? "bg-red-50/50"
-                                                : ""
-                                            }`}
-                                          >
-                                            <td className="px-4 py-3">
-                                              <div className="w-[8rem]">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                  {request.itemName}
-                                                </div>
-                                                {(() => {
-                                                  const getLetterSuffix = (
-                                                    idx: number,
-                                                  ) => {
-                                                    let suffix = "";
-                                                    let temp = idx;
-                                                    while (temp >= 0) {
-                                                      suffix =
-                                                        String.fromCharCode(
-                                                          (temp % 26) + 97,
-                                                        ) + suffix;
-                                                      temp =
-                                                        Math.floor(temp / 26) -
-                                                        1;
-                                                    }
-                                                    return suffix;
-                                                  };
-                                                  const rawItemNo =
-                                                    request.itemNo ||
-                                                    `${inquiry.inquiryNo || "AF"}${getLetterSuffix(index)}`;
-                                                  const displayItemNo =
-                                                    rawItemNo.replace(
-                                                      /^(.+)-([a-z])$/i,
-                                                      "$1$2",
+                                        return reqList.map(
+                                          (request: any, index: number) => (
+                                            <tr
+                                              key={request.id}
+                                              onClick={() => {
+                                                setSelectedRequestForDetail(
+                                                  request,
+                                                );
+                                                setSelectedRequestInquiryId(
+                                                  inquiry.id,
+                                                );
+                                                setShowRequestDetailModal(true);
+                                              }}
+                                              className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${
+                                                request.priority === "High"
+                                                  ? "bg-red-50/50"
+                                                  : ""
+                                              }`}
+                                            >
+                                              <td className="px-4 py-3">
+                                                <div className="w-[8rem]">
+                                                  <div className="text-sm font-medium text-gray-900">
+                                                    {request.itemName}
+                                                  </div>
+                                                  {(() => {
+                                                    const getLetterSuffix = (
+                                                      idx: number,
+                                                    ) => {
+                                                      let suffix = "";
+                                                      let temp = idx;
+                                                      while (temp >= 0) {
+                                                        suffix =
+                                                          String.fromCharCode(
+                                                            (temp % 26) + 97,
+                                                          ) + suffix;
+                                                        temp =
+                                                          Math.floor(
+                                                            temp / 26,
+                                                          ) - 1;
+                                                      }
+                                                      return suffix;
+                                                    };
+                                                    const rawItemNo =
+                                                      request.itemNo ||
+                                                      `${inquiry.inquiryNo || "AF"}${getLetterSuffix(index)}`;
+                                                    const displayItemNo =
+                                                      rawItemNo.replace(
+                                                        /^(.+)-([a-z])$/i,
+                                                        "$1$2",
+                                                      );
+                                                    return (
+                                                      <div className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold inline-block mt-0.5">
+                                                        {displayItemNo}
+                                                      </div>
                                                     );
-                                                  return (
-                                                    <div className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold inline-block mt-0.5">
-                                                      {displayItemNo}
-                                                    </div>
-                                                  );
-                                                })()}
-                                              </div>
-                                            </td>
-                                            <td className="px-3 py-3 text-center">
-                                              <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
-                                                {request.images &&
-                                                request.images.length > 0 ? (
-                                                  <img
-                                                    src={request.images[0]}
-                                                    alt="Item"
-                                                    className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                                                  })()}
+                                                </div>
+                                              </td>
+                                              <td className="px-3 py-3 text-center">
+                                                <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
+                                                  {request.images &&
+                                                  request.images.length > 0 ? (
+                                                    <img
+                                                      src={request.images[0]}
+                                                      alt="Item"
+                                                      className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.open(
+                                                          request.images![0],
+                                                          "_blank",
+                                                        );
+                                                      }}
+                                                      title="View image"
+                                                    />
+                                                  ) : (
+                                                    <PhotoIcon
+                                                      className="w-5 h-5 text-gray-300"
+                                                      title="No image available"
+                                                    />
+                                                  )}
+                                                </div>
+                                              </td>{" "}
+                                              <td className="px-4 py-3 text-center">
+                                                <div className="text-sm font-medium text-gray-900">
+                                                  {request.qty} /{" "}
+                                                  {request.interval}
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-center">
+                                                <div className="text-sm font-medium text-gray-900">
+                                                  {request.targetPrice !==
+                                                    undefined &&
+                                                  request.targetPrice !== null
+                                                    ? `${request.targetPrice} €`
+                                                    : "-"}
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-center">
+                                                <div className="text-sm font-bold text-blue-600">
+                                                  {request.annualPotentialKEur !==
+                                                    undefined &&
+                                                  request.annualPotentialKEur !==
+                                                    null
+                                                    ? Math.round(
+                                                        request.annualPotentialKEur,
+                                                      )
+                                                    : "-"}
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-center">
+                                                <select
+                                                  value={request.requestStatus}
+                                                  onClick={(e) =>
+                                                    e.stopPropagation()
+                                                  }
+                                                  onChange={async (e: any) => {
+                                                    const nextStatus =
+                                                      e.target.value;
+
+                                                    setInquiries(
+                                                      (prevInquiries) =>
+                                                        prevInquiries.map(
+                                                          (inq) => ({
+                                                            ...inq,
+                                                            requests:
+                                                              inq.requests?.map(
+                                                                (req: any) =>
+                                                                  req.id ===
+                                                                  request.id
+                                                                    ? {
+                                                                        ...req,
+                                                                        requestStatus:
+                                                                          nextStatus,
+                                                                      }
+                                                                    : req,
+                                                              ),
+                                                          }),
+                                                        ),
+                                                    );
+
+                                                    setAllInquiries(
+                                                      (prevAllInquiries) =>
+                                                        prevAllInquiries.map(
+                                                          (inq) => ({
+                                                            ...inq,
+                                                            requests:
+                                                              inq.requests?.map(
+                                                                (req: any) =>
+                                                                  req.id ===
+                                                                  request.id
+                                                                    ? {
+                                                                        ...req,
+                                                                        requestStatus:
+                                                                          nextStatus,
+                                                                      }
+                                                                    : req,
+                                                              ),
+                                                          }),
+                                                        ),
+                                                    );
+
+                                                    try {
+                                                      await updateRequestedItem(
+                                                        request.id,
+                                                        {
+                                                          requestStatus:
+                                                            nextStatus,
+                                                        },
+                                                      );
+
+                                                      fetchInquiries();
+                                                    } catch (error) {
+                                                      fetchInquiries();
+                                                    }
+                                                  }}
+                                                  className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
+                                                    request.requestStatus,
+                                                  )}`}
+                                                >
+                                                  {getAvailableRequestStatuses().map(
+                                                    (status) => (
+                                                      <option
+                                                        key={status.value}
+                                                        value={status.value}
+                                                      >
+                                                        {status.label}
+                                                      </option>
+                                                    ),
+                                                  )}
+                                                </select>
+                                              </td>
+                                              <td className="px-4 py-3 text-center">
+                                                <span
+                                                  className={`text-xs px-2 py-1 rounded-full font-medium ${getRequestPriorityColor(
+                                                    request.priority,
+                                                  )}`}
+                                                >
+                                                  {request.priority}
+                                                </span>
+                                              </td>
+                                              <td className="px-4 py-3 text-center">
+                                                {request.asanaLink ? (
+                                                  <button
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       window.open(
-                                                        request.images![0],
+                                                        request.asanaLink,
                                                         "_blank",
                                                       );
                                                     }}
-                                                    title="View image"
-                                                  />
+                                                    className="inline-block transition-transform hover:scale-110 p-0.5"
+                                                    title="Open Asana link"
+                                                  >
+                                                    <img
+                                                      src="/asana.svg"
+                                                      alt="Asana"
+                                                      className="w-4 h-4 object-contain"
+                                                    />
+                                                  </button>
                                                 ) : (
-                                                  <PhotoIcon
-                                                    className="w-5 h-5 text-gray-300"
-                                                    title="No image available"
-                                                  />
+                                                  <span
+                                                    className="text-red-500 font-bold text-lg animate-pulse"
+                                                    title="Missing Asana Link"
+                                                  >
+                                                    !
+                                                  </span>
                                                 )}
-                                              </div>
-                                            </td>{" "}
-                                            <td className="px-4 py-3 text-center">
-                                              <div className="text-sm font-medium text-gray-900">
-                                                {request.qty} /{" "}
-                                                {request.interval}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              <div className="text-sm font-medium text-gray-900">
-                                                {request.targetPrice !==
-                                                  undefined &&
-                                                request.targetPrice !== null
-                                                  ? `${request.targetPrice} €`
-                                                  : "-"}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              <div className="text-sm font-bold text-blue-600">
-                                                {request.annualPotentialKEur !==
-                                                  undefined &&
-                                                request.annualPotentialKEur !==
-                                                  null
-                                                  ? Math.round(
-                                                      request.annualPotentialKEur,
-                                                    )
-                                                  : "-"}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              <select
-                                                value={request.requestStatus}
-                                                onClick={(e) =>
-                                                  e.stopPropagation()
-                                                }
-                                                onChange={async (e: any) => {
-                                                  const nextStatus =
-                                                    e.target.value;
-
-                                                  setInquiries(
-                                                    (prevInquiries) =>
-                                                      prevInquiries.map(
-                                                        (inq) => ({
-                                                          ...inq,
-                                                          requests:
-                                                            inq.requests?.map(
-                                                              (req: any) =>
-                                                                req.id ===
-                                                                request.id
-                                                                  ? {
-                                                                      ...req,
-                                                                      requestStatus:
-                                                                        nextStatus,
-                                                                    }
-                                                                  : req,
-                                                            ),
-                                                        }),
-                                                      ),
-                                                  );
-
-                                                  setAllInquiries(
-                                                    (prevAllInquiries) =>
-                                                      prevAllInquiries.map(
-                                                        (inq) => ({
-                                                          ...inq,
-                                                          requests:
-                                                            inq.requests?.map(
-                                                              (req: any) =>
-                                                                req.id ===
-                                                                request.id
-                                                                  ? {
-                                                                      ...req,
-                                                                      requestStatus:
-                                                                        nextStatus,
-                                                                    }
-                                                                  : req,
-                                                            ),
-                                                        }),
-                                                      ),
-                                                  );
-
-                                                  try {
-                                                    await updateRequestedItem(
-                                                      request.id,
-                                                      {
-                                                        requestStatus:
-                                                          nextStatus,
-                                                      },
-                                                    );
-
-                                                    fetchInquiries();
-                                                  } catch (error) {
-                                                    fetchInquiries();
-                                                  }
-                                                }}
-                                                className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
-                                                  request.requestStatus,
-                                                )}`}
-                                              >
-                                                {getAvailableRequestStatuses().map(
-                                                  (status) => (
-                                                    <option
-                                                      key={status.value}
-                                                      value={status.value}
-                                                    >
-                                                      {status.label}
-                                                    </option>
-                                                  ),
-                                                )}
-                                              </select>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              <span
-                                                className={`text-xs px-2 py-1 rounded-full font-medium ${getRequestPriorityColor(
-                                                  request.priority,
-                                                )}`}
-                                              >
-                                                {request.priority}
-                                              </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              {request.asanaLink ? (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    window.open(
-                                                      request.asanaLink,
-                                                      "_blank",
-                                                    );
-                                                  }}
-                                                  className="inline-block transition-transform hover:scale-110 p-0.5"
-                                                  title="Open Asana link"
-                                                >
-                                                  <img
-                                                    src="/asana.svg"
-                                                    alt="Asana"
-                                                    className="w-4 h-4 object-contain"
-                                                  />
-                                                </button>
-                                              ) : (
-                                                <span
-                                                  className="text-red-500 font-bold text-lg animate-pulse"
-                                                  title="Missing Asana Link"
-                                                >
-                                                  !
-                                                </span>
-                                              )}
-                                            </td>
-                                            <td className="px-4 py-3">
+                                              </td>
+                                              {/* <td className="px-4 py-3">
                                               <div className="flex items-center justify-center gap-2">
                                                 <button
                                                   onClick={(e) => {
@@ -2238,9 +2288,10 @@ const CombinedInquiriesPageContent = () => {
                                                   Convert
                                                 </button>
                                               </div>
-                                            </td>
-                                          </tr>
-                                        ));
+                                            </td> */}
+                                            </tr>
+                                          ),
+                                        );
                                       })()}
                                     </tbody>
                                   </table>
@@ -4049,7 +4100,7 @@ const CombinedInquiriesPageContent = () => {
             >
               Cancel
             </button>
-            <CustomButton
+            {/* <CustomButton
               gradient={true}
               onClick={
                 conversionType === "inquiry"
@@ -4060,7 +4111,7 @@ const CombinedInquiriesPageContent = () => {
             >
               <ArrowRightIcon className="h-4 w-4" />
               Convert to Item
-            </CustomButton>
+            </CustomButton> */}
           </div>
         </div>
       </CustomModal>

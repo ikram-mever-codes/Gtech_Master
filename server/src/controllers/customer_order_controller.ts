@@ -459,6 +459,8 @@ export const getOfferDraftItemsPreview = async (
           photo: li.photo || backingItem.photo || undefined,
           itemName: li.itemName,
           material: li.material,
+          itemNameDe: backingItem.item_name_de,
+          taricId: backingItem.taric_id,
           // NEW — Art.-Nr. should show the Item's real item_no_de, not
           // the offer line's own `material` string. Falls back to the
           // line's material only if the backing Item has no item_no_de
