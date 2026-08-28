@@ -717,6 +717,12 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const persistLine = async (lineItemId: string, payload: any) => {
     if (!order || isCreate) return;
     try {
+      setOrder((prev: any) => ({
+        ...prev,
+        orderItems: (prev?.orderItems || []).map((li: any) =>
+          li.id === lineItemId ? { ...li, ...payload } : li,
+        ),
+      }));
       const res: any = await updateTransferOrderLineItem(
         order.id,
         lineItemId,
@@ -726,7 +732,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       if (updatedItem?.id) {
         setOrder((prev: any) => ({
           ...prev,
-          orderItems: prev.orderItems.map((li: any) =>
+          orderItems: (prev?.orderItems || []).map((li: any) =>
             li.id === lineItemId ? updatedItem : li,
           ),
         }));

@@ -411,24 +411,25 @@ export const updateTransferOrder = async (
     }
 
     if (supplierId !== undefined) {
-      const supplierRepo = AppDataSource.getRepository(Supplier);
-      if (supplierId === null) {
-        bestellung.supplier_id = undefined;
+      const currentSupplierId = bestellung.supplier_id
+        ? Number(bestellung.supplier_id)
+        : null;
+      const targetSupplierId = supplierId ? Number(supplierId) : null;
+      if (currentSupplierId !== targetSupplierId) {
+        if (targetSupplierId !== null) {
+          const supplierRepo = AppDataSource.getRepository(Supplier);
+          const supplier = await supplierRepo.findOne({
+            where: { id: targetSupplierId },
+          });
+          if (!supplier) {
+            res
+              .status(404)
+              .json({ success: false, message: "Supplier not found" });
+            return;
+          }
+        }
+        bestellung.supplier_id = targetSupplierId ? targetSupplierId : undefined;
         receiverOrSupplierChanged = true;
-      } else {
-        const supplier = await supplierRepo.findOne({
-          where: { id: Number(supplierId) },
-        });
-        if (!supplier) {
-          res
-            .status(404)
-            .json({ success: false, message: "Supplier not found" });
-          return;
-        }
-        if (Number(bestellung.supplier_id) !== Number(supplierId)) {
-          bestellung.supplier_id = Number(supplierId);
-          receiverOrSupplierChanged = true;
-        }
       }
     }
 
