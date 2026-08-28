@@ -1280,6 +1280,8 @@ export const updateCustomerOrder = async (
     if (dateDelivery !== undefined) auftrag.date_delivery = dateDelivery;
     if (paymentMethod !== undefined) auftrag.payment_method = paymentMethod;
     if (shippingMethod !== undefined) auftrag.shipping_method = shippingMethod;
+    if (body.shipping_text !== undefined) auftrag.shipping_text = body.shipping_text;
+    if (body.shippingText !== undefined) auftrag.shipping_text = body.shippingText;
     if (paymentTerms !== undefined) auftrag.payment_terms = paymentTerms;
     if (deliveryTerms !== undefined) auftrag.delivery_terms = deliveryTerms;
     if (termsConditions !== undefined)

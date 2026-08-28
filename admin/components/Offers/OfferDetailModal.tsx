@@ -1117,6 +1117,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
         paymentMethod: form.paymentMethod || undefined,
         shippingMethod: form.shippingMethod || undefined,
+        shippingText: form.shippingText !== undefined ? form.shippingText : form.shippingMethod,
         deliveryTerms: form.deliveryTerms,
         termsConditions: form.termsConditions,
         notes: form.notes,
@@ -2384,9 +2385,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <select
                       className={inputCls}
                       value={form.shippingMethod || ""}
-                      onChange={(e) =>
-                        patch({ shippingMethod: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        patch({
+                          shippingMethod: val,
+                          ...(!form.shippingText || form.shippingText === form.shippingMethod
+                            ? { shippingText: val }
+                            : {}),
+                        });
+                      }}
                     >
                       <option value="">Select…</option>
                       {(dbShippingMethods.length > 0
@@ -2766,15 +2773,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               {edit ? (
                                 <input
                                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
-                                  value={form.shippingMethod || ""}
-                                  onChange={(e) =>
-                                    patch({ shippingMethod: e.target.value })
+                                  value={
+                                    form.shippingText !== undefined
+                                      ? form.shippingText
+                                      : form.shippingMethod || ""
                                   }
-                                  placeholder="Shipping method"
+                                  onChange={(e) =>
+                                    patch({ shippingText: e.target.value })
+                                  }
+                                  placeholder="Shipping method description"
                                 />
                               ) : (
                                 <span className="font-medium text-gray-700">
-                                  {offer.shippingMethod ||
+                                  {offer.shippingText ||
+                                    offer.shippingMethod ||
                                     "No shipping method set"}
                                 </span>
                               )}

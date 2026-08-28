@@ -204,15 +204,6 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
 
       newPage.drawPage(embeddedTemplate, { x: 0, y: 0, width, height });
 
-      newPage.drawRectangle({
-        x: 300,
-        y: 670,
-        width: 270,
-        height: 70,
-        color: pdfLib.rgb(1, 1, 1),
-      });
-
-      // 3. Draw generated content on top
       newPage.drawPage(embeddedContent, { x: 0, y: 0, width, height });
     }
 
@@ -425,6 +416,10 @@ export class UpdateOfferDto {
   @IsOptional()
   @IsString()
   shippingMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingText?: string;
 
   @IsOptional()
   @IsString()
@@ -1016,10 +1011,6 @@ export class OfferController {
       });
     }
   }
-  // ---------------------------------------------------------------------
-  // Pricing helpers
-  // ---------------------------------------------------------------------
-
   private createDefaultPriceMatrix(): PriceMatrixEntry[] {
     const now = new Date();
     return ["1000", "5000", "10000"].map((q, i) => ({
@@ -2508,6 +2499,7 @@ export class OfferController {
         "paymentTerms",
         "paymentMethod",
         "shippingMethod",
+        "shippingText",
         "deliveryTerms",
         "termsConditions",
         "notes",

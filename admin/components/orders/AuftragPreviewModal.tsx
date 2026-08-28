@@ -544,6 +544,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       shippingQuantity: o.shipping_quantity ?? 1,
       paymentMethod: o.payment_method || "",
       shippingMethod: o.shipping_method || "",
+      shippingText: o.shipping_text || o.shippingText || o.shipping_method || "",
       paymentTerms: o.payment_terms || "",
       deliveryTerms: o.delivery_terms || "",
       termsConditions: o.terms_conditions || "",
@@ -620,6 +621,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
           shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
           paymentMethod: form.paymentMethod || undefined,
           shippingMethod: form.shippingMethod || undefined,
+          shippingText: form.shippingText !== undefined ? form.shippingText : form.shippingMethod,
           paymentTerms: form.paymentTerms,
           deliveryTerms: form.deliveryTerms,
           termsConditions: form.termsConditions,
@@ -1417,7 +1419,15 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 <select
                   className={inputCls}
                   value={form.shippingMethod || ""}
-                  onChange={(e) => patch({ shippingMethod: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    patch({
+                      shippingMethod: val,
+                      ...(!form.shippingText || form.shippingText === form.shippingMethod
+                        ? { shippingText: val }
+                        : {}),
+                    });
+                  }}
                 >
                   <option value="">Select…</option>
                   {(dbShippingMethods.length > 0
@@ -1823,15 +1833,21 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         {effectiveEdit && canEditCommercial ? (
                           <input
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
-                            value={form.shippingMethod || ""}
-                            onChange={(e) =>
-                              patch({ shippingMethod: e.target.value })
+                            value={
+                              form.shippingText !== undefined
+                                ? form.shippingText
+                                : form.shippingMethod || ""
                             }
-                            placeholder="Shipping method"
+                            onChange={(e) =>
+                              patch({ shippingText: e.target.value })
+                            }
+                            placeholder="Shipping method description"
                           />
                         ) : (
                           <span className="font-medium text-gray-700">
-                            {order.shipping_method || "No shipping method set"}
+                            {order.shipping_text ||
+                              order.shipping_method ||
+                              "No shipping method set"}
                           </span>
                         )}
                       </td>

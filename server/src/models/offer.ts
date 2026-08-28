@@ -210,6 +210,9 @@ export class Offer {
   @Column({ type: "varchar", length: 100, nullable: true })
   shippingMethod?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  shippingText?: string;
+
   @Column({ type: "varchar", length: 100, nullable: true })
   deliveryTime?: string;
 

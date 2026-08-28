@@ -81,14 +81,6 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
         height,
       });
 
-      newPage.drawRectangle({
-        x: 300,
-        y: 670,
-        width: 270,
-        height: 70,
-        color: pdfLib.rgb(1, 1, 1),
-      });
-
       newPage.drawPage(embeddedContent, {
         x: 0,
         y: 0,
