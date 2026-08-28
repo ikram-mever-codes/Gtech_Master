@@ -1037,7 +1037,7 @@ const ItemsManagementPage: React.FC = () => {
     setFilters({
       search: "",
       status: "",
-      category: "PRO",
+      category: "",
       eanSearch: "",
       supplier: "",
       isActive: "",
@@ -1185,10 +1185,7 @@ const ItemsManagementPage: React.FC = () => {
             <tr
               key={item.id}
               onClick={() => openItemPreview(item)}
-              className={`cursor-pointer transition-colors ${isNew
-                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                  : "hover:bg-gray-50"
-                }`}
+              className="cursor-pointer transition-colors hover:bg-gray-50"
             >
               <td className="px-2 py-2">
                 <div className="w-15 h-15 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
@@ -1708,8 +1705,30 @@ const ItemsManagementPage: React.FC = () => {
               <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm overflow-visible">
                 {activeTab === "items" ? (
                   <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full py-0.5 relative z-10">
-                    <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
-                      <FunnelIcon className="w-4 h-4 text-primary" />
+                    <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
+                      {Boolean(
+                        filters.search ||
+                        filters.eanSearch ||
+                        filters.status ||
+                        filters.category ||
+                        filters.supplier ||
+                        filters.isActive ||
+                        filters.tags ||
+                        filters.company ||
+                        filters.isLabel ||
+                        filters.isStock
+                      ) ? (
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                          title="Reset all filters"
+                        >
+                          <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </button>
+                      ) : (
+                        <FunnelIcon className="w-4 h-4 text-primary" />
+                      )}
                     </div>
                     <div className="relative w-[115px] flex-shrink-0">
                       <div className="relative">
@@ -1770,6 +1789,7 @@ const ItemsManagementPage: React.FC = () => {
                       <TagFilterSelector
                         category="item"
                         compact={true}
+                        value={filters.tags || ""}
                         onChange={(tagString) =>
                           setFilters((prev) => ({ ...prev, tags: tagString }))
                         }
@@ -1870,20 +1890,22 @@ const ItemsManagementPage: React.FC = () => {
                           ))}
                       </select>
                     </div>
-                    <div className="shrink-0">
-                      <button
-                        onClick={resetFilters}
-                        className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1 whitespace-nowrap"
-                      >
-                        <ArrowPathIcon className="w-3.5 h-3.5" />
-                        Reset
-                      </button>
-                    </div>
                   </div>
                 ) : activeTab === "parents" ? (
                   <div className="flex flex-wrap items-center gap-2 w-full">
-                    <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                      <FunnelIcon className="w-5 h-5 text-primary" />
+                    <div className="flex items-center gap-1.5 shrink-0 select-none px-1">
+                      {!!filters.search ? (
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                          title="Reset search"
+                        >
+                          <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </button>
+                      ) : (
+                        <FunnelIcon className="w-5 h-5 text-primary" />
+                      )}
                     </div>
                     <div className="w-64 shrink-0">
                       <input
@@ -1896,18 +1918,22 @@ const ItemsManagementPage: React.FC = () => {
                         className={getInputClass(!!filters.search)}
                       />
                     </div>
-                    <button
-                      onClick={resetFilters}
-                      className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                    >
-                      <ArrowPathIcon className="w-4 h-4" />
-                      Reset
-                    </button>
                   </div>
                 ) : activeTab === "tarics" ? (
                   <div className="flex flex-wrap items-center gap-2 w-full">
-                    <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                      <FunnelIcon className="w-5 h-5 text-primary" />
+                    <div className="flex items-center gap-1.5 shrink-0 select-none px-1">
+                      {!!taricSearch ? (
+                        <button
+                          type="button"
+                          onClick={() => setTaricSearch("")}
+                          className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                          title="Reset search"
+                        >
+                          <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </button>
+                      ) : (
+                        <FunnelIcon className="w-5 h-5 text-primary" />
+                      )}
                     </div>
                     <div className="w-64 shrink-0">
                       <input
@@ -1918,13 +1944,6 @@ const ItemsManagementPage: React.FC = () => {
                         className={getInputClass(!!taricSearch)}
                       />
                     </div>
-                    <button
-                      onClick={() => setTaricSearch("")}
-                      className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                    >
-                      <ArrowPathIcon className="w-4 h-4" />
-                      Reset
-                    </button>
                   </div>
                 ) : (
                   <div className="flex items-end justify-end">
