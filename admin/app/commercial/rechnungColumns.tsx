@@ -62,7 +62,10 @@ export const RECHNUNG_PAYMENT_STATUS_FILTER_OPTIONS = [
   "paid",
 ].map((value) => ({ value, label: RECHNUNG_PAYMENT_STATUS_LABELS[value] }));
 
-const PaymentStatusBadge: React.FC<{ row: any }> = ({ row }) => {
+const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
+  row,
+  rechnungenK,
+}) => {
   const status = row.payment_status || "unpaid";
   const label = RECHNUNG_PAYMENT_STATUS_LABELS[status] || status;
   const classes: Record<string, string> = {
@@ -71,18 +74,42 @@ const PaymentStatusBadge: React.FC<{ row: any }> = ({ row }) => {
     unpaid: "bg-gray-100 text-gray-600 border-gray-300",
     overdue: "bg-rose-100 text-rose-800 border-rose-300",
   };
+
+  const hasRk =
+    Boolean(row.hasRk || row.has_rk) ||
+    (Array.isArray(row.rks) && row.rks.length > 0) ||
+    (Array.isArray(rechnungenK) &&
+      rechnungenK.length > 0 &&
+      rechnungenK.some(
+        (rk: any) =>
+          String(
+            rk.rechnungId || rk.rechnung_id || rk.invoiceId || rk.invoice_id,
+          ) === String(row.id),
+      ));
+
   return (
-    <span
-      className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${classes[status] || classes.unpaid
+    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+      <span
+        className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${
+          classes[status] || classes.unpaid
         }`}
-      title={
-        row.paid_amount !== undefined
-          ? `Paid: ${Number(row.paid_amount).toFixed(2)} / Open: ${Number(row.open_amount ?? 0).toFixed(2)}`
-          : undefined
-      }
-    >
-      {label}
-    </span>
+        title={
+          row.paid_amount !== undefined
+            ? `Paid: ${Number(row.paid_amount).toFixed(2)} / Open: ${Number(row.open_amount ?? 0).toFixed(2)}`
+            : undefined
+        }
+      >
+        {label}
+      </span>
+      {hasRk && (
+        <span
+          className="px-1.5 py-0.5 text-[10px] font-extrabold bg-[#FF6B00] text-white rounded-[4px] uppercase tracking-wider shrink-0 shadow-xs"
+          title="Rechnungskorrektur vorhanden"
+        >
+          RK
+        </span>
+      )}
+    </div>
   );
 };
 
@@ -247,40 +274,20 @@ export function buildRechnungColumns({
       header: "Nr",
       width: "110px",
       align: "center",
-      render: (row) => {
-        const hasRk =
-          Boolean(row.hasRk || row.has_rk) ||
-          (Array.isArray(row.rks) && row.rks.length > 0) ||
-          (Array.isArray(rechnungenK) &&
-            rechnungenK.length > 0 &&
-            rechnungenK.some(
-              (rk: any) =>
-                String(rk.rechnungId || rk.rechnung_id || rk.invoiceId || rk.invoice_id) === String(row.id)
-            ));
-
-        return (
-          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewRechnung(row);
-              }}
-              className="truncate text-green-600 font-semibold hover:underline cursor-pointer"
-              title={row.invoiceNumber || row.id}
-            >
-              {row.invoiceNumber || row.id}
-            </button>
-            {hasRk && (
-              <span
-                className="px-1.5 py-0.5 text-[10px] font-extrabold bg-[#FF6B00] text-white rounded-[4px] uppercase tracking-wider shrink-0 shadow-xs"
-                title="Rechnungskorrektur vorhanden"
-              >
-                RK
-              </span>
-            )}
-          </div>
-        );
-      },
+      render: (row) => (
+        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewRechnung(row);
+            }}
+            className="truncate text-green-600 font-semibold hover:underline cursor-pointer"
+            title={row.invoiceNumber || row.id}
+          >
+            {row.invoiceNumber || row.id}
+          </button>
+        </div>
+      ),
     },
     kundeColumn,
     titelColumn,
@@ -289,9 +296,9 @@ export function buildRechnungColumns({
     buildNettowertColumn(valueNetCalc),
     {
       header: "Status",
-      width: "100px",
+      width: "130px",
       align: "center",
-      render: (row) => <PaymentStatusBadge row={row} />,
+      render: (row) => <PaymentStatusBadge row={row} rechnungenK={rechnungenK} />,
     },
     {
       header: "",
