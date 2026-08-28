@@ -1028,7 +1028,7 @@ export const createAuftragFromOffer = async (
             ? (lineItem.taxRate ?? undefined)
             : undefined,
         lineTotal: lineTotal,
-        position: idx + 1,
+        position: lineItem?.position || idx + 1,
         sourceLineItemId: lineItem?.id || undefined,
         sourceItemId: lineItem?.sourceItemId || undefined,
         notes: lineItem?.notes || "",
@@ -1579,6 +1579,9 @@ export const updateOrderLineItem = async (
     }
     if (body.extraWeight !== undefined) {
       lineItem.extraWeight = parseFlexibleNumber(body.extraWeight) ?? undefined;
+    }
+    if (body.position !== undefined) {
+      lineItem.position = Number(body.position);
     }
     // taxRate only meaningful (and only editable in the UI) for Freizeile
     // lines, but we don't gate it server-side beyond honoring it if sent.
