@@ -1,15 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Select from "react-select";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Plus } from "lucide-react";
 import CustomModal from "@/components/UI/CustomModal";
 import { CargoType } from "@/api/cargos";
-
-// Four small modals from the original page.tsx, ported verbatim. They were
-// rendered as page-level siblings (not nested inside InvoiceDetailsModal),
-// so they stay separate components here too — page.tsx renders whichever
-// are open, same as before.
+import CargoCreateModal from "@/components/cargos/CargoCreateModal";
 
 interface ReassignModalProps {
   isOpen: boolean;
@@ -19,6 +15,7 @@ interface ReassignModalProps {
   targetCargoId: string;
   setTargetCargoId: (id: string) => void;
   onConfirm: () => void;
+  onCargoCreated?: (newCargo: CargoType) => void;
 }
 
 export const ReassignModal: React.FC<ReassignModalProps> = ({
@@ -29,7 +26,10 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
   targetCargoId,
   setTargetCargoId,
   onConfirm,
+  onCargoCreated,
 }) => {
+  const [showCargoCreate, setShowCargoCreate] = useState(false);
+
   if (!isOpen || !selectedItem) return null;
 
   const cargoOptions = cargos
@@ -43,59 +43,80 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
     }));
 
   return (
-    <CustomModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={
-        selectedItem.cargo_id
-          ? selectedItem.order_no
-            ? `Reassign Order No: ${selectedItem.order_no}`
-            : `Reassign Item ID: ${selectedItem.id}`
-          : selectedItem.order_no
-            ? `Assign Order No: ${selectedItem.order_no}`
-            : `Assign Item ID: ${selectedItem.id}`
-      }
-    >
-      <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
-        <div>
-          <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
-            Select Target Cargo
-          </label>
-          <Select
-            className="text-sm"
-            menuPortalTarget={
-              typeof window !== "undefined" ? document.body : undefined
-            }
-            styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-            options={cargoOptions}
-            value={
-              cargoOptions.find((opt) => opt.value === String(targetCargoId)) ||
-              null
-            }
-            onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
-            placeholder="Search or Select Cargo..."
-            isSearchable
-            isClearable
-          />
+    <>
+      <CustomModal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={
+          selectedItem.cargo_id
+            ? selectedItem.order_no
+              ? `Reassign Order No: ${selectedItem.order_no}`
+              : `Reassign Item ID: ${selectedItem.id}`
+            : selectedItem.order_no
+              ? `Assign Order No: ${selectedItem.order_no}`
+              : `Assign Item ID: ${selectedItem.id}`
+        }
+      >
+        <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
+          <div className="space-y-3">
+            <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
+              Select Target Cargo
+            </label>
+            <Select
+              className="text-sm"
+              menuPortalTarget={
+                typeof window !== "undefined" ? document.body : undefined
+              }
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              options={cargoOptions}
+              value={
+                cargoOptions.find((opt) => opt.value === String(targetCargoId)) ||
+                null
+              }
+              onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
+              placeholder="Search or Select Cargo..."
+              isSearchable
+              isClearable
+            />
+
+            <button
+              onClick={() => setShowCargoCreate(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-[#8CC21B] border-2 border-dashed border-[#8CC21B] rounded-[6px] hover:bg-[#8CC21B]/10 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              create new cargo
+            </button>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-8">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={!targetCargoId}
+              className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {selectedItem.cargo_id ? "Confirm Reassign" : "Confirm Assign"}
+            </button>
+          </div>
         </div>
-        <div className="flex justify-end gap-3 mt-8">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={!targetCargoId}
-            className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            {selectedItem.cargo_id ? "Confirm Reassign" : "Confirm Assign"}
-          </button>
-        </div>
-      </div>
-    </CustomModal>
+      </CustomModal>
+
+      <CargoCreateModal
+        isOpen={showCargoCreate}
+        onClose={() => setShowCargoCreate(false)}
+        onCreated={(newCargo) => {
+          onCargoCreated?.(newCargo);
+          setTargetCargoId(String(newCargo.id));
+          setShowCargoCreate(false);
+        }}
+      />
+    </>
   );
 };
 
@@ -203,7 +224,7 @@ export const SplitModal: React.FC<SplitModalProps> = ({
             disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
             className="w-full sm:w-auto px-10 py-3 bg-[#10B981] text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
           >
-            Split & Move Item Position
+            Split &amp; Move Item Position
           </button>
         </div>
       </div>

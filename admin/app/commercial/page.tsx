@@ -2184,6 +2184,7 @@ const InvoiceListPage: React.FC = () => {
           targetCargoId={targetCargoId}
           setTargetCargoId={setTargetCargoId}
           onConfirm={handleReassignItem}
+          onCargoCreated={(newCargo) => setCargos((prev) => [...prev, newCargo])}
         />
         <SplitModal
           isOpen={showSPModal}
