@@ -698,6 +698,32 @@ const OffersPage: React.FC<any> = ({
     });
   }, [offers, docFilters]);
 
+const getOfferNetTotal = (off: any): number => {
+  const shipping = Number(
+    off.shippingCost ||
+      off.shipping_cost ||
+      off.freightCost ||
+      off.freight_cost ||
+      0,
+  );
+
+  if (off.subtotal !== undefined && off.subtotal !== null) {
+    return Number(off.subtotal) + shipping;
+  }
+  if (off.sub_total !== undefined && off.sub_total !== null) {
+    return Number(off.sub_total) + shipping;
+  }
+  if (off.netTotal !== undefined && off.netTotal !== null && Number(off.netTotal) > 0) {
+    return Number(off.netTotal);
+  }
+  if (off.net_total !== undefined && off.net_total !== null && Number(off.net_total) > 0) {
+    return Number(off.net_total);
+  }
+  const gross = Number(off.totalAmount || off.total_amount || 0);
+  const taxRate = Number(off.taxRate || off.tax_rate || 19);
+  return gross > 0 ? gross / (1 + taxRate / 100) : 0;
+};
+
   const offerColumns: ColumnDef<any>[] = useMemo(
     () => [
       buildExpandColumn(expandedOfferIds, setExpandedOfferIds),
@@ -741,13 +767,7 @@ const OffersPage: React.FC<any> = ({
           );
         },
       },
-      buildNettowertColumn((row: any) => {
-        if (row.subtotal !== undefined && row.subtotal !== null) {
-          return Number(row.subtotal) + Number(row.shippingCost || 0);
-        }
-        // totalAmount already includes shippingCost (see Offer.calculateTotals())
-        return Number(row.totalAmount || 0);
-      }),
+      buildNettowertColumn((row: any) => getOfferNetTotal(row)),
       {
         header: "Status",
         width: "90px",
@@ -875,18 +895,7 @@ const OffersPage: React.FC<any> = ({
           expandedRowIds={expandedOfferIds}
           summaryCount={displayOffers.length}
           summaryTotal={displayOffers.reduce((sum: number, off: any) => {
-            let val = 0;
-            if (off.subtotal !== undefined && off.subtotal !== null) {
-              val = Number(off.subtotal) + Number(off.shippingCost || 0);
-            } else if (off.netTotal !== undefined && off.netTotal !== null && Number(off.netTotal) > 0) {
-              val = Number(off.netTotal);
-            } else if (off.net_total !== undefined && off.net_total !== null && Number(off.net_total) > 0) {
-              val = Number(off.net_total);
-            } else {
-              const gross = Number(off.totalAmount || off.total_amount || 0);
-              const taxRate = Number(off.taxRate || off.tax_rate || 19);
-              val = gross > 0 ? gross / (1 + taxRate / 100) : 0;
-            }
+            const val = getOfferNetTotal(off);
             return sum + (isNaN(val) ? 0 : val);
           }, 0)}
           renderRowDetails={(row) => (
