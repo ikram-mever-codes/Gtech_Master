@@ -5,6 +5,8 @@ import { Trash2 } from "lucide-react";
 import CustomModal from "@/components/UI/CustomModal";
 import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
 
+import { ChevronUpIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
+
 interface OrderFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,6 +33,7 @@ interface OrderFormModalProps {
   onUpdateOrderItemQty: (itemId: string, qty: number) => void;
   onUpdateOrderItemRemark: (itemId: string, remark: string) => void;
   onRemoveOrderItem: (itemId: string) => void;
+  onReorderOrderItem?: (itemId: string, direction: "up" | "down") => void;
   onSubmit: () => void;
 }
 
@@ -54,6 +57,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
   onUpdateOrderItemQty,
   onUpdateOrderItemRemark,
   onRemoveOrderItem,
+  onReorderOrderItem,
   onSubmit,
 }) => {
   if (!isOpen) return null;
@@ -147,8 +151,8 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
             <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
               <thead className="bg-gray-100 text-gray-800">
                 <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                    ID
+                  <th className="px-4 py-2 text-left text-sm font-medium border-b w-[80px]">
+                    Pos
                   </th>
                   <th className="px-4 py-2 text-left text-sm font-medium border-b w-[120px]">
                     Item name
@@ -168,10 +172,34 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
                 </tr>
               </thead>
               <tbody className="text-gray-700">
-                {orderItems.map((row) => (
+                {orderItems.map((row, index) => (
                   <tr key={row.item_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-sm border-b">
-                      {row.item_id}
+                    <td className="px-4 py-2 text-sm border-b whitespace-nowrap">
+                      <div className="flex items-center gap-1 select-none">
+                        <span className="w-4 text-xs font-semibold">{index + 1}</span>
+                        {onReorderOrderItem && (
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={() => onReorderOrderItem(row.item_id, "up")}
+                              className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                              title="Move Up"
+                            >
+                              <ChevronUpIcon className="w-3 h-3 stroke-[2.5]" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === orderItems.length - 1}
+                              onClick={() => onReorderOrderItem(row.item_id, "down")}
+                              className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                              title="Move Down"
+                            >
+                              <ChevronDownIcon className="w-3 h-3 stroke-[2.5]" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-sm border-b">
                       <div className="line-clamp-2 leading-tight max-w-[120px]">

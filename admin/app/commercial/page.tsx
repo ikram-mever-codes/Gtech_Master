@@ -657,6 +657,20 @@ const InvoiceListPage: React.FC = () => {
     );
   };
 
+  const handleReorderOrderItem = (item_id: string, direction: "up" | "down") => {
+    setOrderItems((prev: any[]) => {
+      const idx = prev.findIndex((x: any) => x.item_id === item_id);
+      if (idx === -1) return prev;
+      const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = temp;
+      return next;
+    });
+  };
+
   const handleEditOrder = async (order: any) => {
     setForm({
       category_id: String(order.category_id ?? ""),
@@ -1926,9 +1940,9 @@ const InvoiceListPage: React.FC = () => {
                 if ((activeInvTab as string) === "payment_inbound" || (activeInvTab as string) === "payments") {
                   amt = Number(item.amount || item.total || 0);
                 } else if (item.subtotal !== undefined && item.subtotal !== null) {
-                  amt = Number(item.subtotal);
+                  amt = Number(item.subtotal) + Number(item.shippingCost || item.shipping_cost || item.freightCost || item.freight_cost || 0);
                 } else if (item.sub_total !== undefined && item.sub_total !== null) {
-                  amt = Number(item.sub_total);
+                  amt = Number(item.sub_total) + Number(item.shippingCost || item.shipping_cost || item.freightCost || item.freight_cost || 0);
                 } else if (item.netTotal !== undefined && item.netTotal !== null && Number(item.netTotal) > 0) {
                   amt = Number(item.netTotal);
                 } else if (item.net_total !== undefined && item.net_total !== null && Number(item.net_total) > 0) {
@@ -1941,7 +1955,7 @@ const InvoiceListPage: React.FC = () => {
                     const p = Number(it.price || it.sales_price || it.unit_price || it.net_price || 0);
                     const q = Number(it.quantity || it.qty || 1);
                     return acc + p * q;
-                  }, 0);
+                  }, 0) + Number(item.shippingCost || item.shipping_cost || item.freightCost || item.freight_cost || 0);
                 } else {
                   const gross = Number(item.total_amount || item.totalAmount || item.total || item.grossTotal || 0);
                   const taxRate = Number(item.tax_rate || item.taxRate || 19);
@@ -2268,6 +2282,7 @@ const InvoiceListPage: React.FC = () => {
           onUpdateOrderItemQty={handleUpdateOrderItemQty}
           onUpdateOrderItemRemark={handleUpdateOrderItemRemark}
           onRemoveOrderItem={handleRemoveOrderItem}
+          onReorderOrderItem={handleReorderOrderItem}
           onSubmit={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
         />
 

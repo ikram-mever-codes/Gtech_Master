@@ -13,6 +13,8 @@ import {
   CubeIcon,
   BuildingOfficeIcon,
   ClipboardDocumentIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
@@ -1222,6 +1224,43 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     } catch (e) {
       console.error("Couldn't save line item change:", e);
       toast.error("Couldn't save that change.", errorStyles);
+    }
+  };
+
+  const handleMoveLineItem = async (lineItemId: string, direction: "up" | "down") => {
+    const sorted = [...visibleLineItems].sort(
+      (a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0)
+    );
+    const idx = sorted.findIndex((li: any) => li.id === lineItemId);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= sorted.length) return;
+
+    const currentItem = sorted[idx];
+    const targetItem = sorted[targetIdx];
+
+    const currentPos = Number(currentItem.position) || (idx + 1);
+    const targetPos = Number(targetItem.position) || (targetIdx + 1);
+
+    setOffer((prev: any) => ({
+      ...prev,
+      lineItems: prev.lineItems.map((li: any) => {
+        if (li.id === currentItem.id) return { ...li, position: targetPos };
+        if (li.id === targetItem.id) return { ...li, position: currentPos };
+        return li;
+      }),
+    }));
+
+    try {
+      await Promise.all([
+        persistLine(currentItem.id, { position: targetPos }),
+        persistLine(targetItem.id, { position: currentPos }),
+      ]);
+      await refreshLocal();
+      onChanged?.();
+    } catch (e) {
+      console.error("Couldn't save line item order change:", e);
+      toast.error("Couldn't save item order change.", errorStyles);
     }
   };
 
@@ -2507,7 +2546,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             </td>
                           </tr>
                         )}
-                        {visibleLineItems.map((item: any) => {
+                        {visibleLineItems.map((item: any, index: number) => {
                           const freetext = isFreetextLine(item);
                           const total = getLineItemTotal(item, "classic");
                           const qtyDisplay = Math.round(
@@ -2532,8 +2571,34 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   : undefined
                               }
                             >
-                              <td className="px-2 py-2 text-gray-500">
-                                {item.position}
+                              <td className="px-2 py-2 text-gray-500 whitespace-nowrap">
+                                {edit ? (
+                                  <div className="flex items-center gap-1 select-none">
+                                    <span className="w-4 text-xs font-semibold">{item.position || index + 1}</span>
+                                    <div className="flex flex-col gap-0.5">
+                                      <button
+                                        type="button"
+                                        disabled={index === 0}
+                                        onClick={() => handleMoveLineItem(item.id, "up")}
+                                        className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                                        title="Move Up"
+                                      >
+                                        <ChevronUpIcon className="w-3 h-3 stroke-[2.5]" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={index === visibleLineItems.length - 1}
+                                        onClick={() => handleMoveLineItem(item.id, "down")}
+                                        className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                                        title="Move Down"
+                                      >
+                                        <ChevronDownIcon className="w-3 h-3 stroke-[2.5]" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  item.position || index + 1
+                                )}
                               </td>
                               <td className="px-2 py-2">
                                 <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">

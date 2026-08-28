@@ -875,12 +875,18 @@ const OffersPage: React.FC<any> = ({
           expandedRowIds={expandedOfferIds}
           summaryCount={displayOffers.length}
           summaryTotal={displayOffers.reduce((sum: number, off: any) => {
-            const val =
-              typeof off.subtotal === "number"
-                ? off.subtotal
-                : typeof off.netTotal === "number"
-                  ? off.netTotal
-                  : parseFloat(off.subtotal || off.sub_total || off.netTotal || off.net_total || "0");
+            let val = 0;
+            if (off.subtotal !== undefined && off.subtotal !== null) {
+              val = Number(off.subtotal) + Number(off.shippingCost || 0);
+            } else if (off.netTotal !== undefined && off.netTotal !== null && Number(off.netTotal) > 0) {
+              val = Number(off.netTotal);
+            } else if (off.net_total !== undefined && off.net_total !== null && Number(off.net_total) > 0) {
+              val = Number(off.net_total);
+            } else {
+              const gross = Number(off.totalAmount || off.total_amount || 0);
+              const taxRate = Number(off.taxRate || off.tax_rate || 19);
+              val = gross > 0 ? gross / (1 + taxRate / 100) : 0;
+            }
             return sum + (isNaN(val) ? 0 : val);
           }, 0)}
           renderRowDetails={(row) => (
