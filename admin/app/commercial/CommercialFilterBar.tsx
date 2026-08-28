@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FunnelIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { FunnelIcon, ArrowPathIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { CommercialFilters } from "@/utils/commercialFilters";
 import type { InvoiceTab } from "../../hooks/useCommercialTabData";
 
@@ -43,8 +43,19 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
   return (
     <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm overflow-visible">
       <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full py-0.5 relative z-10">
-        <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
-          <FunnelIcon className="w-4 h-4 text-primary" />
+        <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
+          {isAnyFilterActive ? (
+            <button
+              type="button"
+              onClick={onReset}
+              className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              title="Reset all filters"
+            >
+              <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+            </button>
+          ) : (
+            <FunnelIcon className="w-4 h-4 text-primary" />
+          )}
         </div>
 
         <div className="w-32 shrink-0">
@@ -237,16 +248,6 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
             </option>
           </select>
         </div>
-
-        {isAnyFilterActive && (
-          <button
-            onClick={onReset}
-            className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-          >
-            <ArrowPathIcon className="w-3.5 h-3.5" />
-            Reset
-          </button>
-        )}
       </div>
 
       {docFilters.datePreset === "custom" && (

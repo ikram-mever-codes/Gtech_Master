@@ -813,8 +813,22 @@ const CustomersPage = () => {
           </Grid>
           <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                <FunnelIcon className="w-5 h-5 text-gray-400" />
+              <div className="flex items-center gap-1.5 shrink-0 select-none px-1">
+                {Boolean(searchText || filters.status.length > 0) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchText("");
+                      setFilters({ status: [] });
+                    }}
+                    className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                    title="Reset all filters"
+                  >
+                    <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                ) : (
+                  <FunnelIcon className="w-5 h-5 text-gray-400" />
+                )}
               </div>
 
               <div className="relative flex-1 min-w-[240px]">
@@ -856,19 +870,6 @@ const CustomersPage = () => {
                   ))}
                 </select>
               </div>
-
-              {(searchText || filters.status.length > 0) && (
-                <button
-                  onClick={() => {
-                    setSearchText("");
-                    setFilters({ status: [] });
-                  }}
-                  className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                >
-                  <ArrowPathIcon className="w-4 h-4" />
-                  Reset
-                </button>
-              )}
             </div>
           </div>
         </Box>

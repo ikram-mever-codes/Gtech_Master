@@ -14,6 +14,7 @@ import {
   BuildingOfficeIcon,
   CalendarIcon,
   FunnelIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import {
   BadgePercent,
@@ -795,7 +796,20 @@ const OffersPage: React.FC<any> = ({
       {!embedded && (
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
-            <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
+            {Boolean(filters.search || filters.status) ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({ ...filters, search: "", status: "", page: 1 })
+                }
+                className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0"
+                title="Reset all filters"
+              >
+                <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            ) : (
+              <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
+            )}
             <div className="w-64 shrink-0">
               <input
                 type="text"
@@ -823,15 +837,6 @@ const OffersPage: React.FC<any> = ({
                 ))}
               </select>
             </div>
-            <button
-              onClick={() =>
-                setFilters({ ...filters, search: "", status: "", page: 1 })
-              }
-              className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-            >
-              <ArrowPathIcon className="w-4 h-4" />
-              Reset
-            </button>
           </div>
 
           <div className="flex gap-2 shrink-0">
@@ -871,9 +876,11 @@ const OffersPage: React.FC<any> = ({
           summaryCount={displayOffers.length}
           summaryTotal={displayOffers.reduce((sum: number, off: any) => {
             const val =
-              typeof off.totalAmount === "number"
-                ? off.totalAmount
-                : parseFloat(off.totalAmount || off.total || "0");
+              typeof off.subtotal === "number"
+                ? off.subtotal
+                : typeof off.netTotal === "number"
+                  ? off.netTotal
+                  : parseFloat(off.subtotal || off.sub_total || off.netTotal || off.net_total || "0");
             return sum + (isNaN(val) ? 0 : val);
           }, 0)}
           renderRowDetails={(row) => (

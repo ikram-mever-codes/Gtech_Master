@@ -26,6 +26,7 @@ interface TagFilterSelectorProps {
   onReset?: () => void;
   compact?: boolean;
   placeholder?: string;
+  value?: string;
 }
 
 export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
@@ -34,12 +35,19 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
   onReset,
   compact = false,
   placeholder,
+  value,
 }) => {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<TagFilter[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (value === "" || value === undefined) {
+      setSelectedFilters([]);
+    }
+  }, [value]);
 
   const onChangeRef = useRef(onChange);
   useEffect(() => {

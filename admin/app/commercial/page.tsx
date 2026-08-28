@@ -1946,26 +1946,29 @@ const InvoiceListPage: React.FC = () => {
               summaryCount={displayItems.length}
               summaryTotal={displayItems.reduce((sum: number, item: any) => {
                 let amt = 0;
-                if (activeInvTab === "payment_inbound") {
+                if ((activeInvTab as string) === "payment_inbound" || (activeInvTab as string) === "payments") {
                   amt = Number(item.amount || item.total || 0);
-                } else if (item.totalAmount !== undefined && item.totalAmount !== null) {
-                  amt = Number(item.totalAmount);
-                } else if (item.total_amount !== undefined && item.total_amount !== null) {
-                  amt = Number(item.total_amount);
+                } else if (item.subtotal !== undefined && item.subtotal !== null) {
+                  amt = Number(item.subtotal);
+                } else if (item.sub_total !== undefined && item.sub_total !== null) {
+                  amt = Number(item.sub_total);
                 } else if (item.netTotal !== undefined && item.netTotal !== null && Number(item.netTotal) > 0) {
                   amt = Number(item.netTotal);
-                } else if (item.grossTotal !== undefined && item.grossTotal !== null && Number(item.grossTotal) > 0) {
-                  amt = Number(item.grossTotal);
-                } else if (item.total !== undefined && item.total !== null && Number(item.total) > 0) {
-                  amt = Number(item.total);
-                } else if (item.bruttoAmount !== undefined && item.bruttoAmount !== null && Number(item.bruttoAmount) > 0) {
-                  amt = Number(item.bruttoAmount);
-                } else if (Array.isArray(item.items) && item.items.length > 0) {
-                  amt = item.items.reduce((acc: number, it: any) => {
-                    const p = Number(it.price || it.sales_price || it.unit_price || 0);
-                    const q = Number(it.qty || it.quantity || 0);
+                } else if (item.net_total !== undefined && item.net_total !== null && Number(item.net_total) > 0) {
+                  amt = Number(item.net_total);
+                } else if (item.netAmount !== undefined && item.netAmount !== null && Number(item.netAmount) > 0) {
+                  amt = Number(item.netAmount);
+                } else if (Array.isArray(item.items || item.orderItems || item.lineItems) && (item.items || item.orderItems || item.lineItems).length > 0) {
+                  const lineItems = item.items || item.orderItems || item.lineItems;
+                  amt = lineItems.reduce((acc: number, it: any) => {
+                    const p = Number(it.price || it.sales_price || it.unit_price || it.net_price || 0);
+                    const q = Number(it.quantity || it.qty || 1);
                     return acc + p * q;
                   }, 0);
+                } else {
+                  const gross = Number(item.total_amount || item.totalAmount || item.total || item.grossTotal || 0);
+                  const taxRate = Number(item.tax_rate || item.taxRate || 19);
+                  amt = gross > 0 ? gross / (1 + taxRate / 100) : 0;
                 }
                 return sum + (isNaN(amt) ? 0 : amt);
               }, 0)}
