@@ -248,33 +248,18 @@ export function buildRechnungColumns({
       width: "110px",
       align: "center",
       render: (row) => {
-        const rowOpenQuantities = allOpenQuantities?.[row.id] || {};
-        const isFullyCorrected =
-          row.items?.length > 0 &&
-          row.items?.every((item: any) => {
-            const itemOpenQty = rowOpenQuantities[item.id] || 0;
-            return itemOpenQty <= 0;
-          });
-
         const hasRk =
-          isFullyCorrected ||
-          row.hasRk ||
-          row.has_rk ||
-          (rechnungenK || []).some(
-            (rk: any) =>
-              String(rk.rechnungId || rk.rechnung_id || rk.invoiceId || rk.invoice_id) === String(row.id)
-          );
+          Boolean(row.hasRk || row.has_rk) ||
+          (Array.isArray(row.rks) && row.rks.length > 0) ||
+          (Array.isArray(rechnungenK) &&
+            rechnungenK.length > 0 &&
+            rechnungenK.some(
+              (rk: any) =>
+                String(rk.rechnungId || rk.rechnung_id || rk.invoiceId || rk.invoice_id) === String(row.id)
+            ));
 
         return (
           <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-            {hasRk && (
-              <span
-                className="px-1.5 py-0.5 text-[10px] font-extrabold bg-[#FF6B00] text-white rounded-[4px] uppercase tracking-wider shrink-0 shadow-xs"
-                title="Rechnungskorrektur vorhanden"
-              >
-                RK
-              </span>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -285,6 +270,14 @@ export function buildRechnungColumns({
             >
               {row.invoiceNumber || row.id}
             </button>
+            {hasRk && (
+              <span
+                className="px-1.5 py-0.5 text-[10px] font-extrabold bg-[#FF6B00] text-white rounded-[4px] uppercase tracking-wider shrink-0 shadow-xs"
+                title="Rechnungskorrektur vorhanden"
+              >
+                RK
+              </span>
+            )}
           </div>
         );
       },
