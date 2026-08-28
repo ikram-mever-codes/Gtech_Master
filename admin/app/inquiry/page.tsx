@@ -1618,8 +1618,31 @@ const CombinedInquiriesPageContent = () => {
 
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap items-center gap-2 w-full">
-            <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-              <FunnelIcon className="w-5 h-5 text-gray-400" />
+            <div className="flex items-center gap-1.5 shrink-0 select-none px-1">
+              {Boolean(
+                inquiryFilters.tags ||
+                inquiryFilters.requestItemTags ||
+                selectedCustomerId
+              ) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInquiryFilters((prev: any) => ({
+                      ...prev,
+                      tags: "",
+                      requestItemTags: "",
+                    }));
+                    setSelectedCustomerId("");
+                    setInquiryCurrentPage(1);
+                  }}
+                  className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  title="Reset all filters"
+                >
+                  <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+              ) : (
+                <FunnelIcon className="w-5 h-5 text-gray-400" />
+              )}
             </div>
 
             <div className="w-56 shrink-0">
@@ -1627,6 +1650,7 @@ const CombinedInquiriesPageContent = () => {
                 category="inquiry"
                 compact={true}
                 placeholder="Filter by Inquiry Tags..."
+                value={inquiryFilters.tags || ""}
                 onChange={(tagString) =>
                   setInquiryFilters((prev: any) => ({
                     ...prev,
@@ -1644,6 +1668,7 @@ const CombinedInquiriesPageContent = () => {
                 category="request_item"
                 compact={true}
                 placeholder="Filter by Request Item Tags..."
+                value={inquiryFilters.requestItemTags || ""}
                 onChange={(tagString) =>
                   setInquiryFilters((prev: any) => ({
                     ...prev,
@@ -1669,24 +1694,6 @@ const CombinedInquiriesPageContent = () => {
                 placeholder="Filter by Customer..."
                 mode="customers"
               />
-            </div>
-
-            <div className="shrink-0">
-              <button
-                onClick={() => {
-                  setInquiryFilters((prev: any) => ({
-                    ...prev,
-                    tags: "",
-                    requestItemTags: "",
-                  }));
-                  setSelectedCustomerId("");
-                  setInquiryCurrentPage(1);
-                }}
-                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                Reset
-              </button>
             </div>
           </div>
         </div>
