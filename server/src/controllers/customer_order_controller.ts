@@ -2061,7 +2061,7 @@ export const downloadCustomerOrderPdf = async (
       isDelivered: isDelivered,
       lineItems: items,
       showPrices: true,
-      shippingMethod: order.shipping_method,
+      shippingMethod: order.shipping_text || order.shipping_method,
       shippingCost: Number(order.shipping_cost || 0),
       shippingQuantity: Number(order.shipping_quantity || 1),
       shippingTaxRate: defaultTaxRate,
