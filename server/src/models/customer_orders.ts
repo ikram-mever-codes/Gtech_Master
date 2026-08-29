@@ -108,6 +108,9 @@ export class CustomerOrder {
   shipping_method?: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
+  shipping_text?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
   payment_terms?: string;
 
   @Column({ type: "text", nullable: true })

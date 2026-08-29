@@ -662,6 +662,20 @@ const InvoiceListPage: React.FC = () => {
     );
   };
 
+  const handleReorderOrderItem = (item_id: string, direction: "up" | "down") => {
+    setOrderItems((prev: any[]) => {
+      const idx = prev.findIndex((x: any) => x.item_id === item_id);
+      if (idx === -1) return prev;
+      const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = temp;
+      return next;
+    });
+  };
+
   const handleEditOrder = async (order: any) => {
     setForm({
       category_id: String(order.category_id ?? ""),
@@ -1946,27 +1960,67 @@ const InvoiceListPage: React.FC = () => {
               summaryCount={displayItems.length}
               summaryTotal={displayItems.reduce((sum: number, item: any) => {
                 let amt = 0;
-                if ((activeInvTab as string) === "payment_inbound" || (activeInvTab as string) === "payments") {
+                const shipping = Number(
+                  item.shippingCost ||
+                    item.shipping_cost ||
+                    item.freightCost ||
+                    item.freight_cost ||
+                    0,
+                );
+
+                if (
+                  (activeInvTab as string) === "payment_inbound" ||
+                  (activeInvTab as string) === "payments"
+                ) {
                   amt = Number(item.amount || item.total || 0);
                 } else if (item.subtotal !== undefined && item.subtotal !== null) {
-                  amt = Number(item.subtotal);
+                  amt = Number(item.subtotal) + shipping;
                 } else if (item.sub_total !== undefined && item.sub_total !== null) {
-                  amt = Number(item.sub_total);
-                } else if (item.netTotal !== undefined && item.netTotal !== null && Number(item.netTotal) > 0) {
+                  amt = Number(item.sub_total) + shipping;
+                } else if (
+                  item.netTotal !== undefined &&
+                  item.netTotal !== null &&
+                  Number(item.netTotal) > 0
+                ) {
                   amt = Number(item.netTotal);
-                } else if (item.net_total !== undefined && item.net_total !== null && Number(item.net_total) > 0) {
+                } else if (
+                  item.net_total !== undefined &&
+                  item.net_total !== null &&
+                  Number(item.net_total) > 0
+                ) {
                   amt = Number(item.net_total);
-                } else if (item.netAmount !== undefined && item.netAmount !== null && Number(item.netAmount) > 0) {
+                } else if (
+                  item.netAmount !== undefined &&
+                  item.netAmount !== null &&
+                  Number(item.netAmount) > 0
+                ) {
                   amt = Number(item.netAmount);
-                } else if (Array.isArray(item.items || item.orderItems || item.lineItems) && (item.items || item.orderItems || item.lineItems).length > 0) {
-                  const lineItems = item.items || item.orderItems || item.lineItems;
-                  amt = lineItems.reduce((acc: number, it: any) => {
-                    const p = Number(it.price || it.sales_price || it.unit_price || it.net_price || 0);
-                    const q = Number(it.quantity || it.qty || 1);
-                    return acc + p * q;
-                  }, 0);
+                } else if (
+                  Array.isArray(item.items || item.orderItems || item.lineItems) &&
+                  (item.items || item.orderItems || item.lineItems).length > 0
+                ) {
+                  const lineItems =
+                    item.items || item.orderItems || item.lineItems;
+                  amt =
+                    lineItems.reduce((acc: number, it: any) => {
+                      const p = Number(
+                        it.price ||
+                          it.sales_price ||
+                          it.unit_price ||
+                          it.net_price ||
+                          0,
+                      );
+                      const q = Number(it.quantity || it.qty || 1);
+                      return acc + p * q;
+                    }, 0) + shipping;
                 } else {
-                  const gross = Number(item.total_amount || item.totalAmount || item.total || item.grossTotal || 0);
+                  const gross = Number(
+                    item.total_amount ||
+                      item.totalAmount ||
+                      item.total ||
+                      item.grossTotal ||
+                      0,
+                  );
                   const taxRate = Number(item.tax_rate || item.taxRate || 19);
                   amt = gross > 0 ? gross / (1 + taxRate / 100) : 0;
                 }
@@ -2194,6 +2248,7 @@ const InvoiceListPage: React.FC = () => {
           targetCargoId={targetCargoId}
           setTargetCargoId={setTargetCargoId}
           onConfirm={handleReassignItem}
+          onCargoCreated={(newCargo) => setCargos((prev) => [...prev, newCargo])}
         />
         <SplitModal
           isOpen={showSPModal}
@@ -2292,6 +2347,7 @@ const InvoiceListPage: React.FC = () => {
           onUpdateOrderItemQty={handleUpdateOrderItemQty}
           onUpdateOrderItemRemark={handleUpdateOrderItemRemark}
           onRemoveOrderItem={handleRemoveOrderItem}
+          onReorderOrderItem={handleReorderOrderItem}
           onSubmit={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
         />
 

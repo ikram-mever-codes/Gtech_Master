@@ -81,14 +81,6 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
         height,
       });
 
-      newPage.drawRectangle({
-        x: 300,
-        y: 670,
-        width: 270,
-        height: 70,
-        color: pdfLib.rgb(1, 1, 1),
-      });
-
       newPage.drawPage(embeddedContent, {
         x: 0,
         y: 0,
@@ -741,7 +733,7 @@ export async function generateGtechDocumentPdf(
         shippingMethod,
         `${formatGermanNum(shippingTaxRateForRow, 2)}%`,
         String(shippingQtyNum),
-        formatGermanNum(shippingCostNum, 3),
+        formatGermanPrice(shippingCostNum),
         formatGermanNum(shippingLineTotal, 2),
       ];
       let shipX = LEFT_X;

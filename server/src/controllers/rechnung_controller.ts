@@ -406,7 +406,7 @@ export const createRechnungFromAuftrag = async (
         total_price: lineTotal,
         order_no: auftrag.order_no,
         remark: selItem.notes || sourceLine?.description || undefined,
-        position: (itemsToCreate.length || 0) + 1,
+        position: sourceLine?.position || (itemsToCreate.length || 0) + 1,
         max_qty: qty,
         transferPrice: price,
         purchasePrice: price,

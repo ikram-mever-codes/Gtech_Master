@@ -238,10 +238,15 @@ export default function AuftragCreateModal({
     );
   }, [customers, filterCustomerId]);
 
+  const [paymentTerms, setPaymentTerms] = useState("");
+
   useEffect(() => {
     if (!selectedCustomer) return;
     setPaymentMethod(selectedCustomer.defaultPaymentMethod || "");
     setShippingMethod(selectedCustomer.defaultShippingMethod || "");
+    if (selectedCustomer.defaultPaymentDueDays) {
+      setPaymentTerms(String(selectedCustomer.defaultPaymentDueDays));
+    }
   }, [selectedCustomer]);
 
   const toggleItem = (it: any) => {
@@ -302,6 +307,7 @@ export default function AuftragCreateModal({
         title: title.trim() || undefined,
         paymentMethod: paymentMethod || undefined,
         shippingMethod: shippingMethod || undefined,
+        paymentTerms: paymentTerms || undefined,
         notes: notes || undefined,
       };
 

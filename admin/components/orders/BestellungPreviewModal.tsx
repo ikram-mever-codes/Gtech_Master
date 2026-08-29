@@ -717,6 +717,12 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const persistLine = async (lineItemId: string, payload: any) => {
     if (!order || isCreate) return;
     try {
+      setOrder((prev: any) => ({
+        ...prev,
+        orderItems: (prev?.orderItems || []).map((li: any) =>
+          li.id === lineItemId ? { ...li, ...payload } : li,
+        ),
+      }));
       const res: any = await updateTransferOrderLineItem(
         order.id,
         lineItemId,
@@ -726,7 +732,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       if (updatedItem?.id) {
         setOrder((prev: any) => ({
           ...prev,
-          orderItems: prev.orderItems.map((li: any) =>
+          orderItems: (prev?.orderItems || []).map((li: any) =>
             li.id === lineItemId ? updatedItem : li,
           ),
         }));
@@ -1319,13 +1325,32 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                             <div className="text-right">{qtyDisplay}</div>
                           )}
                         </td>
-                        <td className="px-2 py-2 text-right text-gray-600">
-                          {item.sourceItemId
-                            ? formatPrice(
-                                item.purchasePrice ?? item.transferPrice,
-                                lineCurrency,
-                              )
-                            : "—"}
+                        <td className="px-2 py-2">
+                          {edit || isCreate ? (
+                            <DecimalInput
+                              className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right bg-white"
+                              value={item.purchasePrice ?? item.transferPrice}
+                              onCommit={(raw) =>
+                                persistLine(item.id, {
+                                  transferPrice: raw.trim() || "0",
+                                  purchasePrice: raw.trim() || "0",
+                                })
+                              }
+                            />
+                          ) : (
+                            <div className="text-right text-gray-600">
+                              {item.purchasePrice !== null &&
+                              item.purchasePrice !== undefined
+                                ? formatPrice(item.purchasePrice, lineCurrency)
+                                : item.transferPrice !== null &&
+                                    item.transferPrice !== undefined
+                                  ? formatPrice(
+                                      item.transferPrice,
+                                      lineCurrency,
+                                    )
+                                  : "—"}
+                            </div>
+                          )}
                         </td>
                         <td className="px-2 py-2 text-right font-medium">
                           {formatPrice(total, lineCurrency)}

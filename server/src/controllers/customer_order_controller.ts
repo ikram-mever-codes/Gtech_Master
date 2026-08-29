@@ -728,6 +728,7 @@ export const createAuftragFromItems = async (
       title,
       paymentMethod,
       shippingMethod,
+      paymentTerms,
       notes,
       stock_where,
     } = req.body;
@@ -873,6 +874,16 @@ export const createAuftragFromItems = async (
       finalStockWhere = StockWhere.CN;
     }
 
+    const effectivePaymentMethod =
+      paymentMethod || customer.defaultPaymentMethod || undefined;
+    const effectiveShippingMethod =
+      shippingMethod || customer.defaultShippingMethod || undefined;
+    const effectivePaymentTerms =
+      paymentTerms ||
+      (customer.defaultPaymentDueDays
+        ? String(customer.defaultPaymentDueDays)
+        : undefined);
+
     const customerOrder = customerOrderRepo.create({
       order_no: auftragNo,
       title: orderTitle,
@@ -880,8 +891,9 @@ export const createAuftragFromItems = async (
       status: "open",
       currency: "EUR",
       tax_rate: taxRate,
-      payment_method: paymentMethod,
-      shipping_method: shippingMethod,
+      payment_method: effectivePaymentMethod,
+      shipping_method: effectiveShippingMethod,
+      payment_terms: effectivePaymentTerms,
       notes: notes || "",
       customerSnapshot: customerSnapshot,
       date_created: dateCreatedStr,
@@ -1113,7 +1125,7 @@ export const createAuftragFromOffer = async (
             ? (lineItem.taxRate ?? undefined)
             : undefined,
         lineTotal: lineTotal,
-        position: idx + 1,
+        position: lineItem?.position || idx + 1,
         sourceLineItemId: lineItem?.id || undefined,
         sourceItemId: lineItem?.sourceItemId || undefined,
         notes: lineItem?.notes || "",
@@ -1137,6 +1149,25 @@ export const createAuftragFromOffer = async (
       finalStockWhere = StockWhere.CN;
     }
 
+    let offerCustomer: Customer | null = null;
+    if (offer.customerId) {
+      const custRepo = AppDataSource.getRepository(Customer);
+      offerCustomer = await custRepo.findOne({
+        where: { id: offer.customerId },
+      });
+    }
+
+    const effectivePaymentMethod =
+      offer.paymentMethod || offerCustomer?.defaultPaymentMethod || undefined;
+    const effectiveShippingMethod =
+      offer.shippingMethod || offerCustomer?.defaultShippingMethod || undefined;
+    const effectivePaymentTerms =
+      offer.paymentDueDays
+        ? String(offer.paymentDueDays)
+        : offerCustomer?.defaultPaymentDueDays
+          ? String(offerCustomer.defaultPaymentDueDays)
+          : "30";
+
     const customerOrder = customerOrderRepo.create({
       order_no: auftragNo,
       offer_id: offer.id,
@@ -1149,9 +1180,9 @@ export const createAuftragFromOffer = async (
       discount_amount: offer.discountAmount || 0,
       shipping_cost: offer.shippingCost || 0,
       shipping_quantity: offer.shippingQuantity || 1,
-      payment_method: offer.paymentMethod,
-      shipping_method: offer.shippingMethod,
-      payment_terms: offer.paymentDueDays ? String(offer.paymentDueDays) : "30",
+      payment_method: effectivePaymentMethod,
+      shipping_method: effectiveShippingMethod,
+      payment_terms: effectivePaymentTerms,
       delivery_terms: offer.deliveryTerms,
       terms_conditions: offer.termsConditions,
       notes: offer.notes || "",
@@ -1367,6 +1398,8 @@ export const updateCustomerOrder = async (
     if (dateDelivery !== undefined) auftrag.date_delivery = dateDelivery;
     if (paymentMethod !== undefined) auftrag.payment_method = paymentMethod;
     if (shippingMethod !== undefined) auftrag.shipping_method = shippingMethod;
+    if (body.shipping_text !== undefined) auftrag.shipping_text = body.shipping_text;
+    if (body.shippingText !== undefined) auftrag.shipping_text = body.shippingText;
     if (paymentTerms !== undefined) auftrag.payment_terms = paymentTerms;
     if (deliveryTerms !== undefined) auftrag.delivery_terms = deliveryTerms;
     if (termsConditions !== undefined)
@@ -1666,6 +1699,9 @@ export const updateOrderLineItem = async (
     }
     if (body.extraWeight !== undefined) {
       lineItem.extraWeight = parseFlexibleNumber(body.extraWeight) ?? undefined;
+    }
+    if (body.position !== undefined) {
+      lineItem.position = Number(body.position);
     }
     // taxRate only meaningful (and only editable in the UI) for Freizeile
     // lines, but we don't gate it server-side beyond honoring it if sent.

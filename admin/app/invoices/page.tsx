@@ -70,6 +70,7 @@ import {
   deleteOrder,
 } from "@/api/orders";
 import { getAllCargos, CargoType, assignOrdersToCargo } from "@/api/cargos";
+import CargoCreateModal from "@/components/cargos/CargoCreateModal";
 import { getAllTaricsSimple, getItems, updateItem } from "@/api/items";
 import { getAllSuppliers, getSupplierItems } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
@@ -285,6 +286,7 @@ const InvoiceListPage: React.FC = () => {
   const [showREModal, setShowREModal] = useState(false);
   const [showSPModal, setShowSPModal] = useState(false);
   const [showQTYModal, setShowQTYModal] = useState(false);
+  const [showCargoCreateModal, setShowCargoCreateModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [cargos, setCargos] = useState<CargoType[]>([]);
   const [splitQty, setSplitQty] = useState<number>(0);
@@ -2887,76 +2889,95 @@ const InvoiceListPage: React.FC = () => {
         )}
 
         {showREModal && selectedItem && (
-          <CustomModal
-            isOpen={showREModal}
-            onClose={() => setShowREModal(false)}
-            title={
-              selectedItem.cargo_id
-                ? selectedItem.order_no
-                  ? `Reassign Order No: ${selectedItem.order_no}`
-                  : `Reassign Item ID: ${selectedItem.id}`
-                : selectedItem.order_no
-                  ? `Assign Order No: ${selectedItem.order_no}`
-                  : `Assign Item ID: ${selectedItem.id}`
-            }
-          >
-            <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
-              <div>
-                <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
-                  Select Target Cargo
-                </label>
-                <Select
-                  className="text-sm"
-                  menuPortalTarget={
-                    typeof window !== "undefined" ? document.body : undefined
-                  }
-                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                  options={cargos
-                    .filter((c) => {
-                      const status = (c.cargo_status || "")
-                        .trim()
-                        .toLowerCase();
-                      return status !== "shipped" && status !== "delivered";
-                    })
-                    .map((c) => ({
-                      value: String(c.id),
-                      label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                    }))}
-                  value={
-                    cargos
+          <>
+            <CustomModal
+              isOpen={showREModal}
+              onClose={() => setShowREModal(false)}
+              title={
+                selectedItem.cargo_id
+                  ? selectedItem.order_no
+                    ? `Reassign Order No: ${selectedItem.order_no}`
+                    : `Reassign Item ID: ${selectedItem.id}`
+                  : selectedItem.order_no
+                    ? `Assign Order No: ${selectedItem.order_no}`
+                    : `Assign Item ID: ${selectedItem.id}`
+              }
+            >
+              <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
+                <div>
+                  <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
+                    Select Target Cargo
+                  </label>
+                  <Select
+                    className="text-sm"
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : undefined
+                    }
+                    styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                    options={cargos
+                      .filter((c) => {
+                        const status = (c.cargo_status || "")
+                          .trim()
+                          .toLowerCase();
+                        return status !== "shipped" && status !== "delivered";
+                      })
                       .map((c) => ({
                         value: String(c.id),
                         label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                      }))
-                      .find((opt) => opt.value === String(targetCargoId)) ||
-                    null
-                  }
-                  onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
-                  placeholder="Search or Select Cargo..."
-                  isSearchable
-                  isClearable
-                />
+                      }))}
+                    value={
+                      cargos
+                        .map((c) => ({
+                          value: String(c.id),
+                          label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
+                        }))
+                        .find((opt) => opt.value === String(targetCargoId)) ||
+                      null
+                    }
+                    onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
+                    placeholder="Search or Select Cargo..."
+                    isSearchable
+                    isClearable
+                  />
+
+                  <button
+                    onClick={() => setShowCargoCreateModal(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 mt-3 text-sm font-bold text-[#8CC21B] border-2 border-dashed border-[#8CC21B] rounded-[6px] hover:bg-[#8CC21B]/10 transition-all"
+                  >
+                    <span className="text-lg leading-none">+</span>
+                    create new cargo
+                  </button>
+                </div>
+                <div className="flex justify-end gap-3 mt-8">
+                  <button
+                    onClick={() => setShowREModal(false)}
+                    className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReassignItem}
+                    disabled={!targetCargoId}
+                    className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    {selectedItem.cargo_id
+                      ? "Confirm Reassign"
+                      : "Confirm Assign"}
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-end gap-3 mt-8">
-                <button
-                  onClick={() => setShowREModal(false)}
-                  className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleReassignItem}
-                  disabled={!targetCargoId}
-                  className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  {selectedItem.cargo_id
-                    ? "Confirm Reassign"
-                    : "Confirm Assign"}
-                </button>
-              </div>
-            </div>
-          </CustomModal>
+            </CustomModal>
+            <CargoCreateModal
+              isOpen={showCargoCreateModal}
+              onClose={() => setShowCargoCreateModal(false)}
+              onCreated={(newCargo) => {
+                setCargos((prev) => [...prev, newCargo]);
+                setTargetCargoId(String(newCargo.id));
+                setShowCargoCreateModal(false);
+              }}
+            />
+          </>
         )}
 
         {showSPModal && selectedItem && (

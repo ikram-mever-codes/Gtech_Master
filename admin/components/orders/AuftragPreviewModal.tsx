@@ -10,6 +10,8 @@ import {
   CubeIcon,
   ArrowUpTrayIcon,
   ClipboardDocumentIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
@@ -542,6 +544,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       shippingQuantity: o.shipping_quantity ?? 1,
       paymentMethod: o.payment_method || "",
       shippingMethod: o.shipping_method || "",
+      shippingText: o.shipping_text || o.shippingText || o.shipping_method || "",
       paymentTerms: o.payment_terms || "",
       deliveryTerms: o.delivery_terms || "",
       termsConditions: o.terms_conditions || "",
@@ -618,6 +621,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
           shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
           paymentMethod: form.paymentMethod || undefined,
           shippingMethod: form.shippingMethod || undefined,
+          shippingText: form.shippingText !== undefined ? form.shippingText : form.shippingMethod,
           paymentTerms: form.paymentTerms,
           deliveryTerms: form.deliveryTerms,
           termsConditions: form.termsConditions,
@@ -726,6 +730,43 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     } catch (e) {
       console.error("Couldn't save line item change:", e);
       toast.error("Couldn't save that change.", errorStyles);
+    }
+  };
+
+  const handleMoveLineItem = async (lineItemId: string, direction: "up" | "down") => {
+    if (!canEditCommercial) return;
+    const sorted = [...visibleLineItems].sort(
+      (a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0)
+    );
+    const idx = sorted.findIndex((li: any) => li.id === lineItemId);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= sorted.length) return;
+
+    const currentItem = sorted[idx];
+    const targetItem = sorted[targetIdx];
+
+    const currentPos = Number(currentItem.position) || (idx + 1);
+    const targetPos = Number(targetItem.position) || (targetIdx + 1);
+
+    setOrder((prev: any) => ({
+      ...prev,
+      orderItems: prev.orderItems.map((li: any) => {
+        if (li.id === currentItem.id) return { ...li, position: targetPos };
+        if (li.id === targetItem.id) return { ...li, position: currentPos };
+        return li;
+      }),
+    }));
+
+    try {
+      await Promise.all([
+        persistLine(currentItem.id, { position: targetPos }),
+        persistLine(targetItem.id, { position: currentPos }),
+      ]);
+      await refreshLocal();
+    } catch (e) {
+      console.error("Couldn't save line item order change:", e);
+      toast.error("Couldn't save item order change.", errorStyles);
     }
   };
 
@@ -1378,7 +1419,15 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 <select
                   className={inputCls}
                   value={form.shippingMethod || ""}
-                  onChange={(e) => patch({ shippingMethod: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    patch({
+                      shippingMethod: val,
+                      ...(!form.shippingText || form.shippingText === form.shippingMethod
+                        ? { shippingText: val }
+                        : {}),
+                    });
+                  }}
                 >
                   <option value="">Select…</option>
                   {(dbShippingMethods.length > 0
@@ -1579,7 +1628,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       </td>
                     </tr>
                   )}
-                  {visibleLineItems.map((item: any) => {
+                  {visibleLineItems.map((item: any, index: number) => {
                     const freetext = isFreetextLine(item);
                     const total = getLineItemTotal(item);
                     const qtyDisplay = Math.round(
@@ -1595,8 +1644,34 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                           rowColor ? { backgroundColor: rowColor } : undefined
                         }
                       >
-                        <td className="px-2 py-2 text-gray-500">
-                          {item.position}
+                        <td className="px-2 py-2 text-gray-500 whitespace-nowrap">
+                          {effectiveEdit && canEditCommercial ? (
+                            <div className="flex items-center gap-1 select-none">
+                              <span className="w-4 text-xs font-semibold">{item.position || index + 1}</span>
+                              <div className="flex flex-col gap-0.5">
+                                <button
+                                  type="button"
+                                  disabled={index === 0}
+                                  onClick={() => handleMoveLineItem(item.id, "up")}
+                                  className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                                  title="Move Up"
+                                >
+                                  <ChevronUpIcon className="w-3 h-3 stroke-[2.5]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={index === visibleLineItems.length - 1}
+                                  onClick={() => handleMoveLineItem(item.id, "down")}
+                                  className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                                  title="Move Down"
+                                >
+                                  <ChevronDownIcon className="w-3 h-3 stroke-[2.5]" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            item.position || index + 1
+                          )}
                         </td>
                         <td className="px-2 py-2">
                           <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
@@ -1758,15 +1833,21 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         {effectiveEdit && canEditCommercial ? (
                           <input
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
-                            value={form.shippingMethod || ""}
-                            onChange={(e) =>
-                              patch({ shippingMethod: e.target.value })
+                            value={
+                              form.shippingText !== undefined
+                                ? form.shippingText
+                                : form.shippingMethod || ""
                             }
-                            placeholder="Shipping method"
+                            onChange={(e) =>
+                              patch({ shippingText: e.target.value })
+                            }
+                            placeholder="Shipping method description"
                           />
                         ) : (
                           <span className="font-medium text-gray-700">
-                            {order.shipping_method || "No shipping method set"}
+                            {order.shipping_text ||
+                              order.shipping_method ||
+                              "No shipping method set"}
                           </span>
                         )}
                       </td>
