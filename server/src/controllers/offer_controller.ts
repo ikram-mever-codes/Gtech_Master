@@ -4318,7 +4318,7 @@ export class OfferController {
           shippingMethod,
           `${formatGermanNum(shippingTaxRateNum, 2)}%`,
           String(shippingQtyNum),
-          formatGermanNum(shippingCostNum, offer.unitPriceDecimalPlaces || 3),
+          formatGermanPrice(shippingCostNum),
           formatGermanNum(shippingTotal, 2),
         ];
 

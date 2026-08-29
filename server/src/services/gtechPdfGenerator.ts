@@ -733,7 +733,7 @@ export async function generateGtechDocumentPdf(
         shippingMethod,
         `${formatGermanNum(shippingTaxRateForRow, 2)}%`,
         String(shippingQtyNum),
-        formatGermanNum(shippingCostNum, 3),
+        formatGermanPrice(shippingCostNum),
         formatGermanNum(shippingLineTotal, 2),
       ];
       let shipX = LEFT_X;
