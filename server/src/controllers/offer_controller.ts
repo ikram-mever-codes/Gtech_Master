@@ -1267,6 +1267,16 @@ export class OfferController {
             savedOffer.assemblyName ||
             assemblyItemData.itemName ||
             inquiry.name,
+          // Art.-Nr. always comes from the real Item's item_no_de when a
+          // backing Item exists — never from a mirrored fallback string.
+          material:
+            inquiry.item?.item_no_de || assemblyItemData.material || undefined,
+          // Links this line back to its real Item via the same
+          // sourceItemId path used everywhere else in the Offer
+          // controller (getOfferById/getAllOffers resolve itemNo/isDraft
+          // from this field) — previously unset for inquiry-sourced
+          // lines, which is why draft status and Art.-Nr. never showed.
+          sourceItemId: inquiry.item ? String(inquiry.item.id) : undefined,
           description: savedOffer.assemblyDescription || inquiry.description,
           photo: assemblyItemData.photo || undefined,
           position: position++,
@@ -1305,8 +1315,15 @@ export class OfferController {
               offer: savedOffer,
               offerId: savedOffer.id,
               requestedItemId: request.id,
+              // Same rationale as the assembly line above — link via
+              // sourceItemId to request.item, the RequestedItem's real
+              // backing Item, so downstream resolution works uniformly.
+              sourceItemId: request.item ? String(request.item.id) : undefined,
               itemName: componentItemData.itemName || "Component",
-              material: componentItemData.material,
+              material:
+                request.item?.item_no_de ||
+                componentItemData.material ||
+                undefined,
               photo: componentItemData.photo || undefined,
               specification: componentItemData.specification,
               description: request.comment || request.extraNote,
@@ -1347,8 +1364,12 @@ export class OfferController {
               offer: savedOffer,
               offerId: savedOffer.id,
               requestedItemId: request.id,
+              // Same rationale — link via sourceItemId to the
+              // RequestedItem's backing Item.
+              sourceItemId: request.item ? String(request.item.id) : undefined,
               itemName: itemData.itemName || "Item",
-              material: itemData.material,
+              material:
+                request.item?.item_no_de || itemData.material || undefined,
               photo: itemData.photo || undefined,
               specification: itemData.specification,
               description: request.comment || request.extraNote,
@@ -2245,80 +2266,69 @@ export class OfferController {
       }
 
       // ---------------------------------------------------------------
-      // Backfill `material` (Art.-Nr.) / `basePrice` (Price) / `photo`
-      // (thumbnail) from the originating Item whenever a line item is
-      // missing them
+      // Backfill `basePrice` / `photo` from the originating Item whenever
+      // a line item is missing them. `material` is no longer read,
+      // backfilled, or persisted anywhere here — the Art.-Nr. shown to
+      // the client always comes live from the source Item's item_no_de
+      // (see itemNo resolution below), never from a stored line-item
+      // string.
       // ---------------------------------------------------------------
-      if (offer.lineItems && offer.lineItems.length > 0) {
-        const missingIds = offer.lineItems
-          .filter(
-            (li: any) =>
-              li.sourceItemId &&
-              (li.material === null ||
-                li.material === undefined ||
-                li.material === "" ||
-                li.basePrice === null ||
-                li.basePrice === undefined ||
-                li.photo === null ||
-                li.photo === undefined ||
-                li.photo === ""),
-          )
-          .map((li: any) => Number(li.sourceItemId))
-          .filter((id: number) => !isNaN(id));
+      const sourceItemIds = Array.from(
+        new Set(
+          (offer.lineItems || [])
+            .filter((li: any) => li.sourceItemId)
+            .map((li: any) => Number(li.sourceItemId))
+            .filter((id: number) => !isNaN(id)),
+        ),
+      );
 
-        if (missingIds.length > 0) {
-          const itemRepository = AppDataSource.getRepository(Item);
-          const sourceItems = await itemRepository.find({
-            where: { id: In(Array.from(new Set(missingIds))) },
-            relations: ["parent"],
-          });
-          const itemById = new Map(
-            sourceItems.map((it: any) => [String(it.id), it]),
-          );
+      let itemById = new Map<string, any>();
+      if (sourceItemIds.length > 0) {
+        const itemRepository = AppDataSource.getRepository(Item);
+        const sourceItems = await itemRepository.find({
+          where: { id: In(sourceItemIds) },
+          relations: ["parent"],
+        });
+        itemById = new Map(sourceItems.map((it: any) => [String(it.id), it]));
 
-          const getDeNo = (it: any): string =>
-            it.item_no_de || it.parent?.de_no || "";
+        let needsSave = false;
+        for (const li of offer.lineItems as any[]) {
+          if (!li.sourceItemId) continue;
+          const src = itemById.get(String(li.sourceItemId));
+          if (!src) continue;
 
-          let needsSave = false;
-          for (const li of offer.lineItems as any[]) {
-            if (!li.sourceItemId) continue;
-            const src = itemById.get(String(li.sourceItemId));
-            if (!src) continue;
-
-            if (
-              li.material === null ||
-              li.material === undefined ||
-              li.material === ""
-            ) {
-              li.material = getDeNo(src);
-              needsSave = true;
-            }
-            if (li.basePrice === null || li.basePrice === undefined) {
-              li.basePrice = src.price ?? 0;
-              needsSave = true;
-            }
-            if (
-              li.photo === null ||
-              li.photo === undefined ||
-              li.photo === ""
-            ) {
-              li.photo = src.photo || undefined;
-              needsSave = true;
-            }
+          if (li.basePrice === null || li.basePrice === undefined) {
+            li.basePrice = src.price ?? 0;
+            needsSave = true;
           }
-
-          if (needsSave) {
-            await this.lineItemRepository.save(offer.lineItems as any[]);
+          if (li.photo === null || li.photo === undefined || li.photo === "") {
+            li.photo = src.photo || undefined;
+            needsSave = true;
           }
+        }
+
+        if (needsSave) {
+          await this.lineItemRepository.save(offer.lineItems as any[]);
         }
       }
 
       if (offer.lineItems) {
-        offer.lineItems = offer.lineItems.map((item: any) => ({
-          ...item,
-          itemNo: item.material,
-          activePrice: this.getActiveMatrixEntry(item),
-        }));
+        offer.lineItems = offer.lineItems.map((item: any) => {
+          const src = item.sourceItemId
+            ? itemById.get(String(item.sourceItemId))
+            : undefined;
+          return {
+            ...item,
+            // Always the source Item's real item_no_de — never
+            // item.material, never a stored/backfilled value.
+            itemNo: src?.item_no_de || null,
+            // Always resolved live from the source Item — a line item
+            // has no isDraft of its own, only whatever Item it currently
+            // points to does.
+            isDraft: !!src?.isDraft,
+            activePrice: this.getActiveMatrixEntry(item),
+          };
+        });
       }
 
       // Live-resolved tax profile — matched from the customer's country
@@ -2401,34 +2411,30 @@ export class OfferController {
         }
       }
 
-      // Photo backfill for line items
-      const missingPhotoIds = Array.from(
+      // Batched source-Item lookup for every line item across the page —
+      // used to always resolve itemNo (from item_no_de) and isDraft live,
+      // plus the existing photo backfill. `material` is never read from
+      // or written to the line item anywhere in this response.
+      const sourceItemIds = Array.from(
         new Set(
           offers
             .flatMap((offer: any) => offer.lineItems || [])
-            .filter(
-              (li: any) =>
-                li.sourceItemId &&
-                (li.photo === null ||
-                  li.photo === undefined ||
-                  li.photo === ""),
-            )
+            .filter((li: any) => li.sourceItemId)
             .map((li: any) => Number(li.sourceItemId))
             .filter((id: number) => !isNaN(id)),
         ),
       );
 
-      let photoByItemId = new Map<string, string | undefined>();
-      if (missingPhotoIds.length > 0) {
+      let itemById = new Map<string, any>();
+      if (sourceItemIds.length > 0) {
         const itemRepository = AppDataSource.getRepository(Item);
         const sourceItems = await itemRepository.find({
-          where: { id: In(missingPhotoIds) },
-          select: ["id", "photo"],
+          where: { id: In(sourceItemIds) },
+          select: ["id", "item_no_de", "isDraft", "photo"],
         });
-        photoByItemId = new Map(
-          sourceItems.map((it: any) => [String(it.id), it.photo || undefined]),
-        );
+        itemById = new Map(sourceItems.map((it: any) => [String(it.id), it]));
       }
+
       // Tax profiles for every distinct customer on the page — read
       // directly from Customer.default_tax_profile_id (kept in sync by
       // createBusiness/updateBusiness), one batched query, no re-matching
@@ -2494,16 +2500,21 @@ export class OfferController {
           taxProfile: offer.customerId
             ? taxProfileByCustomerId.get(offer.customerId) || defaultTaxProfile
             : defaultTaxProfile,
-          lineItems: (offer.lineItems || []).map((item: any) => ({
-            ...item,
-            itemNo: item.material,
-            photo:
-              item.photo ||
-              (item.sourceItemId
-                ? photoByItemId.get(String(item.sourceItemId))
-                : undefined) ||
-              item.photo,
-          })),
+          lineItems: (offer.lineItems || []).map((item: any) => {
+            const src = item.sourceItemId
+              ? itemById.get(String(item.sourceItemId))
+              : undefined;
+            return {
+              ...item,
+              // Always the source Item's real item_no_de — never
+              // item.material.
+              itemNo: src?.item_no_de || null,
+              // Always resolved live from the source Item, linked via
+              // sourceItemId on this line item.
+              isDraft: !!src?.isDraft,
+              photo: item.photo || src?.photo || undefined,
+            };
+          }),
           linkedDocuments: linkedOrdersByOfferId.get(offer.id) || [],
         };
       });

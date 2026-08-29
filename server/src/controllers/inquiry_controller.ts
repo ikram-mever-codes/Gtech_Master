@@ -762,6 +762,78 @@ export class InquiryController {
     }
   }
 
+  /**
+   * Ensures every RequestedItem line saved here has a backing Item row,
+   * created as a draft (isDraft: true) the first time this request is
+   * saved. updateInquiry deletes and recreates every RequestedItem on
+   * every save, so without reusing an existing linked Item, every single
+   * edit to an inquiry would leave behind a new orphaned draft Item for
+   * each request line. If reqData carries a reference to an Item it was
+   * already linked to (itemId, from the previous save round-tripped back
+   * by the frontend), that Item is updated in place instead.
+   */
+  private async resolveOrCreateDraftItemForRequest(
+    reqData: any,
+    assignedItemNo: string,
+    catId: number | undefined,
+  ): Promise<Item> {
+    const itemRepo = AppDataSource.getRepository(Item);
+
+    const existingItemId =
+      reqData.itemId || reqData.item_id || reqData.item?.id || undefined;
+
+    const fields: Partial<Item> = {
+      item_name: reqData.itemName || undefined,
+      item_name_cn: reqData.itemNameCN || reqData.item_name_cn || undefined,
+      item_no_de: assignedItemNo,
+      model: reqData.model || undefined,
+      material: reqData.material || undefined,
+      specification: reqData.specification || undefined,
+      weight:
+        reqData.weight !== undefined && reqData.weight !== null
+          ? Number(reqData.weight)
+          : undefined,
+      width:
+        reqData.width !== undefined && reqData.width !== null
+          ? Number(reqData.width)
+          : undefined,
+      height:
+        reqData.height !== undefined && reqData.height !== null
+          ? Number(reqData.height)
+          : undefined,
+      length:
+        reqData.length !== undefined && reqData.length !== null
+          ? Number(reqData.length)
+          : undefined,
+      price:
+        reqData.purchasePrice !== undefined && reqData.purchasePrice !== null
+          ? Number(reqData.purchasePrice)
+          : undefined,
+      currency: reqData.currency || undefined,
+      photo: reqData.photo || reqData.picture || undefined,
+      remark: reqData.comment || reqData.extraNote || undefined,
+      cat_id: catId,
+    };
+
+    if (existingItemId) {
+      const existing = await itemRepo.findOne({
+        where: { id: Number(existingItemId) },
+      });
+      if (existing) {
+        Object.assign(existing, fields);
+        return itemRepo.save(existing);
+      }
+    }
+
+    const created = itemRepo.create({
+      ...fields,
+      isDraft: true,
+      isActive: "Y",
+      is_new: "Y",
+    });
+    return itemRepo.save(created);
+  }
+
   async updateInquiry(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -808,7 +880,6 @@ export class InquiryController {
         owner_user_id,
         next_action,
       } = request.body;
-
       const existingInquiry = await this.inquiryRepository.findOne({
         where: { id },
         relations: [
@@ -818,27 +889,23 @@ export class InquiryController {
           "customer.starBusinessDetails",
         ],
       });
-
       if (!existingInquiry) {
         return response.status(404).json({
           success: false,
           message: "Inquiry not found",
         });
       }
-
       let inquiryNo = existingInquiry.inquiryNo;
       if (!inquiryNo) {
         inquiryNo = await this.getNextInquiryNo();
         existingInquiry.inquiryNo = inquiryNo;
         await this.inquiryRepository.update(id, { inquiryNo });
       }
-
       let contactPerson = null;
       if (contactPersonId) {
         contactPerson = await this.contactPersonRepository.findOne({
           where: { id: contactPersonId },
         });
-
         if (!contactPerson) {
           return response.status(404).json({
             success: false,
@@ -846,7 +913,6 @@ export class InquiryController {
           });
         }
       }
-
       const updateData: any = {
         ...(name && { name }),
         ...(description !== undefined && { description }),
@@ -886,18 +952,14 @@ export class InquiryController {
         ...(owner_user_id !== undefined && { owner_user_id }),
         ...(next_action !== undefined && { next_action }),
       };
-
       if (contactPersonId !== undefined) {
         updateData.contactPersonId = contactPersonId || null;
       }
-
       await this.inquiryRepository.update(id, updateData);
-
       if (requests && Array.isArray(requests)) {
         if (existingInquiry.requests && existingInquiry.requests.length > 0) {
           await this.requestRepository.remove(existingInquiry.requests);
         }
-
         let total_potential_k_eur = 0;
         if (requests.length > 0) {
           let starBusinessDetails =
@@ -910,7 +972,6 @@ export class InquiryController {
             });
             await starBusinessDetailsRepository.save(starBusinessDetails);
           }
-
           if (starBusinessDetails) {
             let defaultProCatId: number | undefined = undefined;
             try {
@@ -924,18 +985,15 @@ export class InquiryController {
             } catch (e) {
               console.error("Failed to fetch default PRO category:", e);
             }
-
-            const requestEntities = requests.map(
-              (reqData: any, index: number) => {
+            const requestEntities = await Promise.all(
+              requests.map(async (reqData: any, index: number) => {
                 let totalWeight = null;
                 const currentQty = reqData.qty || reqData.quantity;
                 if (reqData.unitWeight && currentQty) {
                   totalWeight =
                     parseFloat(reqData.unitWeight) * parseFloat(currentQty);
                 }
-
                 const { id: _ignored, ...reqDataWithoutId } = reqData;
-
                 const qtyVal = parseInt(currentQty || "0", 10) || 0;
                 const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
                 let factor = 12;
@@ -975,7 +1033,6 @@ export class InquiryController {
                 const annualPotential = qtyVal * targetPriceVal * factor;
                 const annualPotentialKEur = annualPotential / 1000;
                 total_potential_k_eur += annualPotentialKEur;
-
                 const letterSuffix = this.getLetterSuffix(index);
                 let assignedItemNo = `${existingInquiry.inquiryNo || "AF"}${letterSuffix}`;
                 if (
@@ -995,11 +1052,22 @@ export class InquiryController {
                     assignedItemNo = rawNo;
                   }
                 }
+                const resolvedCatId = reqData.cat_id || defaultProCatId;
+
+                // Every RequestedItem gets a backing draft Item — created
+                // fresh the first time this line is saved, or updated in
+                // place if reqData still references a previously-created
+                // Item (see resolveOrCreateDraftItemForRequest).
+                const draftItem = await this.resolveOrCreateDraftItemForRequest(
+                  reqData,
+                  assignedItemNo,
+                  resolvedCatId,
+                );
 
                 const requestItem = this.requestRepository.create({
                   ...reqDataWithoutId,
                   itemNo: assignedItemNo,
-                  cat_id: reqData.cat_id || defaultProCatId,
+                  cat_id: resolvedCatId,
                   businessId: starBusinessDetails.id,
                   business: starBusinessDetails,
                   inquiry: existingInquiry,
@@ -1008,38 +1076,35 @@ export class InquiryController {
                   targetPrice: reqData.targetPrice || null,
                   annualPotential: annualPotential,
                   annualPotentialKEur: annualPotentialKEur,
+                  item: draftItem,
+                  itemId: draftItem.id,
                 });
-
                 return requestItem;
-              },
+              }),
             );
-
             await this.requestRepository.save(requestEntities);
           }
         }
-
         existingInquiry.total_potential_k_eur = total_potential_k_eur;
         await this.inquiryRepository.update(id, { total_potential_k_eur });
       }
-
       if (status && status !== existingInquiry.status) {
         const updatedInquiry = await this.inquiryRepository.findOne({
           where: { id },
           relations: ["requests"],
         });
       }
-
       const updatedInquiry = await this.inquiryRepository.findOne({
         where: { id },
         relations: [
           "customer",
           "contactPerson",
           "requests",
+          "requests.item",
           "customer.starBusinessDetails",
           "tags",
         ],
       });
-
       return response.status(200).json({
         success: true,
         message: "Inquiry updated successfully",
@@ -1053,7 +1118,6 @@ export class InquiryController {
       });
     }
   }
-
   async deleteInquiry(request: Request, response: Response) {
     try {
       const { id } = request.params;

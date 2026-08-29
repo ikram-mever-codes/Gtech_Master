@@ -2526,11 +2526,20 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           return (
                             <tr
                               key={item.id}
-                              style={
-                                rowColor
+                              style={{
+                                ...(rowColor
                                   ? { backgroundColor: rowColor }
-                                  : undefined
-                              }
+                                  : {}),
+                                // Draft-item indicator — a thin colored
+                                // stripe on the extreme left of the row,
+                                // independent of the background color
+                                // logic above. Purely visual; doesn't
+                                // affect layout width since it replaces
+                                // the row's own left border.
+                                ...(item.isDraft
+                                  ? { borderLeft: "4px solid #D8964A" }
+                                  : {}),
+                              }}
                             >
                               <td className="px-2 py-2 text-gray-500">
                                 {item.position}

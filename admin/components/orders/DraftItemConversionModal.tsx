@@ -33,6 +33,14 @@ interface DraftItemConversionModalProps {
   offer: any; // the Angebot, with lineItems
   draftItems: DraftLineItemPreview[]; // from getOfferDraftItemsPreview
   onSubmit: (selectedItems: any[]) => Promise<boolean>;
+  /** Called when Sales Price is edited here, so the parent can push the
+   * same value into the offer line item's basePrice — keeps the Item's
+   * sales price and the offer line item's price in sync regardless of
+   * which side the edit originated from. Optional so this modal still
+   * works if the parent doesn't wire it up, though the sync then only
+   * happens in the other direction (offer price -> sales price, handled
+   * server-side when the offer line item's price is saved). */
+  onLineItemPriceSync?: (lineItemId: string, price: number) => void;
 }
 
 /**
@@ -49,7 +57,7 @@ interface DraftItemConversionModalProps {
  */
 const getMissingFields = (item: DraftLineItemPreview): string[] => {
   const missing: string[] = [];
-  if (!item.taric || !item.taric.trim()) missing.push("TARIC");
+  if (!item.taricId) missing.push("TARIC");
   if (!item.weight || item.weight <= 0) missing.push("Weight");
   if (!item.salesPrice || item.salesPrice <= 0) missing.push("Sales Price");
   if (item.isDimWeightEstimated !== true)
@@ -66,6 +74,7 @@ export default function DraftItemConversionModal({
   offer,
   draftItems,
   onSubmit,
+  onLineItemPriceSync,
 }: DraftItemConversionModalProps) {
   // draft rows, keyed by lineItemId, selected true by default per spec
   const [selection, setSelection] = useState<Record<string, boolean>>(() =>
@@ -75,8 +84,8 @@ export default function DraftItemConversionModal({
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
 
   // Local editable copy of the draft rows — inline edits (Name DE, TARIC,
-  // Weight, Estimated?) persist to the backing Item via updateItem and
-  // update here immediately so the "Required Data" badge reflects the
+  // Weight, Estimated?, Sales Price) persist to the backing Item via
+  // updateItem and update here immediately so validation reflects the
   // change without needing the parent to re-fetch.
   const [localItems, setLocalItems] =
     useState<DraftLineItemPreview[]>(draftItems);
@@ -173,9 +182,23 @@ export default function DraftItemConversionModal({
     );
   };
 
+  const handleSalesPriceCommit = (item: DraftLineItemPreview, raw: string) => {
+    const parsed = parseFlexibleNumber(raw);
+    const value = parsed ?? 0;
+    if (value === (item.salesPrice ?? 0)) return;
+    saveField(item, { sales_price: value }, { salesPrice: value });
+    // Keep the offer line item's own price in sync with the Item's sales
+    // price. The backend syncs the other direction (offer line price ->
+    // sales price, only when sales price is currently 0/unset) when the
+    // offer line item's price is saved; since this edit originates here,
+    // on the Item side, it's pushed back to the line item explicitly so
+    // both stay aligned regardless of which side was edited.
+    onLineItemPriceSync?.(item.lineItemId, value);
+  };
+
   const handleSubmit = async () => {
     // Validate every selected draft item before doing anything else — a
-    // line left unselected stays a Freizeile as today and needs no check.
+    // line left unselected is excluded entirely below and needs no check.
     const invalidItems = localItems.filter(
       (it) => selection[it.lineItemId] && getMissingFields(it).length > 0,
     );
@@ -195,25 +218,37 @@ export default function DraftItemConversionModal({
 
     setSubmitting(true);
     try {
-      // Every non-component offer line goes into the Auftrag, same as the
-      // direct-conversion path — only draft lines carry a convertDraft
-      // flag, telling the backend whether to graduate that line's Item.
       const draftLineIds = new Set(localItems.map((it) => it.lineItemId));
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
 
-      const selectedItems = lineItems.map((li: any) => {
-        const base = {
-          lineItemId: li.id,
-          quantity: Number(li.baseQuantity || 1) || 1,
-          price: Number(li.basePrice) || 0,
-          itemName: li.itemName || li.notes || li.description || "Line Item",
-        };
-        if (draftLineIds.has(li.id)) {
-          return { ...base, convertDraft: !!selection[li.id] };
-        }
-        return base;
-      });
+      // Non-draft lines always go into the Auftrag, same as the direct
+      // conversion path. Draft lines only go in if the user actually
+      // checked them here — an unselected draft line is excluded from
+      // the Auftrag entirely rather than included-but-not-converted,
+      // which is what previously let unvalidated, missing-field draft
+      // items slip into the created Auftrag.
+      const selectedItems = lineItems
+        .filter((li: any) => !draftLineIds.has(li.id) || !!selection[li.id])
+        .map((li: any) => {
+          const base = {
+            lineItemId: li.id,
+            quantity: Number(li.baseQuantity || 1) || 1,
+            price: Number(li.basePrice) || 0,
+            itemName: li.itemName || li.notes || li.description || "Line Item",
+          };
+          // Every draft line reaching this point was selected (filtered
+          // above) and already passed validation, so it always converts.
+          if (draftLineIds.has(li.id)) {
+            return { ...base, convertDraft: true };
+          }
+          return base;
+        });
+
+      if (selectedItems.length === 0) {
+        toast.error("Select at least one item to include in the Auftrag.");
+        return;
+      }
 
       const ok = await onSubmit(selectedItems);
       if (!ok) {
@@ -237,8 +272,8 @@ export default function DraftItemConversionModal({
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5">
               Choose which draft items become real catalog items. Edit Weight,
-              Estimated?, TARIC, and Name DE directly in the table, or click
-              "Item Info" for everything else.
+              Estimated?, TARIC, Name DE, and Sales Price directly in the table,
+              or click "Item Info" for everything else.
             </h2>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -291,8 +326,8 @@ export default function DraftItemConversionModal({
                   <th className="px-2 py-2 text-right font-semibold w-20">
                     Qty
                   </th>
-                  <th className="px-2 py-2 text-right font-semibold w-24">
-                    Price
+                  <th className="px-2 py-2 text-right font-semibold w-28">
+                    Sales Price
                   </th>
                   {/* <th className="px-2 py-2 text-center font-semibold w-32">
                     Required Data
@@ -418,11 +453,16 @@ export default function DraftItemConversionModal({
                       <td className="px-2 py-2 text-right">
                         {item.quantity || 1}
                       </td>
-                      <td className="px-2 py-2 text-right">
-                        {item.price !== undefined
-                          ? Number(item.price).toFixed(2)
-                          : "0.00"}
+
+                      {/* Sales Price — editable, syncs to offer line item price */}
+                      <td className="px-2 py-2">
+                        <SalesPriceCell
+                          value={item.salesPrice ?? item.price ?? ""}
+                          disabled={isSavingThisRow}
+                          onCommit={(raw) => handleSalesPriceCommit(item, raw)}
+                        />
                       </td>
+
                       {/* <td className="px-2 py-2 text-center">
                         {!selected ? (
                           <span className="text-gray-400 text-xs">—</span>
@@ -458,10 +498,11 @@ export default function DraftItemConversionModal({
 
           <p className="text-xs text-gray-500">
             Selected draft items need TARIC, weight, sales price, and confirmed
-            dimensions before they can convert. Weight, Estimated?, TARIC, and
-            Name DE can be edited directly above — everything else (Sales Price,
-            EAN, etc.) via "Item Info". Unselected items stay as-is — they won't
-            be marked as finished catalog items.
+            dimensions before they can convert. Weight, Estimated?, TARIC, Name
+            DE, and Sales Price can be edited directly above — everything else
+            (EAN, etc.) via "Item Info". Editing Sales Price here also updates
+            the offer line item's price. Unselected items stay as-is — they
+            won't be marked as finished catalog items.
           </p>
         </div>
 
@@ -507,10 +548,9 @@ export default function DraftItemConversionModal({
             // ItemPreviewModal persists edits directly via updateItem.
             // This modal's draftItems prop is a snapshot fetched before
             // the user opened the editor — it does NOT auto-refresh, so
-            // the "Required Data" badge and Art.-Nr./price/weight shown
-            // in the table won't reflect this save until the parent
-            // re-fetches draft items (e.g. by re-opening the conversion
-            // modal).
+            // any fields changed there won't reflect in this table until
+            // the parent re-fetches draft items (e.g. by re-opening the
+            // conversion modal).
             setEditingItemId(null);
           }}
         />
@@ -564,6 +604,32 @@ const WeightCell: React.FC<{
       value={local}
       disabled={disabled}
       placeholder="0"
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => onCommit(local)}
+      className={`${cellInputCls} text-right`}
+    />
+  );
+};
+
+/** Same commit-on-blur pattern for the sales price field. */
+const SalesPriceCell: React.FC<{
+  value: string | number;
+  disabled?: boolean;
+  onCommit: (raw: string) => void;
+}> = ({ value, disabled, onCommit }) => {
+  const [local, setLocal] = useState(String(value ?? ""));
+
+  useEffect(() => {
+    setLocal(String(value ?? ""));
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={local}
+      disabled={disabled}
+      placeholder="0.00"
       onChange={(e) => setLocal(e.target.value)}
       onBlur={() => onCommit(local)}
       className={`${cellInputCls} text-right`}

@@ -455,17 +455,15 @@ export const getOfferDraftItemsPreview = async (
         results.push({
           lineItemId: li.id,
           itemId: backingItem.id,
+          isDraft: !!backingItem.isDraft,
           position: li.position,
           photo: li.photo || backingItem.photo || undefined,
           itemName: li.itemName,
-          material: li.material,
           itemNameDe: backingItem.item_name_de,
           taricId: backingItem.taric_id,
-          // NEW — Art.-Nr. should show the Item's real item_no_de, not
-          // the offer line's own `material` string. Falls back to the
-          // line's material only if the backing Item has no item_no_de
-          // set yet (still a draft with no number assigned).
-          itemNoDe: backingItem.item_no_de || null,
+          // itemNo is always the Item's real item_no_de — the line's own
+          // `material` string is no longer read or sent at all.
+          itemNo: backingItem.item_no_de || null,
           quantity: li.baseQuantity,
           price: li.basePrice,
           taric: backingItem.taricCode || null,
@@ -481,7 +479,6 @@ export const getOfferDraftItemsPreview = async (
     next(error);
   }
 };
-
 /**
  * DE-VAT (or first active) profile — used only when a customer has no
  * resolved default_tax_profile_id yet.

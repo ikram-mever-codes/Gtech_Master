@@ -105,6 +105,7 @@ export class ItemLinkService {
     payload: Record<string, any>,
   ): Promise<Item> {
     const itemRepo = queryRunner.manager.getRepository(Item);
+    console.log("Body OF item", payload);
 
     if (payload.itemId !== undefined && payload.itemId !== null) {
       const existing = await itemRepo.findOne({
