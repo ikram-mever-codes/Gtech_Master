@@ -264,7 +264,7 @@ export default function RechnungDetailModal({
     shippingTotal * (Number(data.tax_rate ?? 19) / 100);
   const grossTotal = netTotal + taxAmount;
 
-  const taxRate = Number(data.tax_rate ?? 19);
+  const taxRate = Number(data.taxProfile.tax_rate ?? 19);
 
   const invoiceNumber = data.invoice_number || data.rk_number || data.id;
   const companyName =
