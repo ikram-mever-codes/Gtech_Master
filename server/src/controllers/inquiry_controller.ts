@@ -776,11 +776,16 @@ export class InquiryController {
     reqData: any,
     assignedItemNo: string,
     catId: number | undefined,
+    fallbackItemId?: number,
   ): Promise<Item> {
     const itemRepo = AppDataSource.getRepository(Item);
 
     const existingItemId =
-      reqData.itemId || reqData.item_id || reqData.item?.id || undefined;
+      reqData.itemId ||
+      reqData.item_id ||
+      reqData.item?.id ||
+      fallbackItemId ||
+      undefined;
 
     const fields: Partial<Item> = {
       item_name: reqData.itemName || undefined,
@@ -827,6 +832,7 @@ export class InquiryController {
 
     const created = itemRepo.create({
       ...fields,
+      supplier_id: reqData.supplier_id ?? reqData.supplierId ?? 1,
       isDraft: true,
       isActive: "Y",
       is_new: "Y",
@@ -957,6 +963,20 @@ export class InquiryController {
       }
       await this.inquiryRepository.update(id, updateData);
       if (requests && Array.isArray(requests)) {
+        // Snapshot RequestedItem.id -> backing Item.id BEFORE deleting the
+        // old rows, so a request line whose payload doesn't round-trip
+        // itemId can still be matched to its already-existing Item instead
+        // of spawning a duplicate draft with the same item_no_de.
+        const existingItemIdByRequestId = new Map<string, number | undefined>();
+        if (existingInquiry.requests) {
+          for (const r of existingInquiry.requests) {
+            existingItemIdByRequestId.set(
+              r.id,
+              r.itemId ?? (r.item as any)?.id,
+            );
+          }
+        }
+
         if (existingInquiry.requests && existingInquiry.requests.length > 0) {
           await this.requestRepository.remove(existingInquiry.requests);
         }
@@ -1057,11 +1077,18 @@ export class InquiryController {
                 // Every RequestedItem gets a backing draft Item — created
                 // fresh the first time this line is saved, or updated in
                 // place if reqData still references a previously-created
-                // Item (see resolveOrCreateDraftItemForRequest).
+                // Item (see resolveOrCreateDraftItemForRequest), falling
+                // back to the pre-delete snapshot when reqData itself
+                // doesn't carry the itemId for this line.
+                const fallbackItemId = reqData.id
+                  ? existingItemIdByRequestId.get(reqData.id)
+                  : undefined;
+
                 const draftItem = await this.resolveOrCreateDraftItemForRequest(
                   reqData,
                   assignedItemNo,
                   resolvedCatId,
+                  fallbackItemId,
                 );
 
                 const requestItem = this.requestRepository.create({
@@ -1118,6 +1145,7 @@ export class InquiryController {
       });
     }
   }
+
   async deleteInquiry(request: Request, response: Response) {
     try {
       const { id } = request.params;

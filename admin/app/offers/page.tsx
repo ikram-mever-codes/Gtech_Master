@@ -698,31 +698,39 @@ const OffersPage: React.FC<any> = ({
     });
   }, [offers, docFilters]);
 
-const getOfferNetTotal = (off: any): number => {
-  const shipping = Number(
-    off.shippingCost ||
-      off.shipping_cost ||
-      off.freightCost ||
-      off.freight_cost ||
-      0,
-  );
+  const getOfferNetTotal = (off: any): number => {
+    const shipping = Number(
+      off.shippingCost ||
+        off.shipping_cost ||
+        off.freightCost ||
+        off.freight_cost ||
+        0,
+    );
 
-  if (off.subtotal !== undefined && off.subtotal !== null) {
-    return Number(off.subtotal) + shipping;
-  }
-  if (off.sub_total !== undefined && off.sub_total !== null) {
-    return Number(off.sub_total) + shipping;
-  }
-  if (off.netTotal !== undefined && off.netTotal !== null && Number(off.netTotal) > 0) {
-    return Number(off.netTotal);
-  }
-  if (off.net_total !== undefined && off.net_total !== null && Number(off.net_total) > 0) {
-    return Number(off.net_total);
-  }
-  const gross = Number(off.totalAmount || off.total_amount || 0);
-  const taxRate = Number(off.taxRate || off.tax_rate || 19);
-  return gross > 0 ? gross / (1 + taxRate / 100) : 0;
-};
+    if (off.subtotal !== undefined && off.subtotal !== null) {
+      return Number(off.subtotal) + shipping;
+    }
+    if (off.sub_total !== undefined && off.sub_total !== null) {
+      return Number(off.sub_total) + shipping;
+    }
+    if (
+      off.netTotal !== undefined &&
+      off.netTotal !== null &&
+      Number(off.netTotal) > 0
+    ) {
+      return Number(off.netTotal);
+    }
+    if (
+      off.net_total !== undefined &&
+      off.net_total !== null &&
+      Number(off.net_total) > 0
+    ) {
+      return Number(off.net_total);
+    }
+    const gross = Number(off.totalAmount || off.total_amount || 0);
+    const taxRate = Number(off.taxRate || off.tax_rate || 19);
+    return gross > 0 ? gross / (1 + taxRate / 100) : 0;
+  };
 
   const offerColumns: ColumnDef<any>[] = useMemo(
     () => [
@@ -1008,6 +1016,17 @@ const getOfferNetTotal = (off: any): number => {
           onClose={() => {
             setDraftConversionOffer(null);
             setDraftItemsPreview([]);
+          }}
+          onLineItemPriceSync={(lineItemId, price) => {
+            setDraftConversionOffer((prev: any) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                lineItems: prev.lineItems.map((li: any) =>
+                  li.id === lineItemId ? { ...li, basePrice: price } : li,
+                ),
+              };
+            });
           }}
           onSubmit={async (selectedItems) => {
             const ok = await runDirectConversion(

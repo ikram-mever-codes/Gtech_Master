@@ -118,9 +118,16 @@ export class ItemLinkService {
     }
 
     const itemData: Partial<Item> = { isDraft: true };
+    // Default supplier_id to 1 when the payload doesn't specify one
+    // (neither supplier_id nor its camelCase alias supplierId), so every
+    // freshly-created draft Item has a supplier out of the box.
+    const resolvedPayload: any = {
+      ...payload,
+      supplier_id: payload.supplier_id ?? payload.supplierId ?? 1,
+    };
     for (const [payloadKey, itemKey] of Object.entries(ITEM_FIELD_MAP)) {
-      if (payload[payloadKey] !== undefined) {
-        (itemData as any)[itemKey] = payload[payloadKey];
+      if (resolvedPayload[payloadKey] !== undefined) {
+        (itemData as any)[itemKey] = resolvedPayload[payloadKey];
       }
     }
 
