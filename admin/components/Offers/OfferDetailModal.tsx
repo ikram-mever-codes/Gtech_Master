@@ -48,9 +48,13 @@ import { autocompleteItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 import { UserRole } from "@/utils/interfaces";
-import { errorStyles, successStyles } from "@/utils/constants";
-import { BASE_URL } from "@/utils/constants";
-import { parseFlexibleNumber, formatMatrixPrice } from "@/utils/decimal";
+import { errorStyles, successStyles, BASE_URL } from "@/utils/constants";
+import {
+  parseFlexibleNumber,
+  formatUnitPriceCurrency,
+  parseAndRoundTo3Decimals,
+  formatMatrixPrice,
+} from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 import { PrinterIcon } from "lucide-react";
 
@@ -287,11 +291,10 @@ const ItemRow: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
-        selected
-          ? "border-primary bg-primary/5"
-          : "border-gray-200 hover:bg-gray-50"
-      }`}
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
+        ? "border-primary bg-primary/5"
+        : "border-gray-200 hover:bg-gray-50"
+        }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -341,11 +344,10 @@ const PickerRow: React.FC<{
 }> = ({ selected, onClick, title, subtitle, meta }) => (
   <div
     onClick={onClick}
-    className={`p-3 border rounded-lg cursor-pointer transition-all ${
-      selected
-        ? "border-primary bg-primary/5"
-        : "border-gray-200 hover:bg-gray-50"
-    }`}
+    className={`p-3 border rounded-lg cursor-pointer transition-all ${selected
+      ? "border-primary bg-primary/5"
+      : "border-gray-200 hover:bg-gray-50"
+      }`}
   >
     <div className="flex justify-between items-start">
       <div className="min-w-0">
@@ -955,7 +957,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         selectedCustomer.defaultShippingMethod || f.shippingMethod,
       paymentTerms:
         selectedCustomer.defaultPaymentDueDays !== undefined &&
-        selectedCustomer.defaultPaymentDueDays !== null
+          selectedCustomer.defaultPaymentDueDays !== null
           ? `${selectedCustomer.defaultPaymentDueDays}`
           : f.paymentTerms,
     }));
@@ -1082,36 +1084,36 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
         paymentTerms: form.paymentTerms,
         deliveryAddress: isSameAsBilling
           ? {
-              addressName: "",
-              contactName:
-                form.customerSnapshot?.legalName ||
-                form.customerSnapshot?.companyName ||
-                offer?.customerSnapshot?.legalName ||
-                offer?.customerSnapshot?.companyName ||
-                "",
-              street:
-                form.customerSnapshot?.address ||
-                form.customerSnapshot?.street ||
-                offer?.customerSnapshot?.address ||
-                offer?.customerSnapshot?.street ||
-                "",
-              postalCode:
-                form.customerSnapshot?.postalCode ||
-                offer?.customerSnapshot?.postalCode ||
-                "",
-              city:
-                form.customerSnapshot?.city ||
-                offer?.customerSnapshot?.city ||
-                "",
-              country:
-                form.customerSnapshot?.country ||
-                offer?.customerSnapshot?.country ||
-                "",
-              contactPhone:
-                form.customerSnapshot?.contactPhoneNumber ||
-                offer?.customerSnapshot?.contactPhoneNumber ||
-                "",
-            }
+            addressName: "",
+            contactName:
+              form.customerSnapshot?.legalName ||
+              form.customerSnapshot?.companyName ||
+              offer?.customerSnapshot?.legalName ||
+              offer?.customerSnapshot?.companyName ||
+              "",
+            street:
+              form.customerSnapshot?.address ||
+              form.customerSnapshot?.street ||
+              offer?.customerSnapshot?.address ||
+              offer?.customerSnapshot?.street ||
+              "",
+            postalCode:
+              form.customerSnapshot?.postalCode ||
+              offer?.customerSnapshot?.postalCode ||
+              "",
+            city:
+              form.customerSnapshot?.city ||
+              offer?.customerSnapshot?.city ||
+              "",
+            country:
+              form.customerSnapshot?.country ||
+              offer?.customerSnapshot?.country ||
+              "",
+            contactPhone:
+              form.customerSnapshot?.contactPhoneNumber ||
+              offer?.customerSnapshot?.contactPhoneNumber ||
+              "",
+          }
           : form.deliveryAddress,
         customerSnapshot: form.customerSnapshot,
         discountPercentage: parseFlexibleNumber(form.discountPercentage) ?? 0,
@@ -1237,26 +1239,35 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= sorted.length) return;
 
-    const currentItem = sorted[idx];
-    const targetItem = sorted[targetIdx];
+    const newItems = [...sorted];
+    const [moved] = newItems.splice(idx, 1);
+    newItems.splice(targetIdx, 0, moved);
 
-    const currentPos = Number(currentItem.position) || (idx + 1);
-    const targetPos = Number(targetItem.position) || (targetIdx + 1);
+    const posMap = new Map<string, number>();
+    const updatesToPersist: { id: string; position: number }[] = [];
+
+    newItems.forEach((item, i) => {
+      const newPos = i + 1;
+      posMap.set(String(item.id), newPos);
+      if (Number(item.position) !== newPos) {
+        updatesToPersist.push({ id: String(item.id), position: newPos });
+      }
+    });
 
     setOffer((prev: any) => ({
       ...prev,
-      lineItems: prev.lineItems.map((li: any) => {
-        if (li.id === currentItem.id) return { ...li, position: targetPos };
-        if (li.id === targetItem.id) return { ...li, position: currentPos };
-        return li;
+      lineItems: (prev?.lineItems || []).map((li: any) => {
+        const newPos = posMap.get(String(li.id));
+        return newPos !== undefined ? { ...li, position: newPos } : li;
       }),
     }));
 
     try {
-      await Promise.all([
-        persistLine(currentItem.id, { position: targetPos }),
-        persistLine(targetItem.id, { position: currentPos }),
-      ]);
+      await Promise.all(
+        updatesToPersist.map((u) =>
+          updateLineItem(offer.id, u.id, { position: u.position })
+        )
+      );
       await refreshLocal();
       onChanged?.();
     } catch (e) {
@@ -1526,17 +1537,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     label: string;
     icon: React.ReactNode;
   }[] = [
-    {
-      key: "inquiry",
-      label: "From inquiry",
-      icon: <LinkIcon className="h-4 w-4" />,
-    },
-    {
-      key: "item",
-      label: "Customer + item(s)",
-      icon: <CubeIcon className="h-4 w-4" />,
-    },
-  ];
+      {
+        key: "inquiry",
+        label: "From inquiry",
+        icon: <LinkIcon className="h-4 w-4" />,
+      },
+      {
+        key: "item",
+        label: "Customer + item(s)",
+        icon: <CubeIcon className="h-4 w-4" />,
+      },
+    ];
 
   // --- Delivery-address-vs-billing state (used below in the address block) --
   const currentDeliveryAddress = offer
@@ -1585,11 +1596,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       setSearchName("");
                       setPickerItems([]);
                     }}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
-                      sourceType === t.key
-                        ? "border-primary bg-primary/5 text-primary font-semibold"
-                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                    }`}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${sourceType === t.key
+                      ? "border-primary bg-primary/5 text-primary font-semibold"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
                   >
                     {t.icon}
                     {t.label}
@@ -1622,11 +1632,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <button
                       key={m}
                       onClick={() => cPatch({ pricingMode: m })}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${
-                        createForm.pricingMode === m
-                          ? "border-primary bg-primary/5 text-primary font-semibold"
-                          : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-all ${createForm.pricingMode === m
+                        ? "border-primary bg-primary/5 text-primary font-semibold"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
                     >
                       {m === "classic"
                         ? "Classic (1 qty · 1 price)"
@@ -1861,15 +1870,15 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       addr={
                         selectedCustomer.deliveryAddressLine1
                           ? {
-                              contactName:
-                                selectedCustomer.legalName ||
-                                selectedCustomer.companyName,
-                              street: selectedCustomer.deliveryAddressLine1,
-                              postalCode: selectedCustomer.deliveryPostalCode,
-                              city: selectedCustomer.deliveryCity,
-                              country: selectedCustomer.deliveryCountry,
-                              contactPhone: selectedCustomer.contactPhoneNumber,
-                            }
+                            contactName:
+                              selectedCustomer.legalName ||
+                              selectedCustomer.companyName,
+                            street: selectedCustomer.deliveryAddressLine1,
+                            postalCode: selectedCustomer.deliveryPostalCode,
+                            city: selectedCustomer.deliveryCity,
+                            country: selectedCustomer.deliveryCountry,
+                            contactPhone: selectedCustomer.contactPhoneNumber,
+                          }
                           : null
                       }
                       emptyText="Same as customer address."
@@ -1904,7 +1913,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             paymentTerms:
                               inq.customer?.defaultPaymentDueDays !==
                                 undefined &&
-                              inq.customer?.defaultPaymentDueDays !== null
+                                inq.customer?.defaultPaymentDueDays !== null
                                 ? `${inq.customer.defaultPaymentDueDays}`
                                 : f.paymentTerms || "",
                           }));
@@ -2590,7 +2599,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                               <td className="px-2 py-2 text-gray-500 whitespace-nowrap">
                                 {edit ? (
                                   <div className="flex items-center gap-1 select-none">
-                                    <span className="w-4 text-xs font-semibold">{item.position || index + 1}</span>
+                                    <span className="w-4 text-xs font-semibold">{index + 1}</span>
                                     <div className="flex flex-col gap-0.5">
                                       <button
                                         type="button"
@@ -2613,7 +2622,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     </div>
                                   </div>
                                 ) : (
-                                  item.position || index + 1
+                                  index + 1
                                 )}
                               </td>
                               <td className="px-2 py-2">
@@ -2624,9 +2633,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                       alt="thumb"
                                       className="w-full h-full object-contain"
                                       onError={(e) =>
-                                        ((
-                                          e.target as HTMLImageElement
-                                        ).style.display = "none")
+                                      ((
+                                        e.target as HTMLImageElement
+                                      ).style.display = "none")
                                       }
                                     />
                                   ) : (
@@ -2737,17 +2746,18 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                                     value={item.basePrice}
                                     onCommit={(raw) => {
-                                      const parsed = parseFlexibleNumber(raw);
+                                      const parsed = parseAndRoundTo3Decimals(raw);
                                       persistLine(item.id, {
-                                        basePrice: parsed === null ? "0" : raw,
+                                        basePrice: parsed === null ? "0" : parsed,
                                       });
                                     }}
                                   />
                                 ) : (
                                   <div className="text-right">
-                                    {formatCurrency(
+                                    {formatUnitPriceCurrency(
                                       item.basePrice || 0,
                                       offer.currency,
+                                      3,
                                     )}
                                   </div>
                                 )}
@@ -2850,7 +2860,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <td className="px-2 py-2 text-right font-bold text-gray-800">
                               {formatCurrency(
                                 (form.shippingCost || 0) *
-                                  (form.shippingQuantity || 1),
+                                (form.shippingQuantity || 1),
                                 offer.currency,
                               )}
                             </td>
@@ -3001,9 +3011,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   alt="thumb"
                                   className="w-full h-full object-cover"
                                   onError={(e) =>
-                                    ((
-                                      e.target as HTMLImageElement
-                                    ).style.display = "none")
+                                  ((
+                                    e.target as HTMLImageElement
+                                  ).style.display = "none")
                                   }
                                 />
                               ) : (
@@ -3128,7 +3138,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                               {formatMatrixPrice(
                                                 p.price,
                                                 offer.unitPriceDecimalPlaces ||
-                                                  3,
+                                                3,
                                               )}
                                             </span>
                                           )}
@@ -3137,9 +3147,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                           {p.total === null
                                             ? "."
                                             : formatCurrency(
-                                                p.total,
-                                                offer.currency,
-                                              )}
+                                              p.total,
+                                              offer.currency,
+                                            )}
                                         </td>
                                         <td className="px-3 py-2">
                                           {p.isActive ? (
@@ -3250,7 +3260,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                       className={inputCls}
                       defaultValue={
                         visibleLineItems[0]?.extraWeight === null ||
-                        visibleLineItems[0]?.extraWeight === undefined
+                          visibleLineItems[0]?.extraWeight === undefined
                           ? ""
                           : String(visibleLineItems[0].extraWeight)
                       }

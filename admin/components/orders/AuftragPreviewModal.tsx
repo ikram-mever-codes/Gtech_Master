@@ -36,7 +36,7 @@ import {
 } from "@/api/weiterversand_service_providers";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { parseFlexibleNumber } from "@/utils/decimal";
+import { parseFlexibleNumber, formatUnitPriceCurrency, parseAndRoundTo3Decimals } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 
 interface AuftragPreviewModalProps {
@@ -743,26 +743,35 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= sorted.length) return;
 
-    const currentItem = sorted[idx];
-    const targetItem = sorted[targetIdx];
+    const newItems = [...sorted];
+    const [moved] = newItems.splice(idx, 1);
+    newItems.splice(targetIdx, 0, moved);
 
-    const currentPos = Number(currentItem.position) || (idx + 1);
-    const targetPos = Number(targetItem.position) || (targetIdx + 1);
+    const posMap = new Map<string, number>();
+    const updatesToPersist: { id: string; position: number }[] = [];
+
+    newItems.forEach((item, i) => {
+      const newPos = i + 1;
+      posMap.set(String(item.id), newPos);
+      if (Number(item.position) !== newPos) {
+        updatesToPersist.push({ id: String(item.id), position: newPos });
+      }
+    });
 
     setOrder((prev: any) => ({
       ...prev,
-      orderItems: prev.orderItems.map((li: any) => {
-        if (li.id === currentItem.id) return { ...li, position: targetPos };
-        if (li.id === targetItem.id) return { ...li, position: currentPos };
-        return li;
+      orderItems: (prev?.orderItems || []).map((li: any) => {
+        const newPos = posMap.get(String(li.id));
+        return newPos !== undefined ? { ...li, position: newPos } : li;
       }),
     }));
 
     try {
-      await Promise.all([
-        persistLine(currentItem.id, { position: targetPos }),
-        persistLine(targetItem.id, { position: currentPos }),
-      ]);
+      await Promise.all(
+        updatesToPersist.map((u) =>
+          updateOrderLineItem(order.id, u.id, { position: u.position })
+        )
+      );
       await refreshLocal();
     } catch (e) {
       console.error("Couldn't save line item order change:", e);
@@ -913,25 +922,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const isPartiallyDeliveredStatus = auftragStatus === "partially_delivered";
   const canEnterEditMode = isOpenStatus || isPartiallyDeliveredStatus;
   const canEditCommercial = isOpenStatus;
-  // The actual flag every render decision below uses instead of the raw
-  // `edit` state. `edit` alone isn't trustworthy — it can be true because
-  // of a stale initialEdit render, a leftover state from before the order
-  // finished loading, or any future code path that sets it directly.
-  // ANDing with canEnterEditMode here means nothing can ever render as
-  // editable, and Save can never be offered, outside Open/Partially
-  // Delivered — regardless of how `edit` got set.
   const effectiveEdit = edit && canEnterEditMode;
 
-  // Same read as OfferDetailModal's `offer?.taxProfile`: a customer-level
-  // tax profile object ({ name, taxRate }) that Offer expects its backend
-  // to attach to the response, resolved fresh from the customer on every
-  // load — not a field stored on the entity itself (neither Offer nor
-  // CustomerOrder declares a taxProfile relation in the entity classes
-  // I've seen). I don't have customer_orders_controller.ts's
-  // getCustomerOrderById in this conversation, so I can't confirm it
-  // attaches the same object to the Auftrag response. If it doesn't yet,
-  // this will just always show the fallback text below — that's a
-  // backend gap to close there, not something fixable from this file.
   const taxProfile = order?.taxProfile || null;
 
   const netWeightKg = visibleLineItems.reduce((sum: number, li: any) => {
@@ -1647,7 +1639,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         <td className="px-2 py-2 text-gray-500 whitespace-nowrap">
                           {effectiveEdit && canEditCommercial ? (
                             <div className="flex items-center gap-1 select-none">
-                              <span className="w-4 text-xs font-semibold">{item.position || index + 1}</span>
+                              <span className="w-4 text-xs font-semibold">{index + 1}</span>
                               <div className="flex flex-col gap-0.5">
                                 <button
                                   type="button"
@@ -1670,7 +1662,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                               </div>
                             </div>
                           ) : (
-                            item.position || index + 1
+                            index + 1
                           )}
                         </td>
                         <td className="px-2 py-2">
@@ -1789,17 +1781,18 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                               className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right"
                               value={item.price}
                               onCommit={(raw) => {
-                                const parsed = parseFlexibleNumber(raw);
+                                const parsed = parseAndRoundTo3Decimals(raw);
                                 persistLine(item.id, {
-                                  price: parsed === null ? "0" : raw,
+                                  price: parsed === null ? "0" : parsed,
                                 });
                               }}
                             />
                           ) : (
-                            <div className="text-right">
-                              {formatCurrency(
+                            <div className="text-right font-medium">
+                              {formatUnitPriceCurrency(
                                 item.price || 0,
                                 order?.currency || "EUR",
+                                3,
                               )}
                             </div>
                           )}

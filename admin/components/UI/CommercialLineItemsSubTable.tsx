@@ -42,11 +42,14 @@ interface CommercialLineItemsSubTableProps {
   taxRate?: number | string;
 }
 
+const formatUnitPrice = (val: number | string | undefined, currency = "EUR"): string => {
+  const n = Number(val ?? 0);
+  return `${n.toLocaleString("de-DE", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${currency === "EUR" ? "€" : currency}`;
+};
+
 const formatPrice = (val: number | string | undefined, currency = "EUR"): string => {
   const n = Number(val ?? 0);
-  const has3Decimals = Math.abs(n - Math.round(n * 100) / 100) > 0.0001;
-  const digits = has3Decimals ? 3 : 2;
-  return `${n.toLocaleString("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: 3 })} ${currency === "EUR" ? "€" : currency}`;
+  return `${n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency === "EUR" ? "€" : currency}`;
 };
 
 export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTableProps> = ({
@@ -166,7 +169,7 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
                   <td className="px-2 py-2 text-center text-gray-600">{getVatRate(item)}</td>
                   <td className="px-2 py-2 text-right font-medium text-gray-800">{qty}</td>
                   <td className="px-2 py-2 text-right text-gray-700">
-                    {formatPrice(unitPrice, currency)}
+                    {formatUnitPrice(unitPrice, currency)}
                   </td>
                   <td className="px-2 py-2 text-right font-semibold text-gray-900">
                     {formatPrice(lineTotal, currency)}

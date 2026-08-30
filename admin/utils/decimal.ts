@@ -1,11 +1,3 @@
-// utils/decimal.ts
-
-/**
- * Accepts "," and "." interchangeably as the decimal separator. If both
- * appear, the last one is the decimal point; if only one appears, it's
- * the decimal point. "." alone is the client's "not calculated" placeholder
- * and returns null, not 0.
- */
 export function parseFlexibleNumber(
   value: string | number | null | undefined,
 ): number | null {
@@ -34,7 +26,6 @@ export function parseFlexibleNumber(
 export const isPlaceholderInput = (raw: string | null | undefined) =>
   raw === null || raw === undefined || raw.trim() === "" || raw.trim() === ".";
 
-/** "." for null (not calculated), otherwise the formatted number. */
 export function formatMatrixPrice(
   price: number | null | undefined,
   decimals = 3,
@@ -51,4 +42,39 @@ export function formatMax3Decimals(val: number | string | null | undefined): str
   const rounded = Math.round(num * 1000) / 1000;
   const has3rdDecimal = Math.abs(Math.round(rounded * 1000) - Math.round(rounded * 100) * 10) > 0;
   return rounded.toFixed(has3rdDecimal ? 3 : 2);
+}
+
+export function formatUnitPriceCurrency(
+  amount: number | string | null | undefined,
+  currency?: string | null,
+  decimals: number = 3,
+): string {
+  const safeCurrency =
+    currency && typeof currency === "string" && currency.trim()
+      ? currency.trim().toUpperCase()
+      : "EUR";
+  const num = typeof amount === "number" ? amount : parseFlexibleNumber(amount) || 0;
+  try {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: safeCurrency,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(num);
+  } catch (e) {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(num);
+  }
+}
+
+export function parseAndRoundTo3Decimals(
+  value: string | number | null | undefined,
+): number | null {
+  const parsed = parseFlexibleNumber(value);
+  if (parsed === null) return null;
+  return Math.round(parsed * 1000) / 1000;
 }
