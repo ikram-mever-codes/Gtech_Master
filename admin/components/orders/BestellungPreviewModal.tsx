@@ -29,7 +29,7 @@ import { getAllGtechCompanies, GtechCompany } from "@/api/gtech_companies";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { parseFlexibleNumber } from "@/utils/decimal";
+import { parseFlexibleNumber, parseAndRoundTo3Decimals } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 import { formatCurrency } from "@/api/customer_orders";
 
@@ -115,8 +115,8 @@ const formatPrice = (
   if (price === null || price === undefined) return "—";
   const symbol = currencySymbol(currency);
   return `${symbol}${Number(price).toLocaleString("de-DE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
   })}`;
 };
 
@@ -194,12 +194,6 @@ const getItemCompany = (item: any): string =>
   item?.company_name ||
   item?.company ||
   "";
-
-// Byte-for-byte OfferDetailModal's real ItemRow (verified against its
-// actual source) — item_name_de as the display name, company + LABEL
-// badge in the subtitle row. The picker always passes selected={false}
-// here (same as Offer's own "add existing item" picker does), so the
-// highlighted/checkmark state never shows in this context.
 const ItemRow: React.FC<{
   item: any;
   selected: boolean;
@@ -1352,9 +1346,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                                   : (item.purchasePrice ?? item.transferPrice)
                               }
                               onCommit={(raw) => {
+                                const parsed = parseAndRoundTo3Decimals(raw);
                                 setPendingPrices((prev) => ({
                                   ...prev,
-                                  [String(item.id)]: raw.trim() || "0",
+                                  [String(item.id)]: String(parsed ?? 0),
                                 }));
                               }}
                             />
