@@ -4417,7 +4417,7 @@ export class OfferController {
         });
       }
 
-      const shippingMethod = (offer.shippingMethod || "").trim();
+      const shippingMethod = ((offer.shippingText || offer.shippingMethod) || "").trim();
       const shippingCostNum = getSafeNumber(offer.shippingCost);
       const shippingQtyNum = getSafeNumber(offer.shippingQuantity) || 1;
       const shippingTotal = shippingCostNum * shippingQtyNum;

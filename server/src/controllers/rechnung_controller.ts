@@ -46,19 +46,19 @@ async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
   return match
     ? {
-        id: match.id,
-        name: match.name,
-        taxCase: match.tax_case || undefined,
-        taxRate: Number(match.tax_rate),
-        taxCode: match.tax_code || undefined,
-      }
+      id: match.id,
+      name: match.name,
+      taxCase: match.tax_case || undefined,
+      taxRate: Number(match.tax_rate),
+      taxCode: match.tax_code || undefined,
+    }
     : {
-        id: null,
-        name: "Frozen",
-        taxCase: undefined,
-        taxRate: Number(taxRate) || 19,
-        taxCode: undefined,
-      };
+      id: null,
+      name: "Frozen",
+      taxCase: undefined,
+      taxRate: Number(taxRate) || 19,
+      taxCode: undefined,
+    };
 }
 
 async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
@@ -68,9 +68,9 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const [auftrag, rechnungenK] = await Promise.all([
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
-          where: { id: rechnung.auftrag_id },
-          select: ["id", "order_no", "title", "created_at"],
-        })
+        where: { id: rechnung.auftrag_id },
+        select: ["id", "order_no", "title", "created_at"],
+      })
       : Promise.resolve(null),
     rechnungKRepo.find({
       where: { original_rechnung_id: rechnung.id },
@@ -107,9 +107,9 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const [auftraege, rechnungenK] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "order_no", "title", "created_at"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "title", "created_at"],
+      })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
@@ -233,8 +233,6 @@ export const createRechnungFromAuftrag = async (
       return;
     }
 
-    // Delivered and Closed are final states in the Auftrag Status state
-    // machine — no further delivery can be generated against them.
     const preDeliveryStatus = auftrag.auftrag_status || AuftragStatus.OPEN;
     if (
       preDeliveryStatus === AuftragStatus.DELIVERED ||
@@ -345,12 +343,12 @@ export const createRechnungFromAuftrag = async (
     const lineItemIds = (auftrag.orderItems || []).map((li) => li.id);
     const alreadyDeliveredRows = lineItemIds.length
       ? await rechnungItemRepo
-          .createQueryBuilder("ri")
-          .select("ri.sourceLineItemId", "sourceLineItemId")
-          .addSelect("SUM(ri.quantity)", "delivered")
-          .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
-          .groupBy("ri.sourceLineItemId")
-          .getRawMany()
+        .createQueryBuilder("ri")
+        .select("ri.sourceLineItemId", "sourceLineItemId")
+        .addSelect("SUM(ri.quantity)", "delivered")
+        .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
+        .groupBy("ri.sourceLineItemId")
+        .getRawMany()
       : [];
     const alreadyDeliveredByLineId = new Map<string, number>(
       alreadyDeliveredRows.map((r: any) => [
@@ -551,6 +549,7 @@ export const createRechnungFromAuftrag = async (
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
       shipping_method:
+        auftrag.shipping_text ||
         auftrag.shipping_method ||
         (auftrag.customerSnapshot as any)?.defaultShippingMethod ||
         (auftrag.customerSnapshot as any)?.shipping_method ||
@@ -823,7 +822,7 @@ export const createRechnungOhneAusliefern = async (
       customerSnapshot: auftrag.customerSnapshot || undefined,
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: auftrag.shipping_method || undefined,
+      shipping_method: auftrag.shipping_text || auftrag.shipping_method || undefined,
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
@@ -1021,9 +1020,9 @@ export const getLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "title", "shipping_method"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "title", "shipping_method"],
+      })
       : [];
     const auftragTitleById = new Map(
       auftraege.map((a: any) => [a.id, a.title]),
@@ -1338,7 +1337,7 @@ export const downloadRechnungPdf = async (
 
     const defaultTaxRate =
       rechnung.tax_profile_case === "EU_IGL" ||
-      rechnung.tax_profile_case === "third_country"
+        rechnung.tax_profile_case === "third_country"
         ? 0
         : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
           ? Number(rechnung.tax_rate)

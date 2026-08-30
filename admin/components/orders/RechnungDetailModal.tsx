@@ -41,6 +41,14 @@ const formatDeCurrency = (val: number) => {
   })} €`;
 };
 
+const formatDeUnitPrice = (val: number) => {
+  const num = isNaN(val) || !isFinite(val) ? 0 : val;
+  return `${num.toLocaleString("de-DE", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })} €`;
+};
+
 const formatWeight = (kg: number): string =>
   `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
     minimumFractionDigits: 1,
@@ -1073,7 +1081,7 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-right">{qty}</td>
                             <td className="px-2 py-2 text-right">
-                              {formatDeCurrency(unitPrice)}
+                              {formatDeUnitPrice(unitPrice)}
                             </td>
                           </>
                         )}
@@ -1111,7 +1119,7 @@ export default function RechnungDetailModal({
                                   />
                                 ) : (
                                   <span className="font-medium">
-                                    {formatDeCurrency(unitPrice)}
+                                    {formatDeUnitPrice(unitPrice)}
                                   </span>
                                 )}
                               </div>

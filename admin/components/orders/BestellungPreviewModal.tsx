@@ -29,7 +29,7 @@ import { getAllGtechCompanies, GtechCompany } from "@/api/gtech_companies";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { parseFlexibleNumber } from "@/utils/decimal";
+import { parseFlexibleNumber, parseAndRoundTo3Decimals } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 import { formatCurrency } from "@/api/customer_orders";
 
@@ -115,8 +115,8 @@ const formatPrice = (
   if (price === null || price === undefined) return "—";
   const symbol = currencySymbol(currency);
   return `${symbol}${Number(price).toLocaleString("de-DE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
   })}`;
 };
 
@@ -194,12 +194,6 @@ const getItemCompany = (item: any): string =>
   item?.company_name ||
   item?.company ||
   "";
-
-// Byte-for-byte OfferDetailModal's real ItemRow (verified against its
-// actual source) — item_name_de as the display name, company + LABEL
-// badge in the subtitle row. The picker always passes selected={false}
-// here (same as Offer's own "add existing item" picker does), so the
-// highlighted/checkmark state never shows in this context.
 const ItemRow: React.FC<{
   item: any;
   selected: boolean;
@@ -214,11 +208,10 @@ const ItemRow: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
-        selected
-          ? "border-primary bg-primary/5"
-          : "border-gray-200 hover:bg-gray-50"
-      }`}
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
+        ? "border-primary bg-primary/5"
+        : "border-gray-200 hover:bg-gray-50"
+        }`}
     >
       <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -281,6 +274,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [pendingPrices, setPendingPrices] = useState<Record<string, string>>({});
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [newLine, setNewLine] = useState({ itemName: "", qty: 0 });
@@ -617,6 +611,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       return;
     }
     setForm(buildForm(order));
+    setPendingPrices({});
     setEdit(false);
     setShowItemPicker(false);
     setSearchEan("");
@@ -632,9 +627,22 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
     setSaving(true);
     try {
+      if (Object.keys(pendingPrices).length > 0 && order?.id) {
+        await Promise.all(
+          Object.entries(pendingPrices).map(([lineItemId, raw]) =>
+            updateTransferOrderLineItem(order.id, lineItemId, {
+              transferPrice: parseFloat(raw) || 0,
+              purchasePrice: parseFloat(raw) || 0,
+            }).catch((e) =>
+              console.error(`Failed to save price for line ${lineItemId}:`, e)
+            )
+          )
+        );
+        setPendingPrices({});
+      }
+
       let res;
       if (isCreate) {
-        // Create new Bestellung
         res = await createTransferOrder({
           title: form.title,
           status: form.status,
@@ -686,14 +694,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       } else {
         toast.error(
           res.message ||
-            `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
+          `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
           errorStyles,
         );
       }
     } catch (e: any) {
       toast.error(
         e.message ||
-          `An error occurred while ${isCreate ? "creating" : "saving"}.`,
+        `An error occurred while ${isCreate ? "creating" : "saving"}.`,
         errorStyles,
       );
     } finally {
@@ -849,7 +857,6 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     }
   };
 
-  // Calculate totals from line items
   const calculateTotals = useCallback(() => {
     const items = order?.orderItems || [];
     let total = 0;
@@ -857,8 +864,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     let allSameCurrency = true;
 
     items.forEach((item: any) => {
-      const lineTotal = getLineItemTotal(item);
-      total += lineTotal;
+      const pendingRaw = pendingPrices[String(item.id)];
+      const effectivePrice =
+        pendingRaw !== undefined
+          ? parseFlexibleNumber(pendingRaw) ?? 0
+          : (parseFlexibleNumber(item?.purchasePrice ?? item?.transferPrice ?? 0) ?? 0);
+      const qty = parseFlexibleNumber(item?.qty) ?? 1;
+      total += qty * effectivePrice;
 
       const itemCurrency =
         order?.receiver === "Supplier" ? item.purchaseCurrency || "EUR" : "EUR";
@@ -872,14 +884,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
     const displayCurrency = allSameCurrency ? firstCurrency : "EUR";
     return { total, displayCurrency };
-  }, [order?.orderItems, order?.receiver]);
+  }, [order?.orderItems, order?.receiver, pendingPrices]);
 
   const { total: displayTotal, displayCurrency } = calculateTotals();
 
   const visibleLineItems = order?.orderItems
     ? [...order.orderItems].sort(
-        (a: any, b: any) => (a.position || 0) - (b.position || 0),
-      )
+      (a: any, b: any) => (a.position || 0) - (b.position || 0),
+    )
     : [];
 
   // Loading state for existing order
@@ -939,17 +951,16 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 {title}
               </p>
               <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                  (form.zweck || displayOrder.zweck) === "direkt"
-                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                    : (form.zweck || displayOrder.zweck) === "periodisch"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : (form.zweck || displayOrder.zweck) === "ReserveEU"
-                        ? "bg-amber-50 text-amber-700 border-amber-200"
-                        : (form.zweck || displayOrder.zweck) === "ReserveCN"
-                          ? "bg-rose-50 text-rose-700 border-rose-200"
-                          : "bg-blue-50 text-blue-700 border-blue-200"
-                }`}
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${(form.zweck || displayOrder.zweck) === "direkt"
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : (form.zweck || displayOrder.zweck) === "periodisch"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : (form.zweck || displayOrder.zweck) === "ReserveEU"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : (form.zweck || displayOrder.zweck) === "ReserveCN"
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}
               >
                 {form.zweck || displayOrder.zweck || "direkt"}
               </span>
@@ -1329,25 +1340,30 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           {edit || isCreate ? (
                             <DecimalInput
                               className="w-full px-1.5 py-1 text-sm border border-gray-300 rounded text-right bg-white"
-                              value={item.purchasePrice ?? item.transferPrice}
-                              onCommit={(raw) =>
-                                persistLine(item.id, {
-                                  transferPrice: raw.trim() || "0",
-                                  purchasePrice: raw.trim() || "0",
-                                })
+                              value={
+                                pendingPrices[String(item.id)] !== undefined
+                                  ? pendingPrices[String(item.id)]
+                                  : (item.purchasePrice ?? item.transferPrice)
                               }
+                              onCommit={(raw) => {
+                                const parsed = parseAndRoundTo3Decimals(raw);
+                                setPendingPrices((prev) => ({
+                                  ...prev,
+                                  [String(item.id)]: String(parsed ?? 0),
+                                }));
+                              }}
                             />
                           ) : (
                             <div className="text-right text-gray-600">
                               {item.purchasePrice !== null &&
-                              item.purchasePrice !== undefined
+                                item.purchasePrice !== undefined
                                 ? formatPrice(item.purchasePrice, lineCurrency)
                                 : item.transferPrice !== null &&
-                                    item.transferPrice !== undefined
+                                  item.transferPrice !== undefined
                                   ? formatPrice(
-                                      item.transferPrice,
-                                      lineCurrency,
-                                    )
+                                    item.transferPrice,
+                                    lineCurrency,
+                                  )
                                   : "—"}
                             </div>
                           )}
@@ -1487,13 +1503,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                    visibleLineItems[0]?.extraWeight === undefined
+                      visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : (
-                          parseFlexibleNumber(
-                            visibleLineItems[0].extraWeight,
-                          ) ?? 0
-                        ).toFixed(1)
+                        parseFlexibleNumber(
+                          visibleLineItems[0].extraWeight,
+                        ) ?? 0
+                      ).toFixed(1)
                   }
                   placeholder="0"
                   disabled={visibleLineItems.length === 0 || isCreate}

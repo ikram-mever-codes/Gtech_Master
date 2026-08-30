@@ -509,7 +509,7 @@ export const downloadLieferscheinPdf = async (
       trackingList.push(`${providerName} · ${customerOrder.weiterversand_tracking}`);
     }
 
-    const effectiveShippingMethod = customerOrder?.shipping_method || rechnung?.shipping_method;
+    const effectiveShippingMethod = customerOrder?.shipping_text || customerOrder?.shipping_method || rechnung?.shipping_method;
 
     const rawStatus = String(lieferschein.status || "").toLowerCase().trim();
     let displayStatus = "bestätigt";
