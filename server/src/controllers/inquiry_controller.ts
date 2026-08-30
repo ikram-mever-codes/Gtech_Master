@@ -512,6 +512,7 @@ export class InquiryController {
         itemId,
       } = body;
 
+      console.log(requests);
       if (!name || !customerId) {
         await queryRunner.rollbackTransaction();
         return response.status(400).json({
@@ -680,12 +681,9 @@ export class InquiryController {
             }
           }
 
-          // Resolve/create the master Item for this request item — every
-          // requested item gets one, linked or freshly drafted. cat_id
-          // falls back to the default PRO category on the Item, not on
-          // RequestedItem (cat_id is a shared field now).
           const reqItem = await ItemLinkService.resolveItem(queryRunner, {
             ...reqData,
+            itemNo: assignedItemNo,
             cat_id: reqData.cat_id || defaultProCatId,
           });
 
@@ -830,8 +828,25 @@ export class InquiryController {
       }
     }
 
+    // Creation-time-only defaults — item_name_de and sales_price are
+    // taken from the request item ONLY when the backing Item is first
+    // created here. They're deliberately left out of `fields` above, so
+    // Object.assign(existing, fields) on the update branch never
+    // overwrites either value on an Item that already exists.
+    const salesPriceFromTarget =
+      reqData.targetPrice !== undefined &&
+      reqData.targetPrice !== null &&
+      reqData.targetPrice !== ""
+        ? Number(reqData.targetPrice)
+        : undefined;
+
     const created = itemRepo.create({
       ...fields,
+      item_name_de: reqData.itemName || undefined,
+      sales_price:
+        salesPriceFromTarget !== undefined && !isNaN(salesPriceFromTarget)
+          ? salesPriceFromTarget
+          : undefined,
       supplier_id: reqData.supplier_id ?? reqData.supplierId ?? 1,
       isDraft: true,
       isActive: "Y",
