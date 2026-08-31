@@ -155,6 +155,32 @@ const toCountryCode = (country?: string) => {
   return map[c.toLowerCase()] || c.toUpperCase().slice(0, 2);
 };
 
+const buildFullAddress = (b: any) => {
+  if (!b) return null;
+  const code = toCountryCode(b.country);
+  const isGerman = !code || code === "DE";
+
+  let postal = (b.postalCode || "").trim();
+  let city = (b.city || "").trim();
+
+  const zipMatch = `${postal} ${city}`.trim().match(/(\d{4,5})\s+([^,]+)/);
+  if (zipMatch) {
+    postal = zipMatch[1];
+    city = zipMatch[2].trim();
+  }
+
+  const cityLine = [postal, city]
+    .filter((x: string) => x && x.trim())
+    .join(" ")
+    .trim();
+
+  if (!cityLine) return null;
+  if (!isGerman && code) {
+    return `${cityLine}, ${code}`;
+  }
+  return cityLine;
+};
+
 const formatDateTime = (dateString: string | undefined) => {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -1245,31 +1271,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       postalCode: "",
       country: "",
     });
-  };
-
-  const buildFullAddress = (b: any) => {
-    const code = toCountryCode(b.country);
-    const isGerman = !code || code === "DE";
-
-    let postal = (b.postalCode || "").trim();
-    let city = (b.city || "").trim();
-
-    const zipMatch = `${postal} ${city}`.trim().match(/(\d{4,5})\s+([^,]+)/);
-    if (zipMatch) {
-      postal = zipMatch[1];
-      city = zipMatch[2].trim();
-    }
-
-    const cityLine = [postal, city]
-      .filter((x: string) => x && x.trim())
-      .join(" ")
-      .trim();
-
-    if (!cityLine) return null;
-    if (!isGerman && code) {
-      return `${cityLine}, ${code}`;
-    }
-    return cityLine;
   };
 
   const getLinkedInStateColor = (state: string) => {
