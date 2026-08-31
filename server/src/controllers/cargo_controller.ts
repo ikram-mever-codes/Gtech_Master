@@ -378,12 +378,21 @@ export const getCargoById = async (
     const orderIds = cargoOrders.map((co) => co.order_id);
 
     let orderItems: any[] = [];
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
     if (orderIds.length > 0) {
-      const orderItemRepo = AppDataSource.getRepository(OrderItem);
       orderItems = await orderItemRepo
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
-        .where("oi.order_id IN (:...orderIds)", { orderIds })
+        .where(
+          "(oi.cargo_id = :cargoId OR (oi.cargo_id IS NULL AND oi.order_id IN (:...orderIds)))",
+          { cargoId: cargo.id, orderIds },
+        )
+        .getMany();
+    } else {
+      orderItems = await orderItemRepo
+        .createQueryBuilder("oi")
+        .leftJoinAndSelect("oi.item", "item")
+        .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
         .getMany();
     }
 
@@ -780,12 +789,21 @@ export const getCargoOrders = async (
 
     const orderIds = cargoOrders.map((co) => co.order_id);
     let orderItems: any[] = [];
+    const orderItemRepo2 = AppDataSource.getRepository(OrderItem);
     if (orderIds.length > 0) {
-      const orderItemRepo = AppDataSource.getRepository(OrderItem);
-      orderItems = await orderItemRepo
+      orderItems = await orderItemRepo2
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
-        .where("oi.order_id IN (:...orderIds)", { orderIds })
+        .where(
+          "(oi.cargo_id = :cargoId OR (oi.cargo_id IS NULL AND oi.order_id IN (:...orderIds)))",
+          { cargoId: Number(id), orderIds },
+        )
+        .getMany();
+    } else {
+      orderItems = await orderItemRepo2
+        .createQueryBuilder("oi")
+        .leftJoinAndSelect("oi.item", "item")
+        .where("oi.cargo_id = :cargoId", { cargoId: Number(id) })
         .getMany();
     }
 

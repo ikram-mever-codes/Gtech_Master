@@ -709,11 +709,6 @@ const InvoiceListPage: React.FC = () => {
       } else {
         await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
 
-        const orderId = selectedItem.order_id || selectedItem.order?.id;
-        if (orderId) {
-          await assignOrdersToCargo(cargoIdNum, [Number(orderId)], true);
-        }
-
         toast.success("Item reassigned successfully");
         setShowREModal(false);
 

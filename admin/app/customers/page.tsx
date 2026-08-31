@@ -72,13 +72,12 @@ import PageHeader from "@/components/UI/PageHeader";
 import theme from "@/styles/theme";
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
       ? "text-gray-400 border-gray-300 bg-white"
       : "text-gray-900 border-gray-300 bg-white"
-  }`;
+    }`;
 };
 import {
   deleteCustomer,
