@@ -626,6 +626,15 @@ export class RequestedItemController {
 
       const updateData: Record<string, any> = toOwnFields(body);
 
+      // TARIC lives solely on the linked Item (set above via
+      // ItemLinkService), never on RequestedItem itself. REQUESTED_ITEM_OWN_FIELDS
+      // still lists taric_id for legacy reasons, but writing it here creates
+      // a second, independent copy that drifts out of sync with the Item's
+      // real taric_id/taricRel the moment this RequestedItem gets re-linked
+      // to a different Item or backfilled. Drop it so it's never persisted
+      // on this entity.
+      delete updateData.taric_id;
+
       updateData.itemId = linkedItem.id;
       if (contactPerson !== undefined) {
         updateData.contactPersonId = contactPerson ? contactPerson.id : null;

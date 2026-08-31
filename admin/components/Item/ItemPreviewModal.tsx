@@ -216,6 +216,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             : null,
           item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
+          remark_ex: raw.remark_ex || "",
           remarkCN: raw.remark_cn || "",
           price: raw.purchasePrice || 0,
           currency: raw.currency || "EUR",
@@ -227,6 +228,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             length: raw.length || 0,
             width: raw.width || 0,
             height: raw.height || 0,
+            is_dim_weight_estimated: !!raw.is_dim_weight_estimated,
           },
           pictures: {
             shopPicture: raw.photo || "",
@@ -418,6 +420,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           model: previewItem.model,
           extraNote: previewItem.remark,
           remark: previewItem.remark,
+          remark_ex: previewItem.remark_ex,
           remark_cn: previewItem.remarkCN || "",
           cat_id: previewItem.category_id
             ? parseInt(previewItem.category_id)
@@ -1343,7 +1346,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         }
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
-                        {previewItem.supplierItem?.currency || ""}
+                        {"RMB"}
                       </span>
                     </div>
                   ) : (
@@ -1354,7 +1357,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                           0,
                       )}{" "}
                       <span className="font-semibold text-gray-700">
-                        {previewItem.supplierItem?.currency || ""}
+                        {"RMB"}
                       </span>
                     </span>
                   )}
@@ -1369,14 +1372,14 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         onChange={(raw) => patchPreview({ price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
-                        {/* {previewItem.currency || "EUR"} */}
+                        {"EUR"}
                       </span>
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
                       {formatMax3Decimals(previewItem.price ?? 0)}{" "}
                       <span className="font-semibold text-gray-700">
-                        {/* {previewItem.currency || "EUR"} */}
+                        {"EUR"}
                       </span>
                     </span>
                   )}
@@ -1392,14 +1395,14 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         onChange={(raw) => patchPreview({ sales_price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
-                        {/* {previewItem.currency || "EUR"} */}
+                        {"EUR"}
                       </span>
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
                       {formatMax3Decimals(previewItem.sales_price ?? 0)}{" "}
                       <span className="font-semibold text-gray-700">
-                        {/* {previewItem.currency || "EUR"} */}
+                        {"EUR"}
                       </span>
                     </span>
                   )}

@@ -95,6 +95,9 @@ export class Item {
   cat_id?: number;
 
   @Column({ type: "text", nullable: true })
+  remark_cn?: string;
+
+  @Column({ type: "text", nullable: true })
   remark?: string;
 
   @Column({ type: "text", nullable: true })
