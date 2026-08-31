@@ -1088,6 +1088,7 @@ const CombinedInquiriesPageContent = () => {
       asanaLink: inquiry.asanaLink || "",
       assemblyInstructions: inquiry.assemblyInstructions || "",
       weight: inquiry.weight,
+      qty: inquiry.qty,
       width: inquiry.width,
       height: inquiry.height,
       length: inquiry.length,

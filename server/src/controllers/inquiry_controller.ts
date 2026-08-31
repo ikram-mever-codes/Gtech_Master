@@ -493,6 +493,8 @@ export class InquiryController {
         height,
         length,
         itemNo,
+        qty,
+        interval,
         urgency1,
         urgency2,
         painPoints,
@@ -512,7 +514,6 @@ export class InquiryController {
         itemId,
       } = body;
 
-      console.log(requests);
       if (!name || !customerId) {
         await queryRunner.rollbackTransaction();
         return response.status(400).json({
@@ -603,6 +604,8 @@ export class InquiryController {
         height,
         length,
         itemNo,
+        qty,
+        interval,
         urgency1,
         urgency2,
         painPoints,
@@ -885,6 +888,8 @@ export class InquiryController {
         height,
         length,
         itemNo,
+        qty,
+        interval,
         urgency1,
         urgency2,
         painPoints,
@@ -954,6 +959,8 @@ export class InquiryController {
         ...(height !== undefined && { height }),
         ...(length !== undefined && { length }),
         ...(itemNo !== undefined && { itemNo }),
+        ...(qty !== undefined && { qty }),
+        ...(interval !== undefined && { interval }),
         ...(urgency1 !== undefined && { urgency1 }),
         ...(urgency2 !== undefined && { urgency2 }),
         ...(painPoints !== undefined && { painPoints }),
