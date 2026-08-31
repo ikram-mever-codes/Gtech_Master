@@ -274,6 +274,9 @@ export function buildRechnungColumns({
       header: "Nr",
       width: "110px",
       align: "center",
+      sortKey: "invoiceNumber",
+      sortValue: (row) =>
+        String(row.invoiceNumber || row.invoice_number || row.id || "").toLowerCase(),
       render: (row) => (
         <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
           <button
@@ -298,6 +301,8 @@ export function buildRechnungColumns({
       header: "Status",
       width: "130px",
       align: "center",
+      sortKey: "status",
+      sortValue: (row) => (row.payment_status || "unpaid").toLowerCase(),
       render: (row) => <PaymentStatusBadge row={row} rechnungenK={rechnungenK} />,
     },
     {

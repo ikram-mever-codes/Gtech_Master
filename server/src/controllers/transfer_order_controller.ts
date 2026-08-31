@@ -179,8 +179,8 @@ export const createTransferOrderFromAuftrag = async (
     // CEO requirement: OrderRemark for processing (Team Bowang) must be internal comment
     const finalNotes =
       bodyNotes !== undefined &&
-      bodyNotes !== null &&
-      String(bodyNotes).trim() !== ""
+        bodyNotes !== null &&
+        String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
         : auftrag.internal_notes || auftrag.notes || "";
 
@@ -436,6 +436,7 @@ export const updateTransferOrder = async (
       await refreshLineItemPurchasePrices(bestellung.id);
     }
     await calculateTransferOrderTotals(bestellung.id);
+    await syncBestellungToLinkedOrder(bestellung.id);
 
     const fullOrder = await transferOrderRepo.findOne({
       where: { id: bestellung.id },
@@ -552,6 +553,7 @@ export const createTransferOrderLineItem = async (
     const saved = await orderItemRepo.save(lineItem);
     await refreshLineItemPurchasePrices(order.id);
     await calculateTransferOrderTotals(order.id);
+    await syncBestellungToLinkedOrder(order.id);
 
     res
       .status(201)
@@ -610,6 +612,7 @@ export const updateTransferOrderLineItem = async (
 
     const updated = await orderItemRepo.save(lineItem);
     await calculateTransferOrderTotals(order.id);
+    await syncBestellungToLinkedOrder(order.id);
 
     res
       .status(200)
@@ -636,6 +639,7 @@ export const deleteTransferOrderLineItem = async (
     }
     await orderItemRepo.remove(lineItem);
     await calculateTransferOrderTotals(Number(orderId));
+    await syncBestellungToLinkedOrder(Number(orderId));
 
     res.status(200).json({ success: true, message: "Line item deleted" });
   } catch (error) {
@@ -702,8 +706,9 @@ async function createOrderFromBestellung(
     if (existing) {
       createdOrderId = existing.id;
       console.warn(
-        `Order ${bestellung.order_no} already exists (id ${existing.id}) — reusing it instead of creating a duplicate.`,
+        `Order ${bestellung.order_no} already exists (id ${existing.id}) — syncing items.`,
       );
+      await syncBestellungToLinkedOrder(bestellung.id);
       return;
     }
 
@@ -732,7 +737,7 @@ async function createOrderFromBestellung(
         item_id: itemId,
         order_id: savedOrder.id,
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
-        remark_de: li.remark_order_item || li.notes || li.itemName || undefined,
+        remark_de: li.remark_order_item?.trim() ? li.remark_order_item.trim() : undefined,
         price:
           li.transferPrice !== undefined && li.transferPrice !== null
             ? li.transferPrice
@@ -749,6 +754,100 @@ async function createOrderFromBestellung(
   );
 
   return { createdOrderId, skippedCount };
+}
+
+export async function syncBestellungToLinkedOrder(bestellungId: number): Promise<void> {
+  try {
+    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+    const bestellung = await transferOrderRepo.findOne({
+      where: { id: Number(bestellungId) },
+      relations: ["orderItems"],
+    });
+    if (!bestellung) return;
+
+    const orderRepo = AppDataSource.getRepository(Order);
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+
+    const linkedOrder = await orderRepo.findOne({
+      where: { order_no: bestellung.order_no },
+      relations: ["orderItems"],
+    });
+
+    if (!linkedOrder) return;
+
+    if (bestellung.supplier_id !== undefined)
+      linkedOrder.supplier_id = bestellung.supplier_id || undefined;
+    if (bestellung.customer_id !== undefined)
+      linkedOrder.customer_id = bestellung.customer_id || undefined;
+    if (bestellung.date_delivery !== undefined)
+      linkedOrder.date_delivery = bestellung.date_delivery || undefined;
+    if (bestellung.title || bestellung.notes) {
+      linkedOrder.comment =
+        [bestellung.title, bestellung.notes].filter(Boolean).join(" — ") ||
+        linkedOrder.comment;
+    }
+
+    await orderRepo.save(linkedOrder);
+
+    const bestellungItems = bestellung.orderItems || [];
+    const existingOrderItems = linkedOrder.orderItems || [];
+
+    const itemRepo = AppDataSource.getRepository(Item);
+    const lookupCodes = Array.from(
+      new Set(
+        bestellungItems
+          .map((li) => (li.itemNo || li.material || "").trim())
+          .filter((code) => code.length > 0),
+      ),
+    );
+
+    let itemByDeNo = new Map<string, Item>();
+    if (lookupCodes.length > 0) {
+      const foundItems = await itemRepo.find({
+        where: { item_no_de: In(lookupCodes) },
+      });
+      itemByDeNo = new Map(
+        foundItems.map((it) => [it.item_no_de as string, it]),
+      );
+    }
+
+    for (let i = 0; i < bestellungItems.length; i++) {
+      const li = bestellungItems[i];
+      const code = (li.itemNo || li.material || "").trim();
+      const catalogItem = code ? itemByDeNo.get(code) : undefined;
+      const itemId = li.sourceItemId ? Number(li.sourceItemId) : catalogItem?.id;
+
+      const remarkForChina = li.remark_order_item?.trim()
+        ? li.remark_order_item.trim()
+        : undefined;
+
+      let targetItem = existingOrderItems[i];
+      if (!targetItem) {
+        targetItem = orderItemRepo.create({
+          order_id: linkedOrder.id,
+          status: "NSO",
+        });
+      }
+
+      if (itemId) targetItem.item_id = itemId;
+      targetItem.qty = Math.max(1, Math.round(Number(li.qty) || 1));
+      targetItem.remark_de = remarkForChina;
+      targetItem.price =
+        li.transferPrice !== undefined && li.transferPrice !== null
+          ? li.transferPrice
+          : (li.purchasePrice ?? targetItem.price);
+      targetItem.currency = li.purchaseCurrency || bestellung.currency || "EUR";
+
+      await orderItemRepo.save(targetItem);
+    }
+
+    if (existingOrderItems.length > bestellungItems.length) {
+      const surplus = existingOrderItems.slice(bestellungItems.length);
+      await orderItemRepo.remove(surplus);
+    }
+  } catch (err) {
+    console.error("Error in syncBestellungToLinkedOrder:", err);
+  }
 }
 export const updateTransferOrderStatus = async (
   req: Request,
@@ -818,11 +917,10 @@ export const updateTransferOrderStatus = async (
     let message = "Bestellung status updated successfully";
     if (previousStatus === "draft" && status === "to be processed") {
       if (conversionResult) {
-        message += ` — Order created${
-          conversionResult.skippedCount > 0
-            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
-            : ""
-        }.`;
+        message += ` — Order created${conversionResult.skippedCount > 0
+          ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
+          : ""
+          }.`;
       } else {
         message +=
           " — no Order was created (no catalog line items found on this Bestellung).";

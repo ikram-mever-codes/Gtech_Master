@@ -141,6 +141,9 @@ export function buildRkColumns({
       header: "Nr",
       width: "80px",
       align: "center",
+      sortKey: "rk_number",
+      sortValue: (row) =>
+        String(row.invoiceNumber || row.order_no || row.id || "").toLowerCase(),
       render: (row) => (
         <button
           onClick={(e) => {
@@ -163,6 +166,8 @@ export function buildRkColumns({
       header: "Status",
       width: "90px",
       align: "center",
+      sortKey: "status",
+      sortValue: (row) => (row.status || "RK").toLowerCase(),
       render: (row) => (
         <span className="text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium bg-rose-50 text-rose-700 border-rose-200 uppercase">
           {row.status || "RK"}

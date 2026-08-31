@@ -161,6 +161,18 @@ export const datumColumn: ColumnDef<any> = {
   header: "Datum",
   width: "75px",
   align: "center",
+  sortKey: "date",
+  sortValue: (row) => {
+    const rawDate =
+      row.createdAt ||
+      row.created_at ||
+      row.date_created ||
+      row.invoiceDate ||
+      row.invoice_date ||
+      row.offer_date ||
+      row.date;
+    return new Date(rawDate || 0).getTime();
+  },
   render: (row) => {
     const rawDate =
       row.createdAt ||
@@ -188,6 +200,21 @@ export const kundeColumn: ColumnDef<any> = {
   header: "Kunde",
   width: "140px",
   align: "left",
+  sortKey: "customer",
+  sortValue: (row) =>
+    (
+      row.customer?.display_name ||
+      row.customerSnapshot?.displayName ||
+      row.customer?.displayName ||
+      row.customerSnapshot?.companyName ||
+      row.customer?.company_name ||
+      row.customer?.companyName ||
+      row.customerName ||
+      row.supplier?.displayName ||
+      row.supplier?.company_name ||
+      row.supplier?.name ||
+      ""
+    ).toLowerCase(),
   render: (row) => {
     const text =
       row.customer?.display_name ||
@@ -259,6 +286,8 @@ export const titelColumn: ColumnDef<any> = {
   header: "Titel",
   width: "240px",
   align: "left",
+  sortKey: "title",
+  sortValue: (row) => formatTitel35(row).toLowerCase(),
   render: (row) => {
     const rawTitle =
       row.title ||
@@ -289,6 +318,8 @@ export const lieferortColumn: ColumnDef<any> = {
   header: "Lieferort",
   width: "130px",
   align: "left",
+  sortKey: "lieferort",
+  sortValue: (row) => formatLieferort(row).toLowerCase(),
   render: (row) => {
     const text = formatLieferort(row);
     return (
@@ -306,6 +337,18 @@ export const lieferdatumColumn: ColumnDef<any> = {
   header: "Lieferdatum",
   width: "90px",
   align: "center",
+  sortKey: "lieferdatum",
+  sortValue: (row) => {
+    const rawDate =
+      row.date_delivery ||
+      row.deliveryDate ||
+      row.delivery_date ||
+      row.real_delivery_date ||
+      row.date ||
+      row.due_date ||
+      row.dueDate;
+    return new Date(rawDate || 0).getTime();
+  },
   render: (row) => {
     const rawDate =
       row.date_delivery ||
@@ -328,6 +371,16 @@ export const personColumn: ColumnDef<any> = {
   header: "Person",
   width: "90px",
   align: "left",
+  sortKey: "person",
+  sortValue: (row) =>
+    (
+      row.customer?.contactName ||
+      row.customer?.contactPhoneNumber ||
+      row.customer?.email ||
+      row.customer?.contactEmail ||
+      row.ship_to ||
+      ""
+    ).toLowerCase(),
   render: (row) => {
     const text =
       row.customer?.contactName ||
@@ -350,6 +403,14 @@ export const postalCodeColumn: ColumnDef<any> = {
   header: "Postal",
   width: "55px",
   align: "center",
+  sortKey: "postal",
+  sortValue: (row) =>
+    row.deliveryAddress?.postalCode ||
+    row.customerSnapshot?.postalCode ||
+    row.customer?.postalCode ||
+    row.cargo?.customer?.postalCode ||
+    row.postalCode ||
+    "",
   render: (row) =>
     row.deliveryAddress?.postalCode ||
     row.customerSnapshot?.postalCode ||
@@ -363,6 +424,16 @@ export const cityColumn: ColumnDef<any> = {
   header: "City",
   width: "75px",
   align: "left",
+  sortKey: "city",
+  sortValue: (row) =>
+    (
+      row.deliveryAddress?.city ||
+      row.customerSnapshot?.city ||
+      row.customer?.city ||
+      row.cargo?.customer?.city ||
+      row.city ||
+      ""
+    ).toLowerCase(),
   render: (row) => {
     const city =
       row.deliveryAddress?.city ||
@@ -395,6 +466,8 @@ export function buildNettowertColumn(
     header: "Nettowert",
     width: "110px",
     align: "right",
+    sortKey: "nettowert",
+    sortValue: (row: any) => calc(row),
     render: (row: any) => {
       const val = calc(row);
       return (
