@@ -68,13 +68,25 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const countryCode = getCountryCode(addr.country);
   const isGermany = isGermanCountry(addr.country);
 
+  let street = (addr.street || addr.address || "").trim();
+  const postalCode = (addr.postalCode || addr.postal_code || "").trim();
+  const city = (addr.city || "").trim();
+
+  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+    street = street
+      .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
+      .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+      .trim()
+      .replace(/,\s*$/, "");
+  }
+
   return (
     <div className="space-y-0.5 text-sm text-gray-700">
       {addr.legalName && <div className="font-medium">{addr.legalName}</div>}
       {addr.contactName && <div>{addr.contactName}</div>}
-      {(addr.address || addr.street) && <div>{addr.address || addr.street}</div>}
-      {(addr.postalCode || addr.city) && (
-        <div>{[addr.postalCode, addr.city].filter(Boolean).join(" ")}</div>
+      {street && <div>{street}</div>}
+      {(postalCode || city) && (
+        <div>{[postalCode, city].filter(Boolean).join(" ")}</div>
       )}
       {!isGermany && countryCode && <div>{countryCode}</div>}
       {addr.vatId && !isGermany && (

@@ -153,9 +153,22 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   if (!addr) return <div className="text-sm text-gray-400">{emptyText}</div>;
   const countryCode = getCountryCode(addr.country);
   const isGermany = countryCode === "DE";
-  const cityLine = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
+
+  let street = (addr.street || addr.address || "").trim();
+  const postalCode = (addr.postalCode || addr.postal_code || "").trim();
+  const city = (addr.city || "").trim();
+
+  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+    street = street
+      .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
+      .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+      .trim()
+      .replace(/,\s*$/, "");
+  }
+
+  const cityLine = `${postalCode} ${city}`.trim();
   const addressLine = [
-    addr.address || addr.street,
+    street,
     cityLine,
     !isGermany ? countryCode : "",
   ]

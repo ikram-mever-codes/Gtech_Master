@@ -737,7 +737,7 @@ async function createOrderFromBestellung(
         item_id: itemId,
         order_id: savedOrder.id,
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
-        remark_de: li.remark_order_item?.trim() ? li.remark_order_item.trim() : undefined,
+        remark_de: li.remark_order_item?.trim() ? li.remark_order_item.trim() : (null as any),
         price:
           li.transferPrice !== undefined && li.transferPrice !== null
             ? li.transferPrice
@@ -819,7 +819,7 @@ export async function syncBestellungToLinkedOrder(bestellungId: number): Promise
 
       const remarkForChina = li.remark_order_item?.trim()
         ? li.remark_order_item.trim()
-        : undefined;
+        : null;
 
       let targetItem = existingOrderItems[i];
       if (!targetItem) {
@@ -831,7 +831,7 @@ export async function syncBestellungToLinkedOrder(bestellungId: number): Promise
 
       if (itemId) targetItem.item_id = itemId;
       targetItem.qty = Math.max(1, Math.round(Number(li.qty) || 1));
-      targetItem.remark_de = remarkForChina;
+      targetItem.remark_de = remarkForChina as any;
       targetItem.price =
         li.transferPrice !== undefined && li.transferPrice !== null
           ? li.transferPrice

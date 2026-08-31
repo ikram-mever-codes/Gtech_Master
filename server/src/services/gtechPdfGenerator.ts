@@ -288,8 +288,8 @@ export async function generateGtechDocumentPdf(
     ""
   ).trim();
   const mainStreetStr = (
-    customer.address ||
     customer.street ||
+    customer.address ||
     opts.customerEntity?.addressLine1 ||
     ""
   ).trim();
@@ -315,10 +315,22 @@ export async function generateGtechDocumentPdf(
     const dispC = formatCountry(rawC);
     const isGer =
       !rawC ||
-      ["DE", "GERMANY", "DEUTSCHLAND"].includes(rawC.toUpperCase());
+      ["DE", "GERMANY", "DEUTSCHLAND", "DE - GERMANY"].some((s) =>
+        rawC.toUpperCase().includes(s),
+      );
 
+    let cleanStreet = (street || "").trim();
     const pStr = (pCode || "").trim();
     const cStr = (city || "").trim();
+
+    if (pStr && cStr && cleanStreet.includes(pStr) && cleanStreet.includes(cStr)) {
+      cleanStreet = cleanStreet
+        .replace(new RegExp(`,?\\s*${pStr}\\s+${cStr}`, "gi"), "")
+        .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+        .trim()
+        .replace(/,\s*$/, "");
+    }
+
     let cityLineVal = `${pStr} ${cStr}`.trim();
     if (!isGer && rawC) {
       const cCode =
@@ -340,7 +352,7 @@ export async function generateGtechDocumentPdf(
       lines.push(addLine.trim());
     }
 
-    if (street && street.trim()) lines.push(street.trim());
+    if (cleanStreet) lines.push(cleanStreet);
     if (cityLineVal) lines.push(cityLineVal);
 
     return lines;
