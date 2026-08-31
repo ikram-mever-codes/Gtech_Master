@@ -1309,11 +1309,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
-                        value={formatMax3Decimals(
+                        value={
                           previewItem.supplierItem?.priceRMB ??
                           previewItem.priceRMB ??
                           ""
-                        )}
+                        }
                         onChange={(raw) =>
                           patchPreviewSupplierItem({ priceRMB: raw })
                         }
@@ -1341,7 +1341,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
-                        value={formatMax3Decimals(previewItem.price ?? "")}
+                        value={previewItem.price ?? ""}
                         onChange={(raw) => patchPreview({ price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
@@ -1364,7 +1364,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
-                        value={formatMax3Decimals(previewItem.sales_price ?? "")}
+                        value={previewItem.sales_price ?? ""}
                         onChange={(raw) => patchPreview({ sales_price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
