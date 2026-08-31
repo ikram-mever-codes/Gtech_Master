@@ -1,13 +1,10 @@
 "use client";
 
 import React from "react";
-import { FunnelIcon, ArrowPathIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import { CommercialFilters } from "@/utils/commercialFilters";
 import type { InvoiceTab } from "../../hooks/useCommercialTabData";
 
-// Mirrors the string status values InvoiceListPage actually filters on
-// (item.auftrag_status, and STATUS_ORDER for the Auftrag tab's default
-// sort) — the old generic numeric options (1-4) never matched these.
 export enum AuftragStatus {
   OPEN = "open",
   PARTIALLY_DELIVERED = "partially_delivered",
@@ -16,13 +13,12 @@ export enum AuftragStatus {
 }
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
-  }`;
+  return `w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
+    }`;
 };
 
 interface CommercialFilterBarProps {
@@ -44,18 +40,7 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
     <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm overflow-visible">
       <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full py-0.5 relative z-10">
         <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
-          {isAnyFilterActive ? (
-            <button
-              type="button"
-              onClick={onReset}
-              className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-              title="Reset all filters"
-            >
-              <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
-            </button>
-          ) : (
-            <FunnelIcon className="w-4 h-4 text-primary" />
-          )}
+          <FilterResetIcon isActive={isAnyFilterActive} onReset={onReset} />
         </div>
 
         <div className="w-32 shrink-0">

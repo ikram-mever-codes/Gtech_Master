@@ -36,6 +36,7 @@ import {
   Clock,
 } from "lucide-react";
 import { FunnelIcon } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 
 import {
   getAllInvoices,
@@ -1612,8 +1613,33 @@ const InvoiceListPage: React.FC = () => {
 
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2 overflow-visible">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
-            <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
-              <FunnelIcon className="w-4 h-4 text-primary" />
+            <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
+              <FilterResetIcon
+                isActive={!!(
+                  searchTerm ||
+                  orderNoFilter ||
+                  filters.status ||
+                  filters.dateFrom ||
+                  filters.dateTo ||
+                  filters.customer ||
+                  filters.minAmount ||
+                  filters.maxAmount ||
+                  (cargoStatusFilter && cargoStatusFilter !== "Open")
+                )}
+                onReset={() => {
+                  setSearchTerm("");
+                  setOrderNoFilter("");
+                  setFilters({
+                    status: "",
+                    dateFrom: "",
+                    dateTo: "",
+                    customer: "",
+                    minAmount: "",
+                    maxAmount: "",
+                  });
+                  setCargoStatusFilter("Open");
+                }}
+              />
             </div>
             <div className="relative w-80 shrink-0">
               <input

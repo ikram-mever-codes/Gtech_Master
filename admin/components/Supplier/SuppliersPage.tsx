@@ -14,6 +14,7 @@ import {
     ChevronUpIcon,
     ChevronDownIcon,
 } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import { useTableSort, sortData } from "@/hooks/useTableSort";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
@@ -256,8 +257,14 @@ export const SuppliersPage = React.forwardRef<
         <>
             <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 w-full">
-                    <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-                        <FunnelIcon className="w-5 h-5 text-gray-400" />
+                    <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+                        <FilterResetIcon
+                            isActive={Boolean(search || tagsFilter)}
+                            onReset={() => {
+                                setSearch("");
+                                setTagsFilter("");
+                            }}
+                        />
                     </div>
                     <div className="relative flex-grow flex-shrink flex-1 min-w-[240px]">
                         <div className="relative">
