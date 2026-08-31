@@ -69,7 +69,7 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
         where: { id: rechnung.auftrag_id },
-        select: ["id", "order_no", "title", "created_at"],
+        select: ["id", "order_no", "title", "created_at", "payment_terms", "payment_method"],
       })
       : Promise.resolve(null),
     rechnungKRepo.find({
@@ -108,7 +108,7 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
     auftragIds.length
       ? customerOrderRepo.find({
         where: { id: In(auftragIds) },
-        select: ["id", "order_no", "title", "created_at"],
+        select: ["id", "order_no", "title", "created_at", "payment_terms", "payment_method"],
       })
       : Promise.resolve([]),
     rechnungKRepo.find({
@@ -135,15 +135,6 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   return result;
 }
 
-/**
- * Prepayment credit available for an Auftrag: every "Rechnung ohne
- * Ausliefern" (is_prepayment = true) issued against it whose total_amount
- * is still > 0. total_amount on a prepayment Rechnung doubles as its
- * remaining unapplied balance — applying credit decrements it directly
- * (see createRechnungFromAuftrag below), so a fully-consumed prepayment
- * naturally reads 0 and drops out of `available` on its own, with no
- * separate "applied" bookkeeping needed.
- */
 async function getAvailablePrepaymentCredit(auftragId: number): Promise<{
   available: number;
   prepayments: Rechnung[];
@@ -162,12 +153,6 @@ async function getAvailablePrepaymentCredit(auftragId: number): Promise<{
   return { available, prepayments };
 }
 
-/**
- * Read-only prepayment summary for an Auftrag — used by the Ausliefern
- * modal to preview the deduction before generating the delivery Rechnung.
- * The deduction itself is always recomputed and applied server-side in
- * createRechnungFromAuftrag; this endpoint never writes anything.
- */
 export const getPrepaymentsForAuftrag = async (
   req: Request,
   res: Response,
@@ -590,9 +575,6 @@ export const createRechnungFromAuftrag = async (
     // ============================================
     // CREATE CCI INVOICE (Mirror to CCI tables)
     // ============================================
-    // NOTE: intentionally uses totalAmount (full goods value), not
-    // amountDueNow — the CCI mirror is for customs, not AR, and must not
-    // be affected by prepayment deductions.
     try {
       const cciCustRepo = AppDataSource.getRepository(CCICustomer);
       const cciCust = cciCustRepo.create({
@@ -1335,6 +1317,17 @@ export const downloadRechnungPdf = async (
       return;
     }
 
+    let auftrag: any = null;
+    if (rechnung.auftrag_id) {
+      auftrag = await AppDataSource.getRepository(CustomerOrder).findOne({
+        where: { id: rechnung.auftrag_id },
+      });
+    } else if (rechnung.auftrag_no) {
+      auftrag = await AppDataSource.getRepository(CustomerOrder).findOne({
+        where: { order_no: rechnung.auftrag_no },
+      });
+    }
+
     const defaultTaxRate =
       rechnung.tax_profile_case === "EU_IGL" ||
         rechnung.tax_profile_case === "third_country"
@@ -1466,10 +1459,15 @@ export const downloadRechnungPdf = async (
       deliveryTime: (rechnung as any).delivery_date || rechnung.date_delivery,
       deliveryDate: (rechnung as any).delivery_date || rechnung.date_delivery,
       deliveryTerms: rechnung.delivery_terms,
-      paymentTerms: rechnung.payment_terms
-        ? `Zahlungsziel: ${rechnung.payment_terms} Tage`
-        : undefined,
-      paymentMethod: rechnung.payment_method,
+      paymentTerms: (() => {
+        const terms = rechnung.payment_terms || auftrag?.payment_terms;
+        return terms ? `Zahlungsziel: ${terms} Tage` : undefined;
+      })(),
+      paymentMethod: rechnung.payment_method || auftrag?.payment_method,
+      invoiceDate:
+        rechnung.date_created ||
+        rechnung.invoice_date ||
+        rechnung.created_at,
       payments: pdfPayments.length > 0 ? pdfPayments : undefined,
       rks: pdfRks.length > 0 ? pdfRks : undefined,
       outstandingAmount:

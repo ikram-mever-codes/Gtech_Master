@@ -892,8 +892,61 @@ export default function RechnungDetailModal({
                 label="Delivery Date"
                 value={deliveryDate ? formatDate(deliveryDate) : ""}
               />
-              <Field label="Payment method" value={data.payment_method} />
-              <Field label="Payment Due Days" value={data.payment_terms} />
+              <Field
+                label="Payment method"
+                value={(() => {
+                  const linkedAuftrag = auftragDocs[0] || data.auftrag;
+                  const method =
+                    data.payment_method ||
+                    linkedAuftrag?.payment_method ||
+                    "";
+                  const terms =
+                    data.payment_terms ||
+                    linkedAuftrag?.payment_terms ||
+                    "";
+                  if (!method && !terms) return "—";
+                  if (method && terms) return `${method}, ${terms} Tage`;
+                  if (method) return method;
+                  return `${terms} Tage`;
+                })()}
+              />
+              <Field
+                label="Fällig am"
+                value={(() => {
+                  const linkedAuftrag = auftragDocs[0] || data.auftrag;
+                  const rawTerms =
+                    data.payment_terms ||
+                    linkedAuftrag?.payment_terms ||
+                    "";
+                  const dayMatch = String(rawTerms).match(/(\d+)/);
+                  if (!dayMatch) return "—";
+                  const dueDays = parseInt(dayMatch[1], 10);
+
+                  const baseRaw =
+                    data.invoice_date ||
+                    data.date_created ||
+                    data.created_at;
+                  if (!baseRaw) return "—";
+
+                  let baseDate: Date;
+                  const rawStr = String(baseRaw).trim();
+                  const germanMatch = rawStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+                  if (germanMatch) {
+                    baseDate = new Date(
+                      parseInt(germanMatch[3], 10),
+                      parseInt(germanMatch[2], 10) - 1,
+                      parseInt(germanMatch[1], 10),
+                    );
+                  } else {
+                    baseDate = new Date(rawStr);
+                  }
+
+                  if (isNaN(baseDate.getTime())) return "—";
+                  const dueDate = new Date(baseDate);
+                  dueDate.setDate(dueDate.getDate() + dueDays);
+                  return formatDate(dueDate);
+                })()}
+              />
               <Field
                 label="Shipping method"
                 value={editShippingMethod || data.shipping_method || "—"}
