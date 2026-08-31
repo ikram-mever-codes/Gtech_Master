@@ -46,19 +46,19 @@ async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
   return match
     ? {
-      id: match.id,
-      name: match.name,
-      taxCase: match.tax_case || undefined,
-      taxRate: Number(match.tax_rate),
-      taxCode: match.tax_code || undefined,
-    }
+        id: match.id,
+        name: match.name,
+        taxCase: match.tax_case || undefined,
+        taxRate: Number(match.tax_rate),
+        taxCode: match.tax_code || undefined,
+      }
     : {
-      id: null,
-      name: "Frozen",
-      taxCase: undefined,
-      taxRate: Number(taxRate) || 19,
-      taxCode: undefined,
-    };
+        id: null,
+        name: "Frozen",
+        taxCase: undefined,
+        taxRate: Number(taxRate),
+        taxCode: undefined,
+      };
 }
 
 async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
@@ -68,9 +68,9 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const [auftrag, rechnungenK] = await Promise.all([
     rechnung.auftrag_id
       ? customerOrderRepo.findOne({
-        where: { id: rechnung.auftrag_id },
-        select: ["id", "order_no", "title", "created_at"],
-      })
+          where: { id: rechnung.auftrag_id },
+          select: ["id", "order_no", "title", "created_at"],
+        })
       : Promise.resolve(null),
     rechnungKRepo.find({
       where: { original_rechnung_id: rechnung.id },
@@ -107,9 +107,9 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const [auftraege, rechnungenK] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "order_no", "title", "created_at"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "order_no", "title", "created_at"],
+        })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
@@ -135,15 +135,6 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   return result;
 }
 
-/**
- * Prepayment credit available for an Auftrag: every "Rechnung ohne
- * Ausliefern" (is_prepayment = true) issued against it whose total_amount
- * is still > 0. total_amount on a prepayment Rechnung doubles as its
- * remaining unapplied balance — applying credit decrements it directly
- * (see createRechnungFromAuftrag below), so a fully-consumed prepayment
- * naturally reads 0 and drops out of `available` on its own, with no
- * separate "applied" bookkeeping needed.
- */
 async function getAvailablePrepaymentCredit(auftragId: number): Promise<{
   available: number;
   prepayments: Rechnung[];
@@ -198,12 +189,6 @@ export const getPrepaymentsForAuftrag = async (
   }
 };
 
-// Replacement for createRechnungFromAuftrag. quantity on CustomerOrderItem
-// is never touched anymore — no migration needed. "Open" is computed from
-// existing rechnung_item rows (already-delivered) plus what's being
-// delivered in this call (not yet saved when totalRemainingQty is
-// computed, so it's added in manually from the same loop).
-
 export const createRechnungFromAuftrag = async (
   req: Request,
   res: Response,
@@ -211,8 +196,16 @@ export const createRechnungFromAuftrag = async (
 ) => {
   try {
     const { auftragId } = req.params;
-    const { selectedItems, notes, deliveryDate, warehouse, include_shipping } =
-      req.body;
+    const {
+      selectedItems,
+      notes,
+      deliveryDate,
+      warehouse,
+      include_shipping,
+      shippingCost: shippingCostOverride,
+      shippingQuantity: shippingQuantityOverride,
+      shippingMethod: shippingMethodOverride,
+    } = req.body;
 
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       res.status(400).json({
@@ -334,21 +327,16 @@ export const createRechnungFromAuftrag = async (
     const savedCustomerSnapshot =
       await rechnungCustomerRepo.save(rechnungCustomer);
 
-    // Already-delivered quantity per Auftrag line, summed from every
-    // Rechnung generated off this Auftrag so far. Used only to compute
-    // the Auftrag's new auftrag_status after this delivery — the source
-    // of truth stays rechnung_item, nothing here is written back onto
-    // CustomerOrderItem.
     const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
     const lineItemIds = (auftrag.orderItems || []).map((li) => li.id);
     const alreadyDeliveredRows = lineItemIds.length
       ? await rechnungItemRepo
-        .createQueryBuilder("ri")
-        .select("ri.sourceLineItemId", "sourceLineItemId")
-        .addSelect("SUM(ri.quantity)", "delivered")
-        .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
-        .groupBy("ri.sourceLineItemId")
-        .getRawMany()
+          .createQueryBuilder("ri")
+          .select("ri.sourceLineItemId", "sourceLineItemId")
+          .addSelect("SUM(ri.quantity)", "delivered")
+          .where("ri.sourceLineItemId IN (:...ids)", { ids: lineItemIds })
+          .groupBy("ri.sourceLineItemId")
+          .getRawMany()
       : [];
     const alreadyDeliveredByLineId = new Map<string, number>(
       alreadyDeliveredRows.map((r: any) => [
@@ -356,9 +344,6 @@ export const createRechnungFromAuftrag = async (
         Number(r.delivered) || 0,
       ]),
     );
-    // Accumulates what THIS call is about to deliver, per line — added on
-    // top of alreadyDeliveredByLineId below since these rechnung_item rows
-    // don't exist yet at the point totalRemainingQty is computed.
     const justDeliveredByLineId = new Map<string, number>();
 
     let subtotal = 0;
@@ -414,9 +399,6 @@ export const createRechnungFromAuftrag = async (
 
       itemsToCreate.push(itemData);
 
-      // quantity on CustomerOrderItem is the fixed ordered amount — it is
-      // NEVER written to here. Track what's being delivered in this call
-      // only for the auftrag_status computation below.
       if (sourceLine) {
         const key = String(sourceLine.id);
         justDeliveredByLineId.set(
@@ -426,9 +408,6 @@ export const createRechnungFromAuftrag = async (
       }
     }
 
-    // Sum of what's still open across all lines after this delivery:
-    // quantity - (already delivered from past Rechnungen + delivered just
-    // now), floored at 0 per line.
     const totalRemainingQty = (auftrag.orderItems || []).reduce((sum, li) => {
       const delivered =
         (alreadyDeliveredByLineId.get(String(li.id)) || 0) +
@@ -436,14 +415,6 @@ export const createRechnungFromAuftrag = async (
       return sum + Math.max(0, Number(li.quantity || 0) - delivered);
     }, 0);
 
-    // Advance both the legacy `status` field and the delivery-lifecycle
-    // `auftrag_status` field together. `auftrag_status` is what drives the
-    // Auftrag-tab sort order and row background highlighting, so it must
-    // stay in sync with every Rechnung generated off this Auftrag.
-    // A manually CLOSED Auftrag is never reopened by a later Rechnung —
-    // closing is a deliberate, final action ("we're done even though
-    // qty open > 0"), so `status` still tracks fulfillment but
-    // `auftrag_status` is left as CLOSED.
     if (auftrag.auftrag_status !== AuftragStatus.CLOSED) {
       if (totalRemainingQty <= 0) {
         auftrag.status = "Completed";
@@ -460,13 +431,17 @@ export const createRechnungFromAuftrag = async (
     await customerOrderRepo.save(auftrag);
 
     const taxRate = Number(auftrag.tax_rate ?? 19);
-
-    // Get shipping values - only if shipping is included
+    // the Auftrag's own stored values when no override is sent.
     const shippingCost = include_shipping
-      ? Number(auftrag.shipping_cost ?? 0)
+      ? shippingCostOverride !== undefined && shippingCostOverride !== null
+        ? Number(shippingCostOverride)
+        : Number(auftrag.shipping_cost ?? 0)
       : 0;
     const shippingQuantity = include_shipping
-      ? Number(auftrag.shipping_quantity ?? 1)
+      ? shippingQuantityOverride !== undefined &&
+        shippingQuantityOverride !== null
+        ? Number(shippingQuantityOverride)
+        : Number(auftrag.shipping_quantity ?? 1)
       : 0;
     const shippingTotal = shippingCost * shippingQuantity;
 
@@ -549,6 +524,7 @@ export const createRechnungFromAuftrag = async (
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
       shipping_method:
+        shippingMethodOverride ||
         auftrag.shipping_text ||
         auftrag.shipping_method ||
         (auftrag.customerSnapshot as any)?.defaultShippingMethod ||
@@ -630,6 +606,7 @@ export const createRechnungFromAuftrag = async (
         discount_amount: discountAmount,
         payment_terms: auftrag.payment_terms || undefined,
         shipping_method:
+          shippingMethodOverride ||
           auftrag.shipping_method ||
           (auftrag.customerSnapshot as any)?.defaultShippingMethod ||
           (auftrag.customerSnapshot as any)?.shipping_method ||
@@ -677,7 +654,6 @@ export const createRechnungFromAuftrag = async (
     next(error);
   }
 };
-
 export const createRechnungOhneAusliefern = async (
   req: Request,
   res: Response,
@@ -822,7 +798,8 @@ export const createRechnungOhneAusliefern = async (
       customerSnapshot: auftrag.customerSnapshot || undefined,
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: auftrag.shipping_text || auftrag.shipping_method || undefined,
+      shipping_method:
+        auftrag.shipping_text || auftrag.shipping_method || undefined,
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
@@ -1020,9 +997,9 @@ export const getLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "title", "shipping_method"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "title", "shipping_method"],
+        })
       : [];
     const auftragTitleById = new Map(
       auftraege.map((a: any) => [a.id, a.title]),
@@ -1337,7 +1314,7 @@ export const downloadRechnungPdf = async (
 
     const defaultTaxRate =
       rechnung.tax_profile_case === "EU_IGL" ||
-        rechnung.tax_profile_case === "third_country"
+      rechnung.tax_profile_case === "third_country"
         ? 0
         : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
           ? Number(rechnung.tax_rate)
