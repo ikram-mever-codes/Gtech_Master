@@ -612,8 +612,26 @@ const CombinedBusinessContactsContent: React.FC = () => {
       }
     }
   }, [searchParams, allBusinesses, businessIdHandled]);
+  const { sortBy, sortOrder, handleSort } = useTableSort();
+
+  const sortedFilteredBusinesses = useMemo(() => {
+    return sortData(filteredBusinesses, sortBy, sortOrder, {
+      company: (b: any) =>
+        (b.displayName || b.companyName || b.name || b.legalName || "").toLowerCase(),
+      address: (b: any) => {
+        const full = buildFullAddress(b) || "";
+        const pc = (b.postalCode || "").trim();
+        const city = (b.city || "").trim();
+        const street = (b.street || b.address || "").trim();
+        return `${pc} ${city} ${street} ${full}`.trim().toLowerCase();
+      },
+      website: (b: any) => (b.website || "").toLowerCase(),
+      note: (b: any) => (b.note || "").toLowerCase(),
+    });
+  }, [filteredBusinesses, sortBy, sortOrder]);
+
   useEffect(() => {
-    const total = filteredBusinesses.length;
+    const total = sortedFilteredBusinesses.length;
     setTotalRecords(total);
     const pages = Math.max(1, Math.ceil(total / itemsPerPage));
     setTotalPages(pages);
@@ -624,21 +642,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
     const startIndex = (safePage - 1) * itemsPerPage;
     setBusinesses(
-      filteredBusinesses.slice(startIndex, startIndex + itemsPerPage),
+      sortedFilteredBusinesses.slice(startIndex, startIndex + itemsPerPage),
     );
-  }, [currentPage, filteredBusinesses]);
-
-  const { sortBy, sortOrder, handleSort } = useTableSort();
-
-  const sortedBusinesses = useMemo(() => {
-    return sortData(businesses, sortBy, sortOrder, {
-      company: (b: any) =>
-        (b.displayName || b.companyName || b.name || "").toLowerCase(),
-      address: (b: any) => (buildFullAddress(b) || "").toLowerCase(),
-      website: (b: any) => (b.website || "").toLowerCase(),
-      note: (b: any) => (b.note || "").toLowerCase(),
-    });
-  }, [businesses, sortBy, sortOrder]);
+  }, [currentPage, sortedFilteredBusinesses]);
 
   const renderSortIcon = (field: string) => {
     if (sortBy === field) {
@@ -1515,7 +1521,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {sortedBusinesses.map((business: any) => (
+                    {businesses.map((business: any) => (
                       <React.Fragment key={business.id}>
                         <tr className="hover:bg-gray-50 transition-colors align-top">
                           <td className="px-3 py-3">

@@ -732,6 +732,9 @@ const getOfferNetTotal = (off: any): number => {
         header: "Nr",
         width: "110px",
         align: "center",
+        sortKey: "offerNumber",
+        sortValue: (row: any) =>
+          String(row.offerNumber || row.id || "").toLowerCase(),
         render: (row: any) => (
           <div className="text-sm font-semibold text-green-600 hover:underline whitespace-nowrap cursor-pointer">
             {row.offerNumber}
@@ -750,6 +753,9 @@ const getOfferNetTotal = (off: any): number => {
         header: "Lieferdatum",
         width: "90px",
         align: "center",
+        sortKey: "lieferdatum",
+        sortValue: (row: any) =>
+          new Date(row.date_delivery || row.validUntil || 0).getTime(),
         render: (row: any) => {
           const raw = row.date_delivery || row.validUntil;
           if (!raw)
@@ -772,6 +778,8 @@ const getOfferNetTotal = (off: any): number => {
         header: "Status",
         width: "90px",
         align: "center",
+        sortKey: "status",
+        sortValue: (row: any) => (row.status || "Draft").toLowerCase(),
         render: (row: any) => (
           <span className="text-[11px] px-2.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 font-medium capitalize">
             {row.status || "Draft"}

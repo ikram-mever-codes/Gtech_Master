@@ -427,6 +427,8 @@ export function buildAuftragColumns({
       header: "Nr",
       width: "110px",
       align: "center",
+      sortKey: "order_no",
+      sortValue: (row) => (row.order_no || "").toLowerCase(),
       render: (row) => (
         <button
           onClick={(e) => {
@@ -448,6 +450,8 @@ export function buildAuftragColumns({
       header: "QTY Open",
       width: "80px",
       align: "center",
+      sortKey: "qty_open",
+      sortValue: (row) => qtyOpenCalc(row),
       render: (row) => (
         <span className="text-sm font-semibold text-gray-900">
           {qtyOpenCalc(row)}
@@ -458,6 +462,8 @@ export function buildAuftragColumns({
       header: "Status",
       width: "90px",
       align: "center",
+      sortKey: "status",
+      sortValue: (row) => getRowStatus(row),
       render: (row) => {
         const status = getRowStatus(row);
         const label = AUFTRAG_STATUS_LABELS[status] || status;

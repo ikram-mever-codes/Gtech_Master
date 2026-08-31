@@ -279,6 +279,9 @@ export function buildLieferscheinColumns({
       header: "Nr",
       width: "80px",
       align: "center",
+      sortKey: "deliveryNoteNo",
+      sortValue: (row) =>
+        String(row.deliveryNoteNo || row.id || "").toLowerCase(),
       render: (row) => (
         <button
           onClick={(e) => {
@@ -300,6 +303,9 @@ export function buildLieferscheinColumns({
       header: "Versandart",
       width: "110px",
       align: "center",
+      sortKey: "versandart",
+      sortValue: (row) =>
+        (row.shipping_method || row.shippingMethod || row.shipping_provider || "").toLowerCase(),
       render: (row) => {
         const text =
           row.shipping_method ||
@@ -320,6 +326,8 @@ export function buildLieferscheinColumns({
       header: "Status",
       width: "110px",
       align: "center",
+      sortKey: "status",
+      sortValue: (row) => (row.status || "vorläufig").toLowerCase(),
       render: (row) => {
         const rawStatus = (row.status || "vorläufig").toLowerCase();
         let displayStatus = row.status || "vorläufig";

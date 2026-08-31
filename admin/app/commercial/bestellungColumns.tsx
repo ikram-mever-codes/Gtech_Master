@@ -205,6 +205,11 @@ export function buildBestellungColumns({
       header: "Datum",
       width: "65px",
       align: "center",
+      sortKey: "date",
+      sortValue: (row) =>
+        new Date(
+          row.date_created || row.createdAt || row.created_at || 0,
+        ).getTime(),
       render: (row) => {
         const rawDate =
           row.date_created || row.createdAt || row.created_at;
@@ -226,6 +231,8 @@ export function buildBestellungColumns({
       header: "Nr",
       width: "85px",
       align: "center",
+      sortKey: "order_no",
+      sortValue: (row) => (row.order_no || "").toLowerCase(),
       render: (row) => (
         <button
           onClick={(e) => {
@@ -243,6 +250,25 @@ export function buildBestellungColumns({
       header: "Kunde",
       width: "115px",
       align: "left",
+      sortKey: "customer",
+      sortValue: (row) =>
+        (
+          row.customerSnapshot?.displayName ||
+          row.customerSnapshot?.display_name ||
+          row.customer?.displayName ||
+          row.customer?.display_name ||
+          row.customerSnapshot?.companyName ||
+          row.customer?.company_name ||
+          row.customer?.companyName ||
+          row.customer?.name ||
+          row.customer_name ||
+          row.supplier?.displayName ||
+          row.supplier?.display_name ||
+          row.supplier?.name ||
+          row.customerSnapshot?.legalName ||
+          row.customer?.legalName ||
+          ""
+        ).toLowerCase(),
       render: (row) => {
         const text =
           row.customerSnapshot?.displayName ||
@@ -274,6 +300,8 @@ export function buildBestellungColumns({
       header: "Titel",
       width: "185px",
       align: "left",
+      sortKey: "title",
+      sortValue: (row) => formatTitel35(row).toLowerCase(),
       render: (row) => {
         const titleStr = String(
           row.title ||
@@ -300,6 +328,8 @@ export function buildBestellungColumns({
       header: "Zweck",
       width: "85px",
       align: "center",
+      sortKey: "zweck",
+      sortValue: (row) => (row.zweck || "direkt").toLowerCase(),
       render: (row) => {
         const zweck = row.zweck || "direkt";
         return (
@@ -317,6 +347,8 @@ export function buildBestellungColumns({
       header: "Lieferort",
       width: "110px",
       align: "left",
+      sortKey: "lieferort",
+      sortValue: (row) => formatLieferort(row).toLowerCase(),
       render: (row) => {
         const text = formatLieferort(row);
         return (
@@ -333,6 +365,9 @@ export function buildBestellungColumns({
       header: "Lieferdatum",
       width: "75px",
       align: "center",
+      sortKey: "lieferdatum",
+      sortValue: (row) =>
+        new Date(row.date_delivery || row.deliveryDate || 0).getTime(),
       render: (row) => {
         const raw = row.date_delivery || row.deliveryDate;
         if (!raw) return <span className="text-gray-400 font-normal text-xs">—</span>;
@@ -347,6 +382,8 @@ export function buildBestellungColumns({
       header: "Bestellwert netto",
       width: "95px",
       align: "right",
+      sortKey: "nettowert",
+      sortValue: (row) => valueNetCalc(row),
       render: (row) => {
         const val = valueNetCalc(row);
         return (
@@ -363,6 +400,13 @@ export function buildBestellungColumns({
       header: "Receiver",
       width: "145px",
       align: "left",
+      sortKey: "receiver",
+      sortValue: (row) =>
+        (
+          row.receiver === "Supplier"
+            ? formatSupplierDisplayName(row.supplier)
+            : gtechHkDisplayName || row.receiver || ""
+        ).toLowerCase(),
       render: (row) => {
         const text =
           row.receiver === "Supplier"
@@ -382,6 +426,8 @@ export function buildBestellungColumns({
       header: "Status",
       width: "75px",
       align: "center",
+      sortKey: "status",
+      sortValue: (row: any) => (row.status || "draft").toLowerCase(),
       render: (row: any) => {
         const currentStatus = row.status || "draft";
         return (
