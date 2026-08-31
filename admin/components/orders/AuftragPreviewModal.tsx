@@ -1404,18 +1404,37 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   ))}
                 </select>
               </Field>
-              <Field
-                label="Payment terms"
-                edit={effectiveEdit && canEditCommercial}
-                value={order.payment_terms}
-              >
-                <input
-                  className={inputCls}
-                  value={form.paymentTerms}
-                  placeholder="e.g., 30 days net"
-                  onChange={(e) => patch({ paymentTerms: e.target.value })}
-                />
-              </Field>
+              {(() => {
+                const currentPmName = form.paymentMethod || order.payment_method || "";
+                const selectedPmObj = dbPaymentMethods.find(
+                  (pm: any) => pm.name === currentPmName
+                );
+                const isDueDaysEditable = selectedPmObj
+                  ? !selectedPmObj.is_prepayment
+                  : currentPmName
+                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(currentPmName)
+                    : false;
+
+                return (
+                  <Field
+                    label="Due Days"
+                    edit={effectiveEdit && canEditCommercial && isDueDaysEditable}
+                    value={order.payment_terms}
+                  >
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className={inputCls}
+                      value={form.paymentTerms}
+                      placeholder="e.g., 30"
+                      disabled={!isDueDaysEditable}
+                      onChange={(e) =>
+                        patch({ paymentTerms: e.target.value.replace(/\D/g, "") })
+                      }
+                    />
+                  </Field>
+                );
+              })()}
               <Field
                 label="Shipping method"
                 edit={effectiveEdit && canEditCommercial}

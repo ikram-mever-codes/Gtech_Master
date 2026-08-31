@@ -784,19 +784,29 @@ export default function AuftragToRechnungModal({
                 </select>
               </Field>
 
-              <Field
-                label="PAYMENT DUE DAYS"
-                value={editPaymentTerms}
-                isEdit={isEditingAuftrag}
-              >
-                <input
-                  type="text"
-                  value={editPaymentTerms}
-                  onChange={(e) => setEditPaymentTerms(e.target.value)}
-                  placeholder="e.g., 30 days net"
-                  className={inputCls}
-                />
-              </Field>
+              {(() => {
+                const isDueDaysEditable = editPaymentMethod
+                  ? !/vorkasse|prepayment|paypal|cash|credit/i.test(editPaymentMethod)
+                  : false;
+
+                return (
+                  <Field
+                    label="DUE DAYS"
+                    value={editPaymentTerms}
+                    isEdit={isEditingAuftrag && isDueDaysEditable}
+                  >
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={editPaymentTerms}
+                      disabled={!isDueDaysEditable}
+                      onChange={(e) => setEditPaymentTerms(e.target.value.replace(/\D/g, ""))}
+                      placeholder="e.g. 30"
+                      className={inputCls}
+                    />
+                  </Field>
+                );
+              })()}
 
               <Field
                 label="SHIPPING METHOD"

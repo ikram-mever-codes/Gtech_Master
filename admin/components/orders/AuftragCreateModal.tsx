@@ -588,6 +588,40 @@ export default function AuftragCreateModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Due Days
+            </label>
+            {(() => {
+              const selectedPmObj = dbPaymentMethods.find(
+                (pm: any) => pm.name === paymentMethod,
+              );
+              const isDueDaysEditable = selectedPmObj
+                ? !selectedPmObj.is_prepayment
+                : paymentMethod
+                  ? !/vorkasse|prepayment|paypal|cash|credit/i.test(paymentMethod)
+                  : false;
+
+              return (
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={paymentTerms}
+                  placeholder="e.g. 30"
+                  disabled={!isDueDaysEditable}
+                  onChange={(e) =>
+                    setPaymentTerms(e.target.value.replace(/\D/g, ""))
+                  }
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                    !isDueDaysEditable
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
+                      : "bg-white text-gray-900 border-gray-300"
+                  }`}
+                />
+              );
+            })()}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Shipping method
             </label>
             <select
