@@ -178,12 +178,13 @@ const slugFromWebsite = (website?: string) => {
 };
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 const CombinedBusinessContactsContent: React.FC = () => {
@@ -305,6 +306,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const [businessForm, setBusinessForm] = useState<any>({
     ...emptyBusinessForm,
   });
+
   const [taxProfiles, setTaxProfiles] = useState<any[]>([]);
   const [dbCountries, setDbCountries] = useState<any[]>([]);
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
@@ -1005,18 +1007,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const autoDisplay = displayNameTouched.current
         ? prev.displayName
         : generateDisplayName(
-          prev.companyName,
-          allBusinesses,
-          editingBusinessId,
-        );
+            prev.companyName,
+            allBusinesses,
+            editingBusinessId,
+          );
       const autoStar = starPortalTouched.current
         ? prev.starPortalLinkName
         : generateStarPortalLinkName(
-          prev.companyName,
-          prev.website,
-          allBusinesses,
-          editingBusinessId,
-        );
+            prev.companyName,
+            prev.website,
+            allBusinesses,
+            editingBusinessId,
+          );
       return {
         ...prev,
         displayName: autoDisplay,
@@ -1103,6 +1105,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       vat_id_status: business.vat_id_status || "unchecked",
       defaultPaymentMethod: business.defaultPaymentMethod || "",
       defaultShippingMethod: business.defaultShippingMethod || "",
+      defaultPaymentDueDays: business.defaultPaymentDueDays,
     });
     if (updateUrl) {
       updateBusinessIdInUrl(business.id);
@@ -1144,7 +1147,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         defaultShippingMethod: businessForm.defaultShippingMethod || null,
         defaultPaymentDueDays:
           businessForm.defaultPaymentDueDays !== undefined &&
-            businessForm.defaultPaymentDueDays !== null
+          businessForm.defaultPaymentDueDays !== null
             ? parseInt(businessForm.defaultPaymentDueDays)
             : 7,
       };
@@ -1194,7 +1197,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
       fetchData();
       toast.success("Business deleted successfully");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to delete business");
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete business",
+      );
     }
   };
 
@@ -1343,7 +1350,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 clientFilters.postalCode ||
                 clientFilters.city ||
                 clientFilters.country ||
-                filters.tags
+                filters.tags,
               ) ? (
                 <button
                   type="button"
@@ -1534,7 +1541,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 }}
                                 title={
                                   !business.contacts ||
-                                    business.contacts.length === 0
+                                  business.contacts.length === 0
                                     ? "No contacts yet"
                                     : expandedBusinessIds.has(business.id)
                                       ? "Hide contacts"
@@ -1559,15 +1566,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
                                       ? sortTags(
-                                        business.tags,
-                                        business.tagOrder,
-                                      ).map((tag: any) => (
-                                        <TagBadge
-                                          key={tag.id}
-                                          tag={tag}
-                                          size="sm"
-                                        />
-                                      ))
+                                          business.tags,
+                                          business.tagOrder,
+                                        ).map((tag: any) => (
+                                          <TagBadge
+                                            key={tag.id}
+                                            tag={tag}
+                                            size="sm"
+                                          />
+                                        ))
                                       : null}
                                   </div>
                                 </div>
@@ -1766,9 +1773,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               const noteText =
                                                 (contact.note || "").trim() ||
                                                 (contact.notes || "").trim() ||
-                                                (contact.noteContactPreference || "").trim() ||
-                                                (contact.decisionMakerNote || "").trim() ||
-                                                (contact.description || "").trim() ||
+                                                (
+                                                  contact.noteContactPreference ||
+                                                  ""
+                                                ).trim() ||
+                                                (
+                                                  contact.decisionMakerNote ||
+                                                  ""
+                                                ).trim() ||
+                                                (
+                                                  contact.description || ""
+                                                ).trim() ||
                                                 (contact.remark || "").trim();
 
                                               if (!noteText) {
@@ -1783,7 +1798,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                                 <div
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleOpenNotesModal(contact);
+                                                    handleOpenNotesModal(
+                                                      contact,
+                                                    );
                                                   }}
                                                   className="text-xs text-gray-700 break-words leading-relaxed cursor-pointer hover:bg-gray-100/80 p-1 rounded transition-colors"
                                                   title="Click to view full note"
@@ -1896,7 +1913,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <ModalHeader
           entityName="Business"
           entityNo={
-            businessModalMode === "edit" ? businessForm.displayName || businessForm.companyName : null
+            businessModalMode === "edit"
+              ? businessForm.displayName || businessForm.companyName
+              : null
           }
           subtitle={
             businessModalMode === "edit"
@@ -1925,7 +1944,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   showEmptyText={false}
                 />
               </div>
-            ) : businessModalMode === "edit" && editingBusinessId && (businessEditMode || (businessForm.tags && businessForm.tags.length > 0)) ? (
+            ) : businessModalMode === "edit" &&
+              editingBusinessId &&
+              (businessEditMode ||
+                (businessForm.tags && businessForm.tags.length > 0)) ? (
               <div className="flex items-center gap-2">
                 {businessEditMode && (
                   <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
@@ -1976,7 +1998,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   className="inline-flex items-center justify-center p-1 rounded-md hover:bg-gray-100 transition-colors"
                   title="Open Asana link"
                 >
-                  <img src="/asana.svg" alt="Asana" className="w-5 h-5 object-contain" />
+                  <img
+                    src="/asana.svg"
+                    alt="Asana"
+                    className="w-5 h-5 object-contain"
+                  />
                 </a>
               )}
             </div>
@@ -2005,7 +2031,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Muster GmbH & Co. KG"
                   />
                 </div>
-
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Display Name
@@ -2025,7 +2050,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Auto from first word (unique)"
                   />
                 </div>
-
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1 truncate">
                     Star Portal Link Name
@@ -2045,7 +2069,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Auto from web URL"
                   />
                 </div>
-
                 <div className="col-span-12 md:col-span-4 flex items-end gap-1.5">
                   <div className="flex-1 min-w-0">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2075,7 +2098,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     <ClipboardDocumentIcon className="w-5 h-5" />
                   </button>
                 </div>
-
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Address Additional Line
@@ -2094,7 +2116,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="c/o, building, floor…"
                   />
                 </div>
-
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Street and Street Number
@@ -2113,7 +2134,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Musterstraße 12"
                   />
                 </div>
-
                 <div className="col-span-4 md:col-span-1">
                   <label className="block text-[11px] font-medium text-gray-700 mb-1 whitespace-nowrap">
                     Pos-Code
@@ -2132,7 +2152,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="80331"
                   />
                 </div>
-
                 <div className="col-span-8 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     City
@@ -2151,7 +2170,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="München"
                   />
                 </div>
-
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Country
@@ -2169,18 +2187,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   >
                     {dbCountries.length > 0
                       ? dbCountries.map((c) => (
-                        <option key={c.id} value={c.iso2}>
-                          {c.iso2} - {c.name}
-                        </option>
-                      ))
+                          <option key={c.id} value={c.iso2}>
+                            {c.iso2} - {c.name}
+                          </option>
+                        ))
                       : COUNTRY_OPTIONS.map((c) => (
-                        <option key={c.value} value={c.value}>
-                          {c.label}
-                        </option>
-                      ))}
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
                   </select>
                 </div>
-
                 {/* Row 3: Email | Phone | Web URL | Company Label Print Logo | Note (wider, spans rows 3-4) */}
                 <div className="col-span-12 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2200,7 +2217,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="info@muster.de"
                   />
                 </div>
-
                 <div className="col-span-12 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Phone
@@ -2219,7 +2235,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="+49 89 1234567"
                   />
                 </div>
-
                 <div className="col-span-12 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Web URL
@@ -2239,9 +2254,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="https://www.muster.de"
                   />
                 </div>
-
                 <div className="col-span-12 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Company Label Print Logo">
+                  <label
+                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                    title="Company Label Print Logo"
+                  >
                     Company Label Print Logo
                   </label>
                   <div className="flex items-center gap-2 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
@@ -2266,10 +2283,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     />
                     <label
                       htmlFor="labelLogoInput"
-                      className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
-                        ? "opacity-50 cursor-not-allowed"
-                        : "cursor-pointer hover:bg-white"
-                        }`}
+                      className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${
+                        businessFieldDisabled
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer hover:bg-white"
+                      }`}
                     >
                       Upload
                     </label>
@@ -2290,7 +2308,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       )}
                   </div>
                 </div>
-
                 <div className="col-span-12 md:col-span-4 md:row-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Note
@@ -2309,7 +2326,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="Internal note…"
                   />
                 </div>
-
                 {/* Row 4: Debitor No | VAT/Tax ID | VAT Check Status | Tax Profile (read-only, small) */}
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2329,7 +2345,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="D-99000"
                   />
                 </div>
-
                 <div className="col-span-6 md:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     VAT / Tax ID
@@ -2348,9 +2363,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     placeholder="DE123456789"
                   />
                 </div>
-
                 <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="VAT Check Status">
+                  <label
+                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                    title="VAT Check Status"
+                  >
                     VAT Check Status
                   </label>
                   <select
@@ -2375,23 +2392,25 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </option>
                   </select>
                 </div>
-
                 {/* Tax Profile — read-only plain text, small field */}
                 <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Default Tax Profile">
+                  <label
+                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                    title="Default Tax Profile"
+                  >
                     Default Tax Profile
                   </label>
                   <div className="w-full px-3 py-2 text-sm border border-gray-200 bg-gray-100 rounded-lg text-gray-700 font-medium truncate h-[38px] flex items-center">
                     {taxProfiles.find(
                       (tp: any) =>
-                        tp.id === (
-                          businessForm.default_tax_profile_id ||
+                        tp.id ===
+                        (businessForm.default_tax_profile_id ||
                           taxProfiles.find(
                             (t: any) =>
-                              (t.tax_case || "").trim().toUpperCase() === "DE-VAT",
+                              (t.tax_case || "").trim().toUpperCase() ===
+                              "DE-VAT",
                           )?.id ||
-                          taxProfiles[0]?.id
-                        ),
+                          taxProfiles[0]?.id),
                     )?.tax_case ||
                       taxProfiles.find(
                         (tp: any) =>
@@ -2401,7 +2420,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       "—"}
                   </div>
                 </div>
-
                 {/* Row 5: Shipping Method | Payment Method | Due Days */}
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2422,12 +2440,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {(dbShippingMethods.length > 0
                       ? dbShippingMethods.map((sm: any) => sm.name)
                       : [
-                        "Standard shipping",
-                        "Express shipping",
-                        "Freight",
-                        "Courier",
-                        "Pickup",
-                      ]
+                          "Standard shipping",
+                          "Express shipping",
+                          "Freight",
+                          "Courier",
+                          "Pickup",
+                        ]
                     ).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -2435,7 +2453,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     ))}
                   </select>
                 </div>
-
                 <div className="col-span-12 md:col-span-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Default Payment Method
@@ -2455,13 +2472,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {(dbPaymentMethods.length > 0
                       ? dbPaymentMethods.map((pm: any) => pm.name)
                       : [
-                        "Prepayment",
-                        "Bank transfer",
-                        "Cash on delivery",
-                        "Invoice",
-                        "Credit card",
-                        "PayPal",
-                      ]
+                          "Prepayment",
+                          "Bank transfer",
+                          "Cash on delivery",
+                          "Invoice",
+                          "Credit card",
+                          "PayPal",
+                        ]
                     ).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -2469,14 +2486,21 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     ))}
                   </select>
                 </div>
-
                 <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Due Days">
+                  <label
+                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                    title="Due Days"
+                  >
                     Due Days
                   </label>
                   {(() => {
-                    const pmLower = (businessForm.defaultPaymentMethod || "").toLowerCase();
-                    const isKaufAufRechnung = pmLower.includes("rechnung") || pmLower.includes("invoice") || pmLower.includes("account");
+                    const pmLower = (
+                      businessForm.defaultPaymentMethod || ""
+                    ).toLowerCase();
+                    const isKaufAufRechnung =
+                      pmLower.includes("rechnung") ||
+                      pmLower.includes("invoice") ||
+                      pmLower.includes("account");
                     return (
                       <input
                         type="number"
@@ -2496,10 +2520,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           })
                         }
                         disabled={businessFieldDisabled || !isKaufAufRechnung}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg transition-all font-medium ${businessFieldDisabled || !isKaufAufRechnung
-                          ? "bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed"
-                          : "bg-white/70 text-gray-900 border-gray-300/80 focus:ring-2 focus:ring-gray-500/50 focus:border-transparent"
-                          }`}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg transition-all font-medium ${
+                          businessFieldDisabled || !isKaufAufRechnung
+                            ? "bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed"
+                            : "bg-white/70 text-gray-900 border-gray-300/80 focus:ring-2 focus:ring-gray-500/50 focus:border-transparent"
+                        }`}
                         placeholder="7"
                         title={
                           !isKaufAufRechnung
@@ -2509,7 +2534,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       />
                     );
                   })()}
-                </div>      </div>
+                </div>{" "}
+              </div>
             </div>
 
             {businessModalMode === "edit" && (
@@ -2585,7 +2611,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                               {user?.role === UserRole.ADMIN && (
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteContact(contact.id)}
+                                  onClick={() =>
+                                    handleDeleteContact(contact.id)
+                                  }
                                   title="Delete contact"
                                 >
                                   <Delete sx={{ fontSize: 16, color: "red" }} />
@@ -2637,29 +2665,31 @@ const CombinedBusinessContactsContent: React.FC = () => {
               <span className="text-sm font-medium text-gray-700">
                 Edit Mode
               </span>
-              {editingContactId && (editModeEnabled || (createForm.tags && createForm.tags.length > 0)) && (
-                <div className="flex items-center gap-2">
-                  {editModeEnabled && (
-                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                      TAGS
-                    </span>
-                  )}
-                  <EntityTagSelector
-                    entityId={editingContactId}
-                    entityType="contact"
-                    initialTags={createForm.tags || []}
-                    tagOrder={createForm.tagOrder}
-                    onTagsUpdated={(updatedTags) =>
-                      setCreateForm((prev: any) => ({
-                        ...prev,
-                        tags: updatedTags,
-                        tagOrder: updatedTags.map((t) => t.id).join(","),
-                      }))
-                    }
-                    disabled={!editModeEnabled}
-                  />
-                </div>
-              )}
+              {editingContactId &&
+                (editModeEnabled ||
+                  (createForm.tags && createForm.tags.length > 0)) && (
+                  <div className="flex items-center gap-2">
+                    {editModeEnabled && (
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        TAGS
+                      </span>
+                    )}
+                    <EntityTagSelector
+                      entityId={editingContactId}
+                      entityType="contact"
+                      initialTags={createForm.tags || []}
+                      tagOrder={createForm.tagOrder}
+                      onTagsUpdated={(updatedTags) =>
+                        setCreateForm((prev: any) => ({
+                          ...prev,
+                          tags: updatedTags,
+                          tagOrder: updatedTags.map((t) => t.id).join(","),
+                        }))
+                      }
+                      disabled={!editModeEnabled}
+                    />
+                  </div>
+                )}
             </div>
             <div className="flex items-center">
               <span className="text-sm text-gray-500 mr-3">
@@ -2667,16 +2697,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
               </span>
               <button
                 type="button"
-                className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                  } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                className={`${
+                  editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                 role="switch"
                 aria-checked={editModeEnabled}
                 onClick={() => setEditModeEnabled(!editModeEnabled)}
               >
                 <span
                   aria-hidden="true"
-                  className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
-                    } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                  className={`${
+                    editModeEnabled ? "translate-x-5" : "translate-x-0"
+                  } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                 />
               </button>
             </div>
@@ -3118,10 +3150,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
         }}
         title={
           businessNoteData
-            ? `Note · ${businessNoteData.displayName ||
-            businessNoteData.companyName ||
-            businessNoteData.name
-            }`
+            ? `Note · ${
+                businessNoteData.displayName ||
+                businessNoteData.companyName ||
+                businessNoteData.name
+              }`
             : "Note"
         }
         width="max-w-2xl"
