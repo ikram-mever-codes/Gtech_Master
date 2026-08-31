@@ -36,7 +36,11 @@ import {
 } from "@/api/weiterversand_service_providers";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { parseFlexibleNumber, formatUnitPriceCurrency, parseAndRoundTo3Decimals } from "@/utils/decimal";
+import {
+  parseFlexibleNumber,
+  formatUnitPriceCurrency,
+  parseAndRoundTo3Decimals,
+} from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 
 interface AuftragPreviewModalProps {
@@ -460,7 +464,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         setOrder(res.data);
         setForm(buildForm(res.data));
         setSameAsBusiness(
-          isDeliverySameAsBilling(res.data.deliveryAddress, res.data.customerSnapshot),
+          isDeliverySameAsBilling(
+            res.data.deliveryAddress,
+            res.data.customerSnapshot,
+          ),
         );
         // initialEdit is only honored once we actually know the order's
         // status — a caller requesting edit mode (e.g. "Edit Auftrag" from
@@ -544,7 +551,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       shippingQuantity: o.shipping_quantity ?? 1,
       paymentMethod: o.payment_method || "",
       shippingMethod: o.shipping_method || "",
-      shippingText: o.shipping_text || o.shippingText || o.shipping_method || "",
+      shippingText:
+        o.shipping_text || o.shippingText || o.shipping_method || "",
       paymentTerms: o.payment_terms || "",
       deliveryTerms: o.delivery_terms || "",
       termsConditions: o.terms_conditions || "",
@@ -612,38 +620,41 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
       // dedicated Close action, never through this general save.
       const payload: any = canEditCommercial
         ? {
-          title: form.title,
-          currency: form.currency,
-          taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
-          discountPercentage:
-            parseFlexibleNumber(form.discountPercentage) ?? 0,
-          shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
-          shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
-          paymentMethod: form.paymentMethod || undefined,
-          shippingMethod: form.shippingMethod || undefined,
-          shippingText: form.shippingText !== undefined ? form.shippingText : form.shippingMethod,
-          paymentTerms: form.paymentTerms,
-          deliveryTerms: form.deliveryTerms,
-          termsConditions: form.termsConditions,
-          notes: form.notes,
-          internalNotes: form.internalNotes,
-          highlightColor: form.highlightColor ?? "",
-          dateDelivery: form.dateDelivery,
-          customerSnapshot: form.customerSnapshot,
-          deliveryAddress: form.deliveryAddress,
-          realDeliveryDate: form.realDeliveryDate || null,
-          isWeiterversand: form.isWeiterversand,
-          weiterversandServiceProviderId: form.weiterversandServiceProviderId
-            ? Number(form.weiterversandServiceProviderId)
-            : null,
-          weiterversandLabels: form.weiterversandLabels,
-          weiterversandTracking: form.weiterversandTracking,
-        }
+            title: form.title,
+            currency: form.currency,
+            taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
+            discountPercentage:
+              parseFlexibleNumber(form.discountPercentage) ?? 0,
+            shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
+            shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
+            paymentMethod: form.paymentMethod || undefined,
+            shippingMethod: form.shippingMethod || undefined,
+            shippingText:
+              form.shippingText !== undefined
+                ? form.shippingText
+                : form.shippingMethod,
+            paymentTerms: form.paymentTerms,
+            deliveryTerms: form.deliveryTerms,
+            termsConditions: form.termsConditions,
+            notes: form.notes,
+            internalNotes: form.internalNotes,
+            highlightColor: form.highlightColor ?? "",
+            dateDelivery: form.dateDelivery,
+            customerSnapshot: form.customerSnapshot,
+            deliveryAddress: form.deliveryAddress,
+            realDeliveryDate: form.realDeliveryDate || null,
+            isWeiterversand: form.isWeiterversand,
+            weiterversandServiceProviderId: form.weiterversandServiceProviderId
+              ? Number(form.weiterversandServiceProviderId)
+              : null,
+            weiterversandLabels: form.weiterversandLabels,
+            weiterversandTracking: form.weiterversandTracking,
+          }
         : {
-          notes: form.notes,
-          internalNotes: form.internalNotes,
-          highlightColor: form.highlightColor ?? "",
-        };
+            notes: form.notes,
+            internalNotes: form.internalNotes,
+            highlightColor: form.highlightColor ?? "",
+          };
 
       const res = await updateCustomerOrder(order.id, payload);
       if (res.success) {
@@ -733,10 +744,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     }
   };
 
-  const handleMoveLineItem = async (lineItemId: string, direction: "up" | "down") => {
+  const handleMoveLineItem = async (
+    lineItemId: string,
+    direction: "up" | "down",
+  ) => {
     if (!canEditCommercial) return;
     const sorted = [...visibleLineItems].sort(
-      (a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0)
+      (a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0),
     );
     const idx = sorted.findIndex((li: any) => li.id === lineItemId);
     if (idx === -1) return;
@@ -769,8 +783,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     try {
       await Promise.all(
         updatesToPersist.map((u) =>
-          updateOrderLineItem(order.id, u.id, { position: u.position })
-        )
+          updateOrderLineItem(order.id, u.id, { position: u.position }),
+        ),
       );
       await refreshLocal();
     } catch (e) {
@@ -1019,24 +1033,25 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 Auftrag {order.order_no}
               </p>
               <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.auftrag_status === "delivered" ||
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                  order.auftrag_status === "delivered" ||
                   order.status === "Completed"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : order.auftrag_status === "partially_delivered" ||
-                    order.status === "In Progress"
-                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : order.auftrag_status === "closed"
-                      ? "bg-gray-200 text-gray-700 border-gray-300"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
-                  }`}
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : order.auftrag_status === "partially_delivered" ||
+                        order.status === "In Progress"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : order.auftrag_status === "closed"
+                        ? "bg-gray-200 text-gray-700 border-gray-300"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
               >
                 {order.auftrag_status === "closed"
                   ? "Closed"
                   : order.auftrag_status === "delivered" ||
-                    order.status === "Completed"
+                      order.status === "Completed"
                     ? "Delivered"
                     : order.auftrag_status === "partially_delivered" ||
-                      order.status === "In Progress"
+                        order.status === "In Progress"
                       ? "Partially Delivered"
                       : "Open"}
               </span>
@@ -1415,7 +1430,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     const val = e.target.value;
                     patch({
                       shippingMethod: val,
-                      ...(!form.shippingText || form.shippingText === form.shippingMethod
+                      ...(!form.shippingText ||
+                      form.shippingText === form.shippingMethod
                         ? { shippingText: val }
                         : {}),
                     });
@@ -1460,110 +1476,110 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   {(effectiveEdit && canEditCommercial
                     ? form.isWeiterversand
                     : order.is_weiterversand === true ||
-                    order.is_weiterversand === 1 ||
-                    order.is_weiterversand === "true" ||
-                    order.is_weiterversand === "1" ||
-                    order.is_weiterversand === "Yes") && (
-                      <>
-                        <div className="w-48 shrink-0">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Service Provider
-                          </label>
-                          {effectiveEdit && canEditCommercial ? (
-                            <select
-                              className={inputCls}
-                              value={form.weiterversandServiceProviderId || ""}
-                              onChange={(e) =>
-                                patch({
-                                  weiterversandServiceProviderId: e.target.value,
-                                })
-                              }
-                            >
-                              <option value="">Select Provider…</option>
-                              {dbServiceProviders.map((sp) => (
-                                <option key={sp.id} value={sp.id}>
-                                  {sp.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="text-sm font-medium text-gray-800 py-1.5">
-                              {order.weiterversandServiceProvider?.name || "—"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="w-40 shrink-0">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Tracking No.
-                          </label>
-                          {effectiveEdit && canEditCommercial ? (
-                            <input
-                              type="text"
-                              className={inputCls}
-                              placeholder="Tracking No."
-                              value={form.weiterversandTracking || ""}
-                              onChange={(e) =>
-                                patch({ weiterversandTracking: e.target.value })
-                              }
-                            />
-                          ) : (
-                            <div className="text-sm font-medium text-gray-800 py-1.5">
-                              {order.weiterversand_tracking || "—"}
-                            </div>
-                          )}
-                        </div>
-
-                        {effectiveEdit && canEditCommercial && (
-                          <div className="shrink-0 self-end">
-                            <label
-                              htmlFor="weiterversand-label-file"
-                              className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
-                            >
-                              <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
-                              Upload Label(s)
-                            </label>
-                            <input
-                              id="weiterversand-label-file"
-                              type="file"
-                              multiple
-                              className="hidden"
-                              accept="application/pdf,image/*"
-                              onChange={(e) => {
-                                const files = Array.from(e.target.files || []);
-                                if (files.length === 0) return;
-                                const currentList = parseLabels(
-                                  form.weiterversandLabels ||
-                                  order.weiterversand_labels,
-                                );
-                                let count = 0;
-                                files.forEach((file) => {
-                                  const reader = new FileReader();
-                                  reader.onload = (evt) => {
-                                    const dataUrl = evt.target?.result as string;
-                                    currentList.push({
-                                      name: file.name,
-                                      url: dataUrl,
-                                    });
-                                    count++;
-                                    if (count === files.length) {
-                                      patch({
-                                        weiterversandLabels:
-                                          JSON.stringify(currentList),
-                                      });
-                                      toast.success(
-                                        `Attached ${files.length} document(s)`,
-                                      );
-                                    }
-                                  };
-                                  reader.readAsDataURL(file);
-                                });
-                              }}
-                            />
+                      order.is_weiterversand === 1 ||
+                      order.is_weiterversand === "true" ||
+                      order.is_weiterversand === "1" ||
+                      order.is_weiterversand === "Yes") && (
+                    <>
+                      <div className="w-48 shrink-0">
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Service Provider
+                        </label>
+                        {effectiveEdit && canEditCommercial ? (
+                          <select
+                            className={inputCls}
+                            value={form.weiterversandServiceProviderId || ""}
+                            onChange={(e) =>
+                              patch({
+                                weiterversandServiceProviderId: e.target.value,
+                              })
+                            }
+                          >
+                            <option value="">Select Provider…</option>
+                            {dbServiceProviders.map((sp) => (
+                              <option key={sp.id} value={sp.id}>
+                                {sp.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-800 py-1.5">
+                            {order.weiterversandServiceProvider?.name || "—"}
                           </div>
                         )}
-                      </>
-                    )}
+                      </div>
+
+                      <div className="w-40 shrink-0">
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Tracking No.
+                        </label>
+                        {effectiveEdit && canEditCommercial ? (
+                          <input
+                            type="text"
+                            className={inputCls}
+                            placeholder="Tracking No."
+                            value={form.weiterversandTracking || ""}
+                            onChange={(e) =>
+                              patch({ weiterversandTracking: e.target.value })
+                            }
+                          />
+                        ) : (
+                          <div className="text-sm font-medium text-gray-800 py-1.5">
+                            {order.weiterversand_tracking || "—"}
+                          </div>
+                        )}
+                      </div>
+
+                      {effectiveEdit && canEditCommercial && (
+                        <div className="shrink-0 self-end">
+                          <label
+                            htmlFor="weiterversand-label-file"
+                            className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
+                          >
+                            <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
+                            Upload Label(s)
+                          </label>
+                          <input
+                            id="weiterversand-label-file"
+                            type="file"
+                            multiple
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length === 0) return;
+                              const currentList = parseLabels(
+                                form.weiterversandLabels ||
+                                  order.weiterversand_labels,
+                              );
+                              let count = 0;
+                              files.forEach((file) => {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  const dataUrl = evt.target?.result as string;
+                                  currentList.push({
+                                    name: file.name,
+                                    url: dataUrl,
+                                  });
+                                  count++;
+                                  if (count === files.length) {
+                                    patch({
+                                      weiterversandLabels:
+                                        JSON.stringify(currentList),
+                                    });
+                                    toast.success(
+                                      `Attached ${files.length} document(s)`,
+                                    );
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              });
+                            }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1639,12 +1655,16 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         <td className="px-2 py-2 text-gray-500 whitespace-nowrap">
                           {effectiveEdit && canEditCommercial ? (
                             <div className="flex items-center gap-1 select-none">
-                              <span className="w-4 text-xs font-semibold">{index + 1}</span>
+                              <span className="w-4 text-xs font-semibold">
+                                {index + 1}
+                              </span>
                               <div className="flex flex-col gap-0.5">
                                 <button
                                   type="button"
                                   disabled={index === 0}
-                                  onClick={() => handleMoveLineItem(item.id, "up")}
+                                  onClick={() =>
+                                    handleMoveLineItem(item.id, "up")
+                                  }
                                   className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
                                   title="Move Up"
                                 >
@@ -1652,8 +1672,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={index === visibleLineItems.length - 1}
-                                  onClick={() => handleMoveLineItem(item.id, "down")}
+                                  disabled={
+                                    index === visibleLineItems.length - 1
+                                  }
+                                  onClick={() =>
+                                    handleMoveLineItem(item.id, "down")
+                                  }
                                   className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
                                   title="Move Down"
                                 >
@@ -1889,7 +1913,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-right font-bold text-gray-800">
                         {formatCurrency(
                           (form.shippingCost || 0) *
-                          (form.shippingQuantity || 1),
+                            (form.shippingQuantity || 1),
                           order?.currency || "EUR",
                         )}
                       </td>
@@ -2028,13 +2052,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                      visibleLineItems[0]?.extraWeight === undefined
+                    visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : (
-                        parseFlexibleNumber(
-                          visibleLineItems[0].extraWeight,
-                        ) ?? 0
-                      ).toFixed(1)
+                          parseFlexibleNumber(
+                            visibleLineItems[0].extraWeight,
+                          ) ?? 0
+                        ).toFixed(1)
                   }
                   placeholder="0"
                   disabled={visibleLineItems.length === 0}
@@ -2096,7 +2120,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
               {/* Payments & Open Amount (offener Betrag) — only if there are assigned payments */}
               {(() => {
-                const paymentsList = order?.payments || order?.assignedPayments || [];
+                const paymentsList =
+                  order?.payments || order?.assignedPayments || [];
                 if (paymentsList.length === 0) return null;
 
                 const totalPaid = paymentsList.reduce(
@@ -2108,19 +2133,30 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 return (
                   <div className="pt-2 space-y-1 text-xs border-t border-dashed border-gray-200">
                     {paymentsList.map((p: any, idx: number) => (
-                      <div key={p.id || idx} className="flex justify-between text-gray-600">
+                      <div
+                        key={p.id || idx}
+                        className="flex justify-between text-gray-600"
+                      >
                         <span>
-                          Zahlung ({p.paymentMethod || p.method || "Überweisung"}) vom{" "}
+                          Zahlung (
+                          {p.paymentMethod || p.method || "Überweisung"}) vom{" "}
                           {formatDate(p.receivedDate || p.createdAt || p.date)}
                         </span>
                         <span className="font-medium text-emerald-700">
-                          {formatCurrency(p.amount || 0, order?.currency || "EUR")}
+                          {formatCurrency(
+                            p.amount || 0,
+                            order?.currency || "EUR",
+                          )}
                         </span>
                       </div>
                     ))}
                     <div className="flex justify-between font-bold text-sm pt-1 text-gray-900">
                       <span>offener Betrag</span>
-                      <span className={openAmount > 0 ? "text-rose-600" : "text-emerald-700"}>
+                      <span
+                        className={
+                          openAmount > 0 ? "text-rose-600" : "text-emerald-700"
+                        }
+                      >
                         {formatCurrency(openAmount, order?.currency || "EUR")}
                       </span>
                     </div>
