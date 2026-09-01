@@ -297,7 +297,7 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
 };
 
 const isFreetextLine = (item: any): boolean =>
-  !item?.itemNO && !item?.requestedItemId;
+  !item?.itemNO && !item?.sourceItemId;
 
 const getLineTaxRate = (item: any, order: any): number => {
   const orderRate = parseFlexibleNumber(order?.tax_rate) ?? 19;
@@ -1707,7 +1707,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       parseFlexibleNumber(item.quantity) ?? 1,
                     );
                     const rowColor =
-                      item.highlightColor || (freetext ? "" : null);
+                      item.highlightColor || (freetext ? "#D8964A" : null);
                     const lineTaxRate = getLineTaxRate(item, order);
                     return (
                       <tr
