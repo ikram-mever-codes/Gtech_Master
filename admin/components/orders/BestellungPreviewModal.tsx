@@ -115,8 +115,8 @@ const formatPrice = (
   if (price === null || price === undefined) return "—";
   const symbol = currencySymbol(currency);
   return `${symbol}${Number(price).toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })}`;
 };
 
