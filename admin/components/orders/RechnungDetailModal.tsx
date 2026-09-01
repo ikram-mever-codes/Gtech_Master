@@ -246,9 +246,17 @@ export default function RechnungDetailModal({
     setData(rechnung);
     setIsEditMode(false);
     setAddressEdit(false);
-
-    setEditShippingCost(Number(rechnung?.shipping_cost) || 0);
-    setEditShippingQuantity(Number(rechnung?.shipping_quantity) || 1);
+    setEditShippingCost(
+      rechnung?.shipping_cost !== undefined && rechnung?.shipping_cost !== null
+        ? Number(rechnung.shipping_cost)
+        : 0,
+    );
+    setEditShippingQuantity(
+      rechnung?.shipping_quantity !== undefined &&
+        rechnung?.shipping_quantity !== null
+        ? Number(rechnung.shipping_quantity)
+        : 1,
+    );
     setEditShippingMethod(
       rechnung?.shipping_method ||
         rechnung?.auftrag?.shipping_method ||
