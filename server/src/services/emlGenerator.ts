@@ -122,6 +122,10 @@ export async function generateRechnungLieferscheinEml(
     });
   }
 
+  if (contactPersons.length === 0) {
+    throw new Error("No contact person email address set — EML file cannot be generated.");
+  }
+
   const uploadsDir = path.join(__dirname, "../../uploads/eml");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -443,6 +447,10 @@ export async function generateRechnungOnlyEml(
     });
   }
 
+  if (contactPersons.length === 0) {
+    throw new Error("No contact person email address set — EML file cannot be generated.");
+  }
+
   const uploadsDir = path.join(__dirname, "../../uploads/eml");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -690,6 +698,10 @@ export async function generateAuftragEml(
         "Customer",
       email: String(auftrag.customerSnapshot.email).trim(),
     });
+  }
+
+  if (contactPersons.length === 0) {
+    throw new Error("No contact person email address set — EML file cannot be generated.");
   }
 
   const uploadsDir = path.join(__dirname, "../../uploads/eml");
@@ -974,6 +986,10 @@ export async function generateOfferEml(
     });
   }
 
+  if (contactPersons.length === 0) {
+    throw new Error("No contact person email address set — EML file cannot be generated.");
+  }
+
   const uploadsDir = path.join(__dirname, "../../uploads/eml");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -1225,6 +1241,10 @@ export async function generateRechnungKEml(
       name: rechnungK.customer.company_name || "Customer",
       email: rechnungK.customer.email.trim(),
     });
+  }
+
+  if (contactPersons.length === 0) {
+    throw new Error("No contact person email address set — EML file cannot be generated.");
   }
 
   const uploadsDir = path.join(__dirname, "../../uploads/eml");
