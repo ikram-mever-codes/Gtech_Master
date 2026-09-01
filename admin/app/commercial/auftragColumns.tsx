@@ -23,6 +23,7 @@ import {
   lieferortColumn,
   lieferdatumColumn,
   buildNettowertColumn,
+  hasContactPersonEmail,
 } from "./sharedColumns";
 
 interface AuftragColumnsArgs {
@@ -240,8 +241,8 @@ const AuftragActionMenu: React.FC<{
             setIsOpen((prev) => !prev);
           }}
           className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
-              ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
-              : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
             }`}
           title="Aktionen"
         >
@@ -269,8 +270,8 @@ const AuftragActionMenu: React.FC<{
                   onConvertToBestellung(row);
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors ${isLocked
-                    ? "opacity-50 cursor-not-allowed text-gray-400"
-                    : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
+                  ? "opacity-50 cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
                   }`}
                 title={
                   isLocked
@@ -297,8 +298,8 @@ const AuftragActionMenu: React.FC<{
                   onRechnungOhneAusliefern?.(row);
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors ${isLocked
-                    ? "opacity-50 cursor-not-allowed text-gray-400"
-                    : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
+                  ? "opacity-50 cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
                   }`}
                 title={
                   isLocked
@@ -325,8 +326,8 @@ const AuftragActionMenu: React.FC<{
                   onGenerateRechnung(row);
                 }}
                 className={`w-full flex items-start gap-3 px-3 py-2 text-left rounded-lg transition-colors ${isLocked
-                    ? "opacity-50 cursor-not-allowed text-gray-400"
-                    : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
+                  ? "opacity-50 cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900 cursor-pointer"
                   }`}
                 title={
                   isLocked
@@ -389,20 +390,32 @@ const AuftragActionMenu: React.FC<{
 
             {/* Option 6: PDF in Email (.eml) */}
             <div className="p-1">
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  setIsOpen(false);
-                  try {
-                    await downloadCustomerOrderEml(row.id, row.order_no);
-                  } catch (_) { }
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-              >
-                <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
-                <span className="text-xs font-semibold">PDF in Email</span>
-              </button>
+              {hasContactPersonEmail(row) ? (
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    try {
+                      await downloadCustomerOrderEml(row.id, row.order_no);
+                    } catch (_) { }
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                >
+                  <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
+                  <span className="text-xs font-semibold">PDF in Email</span>
+                </button>
+              ) : (
+                <div
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg bg-orange-50/60 cursor-not-allowed select-none"
+                  title="No contact person email address set"
+                >
+                  <Mail className="w-4 h-4 text-orange-500 shrink-0" />
+                  <span className="text-xs font-semibold text-orange-500">
+                    keine Emailadresse
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}

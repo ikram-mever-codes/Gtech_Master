@@ -182,7 +182,7 @@ export const createTransferOrderFromAuftrag = async (
       bodyNotes !== null &&
       String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
-        : auftrag.internal_notes || auftrag.notes || "";
+        : auftrag.internal_notes || "";
 
     const transferOrderRepo: any = AppDataSource.getRepository(TransferOrder);
     const transferOrder = transferOrderRepo.create({
@@ -830,7 +830,7 @@ export async function syncBestellungToLinkedOrder(
 
       const remarkForChina = li.remark_order_item?.trim()
         ? li.remark_order_item.trim()
-        : undefined;
+        : null;
 
       let targetItem = existingOrderItems[i];
       if (!targetItem) {
@@ -842,7 +842,7 @@ export async function syncBestellungToLinkedOrder(
 
       if (itemId) targetItem.item_id = itemId;
       targetItem.qty = Math.max(1, Math.round(Number(li.qty) || 1));
-      targetItem.remark_de = remarkForChina;
+      targetItem.remark_de = remarkForChina as any;
       targetItem.price =
         li.transferPrice !== undefined && li.transferPrice !== null
           ? li.transferPrice

@@ -33,6 +33,7 @@ import {
   ExclamationTriangleIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-hot-toast";
 import { useTableSort, sortData } from "@/hooks/useTableSort";
@@ -153,6 +154,32 @@ const toCountryCode = (country?: string) => {
     schweiz: "CH",
   };
   return map[c.toLowerCase()] || c.toUpperCase().slice(0, 2);
+};
+
+const buildFullAddress = (b: any) => {
+  if (!b) return null;
+  const code = toCountryCode(b.country);
+  const isGerman = !code || code === "DE";
+
+  let postal = (b.postalCode || "").trim();
+  let city = (b.city || "").trim();
+
+  const zipMatch = `${postal} ${city}`.trim().match(/(\d{4,5})\s+([^,]+)/);
+  if (zipMatch) {
+    postal = zipMatch[1];
+    city = zipMatch[2].trim();
+  }
+
+  const cityLine = [postal, city]
+    .filter((x: string) => x && x.trim())
+    .join(" ")
+    .trim();
+
+  if (!cityLine) return null;
+  if (!isGerman && code) {
+    return `${cityLine}, ${code}`;
+  }
+  return cityLine;
 };
 
 const formatDateTime = (dateString: string | undefined) => {
@@ -619,7 +646,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const sortedFilteredBusinesses = useMemo(() => {
     return sortData(filteredBusinesses, sortBy, sortOrder, {
       company: (b: any) =>
-        (b.displayName || b.companyName || b.name || b.legalName || "").toLowerCase(),
+        (
+          b.displayName ||
+          b.companyName ||
+          b.name ||
+          b.legalName ||
+          ""
+        ).toLowerCase(),
       address: (b: any) => {
         const full = buildFullAddress(b) || "";
         const pc = (b.postalCode || "").trim();
@@ -1252,31 +1285,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       postalCode: "",
       country: "",
     });
-  };
-
-  const buildFullAddress = (b: any) => {
-    const code = toCountryCode(b.country);
-    const isGerman = !code || code === "DE";
-
-    let postal = (b.postalCode || "").trim();
-    let city = (b.city || "").trim();
-
-    const zipMatch = `${postal} ${city}`.trim().match(/(\d{4,5})\s+([^,]+)/);
-    if (zipMatch) {
-      postal = zipMatch[1];
-      city = zipMatch[2].trim();
-    }
-
-    const cityLine = [postal, city]
-      .filter((x: string) => x && x.trim())
-      .join(" ")
-      .trim();
-
-    if (!cityLine) return null;
-    if (!isGerman && code) {
-      return `${cityLine}, ${code}`;
-    }
-    return cityLine;
   };
 
   const getLinkedInStateColor = (state: string) => {

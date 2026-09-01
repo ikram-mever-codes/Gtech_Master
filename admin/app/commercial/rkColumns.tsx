@@ -12,6 +12,7 @@ import {
   lieferortColumn,
   lieferdatumColumn,
   buildNettowertColumn,
+  hasContactPersonEmail,
 } from "./sharedColumns";
 
 const RkActionMenu: React.FC<{
@@ -82,23 +83,35 @@ const RkActionMenu: React.FC<{
           </div>
 
           <div className="p-1">
-            <button
-              type="button"
-              onClick={async (e) => {
-                e.stopPropagation();
-                setIsOpen(false);
-                try {
-                  await downloadRechnungKEml(
-                    row.id,
-                    row.invoiceNumber || row.invoice_number,
-                  );
-                } catch (_) { }
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-            >
-              <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
-              <span className="text-xs font-semibold">PDF in Email</span>
-            </button>
+            {hasContactPersonEmail(row) ? (
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  try {
+                    await downloadRechnungKEml(
+                      row.id,
+                      row.invoiceNumber || row.invoice_number,
+                    );
+                  } catch (_) { }
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+              >
+                <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
+                <span className="text-xs font-semibold">PDF in Email</span>
+              </button>
+            ) : (
+              <div
+                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg bg-orange-50/60 cursor-not-allowed select-none"
+                title="No contact person email address set"
+              >
+                <Mail className="w-4 h-4 text-orange-500 shrink-0" />
+                <span className="text-xs font-semibold text-orange-500">
+                  keine Emailadresse
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="p-1">

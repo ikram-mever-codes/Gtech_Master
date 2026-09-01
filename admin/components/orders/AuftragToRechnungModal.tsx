@@ -13,7 +13,16 @@ import {
   deleteCustomerOrder,
 } from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, Warehouse, ClipboardCheck, Check } from "lucide-react";
+import {
+  Loader2,
+  Warehouse,
+  ClipboardCheck,
+  Check,
+  AlertTriangle,
+  Building,
+} from "lucide-react";
+import { getAllPaymentMethods } from "@/api/payment_methods";
+import { getAllShippingMethods } from "@/api/shipping_methods";
 
 interface SelectedItemState {
   id: string;
@@ -176,6 +185,7 @@ export default function AuftragToRechnungModal({
   // Inline Edit Mode state (matching OfferDetailModal)
   const [isEditingAuftrag, setIsEditingAuftrag] = useState(false);
   const [editTitle, setEditTitle] = useState("");
+  const [editAnsprechpartner, setEditAnsprechpartner] = useState("");
   const [editShippingMethod, setEditShippingMethod] = useState("");
   const [editPaymentMethod, setEditPaymentMethod] = useState("");
   const [editPaymentTerms, setEditPaymentTerms] = useState("");
@@ -189,6 +199,31 @@ export default function AuftragToRechnungModal({
   const [editCity, setEditCity] = useState("");
   const [editCountry, setEditCountry] = useState("DE");
   const [editVatId, setEditVatId] = useState("");
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
+  const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setShowNoEmailWarning(false);
+    setUserApprovedNoEmail(false);
+    Promise.all([
+      getAllPaymentMethods(true).catch(() => ({ data: [] })),
+      getAllShippingMethods(true).catch(() => ({ data: [] })),
+    ]).then(([pmRes, smRes]: any) => {
+      if (pmRes?.data)
+        setDbPaymentMethods(
+          Array.isArray(pmRes.data)
+            ? pmRes.data.filter((pm: any) => pm.is_active)
+            : [],
+        );
+      if (smRes?.data)
+        setDbShippingMethods(
+          Array.isArray(smRes.data)
+            ? smRes.data.filter((sm: any) => sm.is_active)
+            : [],
+        );
+    });
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !auftrag) return;
@@ -254,6 +289,7 @@ export default function AuftragToRechnungModal({
     setNotes(auftrag.notes || auftrag.comment || "");
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
     setEditTitle(auftrag.title || auftrag.comment || "");
+    setEditAnsprechpartner(auftrag.ansprechpartner || "");
     // Populate Customer Address & Defaults State
     const cust = auftrag.customerSnapshot || auftrag.customer || {};
     setEditCompanyName(
@@ -503,6 +539,7 @@ export default function AuftragToRechnungModal({
       setSavingAuftrag(true);
       const payload = {
         title: editTitle,
+        ansprechpartner: editAnsprechpartner,
         shippingMethod: editShippingMethod,
         paymentMethod: editPaymentMethod,
         paymentTerms: editPaymentTerms,
@@ -558,22 +595,39 @@ export default function AuftragToRechnungModal({
     }
   };
 
-  const handleSubmit = async () => {
-    if (selectedItems.length === 0) {
-      toast.error(
-        "Please select at least 1 item with quantity > 0",
-        errorStyles,
+  const [showNoEmailWarning, setShowNoEmailWarning] = useState(false);
+  const [userApprovedNoEmail, setUserApprovedNoEmail] = useState(false);
+
+  const checkHasContactEmail = () => {
+    if (!auftrag) return true;
+    const cust = auftrag.customer;
+    const snap = auftrag.customerSnapshot;
+
+    const directEmail = (cust?.email || snap?.email || "").trim();
+    if (directEmail && directEmail.includes("@")) return true;
+
+    const ansprechpartner = (
+      editAnsprechpartner ||
+      auftrag.ansprechpartner ||
+      ""
+    ).trim();
+    if (ansprechpartner && ansprechpartner.includes("@")) return true;
+
+    const contacts =
+      cust?.contactPersons ||
+      cust?.starBusinessDetails?.contactPersons ||
+      snap?.contactPersons;
+    if (Array.isArray(contacts)) {
+      const found = contacts.find(
+        (c: any) => c?.email && String(c.email).trim().includes("@"),
       );
-      return;
-    }
-    if (hasInvalidSelection) {
-      toast.error(
-        "One or more stock items exceed available stock.",
-        errorStyles,
-      );
-      return;
+      if (found) return true;
     }
 
+    return false;
+  };
+
+  const proceedWithSubmit = async () => {
     try {
       setSubmitting(true);
       const payloadItems = selectedItems.map((it) => ({
@@ -590,12 +644,11 @@ export default function AuftragToRechnungModal({
         {
           deliveryDate,
           warehouse: hasStockItems ? stockWhere : undefined,
-          // Per-delivery shipping override — applies only to this
-          // Rechnung, never written back onto the Auftrag itself.
           include_shipping: shippingIncluded,
           shippingCost: shippingCostInput,
           shippingQuantity: shippingQuantityInput,
           shippingMethod: editShippingMethod || undefined,
+          ansprechpartner: editAnsprechpartner || auftrag.ansprechpartner,
         } as any,
       );
 
@@ -627,10 +680,34 @@ export default function AuftragToRechnungModal({
     }
   };
 
+  const handleSubmit = async () => {
+    if (selectedItems.length === 0) {
+      toast.error(
+        "Please select at least 1 item with quantity > 0",
+        errorStyles,
+      );
+      return;
+    }
+    if (hasInvalidSelection) {
+      toast.error(
+        "One or more stock items exceed available stock.",
+        errorStyles,
+      );
+      return;
+    }
+
+    const hasEmail = checkHasContactEmail();
+    if (!hasEmail && !userApprovedNoEmail) {
+      setShowNoEmailWarning(true);
+      return;
+    }
+
+    await proceedWithSubmit();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden text-gray-900 font-sans">
-        {/* ── Top Header Bar (Matching OfferDetailModal) ── */}
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1450px] w-full max-h-[92vh] flex flex-col overflow-hidden text-gray-900 font-sans">
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -656,9 +733,7 @@ export default function AuftragToRechnungModal({
             </h2>
           </div>
 
-          {/* Warehouse Selector + Close Button in Header */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Warehouse Selector - only show if there are stock items */}
             {hasStockItems && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg">
                 <Warehouse className="w-4 h-4 text-amber-600" />
@@ -776,6 +851,19 @@ export default function AuftragToRechnungModal({
                 />
               </Field>
 
+              <Field
+                label="ANSPRECHPARTNER"
+                value={editAnsprechpartner}
+                isEdit={isEditingAuftrag}
+              >
+                <input
+                  type="text"
+                  value={editAnsprechpartner}
+                  onChange={(e) => setEditAnsprechpartner(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+
               <Field label="TAX PROFILE" value={taxProfileLabel} />
 
               {/* Delivery Date */}
@@ -808,27 +896,60 @@ export default function AuftragToRechnungModal({
                   onChange={(e) => setEditPaymentMethod(e.target.value)}
                   className={inputCls}
                 >
-                  {PAYMENT_METHODS.map((pm) => (
-                    <option key={pm} value={pm}>
-                      {pm}
+                  <option value="">Select…</option>
+                  {editPaymentMethod &&
+                    !(
+                      dbPaymentMethods.length > 0
+                        ? dbPaymentMethods.map((pm: any) => pm.name)
+                        : PAYMENT_METHODS
+                    ).includes(editPaymentMethod) && (
+                      <option value={editPaymentMethod}>
+                        {editPaymentMethod}
+                      </option>
+                    )}
+                  {(dbPaymentMethods.length > 0
+                    ? dbPaymentMethods.map((pm: any) => pm.name)
+                    : PAYMENT_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
                     </option>
                   ))}
                 </select>
               </Field>
 
-              <Field
-                label="PAYMENT DUE DAYS"
-                value={editPaymentTerms}
-                isEdit={isEditingAuftrag}
-              >
-                <input
-                  type="text"
-                  value={editPaymentTerms}
-                  onChange={(e) => setEditPaymentTerms(e.target.value)}
-                  placeholder="e.g., 30 days net"
-                  className={inputCls}
-                />
-              </Field>
+              {(() => {
+                const selectedPmObj = dbPaymentMethods.find(
+                  (pm: any) => pm.name === editPaymentMethod,
+                );
+                const isDueDaysEditable = selectedPmObj
+                  ? !selectedPmObj.is_prepayment
+                  : editPaymentMethod
+                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(
+                        editPaymentMethod,
+                      )
+                    : false;
+
+                return (
+                  <Field
+                    label="DUE DAYS"
+                    value={editPaymentTerms}
+                    isEdit={isEditingAuftrag && isDueDaysEditable}
+                  >
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={editPaymentTerms}
+                      disabled={!isDueDaysEditable}
+                      onChange={(e) =>
+                        setEditPaymentTerms(e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="e.g. 30"
+                      className={inputCls}
+                    />
+                  </Field>
+                );
+              })()}
 
               <Field
                 label="SHIPPING METHOD"
@@ -840,9 +961,23 @@ export default function AuftragToRechnungModal({
                   onChange={(e) => setEditShippingMethod(e.target.value)}
                   className={inputCls}
                 >
-                  {SHIPPING_METHODS.map((sm) => (
-                    <option key={sm} value={sm}>
-                      {sm}
+                  <option value="">Select…</option>
+                  {editShippingMethod &&
+                    !(
+                      dbShippingMethods.length > 0
+                        ? dbShippingMethods.map((sm: any) => sm.name)
+                        : SHIPPING_METHODS
+                    ).includes(editShippingMethod) && (
+                      <option value={editShippingMethod}>
+                        {editShippingMethod}
+                      </option>
+                    )}
+                  {(dbShippingMethods.length > 0
+                    ? dbShippingMethods.map((sm: any) => sm.name)
+                    : SHIPPING_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
                     </option>
                   ))}
                 </select>
@@ -1347,6 +1482,61 @@ export default function AuftragToRechnungModal({
           </div>
         </div>
       </div>
+
+      {showNoEmailWarning && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 select-none">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-900 font-sans">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
+              <h3 className="text-base font-bold text-gray-900">
+                No Contact Person Email Address
+              </h3>
+            </div>
+            <p className="text-sm text-gray-700 leading-relaxed mb-6">
+              No contact person email address. Do you want to continue
+              Ausliefern?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const customerId =
+                    auftrag.customer_id ||
+                    auftrag.customer?.id ||
+                    auftrag.customerSnapshot?.id ||
+                    auftrag.customerSnapshot?.customer_id;
+                  const targetUrl = customerId
+                    ? `/bussinesses?id=${customerId}`
+                    : `/bussinesses`;
+                  window.open(targetUrl, "_blank");
+                }}
+                className="px-3.5 py-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg hover:bg-amber-100 flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Building className="w-4 h-4 text-amber-600" />
+                Business Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNoEmailWarning(false)}
+                className="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoEmailWarning(false);
+                  setUserApprovedNoEmail(true);
+                  proceedWithSubmit();
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1 shadow-sm"
+              >
+                Ja, trotzdem ausliefern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

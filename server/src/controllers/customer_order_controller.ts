@@ -145,9 +145,7 @@ async function getEffectiveUnitPrice(
   if (tiered !== null) return tiered;
 
   const ownSalesPrice = parseFloat(String(item.sales_price ?? ""));
-  if (!isNaN(ownSalesPrice) && ownSalesPrice > 0) return ownSalesPrice;
-
-  return Number(item.price) || 0;
+  return !isNaN(ownSalesPrice) ? ownSalesPrice : 0;
 }
 
 const isFreetextLine = (li: CustomerOrderItem) =>
@@ -727,6 +725,7 @@ export const createAuftragFromItems = async (
       customerId,
       selectedItems,
       title,
+      ansprechpartner,
       paymentMethod,
       shippingMethod,
       paymentTerms,
@@ -884,10 +883,16 @@ export const createAuftragFromItems = async (
       (customer.defaultPaymentDueDays
         ? String(customer.defaultPaymentDueDays)
         : undefined);
+    const effectiveAnsprechpartner =
+      ansprechpartner?.trim() ||
+      (req as any).user?.name ||
+      (req as any).user?.username ||
+      undefined;
 
     const customerOrder = customerOrderRepo.create({
       order_no: auftragNo,
       title: orderTitle,
+      ansprechpartner: effectiveAnsprechpartner,
       customer_id: customer.id,
       status: "open",
       currency: "EUR",
@@ -1168,10 +1173,17 @@ export const createAuftragFromOffer = async (
         ? String(offerCustomer.defaultPaymentDueDays)
         : "30";
 
+    const effectiveAnsprechpartner =
+      (req.body as any)?.ansprechpartner?.trim() ||
+      (req as any).user?.name ||
+      (req as any).user?.username ||
+      undefined;
+
     const customerOrder = customerOrderRepo.create({
       order_no: auftragNo,
       offer_id: offer.id,
       title: offer.title,
+      ansprechpartner: effectiveAnsprechpartner,
       customer_id: offer.customerId || undefined,
       status: "open",
       currency: offer.currency || "EUR",
@@ -1390,6 +1402,7 @@ export const updateCustomerOrder = async (
     // isPartiallyDelivered check above already rejected the request if
     // any of these keys were present while Partially Delivered.
     if (title !== undefined) auftrag.title = title;
+    if (body.ansprechpartner !== undefined) auftrag.ansprechpartner = body.ansprechpartner;
     if (currency !== undefined) auftrag.currency = currency;
     if (customerSnapshot !== undefined)
       auftrag.customerSnapshot = customerSnapshot;
@@ -2052,14 +2065,17 @@ export const downloadCustomerOrderPdf = async (
     await generateGtechDocumentPdf({
       documentType: "Auftrag" as any,
       documentNumber: order.order_no,
+      documentTitle: order.title || "",
       customerSnapshot: customerSnap,
       customerEntity: order.customer,
       deliveryAddress: order.deliveryAddress,
       metadataItems: [
-        ["Ansprechpartner", contactName],
+        ["Kontakt", contactName],
         ["Kunde", kundeCombined],
         ["Datum", order.date_created || order.created_at],
       ],
+      kontaktName: contactName,
+      kontaktEmail: (req as any).user?.email,
       isDelivered: isDelivered,
       lineItems: items,
       showPrices: true,

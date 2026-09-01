@@ -68,13 +68,25 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const countryCode = getCountryCode(addr.country);
   const isGermany = isGermanCountry(addr.country);
 
+  let street = (addr.street || addr.address || "").trim();
+  const postalCode = (addr.postalCode || addr.postal_code || "").trim();
+  const city = (addr.city || "").trim();
+
+  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+    street = street
+      .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
+      .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+      .trim()
+      .replace(/,\s*$/, "");
+  }
+
   return (
     <div className="space-y-0.5 text-sm text-gray-700">
       {addr.legalName && <div className="font-medium">{addr.legalName}</div>}
       {addr.contactName && <div>{addr.contactName}</div>}
-      {(addr.address || addr.street) && <div>{addr.address || addr.street}</div>}
-      {(addr.postalCode || addr.city) && (
-        <div>{[addr.postalCode, addr.city].filter(Boolean).join(" ")}</div>
+      {street && <div>{street}</div>}
+      {(postalCode || city) && (
+        <div>{[postalCode, city].filter(Boolean).join(" ")}</div>
       )}
       {!isGermany && countryCode && <div>{countryCode}</div>}
       {addr.vatId && !isGermany && (
@@ -378,7 +390,7 @@ export default function LieferscheinDetailModal({
       )}
 
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1450px] w-full max-h-[92vh] flex flex-col overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -698,7 +710,7 @@ export default function LieferscheinDetailModal({
 
           <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
             <div>
-              {status === "vorläufig" && (
+              {isEditMode && status === "vorläufig" && (
                 <button
                   type="button"
                   onClick={() => setShowStornierConfirm(true)}

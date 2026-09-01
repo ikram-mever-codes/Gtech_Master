@@ -407,10 +407,22 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const countryCode = getCountryCode(addr.country);
   const isGermany = countryCode === "DE";
 
-  const cityLine = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
+  let street = (addr.street || addr.address || "").trim();
+  const postalCode = (addr.postalCode || addr.postal_code || "").trim();
+  const city = (addr.city || "").trim();
+
+  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+    street = street
+      .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
+      .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+      .trim()
+      .replace(/,\s*$/, "");
+  }
+
+  const cityLine = `${postalCode} ${city}`.trim();
 
   const addressLine = [
-    addr.address || addr.street,
+    street,
     cityLine,
     !isGermany ? countryCode : "",
   ]
@@ -1564,7 +1576,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1450px] w-full max-h-[92vh] flex flex-col overflow-hidden">
         {isCreate ? (
           <>
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">

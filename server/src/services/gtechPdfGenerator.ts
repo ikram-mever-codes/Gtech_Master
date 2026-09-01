@@ -182,6 +182,9 @@ export interface PdfDocumentOptions {
   | "Lieferschein"
   | string;
   documentNumber: string;
+  documentTitle?: string;
+  kontaktName?: string;
+  kontaktEmail?: string;
   customerSnapshot: any;
   customerEntity?: any;
   deliveryAddress?: any;
@@ -213,6 +216,7 @@ export interface PdfDocumentOptions {
   payments?: Array<{ amount: number; receivedDate?: string | Date; paymentMethod?: string }>;
   rks?: Array<{ amount: number; createdDate?: string | Date; rkNumber?: string }>;
   outstandingAmount?: number;
+  invoiceDate?: string | Date;
 }
 
 export async function generateGtechDocumentPdf(
@@ -288,8 +292,8 @@ export async function generateGtechDocumentPdf(
     ""
   ).trim();
   const mainStreetStr = (
-    customer.address ||
     customer.street ||
+    customer.address ||
     opts.customerEntity?.addressLine1 ||
     ""
   ).trim();
@@ -315,10 +319,22 @@ export async function generateGtechDocumentPdf(
     const dispC = formatCountry(rawC);
     const isGer =
       !rawC ||
-      ["DE", "GERMANY", "DEUTSCHLAND"].includes(rawC.toUpperCase());
+      ["DE", "GERMANY", "DEUTSCHLAND", "DE - GERMANY"].some((s) =>
+        rawC.toUpperCase().includes(s),
+      );
 
+    let cleanStreet = (street || "").trim();
     const pStr = (pCode || "").trim();
     const cStr = (city || "").trim();
+
+    if (pStr && cStr && cleanStreet.includes(pStr) && cleanStreet.includes(cStr)) {
+      cleanStreet = cleanStreet
+        .replace(new RegExp(`,?\\s*${pStr}\\s+${cStr}`, "gi"), "")
+        .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+        .trim()
+        .replace(/,\s*$/, "");
+    }
+
     let cityLineVal = `${pStr} ${cStr}`.trim();
     if (!isGer && rawC) {
       const cCode =
@@ -340,7 +356,7 @@ export async function generateGtechDocumentPdf(
       lines.push(addLine.trim());
     }
 
-    if (street && street.trim()) lines.push(street.trim());
+    if (cleanStreet) lines.push(cleanStreet);
     if (cityLineVal) lines.push(cityLineVal);
 
     return lines;
@@ -501,16 +517,69 @@ export async function generateGtechDocumentPdf(
       });
   }
 
-  const titleBoxX = bannerX;
-  let infoY = bannerY + bannerH + 2;
+  const titleBoxX = bannerX + BANNER_LEFT_PAD;
+  let infoY = bannerY + bannerH + 1.5;
   const LABEL_W = MM(28);
-  const VALUE_X = titleBoxX + LABEL_W + 2;
-  const VALUE_W = bannerW - LABEL_W - 2;
+  const VALUE_X = titleBoxX + LABEL_W;
+  const VALUE_W = bannerW - BANNER_LEFT_PAD * 2 - LABEL_W;
 
   doc.fontSize(8.5).fillColor("#3F4446");
   opts.metadataItems.forEach(([label, value]) => {
     if (!label && !value) return;
-    const lblStr = String(label || "");
+    let lblStr = String(label || "");
+    const isKontakt = lblStr === "Ansprechpartner" || lblStr === "Kontakt";
+
+    if (isKontakt) {
+      lblStr = "Kontakt";
+      const rawVal = String(value || "").trim();
+
+      let contactEmail = opts.kontaktEmail || "";
+      let contactName = opts.kontaktName || "";
+
+      if (!contactEmail && rawVal.includes("@")) {
+        contactEmail = rawVal;
+      }
+      if (!contactName && rawVal && !rawVal.includes("@")) {
+        contactName = rawVal;
+      }
+      if (!contactName && contactEmail) {
+        const parts = contactEmail.split("@")[0].split(".");
+        contactName = parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+      }
+      if (!contactEmail && contactName) {
+        const emailSlug = contactName.toLowerCase().replace(/\s+/g, ".");
+        contactEmail = `${emailSlug}@gtech.de`;
+      }
+
+      let docType = opts.documentType || "Rechnung";
+      if (docType === "Auftragsbestätigung") docType = "Auftrag";
+      if (docType === "RK") docType = "Rechnungskorrektur";
+
+      const docNum = opts.documentNumber || "";
+      const docTitle = (opts.documentTitle || opts.notes || "").trim();
+      const titlePart = docTitle ? ` – ${docTitle}` : "";
+
+      const subject = `Rückfrage ${docType} ${docNum}${titlePart}`;
+      const body = `Hallo guten Tag ${contactName},\n\nich habe eine Rückfrage zur ${docType} ${docNum}${titlePart}:\n\n`;
+
+      const mailtoUrl = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const valDisplay = `${contactEmail} \u2197`;
+
+      const hLbl = doc.font(R).fontSize(8.5).heightOfString(lblStr, { width: LABEL_W });
+      const hVal = doc.font(M).fontSize(8.5).heightOfString(valDisplay, { width: VALUE_W });
+      const rowH = Math.max(11, hLbl, hVal);
+
+      doc.font(R).fontSize(8.5).fillColor("#3F4446").text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
+      doc.font(M).fontSize(8.5).fillColor("#1A202C").text(valDisplay, VALUE_X, infoY, {
+        width: VALUE_W,
+        lineBreak: true,
+        link: mailtoUrl,
+        underline: true,
+      });
+      infoY += rowH + 2;
+      return;
+    }
+
     const valStr =
       lblStr === "Datum" || lblStr === "Lieferdatum" || lblStr === "Date"
         ? formatDate(value)
@@ -519,8 +588,8 @@ export async function generateGtechDocumentPdf(
     const hVal = doc.font(M).fontSize(8.5).heightOfString(valStr, { width: VALUE_W });
     const rowH = Math.max(11, hLbl, hVal);
 
-    doc.font(R).fontSize(8.5).text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
-    doc.font(M).fontSize(8.5).text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+    doc.font(R).fontSize(8.5).fillColor("#3F4446").text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
+    doc.font(M).fontSize(8.5).fillColor("#1A202C").text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
     infoY += rowH + 2;
   });
 
@@ -1076,6 +1145,38 @@ export async function generateGtechDocumentPdf(
   if (combinedPaymentStr) {
     doc.text(`Zahlungsart: ${combinedPaymentStr}`, LEFT_X, yPos);
     yPos += 14;
+  }
+
+  const isRechnungDoc =
+    opts.documentType === "Rechnung" ||
+    opts.documentType === "Rechnungskorrektur" ||
+    opts.documentType === "RK";
+  if (isRechnungDoc) {
+    const dayMatch = rawPayTerms.match(/(\d+)/);
+    if (dayMatch) {
+      const dueDays = parseInt(dayMatch[1], 10);
+      const baseDateRaw = opts.invoiceDate || opts.deliveryDate || opts.deliveryTime;
+      if (baseDateRaw) {
+        let baseDate: Date;
+        const rawStr = String(baseDateRaw).trim();
+        const germanMatch = rawStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (germanMatch) {
+          baseDate = new Date(
+            parseInt(germanMatch[3], 10),
+            parseInt(germanMatch[2], 10) - 1,
+            parseInt(germanMatch[1], 10),
+          );
+        } else {
+          baseDate = new Date(rawStr);
+        }
+        if (!isNaN(baseDate.getTime())) {
+          const dueDate = new Date(baseDate);
+          dueDate.setDate(dueDate.getDate() + dueDays);
+          doc.text(`Fällig am: ${formatDate(dueDate)}`, LEFT_X, yPos);
+          yPos += 14;
+        }
+      }
+    }
   }
   const deliveryInput = opts.deliveryTime || opts.deliveryDate;
   if (deliveryInput) {

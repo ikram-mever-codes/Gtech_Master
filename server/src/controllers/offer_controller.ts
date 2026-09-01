@@ -34,16 +34,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -54,7 +54,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -907,7 +907,8 @@ export class OfferController {
       quantity,
     );
     if (tiered !== null) return tiered;
-    return Number(item.price) || 0;
+    const ownSalesPrice = parseFloat(String(item.sales_price ?? ""));
+    return !isNaN(ownSalesPrice) ? ownSalesPrice : 0;
   }
 
   private itemFieldsOrFallback(
@@ -1170,9 +1171,9 @@ export class OfferController {
         pricingMode === "matrix"
           ? createOfferDto.defaultPriceMatrix
             ? this.processPriceMatrix(
-                createOfferDto.defaultPriceMatrix,
-                createOfferDto.totalPriceDecimalPlaces || 2,
-              )
+              createOfferDto.defaultPriceMatrix,
+              createOfferDto.totalPriceDecimalPlaces || 2,
+            )
             : this.createDefaultPriceMatrix()
           : undefined;
 
@@ -1203,7 +1204,7 @@ export class OfferController {
         // column; left undefined if the customer has no value set.
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         paymentMethod: createOfferDto.paymentMethod,
@@ -1512,7 +1513,7 @@ export class OfferController {
         paymentMethod: body.paymentMethod,
         paymentDueDays:
           customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+            customer.defaultPaymentDueDays !== null
             ? String(customer.defaultPaymentDueDays)
             : "7",
         shippingMethod: body.shippingMethod,
@@ -2289,7 +2290,7 @@ export class OfferController {
           if (!src) continue;
 
           if (li.basePrice === null || li.basePrice === undefined) {
-            li.basePrice = src.price ?? 0;
+            li.basePrice = src.sales_price ?? 0;
             needsSave = true;
           }
           if (li.photo === null || li.photo === undefined || li.photo === "") {
@@ -3246,10 +3247,10 @@ export class OfferController {
             price === null
               ? null
               : parseFloat(
-                  ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
-                    totalPriceDecimalPlaces,
-                  ),
-                );
+                ((parseFlexibleNumber(qty) ?? 0) * price).toFixed(
+                  totalPriceDecimalPlaces,
+                ),
+              );
           return {
             id: uuidv4(),
             quantity: qty,
@@ -3459,11 +3460,11 @@ export class OfferController {
           const match = existing.find((e) => e.quantity === tpl.quantity);
           return match
             ? {
-                ...tpl,
-                price: match.price,
-                total: match.total,
-                isActive: match.isActive,
-              }
+              ...tpl,
+              price: match.price,
+              total: match.total,
+              isActive: match.isActive,
+            }
             : { ...tpl };
         });
 
@@ -3712,7 +3713,7 @@ export class OfferController {
 
       const resolvedDefaultTaxRate: number =
         customerTaxProfile?.taxRate !== undefined &&
-        customerTaxProfile?.taxRate !== null
+          customerTaxProfile?.taxRate !== null
           ? getSafeNumber(customerTaxProfile.taxRate)
           : offer.taxRate !== undefined && offer.taxRate !== null
             ? getSafeNumber(offer.taxRate)
@@ -3768,7 +3769,7 @@ export class OfferController {
         if (shippingTotal > 0) {
           const shipRate =
             offerData.shippingTaxRate !== undefined &&
-            offerData.shippingTaxRate !== null
+              offerData.shippingTaxRate !== null
               ? getSafeNumber(offerData.shippingTaxRate)
               : resolvedDefaultTaxRate;
           taxAmount += shippingTotal * (shipRate / 100);
@@ -3859,8 +3860,8 @@ export class OfferController {
         ""
       ).trim();
       const mainStreetStr = (
-        customer.address ||
         customer.street ||
+        customer.address ||
         customerEntity?.addressLine1 ||
         ""
       ).trim();
@@ -3886,10 +3887,21 @@ export class OfferController {
         const dispC = formatCountry(rawC);
         const isGer =
           !rawC ||
-          ["DE", "GERMANY", "DEUTSCHLAND"].includes(rawC.toUpperCase());
+          ["DE", "GERMANY", "DEUTSCHLAND", "DE - GERMANY"].some((s) =>
+            rawC.toUpperCase().includes(s),
+          );
 
+        let cleanStreet = (street || "").trim();
         const pStr = (pCode || "").trim();
         const cStr = (city || "").trim();
+
+        if (pStr && cStr && cleanStreet.includes(pStr) && cleanStreet.includes(cStr)) {
+          cleanStreet = cleanStreet
+            .replace(new RegExp(`,?\\s*${pStr}\\s+${cStr}`, "gi"), "")
+            .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+            .trim()
+            .replace(/,\s*$/, "");
+        }
 
         let cityLineVal = `${pStr} ${cStr}`.trim();
         if (!isGer && rawC) {
@@ -3912,7 +3924,7 @@ export class OfferController {
           lines.push(addLine.trim());
         }
 
-        if (street && street.trim()) lines.push(street.trim());
+        if (cleanStreet) lines.push(cleanStreet);
         if (cityLineVal) lines.push(cityLineVal);
 
         return lines;
@@ -4088,12 +4100,24 @@ export class OfferController {
           });
       }
 
-      const contactName =
+      const contactNameVal =
         (request as any).user?.name ||
         (request as any).user?.username ||
         (offer.inquiry?.contactPerson
           ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
-          : "Admin");
+          : "");
+      const contactEmailVal =
+        (request as any).user?.email ||
+        (offer.inquiry?.contactPerson?.email ? offer.inquiry.contactPerson.email : "") ||
+        `${contactNameVal.toLowerCase().replace(/\s+/g, ".")}@gtech.de`;
+
+      const offerDocNum = offer.offerNumber || "";
+      const offerDocTitle = (offer.title || "").trim();
+      const offerTitlePart = offerDocTitle ? ` – ${offerDocTitle}` : "";
+
+      const offerSubject = `Rückfrage Angebot ${offerDocNum}${offerTitlePart}`;
+      const offerBody = `Hallo guten Tag ${contactNameVal},\n\nich habe eine Rückfrage zur Angebot ${offerDocNum}${offerTitlePart}:\n\n`;
+      const offerMailtoUrl = `mailto:${contactEmailVal}?subject=${encodeURIComponent(offerSubject)}&body=${encodeURIComponent(offerBody)}`;
 
       const customerCompName = (
         customer.companyName ||
@@ -4115,20 +4139,20 @@ export class OfferController {
         kundeCombined = customerNum;
       }
 
-      const infoItems = [
-        ["Ansprechpartner", contactName],
-        ["Kunde", kundeCombined],
-        ["Datum", formatDate(offer.createdAt)],
+      const infoItems: [string, string, string | null][] = [
+        ["Kontakt", `${contactEmailVal} \u2197`, offerMailtoUrl],
+        ["Kunde", kundeCombined, null],
+        ["Datum", formatDate(offer.createdAt), null],
       ];
 
-      const titleBoxX = bannerX;
-      let infoY = bannerY + bannerH + 2;
+      const titleBoxX = bannerX + BANNER_LEFT_PAD;
+      let infoY = bannerY + bannerH + 1.5;
       const LABEL_W = MM(28);
-      const VALUE_X = titleBoxX + LABEL_W + 2;
-      const VALUE_W = bannerW - LABEL_W - 2;
+      const VALUE_X = titleBoxX + LABEL_W;
+      const VALUE_W = bannerW - BANNER_LEFT_PAD * 2 - LABEL_W;
 
       doc.fontSize(8.5).fillColor("#3F4446");
-      infoItems.forEach(([label, value]) => {
+      infoItems.forEach(([label, value, linkUrl]) => {
         if (!label && !value) return;
         const lblStr = String(label || "");
         const valStr = String(value || "");
@@ -4145,11 +4169,26 @@ export class OfferController {
         doc
           .font(R)
           .fontSize(8.5)
+          .fillColor("#3F4446")
           .text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
-        doc
-          .font(M)
-          .fontSize(8.5)
-          .text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+        if (linkUrl) {
+          doc
+            .font(M)
+            .fontSize(8.5)
+            .fillColor("#1A202C")
+            .text(valStr, VALUE_X, infoY, {
+              width: VALUE_W,
+              lineBreak: true,
+              link: linkUrl,
+              underline: true,
+            });
+        } else {
+          doc
+            .font(M)
+            .fontSize(8.5)
+            .fillColor("#1A202C")
+            .text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+        }
         infoY += rowH + 2;
       });
       const cleanPdfText = (text?: string | null): string => {
@@ -4229,14 +4268,14 @@ export class OfferController {
           .sort((a: any, b: any) => {
             const orderA =
               a.position !== undefined &&
-              a.position !== null &&
-              a.position !== 0
+                a.position !== null &&
+                a.position !== 0
                 ? Number(a.position)
                 : Number(a.sortOrder) || Number(a.index) || 0;
             const orderB =
               b.position !== undefined &&
-              b.position !== null &&
-              b.position !== 0
+                b.position !== null &&
+                b.position !== 0
                 ? Number(b.position)
                 : Number(b.sortOrder) || Number(b.index) || 0;
             return orderA - orderB;
@@ -4275,11 +4314,11 @@ export class OfferController {
             : cleanPdfText(item.material) || item.id?.substring(0, 8) || "—";
           const rawRemarks = cleanPdfText(
             item.notes ||
-              item.remarks ||
-              item.specification ||
-              item.remark_ex ||
-              item.remark ||
-              "",
+            item.remarks ||
+            item.specification ||
+            item.remark_ex ||
+            item.remark ||
+            "",
           );
           const hasRemark = !!(
             rawRemarks &&
@@ -4298,9 +4337,9 @@ export class OfferController {
           });
           const remarkHeight = hasRemark
             ? doc.font(R).fontSize(8).heightOfString(rawRemarks, {
-                width: remarkWidth,
-                lineGap: 2,
-              }) + halfRowGap
+              width: remarkWidth,
+              lineGap: 2,
+            }) + halfRowGap
             : 0;
 
           const computedRowHeight = Math.max(
@@ -4533,7 +4572,7 @@ export class OfferController {
       const discountFactor =
         Number(totals.subtotal) > 0
           ? (Number(totals.subtotal) - Number(totals.discountAmount || 0)) /
-            Number(totals.subtotal)
+          Number(totals.subtotal)
           : 1;
 
       (offer.lineItems || (offer as any).items || []).forEach((it: any) => {
@@ -4614,11 +4653,11 @@ export class OfferController {
 
       const rawTaxProfileKey = String(
         customerTaxProfile?.key ||
-          customerTaxProfile?.name ||
-          (customer as any)?.tax_profile_case ||
-          (customer as any)?.taxProfile ||
-          (customer as any)?.tax_profile ||
-          "",
+        customerTaxProfile?.name ||
+        (customer as any)?.tax_profile_case ||
+        (customer as any)?.taxProfile ||
+        (customer as any)?.tax_profile ||
+        "",
       ).trim();
 
       const rawCountry = String(

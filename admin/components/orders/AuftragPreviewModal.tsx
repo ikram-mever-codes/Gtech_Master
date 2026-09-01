@@ -14,6 +14,8 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/Redux/store";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import {
@@ -157,9 +159,22 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   if (!addr) return <div className="text-sm text-gray-400">{emptyText}</div>;
   const countryCode = getCountryCode(addr.country);
   const isGermany = countryCode === "DE";
-  const cityLine = `${addr.postalCode || ""} ${addr.city || ""}`.trim();
+
+  let street = (addr.street || addr.address || "").trim();
+  const postalCode = (addr.postalCode || addr.postal_code || "").trim();
+  const city = (addr.city || "").trim();
+
+  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+    street = street
+      .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
+      .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
+      .trim()
+      .replace(/,\s*$/, "");
+  }
+
+  const cityLine = `${postalCode} ${city}`.trim();
   const addressLine = [
-    addr.address || addr.street,
+    street,
     cityLine,
     !isGermany ? countryCode : "",
   ]
@@ -349,6 +364,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   onSwitchToRechnung,
   onSwitchToRechnungK,
 }) => {
+  const { user: currentUser } = useSelector((state: RootState) => state.user);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -543,6 +559,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
     return {
       title: o.title || item1Title || "",
+      ansprechpartner: o.ansprechpartner || "",
       status: o.status || "Draft",
       currency: o.currency || "EUR",
       taxRate: o.tax_rate ?? 19,
@@ -914,7 +931,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   if (loading || !order) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white/95 rounded-2xl shadow-xl max-w-5xl w-full p-6 py-24 text-center">
+        <div className="bg-white/95 rounded-2xl shadow-xl max-w-[1450px] w-full p-6 py-24 text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
           <p className="mt-2 text-sm text-gray-500">Loading Auftrag…</p>
         </div>
@@ -1025,7 +1042,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1450px] w-full max-h-[92vh] flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
@@ -1406,18 +1423,37 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   ))}
                 </select>
               </Field>
-              <Field
-                label="Payment terms"
-                edit={effectiveEdit && canEditCommercial}
-                value={order.payment_terms}
-              >
-                <input
-                  className={inputCls}
-                  value={form.paymentTerms}
-                  placeholder="e.g., 30 days net"
-                  onChange={(e) => patch({ paymentTerms: e.target.value })}
-                />
-              </Field>
+              {(() => {
+                const currentPmName = form.paymentMethod || order.payment_method || "";
+                const selectedPmObj = dbPaymentMethods.find(
+                  (pm: any) => pm.name === currentPmName
+                );
+                const isDueDaysEditable = selectedPmObj
+                  ? !selectedPmObj.is_prepayment
+                  : currentPmName
+                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(currentPmName)
+                    : false;
+
+                return (
+                  <Field
+                    label="Due Days"
+                    edit={effectiveEdit && canEditCommercial && isDueDaysEditable}
+                    value={order.payment_terms}
+                  >
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className={inputCls}
+                      value={form.paymentTerms}
+                      placeholder="e.g., 30"
+                      disabled={!isDueDaysEditable}
+                      onChange={(e) =>
+                        patch({ paymentTerms: e.target.value.replace(/\D/g, "") })
+                      }
+                    />
+                  </Field>
+                );
+              })()}
               <Field
                 label="Shipping method"
                 edit={effectiveEdit && canEditCommercial}
@@ -1469,6 +1505,27 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     ) : (
                       <div className="text-sm font-medium text-gray-800 py-1.5">
                         {order.is_weiterversand ? "Yes" : "No"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-56 shrink-0">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                      Ansprechpartner
+                    </label>
+                    {effectiveEdit && canEditCommercial ? (
+                      <input
+                        type="text"
+                        className={inputCls}
+                        value={form.ansprechpartner || ""}
+                        placeholder="Ansprechpartner"
+                        onChange={(e) =>
+                          patch({ ansprechpartner: e.target.value })
+                        }
+                      />
+                    ) : (
+                      <div className="text-sm font-medium text-gray-800 py-1.5">
+                        {order.ansprechpartner || "—"}
                       </div>
                     )}
                   </div>

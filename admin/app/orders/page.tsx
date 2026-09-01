@@ -675,11 +675,6 @@ const OrderPage: React.FC = () => {
           cargo_id: cargoIdNum,
         });
 
-        const orderId = selectedItem.order_id || selectedItem.parentOrder?.id;
-        if (orderId) {
-          await assignOrdersToCargo(cargoIdNum, [Number(orderId)]);
-        }
-
         toast.success(
           `Item reassigned to Cargo ${targetCargoId} — invoice updated!`,
         );
@@ -1544,1261 +1539,1261 @@ const OrderPage: React.FC = () => {
         </div>
 
         <div className="border-b border-gray-100 mb-6 pb-px">
-            <nav className="-mb-px flex space-x-8 overflow-x-auto">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                  }}
-                  className={`py-3.5 px-1 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${activeTab === tab.id
-                    ? "border-[#8CC21B] text-[#8CC21B]"
-                    : "border-transparent text-gray-500 hover:text-gray-900"
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                }}
+                className={`py-3.5 px-1 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${activeTab === tab.id
+                  ? "border-[#8CC21B] text-[#8CC21B]"
+                  : "border-transparent text-gray-500 hover:text-gray-900"
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-          <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2 overflow-visible">
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 flex-1">
-              <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
-                <FunnelIcon className="w-4 h-4 text-primary" />
-              </div>
-              <div className="w-64 shrink-0">
-                <input
-                  type="text"
-                  placeholder={
-                    activeTab === "nso"
-                      ? "Search NSOs..."
-                      : activeTab === "supplier_orders"
-                        ? "Search Supplier Orders..."
-                        : activeTab === "purchase_order"
-                          ? "Search purchase orders..."
-                          : activeTab === "problems"
-                            ? "Search items..."
-                            : "Search reprint items..."
-                  }
-                  value={
-                    activeTab === "nso"
-                      ? nsoSearch
-                      : activeTab === "supplier_orders"
-                        ? supplierOrderSearch
-                        : activeTab === "purchase_order"
-                          ? poSearch
-                          : reprintSearch
-                  }
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (activeTab === "nso") setNsoSearch(val);
-                    else if (activeTab === "supplier_orders") setSupplierOrderSearch(val);
-                    else if (activeTab === "purchase_order") setPoSearch(val);
-                    else setReprintSearch(val);
-                  }}
-                  className={getInputClass(!!(activeTab === "nso" ? nsoSearch : activeTab === "supplier_orders" ? supplierOrderSearch : activeTab === "purchase_order" ? poSearch : reprintSearch))}
-                />
-              </div>
-              {(nsoSearch || supplierOrderSearch || poSearch || reprintSearch) && (
-                <button
-                  onClick={() => {
-                    setNsoSearch("");
-                    setSupplierOrderSearch("");
-                    setPoSearch("");
-                    setReprintSearch("");
-                  }}
-                  className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                >
-                  <ArrowPathIcon className="w-3.5 h-3.5" />
-                  Reset
-                </button>
-              )}
+        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2 overflow-visible">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 flex-1">
+            <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
+              <FunnelIcon className="w-4 h-4 text-primary" />
             </div>
+            <div className="w-64 shrink-0">
+              <input
+                type="text"
+                placeholder={
+                  activeTab === "nso"
+                    ? "Search NSOs..."
+                    : activeTab === "supplier_orders"
+                      ? "Search Supplier Orders..."
+                      : activeTab === "purchase_order"
+                        ? "Search purchase orders..."
+                        : activeTab === "problems"
+                          ? "Search items..."
+                          : "Search reprint items..."
+                }
+                value={
+                  activeTab === "nso"
+                    ? nsoSearch
+                    : activeTab === "supplier_orders"
+                      ? supplierOrderSearch
+                      : activeTab === "purchase_order"
+                        ? poSearch
+                        : reprintSearch
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (activeTab === "nso") setNsoSearch(val);
+                  else if (activeTab === "supplier_orders") setSupplierOrderSearch(val);
+                  else if (activeTab === "purchase_order") setPoSearch(val);
+                  else setReprintSearch(val);
+                }}
+                className={getInputClass(!!(activeTab === "nso" ? nsoSearch : activeTab === "supplier_orders" ? supplierOrderSearch : activeTab === "purchase_order" ? poSearch : reprintSearch))}
+              />
+            </div>
+            {(nsoSearch || supplierOrderSearch || poSearch || reprintSearch) && (
+              <button
+                onClick={() => {
+                  setNsoSearch("");
+                  setSupplierOrderSearch("");
+                  setPoSearch("");
+                  setReprintSearch("");
+                }}
+                className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-3.5 h-3.5" />
+                Reset
+              </button>
+            )}
           </div>
+        </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {activeTab === "nso" ? (
-              <div className="p-4 bg-gray-50/30 min-h-[600px] relative">
-                {loadingOrders && (
-                  <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-4 transition-all duration-300">
-                    <div className="w-12 h-12 border-4 border-gray-200 border-t-[#059669] rounded-full animate-spin shadow-lg"></div>
-                    <p className="text-sm font-bold text-gray-600 animate-pulse uppercase tracking-widest">
-                      Processing NSO Data...
-                    </p>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          {activeTab === "nso" ? (
+            <div className="p-4 bg-gray-50/30 min-h-[600px] relative">
+              {loadingOrders && (
+                <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-4 transition-all duration-300">
+                  <div className="w-12 h-12 border-4 border-gray-200 border-t-[#059669] rounded-full animate-spin shadow-lg"></div>
+                  <p className="text-sm font-bold text-gray-600 animate-pulse uppercase tracking-widest">
+                    Processing NSO Data...
+                  </p>
+                </div>
+              )}
+              <div className="h-4"></div>
+              {(() => {
+                const renderNsoItemDetails = (row: any) => (
+                  <div className="p-4 bg-white border border-gray-100 rounded-lg shadow-inner m-2">
+                    <h4 className="font-bold text-gray-700 mb-3 ml-1 text-sm uppercase">
+                      Order Items in this Group (Total: {row.count}):
+                    </h4>
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-gray-100 text-gray-500 font-semibold uppercase">
+                          <tr>
+                            <th className="px-3 py-2 border-b">Order No</th>
+                            <th className="px-3 py-2 border-b">EAN</th>
+                            <th className="px-3 py-2 border-b w-[200px]">
+                              Item Name
+                            </th>
+                            <th className="px-3 py-2 border-b">Remark</th>
+                            <th className="px-3 py-2 border-b text-center">
+                              Qty
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white">
+                          {row.items.map((it: any, idx: number) => {
+                            const d = it.item || itemById.get(String(it.item_id));
+                            const name =
+                              d?.item_name ||
+                              d?.name ||
+                              it.item_name ||
+                              "Unknown";
+                            const ean = d?.ean || it.ean || "-";
+                            return (
+                              <tr
+                                key={it.id || idx}
+                                className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                              >
+                                <td className="px-3 py-2 font-bold">
+                                  <button
+                                    onClick={() => {
+                                      const targetOrder = {
+                                        id: it.order_id,
+                                        order_no: it._order_no,
+                                      };
+                                      openView(targetOrder);
+                                    }}
+                                    className="text-blue-600 hover:underline"
+                                  >
+                                    {it._order_no || "-"}
+                                  </button>
+                                </td>
+                                <td className="px-3 py-2 text-gray-600">
+                                  {ean}
+                                </td>
+                                <td className="px-3 py-2 font-medium text-gray-900 line-clamp-2 leading-tight max-w-[120px]">
+                                  {name}
+                                </td>
+                                <td className="px-3 py-2 text-gray-500 italic">
+                                  {it.remark_de || it.remarks_cn || "-"}
+                                </td>
+                                <td className="px-3 py-2 font-bold text-center">
+                                  {it.qty}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                )}
-                <div className="h-4"></div>
-                {(() => {
-                  const renderNsoItemDetails = (row: any) => (
-                    <div className="p-4 bg-white border border-gray-100 rounded-lg shadow-inner m-2">
-                      <h4 className="font-bold text-gray-700 mb-3 ml-1 text-sm uppercase">
-                        Order Items in this Group (Total: {row.count}):
-                      </h4>
-                      <div className="overflow-x-auto rounded-lg border border-gray-200">
-                        <table className="w-full text-xs text-left">
-                          <thead className="bg-gray-100 text-gray-500 font-semibold uppercase">
-                            <tr>
-                              <th className="px-3 py-2 border-b">Order No</th>
-                              <th className="px-3 py-2 border-b">EAN</th>
-                              <th className="px-3 py-2 border-b w-[200px]">
-                                Item Name
-                              </th>
-                              <th className="px-3 py-2 border-b">Remark</th>
-                              <th className="px-3 py-2 border-b text-center">
-                                Qty
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white">
-                            {row.items.map((it: any, idx: number) => {
-                              const d = it.item || itemById.get(String(it.item_id));
-                              const name =
-                                d?.item_name ||
-                                d?.name ||
-                                it.item_name ||
-                                "Unknown";
-                              const ean = d?.ean || it.ean || "-";
-                              return (
-                                <tr
-                                  key={it.id || idx}
-                                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                );
+
+                return (
+                  <>
+                    <div className="mb-10">
+                      <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
+                        Express Orders
+                      </h2>
+                      <DataTable
+                        data={nsoGroups.express}
+                        columns={[
+                          {
+                            header: "SupplierID",
+                            width: "120px",
+                            align: "center",
+                            render: (row) => (
+                              <div className="flex items-center justify-center gap-1 group cursor-pointer">
+                                <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
+                                  {row.supplier_id}
+                                  <div className="bg-white rounded-full p-0.5">
+                                    <ChevronDownIcon
+                                      className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? "rotate-180" : ""}`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ),
+                          },
+                          {
+                            header: "Supplier name",
+                            render: (row) => row.supplier_name,
+                            align: "center",
+                          },
+                          {
+                            header: "Order Type",
+                            render: (row) => row.order_type,
+                            align: "center",
+                          },
+                          {
+                            header: "Count",
+                            render: (row) => row.count,
+                            align: "center",
+                          },
+                          {
+                            header: "QTY",
+                            render: (row) => row.qty,
+                            align: "center",
+                          },
+                          {
+                            header: "Actions",
+                            align: "center",
+                            render: (row) => (
+                              <div className="flex justify-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCreateSupplierOrderFromNSO(row);
+                                  }}
+                                  disabled={row.supplier_id === 0}
+                                  className={`${row.supplier_id === 0
+                                    ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                    : "bg-[#059669] hover:bg-green-700"
+                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
                                 >
-                                  <td className="px-3 py-2 font-bold">
-                                    <button
-                                      onClick={() => {
-                                        const targetOrder = {
-                                          id: it.order_id,
-                                          order_no: it._order_no,
-                                        };
-                                        openView(targetOrder);
-                                      }}
-                                      className="text-blue-600 hover:underline"
-                                    >
-                                      {it._order_no || "-"}
-                                    </button>
-                                  </td>
-                                  <td className="px-3 py-2 text-gray-600">
-                                    {ean}
-                                  </td>
-                                  <td className="px-3 py-2 font-medium text-gray-900 line-clamp-2 leading-tight max-w-[120px]">
-                                    {name}
-                                  </td>
-                                  <td className="px-3 py-2 text-gray-500 italic">
-                                    {it.remark_de || it.remarks_cn || "-"}
-                                  </td>
-                                  <td className="px-3 py-2 font-bold text-center">
-                                    {it.qty}
-                                  </td>
-                                </tr>
+                                  <PlusCircleIcon className="h-5 w-5" />
+                                  {row.supplier_id === 0
+                                    ? "Set Supplier"
+                                    : "Supplier order"}
+                                </button>
+                              </div>
+                            ),
+                          },
+                        ]}
+                        loading={loadingOrders}
+                        emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Express NSOs found"}
+                        getRowClassName={() => "bg-red-50"}
+                        expandedRowId={expandedNsoId}
+                        onRowClick={(row) =>
+                          setExpandedNsoId(
+                            expandedNsoId === row.id ? null : row.id,
+                          )
+                        }
+                        renderRowDetails={renderNsoItemDetails}
+                      />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
+                        Normal Orders
+                      </h2>
+                      <DataTable
+                        data={nsoGroups.normal}
+                        columns={[
+                          {
+                            header: "SupplierID",
+                            width: "120px",
+                            align: "center",
+                            render: (row) => (
+                              <div className="flex items-center justify-center gap-1 group cursor-pointer">
+                                <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
+                                  {row.supplier_id}
+                                  <div className="bg-white rounded-full p-0.5">
+                                    <ChevronDownIcon
+                                      className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? "rotate-180" : ""}`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ),
+                          },
+                          {
+                            header: "Supplier",
+                            render: (row) => row.supplier_name,
+                            align: "center",
+                          },
+                          {
+                            header: "Order Type",
+                            render: (row) => row.order_type,
+                            align: "center",
+                          },
+                          {
+                            header: "Count",
+                            render: (row) => row.count,
+                            align: "center",
+                          },
+                          {
+                            header: "QTY",
+                            render: (row) => row.qty,
+                            align: "center",
+                          },
+                          {
+                            header: "Actions",
+                            align: "center",
+                            render: (row) => (
+                              <div className="flex justify-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCreateSupplierOrderFromNSO(row);
+                                  }}
+                                  disabled={row.supplier_id === 0}
+                                  className={`${row.supplier_id === 0
+                                    ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                    : "bg-[#059669] hover:bg-green-700"
+                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
+                                >
+                                  <PlusCircleIcon className="h-5 w-5" />
+                                  {row.supplier_id === 0
+                                    ? "Set Supplier"
+                                    : "Supplier order"}
+                                </button>
+                              </div>
+                            ),
+                          },
+                        ]}
+                        loading={loadingOrders}
+                        emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Normal NSOs found"}
+                        expandedRowId={expandedNsoId}
+                        onRowClick={(row) =>
+                          setExpandedNsoId(
+                            expandedNsoId === row.id ? null : row.id,
+                          )
+                        }
+                        renderRowDetails={renderNsoItemDetails}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          ) : activeTab === "supplier_orders" ? (
+            <div className="p-4 bg-gray-50/30 min-h-[600px]">
+              <div className="h-4"></div>
+              <DataTable
+                data={supplierOrdersList}
+                expandedRowId={expandedSupplierOrderId}
+                renderRowDetails={(row) => {
+                  const items = (row as any).items || [];
+                  return (
+                    <div className="bg-white p-4 border-t border-b border-gray-200">
+                      <DataTable
+                        data={items}
+                        showTotals={items.length > 0}
+                        columns={[
+                          {
+                            header: "#",
+                            width: "35px",
+                            render: (_, i) => i + 1,
+                            align: "center",
+                            renderTotal: () => (
+                              <b className="text-[11px] uppercase">Grand</b>
+                            ),
+                          },
+                          {
+                            header: "EAN",
+                            width: "100px",
+                            render: (item: any) => {
+                              const details = itemById.get(
+                                String(item.item_id),
                               );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                              const parent = orderItemDetailsMap.get(
+                                String(item.id),
+                              );
+                              const isSo =
+                                parent?.status === "SO" ||
+                                item.status === "SO";
+                              return (
+                                <div className="flex flex-col gap-1 items-center">
+                                  {isSo && (
+                                    <button
+                                      onClick={() => handleBackToNSO(item.id)}
+                                      className="bg-[#f43f5e] hover:bg-rose-700 text-white rounded-[4px] px-2 py-0.5 text-[9px] font-bold flex items-center gap-1 w-full justify-center transition-all shadow-sm active:scale-95"
+                                    >
+                                      <ArrowUturnLeftIcon className="h-2.5 w-2.5" />{" "}
+                                      NSO
+                                    </button>
+                                  )}
+                                  <span className="font-semibold text-[10px] text-gray-600">
+                                    {details?.ean || "-"}
+                                  </span>
+                                </div>
+                              );
+                            },
+                            align: "center",
+                          },
+                          {
+                            header: "Item Name",
+                            width: "200px",
+                            render: (item: any) => (
+                              <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-3 break-words">
+                                {item.item?.item_name ||
+                                  itemById.get(String(item.item_id))
+                                    ?.item_name ||
+                                  itemById.get(String(item.item_id))?.name ||
+                                  "Unknown"}
+                              </div>
+                            ),
+                          },
+                          {
+                            header: "Remarks",
+                            render: (item: any) => (
+                              <div className="text-[10px] text-gray-500 italic max-h-12 overflow-y-auto min-w-[120px]">
+                                {item.remark_de || "-"}
+                              </div>
+                            ),
+                          },
+                          {
+                            header: "Order_no",
+                            width: "80px",
+                            render: (item: any) => (
+                              <span className="font-mono text-[10px] font-bold text-[#006FBA]">
+                                {orderItemDetailsMap.get(String(item.id))
+                                  ?.order_no ||
+                                  item.order_no ||
+                                  "-"}
+                              </span>
+                            ),
+                            align: "center",
+                          },
+                          {
+                            header: "Cargold",
+                            width: "60px",
+                            render: (item: any) => (
+                              <span className="text-[10px] font-medium text-slate-600">
+                                {orderItemDetailsMap.get(String(item.id))
+                                  ?.cargo_id ||
+                                  item.cargo_id ||
+                                  "-"}
+                              </span>
+                            ),
+                            align: "center",
+                          },
+                          {
+                            header: "V(dm³)",
+                            width: "55px",
+                            render: (item: any) => calcV(item).toFixed(2),
+                            align: "center",
+                            renderTotal: (data) => (
+                              <span className="font-bold">
+                                {data
+                                  .reduce((acc, it) => acc + calcV(it), 0)
+                                  .toFixed(2)}
+                              </span>
+                            ),
+                          },
+                          {
+                            header: "W(kg)",
+                            width: "55px",
+                            render: (item: any) => calcW(item).toFixed(2),
+                            align: "center",
+                            renderTotal: (data) => (
+                              <span className="font-bold">
+                                {data
+                                  .reduce((acc, it) => acc + calcW(it), 0)
+                                  .toFixed(2)}
+                              </span>
+                            ),
+                          },
+                          {
+                            header: "QTY",
+                            width: "45px",
+                            render: (item: any) => (
+                              <span className="font-bold">{item.qty}</span>
+                            ),
+                            align: "center",
+                            renderTotal: (data) => (
+                              <span className="font-bold">
+                                {data.reduce(
+                                  (acc, it) => acc + (it.qty || 0),
+                                  0,
+                                )}
+                              </span>
+                            ),
+                          },
+                          {
+                            header: "Price",
+                            width: "70px",
+                            render: (item: any) => {
+                              const det = orderItemDetailsMap.get(
+                                String(item.id),
+                              );
+                              const p =
+                                det?.rmb_special_price ||
+                                item.rmb_special_price ||
+                                item.rmb_price ||
+                                item.item?.rmb_price ||
+                                item.item?.rmb_special_price ||
+                                item.item?.RMB_Price ||
+                                item.item?.others?.rmbPrice ||
+                                det?.price ||
+                                item.price ||
+                                "-";
+                              const c = item.currency || "CNY";
+                              return p !== "-" ? p : "0";
+                            },
+                            align: "center",
+                          },
+                          {
+                            header: "Total",
+                            width: "70px",
+                            render: (item: any) => {
+                              const det = orderItemDetailsMap.get(
+                                String(item.id),
+                              );
+                              const p =
+                                det?.rmb_special_price ||
+                                item.rmb_special_price ||
+                                item.rmb_price ||
+                                item.item?.rmb_price ||
+                                item.item?.rmb_special_price ||
+                                item.item?.RMB_Price ||
+                                item.item?.others?.rmbPrice ||
+                                det?.price ||
+                                item.price ||
+                                0;
+                              return (Number(p) * (item.qty || 0)).toFixed(2);
+                            },
+                            align: "center",
+                            renderTotal: (data) => (
+                              <span className="font-bold text-green-700">
+                                {data
+                                  .reduce((acc, it) => {
+                                    const det = orderItemDetailsMap.get(
+                                      String(it.id),
+                                    );
+                                    const p =
+                                      det?.rmb_special_price ||
+                                      it.rmb_special_price ||
+                                      it.rmb_price ||
+                                      it.item?.rmb_price ||
+                                      it.item?.rmb_special_price ||
+                                      it.item?.RMB_Price ||
+                                      it.item?.others?.rmbPrice ||
+                                      det?.price ||
+                                      it.price ||
+                                      0;
+                                    return acc + Number(p) * (it.qty || 0);
+                                  }, 0)
+                                  .toFixed(2)}
+                              </span>
+                            ),
+                          },
+                          {
+                            header: "Status",
+                            width: "80px",
+                            render: (item: any) => {
+                              const st = "SO";
+                              return (
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700`}
+                                >
+                                  {st}
+                                </span>
+                              );
+                            },
+                            align: "center",
+                          },
+                          {
+                            header: "Actions",
+                            align: "center",
+                            render: (item: any) => {
+                              const det = orderItemDetailsMap.get(
+                                String(item.id),
+                              );
+                              return (
+                                <div className="flex gap-1.5 justify-center flex-wrap w-fit mx-auto">
+                                  <button
+                                    onClick={() => handleEditQty(item)}
+                                    className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                  >
+                                    <PencilIcon className="h-3 w-3" /> QTY
+                                  </button>
+                                </div>
+                              );
+                            },
+                          },
+                        ]}
+                        loading={false}
+                        getRowClassName={() => "bg-white"}
+                      />
                     </div>
                   );
-
-                  return (
-                    <>
-                      <div className="mb-10">
-                        <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
-                          Express Orders
-                        </h2>
-                        <DataTable
-                          data={nsoGroups.express}
-                          columns={[
-                            {
-                              header: "SupplierID",
-                              width: "120px",
-                              align: "center",
-                              render: (row) => (
-                                <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                                  <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
-                                    {row.supplier_id}
-                                    <div className="bg-white rounded-full p-0.5">
-                                      <ChevronDownIcon
-                                        className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? "rotate-180" : ""}`}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              ),
-                            },
-                            {
-                              header: "Supplier name",
-                              render: (row) => row.supplier_name,
-                              align: "center",
-                            },
-                            {
-                              header: "Order Type",
-                              render: (row) => row.order_type,
-                              align: "center",
-                            },
-                            {
-                              header: "Count",
-                              render: (row) => row.count,
-                              align: "center",
-                            },
-                            {
-                              header: "QTY",
-                              render: (row) => row.qty,
-                              align: "center",
-                            },
-                            {
-                              header: "Actions",
-                              align: "center",
-                              render: (row) => (
-                                <div className="flex justify-center">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleCreateSupplierOrderFromNSO(row);
-                                    }}
-                                    disabled={row.supplier_id === 0}
-                                    className={`${row.supplier_id === 0
-                                      ? "bg-gray-400 cursor-not-allowed opacity-75"
-                                      : "bg-[#059669] hover:bg-green-700"
-                                      } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
-                                  >
-                                    <PlusCircleIcon className="h-5 w-5" />
-                                    {row.supplier_id === 0
-                                      ? "Set Supplier"
-                                      : "Supplier order"}
-                                  </button>
-                                </div>
-                              ),
-                            },
-                          ]}
-                          loading={loadingOrders}
-                          emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Express NSOs found"}
-                          getRowClassName={() => "bg-red-50"}
-                          expandedRowId={expandedNsoId}
-                          onRowClick={(row) =>
-                            setExpandedNsoId(
-                              expandedNsoId === row.id ? null : row.id,
-                            )
-                          }
-                          renderRowDetails={renderNsoItemDetails}
-                        />
+                }}
+                columns={[
+                  {
+                    header: "#",
+                    width: "40px",
+                    render: (_, i) => i + 1,
+                    align: "center",
+                  },
+                  {
+                    header: "SOID",
+                    width: "100px",
+                    align: "center",
+                    render: (row) => (
+                      <div
+                        onClick={() =>
+                          setExpandedSupplierOrderId(
+                            expandedSupplierOrderId === row.id
+                              ? null
+                              : row.id,
+                          )
+                        }
+                        className="flex items-center justify-center gap-1 group cursor-pointer"
+                      >
+                        <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md hover:bg-slate-700 transition">
+                          {row.id}
+                          <div className="bg-white rounded-full p-0.5">
+                            <ArrowRightIcon
+                              className={`h-2 w-2 text-[#475569] transition-transform ${expandedSupplierOrderId === row.id ? "rotate-90" : ""}`}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
-                          Normal Orders
-                        </h2>
-                        <DataTable
-                          data={nsoGroups.normal}
-                          columns={[
-                            {
-                              header: "SupplierID",
-                              width: "120px",
-                              align: "center",
-                              render: (row) => (
-                                <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                                  <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
-                                    {row.supplier_id}
-                                    <div className="bg-white rounded-full p-0.5">
-                                      <ChevronDownIcon
-                                        className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? "rotate-180" : ""}`}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              ),
-                            },
-                            {
-                              header: "Supplier",
-                              render: (row) => row.supplier_name,
-                              align: "center",
-                            },
-                            {
-                              header: "Order Type",
-                              render: (row) => row.order_type,
-                              align: "center",
-                            },
-                            {
-                              header: "Count",
-                              render: (row) => row.count,
-                              align: "center",
-                            },
-                            {
-                              header: "QTY",
-                              render: (row) => row.qty,
-                              align: "center",
-                            },
-                            {
-                              header: "Actions",
-                              align: "center",
-                              render: (row) => (
-                                <div className="flex justify-center">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleCreateSupplierOrderFromNSO(row);
-                                    }}
-                                    disabled={row.supplier_id === 0}
-                                    className={`${row.supplier_id === 0
-                                      ? "bg-gray-400 cursor-not-allowed opacity-75"
-                                      : "bg-[#059669] hover:bg-green-700"
-                                      } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
-                                  >
-                                    <PlusCircleIcon className="h-5 w-5" />
-                                    {row.supplier_id === 0
-                                      ? "Set Supplier"
-                                      : "Supplier order"}
-                                  </button>
-                                </div>
-                              ),
-                            },
-                          ]}
-                          loading={loadingOrders}
-                          emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Normal NSOs found"}
-                          expandedRowId={expandedNsoId}
-                          onRowClick={(row) =>
-                            setExpandedNsoId(
-                              expandedNsoId === row.id ? null : row.id,
-                            )
-                          }
-                          renderRowDetails={renderNsoItemDetails}
-                        />
+                    ),
+                  },
+                  {
+                    header: "Supplier - ID",
+                    width: "300px",
+                    render: (row) => (
+                      <div className="font-semibold text-gray-700">
+                        {row.supplier?.company_name || "-"} -{" "}
+                        <span className="text-gray-400">
+                          {row.supplier_id || ""}
+                        </span>
                       </div>
-                    </>
-                  );
-                })()}
-              </div>
-            ) : activeTab === "supplier_orders" ? (
-              <div className="p-4 bg-gray-50/30 min-h-[600px]">
-                <div className="h-4"></div>
+                    ),
+                    align: "center",
+                  },
+                  {
+                    header: "Order Type",
+                    width: "120px",
+                    render: (row) => row.order_type?.name || "Taobao",
+                    align: "center",
+                  },
+                  {
+                    header: "Ref No.",
+                    width: "120px",
+                    render: (row) => (
+                      <div className="text-gray-500 font-medium italic">
+                        {row.ref_no || "-"}
+                      </div>
+                    ),
+                    align: "center",
+                  },
+                  {
+                    header: "Remark",
+                    render: (row) => (
+                      <div className="truncate max-w-[150px]">
+                        {row.remark || "-"}
+                      </div>
+                    ),
+                    align: "center",
+                  },
+                  {
+                    header: "Date created",
+                    width: "100px",
+                    render: (row) =>
+                      row.created_at ? formatDate(row.created_at) : "-",
+                    align: "center",
+                  },
+                  {
+                    header: "Actions",
+                    align: "center",
+                    render: (row) => {
+                      const isPurchaseOrder = row.order_type?.name === "Purchase Order";
+                      return (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => openEdit(row as any)}
+                            className="px-4 py-1.5 bg-[#059669] text-white text-xs font-bold rounded-[4px] hover:bg-green-700 transition flex items-center gap-2 shadow-md"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                            Edit
+                          </button>
+                          {isPurchaseOrder && (
+                            <button
+                              onClick={() => openPO(row as any)}
+                              className={`px-4 py-1.5 rounded-[4px] text-xs font-bold transition flex items-center gap-2 shadow-md ${Number(row.is_po_created) === 1 ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+                            >
+                              <DocumentTextIcon className="h-4 w-4" />
+                              {Number(row.is_po_created) === 1 ? "PO Created" : "Create PO"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    },
+                  },
+                ]}
+                loading={loadingSupplierOrders}
+                getRowClassName={(row) =>
+                  expandedSupplierOrderId === row.id ? "bg-blue-50/30" : ""
+                }
+                emptyMessage="No Supplier Orders Found"
+              />
+            </div>
+          ) : activeTab === "purchase_order" ? (
+            <div className="p-4 bg-gray-50/30 min-h-[600px]">
+              <div className="h-4"></div>
+              <DataTable
+                data={purchaseOrdersList}
+                columns={[
+                  {
+                    header: "ID",
+                    width: "60px",
+                    render: (row) => <span className="font-semibold">{row.id}</span>,
+                    align: "center",
+                  },
+                  {
+                    header: "Date created",
+                    width: "120px",
+                    render: (row) => (
+                      <div className="text-center text-[11px]">
+                        {formatDate(row.created_at)}
+                      </div>
+                    ),
+                    align: "center",
+                  },
+                  {
+                    header: "PO No.",
+                    width: "100px",
+                    render: (row) => (
+                      <span className="text-[#059669] font-bold">
+                        {`PO${new Date(row.created_at).getFullYear().toString().slice(-2)}${String(row.id).padStart(3, "0")}`}
+                      </span>
+                    ),
+                    align: "center",
+                  },
+                  {
+                    header: "SOID",
+                    width: "80px",
+                    render: (row) => row.id,
+                    align: "center",
+                  },
+                  {
+                    header: "Supplier",
+                    width: "150px",
+                    render: (row) => (
+                      <div className="font-medium text-gray-700">
+                        {row.supplier_id} - {row.supplier?.company_name || "-"}
+                      </div>
+                    ),
+                    align: "left",
+                  },
+                  {
+                    header: "Description",
+                    width: "180px",
+                    render: (row) => {
+                      const items = row.items || [];
+                      const desc = items.map((i: any) => i.item?.item_name || i.item?.name).filter(Boolean).join(", ");
+                      return <div className="line-clamp-2 text-[10px] text-gray-500">{desc || row.remark || "-"}</div>;
+                    },
+                    align: "left",
+                  },
+                  {
+                    header: "Total RMB",
+                    width: "100px",
+                    render: (row) => {
+                      const total = (row.items || []).reduce((sum: number, it: any) => {
+                        const p = it.price || it.rmb_special_price || 0;
+                        return sum + (Number(p) * (it.qty || 0));
+                      }, 0);
+                      return <span className="font-bold">¥ {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+                    },
+                    align: "right",
+                  },
+                  {
+                    header: "Status",
+                    width: "100px",
+                    render: (row) => {
+                      const allPurchased = row.items?.every((it: any) => {
+                        const st = (it.status || "").toLowerCase().trim();
+                        return st === "purchased" || st === "purchase";
+                      });
+                      return (
+                        <div className="flex flex-col items-center">
+                          <span className="text-green-600 font-bold text-[10px] uppercase">
+                            {allPurchased ? "Purchased" : "PO"}
+                          </span>
+                          <span className="text-green-600 font-bold text-[10px] uppercase">
+                            {allPurchased ? "Order" : "Created"}
+                          </span>
+                        </div>
+                      );
+                    },
+                    align: "center",
+                  },
+                  {
+                    header: "Actions",
+                    width: "200px",
+                    align: "center",
+                    render: (row) => (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openEdit(row as any)}
+                          className="bg-[#059669] text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-700 transition"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => toast.success("PO Closed")}
+                          className="bg-red-600 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-red-700 transition"
+                        >
+                          Close
+                        </button>
+                        <button
+                          onClick={() => {
+                            console.log("Download button clicked for SO ID:", row.id);
+                            downloadPurchaseOrder(row.id);
+                          }}
+                          className="bg-green-700 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-800 transition"
+                        >
+                          Download
+                        </button>
+                      </div>
+                    ),
+                  },
+                ]}
+                loading={loadingSupplierOrders}
+                emptyMessage="No Purchase Orders Found"
+              />
+            </div>
+          ) : activeTab === "problems" ? (
+            <div className="p-4 bg-gray-50/30 min-h-[600px] flex flex-col gap-10">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-800">
+                    Pending Problems
+                  </h2>
+                </div>
                 <DataTable
-                  data={supplierOrdersList}
-                  expandedRowId={expandedSupplierOrderId}
-                  renderRowDetails={(row) => {
-                    const items = (row as any).items || [];
-                    return (
-                      <div className="bg-white p-4 border-t border-b border-gray-200">
-                        <DataTable
-                          data={items}
-                          showTotals={items.length > 0}
-                          columns={[
-                            {
-                              header: "#",
-                              width: "35px",
-                              render: (_, i) => i + 1,
-                              align: "center",
-                              renderTotal: () => (
-                                <b className="text-[11px] uppercase">Grand</b>
-                              ),
-                            },
-                            {
-                              header: "EAN",
-                              width: "100px",
-                              render: (item: any) => {
-                                const details = itemById.get(
-                                  String(item.item_id),
-                                );
-                                const parent = orderItemDetailsMap.get(
-                                  String(item.id),
-                                );
-                                const isSo =
-                                  parent?.status === "SO" ||
-                                  item.status === "SO";
-                                return (
-                                  <div className="flex flex-col gap-1 items-center">
-                                    {isSo && (
-                                      <button
-                                        onClick={() => handleBackToNSO(item.id)}
-                                        className="bg-[#f43f5e] hover:bg-rose-700 text-white rounded-[4px] px-2 py-0.5 text-[9px] font-bold flex items-center gap-1 w-full justify-center transition-all shadow-sm active:scale-95"
-                                      >
-                                        <ArrowUturnLeftIcon className="h-2.5 w-2.5" />{" "}
-                                        NSO
-                                      </button>
-                                    )}
-                                    <span className="font-semibold text-[10px] text-gray-600">
-                                      {details?.ean || "-"}
-                                    </span>
-                                  </div>
-                                );
-                              },
-                              align: "center",
-                            },
-                            {
-                              header: "Item Name",
-                              width: "200px",
-                              render: (item: any) => (
-                                <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-3 break-words">
-                                  {item.item?.item_name ||
-                                    itemById.get(String(item.item_id))
-                                      ?.item_name ||
-                                    itemById.get(String(item.item_id))?.name ||
-                                    "Unknown"}
-                                </div>
-                              ),
-                            },
-                            {
-                              header: "Remarks",
-                              render: (item: any) => (
-                                <div className="text-[10px] text-gray-500 italic max-h-12 overflow-y-auto min-w-[120px]">
-                                  {item.remark_de || "-"}
-                                </div>
-                              ),
-                            },
-                            {
-                              header: "Order_no",
-                              width: "80px",
-                              render: (item: any) => (
-                                <span className="font-mono text-[10px] font-bold text-[#006FBA]">
-                                  {orderItemDetailsMap.get(String(item.id))
-                                    ?.order_no ||
-                                    item.order_no ||
-                                    "-"}
-                                </span>
-                              ),
-                              align: "center",
-                            },
-                            {
-                              header: "Cargold",
-                              width: "60px",
-                              render: (item: any) => (
-                                <span className="text-[10px] font-medium text-slate-600">
-                                  {orderItemDetailsMap.get(String(item.id))
-                                    ?.cargo_id ||
-                                    item.cargo_id ||
-                                    "-"}
-                                </span>
-                              ),
-                              align: "center",
-                            },
-                            {
-                              header: "V(dm³)",
-                              width: "55px",
-                              render: (item: any) => calcV(item).toFixed(2),
-                              align: "center",
-                              renderTotal: (data) => (
-                                <span className="font-bold">
-                                  {data
-                                    .reduce((acc, it) => acc + calcV(it), 0)
-                                    .toFixed(2)}
-                                </span>
-                              ),
-                            },
-                            {
-                              header: "W(kg)",
-                              width: "55px",
-                              render: (item: any) => calcW(item).toFixed(2),
-                              align: "center",
-                              renderTotal: (data) => (
-                                <span className="font-bold">
-                                  {data
-                                    .reduce((acc, it) => acc + calcW(it), 0)
-                                    .toFixed(2)}
-                                </span>
-                              ),
-                            },
-                            {
-                              header: "QTY",
-                              width: "45px",
-                              render: (item: any) => (
-                                <span className="font-bold">{item.qty}</span>
-                              ),
-                              align: "center",
-                              renderTotal: (data) => (
-                                <span className="font-bold">
-                                  {data.reduce(
-                                    (acc, it) => acc + (it.qty || 0),
-                                    0,
-                                  )}
-                                </span>
-                              ),
-                            },
-                            {
-                              header: "Price",
-                              width: "70px",
-                              render: (item: any) => {
-                                const det = orderItemDetailsMap.get(
-                                  String(item.id),
-                                );
-                                const p =
-                                  det?.rmb_special_price ||
-                                  item.rmb_special_price ||
-                                  item.rmb_price ||
-                                  item.item?.rmb_price ||
-                                  item.item?.rmb_special_price ||
-                                  item.item?.RMB_Price ||
-                                  item.item?.others?.rmbPrice ||
-                                  det?.price ||
-                                  item.price ||
-                                  "-";
-                                const c = item.currency || "CNY";
-                                return p !== "-" ? p : "0";
-                              },
-                              align: "center",
-                            },
-                            {
-                              header: "Total",
-                              width: "70px",
-                              render: (item: any) => {
-                                const det = orderItemDetailsMap.get(
-                                  String(item.id),
-                                );
-                                const p =
-                                  det?.rmb_special_price ||
-                                  item.rmb_special_price ||
-                                  item.rmb_price ||
-                                  item.item?.rmb_price ||
-                                  item.item?.rmb_special_price ||
-                                  item.item?.RMB_Price ||
-                                  item.item?.others?.rmbPrice ||
-                                  det?.price ||
-                                  item.price ||
-                                  0;
-                                return (Number(p) * (item.qty || 0)).toFixed(2);
-                              },
-                              align: "center",
-                              renderTotal: (data) => (
-                                <span className="font-bold text-green-700">
-                                  {data
-                                    .reduce((acc, it) => {
-                                      const det = orderItemDetailsMap.get(
-                                        String(it.id),
-                                      );
-                                      const p =
-                                        det?.rmb_special_price ||
-                                        it.rmb_special_price ||
-                                        it.rmb_price ||
-                                        it.item?.rmb_price ||
-                                        it.item?.rmb_special_price ||
-                                        it.item?.RMB_Price ||
-                                        it.item?.others?.rmbPrice ||
-                                        det?.price ||
-                                        it.price ||
-                                        0;
-                                      return acc + Number(p) * (it.qty || 0);
-                                    }, 0)
-                                    .toFixed(2)}
-                                </span>
-                              ),
-                            },
-                            {
-                              header: "Status",
-                              width: "80px",
-                              render: (item: any) => {
-                                const st = "SO";
-                                return (
-                                  <span
-                                    className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700`}
-                                  >
-                                    {st}
-                                  </span>
-                                );
-                              },
-                              align: "center",
-                            },
-                            {
-                              header: "Actions",
-                              align: "center",
-                              render: (item: any) => {
-                                const det = orderItemDetailsMap.get(
-                                  String(item.id),
-                                );
-                                return (
-                                  <div className="flex gap-1.5 justify-center flex-wrap w-fit mx-auto">
-                                    <button
-                                      onClick={() => handleEditQty(item)}
-                                      className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                    >
-                                      <PencilIcon className="h-3 w-3" /> QTY
-                                    </button>
-                                  </div>
-                                );
-                              },
-                            },
-                          ]}
-                          loading={false}
-                          getRowClassName={() => "bg-white"}
-                        />
-                      </div>
-                    );
-                  }}
+                  data={problemItems}
                   columns={[
                     {
-                      header: "#",
+                      header: "ID",
                       width: "40px",
-                      render: (_, i) => i + 1,
+                      render: (row) => row.id,
+                      align: "center",
+                    },
+                    {
+                      header: "Supplier ID",
+                      width: "80px",
+                      render: (row) =>
+                        row.parentOrder?.supplier_id ||
+                        row.supplier_id ||
+                        "-",
+                      align: "center",
+                    },
+                    {
+                      header: "Item name",
+                      width: "200px",
+                      render: (row) => (
+                        <div
+                          className="line-clamp-3 leading-tight break-words"
+                          title={
+                            row.item?.item_name ||
+                            itemById.get(String(row.item_id))?.item_name
+                          }
+                        >
+                          {row.item?.item_name ||
+                            itemById.get(String(row.item_id))?.item_name ||
+                            "Unknown"}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Order No.",
+                      width: "80px",
+                      render: (row) => row.parentOrder?.order_no || "-",
                       align: "center",
                     },
                     {
                       header: "SOID",
-                      width: "100px",
-                      align: "center",
-                      render: (row) => (
-                        <div
-                          onClick={() =>
-                            setExpandedSupplierOrderId(
-                              expandedSupplierOrderId === row.id
-                                ? null
-                                : row.id,
-                            )
-                          }
-                          className="flex items-center justify-center gap-1 group cursor-pointer"
-                        >
-                          <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md hover:bg-slate-700 transition">
-                            {row.id}
-                            <div className="bg-white rounded-full p-0.5">
-                              <ArrowRightIcon
-                                className={`h-2 w-2 text-[#475569] transition-transform ${expandedSupplierOrderId === row.id ? "rotate-90" : ""}`}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ),
-                    },
-                    {
-                      header: "Supplier - ID",
-                      width: "300px",
-                      render: (row) => (
-                        <div className="font-semibold text-gray-700">
-                          {row.supplier?.company_name || "-"} -{" "}
-                          <span className="text-gray-400">
-                            {row.supplier_id || ""}
-                          </span>
-                        </div>
-                      ),
+                      width: "50px",
+                      render: (row) => row.supplier_order_id || "-",
                       align: "center",
                     },
                     {
-                      header: "Order Type",
-                      width: "120px",
-                      render: (row) => row.order_type?.name || "Taobao",
+                      header: "QTY",
+                      width: "40px",
+                      render: (row) => row.qty,
                       align: "center",
                     },
                     {
-                      header: "Ref No.",
-                      width: "120px",
-                      render: (row) => (
-                        <div className="text-gray-500 font-medium italic">
-                          {row.ref_no || "-"}
-                        </div>
-                      ),
-                      align: "center",
-                    },
-                    {
-                      header: "Remark",
-                      render: (row) => (
-                        <div className="truncate max-w-[150px]">
-                          {row.remark || "-"}
-                        </div>
-                      ),
-                      align: "center",
-                    },
-                    {
-                      header: "Date created",
-                      width: "100px",
-                      render: (row) =>
-                        row.created_at ? formatDate(row.created_at) : "-",
-                      align: "center",
-                    },
-                    {
-                      header: "Actions",
-                      align: "center",
-                      render: (row) => {
-                        const isPurchaseOrder = row.order_type?.name === "Purchase Order";
-                        return (
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => openEdit(row as any)}
-                              className="px-4 py-1.5 bg-[#059669] text-white text-xs font-bold rounded-[4px] hover:bg-green-700 transition flex items-center gap-2 shadow-md"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                              Edit
-                            </button>
-                            {isPurchaseOrder && (
-                              <button
-                                onClick={() => openPO(row as any)}
-                                className={`px-4 py-1.5 rounded-[4px] text-xs font-bold transition flex items-center gap-2 shadow-md ${Number(row.is_po_created) === 1 ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
-                              >
-                                <DocumentTextIcon className="h-4 w-4" />
-                                {Number(row.is_po_created) === 1 ? "PO Created" : "Create PO"}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      },
-                    },
-                  ]}
-                  loading={loadingSupplierOrders}
-                  getRowClassName={(row) =>
-                    expandedSupplierOrderId === row.id ? "bg-blue-50/30" : ""
-                  }
-                  emptyMessage="No Supplier Orders Found"
-                />
-              </div>
-            ) : activeTab === "purchase_order" ? (
-              <div className="p-4 bg-gray-50/30 min-h-[600px]">
-                <div className="h-4"></div>
-                <DataTable
-                  data={purchaseOrdersList}
-                  columns={[
-                    {
-                      header: "ID",
-                      width: "60px",
-                      render: (row) => <span className="font-semibold">{row.id}</span>,
-                      align: "center",
-                    },
-                    {
-                      header: "Date created",
-                      width: "120px",
-                      render: (row) => (
-                        <div className="text-center text-[11px]">
-                          {formatDate(row.created_at)}
-                        </div>
-                      ),
-                      align: "center",
-                    },
-                    {
-                      header: "PO No.",
+                      header: "Problem type",
                       width: "100px",
                       render: (row) => (
-                        <span className="text-[#059669] font-bold">
-                          {`PO${new Date(row.created_at).getFullYear().toString().slice(-2)}${String(row.id).padStart(3, "0")}`}
+                        <span className="text-red-600 font-semibold uppercase text-[10px]">
+                          {row.status}
                         </span>
                       ),
                       align: "center",
                     },
                     {
-                      header: "SOID",
-                      width: "80px",
+                      header: "Description",
+                      render: (row) => (
+                        <div className="line-clamp-2 text-xs italic text-gray-500">
+                          {row.problems || "No description"}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Remark",
+                      render: (row) => (
+                        <div className="truncate max-w-[150px]">
+                          {row.remarks_cn || row.remark_de || "-"}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Actions",
+                      width: "100px",
+                      align: "center",
+                      render: (row) => (
+                        <button
+                          onClick={() => openEdit(row.parentOrder)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-[10px] font-bold shadow-md transition-all active:scale-95 flex items-center gap-1 mx-auto"
+                        >
+                          <PencilIcon className="h-3 w-3" /> View Order
+                        </button>
+                      ),
+                    },
+                  ]}
+                  emptyMessage="No problem found"
+                  loading={loadingOrders}
+                />
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-800">
+                    Label Reprint
+                  </h2>
+                </div>
+                <DataTable
+                  data={reprintItems}
+                  columns={[
+                    {
+                      header: "ID",
+                      width: "40px",
                       render: (row) => row.id,
                       align: "center",
                     },
                     {
-                      header: "Supplier",
-                      width: "150px",
+                      header: "EAN",
+                      width: "100px",
+                      render: (row) =>
+                        itemById.get(String(row.item_id))?.ean || "-",
+                      align: "center",
+                    },
+                    {
+                      header: "Item Name",
+                      width: "200px",
                       render: (row) => (
-                        <div className="font-medium text-gray-700">
-                          {row.supplier_id} - {row.supplier?.company_name || "-"}
+                        <div
+                          className="line-clamp-3 leading-tight break-words"
+                          title={
+                            row.item?.item_name ||
+                            itemById.get(String(row.item_id))?.item_name
+                          }
+                        >
+                          {row.item?.item_name ||
+                            itemById.get(String(row.item_id))?.item_name ||
+                            "Unknown"}
                         </div>
                       ),
-                      align: "left",
                     },
                     {
-                      header: "Description",
-                      width: "180px",
-                      render: (row) => {
-                        const items = row.items || [];
-                        const desc = items.map((i: any) => i.item?.item_name || i.item?.name).filter(Boolean).join(", ");
-                        return <div className="line-clamp-2 text-[10px] text-gray-500">{desc || row.remark || "-"}</div>;
-                      },
-                      align: "left",
+                      header: "Remark",
+                      render: (row) => (
+                        <div className="truncate max-w-[150px]">
+                          {row.remarks_cn || "/"}
+                        </div>
+                      ),
                     },
                     {
-                      header: "Total RMB",
-                      width: "100px",
+                      header: "Order_no",
+                      width: "80px",
+                      render: (row) => row.parentOrder?.order_no || "-",
+                      align: "center",
+                    },
+                    {
+                      header: "QTY",
+                      width: "60px",
+                      align: "center",
+                      render: (row) => (
+                        <div className="flex flex-col items-center leading-none">
+                          <span className="font-bold text-gray-800">
+                            {row.qty_label || row.qty}
+                          </span>
+                          {row.qty_label && row.qty_label !== row.qty && (
+                            <span className="text-[10px] text-gray-400">
+                              Orig: {row.qty}
+                            </span>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Price",
+                      width: "70px",
                       render: (row) => {
-                        const total = (row.items || []).reduce((sum: number, it: any) => {
-                          const p = it.price || it.rmb_special_price || 0;
-                          return sum + (Number(p) * (it.qty || 0));
-                        }, 0);
-                        return <span className="font-bold">¥ {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+                        const val = row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0;
+                        return Number(val).toFixed(2);
                       },
-                      align: "right",
+                      align: "center",
+                    },
+                    {
+                      header: "SOID",
+                      width: "50px",
+                      render: (row) => row.supplier_order_id || "-",
+                      align: "center",
                     },
                     {
                       header: "Status",
-                      width: "100px",
-                      render: (row) => {
-                        const allPurchased = row.items?.every((it: any) => {
-                          const st = (it.status || "").toLowerCase().trim();
-                          return st === "purchased" || st === "purchase";
-                        });
-                        return (
-                          <div className="flex flex-col items-center">
-                            <span className="text-green-600 font-bold text-[10px] uppercase">
-                              {allPurchased ? "Purchased" : "PO"}
-                            </span>
-                            <span className="text-green-600 font-bold text-[10px] uppercase">
-                              {allPurchased ? "Order" : "Created"}
-                            </span>
-                          </div>
-                        );
-                      },
+                      width: "60px",
+                      render: (row) => (
+                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                          {row.status}
+                        </span>
+                      ),
                       align: "center",
                     },
                     {
                       header: "Actions",
-                      width: "200px",
+                      width: "150px",
                       align: "center",
                       render: (row) => (
-                        <div className="flex gap-2">
+                        <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => openEdit(row as any)}
-                            className="bg-[#059669] text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-700 transition"
+                            onClick={() => handleEditQty(row)}
+                            className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
                           >
-                            Edit
+                            <PencilIcon className="h-3 w-3" /> edit
                           </button>
                           <button
-                            onClick={() => toast.success("PO Closed")}
-                            className="bg-red-600 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-red-700 transition"
+                            onClick={() => handlePrintLabel(row)}
+                            className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
                           >
-                            Close
-                          </button>
-                          <button
-                            onClick={() => {
-                              console.log("Download button clicked for SO ID:", row.id);
-                              downloadPurchaseOrder(row.id);
-                            }}
-                            className="bg-green-700 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-800 transition"
-                          >
-                            Download
+                            <PrinterIcon className="h-3 w-3" /> Print
                           </button>
                         </div>
                       ),
                     },
                   ]}
-                  loading={loadingSupplierOrders}
-                  emptyMessage="No Purchase Orders Found"
-                />
-              </div>
-            ) : activeTab === "problems" ? (
-              <div className="p-4 bg-gray-50/30 min-h-[600px] flex flex-col gap-10">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-gray-800">
-                      Pending Problems
-                    </h2>
-                  </div>
-                  <DataTable
-                    data={problemItems}
-                    columns={[
-                      {
-                        header: "ID",
-                        width: "40px",
-                        render: (row) => row.id,
-                        align: "center",
-                      },
-                      {
-                        header: "Supplier ID",
-                        width: "80px",
-                        render: (row) =>
-                          row.parentOrder?.supplier_id ||
-                          row.supplier_id ||
-                          "-",
-                        align: "center",
-                      },
-                      {
-                        header: "Item name",
-                        width: "200px",
-                        render: (row) => (
-                          <div
-                            className="line-clamp-3 leading-tight break-words"
-                            title={
-                              row.item?.item_name ||
-                              itemById.get(String(row.item_id))?.item_name
-                            }
-                          >
-                            {row.item?.item_name ||
-                              itemById.get(String(row.item_id))?.item_name ||
-                              "Unknown"}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Order No.",
-                        width: "80px",
-                        render: (row) => row.parentOrder?.order_no || "-",
-                        align: "center",
-                      },
-                      {
-                        header: "SOID",
-                        width: "50px",
-                        render: (row) => row.supplier_order_id || "-",
-                        align: "center",
-                      },
-                      {
-                        header: "QTY",
-                        width: "40px",
-                        render: (row) => row.qty,
-                        align: "center",
-                      },
-                      {
-                        header: "Problem type",
-                        width: "100px",
-                        render: (row) => (
-                          <span className="text-red-600 font-semibold uppercase text-[10px]">
-                            {row.status}
-                          </span>
-                        ),
-                        align: "center",
-                      },
-                      {
-                        header: "Description",
-                        render: (row) => (
-                          <div className="line-clamp-2 text-xs italic text-gray-500">
-                            {row.problems || "No description"}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Remark",
-                        render: (row) => (
-                          <div className="truncate max-w-[150px]">
-                            {row.remarks_cn || row.remark_de || "-"}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Actions",
-                        width: "100px",
-                        align: "center",
-                        render: (row) => (
-                          <button
-                            onClick={() => openEdit(row.parentOrder)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-[10px] font-bold shadow-md transition-all active:scale-95 flex items-center gap-1 mx-auto"
-                          >
-                            <PencilIcon className="h-3 w-3" /> View Order
-                          </button>
-                        ),
-                      },
-                    ]}
-                    emptyMessage="No problem found"
-                    loading={loadingOrders}
-                  />
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-gray-800">
-                      Label Reprint
-                    </h2>
-                  </div>
-                  <DataTable
-                    data={reprintItems}
-                    columns={[
-                      {
-                        header: "ID",
-                        width: "40px",
-                        render: (row) => row.id,
-                        align: "center",
-                      },
-                      {
-                        header: "EAN",
-                        width: "100px",
-                        render: (row) =>
-                          itemById.get(String(row.item_id))?.ean || "-",
-                        align: "center",
-                      },
-                      {
-                        header: "Item Name",
-                        width: "200px",
-                        render: (row) => (
-                          <div
-                            className="line-clamp-3 leading-tight break-words"
-                            title={
-                              row.item?.item_name ||
-                              itemById.get(String(row.item_id))?.item_name
-                            }
-                          >
-                            {row.item?.item_name ||
-                              itemById.get(String(row.item_id))?.item_name ||
-                              "Unknown"}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Remark",
-                        render: (row) => (
-                          <div className="truncate max-w-[150px]">
-                            {row.remarks_cn || "/"}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Order_no",
-                        width: "80px",
-                        render: (row) => row.parentOrder?.order_no || "-",
-                        align: "center",
-                      },
-                      {
-                        header: "QTY",
-                        width: "60px",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex flex-col items-center leading-none">
-                            <span className="font-bold text-gray-800">
-                              {row.qty_label || row.qty}
-                            </span>
-                            {row.qty_label && row.qty_label !== row.qty && (
-                              <span className="text-[10px] text-gray-400">
-                                Orig: {row.qty}
-                              </span>
-                            )}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Price",
-                        width: "70px",
-                        render: (row) => {
-                          const val = row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0;
-                          return Number(val).toFixed(2);
-                        },
-                        align: "center",
-                      },
-                      {
-                        header: "SOID",
-                        width: "50px",
-                        render: (row) => row.supplier_order_id || "-",
-                        align: "center",
-                      },
-                      {
-                        header: "Status",
-                        width: "60px",
-                        render: (row) => (
-                          <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                            {row.status}
-                          </span>
-                        ),
-                        align: "center",
-                      },
-                      {
-                        header: "Actions",
-                        width: "150px",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleEditQty(row)}
-                              className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
-                            >
-                              <PencilIcon className="h-3 w-3" /> edit
-                            </button>
-                            <button
-                              onClick={() => handlePrintLabel(row)}
-                              className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
-                            >
-                              <PrinterIcon className="h-3 w-3" /> Print
-                            </button>
-                          </div>
-                        ),
-                      },
-                    ]}
-                    emptyMessage="No items for reprint found"
-                    loading={loadingOrders}
-                  />
-                </div>
-              </div>
-            ) : activeTab === "label_print" ? (
-              <div className="p-4 bg-gray-50/30 min-h-[600px]">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-gray-800">
-                      Label Management
-                    </h2>
-                  </div>
-
-                  <DataTable
-                    data={labelPrintItems}
-                    columns={[
-                      {
-                        header: "ID",
-                        width: "50px",
-                        render: (row) => row.id,
-                        align: "center",
-                      },
-                      {
-                        header: "EAN",
-                        width: "120px",
-                        render: (row) => {
-                          const ean =
-                            row.item?.ean ||
-                            row.warehouse_data?.ean ||
-                            row.ean ||
-                            row.item?.warehouse_data?.ean ||
-                            itemById.get(String(row.item_id))?.ean ||
-                            "-";
-
-                          const isHighlighted =
-                            reprintSearch &&
-                            ean !== "-" &&
-                            ean
-                              .toString()
-                              .toLowerCase()
-                              .includes(reprintSearch.toLowerCase());
-
-                          return (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                const itemId = row.item_id || row.item?.id || (row as any).id;
-                                if (itemId) router.push(`/items/${itemId}`);
-                              }}
-                              className={`font-medium hover:underline ${isHighlighted ? "text-[#059669] font-bold" : "text-blue-600"}`}
-                            >
-                              {ean}
-                            </button>
-                          );
-                        },
-                        align: "center",
-                      },
-                      {
-                        header: "Item Name",
-                        width: "250px",
-                        render: (row) => (
-                          <div
-                            className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
-                            title={row.item?.item_name || row.item?.name}
-                          >
-                            {row.item?.item_name || row.item?.name || "Unknown"}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Remark",
-                        render: (row) => (
-                          <div className="text-gray-500 italic text-xs space-y-0.5">
-                            {row.remark_de && (
-                              <div className=""> {row.remark_de} /</div>
-                            )}
-                            {row.remarks_cn && (
-                              <div className=""> {row.remarks_cn} /</div>
-                            )}
-                            {row.remark_en && (
-                              <div className=""> {row.remark_en}</div>
-                            )}
-                            {!row.remark_de &&
-                              !row.remarks_cn &&
-                              !row.remark_en && (
-                                <span className="text-gray-300">-</span>
-                              )}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Order_no",
-                        width: "100px",
-                        render: (row) => (
-                          <span className="font-mono font-bold text-blue-600">
-                            {row.parentOrder?.order_no || "-"}
-                          </span>
-                        ),
-                        align: "center",
-                      },
-                      {
-                        header: "QTY",
-                        width: "80px",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex flex-col items-center">
-                            <span className="font-bold text-gray-900">
-                              {row.qty}
-                              {row.qty_label && row.qty_label !== row.qty
-                                ? `/${row.qty_label}`
-                                : ""}
-                            </span>
-                            {row.qty_label && row.qty_label !== row.qty && (
-                              <span className="text-[9px] text-gray-400 uppercase">
-                                Order/Label
-                              </span>
-                            )}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "SOID",
-                        width: "70px",
-                        render: (row) => row.supplier_order_id || "-",
-                        align: "center",
-                      },
-                      {
-                        header: "Status",
-                        width: "90px",
-                        render: (row) => (
-                          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                            {row.status || row.item_status || "Open"}
-                          </span>
-                        ),
-                        align: "center",
-                      },
-                      {
-                        header: "Actions",
-                        width: "180px",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleEditQty(row)}
-                              className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                            >
-                              <PencilIcon className="h-3.5 w-3.5" /> edit
-                            </button>
-                            <button
-                              onClick={() => handlePrintLabel(row)}
-                              className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                            >
-                              <PrinterIcon className="h-3.5 w-3.5" /> Print
-                            </button>
-                          </div>
-                        ),
-                      },
-                    ]}
-                    emptyMessage="No items ready for print found"
-                    loading={loadingOrders}
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                {activeTab === "order_items" && orderNoFilter && (
-                  <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border-b border-blue-100">
-                    <span className="text-xs text-blue-700 font-medium">
-                      🔍 Showing items for order:&nbsp;
-                      <span className="font-bold bg-blue-100 px-1.5 py-0.5 rounded">
-                        {orderNoFilter}
-                      </span>
-                    </span>
-                    <button
-                      onClick={() => setOrderNoFilter("")}
-                      className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold ml-1"
-                    >
-                      Clear filter (show all)
-                    </button>
-                  </div>
-                )}
-                <OrdersTable
-                  orders={visibleOrders}
+                  emptyMessage="No items for reprint found"
                   loading={loadingOrders}
-                  getCategoryName={getCategoryName}
-                  getSupplierName={getSupplierName}
-                  getOrderStatusColor={getOrderStatusColor}
-                  onView={openView}
-                  onEdit={openEdit}
-                  onDelete={handleDeleteOrder}
-                  canDelete={user?.role === UserRole.ADMIN}
-                  showConvert={false}
-                  onConvert={openConvert}
-                  onReassign={(o) => {
-                    setSelectedItem(o);
-                    setTargetCargoId(o.cargo_id ? String(o.cargo_id) : "");
-                    setShowREModal(true);
-                  }}
-                  onGoToItems={(orderNo) => {
-                    router.push(`/invoices?tab=order_items&order_no=${orderNo}`);
-                  }}
-                  activeTab={activeTab}
-                  itemById={itemById}
-                  suppliers={suppliers}
-                  onAssignSupplier={handleAssignSupplier}
-                  onSplit={(row) => {
-                    setSelectedItem(row);
-                    setSplitQty(Math.floor(Number(row.qty || 0) / 2) || 1);
-                    setShowSPModal(true);
-                  }}
-                  router={router}
                 />
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          ) : activeTab === "label_print" ? (
+            <div className="p-4 bg-gray-50/30 min-h-[600px]">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-800">
+                    Label Management
+                  </h2>
+                </div>
+
+                <DataTable
+                  data={labelPrintItems}
+                  columns={[
+                    {
+                      header: "ID",
+                      width: "50px",
+                      render: (row) => row.id,
+                      align: "center",
+                    },
+                    {
+                      header: "EAN",
+                      width: "120px",
+                      render: (row) => {
+                        const ean =
+                          row.item?.ean ||
+                          row.warehouse_data?.ean ||
+                          row.ean ||
+                          row.item?.warehouse_data?.ean ||
+                          itemById.get(String(row.item_id))?.ean ||
+                          "-";
+
+                        const isHighlighted =
+                          reprintSearch &&
+                          ean !== "-" &&
+                          ean
+                            .toString()
+                            .toLowerCase()
+                            .includes(reprintSearch.toLowerCase());
+
+                        return (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const itemId = row.item_id || row.item?.id || (row as any).id;
+                              if (itemId) router.push(`/items/${itemId}`);
+                            }}
+                            className={`font-medium hover:underline ${isHighlighted ? "text-[#059669] font-bold" : "text-blue-600"}`}
+                          >
+                            {ean}
+                          </button>
+                        );
+                      },
+                      align: "center",
+                    },
+                    {
+                      header: "Item Name",
+                      width: "250px",
+                      render: (row) => (
+                        <div
+                          className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
+                          title={row.item?.item_name || row.item?.name}
+                        >
+                          {row.item?.item_name || row.item?.name || "Unknown"}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Remark",
+                      render: (row) => (
+                        <div className="text-gray-500 italic text-xs space-y-0.5">
+                          {row.remark_de && (
+                            <div className=""> {row.remark_de} /</div>
+                          )}
+                          {row.remarks_cn && (
+                            <div className=""> {row.remarks_cn} /</div>
+                          )}
+                          {row.remark_en && (
+                            <div className=""> {row.remark_en}</div>
+                          )}
+                          {!row.remark_de &&
+                            !row.remarks_cn &&
+                            !row.remark_en && (
+                              <span className="text-gray-300">-</span>
+                            )}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Order_no",
+                      width: "100px",
+                      render: (row) => (
+                        <span className="font-mono font-bold text-blue-600">
+                          {row.parentOrder?.order_no || "-"}
+                        </span>
+                      ),
+                      align: "center",
+                    },
+                    {
+                      header: "QTY",
+                      width: "80px",
+                      align: "center",
+                      render: (row) => (
+                        <div className="flex flex-col items-center">
+                          <span className="font-bold text-gray-900">
+                            {row.qty}
+                            {row.qty_label && row.qty_label !== row.qty
+                              ? `/${row.qty_label}`
+                              : ""}
+                          </span>
+                          {row.qty_label && row.qty_label !== row.qty && (
+                            <span className="text-[9px] text-gray-400 uppercase">
+                              Order/Label
+                            </span>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "SOID",
+                      width: "70px",
+                      render: (row) => row.supplier_order_id || "-",
+                      align: "center",
+                    },
+                    {
+                      header: "Status",
+                      width: "90px",
+                      render: (row) => (
+                        <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                          {row.status || row.item_status || "Open"}
+                        </span>
+                      ),
+                      align: "center",
+                    },
+                    {
+                      header: "Actions",
+                      width: "180px",
+                      align: "center",
+                      render: (row) => (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEditQty(row)}
+                            className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                          >
+                            <PencilIcon className="h-3.5 w-3.5" /> edit
+                          </button>
+                          <button
+                            onClick={() => handlePrintLabel(row)}
+                            className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                          >
+                            <PrinterIcon className="h-3.5 w-3.5" /> Print
+                          </button>
+                        </div>
+                      ),
+                    },
+                  ]}
+                  emptyMessage="No items ready for print found"
+                  loading={loadingOrders}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeTab === "order_items" && orderNoFilter && (
+                <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border-b border-blue-100">
+                  <span className="text-xs text-blue-700 font-medium">
+                    🔍 Showing items for order:&nbsp;
+                    <span className="font-bold bg-blue-100 px-1.5 py-0.5 rounded">
+                      {orderNoFilter}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => setOrderNoFilter("")}
+                    className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold ml-1"
+                  >
+                    Clear filter (show all)
+                  </button>
+                </div>
+              )}
+              <OrdersTable
+                orders={visibleOrders}
+                loading={loadingOrders}
+                getCategoryName={getCategoryName}
+                getSupplierName={getSupplierName}
+                getOrderStatusColor={getOrderStatusColor}
+                onView={openView}
+                onEdit={openEdit}
+                onDelete={handleDeleteOrder}
+                canDelete={user?.role === UserRole.ADMIN}
+                showConvert={false}
+                onConvert={openConvert}
+                onReassign={(o) => {
+                  setSelectedItem(o);
+                  setTargetCargoId(o.cargo_id ? String(o.cargo_id) : "");
+                  setShowREModal(true);
+                }}
+                onGoToItems={(orderNo) => {
+                  router.push(`/invoices?tab=order_items&order_no=${orderNo}`);
+                }}
+                activeTab={activeTab}
+                itemById={itemById}
+                suppliers={suppliers}
+                onAssignSupplier={handleAssignSupplier}
+                onSplit={(row) => {
+                  setSelectedItem(row);
+                  setSplitQty(Math.floor(Number(row.qty || 0) / 2) || 1);
+                  setShowSPModal(true);
+                }}
+                router={router}
+              />
+            </>
+          )}
         </div>
+      </div>
 
       {showSupplierConfirm && pendingNsoGroup && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
