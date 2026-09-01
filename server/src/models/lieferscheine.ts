@@ -30,6 +30,13 @@ export class Lieferschein {
   @Column({ type: "varchar", length: 100, nullable: true })
   order_number?: string;
 
+  /**
+   * Copied verbatim from Rechnung.kundenreferenz at the moment this
+   * Lieferschein is generated (createLieferscheinFromRechnung).
+   */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  kundenreferenz?: string;
+
   // --- Dates ---
   @Column({ type: "date" })
   delivery_date!: Date;

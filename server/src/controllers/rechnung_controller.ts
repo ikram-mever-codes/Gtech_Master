@@ -480,9 +480,6 @@ export const createRechnungFromAuftrag = async (
       await AppDataSource.getRepository(Rechnung).save(prepaymentsToSave);
     }
 
-    // ============================================
-    // CREATE RECHNUNG
-    // ============================================
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = rechnungRepo.create({
       invoice_number: invoiceNo,
@@ -491,6 +488,7 @@ export const createRechnungFromAuftrag = async (
         (req.body as any)?.ansprechpartner !== undefined
           ? (req.body as any).ansprechpartner
           : auftrag.ansprechpartner || undefined,
+      kundenreferenz: auftrag.kundenreferenz || undefined,
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,
@@ -777,6 +775,7 @@ export const createRechnungOhneAusliefern = async (
     const rechnung = rechnungRepo.create({
       invoice_number: invoiceNo,
       title: auftrag.title,
+      kundenreferenz: auftrag.kundenreferenz || undefined,
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,
@@ -797,7 +796,6 @@ export const createRechnungOhneAusliefern = async (
       shipping_method:
         auftrag.shipping_text || auftrag.shipping_method || undefined,
     });
-
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
 
     const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
@@ -1162,9 +1160,9 @@ export const updateRechnung = async (
       internal_notes,
       highlight_color,
       ansprechpartner,
+      kundenreferenz,
       title,
     } = req.body;
-
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = await rechnungRepo.findOne({
       where: { id },
@@ -1186,6 +1184,10 @@ export const updateRechnung = async (
       rechnung.highlight_color = highlight_color;
     if (ansprechpartner !== undefined)
       rechnung.ansprechpartner = ansprechpartner;
+
+    if (kundenreferenz !== undefined)
+      rechnung.kundenreferenz = (kundenreferenz || "").toString().slice(0, 255);
+
     if (title !== undefined) rechnung.title = title;
 
     const addressPatch: Record<string, any> = {};

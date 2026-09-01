@@ -726,13 +726,13 @@ export const createAuftragFromItems = async (
       selectedItems,
       title,
       ansprechpartner,
+      kundenreferenz,
       paymentMethod,
       shippingMethod,
       paymentTerms,
       notes,
       stock_where,
     } = req.body;
-
     if (!customerId) {
       res.status(400).json({
         success: false,
@@ -811,8 +811,6 @@ export const createAuftragFromItems = async (
         (matchedItem as any)?.itemName ||
         "Item";
 
-      // material/itemNo now sourced from Item.item_no_de directly, with
-      // the model/EAN fallback kept as before.
       const material =
         matchedItem?.item_no_de ||
         matchedItem?.model ||
@@ -893,6 +891,8 @@ export const createAuftragFromItems = async (
       order_no: auftragNo,
       title: orderTitle,
       ansprechpartner: effectiveAnsprechpartner,
+      kundenreferenz:
+        kundenreferenz?.toString().trim().slice(0, 255) || undefined,
       customer_id: customer.id,
       status: "open",
       currency: "EUR",
@@ -949,6 +949,9 @@ export const createAuftragFromOffer = async (
     const { offerId } = req.params;
     const { selectedItems, stock_where } = req.body;
 
+    const effectiveKundenreferenz =
+      (req.body as any)?.kundenreferenz?.toString().trim().slice(0, 255) ||
+      undefined;
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       res.status(400).json({
         success: false,
@@ -994,28 +997,6 @@ export const createAuftragFromOffer = async (
 
     const getDeNo = (it: any): string =>
       it.item_no_de || it.parent?.de_no || "";
-
-    // ------------------------------------------------------------------
-    // Draft-item resolution and conversion.
-    //
-    // For every selected line, resolve its backing Item (via sourceItemId,
-    // an assembly Inquiry link, or a RequestedItem link). If that Item is
-    // still isDraft === true and the caller didn't explicitly decline
-    // conversion for this line (selItem.convertDraft === false, set by
-    // the DraftItemConversionModal when a draft row is left unchecked),
-    // graduate it:
-    //   - price fallback: if item.sales_price is 0/null, take the price
-    //     being used for this Auftrag line (selItem.price); otherwise
-    //     keep the Item's existing sales_price untouched.
-    //   - flip isDraft to false.
-    //   - link it onto the OfferLineItem (sourceItemId) so the Offer
-    //     itself reflects the link on next read/conversion.
-    //
-    // Any other field edits (name, material, weight, etc.) are already
-    // persisted on the Item by this point — DraftItemConversionModal
-    // opens the real ItemPreviewModal, which saves directly via
-    // updateItem, not through this endpoint.
-    // ------------------------------------------------------------------
     const backingItemByLineItemId = new Map<string, any>();
     const linesToSave: any[] = [];
     const itemsToSave: any[] = [];
@@ -1184,6 +1165,7 @@ export const createAuftragFromOffer = async (
       offer_id: offer.id,
       title: offer.title,
       ansprechpartner: effectiveAnsprechpartner,
+      kundenreferenz: effectiveKundenreferenz,
       customer_id: offer.customerId || undefined,
       status: "open",
       currency: offer.currency || "EUR",
@@ -1205,7 +1187,6 @@ export const createAuftragFromOffer = async (
       date_delivery: offer.deliveryTime,
       ...(finalStockWhere && { stock_where: finalStockWhere }),
     });
-
     const savedOrder: any = await customerOrderRepo.save(customerOrder);
 
     const customerOrderItemRepo =
@@ -1393,16 +1374,19 @@ export const updateCustomerOrder = async (
       weiterversandTracking,
     } = body;
 
-    // Always allowed (Open and Partially Delivered both permit these).
     if (notes !== undefined) auftrag.notes = notes;
     if (internalNotes !== undefined) auftrag.internal_notes = internalNotes;
     if (highlightColor !== undefined) auftrag.highlight_color = highlightColor;
 
-    // Everything below this point only ever runs for Open — the
-    // isPartiallyDelivered check above already rejected the request if
-    // any of these keys were present while Partially Delivered.
     if (title !== undefined) auftrag.title = title;
-    if (body.ansprechpartner !== undefined) auftrag.ansprechpartner = body.ansprechpartner;
+    if (body.ansprechpartner !== undefined)
+      auftrag.ansprechpartner = body.ansprechpartner;
+    if (body.ansprechpartner !== undefined)
+      auftrag.ansprechpartner = body.ansprechpartner;
+    if (body.kundenreferenz !== undefined)
+      auftrag.kundenreferenz = (body.kundenreferenz || "")
+        .toString()
+        .slice(0, 255);
     if (currency !== undefined) auftrag.currency = currency;
     if (customerSnapshot !== undefined)
       auftrag.customerSnapshot = customerSnapshot;
