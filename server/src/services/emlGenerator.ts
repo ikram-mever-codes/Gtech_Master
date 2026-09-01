@@ -182,19 +182,22 @@ export async function generateRechnungLieferscheinEml(
     options?.user?.name ||
     options?.user?.username ||
     customerSnap.contactName ||
-    "Joschua Stehle";
+    "";
 
   await generateGtechDocumentPdf({
     documentType: "Rechnung",
     documentNumber: rechnung.invoice_number || String(rechnung.id),
+    documentTitle: rechnung.title || "",
     customerSnapshot: customerSnap,
     customerEntity: rechnung.customer,
     deliveryAddress: rechnung.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", contactPersonName],
+      ["Kontakt", contactPersonName],
       ["Kunde", kundeCombined],
       ["Datum", formatDateStr(rechnung.invoice_date || rechnung.date_created || rechnung.created_at)],
     ],
+    kontaktName: contactPersonName,
+    kontaktEmail: options?.user?.email,
     lineItems: rechnungItems,
     showPrices: true,
     shippingMethod: rechnung.shipping_method,
@@ -228,15 +231,18 @@ export async function generateRechnungLieferscheinEml(
   await generateGtechDocumentPdf({
     documentType: "Lieferschein",
     documentNumber: lieferscheinNo,
+    documentTitle: (lieferschein as any)?.title || rechnung.title || "",
     customerSnapshot: customerSnap,
     customerEntity: rechnung.customer,
     deliveryAddress: rechnung.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", contactPersonName],
+      ["Kontakt", contactPersonName],
       ["Kunde", kundeCombined],
       ["Datum", formatDateStr(rechnung.invoice_date || rechnung.created_at)],
       ["Lieferdatum", formatDateStr(rechnung.date_delivery || rechnung.delivery_date)],
     ],
+    kontaktName: contactPersonName,
+    kontaktEmail: options?.user?.email,
     lineItems: lieferscheinItems,
     showPrices: false,
     notes: rechnung.notes,
@@ -485,19 +491,22 @@ export async function generateRechnungOnlyEml(
     options?.user?.name ||
     options?.user?.username ||
     customerSnap.contactName ||
-    "Joschua Stehle";
+    "";
 
   await generateGtechDocumentPdf({
     documentType: "Rechnung",
     documentNumber: rechnung.invoice_number || String(rechnung.id),
+    documentTitle: rechnung.title || "",
     customerSnapshot: customerSnap,
     customerEntity: rechnung.customer,
     deliveryAddress: rechnung.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", contactPersonName],
+      ["Kontakt", contactPersonName],
       ["Kunde", kundeCombined],
       ["Datum", formatDateStr(rechnung.invoice_date || rechnung.date_created || rechnung.created_at)],
     ],
+    kontaktName: contactPersonName,
+    kontaktEmail: options?.user?.email,
     lineItems: rechnungItems,
     showPrices: true,
     shippingMethod: rechnung.shipping_method,
@@ -719,7 +728,7 @@ export async function generateAuftragEml(
     options?.user?.name ||
     options?.user?.username ||
     customerSnap.contactName ||
-    "Joschua Stehle";
+    "";
 
   const auftragPdfPath = path.join(
     auftraegeDir,
@@ -765,14 +774,17 @@ export async function generateAuftragEml(
   await generateGtechDocumentPdf({
     documentType: "Auftrag" as any,
     documentNumber: auftrag.order_no,
+    documentTitle: auftrag.title || "",
     customerSnapshot: customerSnap,
     customerEntity: auftrag.customer,
     deliveryAddress: auftrag.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", contactPersonName],
+      ["Kontakt", contactPersonName],
       ["Kunde", kundeCombined],
       ["Datum", auftrag.date_created || auftrag.created_at],
     ],
+    kontaktName: contactPersonName,
+    kontaktEmail: options?.user?.email,
     isDelivered: isDelivered,
     lineItems: items,
     showPrices: true,
@@ -986,7 +998,7 @@ export async function generateOfferEml(
     options?.user?.name ||
     options?.user?.username ||
     (customerSnap as any).contactName ||
-    "Joschua Stehle";
+    "";
 
   const offerPdfPath = path.join(
     offersDir,
@@ -1023,13 +1035,16 @@ export async function generateOfferEml(
   await generateGtechDocumentPdf({
     documentType: "Angebot" as any,
     documentNumber: offer.offerNumber,
+    documentTitle: offer.title || "",
     customerSnapshot: customerSnap,
     deliveryAddress: offer.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", contactPersonName],
+      ["Kontakt", contactPersonName],
       ["Kunde", kundeCombined],
       ["Datum", formatDateStr(offer.createdAt)],
     ],
+    kontaktName: contactPersonName,
+    kontaktEmail: options?.user?.email,
     lineItems: items,
     showPrices: true,
     shippingMethod: offer.shippingMethod,
@@ -1241,7 +1256,7 @@ export async function generateRechnungKEml(
     options?.user?.name ||
     options?.user?.username ||
     customerSnap.contactName ||
-    "Joschua Stehle";
+    "";
 
   const rkPdfPath = path.join(
     rkDir,
@@ -1282,17 +1297,20 @@ export async function generateRechnungKEml(
   await generateGtechDocumentPdf({
     documentType: "RK" as any,
     documentNumber: rechnungK.invoice_number,
+    documentTitle: rechnungK.title || "",
     customerSnapshot: customerSnap,
     customerEntity: rechnungK.customer,
     deliveryAddress: rechnungK.deliveryAddress,
     metadataItems: [
-      ["Ansprechpartner", contactPersonName],
+      ["Kontakt", contactPersonName],
       ["Kunde", kundeCombined],
       [
         "Datum",
         formatDateStr(rechnungK.date_created || rechnungK.created_at || rechnungK.invoice_date),
       ],
     ],
+    kontaktName: contactPersonName,
+    kontaktEmail: options?.user?.email,
     isDelivered: true,
     lineItems: items,
     showPrices: true,

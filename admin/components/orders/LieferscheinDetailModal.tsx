@@ -710,7 +710,7 @@ export default function LieferscheinDetailModal({
 
           <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
             <div>
-              {status === "vorläufig" && (
+              {isEditMode && status === "vorläufig" && (
                 <button
                   type="button"
                   onClick={() => setShowStornierConfirm(true)}

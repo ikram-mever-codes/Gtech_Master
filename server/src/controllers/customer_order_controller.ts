@@ -2065,14 +2065,17 @@ export const downloadCustomerOrderPdf = async (
     await generateGtechDocumentPdf({
       documentType: "Auftrag" as any,
       documentNumber: order.order_no,
+      documentTitle: order.title || "",
       customerSnapshot: customerSnap,
       customerEntity: order.customer,
       deliveryAddress: order.deliveryAddress,
       metadataItems: [
-        ["Ansprechpartner", contactName],
+        ["Kontakt", contactName],
         ["Kunde", kundeCombined],
         ["Datum", order.date_created || order.created_at],
       ],
+      kontaktName: contactName,
+      kontaktEmail: (req as any).user?.email,
       isDelivered: isDelivered,
       lineItems: items,
       showPrices: true,

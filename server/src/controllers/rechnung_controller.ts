@@ -1345,7 +1345,7 @@ export const downloadRechnungPdf = async (
       rechnung.ansprechpartner ||
       (req as any).user?.name ||
       (req as any).user?.username ||
-      "Joschua Stehle";
+      "";
     const customerCompName = (
       customerSnap.company_name ||
       customerSnap.companyName ||
@@ -1434,17 +1434,20 @@ export const downloadRechnungPdf = async (
     await generateGtechDocumentPdf({
       documentType: "Rechnung",
       documentNumber: rechnung.invoice_number,
+      documentTitle: rechnung.title || "",
       customerSnapshot: customerSnap,
       customerEntity: rechnung.customer,
       deliveryAddress: rechnung.deliveryAddress,
       metadataItems: [
-        ["Ansprechpartner", contactName],
+        ["Kontakt", contactName],
         ["Kunde", kundeCombined],
         [
           "Datum",
           rechnung.date_created || rechnung.created_at || rechnung.invoice_date,
         ],
       ],
+      kontaktName: contactName,
+      kontaktEmail: (req as any).user?.email,
       isDelivered: true,
       lineItems: items,
       showPrices: true,

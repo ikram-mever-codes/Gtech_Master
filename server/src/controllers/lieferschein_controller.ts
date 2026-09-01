@@ -434,7 +434,7 @@ export const downloadLieferscheinPdf = async (
     const rechnung = lieferschein.rechnung;
     const customerSnap = rechnung?.customerSnapshot || rechnung?.customer || {};
     const contactName =
-      (req as any).user?.name || (req as any).user?.username || "Admin";
+      (req as any).user?.name || (req as any).user?.username || "";
     const customerCompName = (
       customerSnap.company_name ||
       customerSnap.companyName ||
@@ -526,18 +526,21 @@ export const downloadLieferscheinPdf = async (
     await generateGtechDocumentPdf({
       documentType: "Lieferschein",
       documentNumber: lieferschein.delivery_note_number,
+      documentTitle: (lieferschein as any)?.title || rechnung?.title || "",
       customerSnapshot: customerSnap,
       customerEntity: rechnung?.customer,
       deliveryAddress: rechnung?.deliveryAddress,
       metadataItems: [
         ["Status", displayStatus],
-        ["Ansprechpartner", contactName],
+        ["Kontakt", contactName],
         ["Kunde", kundeCombined],
         [
           "Datum",
           formatDateStr(lieferschein.date_created || lieferschein.created_at),
         ],
       ],
+      kontaktName: contactName,
+      kontaktEmail: (req as any).user?.email,
       isDelivered: true,
       lineItems: items,
       showPrices: false,
