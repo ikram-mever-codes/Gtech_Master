@@ -12,13 +12,14 @@ import {
   lieferortColumn,
   lieferdatumColumn,
   buildNettowertColumn,
+  hasContactPersonEmail,
 } from "./sharedColumns";
 
 interface RechnungColumnsArgs {
   expandedDocIds: Set<string | number>;
   setExpandedDocIds: React.Dispatch<React.SetStateAction<Set<string | number>>>;
   onViewRechnung: (row: any) => void;
-  onCreateRechnungK: (row: any) => void; // This will open the modal with correction form
+  onCreateRechnungK: (row: any) => void;
   creatingRkForId: string | null;
   allOpenQuantities?: Record<string, Record<string, number>>;
   rechnungenK?: any[];
@@ -90,9 +91,8 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
   return (
     <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
       <span
-        className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${
-          classes[status] || classes.unpaid
-        }`}
+        className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${classes[status] || classes.unpaid
+          }`}
         title={
           row.paid_amount !== undefined
             ? `Paid: ${Number(row.paid_amount).toFixed(2)} / Open: ${Number(row.open_amount ?? 0).toFixed(2)}`
@@ -152,8 +152,8 @@ const RechnungActionMenu: React.FC<{
             setIsOpen((prev) => !prev);
           }}
           className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
-              ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
-              : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
             }`}
           title="Aktionen"
         >
@@ -218,23 +218,35 @@ const RechnungActionMenu: React.FC<{
             </div>
 
             <div className="p-1">
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  setIsOpen(false);
-                  try {
-                    await downloadRechnungEml(
-                      row.id,
-                      row.invoiceNumber || row.invoice_number,
-                    );
-                  } catch (_) { }
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-              >
-                <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
-                <span className="text-xs font-semibold">PDF in Email</span>
-              </button>
+              {hasContactPersonEmail(row) ? (
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    try {
+                      await downloadRechnungEml(
+                        row.id,
+                        row.invoiceNumber || row.invoice_number,
+                      );
+                    } catch (_) { }
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                >
+                  <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
+                  <span className="text-xs font-semibold">PDF in Email</span>
+                </button>
+              ) : (
+                <div
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg bg-orange-50/60 cursor-not-allowed select-none"
+                  title="No contact person email address set"
+                >
+                  <Mail className="w-4 h-4 text-orange-500 shrink-0" />
+                  <span className="text-xs font-semibold text-orange-500">
+                    keine Emailadresse
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Option 3: Rechnung öffnen */}

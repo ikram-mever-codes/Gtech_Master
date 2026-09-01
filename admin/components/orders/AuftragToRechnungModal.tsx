@@ -686,9 +686,7 @@ export default function AuftragToRechnungModal({
             </h2>
           </div>
 
-          {/* Warehouse Selector + Close Button in Header */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Warehouse Selector - only show if there are stock items */}
             {hasStockItems && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg">
                 <Warehouse className="w-4 h-4 text-amber-600" />

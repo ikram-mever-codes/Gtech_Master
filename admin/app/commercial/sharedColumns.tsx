@@ -6,9 +6,23 @@ import ExpandRowArrow from "@/components/UI/ExpandRowArrow";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
 
-// Every column below is byte-for-byte the same render logic as the
-// corresponding branch in the original single 400-line commercialColumns
-// useMemo — only pulled out so each tab file only imports what it uses.
+export function hasContactPersonEmail(row: any): boolean {
+  if (!row) return false;
+  const email =
+    row.customerSnapshot?.contactEmail ||
+    row.customerSnapshot?.contact_email ||
+    row.customerSnapshot?.email ||
+    row.customerSnapshot?.contactPersonEmail ||
+    row.customer?.contactPersonEmail ||
+    row.customer?.contact_email ||
+    row.customer?.email ||
+    row.customer?.contactPerson?.email ||
+    row.contactPersonEmail ||
+    row.contact_email ||
+    row.contactEmail ||
+    row.email;
+  return typeof email === "string" && email.trim().length > 0 && email.includes("@");
+}
 
 export function buildExpandColumn(
   expandedDocIds: Set<string | number>,
