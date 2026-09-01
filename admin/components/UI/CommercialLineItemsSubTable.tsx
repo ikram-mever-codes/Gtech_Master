@@ -44,7 +44,11 @@ interface CommercialLineItemsSubTableProps {
 
 const formatUnitPrice = (val: number | string | undefined, currency = "EUR"): string => {
   const n = Number(val ?? 0);
-  return `${n.toLocaleString("de-DE", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${currency === "EUR" ? "€" : currency}`;
+  const rounded3 = Math.round(n * 1000) / 1000;
+  const rounded2 = Math.round(n * 100) / 100;
+  const has3rdDec = Math.abs(rounded3 - rounded2) > 0.0001;
+  const decimals = has3rdDec ? 3 : 2;
+  return `${n.toLocaleString("de-DE", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ${currency === "EUR" ? "€" : currency}`;
 };
 
 const formatPrice = (val: number | string | undefined, currency = "EUR"): string => {

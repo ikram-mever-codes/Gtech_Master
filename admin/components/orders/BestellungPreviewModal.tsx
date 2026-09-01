@@ -120,6 +120,23 @@ const formatPrice = (
   })}`;
 };
 
+const formatUnitPrice = (
+  price: number | null | undefined,
+  currency?: string | null,
+): string => {
+  if (price === null || price === undefined) return "—";
+  const num = Number(price) || 0;
+  const rounded3 = Math.round(num * 1000) / 1000;
+  const rounded2 = Math.round(num * 100) / 100;
+  const has3rdDec = Math.abs(rounded3 - rounded2) > 0.0001;
+  const decimals = has3rdDec ? 3 : 2;
+  const symbol = currencySymbol(currency);
+  return `${symbol}${num.toLocaleString("de-DE", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })}`;
+};
+
 const Field: React.FC<{
   label: string;
   edit: boolean;
@@ -1357,10 +1374,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                             <div className="text-right text-gray-600">
                               {item.purchasePrice !== null &&
                                 item.purchasePrice !== undefined
-                                ? formatPrice(item.purchasePrice, lineCurrency)
+                                ? formatUnitPrice(item.purchasePrice, lineCurrency)
                                 : item.transferPrice !== null &&
                                   item.transferPrice !== undefined
-                                  ? formatPrice(
+                                  ? formatUnitPrice(
                                     item.transferPrice,
                                     lineCurrency,
                                   )

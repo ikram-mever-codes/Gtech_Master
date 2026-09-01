@@ -43,9 +43,13 @@ const formatDeCurrency = (val: number) => {
 
 const formatDeUnitPrice = (val: number) => {
   const num = isNaN(val) || !isFinite(val) ? 0 : val;
+  const rounded3 = Math.round(num * 1000) / 1000;
+  const rounded2 = Math.round(num * 100) / 100;
+  const has3rdDec = Math.abs(rounded3 - rounded2) > 0.0001;
+  const decimals = has3rdDec ? 3 : 2;
   return `${num.toLocaleString("de-DE", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })} €`;
 };
 
