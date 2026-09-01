@@ -11,6 +11,9 @@ import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2 } from "lucide-react";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/Redux/store";
+import { getMe } from "@/api/user";
 
 const PAYMENT_METHODS = [
   "Prepayment (Vorkasse)",
@@ -42,11 +45,10 @@ const ItemRow: React.FC<{
     <div
       ref={rowRef}
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
-        selected
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
           ? "border-primary bg-primary/5 shadow-sm"
           : "border-gray-200 bg-white hover:bg-gray-50"
-      }`}
+        }`}
     >
       <div className="w-12 h-12 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -108,10 +110,29 @@ export default function AuftragCreateModal({
     {},
   );
 
+  const { user: currentUser } = useSelector((state: RootState) => state.user);
+
   const [title, setTitle] = useState("");
+  const [ansprechpartner, setAnsprechpartner] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
   const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const name = currentUser?.name || currentUser?.email || "";
+    if (name) {
+      setAnsprechpartner(name);
+    } else {
+      getMe()
+        .then((res: any) => {
+          const u = res?.data || res;
+          const fetchedName = u?.name || u?.email || "";
+          if (fetchedName) setAnsprechpartner(fetchedName);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, currentUser]);
 
   console.log(selectedItems);
 
@@ -198,6 +219,7 @@ export default function AuftragCreateModal({
     setSearchName("");
     setHasSearched(false);
     setTitle(initialItem ? initialItem.item_name_de || "" : "");
+    setAnsprechpartner(currentUser?.name || currentUser?.email || "");
     setPaymentMethod("");
     setShippingMethod("");
     setNotes("");
@@ -305,6 +327,7 @@ export default function AuftragCreateModal({
         customerId: filterCustomerId,
         selectedItems: formattedItems,
         title: title.trim() || undefined,
+        ansprechpartner: ansprechpartner.trim() || undefined,
         paymentMethod: paymentMethod || undefined,
         shippingMethod: shippingMethod || undefined,
         paymentTerms: paymentTerms || undefined,
@@ -559,6 +582,18 @@ export default function AuftragCreateModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ansprechpartner
+            </label>
+            <input
+              value={ansprechpartner}
+              onChange={(e) => setAnsprechpartner(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
+              placeholder="Defaults to logged-in user if left empty"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Payment method
             </label>
             <select
@@ -610,11 +645,10 @@ export default function AuftragCreateModal({
                   onChange={(e) =>
                     setPaymentTerms(e.target.value.replace(/\D/g, ""))
                   }
-                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                    !isDueDaysEditable
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${!isDueDaysEditable
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
                       : "bg-white text-gray-900 border-gray-300"
-                  }`}
+                    }`}
                 />
               );
             })()}

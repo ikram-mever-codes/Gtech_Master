@@ -46,6 +46,9 @@ export class CustomerOrder {
   @Column({ type: "varchar", length: 255, nullable: true })
   title?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  ansprechpartner?: string;
+
   @Column({ type: "varchar", length: 50, default: "Draft" })
   status!: string;
 

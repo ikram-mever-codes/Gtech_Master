@@ -503,6 +503,10 @@ export const createRechnungFromAuftrag = async (
     const rechnung = rechnungRepo.create({
       invoice_number: invoiceNo,
       title: auftrag.title,
+      ansprechpartner:
+        (req.body as any)?.ansprechpartner !== undefined
+          ? (req.body as any).ansprechpartner
+          : auftrag.ansprechpartner || undefined,
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,

@@ -14,6 +14,8 @@ import {
 } from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { Loader2, Warehouse, ClipboardCheck, Check } from "lucide-react";
+import { getAllPaymentMethods } from "@/api/payment_methods";
+import { getAllShippingMethods } from "@/api/shipping_methods";
 
 interface SelectedItemState {
   id: string;
@@ -168,6 +170,7 @@ export default function AuftragToRechnungModal({
   // Inline Edit Mode state (matching OfferDetailModal)
   const [isEditingAuftrag, setIsEditingAuftrag] = useState(false);
   const [editTitle, setEditTitle] = useState("");
+  const [editAnsprechpartner, setEditAnsprechpartner] = useState("");
   const [editShippingMethod, setEditShippingMethod] = useState("");
   const [editPaymentMethod, setEditPaymentMethod] = useState("");
   const [editPaymentTerms, setEditPaymentTerms] = useState("");
@@ -181,6 +184,29 @@ export default function AuftragToRechnungModal({
   const [editCity, setEditCity] = useState("");
   const [editCountry, setEditCountry] = useState("DE");
   const [editVatId, setEditVatId] = useState("");
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
+  const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    Promise.all([
+      getAllPaymentMethods(true).catch(() => ({ data: [] })),
+      getAllShippingMethods(true).catch(() => ({ data: [] })),
+    ]).then(([pmRes, smRes]: any) => {
+      if (pmRes?.data)
+        setDbPaymentMethods(
+          Array.isArray(pmRes.data)
+            ? pmRes.data.filter((pm: any) => pm.is_active)
+            : [],
+        );
+      if (smRes?.data)
+        setDbShippingMethods(
+          Array.isArray(smRes.data)
+            ? smRes.data.filter((sm: any) => sm.is_active)
+            : [],
+        );
+    });
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !auftrag) return;
@@ -246,6 +272,7 @@ export default function AuftragToRechnungModal({
     setNotes(auftrag.notes || auftrag.comment || "");
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
     setEditTitle(auftrag.title || auftrag.comment || "");
+    setEditAnsprechpartner(auftrag.ansprechpartner || "");
     // Populate Customer Address & Defaults State
     const cust = auftrag.customerSnapshot || auftrag.customer || {};
     setEditCompanyName(
@@ -477,6 +504,7 @@ export default function AuftragToRechnungModal({
       setSavingAuftrag(true);
       const payload = {
         title: editTitle,
+        ansprechpartner: editAnsprechpartner,
         shippingMethod: editShippingMethod,
         paymentMethod: editPaymentMethod,
         paymentTerms: editPaymentTerms,
@@ -564,6 +592,7 @@ export default function AuftragToRechnungModal({
         {
           deliveryDate,
           warehouse: hasStockItems ? stockWhere : undefined,
+          ansprechpartner: editAnsprechpartner || auftrag.ansprechpartner,
         } as any,
       );
 
@@ -744,6 +773,15 @@ export default function AuftragToRechnungModal({
                 />
               </Field>
 
+              <Field label="ANSPRECHPARTNER" value={editAnsprechpartner} isEdit={isEditingAuftrag}>
+                <input
+                  type="text"
+                  value={editAnsprechpartner}
+                  onChange={(e) => setEditAnsprechpartner(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+
               <Field label="TAX PROFILE" value={taxProfileLabel} />
 
               {/* Delivery Date */}
@@ -776,18 +814,35 @@ export default function AuftragToRechnungModal({
                   onChange={(e) => setEditPaymentMethod(e.target.value)}
                   className={inputCls}
                 >
-                  {PAYMENT_METHODS.map((pm) => (
-                    <option key={pm} value={pm}>
-                      {pm}
+                  <option value="">Select…</option>
+                  {editPaymentMethod &&
+                    !(
+                      dbPaymentMethods.length > 0
+                        ? dbPaymentMethods.map((pm: any) => pm.name)
+                        : PAYMENT_METHODS
+                    ).includes(editPaymentMethod) && (
+                      <option value={editPaymentMethod}>{editPaymentMethod}</option>
+                    )}
+                  {(dbPaymentMethods.length > 0
+                    ? dbPaymentMethods.map((pm: any) => pm.name)
+                    : PAYMENT_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
                     </option>
                   ))}
                 </select>
               </Field>
 
               {(() => {
-                const isDueDaysEditable = editPaymentMethod
-                  ? !/vorkasse|prepayment|paypal|cash|credit/i.test(editPaymentMethod)
-                  : false;
+                const selectedPmObj = dbPaymentMethods.find(
+                  (pm: any) => pm.name === editPaymentMethod
+                );
+                const isDueDaysEditable = selectedPmObj
+                  ? !selectedPmObj.is_prepayment
+                  : editPaymentMethod
+                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(editPaymentMethod)
+                    : false;
 
                 return (
                   <Field
@@ -818,9 +873,21 @@ export default function AuftragToRechnungModal({
                   onChange={(e) => setEditShippingMethod(e.target.value)}
                   className={inputCls}
                 >
-                  {SHIPPING_METHODS.map((sm) => (
-                    <option key={sm} value={sm}>
-                      {sm}
+                  <option value="">Select…</option>
+                  {editShippingMethod &&
+                    !(
+                      dbShippingMethods.length > 0
+                        ? dbShippingMethods.map((sm: any) => sm.name)
+                        : SHIPPING_METHODS
+                    ).includes(editShippingMethod) && (
+                      <option value={editShippingMethod}>{editShippingMethod}</option>
+                    )}
+                  {(dbShippingMethods.length > 0
+                    ? dbShippingMethods.map((sm: any) => sm.name)
+                    : SHIPPING_METHODS
+                  ).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
                     </option>
                   ))}
                 </select>

@@ -14,6 +14,8 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/Redux/store";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import {
@@ -358,6 +360,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   onSwitchToRechnung,
   onSwitchToRechnungK,
 }) => {
+  const { user: currentUser } = useSelector((state: RootState) => state.user);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -549,6 +552,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
     return {
       title: o.title || item1Title || "",
+      ansprechpartner: o.ansprechpartner || "",
       status: o.status || "Draft",
       currency: o.currency || "EUR",
       taxRate: o.tax_rate ?? 19,
@@ -1485,6 +1489,27 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     ) : (
                       <div className="text-sm font-medium text-gray-800 py-1.5">
                         {order.is_weiterversand ? "Yes" : "No"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-56 shrink-0">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                      Ansprechpartner
+                    </label>
+                    {effectiveEdit && canEditCommercial ? (
+                      <input
+                        type="text"
+                        className={inputCls}
+                        value={form.ansprechpartner || ""}
+                        placeholder="Ansprechpartner"
+                        onChange={(e) =>
+                          patch({ ansprechpartner: e.target.value })
+                        }
+                      />
+                    ) : (
+                      <div className="text-sm font-medium text-gray-800 py-1.5">
+                        {order.ansprechpartner || "—"}
                       </div>
                     )}
                   </div>
