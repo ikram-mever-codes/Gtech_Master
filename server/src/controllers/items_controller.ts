@@ -191,13 +191,13 @@ export const getItems = async (
       .map((t) => parseInt(t.slice(1), 10))
       .filter((n) => !isNaN(n));
 
-    // Build the main query
     const idQb = itemRepository
       .createQueryBuilder("item")
       .select("item.id")
       .addSelect("item.created_at")
       .leftJoin("item.parent", "parent")
-      .leftJoin("item.category", "category");
+      .leftJoin("item.category", "category")
+      .andWhere("item.isDraft = false");
 
     // Filter by specific item IDs
     if (idsStr) {

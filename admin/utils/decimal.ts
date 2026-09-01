@@ -34,13 +34,36 @@ export function formatMatrixPrice(
   return price.toFixed(decimals);
 }
 
-export function formatMax3Decimals(val: number | string | null | undefined): string {
+export function formatMax3Decimals(
+  val: number | string | null | undefined,
+): string {
   if (val === null || val === undefined || val === "") return "";
-  const num = typeof val === "number" ? val : parseFlexibleNumber(val);
+
+  let num: number;
+
+  if (typeof val === "number") {
+    num = val;
+  } else {
+    const trimmed = val.trim();
+    const lastComma = trimmed.lastIndexOf(",");
+    const lastDot = trimmed.lastIndexOf(".");
+    let normalized: string;
+    if (lastComma > lastDot) {
+      normalized = trimmed.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = trimmed.replace(/,/g, "");
+    }
+    num = parseFloat(normalized);
+  }
+
   if (num === null || isNaN(num)) return String(val);
 
   const rounded = Math.round(num * 1000) / 1000;
-  const has3rdDecimal = Math.abs(Math.round(rounded * 1000) - Math.round(rounded * 100) * 10) > 0;
+
+  const fractional = Math.abs(rounded - Math.trunc(rounded));
+  const thirdDecimalDigit = Math.round(fractional * 1000) % 10;
+  const has3rdDecimal = thirdDecimalDigit !== 0;
+
   return rounded.toFixed(has3rdDecimal ? 3 : 2);
 }
 
@@ -53,7 +76,8 @@ export function formatUnitPriceCurrency(
     currency && typeof currency === "string" && currency.trim()
       ? currency.trim().toUpperCase()
       : "EUR";
-  const num = typeof amount === "number" ? amount : parseFlexibleNumber(amount) || 0;
+  const num =
+    typeof amount === "number" ? amount : parseFlexibleNumber(amount) || 0;
   try {
     return new Intl.NumberFormat("de-DE", {
       style: "currency",

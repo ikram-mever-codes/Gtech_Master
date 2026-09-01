@@ -258,10 +258,7 @@ export default function RechnungDetailModal({
 
     // Initialize corrections with default values for items that have open quantity
     if (rechnung?.items) {
-      const initialCorrections: Record<
-        string,
-        { quantity: number; price: number }
-      > = {};
+      const initialCorrections: any = {};
       rechnung.items.forEach((item: any) => {
         const openQty = openQuantities[item.id] || 0;
         if (openQty > 0) {
@@ -289,7 +286,7 @@ export default function RechnungDetailModal({
     shippingTotal * (Number(data.tax_rate ?? 19) / 100);
   const grossTotal = netTotal + taxAmount;
 
-  const taxRate = Number(data.taxProfile.tax_rate ?? 19);
+  const taxRate = Number(data.taxProfile.taxRate ?? 19);
 
   const invoiceNumber = data.invoice_number || data.rk_number || data.id;
   const companyName =
@@ -886,8 +883,8 @@ export default function RechnungDetailModal({
                 label="TAX PROFILE"
                 value={
                   data.taxProfile?.name
-                    ? `${data.taxProfile.name} (${taxRate}%)`
-                    : `${taxRate}%`
+                    ? `${data.taxProfile.name} (${data.taxProfile.taxRate}%)`
+                    : `${data.taxProfile.taxRate}%`
                 }
               />{" "}
               <Field
@@ -1200,8 +1197,11 @@ export default function RechnungDetailModal({
                     );
                   })}
 
-                  {/* Shipping row */}
-                  {shippingTotal > 0 && (
+                  {/* Shipping row — shown whenever a shipping method is set,
+                      same rule as AuftragPreviewModal (order.shipping_method),
+                      so a €0 shipping cost with a method still shows a row
+                      instead of disappearing. */}
+                  {(editShippingMethod || data.shipping_method) && (
                     <tr className="bg-gray-50/80 border-t-2 border-gray-200">
                       <td className="px-2 py-2 text-gray-400">
                         {items.length + 1}
@@ -1211,7 +1211,9 @@ export default function RechnungDetailModal({
                       )}
                       <td className="px-2 py-2 text-gray-400">—</td>
                       <td className="px-2 py-2 font-medium text-gray-700">
-                        {editShippingMethod || "Shipping"}
+                        {editShippingMethod ||
+                          data.shipping_method ||
+                          "No shipping method set"}
                       </td>
                       {showViewOnly && (
                         <td className="px-2 py-2 text-gray-400"></td>

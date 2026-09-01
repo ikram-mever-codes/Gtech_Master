@@ -13,7 +13,14 @@ import {
   deleteCustomerOrder,
 } from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, Warehouse, ClipboardCheck, Check, AlertTriangle, Building } from "lucide-react";
+import {
+  Loader2,
+  Warehouse,
+  ClipboardCheck,
+  Check,
+  AlertTriangle,
+  Building,
+} from "lucide-react";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 
@@ -98,10 +105,11 @@ const Field: React.FC<{
         children
       ) : (
         <div
-          className={`${highlightOrange
-            ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
-            : ""
-            }`}
+          className={`${
+            highlightOrange
+              ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
+              : ""
+          }`}
         >
           {value || "—"}
         </div>
@@ -156,6 +164,14 @@ export default function AuftragToRechnungModal({
   // was split across two states ("warehouse" and "stockWhere"), which let
   // the selector and the validation drift out of sync.
   const [stockWhere, setStockWhere] = useState<"CN" | "EU">("CN");
+
+  // --- Shipping line (this delivery only) ---------------------------------
+  // Editable per-delivery override for shipping cost/quantity/inclusion —
+  // seeded from the Auftrag's own shipping values but NOT written back to
+  // the Auftrag on submit; only sent along with this specific Rechnung.
+  const [shippingIncluded, setShippingIncluded] = useState(true);
+  const [shippingCostInput, setShippingCostInput] = useState<number>(0);
+  const [shippingQuantityInput, setShippingQuantityInput] = useState<number>(1);
 
   // Prepayment credit ("Rechnung ohne Ausliefern") outstanding on this
   // Auftrag — fetched fresh every time the modal opens for it. Purely
@@ -281,10 +297,10 @@ export default function AuftragToRechnungModal({
     );
     setEditStreet(
       cust.address ||
-      cust.street ||
-      cust.addressLine1 ||
-      cust.bill_to_address ||
-      "",
+        cust.street ||
+        cust.addressLine1 ||
+        cust.bill_to_address ||
+        "",
     );
     setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
     setEditCity(cust.city || "Göttingen");
@@ -322,6 +338,15 @@ export default function AuftragToRechnungModal({
     setEditShippingMethod(sMethod);
     setEditPaymentMethod(pMethod);
     setEditPaymentTerms(pTerms);
+
+    // Seed the per-delivery shipping override from the Auftrag's own
+    // shipping cost/quantity — included by default whenever a shipping
+    // method exists on the Auftrag.
+    setShippingCostInput(Number(auftrag.shipping_cost) || 0);
+    setShippingQuantityInput(Number(auftrag.shipping_quantity) || 1);
+    setShippingIncluded(
+      !!(auftrag.shipping_text || auftrag.shipping_method || sMethod),
+    );
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
@@ -372,6 +397,11 @@ export default function AuftragToRechnungModal({
 
   if (!isOpen || !auftrag) return null;
   const hasStockItems = items.some((it) => it.is_stock_item === "Y");
+  const hasShippingMethod = !!(
+    editShippingMethod ||
+    auftrag.shipping_text ||
+    auftrag.shipping_method
+  );
 
   /** The actual on-hand quantity for a stock item at the currently
    * selected warehouse — null for non-stock lines. */
@@ -428,10 +458,14 @@ export default function AuftragToRechnungModal({
   };
 
   const selectedItems = items.filter((it) => it.selected && it.qty > 0);
-  const subtotal = selectedItems.reduce(
+  const itemsSubtotal = selectedItems.reduce(
     (acc, it) => acc + it.qty * it.price,
     0,
   );
+  const shippingLineTotal = shippingIncluded
+    ? (shippingCostInput || 0) * (shippingQuantityInput || 0)
+    : 0;
+  const subtotal = itemsSubtotal + shippingLineTotal;
   const taxRate = Number(auftrag.tax_rate ?? 19);
   const taxAmount = (subtotal * taxRate) / 100;
   const totalAmount = subtotal + taxAmount;
@@ -461,7 +495,7 @@ export default function AuftragToRechnungModal({
     return sum + ((it.weight || 0) / 1000) * it.qty;
   }, 0);
   const extraWeightKg = selectedItems.reduce(
-    // extraWeight is already stored in kg — no conv  ersion.
+    // extraWeight is already stored in kg — no conversion.
     (sum, it) => sum + (it.extraWeight || 0),
     0,
   );
@@ -572,12 +606,21 @@ export default function AuftragToRechnungModal({
     const directEmail = (cust?.email || snap?.email || "").trim();
     if (directEmail && directEmail.includes("@")) return true;
 
-    const ansprechpartner = (editAnsprechpartner || auftrag.ansprechpartner || "").trim();
+    const ansprechpartner = (
+      editAnsprechpartner ||
+      auftrag.ansprechpartner ||
+      ""
+    ).trim();
     if (ansprechpartner && ansprechpartner.includes("@")) return true;
 
-    const contacts = cust?.contactPersons || cust?.starBusinessDetails?.contactPersons || snap?.contactPersons;
+    const contacts =
+      cust?.contactPersons ||
+      cust?.starBusinessDetails?.contactPersons ||
+      snap?.contactPersons;
     if (Array.isArray(contacts)) {
-      const found = contacts.find((c: any) => c?.email && String(c.email).trim().includes("@"));
+      const found = contacts.find(
+        (c: any) => c?.email && String(c.email).trim().includes("@"),
+      );
       if (found) return true;
     }
 
@@ -601,6 +644,10 @@ export default function AuftragToRechnungModal({
         {
           deliveryDate,
           warehouse: hasStockItems ? stockWhere : undefined,
+          include_shipping: shippingIncluded,
+          shippingCost: shippingCostInput,
+          shippingQuantity: shippingQuantityInput,
+          shippingMethod: editShippingMethod || undefined,
           ansprechpartner: editAnsprechpartner || auftrag.ansprechpartner,
         } as any,
       );
@@ -608,7 +655,7 @@ export default function AuftragToRechnungModal({
       if (res?.success) {
         toast.success(
           res.message ||
-          `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
+            `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
           successStyles,
         );
         const newRechnungId = res?.data?.id;
@@ -804,7 +851,11 @@ export default function AuftragToRechnungModal({
                 />
               </Field>
 
-              <Field label="ANSPRECHPARTNER" value={editAnsprechpartner} isEdit={isEditingAuftrag}>
+              <Field
+                label="ANSPRECHPARTNER"
+                value={editAnsprechpartner}
+                isEdit={isEditingAuftrag}
+              >
                 <input
                   type="text"
                   value={editAnsprechpartner}
@@ -827,10 +878,11 @@ export default function AuftragToRechnungModal({
                     setDeliveryDate(e.target.value);
                     setIsDatePastOrEmpty(false);
                   }}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
-                    ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
-                    : "bg-white border-gray-300 text-gray-900"
-                    }`}
+                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${
+                    isDatePastOrEmpty || !deliveryDate
+                      ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
+                      : "bg-white border-gray-300 text-gray-900"
+                  }`}
                 />
               </div>
 
@@ -851,7 +903,9 @@ export default function AuftragToRechnungModal({
                         ? dbPaymentMethods.map((pm: any) => pm.name)
                         : PAYMENT_METHODS
                     ).includes(editPaymentMethod) && (
-                      <option value={editPaymentMethod}>{editPaymentMethod}</option>
+                      <option value={editPaymentMethod}>
+                        {editPaymentMethod}
+                      </option>
                     )}
                   {(dbPaymentMethods.length > 0
                     ? dbPaymentMethods.map((pm: any) => pm.name)
@@ -866,12 +920,14 @@ export default function AuftragToRechnungModal({
 
               {(() => {
                 const selectedPmObj = dbPaymentMethods.find(
-                  (pm: any) => pm.name === editPaymentMethod
+                  (pm: any) => pm.name === editPaymentMethod,
                 );
                 const isDueDaysEditable = selectedPmObj
                   ? !selectedPmObj.is_prepayment
                   : editPaymentMethod
-                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(editPaymentMethod)
+                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(
+                        editPaymentMethod,
+                      )
                     : false;
 
                 return (
@@ -885,7 +941,9 @@ export default function AuftragToRechnungModal({
                       inputMode="numeric"
                       value={editPaymentTerms}
                       disabled={!isDueDaysEditable}
-                      onChange={(e) => setEditPaymentTerms(e.target.value.replace(/\D/g, ""))}
+                      onChange={(e) =>
+                        setEditPaymentTerms(e.target.value.replace(/\D/g, ""))
+                      }
                       placeholder="e.g. 30"
                       className={inputCls}
                     />
@@ -910,7 +968,9 @@ export default function AuftragToRechnungModal({
                         ? dbShippingMethods.map((sm: any) => sm.name)
                         : SHIPPING_METHODS
                     ).includes(editShippingMethod) && (
-                      <option value={editShippingMethod}>{editShippingMethod}</option>
+                      <option value={editShippingMethod}>
+                        {editShippingMethod}
+                      </option>
                     )}
                   {(dbShippingMethods.length > 0
                     ? dbShippingMethods.map((sm: any) => sm.name)
@@ -1141,10 +1201,11 @@ export default function AuftragToRechnungModal({
                             onChange={(e) =>
                               updateQty(item.lineItemId, e.target.value)
                             }
-                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${invalid
-                              ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
-                              : "border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500"
-                              }`}
+                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${
+                              invalid
+                                ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
+                                : "border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500"
+                            }`}
                           />
                         </td>
 
@@ -1189,6 +1250,74 @@ export default function AuftragToRechnungModal({
                       </tr>
                     );
                   })}
+
+                  {/* Shipping row — editable per this delivery only. Cost and
+                      quantity here override the Auftrag's own values just
+                      for this Rechnung; they are never saved back onto the
+                      Auftrag. Shown whenever the Auftrag has a shipping
+                      method, mirroring Auftrag/Rechnung detail modals. */}
+                  {hasShippingMethod && (
+                    <tr className="bg-gray-50/80 border-t-2 border-gray-200">
+                      <td className="px-2 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={shippingIncluded}
+                          onChange={(e) =>
+                            setShippingIncluded(e.target.checked)
+                          }
+                          className="w-4 h-4 rounded border-gray-400 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500"
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-gray-400">
+                        {items.length + 1}
+                      </td>
+                      <td className="px-2 py-2 text-gray-400"></td>
+                      <td className="px-2 py-2 text-gray-400">—</td>
+                      <td className="px-2 py-2 font-bold text-gray-700">
+                        {editShippingMethod ||
+                          auftrag.shipping_text ||
+                          auftrag.shipping_method ||
+                          "Shipping"}
+                      </td>
+                      <td className="px-2 py-2 text-gray-400"></td>
+                      <td className="px-2 py-2 text-center text-gray-600">
+                        {taxRate}%
+                      </td>
+                      <td className="px-2 py-2 text-gray-400"></td>
+                      <td className="px-2 py-2 text-gray-400"></td>
+                      <td className="px-2 py-2 text-right">
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          disabled={!shippingIncluded}
+                          value={shippingQuantityInput}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setShippingQuantityInput(isNaN(val) ? 0 : val);
+                          }}
+                          className="w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500 disabled:opacity-50 disabled:bg-gray-100"
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <input
+                          type="number"
+                          step="any"
+                          disabled={!shippingIncluded}
+                          value={shippingCostInput}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setShippingCostInput(isNaN(val) ? 0 : val);
+                          }}
+                          className="w-24 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500 disabled:opacity-50 disabled:bg-gray-100"
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-right font-bold">
+                        {formatDeCurrency(shippingLineTotal)}
+                      </td>
+                      {isEditingAuftrag && <td />}
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1207,11 +1336,19 @@ export default function AuftragToRechnungModal({
 
             <div className="max-w-sm ml-auto w-full space-y-1.5 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>Subtotal</span>
+                <span>Items subtotal</span>
                 <span className="font-medium text-gray-900">
-                  {formatDeCurrency(subtotal)}
+                  {formatDeCurrency(itemsSubtotal)}
                 </span>
               </div>
+              {hasShippingMethod && shippingIncluded && (
+                <div className="flex justify-between text-gray-600">
+                  <span>Shipping</span>
+                  <span className="font-medium text-gray-900">
+                    {formatDeCurrency(shippingLineTotal)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-gray-600">
                 <span>VAT ({taxRate}%)</span>
                 <span className="font-medium text-gray-900">
@@ -1356,7 +1493,8 @@ export default function AuftragToRechnungModal({
               </h3>
             </div>
             <p className="text-sm text-gray-700 leading-relaxed mb-6">
-              No contact person email address. Do you want to continue Ausliefern?
+              No contact person email address. Do you want to continue
+              Ausliefern?
             </p>
             <div className="flex flex-col sm:flex-row gap-2 justify-end">
               <button

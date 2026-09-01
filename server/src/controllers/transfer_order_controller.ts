@@ -179,8 +179,8 @@ export const createTransferOrderFromAuftrag = async (
     // CEO requirement: OrderRemark for processing (Team Bowang) must be internal comment
     const finalNotes =
       bodyNotes !== undefined &&
-        bodyNotes !== null &&
-        String(bodyNotes).trim() !== ""
+      bodyNotes !== null &&
+      String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
         : auftrag.internal_notes || "";
 
@@ -425,7 +425,9 @@ export const updateTransferOrder = async (
             return;
           }
         }
-        bestellung.supplier_id = targetSupplierId ? targetSupplierId : undefined;
+        bestellung.supplier_id = targetSupplierId
+          ? targetSupplierId
+          : undefined;
         receiverOrSupplierChanged = true;
       }
     }
@@ -664,7 +666,7 @@ async function createOrderFromBestellung(
   const lookupCodes = Array.from(
     new Set(
       allItems
-        .map((li) => (li.itemNo || li.material || "").trim())
+        .map((li) => (li.itemNo || "").trim())
         .filter((code) => code.length > 0),
     ),
   );
@@ -679,12 +681,15 @@ async function createOrderFromBestellung(
 
   const resolved: { line: TransferOrderItem; itemId?: number }[] = allItems.map(
     (li) => {
-      const code = (li.itemNo || li.material || "").trim();
+      if (li.sourceItemId) {
+        const parsed = Number(li.sourceItemId);
+        if (!isNaN(parsed)) return { line: li, itemId: parsed };
+      }
+      const code = (li.itemNo || "").trim();
       const matched = code ? itemByDeNo.get(code) : undefined;
       return { line: li, itemId: matched?.id };
     },
   );
-
   const skippedCount = resolved.filter((r) => r.itemId === undefined).length;
 
   const now = new Date();
@@ -737,7 +742,9 @@ async function createOrderFromBestellung(
         item_id: itemId,
         order_id: savedOrder.id,
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
-        remark_de: li.remark_order_item?.trim() ? li.remark_order_item.trim() : (null as any),
+        remark_de: li.remark_order_item?.trim()
+          ? li.remark_order_item.trim()
+          : undefined,
         price:
           li.transferPrice !== undefined && li.transferPrice !== null
             ? li.transferPrice
@@ -756,7 +763,9 @@ async function createOrderFromBestellung(
   return { createdOrderId, skippedCount };
 }
 
-export async function syncBestellungToLinkedOrder(bestellungId: number): Promise<void> {
+export async function syncBestellungToLinkedOrder(
+  bestellungId: number,
+): Promise<void> {
   try {
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const bestellung = await transferOrderRepo.findOne({
@@ -796,7 +805,7 @@ export async function syncBestellungToLinkedOrder(bestellungId: number): Promise
     const lookupCodes = Array.from(
       new Set(
         bestellungItems
-          .map((li) => (li.itemNo || li.material || "").trim())
+          .map((li) => (li.itemNo || "").trim())
           .filter((code) => code.length > 0),
       ),
     );
@@ -813,9 +822,11 @@ export async function syncBestellungToLinkedOrder(bestellungId: number): Promise
 
     for (let i = 0; i < bestellungItems.length; i++) {
       const li = bestellungItems[i];
-      const code = (li.itemNo || li.material || "").trim();
+      const code = (li.itemNo || "").trim();
       const catalogItem = code ? itemByDeNo.get(code) : undefined;
-      const itemId = li.sourceItemId ? Number(li.sourceItemId) : catalogItem?.id;
+      const itemId = li.sourceItemId
+        ? Number(li.sourceItemId)
+        : catalogItem?.id;
 
       const remarkForChina = li.remark_order_item?.trim()
         ? li.remark_order_item.trim()
@@ -917,10 +928,11 @@ export const updateTransferOrderStatus = async (
     let message = "Bestellung status updated successfully";
     if (previousStatus === "draft" && status === "to be processed") {
       if (conversionResult) {
-        message += ` — Order created${conversionResult.skippedCount > 0
-          ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
-          : ""
-          }.`;
+        message += ` — Order created${
+          conversionResult.skippedCount > 0
+            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
+            : ""
+        }.`;
       } else {
         message +=
           " — no Order was created (no catalog line items found on this Bestellung).";

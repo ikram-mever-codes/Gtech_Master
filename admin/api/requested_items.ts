@@ -152,6 +152,7 @@ export interface RequestedItemCreatePayload {
   stockEU?: number;
   MSQ_EU?: number;
   stockCN?: number;
+  remark_ex?: string;
   MSQ_CN?: number;
 }
 

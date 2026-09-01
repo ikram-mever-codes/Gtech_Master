@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  MagnifyingGlassIcon,
   ArrowPathIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -10,22 +9,14 @@ import {
   PlusIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  ClockIcon,
-  PauseIcon,
-  LinkIcon,
   CubeIcon,
   ClipboardDocumentListIcon,
-  ArrowRightIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  EyeIcon,
-  EyeSlashIcon,
   InformationCircleIcon,
   ScaleIcon,
   ArrowsPointingOutIcon,
-  TrashIcon,
   PhotoIcon,
-  PaperClipIcon,
   FunnelIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
@@ -45,7 +36,6 @@ import {
   getRequestStatuses,
   convertInquiryToItem,
   convertRequestToItem,
-  removeRequestFromInquiry,
   getInquiryById,
 } from "@/api/inquiry";
 import { uploadFile } from "@/api/library";
@@ -1098,6 +1088,7 @@ const CombinedInquiriesPageContent = () => {
       asanaLink: inquiry.asanaLink || "",
       assemblyInstructions: inquiry.assemblyInstructions || "",
       weight: inquiry.weight,
+      qty: inquiry.qty,
       width: inquiry.width,
       height: inquiry.height,
       length: inquiry.length,
@@ -1633,7 +1624,7 @@ const CombinedInquiriesPageContent = () => {
               {Boolean(
                 inquiryFilters.tags ||
                 inquiryFilters.requestItemTags ||
-                selectedCustomerId
+                selectedCustomerId,
               ) ? (
                 <button
                   type="button"
@@ -2837,11 +2828,11 @@ const CombinedInquiriesPageContent = () => {
                         </label>
                         <input
                           type="number"
-                          value={inquiryFormData.qty || 1}
+                          value={inquiryFormData.qty}
                           onChange={(e) =>
                             setInquiryFormData({
                               ...inquiryFormData,
-                              qty: parseInt(e.target.value) || 1,
+                              qty: parseInt(e.target.value),
                             })
                           }
                           disabled={

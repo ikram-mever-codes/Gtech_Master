@@ -64,23 +64,18 @@ function withItemFields(entity: any): any {
   return {
     ...entity,
     ...projected,
-    // category/supplier are relations, not scalar shared fields — cat_id/
-    // supplier_id come from Item via `projected` above, but the relation
-    // OBJECTS must also come from item.category/item.supplier. RequestedItem
-    // still has its own category/supplier relations (joined via its own,
-    // now-unmaintained cat_id/supplier_id columns) — those are stale from
-    // whenever the row was first created and never updated again, so they
-    // must be overridden here rather than left to leak through the spread.
+    itemId: entity.item?.id ?? entity.itemId ?? null,
+    isDraft: entity.item?.isDraft ?? false,
+    sales_price: entity.item?.sales_price ?? null,
+    salesPrice: entity.item?.sales_price ?? null,
+    taric_id: entity.item?.taric_id ?? null,
+    taricId: entity.item?.taric_id ?? null,
+    item_name_de: entity.item?.item_name_de ?? null,
+    itemNameDe: entity.item?.item_name_de ?? null,
     category: entity.item?.category ?? null,
     supplier: entity.item?.supplier ?? null,
   };
 }
-
-// Backward-compatible response shape: business.customer nested object.
-// Prefers the stored `customer` relation (fast, no extra query); falls
-// back to nothing if a legacy row hasn't been re-saved yet (customer is
-// still null for it) — the frontend already handles a missing customer
-// there since that's exactly the old pre-migration shape.
 function withNestedCustomer(
   business?: StarBusinessDetails,
   customer?: Customer | null,
@@ -630,6 +625,15 @@ export class RequestedItemController {
       }
 
       const updateData: Record<string, any> = toOwnFields(body);
+
+      // TARIC lives solely on the linked Item (set above via
+      // ItemLinkService), never on RequestedItem itself. REQUESTED_ITEM_OWN_FIELDS
+      // still lists taric_id for legacy reasons, but writing it here creates
+      // a second, independent copy that drifts out of sync with the Item's
+      // real taric_id/taricRel the moment this RequestedItem gets re-linked
+      // to a different Item or backfilled. Drop it so it's never persisted
+      // on this entity.
+      delete updateData.taric_id;
 
       updateData.itemId = linkedItem.id;
       if (contactPerson !== undefined) {

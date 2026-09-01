@@ -7,6 +7,7 @@ import { Loader2, ClipboardCheck } from "lucide-react";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 import { updateItem, getAllTarics, type Taric } from "@/api/items";
 import { parseFlexibleNumber } from "@/utils/decimal";
+import { updateLineItem } from "@/api/offers";
 
 interface DraftLineItemPreview {
   lineItemId: string;
@@ -15,7 +16,7 @@ interface DraftLineItemPreview {
   photo?: string;
   itemName: string;
   material?: string;
-  itemNoDe?: string | null;
+  itemNo?: string | null;
   itemNameDe?: string | null;
   quantity?: string;
   price?: number;
@@ -60,8 +61,6 @@ const getMissingFields = (item: DraftLineItemPreview): string[] => {
   if (!item.taricId) missing.push("TARIC");
   if (!item.weight || item.weight <= 0) missing.push("Weight");
   if (!item.salesPrice || item.salesPrice <= 0) missing.push("Sales Price");
-  if (item.isDimWeightEstimated !== true)
-    missing.push("Dimensions marked as estimated");
   return missing;
 };
 
@@ -187,13 +186,20 @@ export default function DraftItemConversionModal({
     const value = parsed ?? 0;
     if (value === (item.salesPrice ?? 0)) return;
     saveField(item, { sales_price: value }, { salesPrice: value });
-    // Keep the offer line item's own price in sync with the Item's sales
-    // price. The backend syncs the other direction (offer line price ->
-    // sales price, only when sales price is currently 0/unset) when the
-    // offer line item's price is saved; since this edit originates here,
-    // on the Item side, it's pushed back to the line item explicitly so
-    // both stay aligned regardless of which side was edited.
-    onLineItemPriceSync?.(item.lineItemId, value);
+    const lineItem = offer.lineItems?.find(
+      (li: any) => li.id === item.lineItemId,
+    );
+    console.log(lineItem);
+    const lineHasNoPrice =
+      Number(lineItem?.basePrice) === null || Number(lineItem?.basePrice) === 0;
+    if (lineHasNoPrice) {
+      updateLineItem(offer.id, item.lineItemId, { basePrice: value }).catch(
+        (err) => {
+          console.error("Failed to sync line item price:", err);
+        },
+      );
+      onLineItemPriceSync?.(item.lineItemId, value);
+    }
   };
 
   const handleSubmit = async () => {
@@ -398,7 +404,7 @@ export default function DraftItemConversionModal({
                       </td>
 
                       <td className="px-2 py-2 text-gray-600">
-                        {item.itemNoDe || "—"}
+                        {item.itemNo || "—"}
                       </td>
 
                       {/* TARIC — editable dropdown */}

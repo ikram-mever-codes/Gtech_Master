@@ -449,6 +449,7 @@ export const getOfferDraftItemsPreview = async (
         itemRepository,
         requestedItemRepo,
       );
+      console.log(backingItem);
       if (backingItem?.isDraft) {
         results.push({
           lineItemId: li.id,
@@ -1166,12 +1167,11 @@ export const createAuftragFromOffer = async (
       offer.paymentMethod || offerCustomer?.defaultPaymentMethod || undefined;
     const effectiveShippingMethod =
       offer.shippingMethod || offerCustomer?.defaultShippingMethod || undefined;
-    const effectivePaymentTerms =
-      offer.paymentDueDays
-        ? String(offer.paymentDueDays)
-        : offerCustomer?.defaultPaymentDueDays
-          ? String(offerCustomer.defaultPaymentDueDays)
-          : "30";
+    const effectivePaymentTerms = offer.paymentDueDays
+      ? String(offer.paymentDueDays)
+      : offerCustomer?.defaultPaymentDueDays
+        ? String(offerCustomer.defaultPaymentDueDays)
+        : "30";
 
     const effectiveAnsprechpartner =
       (req.body as any)?.ansprechpartner?.trim() ||
@@ -1411,8 +1411,10 @@ export const updateCustomerOrder = async (
     if (dateDelivery !== undefined) auftrag.date_delivery = dateDelivery;
     if (paymentMethod !== undefined) auftrag.payment_method = paymentMethod;
     if (shippingMethod !== undefined) auftrag.shipping_method = shippingMethod;
-    if (body.shipping_text !== undefined) auftrag.shipping_text = body.shipping_text;
-    if (body.shippingText !== undefined) auftrag.shipping_text = body.shippingText;
+    if (body.shipping_text !== undefined)
+      auftrag.shipping_text = body.shipping_text;
+    if (body.shippingText !== undefined)
+      auftrag.shipping_text = body.shippingText;
     if (paymentTerms !== undefined) auftrag.payment_terms = paymentTerms;
     if (deliveryTerms !== undefined) auftrag.delivery_terms = deliveryTerms;
     if (termsConditions !== undefined)

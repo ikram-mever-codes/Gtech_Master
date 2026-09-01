@@ -493,6 +493,8 @@ export class InquiryController {
         height,
         length,
         itemNo,
+        qty,
+        interval,
         urgency1,
         urgency2,
         painPoints,
@@ -602,6 +604,8 @@ export class InquiryController {
         height,
         length,
         itemNo,
+        qty,
+        interval,
         urgency1,
         urgency2,
         painPoints,
@@ -680,12 +684,9 @@ export class InquiryController {
             }
           }
 
-          // Resolve/create the master Item for this request item — every
-          // requested item gets one, linked or freshly drafted. cat_id
-          // falls back to the default PRO category on the Item, not on
-          // RequestedItem (cat_id is a shared field now).
           const reqItem = await ItemLinkService.resolveItem(queryRunner, {
             ...reqData,
+            itemNo: assignedItemNo,
             cat_id: reqData.cat_id || defaultProCatId,
           });
 
@@ -776,11 +777,16 @@ export class InquiryController {
     reqData: any,
     assignedItemNo: string,
     catId: number | undefined,
+    fallbackItemId?: number,
   ): Promise<Item> {
     const itemRepo = AppDataSource.getRepository(Item);
 
     const existingItemId =
-      reqData.itemId || reqData.item_id || reqData.item?.id || undefined;
+      reqData.itemId ||
+      reqData.item_id ||
+      reqData.item?.id ||
+      fallbackItemId ||
+      undefined;
 
     const fields: Partial<Item> = {
       item_name: reqData.itemName || undefined,
@@ -825,8 +831,26 @@ export class InquiryController {
       }
     }
 
+    // Creation-time-only defaults — item_name_de and sales_price are
+    // taken from the request item ONLY when the backing Item is first
+    // created here. They're deliberately left out of `fields` above, so
+    // Object.assign(existing, fields) on the update branch never
+    // overwrites either value on an Item that already exists.
+    const salesPriceFromTarget =
+      reqData.targetPrice !== undefined &&
+      reqData.targetPrice !== null &&
+      reqData.targetPrice !== ""
+        ? Number(reqData.targetPrice)
+        : undefined;
+
     const created = itemRepo.create({
       ...fields,
+      item_name_de: reqData.itemName || undefined,
+      sales_price:
+        salesPriceFromTarget !== undefined && !isNaN(salesPriceFromTarget)
+          ? salesPriceFromTarget
+          : undefined,
+      supplier_id: reqData.supplier_id ?? reqData.supplierId ?? 1,
       isDraft: true,
       isActive: "Y",
       is_new: "Y",
@@ -864,6 +888,8 @@ export class InquiryController {
         height,
         length,
         itemNo,
+        qty,
+        interval,
         urgency1,
         urgency2,
         painPoints,
@@ -933,6 +959,8 @@ export class InquiryController {
         ...(height !== undefined && { height }),
         ...(length !== undefined && { length }),
         ...(itemNo !== undefined && { itemNo }),
+        ...(qty !== undefined && { qty }),
+        ...(interval !== undefined && { interval }),
         ...(urgency1 !== undefined && { urgency1 }),
         ...(urgency2 !== undefined && { urgency2 }),
         ...(painPoints !== undefined && { painPoints }),
@@ -957,6 +985,20 @@ export class InquiryController {
       }
       await this.inquiryRepository.update(id, updateData);
       if (requests && Array.isArray(requests)) {
+        // Snapshot RequestedItem.id -> backing Item.id BEFORE deleting the
+        // old rows, so a request line whose payload doesn't round-trip
+        // itemId can still be matched to its already-existing Item instead
+        // of spawning a duplicate draft with the same item_no_de.
+        const existingItemIdByRequestId = new Map<string, number | undefined>();
+        if (existingInquiry.requests) {
+          for (const r of existingInquiry.requests) {
+            existingItemIdByRequestId.set(
+              r.id,
+              r.itemId ?? (r.item as any)?.id,
+            );
+          }
+        }
+
         if (existingInquiry.requests && existingInquiry.requests.length > 0) {
           await this.requestRepository.remove(existingInquiry.requests);
         }
@@ -1057,11 +1099,18 @@ export class InquiryController {
                 // Every RequestedItem gets a backing draft Item — created
                 // fresh the first time this line is saved, or updated in
                 // place if reqData still references a previously-created
-                // Item (see resolveOrCreateDraftItemForRequest).
+                // Item (see resolveOrCreateDraftItemForRequest), falling
+                // back to the pre-delete snapshot when reqData itself
+                // doesn't carry the itemId for this line.
+                const fallbackItemId = reqData.id
+                  ? existingItemIdByRequestId.get(reqData.id)
+                  : undefined;
+
                 const draftItem = await this.resolveOrCreateDraftItemForRequest(
                   reqData,
                   assignedItemNo,
                   resolvedCatId,
+                  fallbackItemId,
                 );
 
                 const requestItem = this.requestRepository.create({
@@ -1118,6 +1167,7 @@ export class InquiryController {
       });
     }
   }
+
   async deleteInquiry(request: Request, response: Response) {
     try {
       const { id } = request.params;
