@@ -2290,7 +2290,7 @@ export class OfferController {
           if (!src) continue;
 
           if (li.basePrice === null || li.basePrice === undefined) {
-            li.basePrice = src.price ?? 0;
+            li.basePrice = src.sales_price ?? 0;
             needsSave = true;
           }
           if (li.photo === null || li.photo === undefined || li.photo === "") {
