@@ -295,10 +295,13 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
     </div>
   );
 };
-
-const isFreetextLine = (item: any): boolean =>
-  !item?.itemNO && !item?.sourceItemId;
-
+const isFreetextLine = (item: any): boolean => {
+  const result = !item?.itemNO && !item?.sourceItemId;
+  console.log("itemNo:", item?.itemNo);
+  console.log("sourceItemId:", item?.sourceItemId);
+  console.log("isFreetextLine:", result);
+  return result;
+};
 const getLineTaxRate = (item: any, order: any): number => {
   const orderRate = parseFlexibleNumber(order?.tax_rate) ?? 19;
   if (isFreetextLine(item)) {
