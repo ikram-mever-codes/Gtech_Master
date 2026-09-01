@@ -461,25 +461,11 @@ export const createRechnungFromAuftrag = async (
     const discountPercentage = Number(auftrag.discount_percentage ?? 0);
     const discountAmount = Number(auftrag.discount_amount ?? 0);
 
-    // ============================================
-    // APPLY PREPAYMENT CREDIT
-    // ============================================
-    // totalAmount above is the full commercial value of this delivery
-    // (subtotal + shipping + tax). It stays as-is for the CCI mirror
-    // further below, which must reflect the true goods value for customs
-    // regardless of any payment arrangement. The Rechnung actually sent
-    // to the customer only asks for what's still open after deducting
-    // any prepayment credit for this Auftrag.
     const { available: prepaymentCredit, prepayments } =
       await getAvailablePrepaymentCredit(auftrag.id);
     const appliedPrepayment = Math.min(prepaymentCredit, totalAmount);
     const amountDueNow = Math.max(0, totalAmount - appliedPrepayment);
 
-    // Draw the prepayment invoices down oldest-first, decrementing each
-    // one's total_amount by what's consumed here. total_amount on a
-    // prepayment Rechnung IS its remaining unapplied balance — an invoice
-    // not fully drained keeps its leftover balance available for the next
-    // partial delivery against the same Auftrag.
     let remainingToApply = appliedPrepayment;
     const prepaymentsToSave: Rechnung[] = [];
     for (const p of prepayments) {
@@ -535,13 +521,14 @@ export const createRechnungFromAuftrag = async (
       customerSnapshot: auftrag.customerSnapshot || undefined,
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method:
-        shippingMethodOverride ||
-        auftrag.shipping_text ||
-        auftrag.shipping_method ||
-        (auftrag.customerSnapshot as any)?.defaultShippingMethod ||
-        (auftrag.customerSnapshot as any)?.shipping_method ||
-        undefined,
+      shipping_method: include_shipping
+        ? shippingMethodOverride ||
+          auftrag.shipping_text ||
+          auftrag.shipping_method ||
+          (auftrag.customerSnapshot as any)?.defaultShippingMethod ||
+          (auftrag.customerSnapshot as any)?.shipping_method ||
+          undefined
+        : undefined,
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);

@@ -297,7 +297,7 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
 };
 
 const isFreetextLine = (item: any): boolean =>
-  !item?.sourceItemId && !item?.requestedItemId;
+  !item?.itemNO && !item?.requestedItemId;
 
 const getLineTaxRate = (item: any, order: any): number => {
   const orderRate = parseFlexibleNumber(order?.tax_rate) ?? 19;
