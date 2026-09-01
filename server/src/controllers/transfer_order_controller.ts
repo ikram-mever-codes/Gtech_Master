@@ -182,7 +182,7 @@ export const createTransferOrderFromAuftrag = async (
         bodyNotes !== null &&
         String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
-        : auftrag.internal_notes || auftrag.notes || "";
+        : auftrag.internal_notes || "";
 
     const transferOrderRepo: any = AppDataSource.getRepository(TransferOrder);
     const transferOrder = transferOrderRepo.create({
