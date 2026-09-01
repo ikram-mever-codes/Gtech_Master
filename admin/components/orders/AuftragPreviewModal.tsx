@@ -1471,7 +1471,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     )}
                   </div>
 
-                  {order.kundenreferenz && !effectiveEdit && (
+                  {(order.kundenreferenz || effectiveEdit) && (
                     <div className="w-56 shrink-0">
                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                         Kundenreferenz
