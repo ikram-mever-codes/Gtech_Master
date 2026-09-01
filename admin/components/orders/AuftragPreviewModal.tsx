@@ -1707,7 +1707,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       parseFlexibleNumber(item.quantity) ?? 1,
                     );
                     const rowColor =
-                      item.highlightColor || (freetext ? "#D8964A" : null);
+                      item.highlightColor || (freetext ? "" : null);
                     const lineTaxRate = getLineTaxRate(item, order);
                     return (
                       <tr
