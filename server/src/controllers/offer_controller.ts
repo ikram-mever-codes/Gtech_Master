@@ -907,7 +907,8 @@ export class OfferController {
       quantity,
     );
     if (tiered !== null) return tiered;
-    return Number(item.price) || 0;
+    const ownSalesPrice = parseFloat(String(item.sales_price ?? ""));
+    return !isNaN(ownSalesPrice) ? ownSalesPrice : 0;
   }
 
   private itemFieldsOrFallback(

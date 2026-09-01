@@ -145,9 +145,7 @@ async function getEffectiveUnitPrice(
   if (tiered !== null) return tiered;
 
   const ownSalesPrice = parseFloat(String(item.sales_price ?? ""));
-  if (!isNaN(ownSalesPrice) && ownSalesPrice > 0) return ownSalesPrice;
-
-  return Number(item.price) || 0;
+  return !isNaN(ownSalesPrice) ? ownSalesPrice : 0;
 }
 
 const isFreetextLine = (li: CustomerOrderItem) =>

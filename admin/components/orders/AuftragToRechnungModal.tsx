@@ -13,7 +13,7 @@ import {
   deleteCustomerOrder,
 } from "@/api/customer_orders";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, Warehouse, ClipboardCheck, Check } from "lucide-react";
+import { Loader2, Warehouse, ClipboardCheck, Check, AlertTriangle, Building } from "lucide-react";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 
@@ -98,11 +98,10 @@ const Field: React.FC<{
         children
       ) : (
         <div
-          className={`${
-            highlightOrange
-              ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
-              : ""
-          }`}
+          className={`${highlightOrange
+            ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
+            : ""
+            }`}
         >
           {value || "—"}
         </div>
@@ -189,6 +188,8 @@ export default function AuftragToRechnungModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    setShowNoEmailWarning(false);
+    setUserApprovedNoEmail(false);
     Promise.all([
       getAllPaymentMethods(true).catch(() => ({ data: [] })),
       getAllShippingMethods(true).catch(() => ({ data: [] })),
@@ -280,10 +281,10 @@ export default function AuftragToRechnungModal({
     );
     setEditStreet(
       cust.address ||
-        cust.street ||
-        cust.addressLine1 ||
-        cust.bill_to_address ||
-        "",
+      cust.street ||
+      cust.addressLine1 ||
+      cust.bill_to_address ||
+      "",
     );
     setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
     setEditCity(cust.city || "Göttingen");
@@ -560,22 +561,30 @@ export default function AuftragToRechnungModal({
     }
   };
 
-  const handleSubmit = async () => {
-    if (selectedItems.length === 0) {
-      toast.error(
-        "Please select at least 1 item with quantity > 0",
-        errorStyles,
-      );
-      return;
-    }
-    if (hasInvalidSelection) {
-      toast.error(
-        "One or more stock items exceed available stock.",
-        errorStyles,
-      );
-      return;
+  const [showNoEmailWarning, setShowNoEmailWarning] = useState(false);
+  const [userApprovedNoEmail, setUserApprovedNoEmail] = useState(false);
+
+  const checkHasContactEmail = () => {
+    if (!auftrag) return true;
+    const cust = auftrag.customer;
+    const snap = auftrag.customerSnapshot;
+
+    const directEmail = (cust?.email || snap?.email || "").trim();
+    if (directEmail && directEmail.includes("@")) return true;
+
+    const ansprechpartner = (editAnsprechpartner || auftrag.ansprechpartner || "").trim();
+    if (ansprechpartner && ansprechpartner.includes("@")) return true;
+
+    const contacts = cust?.contactPersons || cust?.starBusinessDetails?.contactPersons || snap?.contactPersons;
+    if (Array.isArray(contacts)) {
+      const found = contacts.find((c: any) => c?.email && String(c.email).trim().includes("@"));
+      if (found) return true;
     }
 
+    return false;
+  };
+
+  const proceedWithSubmit = async () => {
     try {
       setSubmitting(true);
       const payloadItems = selectedItems.map((it) => ({
@@ -599,7 +608,7 @@ export default function AuftragToRechnungModal({
       if (res?.success) {
         toast.success(
           res.message ||
-            `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
+          `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
           successStyles,
         );
         const newRechnungId = res?.data?.id;
@@ -622,6 +631,31 @@ export default function AuftragToRechnungModal({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (selectedItems.length === 0) {
+      toast.error(
+        "Please select at least 1 item with quantity > 0",
+        errorStyles,
+      );
+      return;
+    }
+    if (hasInvalidSelection) {
+      toast.error(
+        "One or more stock items exceed available stock.",
+        errorStyles,
+      );
+      return;
+    }
+
+    const hasEmail = checkHasContactEmail();
+    if (!hasEmail && !userApprovedNoEmail) {
+      setShowNoEmailWarning(true);
+      return;
+    }
+
+    await proceedWithSubmit();
   };
 
   return (
@@ -796,11 +830,10 @@ export default function AuftragToRechnungModal({
                     setDeliveryDate(e.target.value);
                     setIsDatePastOrEmpty(false);
                   }}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${
-                    isDatePastOrEmpty || !deliveryDate
-                      ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
-                      : "bg-white border-gray-300 text-gray-900"
-                  }`}
+                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
+                    ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
+                    : "bg-white border-gray-300 text-gray-900"
+                    }`}
                 />
               </div>
 
@@ -1111,11 +1144,10 @@ export default function AuftragToRechnungModal({
                             onChange={(e) =>
                               updateQty(item.lineItemId, e.target.value)
                             }
-                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${
-                              invalid
-                                ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
-                                : "border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500"
-                            }`}
+                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${invalid
+                              ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
+                              : "border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500"
+                              }`}
                           />
                         </td>
 
@@ -1316,6 +1348,60 @@ export default function AuftragToRechnungModal({
           </div>
         </div>
       </div>
+
+      {showNoEmailWarning && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 select-none">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-900 font-sans">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
+              <h3 className="text-base font-bold text-gray-900">
+                No Contact Person Email Address
+              </h3>
+            </div>
+            <p className="text-sm text-gray-700 leading-relaxed mb-6">
+              No contact person email address. Do you want to continue Ausliefern?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const customerId =
+                    auftrag.customer_id ||
+                    auftrag.customer?.id ||
+                    auftrag.customerSnapshot?.id ||
+                    auftrag.customerSnapshot?.customer_id;
+                  const targetUrl = customerId
+                    ? `/bussinesses?id=${customerId}`
+                    : `/bussinesses`;
+                  window.open(targetUrl, "_blank");
+                }}
+                className="px-3.5 py-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg hover:bg-amber-100 flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Building className="w-4 h-4 text-amber-600" />
+                Business Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNoEmailWarning(false)}
+                className="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoEmailWarning(false);
+                  setUserApprovedNoEmail(true);
+                  proceedWithSubmit();
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1 shadow-sm"
+              >
+                Ja, trotzdem ausliefern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
