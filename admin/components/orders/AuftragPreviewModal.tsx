@@ -164,7 +164,12 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const postalCode = (addr.postalCode || addr.postal_code || "").trim();
   const city = (addr.city || "").trim();
 
-  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+  if (
+    postalCode &&
+    city &&
+    street.includes(postalCode) &&
+    street.includes(city)
+  ) {
     street = street
       .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
       .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
@@ -173,11 +178,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   }
 
   const cityLine = `${postalCode} ${city}`.trim();
-  const addressLine = [
-    street,
-    cityLine,
-    !isGermany ? countryCode : "",
-  ]
+  const addressLine = [street, cityLine, !isGermany ? countryCode : ""]
     .filter(Boolean)
     .join(", ");
 
@@ -1424,20 +1425,25 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 </select>
               </Field>
               {(() => {
-                const currentPmName = form.paymentMethod || order.payment_method || "";
+                const currentPmName =
+                  form.paymentMethod || order.payment_method || "";
                 const selectedPmObj = dbPaymentMethods.find(
-                  (pm: any) => pm.name === currentPmName
+                  (pm: any) => pm.name === currentPmName,
                 );
                 const isDueDaysEditable = selectedPmObj
                   ? !selectedPmObj.is_prepayment
                   : currentPmName
-                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(currentPmName)
+                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(
+                        currentPmName,
+                      )
                     : false;
 
                 return (
                   <Field
                     label="Due Days"
-                    edit={effectiveEdit && canEditCommercial && isDueDaysEditable}
+                    edit={
+                      effectiveEdit && canEditCommercial && isDueDaysEditable
+                    }
                     value={order.payment_terms}
                   >
                     <input
@@ -1448,7 +1454,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       placeholder="e.g., 30"
                       disabled={!isDueDaysEditable}
                       onChange={(e) =>
-                        patch({ paymentTerms: e.target.value.replace(/\D/g, "") })
+                        patch({
+                          paymentTerms: e.target.value.replace(/\D/g, ""),
+                        })
                       }
                     />
                   </Field>
@@ -1699,8 +1707,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     const qtyDisplay = Math.round(
                       parseFlexibleNumber(item.quantity) ?? 1,
                     );
-                    const rowColor =
-                      item.highlightColor || (freetext ? "#D8964A" : null);
+                    const rowColor = item.highlightColor;
                     const lineTaxRate = getLineTaxRate(item, order);
                     return (
                       <tr
