@@ -296,9 +296,8 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
   );
 };
 
-/** An order line is a "Freizeile" if it wasn't sourced from a catalog item
- * — same rule the Offer modal uses. Only these can have their own VAT. */
-const isFreetextLine = (item: any): boolean => !item?.sourceItemId;
+const isFreetextLine = (item: any): boolean =>
+  !item?.sourceItemId && !item?.requestedItemId;
 
 const getLineTaxRate = (item: any, order: any): number => {
   const orderRate = parseFlexibleNumber(order?.tax_rate) ?? 19;
@@ -1707,7 +1706,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     const qtyDisplay = Math.round(
                       parseFlexibleNumber(item.quantity) ?? 1,
                     );
-                    const rowColor = item.highlightColor;
+                    const rowColor =
+                      item.highlightColor || (freetext ? "#D8964A" : null);
                     const lineTaxRate = getLineTaxRate(item, order);
                     return (
                       <tr
