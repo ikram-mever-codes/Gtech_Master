@@ -993,6 +993,11 @@ const ItemDetailsPage = () => {
         return;
       }
 
+      const effectiveIsActive =
+        updatedData.isActive !== undefined
+          ? Boolean(updatedData.isActive)
+          : Boolean(updatedData.others?.isActive);
+
       const payload: any = {
         item_name: updatedData.name,
         item_name_cn: updatedData.nameCN,
@@ -1001,7 +1006,7 @@ const ItemDetailsPage = () => {
         remark: updatedData.remark,
         remark_ex: updatedData.remark_ex,
         cat_id: toInt(updatedData.category_id),
-        isActive: updatedData.isActive ? "Y" : "N",
+        isActive: effectiveIsActive ? "Y" : "N",
         weight: toNum(updatedData.dimensions?.weight),
         length: toNum(updatedData.dimensions?.length),
         width: toNum(updatedData.dimensions?.width),
@@ -1043,7 +1048,7 @@ const ItemDetailsPage = () => {
 
         warehouseItemData: {
           is_stock_item: updatedData.others?.isStock ? "Y" : "N",
-          is_active: updatedData.others?.isActive ? "Y" : "N",
+          is_active: effectiveIsActive ? "Y" : "N",
           msq: toNum(updatedData.others?.msq),
           is_no_auto_order: updatedData.others?.isNAO ? "Y" : "N",
           buffer: toInt(updatedData.others?.buffer),
@@ -1403,9 +1408,32 @@ const ItemDetailsPage = () => {
                   itemData={itemData}
                   setItemData={setItemData}
                 />
-                <InfoRow label="Active">
-                  <StatusIndicator value={itemData.isActive} />
-                </InfoRow>
+                <SelectInfoRow
+                  label="Active Status"
+                  value={itemData.isActive ? "Yes" : "No"}
+                  field="isActive"
+                  options={[
+                    { label: "Yes", value: "Yes" },
+                    { label: "No", value: "No" },
+                  ]}
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={(updated) => {
+                    if (!updated) return;
+                    const isAct =
+                      updated.isActive === true ||
+                      updated.isActive === "Yes" ||
+                      updated.isActive === "Y";
+                    setItemData({
+                      ...updated,
+                      isActive: isAct,
+                      others: {
+                        ...(updated.others || {}),
+                        isActive: isAct,
+                      },
+                    });
+                  }}
+                />
               </div>
             </div>
           )}
@@ -1842,7 +1870,21 @@ const ItemDetailsPage = () => {
                     field="others.isActive"
                     editMode={editMode}
                     itemData={itemData}
-                    setItemData={setItemData}
+                    setItemData={(updated) => {
+                      if (!updated) return;
+                      const isAct =
+                        updated.others?.isActive === true ||
+                        updated.others?.isActive === "Y" ||
+                        updated.others?.isActive === "Yes";
+                      setItemData({
+                        ...updated,
+                        isActive: isAct,
+                        others: {
+                          ...(updated.others || {}),
+                          isActive: isAct,
+                        },
+                      });
+                    }}
                     options={[
                       { label: "Y", value: "Y" },
                       { label: "N", value: "N" },
