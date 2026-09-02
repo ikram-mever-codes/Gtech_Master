@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { FunnelIcon } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import {
   getAllPaymentAccounts,
   createPaymentAccount,
@@ -210,8 +211,11 @@ export default function PaymentAccountsPage() {
 
   const filterBar = (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
-        <FunnelIcon className="w-4 h-4 text-primary" />
+      <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
+        <FilterResetIcon
+          isActive={!!searchQuery}
+          onReset={() => setSearchQuery("")}
+        />
       </div>
       <div className="relative w-80 shrink-0">
         <input

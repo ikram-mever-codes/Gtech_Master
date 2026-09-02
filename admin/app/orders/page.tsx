@@ -27,6 +27,7 @@ import {
   ChevronDownIcon,
   FunnelIcon,
 } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import { toast } from "react-hot-toast";
 import {
   getAllOrders,
@@ -1559,8 +1560,16 @@ const OrderPage: React.FC = () => {
 
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2 overflow-visible">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 flex-1">
-            <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
-              <FunnelIcon className="w-4 h-4 text-primary" />
+            <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
+              <FilterResetIcon
+                isActive={Boolean(nsoSearch || supplierOrderSearch || poSearch || reprintSearch)}
+                onReset={() => {
+                  setNsoSearch("");
+                  setSupplierOrderSearch("");
+                  setPoSearch("");
+                  setReprintSearch("");
+                }}
+              />
             </div>
             <div className="w-64 shrink-0">
               <input
@@ -1595,20 +1604,6 @@ const OrderPage: React.FC = () => {
                 className={getInputClass(!!(activeTab === "nso" ? nsoSearch : activeTab === "supplier_orders" ? supplierOrderSearch : activeTab === "purchase_order" ? poSearch : reprintSearch))}
               />
             </div>
-            {(nsoSearch || supplierOrderSearch || poSearch || reprintSearch) && (
-              <button
-                onClick={() => {
-                  setNsoSearch("");
-                  setSupplierOrderSearch("");
-                  setPoSearch("");
-                  setReprintSearch("");
-                }}
-                className="px-2.5 h-8 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <ArrowPathIcon className="w-3.5 h-3.5" />
-                Reset
-              </button>
-            )}
           </div>
         </div>
 

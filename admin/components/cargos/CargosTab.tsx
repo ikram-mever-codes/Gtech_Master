@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Truck } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import ModalHeader from "@/components/UI/ModalHeader";
 import ModalFooter from "@/components/UI/ModalFooter";
 import { toast } from "react-hot-toast";
@@ -716,18 +717,13 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                 onChange={handleStatusFilterChange}
                             />
                         </div>
-                        {(search || statusFilter !== "Open") && (
-                            <button
-                                onClick={() => {
-                                    setLocalSearch("");
-                                    handleStatusFilterChange("Open");
-                                }}
-                                className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm justify-center"
-                            >
-                                <ArrowPathIcon className="w-4 h-4" />
-                                Reset
-                            </button>
-                        )}
+                        <FilterResetIcon
+                            isActive={Boolean(search || statusFilter !== "Open")}
+                            onReset={() => {
+                                setLocalSearch("");
+                                handleStatusFilterChange("Open");
+                            }}
+                        />
                     </div>
                 </div>
             )}

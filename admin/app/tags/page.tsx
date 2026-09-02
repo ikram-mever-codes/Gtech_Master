@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Tag, Plus, RefreshCw, Pencil, Trash, Check } from "lucide-react";
 import { FunnelIcon } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import { getTags, createTag, updateTag, deleteTag } from "@/api/tags";
 import { toast } from "react-hot-toast";
 import { colorClasses, TagBadge } from "@/components/Tags/TagManager";
@@ -168,7 +169,10 @@ export default function TagsPage() {
   const filterBar = (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-        <FunnelIcon className="w-4 h-4 text-gray-400" />
+        <FilterResetIcon
+          isActive={activeTab !== "company"}
+          onReset={() => setActiveTab("company")}
+        />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {CATEGORIES.map((cat) => {

@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { PlusIcon, RefreshCw, Users, Search, X } from "lucide-react";
 import { FunnelIcon } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import PageHeader from "@/components/UI/PageHeader";
 import { UserRole, UserStatus } from "@/utils/interfaces";
 import theme from "@/styles/theme";
@@ -207,8 +208,18 @@ export default function UsersPage() {
 
   const filterBar = (
     <div className="flex flex-wrap gap-3 items-center w-full">
-      <div className="flex items-center gap-1 text-gray-400 shrink-0 select-none px-0.5">
-        <FunnelIcon className="w-4 h-4 text-primary" />
+      <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
+        <FilterResetIcon
+          isActive={Boolean(
+            searchText ||
+              filters.status.length > 0 ||
+              filters.role.length > 0,
+          )}
+          onReset={() => {
+            setSearchText("");
+            setFilters({ status: [], role: [] });
+          }}
+        />
       </div>
       <div className="relative w-72 shrink-0">
         <input
