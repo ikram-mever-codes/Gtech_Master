@@ -297,18 +297,6 @@ export const SuppliersPage = React.forwardRef<
                             onReset={() => setTagsFilter("")}
                         />
                     </div>
-                    {(search || tagsFilter) && (
-                        <button
-                            onClick={() => {
-                                setSearch("");
-                                setTagsFilter("");
-                            }}
-                            className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
-                        >
-                            <ArrowPathIcon className="w-4 h-4" />
-                            Reset
-                        </button>
-                    )}
                 </div>
             </div>
 
