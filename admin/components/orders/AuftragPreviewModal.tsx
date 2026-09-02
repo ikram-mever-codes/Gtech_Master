@@ -244,11 +244,40 @@ const TextCellInput: React.FC<{
   onCommit: (raw: string) => void;
   className?: string;
   placeholder?: string;
-}> = ({ value, onCommit, className, placeholder }) => {
+  multiline?: boolean;
+}> = ({ value, onCommit, className, placeholder, multiline = true }) => {
   const [local, setLocal] = useState(value || "");
+
   useEffect(() => {
     setLocal(value || "");
   }, [value]);
+
+  if (multiline) {
+    const text = local || "";
+    const lines = text.split("\n");
+    let lineCount = lines.length;
+    lines.forEach((l) => {
+      if (l.length > 22) {
+        lineCount += Math.floor(l.length / 22);
+      }
+    });
+    const rows = Math.max(1, Math.min(6, lineCount));
+
+    return (
+      <textarea
+        rows={rows}
+        className={
+          className ||
+          "w-full px-1.5 py-1 text-sm border border-gray-300 rounded bg-white leading-snug resize-y min-h-[34px]"
+        }
+        value={local}
+        placeholder={placeholder}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={() => onCommit(local)}
+      />
+    );
+  }
+
   return (
     <input
       type="text"
@@ -1766,6 +1795,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                             <TextCellInput
                               value={item.itemNo || item.material}
                               placeholder="Art.-Nr."
+                              multiline={false}
                               onCommit={(raw) =>
                                 persistLine(item.id, { itemNo: raw })
                               }
@@ -1905,8 +1935,26 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-gray-400">—</td>
                       <td className="px-2 py-2">
                         {effectiveEdit && canEditCommercial ? (
-                          <input
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
+                          <textarea
+                            rows={Math.max(
+                              1,
+                              Math.min(
+                                6,
+                                (
+                                  form.shippingText !== undefined
+                                    ? form.shippingText
+                                    : form.shippingMethod || ""
+                                ).split("\n").length ||
+                                  Math.ceil(
+                                    (
+                                      form.shippingText !== undefined
+                                        ? form.shippingText
+                                        : form.shippingMethod || ""
+                                    ).length / 22,
+                                  ),
+                              ),
+                            )}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white leading-snug resize-y min-h-[34px]"
                             value={
                               form.shippingText !== undefined
                                 ? form.shippingText

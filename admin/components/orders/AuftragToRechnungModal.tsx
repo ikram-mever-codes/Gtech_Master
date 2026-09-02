@@ -1111,8 +1111,17 @@ export default function AuftragToRechnungModal({
                         {/* Bezeichnung */}
                         <td className="px-2 py-2 font-bold">
                           {isEditingAuftrag ? (
-                            <input
-                              type="text"
+                            <textarea
+                              rows={Math.max(
+                                1,
+                                Math.min(
+                                  6,
+                                  (item.itemName || "").split("\n").length ||
+                                    Math.ceil(
+                                      (item.itemName || "").length / 22,
+                                    ),
+                                ),
+                              )}
                               value={item.itemName}
                               onChange={(e) =>
                                 updateItemField(
@@ -1121,7 +1130,7 @@ export default function AuftragToRechnungModal({
                                   e.target.value,
                                 )
                               }
-                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white font-bold"
+                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white font-bold leading-snug resize-y min-h-[30px]"
                             />
                           ) : (
                             item.itemName
@@ -1131,8 +1140,17 @@ export default function AuftragToRechnungModal({
                         {/* Hinweis */}
                         <td className="px-2 py-2">
                           {isEditingAuftrag ? (
-                            <input
-                              type="text"
+                            <textarea
+                              rows={Math.max(
+                                1,
+                                Math.min(
+                                  6,
+                                  (item.hinweis || "").split("\n").length ||
+                                    Math.ceil(
+                                      (item.hinweis || "").length / 22,
+                                    ),
+                                ),
+                              )}
                               value={item.hinweis}
                               onChange={(e) =>
                                 updateItemField(
@@ -1141,7 +1159,7 @@ export default function AuftragToRechnungModal({
                                   e.target.value,
                                 )
                               }
-                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white"
+                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white leading-snug resize-y min-h-[30px]"
                               placeholder="Remark..."
                             />
                           ) : (
