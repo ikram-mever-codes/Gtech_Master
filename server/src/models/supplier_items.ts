@@ -35,7 +35,7 @@ export class SupplierItem {
   @Column({ type: "int", default: 0 })
   oi!: number;
 
-  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  @Column({ type: "decimal", precision: 10, scale: 3, nullable: true })
   price_rmb?: number;
 
   @Column({

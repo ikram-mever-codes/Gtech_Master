@@ -1393,7 +1393,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
-                        value={previewItem.sales_price ?? ""}
+                        value={formatMax3Decimals(previewItem.sales_price ?? 0) || ""}
                         onChange={(raw) => patchPreview({ sales_price: raw })}
                       />
                       <span className="text-xs font-semibold text-gray-700 shrink-0">
