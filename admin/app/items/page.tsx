@@ -1712,15 +1712,28 @@ const ItemsManagementPage: React.FC = () => {
                           filters.search ||
                             filters.eanSearch ||
                             filters.status ||
-                            filters.category ||
+                            (filters.category && filters.category !== "PRO") ||
                             filters.supplier ||
-                            filters.isActive ||
+                            (filters.isActive && filters.isActive !== "Y") ||
                             filters.tags ||
                             filters.company ||
                             filters.isLabel ||
                             filters.isStock,
                         )}
-                        onReset={resetFilters}
+                        onReset={() =>
+                          setFilters({
+                            search: "",
+                            eanSearch: "",
+                            status: "",
+                            category: auditFilter ? "" : "PRO",
+                            supplier: "",
+                            isActive: auditFilter ? "" : "Y",
+                            tags: "",
+                            company: "",
+                            isLabel: "",
+                            isStock: "",
+                          })
+                        }
                       />
                     </div>
                     <div className="relative w-[115px] flex-shrink-0">
@@ -1881,6 +1894,23 @@ const ItemsManagementPage: React.FC = () => {
                               {name}
                             </option>
                           ))}
+                      </select>
+                    </div>
+
+                    <div className="w-[100px] flex-shrink-0">
+                      <select
+                        value={filters.isActive}
+                        onChange={(e) =>
+                          setFilters({ ...filters, isActive: e.target.value })
+                        }
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isActive && filters.isActive !== "Y"
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-900 border-gray-300 bg-white"
+                          }`}
+                      >
+                        <option value="Y">Active</option>
+                        <option value="N">Inactive</option>
+                        <option value="">All Status</option>
                       </select>
                     </div>
                   </div>
