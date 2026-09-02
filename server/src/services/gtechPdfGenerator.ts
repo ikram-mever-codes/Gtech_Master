@@ -778,7 +778,7 @@ export async function generateGtechDocumentPdf(
         ? Number(opts.taxRate)
         : 0;
 
-  if (shippingMethod) {
+  if (shippingMethod && (showPrices ? (shippingCostNum > 0 && shippingQtyNum > 0) : true)) {
     const totalItemCount = opts.lineItems ? opts.lineItems.length : 0;
     const shipRowNum = totalItemCount + 1;
     const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";

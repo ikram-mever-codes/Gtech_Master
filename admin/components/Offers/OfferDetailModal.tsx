@@ -487,12 +487,39 @@ const TextCellInput: React.FC<{
   onCommit: (raw: string) => void;
   className?: string;
   placeholder?: string;
-}> = ({ value, onCommit, className, placeholder }) => {
+  multiline?: boolean;
+}> = ({ value, onCommit, className, placeholder, multiline = true }) => {
   const [local, setLocal] = useState(value || "");
 
   useEffect(() => {
     setLocal(value || "");
   }, [value]);
+
+  if (multiline) {
+    const text = local || "";
+    const lines = text.split("\n");
+    let lineCount = lines.length;
+    lines.forEach((l) => {
+      if (l.length > 22) {
+        lineCount += Math.floor(l.length / 22);
+      }
+    });
+    const rows = Math.max(1, Math.min(6, lineCount));
+
+    return (
+      <textarea
+        rows={rows}
+        className={
+          className ||
+          "w-full px-1.5 py-1 text-sm border border-gray-300 rounded bg-white leading-snug resize-y min-h-[34px]"
+        }
+        value={local}
+        placeholder={placeholder}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={() => onCommit(local)}
+      />
+    );
+  }
 
   return (
     <input
@@ -1576,7 +1603,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1450px] w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1260px] w-full max-h-[92vh] flex flex-col overflow-hidden">
         {isCreate ? (
           <>
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
@@ -2662,6 +2689,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   <TextCellInput
                                     value={item.itemNo}
                                     placeholder="Art.-Nr."
+                                    multiline={false}
                                     onCommit={(raw) =>
                                       persistLine(item.id, { material: raw })
                                     }
@@ -2792,7 +2820,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                           );
                         })}
 
-                        {/* Shipping method row with editable quantity and price */}
                         {offer.shippingMethod && (
                           <tr className="bg-gray-50/80 border-t-2 border-gray-200">
                             <td className="px-2 py-2 text-gray-400">
@@ -2802,8 +2829,26 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             <td className="px-2 py-2 text-gray-400">—</td>
                             <td className="px-2 py-2">
                               {edit ? (
-                                <input
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
+                                <textarea
+                                  rows={Math.max(
+                                    1,
+                                    Math.min(
+                                      6,
+                                      (
+                                        form.shippingText !== undefined
+                                          ? form.shippingText
+                                          : form.shippingMethod || ""
+                                      ).split("\n").length ||
+                                      Math.ceil(
+                                        (
+                                          form.shippingText !== undefined
+                                            ? form.shippingText
+                                            : form.shippingMethod || ""
+                                        ).length / 22,
+                                      ),
+                                    ),
+                                  )}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white leading-snug resize-y min-h-[34px]"
                                   value={
                                     form.shippingText !== undefined
                                       ? form.shippingText

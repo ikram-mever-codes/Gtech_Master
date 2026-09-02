@@ -81,7 +81,8 @@ import ItemCreateModal from "@/components/Item/ItemCreateModal";
 import ParentModal from "@/components/Item/ParentModal";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { SupplierSearchInput } from "@/components/UI/SupplierSearchInput";
-import { TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
+import { EntityTagSelector, TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
 import { SuppliersPage } from "@/components/Supplier/SuppliersPage";
 import { formatDate } from "@/utils/date";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
@@ -1706,29 +1707,34 @@ const ItemsManagementPage: React.FC = () => {
                 {activeTab === "items" ? (
                   <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full py-0.5 relative z-10">
                     <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
-                      {Boolean(
-                        filters.search ||
-                        filters.eanSearch ||
-                        filters.status ||
-                        filters.category ||
-                        filters.supplier ||
-                        filters.isActive ||
-                        filters.tags ||
-                        filters.company ||
-                        filters.isLabel ||
-                        filters.isStock
-                      ) ? (
-                        <button
-                          type="button"
-                          onClick={resetFilters}
-                          className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                          title="Reset all filters"
-                        >
-                          <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
-                        </button>
-                      ) : (
-                        <FunnelIcon className="w-4 h-4 text-primary" />
-                      )}
+                      <FilterResetIcon
+                        isActive={Boolean(
+                          filters.search ||
+                            filters.eanSearch ||
+                            filters.status ||
+                            (filters.category && filters.category !== "PRO") ||
+                            filters.supplier ||
+                            (filters.isActive && filters.isActive !== "Y") ||
+                            filters.tags ||
+                            filters.company ||
+                            filters.isLabel ||
+                            filters.isStock,
+                        )}
+                        onReset={() =>
+                          setFilters({
+                            search: "",
+                            eanSearch: "",
+                            status: "",
+                            category: auditFilter ? "" : "PRO",
+                            supplier: "",
+                            isActive: auditFilter ? "" : "Y",
+                            tags: "",
+                            company: "",
+                            isLabel: "",
+                            isStock: "",
+                          })
+                        }
+                      />
                     </div>
                     <div className="relative w-[115px] flex-shrink-0">
                       <div className="relative">
@@ -1890,22 +1896,31 @@ const ItemsManagementPage: React.FC = () => {
                           ))}
                       </select>
                     </div>
+
+                    <div className="w-[100px] flex-shrink-0">
+                      <select
+                        value={filters.isActive}
+                        onChange={(e) =>
+                          setFilters({ ...filters, isActive: e.target.value })
+                        }
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isActive && filters.isActive !== "Y"
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-900 border-gray-300 bg-white"
+                          }`}
+                      >
+                        <option value="Y">Active</option>
+                        <option value="N">Inactive</option>
+                        <option value="">All Status</option>
+                      </select>
+                    </div>
                   </div>
                 ) : activeTab === "parents" ? (
                   <div className="flex flex-wrap items-center gap-2 w-full">
                     <div className="flex items-center gap-1.5 shrink-0 select-none px-1">
-                      {!!filters.search ? (
-                        <button
-                          type="button"
-                          onClick={resetFilters}
-                          className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                          title="Reset search"
-                        >
-                          <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
-                        </button>
-                      ) : (
-                        <FunnelIcon className="w-5 h-5 text-primary" />
-                      )}
+                      <FilterResetIcon
+                        isActive={!!filters.search}
+                        onReset={resetFilters}
+                      />
                     </div>
                     <div className="w-64 shrink-0">
                       <input
@@ -1922,18 +1937,10 @@ const ItemsManagementPage: React.FC = () => {
                 ) : activeTab === "tarics" ? (
                   <div className="flex flex-wrap items-center gap-2 w-full">
                     <div className="flex items-center gap-1.5 shrink-0 select-none px-1">
-                      {!!taricSearch ? (
-                        <button
-                          type="button"
-                          onClick={() => setTaricSearch("")}
-                          className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                          title="Reset search"
-                        >
-                          <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
-                        </button>
-                      ) : (
-                        <FunnelIcon className="w-5 h-5 text-primary" />
-                      )}
+                      <FilterResetIcon
+                        isActive={!!taricSearch}
+                        onReset={() => setTaricSearch("")}
+                      />
                     </div>
                     <div className="w-64 shrink-0">
                       <input

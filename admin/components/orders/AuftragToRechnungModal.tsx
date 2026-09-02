@@ -709,7 +709,7 @@ export default function AuftragToRechnungModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1450px] w-full max-h-[92vh] flex flex-col overflow-hidden text-gray-900 font-sans">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1260px] w-full max-h-[92vh] flex flex-col overflow-hidden text-gray-900 font-sans">
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1113,8 +1113,17 @@ export default function AuftragToRechnungModal({
                         {/* Bezeichnung */}
                         <td className="px-2 py-2 font-bold">
                           {isEditingAuftrag ? (
-                            <input
-                              type="text"
+                            <textarea
+                              rows={Math.max(
+                                1,
+                                Math.min(
+                                  6,
+                                  (item.itemName || "").split("\n").length ||
+                                    Math.ceil(
+                                      (item.itemName || "").length / 22,
+                                    ),
+                                ),
+                              )}
                               value={item.itemName}
                               onChange={(e) =>
                                 updateItemField(
@@ -1123,7 +1132,7 @@ export default function AuftragToRechnungModal({
                                   e.target.value,
                                 )
                               }
-                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white font-bold"
+                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white font-bold leading-snug resize-y min-h-[30px]"
                             />
                           ) : (
                             item.itemName
@@ -1133,8 +1142,17 @@ export default function AuftragToRechnungModal({
                         {/* Hinweis */}
                         <td className="px-2 py-2">
                           {isEditingAuftrag ? (
-                            <input
-                              type="text"
+                            <textarea
+                              rows={Math.max(
+                                1,
+                                Math.min(
+                                  6,
+                                  (item.hinweis || "").split("\n").length ||
+                                    Math.ceil(
+                                      (item.hinweis || "").length / 22,
+                                    ),
+                                ),
+                              )}
                               value={item.hinweis}
                               onChange={(e) =>
                                 updateItemField(
@@ -1143,7 +1161,7 @@ export default function AuftragToRechnungModal({
                                   e.target.value,
                                 )
                               }
-                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white"
+                              className="w-full px-1.5 py-0.5 text-xs border rounded text-gray-900 bg-white leading-snug resize-y min-h-[30px]"
                               placeholder="Remark..."
                             />
                           ) : (

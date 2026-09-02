@@ -638,7 +638,7 @@ export default function RechnungDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1450px] w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-[1260px] w-full max-h-[92vh] flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">

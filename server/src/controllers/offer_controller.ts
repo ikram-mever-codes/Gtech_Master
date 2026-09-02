@@ -4465,7 +4465,7 @@ export class OfferController {
           ? getSafeNumber(offer.shippingTaxRate)
           : resolvedDefaultTaxRate;
 
-      if (shippingMethod) {
+      if (shippingMethod && shippingCostNum > 0 && shippingQtyNum > 0) {
         const totalItemCount = offer.lineItems
           ? offer.lineItems.filter((item: any) => !item.isComponent).length
           : 0;

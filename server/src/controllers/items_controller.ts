@@ -577,9 +577,12 @@ export const getItems = async (
         item_name_de: item.item_name_de || null,
         ean: item.ean || null,
         ItemID_DE: item.ItemID_DE || null,
-        is_active: warehouseData
-          ? warehouseData.is_active
-          : item.isActive || "N",
+        is_active:
+          item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
+            ? "N"
+            : warehouseData
+            ? warehouseData.is_active
+            : item.isActive || "N",
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
@@ -797,9 +800,12 @@ export const getItemById = async (
       itemNo: `${item.id} / ${de_no}`,
       item_name: item.item_name || "",
       item_name_de: item.item_name_de || "",
-      is_active: primaryWarehouseItem
-        ? primaryWarehouseItem.is_active
-        : item.isActive || "N",
+      is_active:
+        item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
+          ? "N"
+          : primaryWarehouseItem
+          ? primaryWarehouseItem.is_active
+          : item.isActive || "N",
       created_at: item.created_at,
       name: item.item_name || "",
       nameCN: item.item_name_cn || "",
@@ -817,9 +823,12 @@ export const getItemById = async (
       customer_name: item.customer?.companyName || "",
       customer: item.customer,
       painPoints: item.painPoints || [],
-      isActive: primaryWarehouseItem
-        ? primaryWarehouseItem.is_active === "Y"
-        : item.isActive === "Y",
+      isActive:
+        item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
+          ? false
+          : primaryWarehouseItem
+          ? primaryWarehouseItem.is_active === "Y"
+          : item.isActive === "Y",
       tags: item.tags || [],
       tagOrder: item.tagOrder,
       is_updated: item.is_updated,
@@ -889,9 +898,12 @@ export const getItemById = async (
           primaryWarehouseItem?.item_name_de || item.parent?.name_de || "",
         nameEN:
           primaryWarehouseItem?.item_name_en || item.parent?.name_en || "",
-        isActive: primaryWarehouseItem
-          ? primaryWarehouseItem.is_active === "Y"
-          : item.isActive === "Y",
+        isActive:
+          item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
+            ? false
+            : primaryWarehouseItem
+            ? primaryWarehouseItem.is_active === "Y"
+            : item.isActive === "Y",
         isStock: warehouseItems.some((wi: any) => (wi.stock_qty || 0) > 0),
         qty: warehouseItems
           .reduce((sum, wi: any) => sum + (wi.stock_qty || 0), 0)
@@ -1610,6 +1622,14 @@ export const updateItem = async (
       where: { item_id: item.id },
     });
     if (warehouseItem) {
+      if (req.body.isActive !== undefined) {
+        const activeStr =
+          req.body.isActive === "Y" || req.body.isActive === true || req.body.isActive === "Yes"
+            ? "Y"
+            : "N";
+        warehouseItem.is_active = activeStr;
+        await warehouseRepository.save(warehouseItem);
+      }
       if (warehouseItemData) {
         Object.assign(warehouseItem, {
           is_stock_item:

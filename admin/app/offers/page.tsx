@@ -16,6 +16,7 @@ import {
   FunnelIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import {
   BadgePercent,
   FileDown,
@@ -845,20 +846,12 @@ const OffersPage: React.FC<any> = ({
       {!embedded && (
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
-            {Boolean(filters.search || filters.status) ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setFilters({ ...filters, search: "", status: "", page: 1 })
-                }
-                className="w-6 h-6 rounded-md bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0"
-                title="Reset all filters"
-              >
-                <XMarkIcon className="w-3.5 h-3.5 stroke-[2.5]" />
-              </button>
-            ) : (
-              <FunnelIcon className="w-5 h-5 text-primary shrink-0" />
-            )}
+            <FilterResetIcon
+              isActive={Boolean(filters.search || filters.status)}
+              onReset={() =>
+                setFilters({ ...filters, search: "", status: "", page: 1 })
+              }
+            />
             <div className="w-64 shrink-0">
               <input
                 type="text"
