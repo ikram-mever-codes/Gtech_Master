@@ -523,6 +523,12 @@ export const downloadLieferscheinPdf = async (
       displayStatus = lieferschein.status;
     }
 
+    const auftragNo =
+      customerOrder?.order_no ||
+      lieferschein.auftrag_no ||
+      rechnung?.auftrag_no ||
+      (lieferschein as any).orderNumber;
+
     await generateGtechDocumentPdf({
       documentType: "Lieferschein",
       documentNumber: lieferschein.delivery_note_number,
@@ -531,14 +537,17 @@ export const downloadLieferscheinPdf = async (
       customerEntity: rechnung?.customer,
       deliveryAddress: rechnung?.deliveryAddress,
       metadataItems: [
-        ["Status", displayStatus],
-        ["Kontakt", contactName],
-        ["Kunde", kundeCombined],
+        ["Status", String(displayStatus || "")],
+        ["Kontakt", String(contactName || "")],
+        ["Kunde", String(kundeCombined || "")],
+        ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
         [
           "Datum",
-          formatDateStr(lieferschein.date_created || lieferschein.created_at),
+          String(
+            formatDateStr(lieferschein.date_created || lieferschein.created_at),
+          ),
         ],
-      ],
+      ] as [string, string][],
       kontaktName: contactName,
       kontaktEmail: (req as any).user?.email,
       isDelivered: true,

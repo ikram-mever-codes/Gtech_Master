@@ -1431,6 +1431,12 @@ export const downloadRechnungPdf = async (
     const invoiceTotal = Number(rechnung.total_amount || 0);
     const outstandingAmount = Math.max(0, invoiceTotal - totalPaid - totalRk);
 
+    const auftragNo =
+      auftrag?.order_no ||
+      rechnung.auftrag_no ||
+      (rechnung as any).auftragNo ||
+      (rechnung as any).order_no;
+
     await generateGtechDocumentPdf({
       documentType: "Rechnung",
       documentNumber: rechnung.invoice_number,
@@ -1439,13 +1445,16 @@ export const downloadRechnungPdf = async (
       customerEntity: rechnung.customer,
       deliveryAddress: rechnung.deliveryAddress,
       metadataItems: [
-        ["Kontakt", contactName],
-        ["Kunde", kundeCombined],
+        ["Kontakt", String(contactName || "")],
+        ["Kunde", String(kundeCombined || "")],
+        ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
         [
           "Datum",
-          rechnung.date_created || rechnung.created_at || rechnung.invoice_date,
+          String(
+            rechnung.date_created || rechnung.created_at || rechnung.invoice_date || "",
+          ),
         ],
-      ],
+      ] as [string, string][],
       kontaktName: contactName,
       kontaktEmail: (req as any).user?.email,
       isDelivered: true,

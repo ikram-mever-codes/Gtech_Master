@@ -822,6 +822,11 @@ export const downloadRechnungKPdf = async (
       };
     });
 
+    const auftragNo =
+      rechnungK.auftrag_no ||
+      rechnungK.order_number ||
+      (rechnungK as any).auftragNo;
+
     await generateGtechDocumentPdf({
       documentType: "RK" as any,
       documentNumber: rechnungK.invoice_number,
@@ -830,15 +835,19 @@ export const downloadRechnungKPdf = async (
       customerEntity: rechnungK.customer,
       deliveryAddress: rechnungK.deliveryAddress,
       metadataItems: [
-        ["Kontakt", contactName],
-        ["Kunde", kundeCombined],
+        ["Kontakt", String(contactName || "")],
+        ["Kunde", String(kundeCombined || "")],
+        ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
         [
           "Datum",
-          rechnungK.date_created ||
-            rechnungK.created_at ||
-            rechnungK.invoice_date,
+          String(
+            rechnungK.date_created ||
+              rechnungK.created_at ||
+              rechnungK.invoice_date ||
+              "",
+          ),
         ],
-      ],
+      ] as [string, string][],
       kontaktName: contactName,
       kontaktEmail: (req as any).user?.email,
       isDelivered: true,
