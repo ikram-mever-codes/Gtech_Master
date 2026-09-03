@@ -63,9 +63,9 @@ export const getAllLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "title"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "title"],
+      })
       : [];
     const auftragTitleById = new Map(
       auftraege.map((a: any) => [a.id, a.title]),
@@ -601,6 +601,10 @@ export const downloadLieferscheinPdf = async (
         rechnung?.date_delivery ||
         rechnung?.delivery_date,
       deliveryTerms: rechnung?.delivery_terms,
+      kundenreferenz:
+        (lieferschein as any).kundenreferenz ||
+        rechnung?.kundenreferenz ||
+        undefined,
       outputFilePath: filePath,
     });
 

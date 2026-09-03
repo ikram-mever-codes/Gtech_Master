@@ -217,6 +217,7 @@ export interface PdfDocumentOptions {
   rks?: Array<{ amount: number; createdDate?: string | Date; rkNumber?: string }>;
   outstandingAmount?: number;
   invoiceDate?: string | Date;
+  kundenreferenz?: string;
 }
 
 export async function generateGtechDocumentPdf(
@@ -601,7 +602,18 @@ export async function generateGtechDocumentPdf(
     infoY += rowH + 2;
   });
 
+  const kundenreferenzText = (opts.kundenreferenz || "").trim();
   let yPos = Math.max(addrY + 25, infoY + 25);
+
+  if (kundenreferenzText) {
+    doc
+      .font(SB)
+      .fontSize(10)
+      .fillColor("#1A202C")
+      .text(kundenreferenzText, LEFT_X, yPos, { lineBreak: false });
+    yPos += 18;
+  }
+
   const tableY = yPos;
 
   const columns = showPrices

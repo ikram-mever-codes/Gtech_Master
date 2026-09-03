@@ -1483,6 +1483,7 @@ export const downloadRechnungPdf = async (
         (rechnung.customer as any)?.defaultTaxProfile?.key ||
         customerSnap?.tax_profile_case ||
         customerSnap?.taxProfile,
+      kundenreferenz: (rechnung as any).kundenreferenz || undefined,
       outputFilePath: filePath,
     });
 
