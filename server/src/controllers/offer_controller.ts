@@ -4068,7 +4068,7 @@ export class OfferController {
         addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
       }
 
-      const bannerW = MM(67);
+      const bannerW = MM(60);
       const bannerX = TABLE_END_X - bannerW;
       const bannerY = MM(48);
       const bannerH = 16;
