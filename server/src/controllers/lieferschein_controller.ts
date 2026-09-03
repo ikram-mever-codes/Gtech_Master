@@ -483,6 +483,16 @@ export const downloadLieferscheinPdf = async (
 
     const formatDateStr = (dateVal: any): string => {
       if (!dateVal) return "—";
+      if (typeof dateVal === "string") {
+        const trimmed = dateVal.trim();
+        const parts = trimmed.split(".");
+        if (parts.length === 3 && parts[2].length === 4) {
+          const day = parts[0].padStart(2, "0");
+          const month = parts[1].padStart(2, "0");
+          const year = parts[2];
+          return `${day}.${month}.${year}`;
+        }
+      }
       const d = new Date(dateVal);
       if (isNaN(d.getTime())) return String(dateVal);
       const day = String(d.getDate()).padStart(2, "0");
