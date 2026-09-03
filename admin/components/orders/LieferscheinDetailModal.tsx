@@ -8,6 +8,7 @@ import { Loader2, FileText, Pencil, Save, X, Truck, Calendar, CheckCircle, Ban }
 import { formatDate } from "@/utils/date";
 import {
   updateLieferscheinStatus,
+  updateLieferscheinDeliveryDate,
   confirmLieferscheinDelivery,
   stornierLieferschein,
 } from "@/api/lieferscheine";
@@ -288,8 +289,9 @@ export default function LieferscheinDetailModal({
     }
     setIsSaving(true);
     try {
-      await updateLieferscheinStatus(data.id, status);
+      await updateLieferscheinDeliveryDate(data.id, deliveryDate);
       toast.success("Delivery date updated successfully.", successStyles);
+      setData((prev: any) => ({ ...prev, date: deliveryDate }));
       onChanged?.();
       setIsEditMode(false);
     } catch (error: any) {
