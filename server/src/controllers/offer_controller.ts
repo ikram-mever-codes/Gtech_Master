@@ -2329,9 +2329,6 @@ export class OfferController {
       // CURRENT profile, recomputed on every load.
       const taxProfile = await this.getCustomerTaxProfile(offer.customerId);
 
-      // Linked Aufträge (CustomerOrder records) for this offer — full
-      // records, not just ids, so the frontend can show the order number
-      // and date without a second request.
       const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
       const linkedOrders = await customerOrderRepo.find({
         where: { offer_id: id },
@@ -4071,7 +4068,7 @@ export class OfferController {
         addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
       }
 
-      const bannerW = MM(67);
+      const bannerW = MM(60);
       const bannerX = TABLE_END_X - bannerW;
       const bannerY = MM(48);
       const bannerH = 16;
@@ -4147,7 +4144,7 @@ export class OfferController {
 
       const titleBoxX = bannerX + BANNER_LEFT_PAD;
       let infoY = bannerY + bannerH + 1.5;
-      const LABEL_W = MM(28);
+      const LABEL_W = MM(16);
       const VALUE_X = titleBoxX + LABEL_W;
       const VALUE_W = bannerW - BANNER_LEFT_PAD * 2 - LABEL_W;
 
@@ -4178,7 +4175,8 @@ export class OfferController {
             .fillColor("#1A202C")
             .text(valStr, VALUE_X, infoY, {
               width: VALUE_W,
-              lineBreak: true,
+              align: "right",
+              lineBreak: false,
               link: linkUrl,
               underline: true,
             });
@@ -4187,7 +4185,11 @@ export class OfferController {
             .font(M)
             .fontSize(8.5)
             .fillColor("#1A202C")
-            .text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+            .text(valStr, VALUE_X, infoY, {
+              width: VALUE_W,
+              align: "right",
+              lineBreak: false,
+            });
         }
         infoY += rowH + 2;
       });

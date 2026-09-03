@@ -63,9 +63,9 @@ export const getAllLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "title"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "title"],
+      })
       : [];
     const auftragTitleById = new Map(
       auftraege.map((a: any) => [a.id, a.title]),
@@ -483,6 +483,16 @@ export const downloadLieferscheinPdf = async (
 
     const formatDateStr = (dateVal: any): string => {
       if (!dateVal) return "—";
+      if (typeof dateVal === "string") {
+        const trimmed = dateVal.trim();
+        const parts = trimmed.split(".");
+        if (parts.length === 3 && parts[2].length === 4) {
+          const day = parts[0].padStart(2, "0");
+          const month = parts[1].padStart(2, "0");
+          const year = parts[2];
+          return `${day}.${month}.${year}`;
+        }
+      }
       const d = new Date(dateVal);
       if (isNaN(d.getTime())) return String(dateVal);
       const day = String(d.getDate()).padStart(2, "0");
@@ -557,6 +567,12 @@ export const downloadLieferscheinPdf = async (
       displayStatus = lieferschein.status;
     }
 
+    const auftragNo =
+      customerOrder?.order_no ||
+      lieferschein.auftrag_no ||
+      rechnung?.auftrag_no ||
+      (lieferschein as any).orderNumber;
+
     await generateGtechDocumentPdf({
       documentType: "Lieferschein",
       documentNumber: lieferschein.delivery_note_number,
@@ -565,14 +581,17 @@ export const downloadLieferscheinPdf = async (
       customerEntity: rechnung?.customer,
       deliveryAddress: rechnung?.deliveryAddress,
       metadataItems: [
-        ["Status", displayStatus],
-        ["Kontakt", contactName],
-        ["Kunde", kundeCombined],
+        ["Status", String(displayStatus || "")],
+        ["Kontakt", String(contactName || "")],
+        ["Kunde", String(kundeCombined || "")],
+        ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
         [
           "Datum",
-          formatDateStr(lieferschein.date_created || lieferschein.created_at),
+          String(
+            formatDateStr(lieferschein.date_created || lieferschein.created_at),
+          ),
         ],
-      ],
+      ] as [string, string][],
       kontaktName: contactName,
       kontaktEmail: (req as any).user?.email,
       isDelivered: true,
@@ -592,6 +611,10 @@ export const downloadLieferscheinPdf = async (
         rechnung?.date_delivery ||
         rechnung?.delivery_date,
       deliveryTerms: rechnung?.delivery_terms,
+      kundenreferenz:
+        (lieferschein as any).kundenreferenz ||
+        rechnung?.kundenreferenz ||
+        undefined,
       outputFilePath: filePath,
     });
 

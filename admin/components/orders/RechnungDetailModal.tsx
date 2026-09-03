@@ -772,27 +772,10 @@ export default function RechnungDetailModal({
               />
             )}
             {isCorrection && (
-              <button
-                type="button"
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                  isEditMode
-                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {isEditMode ? (
-                  <>
-                    <X className="w-4 h-4" />
-                    Exit Edit
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="w-4 h-4" />
-                    Edit Mode
-                  </>
-                )}
-              </button>
+              <ViewEditToggle
+                isEditEnabled={isEditMode}
+                onToggle={() => setIsEditMode(!isEditMode)}
+              />
             )}
             <button
               type="button"
@@ -1052,14 +1035,14 @@ export default function RechnungDetailModal({
                         Pic
                       </th>
                     )}
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-24">
                       Art.-Nr.
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-64">
                       Bezeichnung
                     </th>
                     {showViewOnly && (
-                      <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                      <th className="px-2 py-2 text-left font-semibold text-gray-600">
                         Hinweis
                       </th>
                     )}
@@ -1068,10 +1051,10 @@ export default function RechnungDetailModal({
                     </th>
                     {showCorrectionUI && (
                       <>
-                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
+                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
                           Open Qty
                         </th>
-                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-28">
+                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-24">
                           Qty
                         </th>
                         <th className="px-2 py-2 text-center font-semibold text-gray-600 w-32">
@@ -1081,7 +1064,7 @@ export default function RechnungDetailModal({
                     )}
                     {showViewOnly && (
                       <>
-                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-16">
                           Menge
                         </th>
                         <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">

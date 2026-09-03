@@ -26,6 +26,7 @@ interface DraftLineItemPreview {
   weight?: number | null;
   salesPrice?: number | null;
   isDimWeightEstimated?: boolean;
+  remarkEx?: string | null;
 }
 
 interface DraftItemConversionModalProps {
@@ -82,10 +83,6 @@ export default function DraftItemConversionModal({
   const [submitting, setSubmitting] = useState(false);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
 
-  // Local editable copy of the draft rows — inline edits (Name DE, TARIC,
-  // Weight, Estimated?, Sales Price) persist to the backing Item via
-  // updateItem and update here immediately so validation reflects the
-  // change without needing the parent to re-fetch.
   const [localItems, setLocalItems] =
     useState<DraftLineItemPreview[]>(draftItems);
   const [savingField, setSavingField] = useState<string | null>(null);
@@ -203,8 +200,6 @@ export default function DraftItemConversionModal({
   };
 
   const handleSubmit = async () => {
-    // Validate every selected draft item before doing anything else — a
-    // line left unselected is excluded entirely below and needs no check.
     const invalidItems = localItems.filter(
       (it) => selection[it.lineItemId] && getMissingFields(it).length > 0,
     );
@@ -228,12 +223,6 @@ export default function DraftItemConversionModal({
       const lineItems =
         offer.lineItems?.filter((li: any) => !li.isComponent) || [];
 
-      // Non-draft lines always go into the Auftrag, same as the direct
-      // conversion path. Draft lines only go in if the user actually
-      // checked them here — an unselected draft line is excluded from
-      // the Auftrag entirely rather than included-but-not-converted,
-      // which is what previously let unvalidated, missing-field draft
-      // items slip into the created Auftrag.
       const selectedItems = lineItems
         .filter((li: any) => !draftLineIds.has(li.id) || !!selection[li.id])
         .map((li: any) => {
@@ -243,8 +232,6 @@ export default function DraftItemConversionModal({
             price: Number(li.basePrice) || 0,
             itemName: li.itemName || li.notes || li.description || "Line Item",
           };
-          // Every draft line reaching this point was selected (filtered
-          // above) and already passed validation, so it always converts.
           if (draftLineIds.has(li.id)) {
             return { ...base, convertDraft: true };
           }
@@ -362,13 +349,12 @@ export default function DraftItemConversionModal({
                   return (
                     <tr
                       key={item.lineItemId}
-                      className={`transition-colors ${
-                        isInvalid
-                          ? "bg-rose-50"
-                          : selected
-                            ? "bg-[#dff0d8]"
-                            : "bg-white"
-                      }`}
+                      className={`transition-colors ${isInvalid
+                        ? "bg-rose-50"
+                        : selected
+                          ? "bg-[#dff0d8]"
+                          : "bg-white"
+                        }`}
                     >
                       <td className="px-2 py-2 text-center">
                         <input
@@ -392,7 +378,17 @@ export default function DraftItemConversionModal({
                           )}
                         </div>
                       </td>
-                      <td className="px-2 py-2 font-medium">{item.itemName}</td>
+                      <td className="px-2 py-2">
+                        <div className="font-medium text-gray-900">{item.itemName}</div>
+                        {item.remarkEx && (
+                          <div className="text-[11px] text-gray-500 italic mt-0.5 font-normal">
+                            <span className="font-semibold text-gray-600 not-italic">
+                              RemarkEx:
+                            </span>{" "}
+                            {item.remarkEx}
+                          </div>
+                        )}
+                      </td>
 
                       {/* Name DE — editable */}
                       <td className="px-2 py-2">
@@ -424,6 +420,9 @@ export default function DraftItemConversionModal({
                           {tarics.map((t: any) => (
                             <option key={t.id} value={t.id}>
                               {t.code}
+                              {t.name || t.description
+                                ? ` - ${t.name || t.description}`
+                                : ""}
                               {t.duty_rate !== null && t.duty_rate !== undefined
                                 ? ` (${t.duty_rate}%)`
                                 : ""}
@@ -463,7 +462,11 @@ export default function DraftItemConversionModal({
                       {/* Sales Price — editable, syncs to offer line item price */}
                       <td className="px-2 py-2">
                         <SalesPriceCell
-                          value={item.salesPrice ?? item.price ?? ""}
+                          value={
+                            item.price !== undefined && item.price !== null
+                              ? item.price
+                              : item.salesPrice ?? ""
+                          }
                           disabled={isSavingThisRow}
                           onCommit={(raw) => handleSalesPriceCommit(item, raw)}
                         />
@@ -551,12 +554,6 @@ export default function DraftItemConversionModal({
           isRequest={false}
           zIndex="z-[60000]"
           onSaved={() => {
-            // ItemPreviewModal persists edits directly via updateItem.
-            // This modal's draftItems prop is a snapshot fetched before
-            // the user opened the editor — it does NOT auto-refresh, so
-            // any fields changed there won't reflect in this table until
-            // the parent re-fetches draft items (e.g. by re-opening the
-            // conversion modal).
             setEditingItemId(null);
           }}
         />
@@ -565,8 +562,6 @@ export default function DraftItemConversionModal({
   );
 }
 
-/** Uncontrolled-feeling text input that commits on blur, so every
- * keystroke doesn't trigger a save call. */
 const NameDeCell: React.FC<{
   value: string;
   disabled?: boolean;

@@ -94,6 +94,16 @@ const formatWeight = (kg: number): string =>
 
 const toDateInputValue = (value: any): string => {
   if (!value) return "";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const parts = trimmed.split(".");
+    if (parts.length === 3 && parts[2].length === 4) {
+      const day = parts[0].padStart(2, "0");
+      const month = parts[1].padStart(2, "0");
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+  }
   const d = new Date(value);
   if (isNaN(d.getTime())) return "";
   return d.toISOString().split("T")[0];
@@ -1243,19 +1253,19 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
                       Pic
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-24">
                       Art.-Nr.
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-64">
                       Bezeichnung
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-36">
                       Hinweis
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
                       Remark
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-16">
                       Menge
                     </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">

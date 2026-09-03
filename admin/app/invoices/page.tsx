@@ -1020,9 +1020,27 @@ const InvoiceListPage: React.FC = () => {
   );
 
   const orderItemsFlat = useMemo(() => {
-    let allItems = orders.flatMap((o: any) =>
-      (o.items || []).map((i: any) => ({
+    let allItems = orders.flatMap((o: any) => {
+      const rawItems = [...(o.items || [])];
+      rawItems.sort((a: any, b: any) => {
+        const posA =
+          a.position !== undefined && a.position !== null
+            ? Number(a.position)
+            : a.id
+              ? Number(a.id)
+              : 0;
+        const posB =
+          b.position !== undefined && b.position !== null
+            ? Number(b.position)
+            : b.id
+              ? Number(b.id)
+              : 0;
+        return posA - posB;
+      });
+
+      return rawItems.map((i: any, idx: number) => ({
         ...i,
+        position: i.position ?? idx + 1,
         order_id: o.id,
         parentOrder: o,
         order_no: o.order_no,
@@ -1031,8 +1049,8 @@ const InvoiceListPage: React.FC = () => {
         supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
         category_id: o.category_id,
         comment: o.comment,
-      })),
-    );
+      }));
+    });
 
     const filterParam = searchParams.get("filter");
     if (filterParam) {

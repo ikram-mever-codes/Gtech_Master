@@ -107,11 +107,19 @@ function cleanPdfText(text?: string | null): string {
 function formatDate(dateVal: any): string {
   if (!dateVal) return "—";
   if (typeof dateVal === "string") {
-    const parts = dateVal.trim().split(".");
-    if (parts.length === 3 && parts[2].length === 4) {
-      const day = parts[0].padStart(2, "0");
-      const month = parts[1].padStart(2, "0");
-      const year = parts[2];
+    const trimmed = dateVal.trim();
+    const dotParts = trimmed.split(".");
+    if (dotParts.length === 3 && dotParts[2].length === 4) {
+      const day = dotParts[0].padStart(2, "0");
+      const month = dotParts[1].padStart(2, "0");
+      const year = dotParts[2];
+      return `${day}.${month}.${year}`;
+    }
+    const dashParts = trimmed.split("T")[0].split("-");
+    if (dashParts.length === 3 && dashParts[0].length === 4) {
+      const year = dashParts[0];
+      const month = dashParts[1].padStart(2, "0");
+      const day = dashParts[2].padStart(2, "0");
       return `${day}.${month}.${year}`;
     }
   }
@@ -217,6 +225,7 @@ export interface PdfDocumentOptions {
   rks?: Array<{ amount: number; createdDate?: string | Date; rkNumber?: string }>;
   outstandingAmount?: number;
   invoiceDate?: string | Date;
+  kundenreferenz?: string;
 }
 
 export async function generateGtechDocumentPdf(
@@ -484,7 +493,10 @@ export async function generateGtechDocumentPdf(
     addrY += doc.heightOfString(shipTextToRender, { width: MM(80) }) + 3;
   }
 
-  const bannerW = MM(67);
+  const isOfferDoc = opts.documentType === "Angebot";
+  const valueAlign: "left" | "right" = "right";
+
+  const bannerW = MM(60);
   const bannerX = TABLE_END_X - bannerW;
   const bannerY = MM(48);
   const bannerH = 16;
@@ -519,7 +531,7 @@ export async function generateGtechDocumentPdf(
 
   const titleBoxX = bannerX + BANNER_LEFT_PAD;
   let infoY = bannerY + bannerH + 1.5;
-  const LABEL_W = MM(28);
+  const LABEL_W = MM(16);
   const VALUE_X = titleBoxX + LABEL_W;
   const VALUE_W = bannerW - BANNER_LEFT_PAD * 2 - LABEL_W;
 
@@ -572,7 +584,8 @@ export async function generateGtechDocumentPdf(
       doc.font(R).fontSize(8.5).fillColor("#3F4446").text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
       doc.font(M).fontSize(8.5).fillColor("#1A202C").text(valDisplay, VALUE_X, infoY, {
         width: VALUE_W,
-        lineBreak: true,
+        align: valueAlign,
+        lineBreak: false,
         link: mailtoUrl,
         underline: true,
       });
@@ -589,11 +602,26 @@ export async function generateGtechDocumentPdf(
     const rowH = Math.max(11, hLbl, hVal);
 
     doc.font(R).fontSize(8.5).fillColor("#3F4446").text(lblStr, titleBoxX, infoY, { width: LABEL_W, lineBreak: true });
-    doc.font(M).fontSize(8.5).fillColor("#1A202C").text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+    doc.font(M).fontSize(8.5).fillColor("#1A202C").text(valStr, VALUE_X, infoY, {
+      width: VALUE_W,
+      align: valueAlign,
+      lineBreak: false,
+    });
     infoY += rowH + 2;
   });
 
+  const kundenreferenzText = (opts.kundenreferenz || "").trim();
   let yPos = Math.max(addrY + 25, infoY + 25);
+
+  if (kundenreferenzText) {
+    doc
+      .font(SB)
+      .fontSize(10)
+      .fillColor("#1A202C")
+      .text(kundenreferenzText, LEFT_X, yPos, { lineBreak: false });
+    yPos += 18;
+  }
+
   const tableY = yPos;
 
   const columns = showPrices
@@ -778,7 +806,7 @@ export async function generateGtechDocumentPdf(
         ? Number(opts.taxRate)
         : 0;
 
-  if (shippingMethod && (showPrices ? (shippingCostNum > 0 && shippingQtyNum > 0) : true)) {
+  if (shippingMethod) {
     const totalItemCount = opts.lineItems ? opts.lineItems.length : 0;
     const shipRowNum = totalItemCount + 1;
     const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";

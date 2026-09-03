@@ -464,11 +464,15 @@ export const getOfferDraftItemsPreview = async (
           // `material` string is no longer read or sent at all.
           itemNo: backingItem.item_no_de || null,
           quantity: li.baseQuantity,
-          price: li.basePrice,
+          price: Number(li.basePrice) || 0,
           taric: backingItem.taricCode || null,
           weight: backingItem.weight ?? null,
-          salesPrice: backingItem.sales_price ?? null,
+          salesPrice:
+            li.basePrice !== undefined && li.basePrice !== null
+              ? Number(li.basePrice)
+              : backingItem.sales_price ?? null,
           isDimWeightEstimated: backingItem.is_dim_weight_estimated,
+          remarkEx: li.notes || backingItem.remark_ex || null,
         });
       }
     }
@@ -1105,6 +1109,7 @@ export const createAuftragFromOffer = async (
         specification: lineItem?.specification || "",
         description: lineItem?.description || "",
         weight: lineItem?.weight || undefined,
+        extraWeight: lineItem?.extraWeight || undefined,
         quantity: qty,
         price: price,
         taxRate:
