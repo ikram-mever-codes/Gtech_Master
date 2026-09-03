@@ -30,6 +30,16 @@ const formatWeight = (kg: number): string =>
 
 const formatFullDate = (val: any): string => {
   if (!val) return "—";
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    const parts = trimmed.split(".");
+    if (parts.length === 3 && parts[2].length === 4) {
+      const day = parts[0].padStart(2, "0");
+      const month = parts[1].padStart(2, "0");
+      const year = parts[2];
+      return `${day}.${month}.${year}`;
+    }
+  }
   const d = new Date(val);
   if (isNaN(d.getTime())) return String(val);
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
