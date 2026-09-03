@@ -487,7 +487,7 @@ export async function generateGtechDocumentPdf(
   const isOfferDoc = opts.documentType === "Angebot";
   const valueAlign: "left" | "right" = isOfferDoc ? "left" : "right";
 
-  const bannerW = MM(78);
+  const bannerW = MM(67);
   const bannerX = TABLE_END_X - bannerW;
   const bannerY = MM(48);
   const bannerH = 16;
@@ -522,7 +522,7 @@ export async function generateGtechDocumentPdf(
 
   const titleBoxX = bannerX + BANNER_LEFT_PAD;
   let infoY = bannerY + bannerH + 1.5;
-  const LABEL_W = MM(20);
+  const LABEL_W = MM(16);
   const VALUE_X = titleBoxX + LABEL_W;
   const VALUE_W = bannerW - BANNER_LEFT_PAD * 2 - LABEL_W;
 

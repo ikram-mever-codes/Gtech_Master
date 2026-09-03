@@ -2329,9 +2329,6 @@ export class OfferController {
       // CURRENT profile, recomputed on every load.
       const taxProfile = await this.getCustomerTaxProfile(offer.customerId);
 
-      // Linked Aufträge (CustomerOrder records) for this offer — full
-      // records, not just ids, so the frontend can show the order number
-      // and date without a second request.
       const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
       const linkedOrders = await customerOrderRepo.find({
         where: { offer_id: id },
