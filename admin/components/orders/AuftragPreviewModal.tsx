@@ -109,6 +109,16 @@ const formatWeight = (kg: number): string =>
 
 const toDateInputValue = (value: any): string => {
   if (!value) return "";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const parts = trimmed.split(".");
+    if (parts.length === 3 && parts[2].length === 4) {
+      const day = parts[0].padStart(2, "0");
+      const month = parts[1].padStart(2, "0");
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+  }
   const d = new Date(value);
   if (isNaN(d.getTime())) return "";
   return d.toISOString().split("T")[0];

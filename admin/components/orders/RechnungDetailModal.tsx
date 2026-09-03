@@ -695,27 +695,10 @@ export default function RechnungDetailModal({
               />
             )}
             {isCorrection && (
-              <button
-                type="button"
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                  isEditMode
-                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {isEditMode ? (
-                  <>
-                    <X className="w-4 h-4" />
-                    Exit Edit
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="w-4 h-4" />
-                    Edit Mode
-                  </>
-                )}
-              </button>
+              <ViewEditToggle
+                isEditEnabled={isEditMode}
+                onToggle={() => setIsEditMode(!isEditMode)}
+              />
             )}
             <button
               type="button"
