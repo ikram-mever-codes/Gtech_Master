@@ -4144,7 +4144,7 @@ export class OfferController {
 
       const titleBoxX = bannerX + BANNER_LEFT_PAD;
       let infoY = bannerY + bannerH + 1.5;
-      const LABEL_W = MM(28);
+      const LABEL_W = MM(16);
       const VALUE_X = titleBoxX + LABEL_W;
       const VALUE_W = bannerW - BANNER_LEFT_PAD * 2 - LABEL_W;
 
@@ -4175,7 +4175,8 @@ export class OfferController {
             .fillColor("#1A202C")
             .text(valStr, VALUE_X, infoY, {
               width: VALUE_W,
-              lineBreak: true,
+              align: "right",
+              lineBreak: false,
               link: linkUrl,
               underline: true,
             });
@@ -4184,7 +4185,11 @@ export class OfferController {
             .font(M)
             .fontSize(8.5)
             .fillColor("#1A202C")
-            .text(valStr, VALUE_X, infoY, { width: VALUE_W, lineBreak: true });
+            .text(valStr, VALUE_X, infoY, {
+              width: VALUE_W,
+              align: "right",
+              lineBreak: false,
+            });
         }
         infoY += rowH + 2;
       });
