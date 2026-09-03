@@ -42,9 +42,24 @@ const getDocCustomerName = (doc: any): string =>
   doc.customer?.company_name ||
   "—";
 
-const getDocTotal = (doc: any): number =>
-  Number(doc.total_amount ?? doc.grossTotal ?? 0);
+const getDocTotal = (doc: any): number => {
+  const subtotal = Number(doc.subtotal ?? 0);
+  const shippingCost = Number(doc.shipping_cost ?? doc.shippingCost ?? 0);
+  const shippingQty = Number(
+    doc.shipping_quantity ?? doc.shippingQuantity ?? 1,
+  );
+  const shippingTotal = shippingCost * shippingQty;
+  const discountAmount = Number(doc.discount_amount ?? doc.discountAmount ?? 0);
+  const taxRate = Number(doc.tax_rate ?? doc.taxRate ?? 19);
 
+  if (subtotal > 0 || shippingTotal > 0) {
+    const net = subtotal - discountAmount + shippingTotal;
+    const tax = net * (taxRate / 100);
+    return net + tax;
+  }
+
+  return Number(doc.total_amount ?? doc.grossTotal ?? 0);
+};
 export const PaymentInboundAssignModal: React.FC<
   PaymentInboundAssignModalProps
 > = ({ isOpen, onClose, paymentInbound, auftraege, rechnungen, onSuccess }) => {
