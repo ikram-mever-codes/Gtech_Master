@@ -1386,7 +1386,7 @@ export const updateBusiness = async (
           customer.companyLabelPrintLogo =
             companyLabelPrintLogo && companyLabelPrintLogo.trim()
               ? companyLabelPrintLogo.trim()
-              : undefined;
+              : null;
         }
         if (contactEmail !== undefined) {
           customer.contactEmail = contactEmail.trim()

@@ -645,9 +645,11 @@ export default function AuftragToRechnungModal({
           deliveryDate,
           warehouse: hasStockItems ? stockWhere : undefined,
           include_shipping: shippingIncluded,
-          shippingCost: shippingCostInput,
-          shippingQuantity: shippingQuantityInput,
-          shippingMethod: editShippingMethod || undefined,
+          shippingCost: shippingIncluded ? shippingCostInput : 0,
+          shippingQuantity: shippingIncluded ? shippingQuantityInput : 0,
+          shippingMethod: shippingIncluded
+            ? editShippingMethod || undefined
+            : undefined,
           ansprechpartner: editAnsprechpartner || auftrag.ansprechpartner,
         } as any,
       );

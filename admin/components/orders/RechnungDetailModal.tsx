@@ -97,7 +97,12 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const postalCode = (addr.postalCode || addr.postal_code || "").trim();
   const city = (addr.city || "").trim();
 
-  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+  if (
+    postalCode &&
+    city &&
+    street.includes(postalCode) &&
+    street.includes(city)
+  ) {
     street = street
       .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
       .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
@@ -106,11 +111,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   }
 
   const cityLine = `${postalCode} ${city}`.trim();
-  const addressLine = [
-    street,
-    cityLine,
-    !isGermany ? countryCode : "",
-  ]
+  const addressLine = [street, cityLine, !isGermany ? countryCode : ""]
     .filter(Boolean)
     .join(", ");
 
@@ -245,15 +246,23 @@ export default function RechnungDetailModal({
     setData(rechnung);
     setIsEditMode(false);
     setAddressEdit(false);
-
-    setEditShippingCost(Number(rechnung?.shipping_cost) || 0);
-    setEditShippingQuantity(Number(rechnung?.shipping_quantity) || 1);
+    setEditShippingCost(
+      rechnung?.shipping_cost !== undefined && rechnung?.shipping_cost !== null
+        ? Number(rechnung.shipping_cost)
+        : 0,
+    );
+    setEditShippingQuantity(
+      rechnung?.shipping_quantity !== undefined &&
+        rechnung?.shipping_quantity !== null
+        ? Number(rechnung.shipping_quantity)
+        : 1,
+    );
     setEditShippingMethod(
       rechnung?.shipping_method ||
-      rechnung?.auftrag?.shipping_method ||
-      (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
-      (rechnung?.customerSnapshot as any)?.shipping_method ||
-      "",
+        rechnung?.auftrag?.shipping_method ||
+        (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
+        (rechnung?.customerSnapshot as any)?.shipping_method ||
+        "",
     );
 
     // Initialize corrections with default values for items that have open quantity
@@ -689,10 +698,11 @@ export default function RechnungDetailModal({
               <button
                 type="button"
                 onClick={() => setIsEditMode(!isEditMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${isEditMode
-                  ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  isEditMode
+                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
               >
                 {isEditMode ? (
                   <>
@@ -896,13 +906,9 @@ export default function RechnungDetailModal({
                 value={(() => {
                   const linkedAuftrag = auftragDocs[0] || data.auftrag;
                   const method =
-                    data.payment_method ||
-                    linkedAuftrag?.payment_method ||
-                    "";
+                    data.payment_method || linkedAuftrag?.payment_method || "";
                   const terms =
-                    data.payment_terms ||
-                    linkedAuftrag?.payment_terms ||
-                    "";
+                    data.payment_terms || linkedAuftrag?.payment_terms || "";
                   if (!method && !terms) return "—";
                   if (method && terms) return `${method}, ${terms} Tage`;
                   if (method) return method;
@@ -914,22 +920,20 @@ export default function RechnungDetailModal({
                 value={(() => {
                   const linkedAuftrag = auftragDocs[0] || data.auftrag;
                   const rawTerms =
-                    data.payment_terms ||
-                    linkedAuftrag?.payment_terms ||
-                    "";
+                    data.payment_terms || linkedAuftrag?.payment_terms || "";
                   const dayMatch = String(rawTerms).match(/(\d+)/);
                   if (!dayMatch) return "—";
                   const dueDays = parseInt(dayMatch[1], 10);
 
                   const baseRaw =
-                    data.invoice_date ||
-                    data.date_created ||
-                    data.created_at;
+                    data.invoice_date || data.date_created || data.created_at;
                   if (!baseRaw) return "—";
 
                   let baseDate: Date;
                   const rawStr = String(baseRaw).trim();
-                  const germanMatch = rawStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+                  const germanMatch = rawStr.match(
+                    /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/,
+                  );
                   if (germanMatch) {
                     baseDate = new Date(
                       parseInt(germanMatch[3], 10),
@@ -1090,10 +1094,11 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${isFullyCorrected
-                                  ? "text-green-600"
-                                  : "text-amber-600"
-                                  }`}
+                                className={`font-semibold ${
+                                  isFullyCorrected
+                                    ? "text-green-600"
+                                    : "text-amber-600"
+                                }`}
                               >
                                 {openQty}
                               </span>
@@ -1201,58 +1206,59 @@ export default function RechnungDetailModal({
                       same rule as AuftragPreviewModal (order.shipping_method),
                       so a €0 shipping cost with a method still shows a row
                       instead of disappearing. */}
-                  {(editShippingMethod || data.shipping_method) && (
-                    <tr className="bg-gray-50/80 border-t-2 border-gray-200">
-                      <td className="px-2 py-2 text-gray-400">
-                        {items.length + 1}
-                      </td>
-                      {isCorrection && (
-                        <td className="px-2 py-2 text-gray-400"></td>
-                      )}
-                      <td className="px-2 py-2 text-gray-400">—</td>
-                      <td className="px-2 py-2 font-medium text-gray-700">
-                        {editShippingMethod ||
-                          data.shipping_method ||
-                          "No shipping method set"}
-                      </td>
-                      {showViewOnly && (
-                        <td className="px-2 py-2 text-gray-400"></td>
-                      )}
-                      <td className="px-2 py-2 text-center text-gray-600">
-                        {taxRate}%
-                      </td>
-                      {showCorrectionUI && (
-                        <>
+                  {(editShippingMethod || data.shipping_method) &&
+                    (editShippingCost > 0 || editShippingQuantity > 0) && (
+                      <tr className="bg-gray-50/80 border-t-2 border-gray-200">
+                        <td className="px-2 py-2 text-gray-400">
+                          {items.length + 1}
+                        </td>
+                        {isCorrection && (
+                          <td className="px-2 py-2 t  ext-gray-400"></td>
+                        )}
+                        <td className="px-2 py-2 text-gray-400">—</td>
+                        <td className="px-2 py-2 font-medium text-gray-700">
+                          {editShippingMethod ||
+                            data.shipping_method ||
+                            "No shipping method set"}
+                        </td>
+                        {showViewOnly && (
                           <td className="px-2 py-2 text-gray-400"></td>
-                          <td className="px-2 py-2 text-gray-400"></td>
-                          <td className="px-2 py-2 text-gray-400"></td>
-                        </>
-                      )}
-                      {showViewOnly && (
-                        <>
-                          <td className="px-2 py-2 text-right text-gray-700">
-                            {editShippingQuantity}
-                          </td>
-                          <td className="px-2 py-2 text-right text-gray-700">
-                            {formatDeCurrency(editShippingCost)}
-                          </td>
-                        </>
-                      )}
-                      {isCorrection && (
-                        <>
-                          <td className="px-2 py-2 text-right text-gray-700">
-                            {editShippingQuantity}
-                          </td>
-                          <td className="px-2 py-2 text-right text-gray-700">
-                            {formatDeCurrency(editShippingCost)}
-                          </td>
-                        </>
-                      )}
-                      <td className="px-2 py-2 text-right font-bold text-gray-800">
-                        {formatDeCurrency(shippingTotal)}
-                      </td>
-                    </tr>
-                  )}
+                        )}
+                        <td className="px-2 py-2 text-center text-gray-600">
+                          {taxRate}%
+                        </td>
+                        {showCorrectionUI && (
+                          <>
+                            <td className="px-2 py-2 text-gray-400"></td>
+                            <td className="px-2 py-2 text-gray-400"></td>
+                            <td className="px-2 py-2 text-gray-400"></td>
+                          </>
+                        )}
+                        {showViewOnly && (
+                          <>
+                            <td className="px-2 py-2 text-right text-gray-700">
+                              {editShippingQuantity}
+                            </td>
+                            <td className="px-2 py-2 text-right text-gray-700">
+                              {formatDeCurrency(editShippingCost)}
+                            </td>
+                          </>
+                        )}
+                        {isCorrection && (
+                          <>
+                            <td className="px-2 py-2 text-right text-gray-700">
+                              {editShippingQuantity}
+                            </td>
+                            <td className="px-2 py-2 text-right text-gray-700">
+                              {formatDeCurrency(editShippingCost)}
+                            </td>
+                          </>
+                        )}
+                        <td className="px-2 py-2 text-right font-bold text-gray-800">
+                          {formatDeCurrency(shippingTotal)}
+                        </td>
+                      </tr>
+                    )}
                 </tbody>
               </table>
             </div>
@@ -1392,10 +1398,11 @@ export default function RechnungDetailModal({
                         ⚠ Not uploaded yet
                       </span>
                       <label
-                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-amber-600 text-white hover:bg-amber-700"
-                          }`}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          uploadingDoc
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-amber-600 text-white hover:bg-amber-700"
+                        }`}
                       >
                         {uploadingDoc ? (
                           <>
@@ -1432,8 +1439,8 @@ export default function RechnungDetailModal({
                 </h3>
               </div>
               {auftragDocs.length === 0 &&
-                rechnungenKDocs.length === 0 &&
-                rechnungDocs.length === 0 ? (
+              rechnungenKDocs.length === 0 &&
+              rechnungDocs.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No linked documents yet.
                 </p>
@@ -1627,10 +1634,11 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
-                  ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+                  hasCorrections && !isCreating
+                    ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
               >
                 {isCreating ? (
                   <>

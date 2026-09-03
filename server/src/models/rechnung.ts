@@ -40,6 +40,16 @@ export class Rechnung {
   @Column({ type: "varchar", length: 255, nullable: true })
   ansprechpartner?: string;
 
+  /**
+   * Copied verbatim from CustomerOrder.kundenreferenz at the moment this
+   * Rechnung is generated (createRechnungFromAuftrag) — never
+   * re-derived afterward. Empty/undefined when the Auftrag didn't have
+   * one set, which is expected (it's optional, filled at the user's
+   * discretion, never auto-populated from the customer name).
+   */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  kundenreferenz?: string;
+
   @Column({ type: "date" })
   invoice_date!: Date;
 

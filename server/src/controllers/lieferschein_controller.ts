@@ -29,6 +29,7 @@ export const createLieferscheinFromRechnung = async (
     auftrag_id: rechnung.auftrag_id,
     auftrag_no: rechnung.auftrag_no,
     order_number: rechnung.order_number,
+    kundenreferenz: rechnung.kundenreferenz || undefined,
     delivery_date: rechnung.delivery_date || now,
     date_created: dateCreatedStr,
     rechnung_id: rechnung.id,
@@ -40,10 +41,6 @@ export const createLieferscheinFromRechnung = async (
   return await lieferscheinRepo.save(lieferschein);
 };
 
-/**
- * Get all Lieferscheine with Rechnung data
- * Fetches from Lieferschein table and joins Rechnung for items and customer data
- */
 export const getAllLieferscheine = async (
   req: Request,
   res: Response,
@@ -66,11 +63,13 @@ export const getAllLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "title"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "title"],
+        })
       : [];
-    const auftragTitleById = new Map(auftraege.map((a: any) => [a.id, a.title]));
+    const auftragTitleById = new Map(
+      auftraege.map((a: any) => [a.id, a.title]),
+    );
 
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
@@ -190,6 +189,11 @@ export const getLieferscheinById = async (
       invoiceNumber: lieferschein.invoice_number,
       orderNumber: lieferschein.auftrag_no || lieferschein.order_number,
       title,
+      kundenreferenz:
+        (lieferschein as any).kundenreferenz ||
+        rechnung?.kundenreferenz ||
+        undefined,
+
       date: lieferschein.delivery_date,
       status: lieferschein.status,
       notes: lieferschein.notes,
@@ -353,12 +357,18 @@ export const confirmLieferscheinDelivery = async (
     const lieferschein = await lieferscheinRepo.findOne({ where: { id } });
 
     if (!lieferschein) {
-      res.status(404).json({ success: false, message: "Lieferschein not found" });
+      res
+        .status(404)
+        .json({ success: false, message: "Lieferschein not found" });
       return;
     }
 
     const confirmedDate = deliveryDate ? new Date(deliveryDate) : new Date();
-    const confirmedBy = (req as any).user?.name || (req as any).user?.username || (req as any).user?.email || "Admin";
+    const confirmedBy =
+      (req as any).user?.name ||
+      (req as any).user?.username ||
+      (req as any).user?.email ||
+      "Admin";
 
     lieferschein.delivery_date = confirmedDate;
     lieferschein.status = "bestätigt";
@@ -375,7 +385,6 @@ export const confirmLieferscheinDelivery = async (
     next(error);
   }
 };
-
 
 /**
  * Delete Lieferschein
@@ -456,14 +465,20 @@ export const downloadLieferscheinPdf = async (
 
     const rawItems = (rechnung?.items || [])
       .slice()
-      .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+      .sort(
+        (a: any, b: any) =>
+          (Number(a.position) || 0) - (Number(b.position) || 0),
+      );
 
     const items = rawItems.map((it: any, idx: number) => ({
       position: it.position || idx + 1,
       artNr: it.itemNo || it.material || "—",
       bezeichnung: it.item_name || it.description || "Item",
       remarks: it.notes || it.remark_ex || "-",
-      quantity: it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1,
+      quantity:
+        it.quantity !== undefined && it.quantity !== null
+          ? Number(it.quantity)
+          : 1,
     }));
 
     const formatDateStr = (dateVal: any): string => {
@@ -487,7 +502,10 @@ export const downloadLieferscheinPdf = async (
     }
 
     const trackingList: string[] = [];
-    const customerId = rechnung?.customer?.id || customerSnap?.id || (lieferschein as any)?.customer_id;
+    const customerId =
+      rechnung?.customer?.id ||
+      customerSnap?.id ||
+      (lieferschein as any)?.customer_id;
     if (customerId) {
       const cargoRepo = AppDataSource.getRepository(Cargo);
       const cargoList = await cargoRepo.find({
@@ -505,19 +523,35 @@ export const downloadLieferscheinPdf = async (
 
     const isWeiterversand = customerOrder?.is_weiterversand;
     if (isWeiterversand && customerOrder?.weiterversand_tracking) {
-      const providerName = customerOrder.weiterversandServiceProvider?.name || "UPS";
-      trackingList.push(`${providerName} · ${customerOrder.weiterversand_tracking}`);
+      const providerName =
+        customerOrder.weiterversandServiceProvider?.name || "UPS";
+      trackingList.push(
+        `${providerName} · ${customerOrder.weiterversand_tracking}`,
+      );
     }
 
-    const effectiveShippingMethod = customerOrder?.shipping_text || customerOrder?.shipping_method || rechnung?.shipping_method;
+    const effectiveShippingMethod =
+      customerOrder?.shipping_text ||
+      customerOrder?.shipping_method ||
+      rechnung?.shipping_method;
 
-    const rawStatus = String(lieferschein.status || "").toLowerCase().trim();
+    const rawStatus = String(lieferschein.status || "")
+      .toLowerCase()
+      .trim();
     let displayStatus = "bestätigt";
-    if (rawStatus === "vorläufig" || rawStatus === "open" || rawStatus === "draft") {
+    if (
+      rawStatus === "vorläufig" ||
+      rawStatus === "open" ||
+      rawStatus === "draft"
+    ) {
       displayStatus = "vorläufig";
     } else if (rawStatus === "storniert" || rawStatus === "cancelled") {
       displayStatus = "storniert";
-    } else if (rawStatus === "bestätigt" || rawStatus === "confirmed" || rawStatus === "closed") {
+    } else if (
+      rawStatus === "bestätigt" ||
+      rawStatus === "confirmed" ||
+      rawStatus === "closed"
+    ) {
       displayStatus = "bestätigt";
     } else if (rawStatus) {
       displayStatus = lieferschein.status;
@@ -582,7 +616,11 @@ export const downloadLieferscheinPdf = async (
       .replace(/[^\w-]/g, "_")
       .replace(/_+/g, "_")
       .replace(/^_+|_+$/g, "");
-    const docNo = String(lieferschein.delivery_note_number || lieferschein.id || "lieferschein").trim().replace(/[\s_]+/g, "_");
+    const docNo = String(
+      lieferschein.delivery_note_number || lieferschein.id || "lieferschein",
+    )
+      .trim()
+      .replace(/[\s_]+/g, "_");
     const downloadFileName = cleanTitle
       ? `Lieferschein_${docNo}_GTech_${cleanTitle}.pdf`
       : `Lieferschein_${docNo}_GTech.pdf`;

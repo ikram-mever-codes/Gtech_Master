@@ -164,7 +164,12 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const postalCode = (addr.postalCode || addr.postal_code || "").trim();
   const city = (addr.city || "").trim();
 
-  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+  if (
+    postalCode &&
+    city &&
+    street.includes(postalCode) &&
+    street.includes(city)
+  ) {
     street = street
       .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
       .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
@@ -173,11 +178,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   }
 
   const cityLine = `${postalCode} ${city}`.trim();
-  const addressLine = [
-    street,
-    cityLine,
-    !isGermany ? countryCode : "",
-  ]
+  const addressLine = [street, cityLine, !isGermany ? countryCode : ""]
     .filter(Boolean)
     .join(", ");
 
@@ -324,10 +325,8 @@ const ItemRow: React.FC<{ item: any; onClick: () => void }> = ({
   );
 };
 
-/** An order line is a "Freizeile" if it wasn't sourced from a catalog item
- * — same rule the Offer modal uses. Only these can have their own VAT. */
-const isFreetextLine = (item: any): boolean => !item?.sourceItemId;
-
+const isFreetextLine = (item: any): boolean =>
+  !item?.itemNo && !item?.sourceItemId; // Changed from itemNO to itemNo
 const getLineTaxRate = (item: any, order: any): number => {
   const orderRate = parseFlexibleNumber(order?.tax_rate) ?? 19;
   if (isFreetextLine(item)) {
@@ -461,10 +460,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     0,
   );
 
-  // Delete/Close visibility is now driven entirely by auftrag_status via
-  // isOpenStatus/isPartiallyDeliveredStatus below (Order Editing Rules) —
-  // these two no longer gate anything, kept as no-ops removed.
-
   const getLinkedDocDisplayNumber = (kind: string, doc: any): string => {
     if (kind === "offers") return doc.offerNumber || doc.id;
     if (kind === "bestellungen") return doc.order_no || doc.id;
@@ -514,11 +509,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
             res.data.customerSnapshot,
           ),
         );
-        // initialEdit is only honored once we actually know the order's
-        // status — a caller requesting edit mode (e.g. "Edit Auftrag" from
-        // the Ausliefern screen) can't force it open on a Delivered/Closed
-        // Auftrag just by asking. Previously setEdit(initialEdit) ran
-        // before this data existed, so it always won.
         const loadedStatus = res.data.auftrag_status || "open";
         const loadedCanEnterEdit =
           loadedStatus === "open" || loadedStatus === "partially_delivered";
@@ -540,13 +530,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     fetchOrder();
   }, [isOpen, orderId, fetchOrder]);
 
-  // Debounced call to autocompleteItems, combining the three fields into
-  // one space-joined query — same effect as BestellungPreviewModal's.
-  // Filling more than one field still narrows results together (the
-  // backend ANDs every word), just against the full catalog now instead
-  // of a capped 1000-item preload, with strict letter-for-letter matching
-  // and ranked results. No query -> no request; empty fields show a
-  // "type to search" prompt instead of eagerly loading everything.
   useEffect(() => {
     if (!showItemPicker) return;
 
@@ -589,6 +572,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     return {
       title: o.title || item1Title || "",
       ansprechpartner: o.ansprechpartner || "",
+      kundenreferenz: o.kundenreferenz || "",
       status: o.status || "Draft",
       currency: o.currency || "EUR",
       taxRate: o.tax_rate ?? 19,
@@ -634,9 +618,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   };
 
   const handleStartEdit = () => {
-    // Second layer, independent of the ViewEditToggle's disabled prop —
-    // this function itself refuses to enter edit mode outside Open/
-    // Partially Delivered, no matter what calls it.
     if (!canEnterEditMode) return;
     setEdit(true);
   };
@@ -648,8 +629,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
   const handleSave = async () => {
     if (!order) return;
-    // Defense in depth — the Save button itself is only ever rendered
-    // when effectiveEdit is true, but this stops a stray call regardless.
     if (!canEnterEditMode) return;
     if (canEditCommercial && !form.title?.trim()) {
       toast.error("Title can't be empty.", errorStyles);
@@ -657,16 +636,11 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     }
     setSaving(true);
     try {
-      // Partially Delivered: only comments + highlight color may change —
-      // sending the full commercial payload would just get rejected by
-      // the backend guard (and would be wrong to attempt anyway, since
-      // Menge/Nettowert must stay exactly what the customer ordered).
-      // auftragStatus/status are never sent from here at all — status
-      // transitions only ever happen through delivery (Ausliefern) or the
-      // dedicated Close action, never through this general save.
       const payload: any = canEditCommercial
         ? {
             title: form.title,
+            ansprechpartner: form.ansprechpartner,
+            kundenreferenz: (form.kundenreferenz || "").slice(0, 255),
             currency: form.currency,
             taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
             discountPercentage:
@@ -768,9 +742,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   };
 
   const persistLine = async (lineItemId: string, payload: any) => {
-    // Defense in depth — the UI already hides/disables these controls
-    // outside Open, but this stops a stray call from reaching the API
-    // (which would reject it anyway with the same rule).
     if (!canEditCommercial) return;
     try {
       const res: any = await updateOrderLineItem(order.id, lineItemId, payload);
@@ -923,9 +894,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     if (!canEditCommercial) return;
     try {
       await createOrderLineItem(order.id, {
-        // item_name_de checked first — the autocomplete response's
-        // primary display field; item_name/itemName kept as fallbacks
-        // for anything still passing the old shape.
         itemName: it.item_name_de || it.item_name || it.itemName || "Item",
         material: it.model || (it.ean ? String(it.ean) : undefined),
         itemNo: it.model || undefined,
@@ -972,11 +940,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     .slice()
     .sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
 
-  // --- Order Editing Rules (mirrors the backend guard in
-  // customer_orders_controller.ts) ---
-  //   Open                -> everything editable
-  //   Partially Delivered -> only comments + highlight color
-  //   Delivered / Closed  -> nothing, edit mode can't even be entered
   const auftragStatus = order.auftrag_status || "open";
   const isOpenStatus = auftragStatus === "open";
   const isPartiallyDeliveredStatus = auftragStatus === "partially_delivered";
@@ -997,21 +960,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
 
-  // Discount reduces each group's (and shipping's) base proportionally —
-  // pulled out here so it can be reused by both vatGroups and displayTotal.
-  // Only reads from `form` while actually, legitimately mid-edit of
-  // commercial data (effectiveEdit && canEditCommercial) — otherwise
-  // these totals must reflect the saved order, never an in-progress form
-  // value, since Menge/Nettowert/Auftrag value must never appear to
-  // change outside of that one legitimate case.
   const discountPct =
     effectiveEdit && canEditCommercial
       ? parseFlexibleNumber(form.discountPercentage) || 0
       : order.discount_percentage || 0;
   const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
 
-  // Shipping net amount (qty * cost), shared by vatGroups, the summary
-  // row, and the total calculation below.
   const shippingTotalForDisplay =
     effectiveEdit && canEditCommercial
       ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
@@ -1042,9 +996,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   })();
 
   const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
-  // Subtotal covers line items only — shipping's net amount has to be
-  // added in explicitly (discounted the same way as everything else),
-  // otherwise only its VAT portion ever reached the total.
   const displayTotal =
     (order.subtotal || 0) -
     (order.discount_amount || 0) +
@@ -1391,10 +1342,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   onChange={(e) => patch({ title: e.target.value })}
                 />
               </Field>
-              {/* Tax profile — added to mirror OfferDetailModal's field of
-                  the same name and position (right after Title). Always
-                  read-only, same as Offer's — there is no edit affordance
-                  for it there either. */}
               <Field
                 label="Tax profile"
                 edit={false}
@@ -1404,19 +1351,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     : "No tax profile assigned to this customer"
                 }
               />
-              {/* <Field label="Status" edit={edit} value={order.status}>
-                <select
-                  className={inputCls}
-                  value={form.status}
-                  onChange={(e) => patch({ status: e.target.value })}
-                >
-                  {ORDER_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </Field> */}
               <Field
                 label="Delivery Date"
                 edit={effectiveEdit && canEditCommercial}
@@ -1453,20 +1387,25 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 </select>
               </Field>
               {(() => {
-                const currentPmName = form.paymentMethod || order.payment_method || "";
+                const currentPmName =
+                  form.paymentMethod || order.payment_method || "";
                 const selectedPmObj = dbPaymentMethods.find(
-                  (pm: any) => pm.name === currentPmName
+                  (pm: any) => pm.name === currentPmName,
                 );
                 const isDueDaysEditable = selectedPmObj
                   ? !selectedPmObj.is_prepayment
                   : currentPmName
-                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(currentPmName)
+                    ? !/vorkasse|prepayment|paypal|cash|credit/i.test(
+                        currentPmName,
+                      )
                     : false;
 
                 return (
                   <Field
                     label="Due Days"
-                    edit={effectiveEdit && canEditCommercial && isDueDaysEditable}
+                    edit={
+                      effectiveEdit && canEditCommercial && isDueDaysEditable
+                    }
                     value={order.payment_terms}
                   >
                     <input
@@ -1477,7 +1416,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       placeholder="e.g., 30"
                       disabled={!isDueDaysEditable}
                       onChange={(e) =>
-                        patch({ paymentTerms: e.target.value.replace(/\D/g, "") })
+                        patch({
+                          paymentTerms: e.target.value.replace(/\D/g, ""),
+                        })
                       }
                     />
                   </Field>
@@ -1559,6 +1500,29 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     )}
                   </div>
 
+                  {(order.kundenreferenz || effectiveEdit) && (
+                    <div className="w-56 shrink-0">
+                      <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        Kundenreferenz
+                      </label>
+                      {effectiveEdit && canEditCommercial ? (
+                        <input
+                          type="text"
+                          maxLength={255}
+                          className={inputCls}
+                          value={form.kundenreferenz || ""}
+                          placeholder="e.g. EURODIMA BE2650931 vom 20.08.2026"
+                          onChange={(e) =>
+                            patch({ kundenreferenz: e.target.value })
+                          }
+                        />
+                      ) : (
+                        <div className="text-sm font-medium text-gray-800 py-1.5">
+                          {order.kundenreferenz || "—"}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {(effectiveEdit && canEditCommercial
                     ? form.isWeiterversand
                     : order.is_weiterversand === true ||
@@ -2223,7 +2187,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 </span>
               </div>
 
-              {/* Payments & Open Amount (offener Betrag) — only if there are assigned payments */}
               {(() => {
                 const paymentsList =
                   order?.payments || order?.assignedPayments || [];

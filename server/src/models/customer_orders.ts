@@ -49,6 +49,18 @@ export class CustomerOrder {
   @Column({ type: "varchar", length: 255, nullable: true })
   ansprechpartner?: string;
 
+  /**
+   * Freeform customer-facing reference line — "how our customer refers to
+   * this document" (e.g. "EURODIMA BE2650931 vom 20.08.2026"). Purely
+   * optional and never auto-populated from the customer name or anything
+   * else; the user decides whether/what to put here. Flows forward onto
+   * every Rechnung and Lieferschein generated from this Auftrag, and is
+   * shown on their PDFs directly above the line-items table — but only
+   * when non-empty.
+   */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  kundenreferenz?: string;
+
   @Column({ type: "varchar", length: 50, default: "Draft" })
   status!: string;
 
@@ -205,7 +217,10 @@ export class CustomerOrder {
   @Column({ type: "int", nullable: true })
   weiterversand_service_provider_id?: number;
 
-  @ManyToOne(() => WeiterversandServiceProvider, { nullable: true, eager: false })
+  @ManyToOne(() => WeiterversandServiceProvider, {
+    nullable: true,
+    eager: false,
+  })
   @JoinColumn({ name: "weiterversand_service_provider_id" })
   weiterversandServiceProvider?: WeiterversandServiceProvider;
 
