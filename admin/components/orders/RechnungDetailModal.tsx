@@ -966,14 +966,14 @@ export default function RechnungDetailModal({
                         Pic
                       </th>
                     )}
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-24">
                       Art.-Nr.
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-64">
                       Bezeichnung
                     </th>
                     {showViewOnly && (
-                      <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                      <th className="px-2 py-2 text-left font-semibold text-gray-600">
                         Hinweis
                       </th>
                     )}
@@ -982,10 +982,10 @@ export default function RechnungDetailModal({
                     </th>
                     {showCorrectionUI && (
                       <>
-                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
+                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
                           Open Qty
                         </th>
-                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-28">
+                        <th className="px-2 py-2 text-center font-semibold text-gray-600 w-24">
                           Qty
                         </th>
                         <th className="px-2 py-2 text-center font-semibold text-gray-600 w-32">
@@ -995,7 +995,7 @@ export default function RechnungDetailModal({
                     )}
                     {showViewOnly && (
                       <>
-                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                        <th className="px-2 py-2 text-right font-semibold text-gray-600 w-16">
                           Menge
                         </th>
                         <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28">

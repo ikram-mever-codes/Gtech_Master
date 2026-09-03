@@ -1682,22 +1682,22 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-12">
                       Pic
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-28">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-24">
                       Art.-Nr.
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-64">
                       Bezeichnung
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold text-gray-600 w-40">
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
                       RemarkEx
                     </th>
-                    <th className="px-2 py-2 text-center font-semibold text-gray-600 w-20">
+                    <th className="px-2 py-2 text-center font-semibold text-gray-600 w-16">
                       MwSt.
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-16">
                       Qty Open
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-16">
                       Menge
                     </th>
                     <th className="px-2 py-2 text-right font-semibold text-gray-600 w-28 whitespace-nowrap">

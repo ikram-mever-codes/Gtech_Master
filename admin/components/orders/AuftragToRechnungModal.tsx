@@ -1000,25 +1000,25 @@ export default function AuftragToRechnungModal({
                     <th className="px-2 py-2 text-left font-semibold w-12">
                       Pic
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold w-28">
+                    <th className="px-2 py-2 text-left font-semibold w-24">
                       Art.-Nr.
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold">
+                    <th className="px-2 py-2 text-left font-semibold w-64">
                       Bezeichnung
                     </th>
-                    <th className="px-2 py-2 text-left font-semibold w-36">
+                    <th className="px-2 py-2 text-left font-semibold">
                       RemarkEx
                     </th>
-                    <th className="px-2 py-2 text-center font-semibold w-16">
+                    <th className="px-2 py-2 text-center font-semibold w-14">
                       MwSt.
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold w-24">
+                    <th className="px-2 py-2 text-right font-semibold w-16">
                       QTY Open
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold w-20">
+                    <th className="px-2 py-2 text-right font-semibold w-16">
                       Stock
                     </th>
-                    <th className="px-2 py-2 text-right font-semibold w-28">
+                    <th className="px-2 py-2 text-right font-semibold w-16">
                       Qty
                     </th>
                     <th className="px-2 py-2 text-right font-semibold w-28">
