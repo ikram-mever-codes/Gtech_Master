@@ -1128,6 +1128,7 @@ export const createAuftragFromOffer = async (
         specification: lineItem?.specification || "",
         description: lineItem?.description || "",
         weight: lineItem?.weight || undefined,
+        extraWeight: lineItem?.extraWeight || undefined,
         quantity: qty,
         price: price,
         taxRate:
