@@ -6,11 +6,12 @@ import { downloadBlob, getFilenameFromResponse } from "@/utils/blobUtils";
 export const createRechnungKFromRechnung = async (
   rechnungId: string | number,
   corrections?: Array<{ itemId: string; quantity: number; price: number }>,
+  options?: { includeShipping?: boolean },
 ) => {
   try {
     const response: any = await api.post(
       `/rechnungen-k/from-rechnung/${rechnungId}`,
-      { corrections },
+      { corrections, includeShipping: options?.includeShipping },
     );
     return response;
   } catch (error: any) {
@@ -57,7 +58,12 @@ export const updateRechnungKItem = async (
 
 export const updateRechnungK = async (
   id: string | number,
-  data: { title?: string; notes?: string; internal_notes?: string; highlight_color?: string },
+  data: {
+    title?: string;
+    notes?: string;
+    internal_notes?: string;
+    highlight_color?: string;
+  },
 ) => {
   try {
     const response: any = await api.patch(`/rechnungen-k/${id}`, data);

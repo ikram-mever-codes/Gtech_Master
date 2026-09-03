@@ -276,9 +276,9 @@ export const createRechnungKFromRechnung = async (
 ) => {
   try {
     const { rechnungId } = req.params;
-    const { corrections } = req.body;
+    const { corrections, includeShipping } = req.body;
+    const shouldIncludeShipping = includeShipping !== false;
 
-    // If corrections is not provided, create correction for all items with open quantity
     if (
       !corrections ||
       !Array.isArray(corrections) ||
@@ -311,7 +311,6 @@ export const createRechnungKFromRechnung = async (
       return;
     }
 
-    // Get current open quantities
     const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
     const allRKs = await rechnungKRepo.find({
       where: { original_rechnung_id: rechnungId },
@@ -329,7 +328,6 @@ export const createRechnungKFromRechnung = async (
       }
     }
 
-    // Validate corrections and check open quantities
     const validationErrors = [];
     const validatedCorrections = [];
 
@@ -397,7 +395,6 @@ export const createRechnungKFromRechnung = async (
       return;
     }
 
-    // Create the correction invoice
     const now = new Date();
     let correctionNo = "";
     try {
@@ -435,12 +432,18 @@ export const createRechnungKFromRechnung = async (
       total_amount: 0,
       discount_percentage: original.discount_percentage,
       discount_amount: original.discount_amount,
-      shipping_cost: original.shipping_cost,
-      shipping_quantity: original.shipping_quantity,
+      // Shipping is only carried onto this RK when the user left the
+      // shipping line checked in the create-RK UI. Deselecting it means
+      // this correction is item-only — the customer isn't being charged
+      // or refunded shipping as part of it.
+      shipping_cost: shouldIncludeShipping ? original.shipping_cost : 0,
+      shipping_quantity: shouldIncludeShipping ? original.shipping_quantity : 0,
       currency: original.currency,
       payment_method: original.payment_method,
       payment_terms: original.payment_terms,
-      shipping_method: original.shipping_method,
+      shipping_method: shouldIncludeShipping
+        ? original.shipping_method
+        : undefined,
       delivery_terms: original.delivery_terms,
       terms_conditions: original.terms_conditions,
       status: "open",
@@ -454,7 +457,6 @@ export const createRechnungKFromRechnung = async (
 
     const savedRechnungK = await rechnungKRepo.save(rechnungK);
 
-    // Create items for the correction invoice
     const itemRepo = AppDataSource.getRepository(RechnungKItem);
     const itemEntities = validatedCorrections.map(
       ({ originalItem, quantity, price }) =>
@@ -507,7 +509,6 @@ export const createRechnungKFromRechnung = async (
     next(error);
   }
 };
-
 export const getAllRechnungenK = async (
   _req: Request,
   res: Response,

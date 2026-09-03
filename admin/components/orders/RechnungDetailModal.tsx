@@ -152,11 +152,6 @@ interface RechnungDetailModalProps {
   onClose: () => void;
   rechnung: any;
   isCorrection?: boolean;
-  /** Only meaningful when isCorrection is false. "view" (default) shows a
-   * plain read-only line items table with a Hinweis column and no
-   * correction-related controls. "correction" — entered only via the
-   * table's "+RK" button — shows the Open Qty / editable Qty & Price
-   * inputs plus the "Create RK" footer button. */
   mode?: "view" | "correction";
   openQuantities?: Record<string, number>;
   onChanged?: () => void;
@@ -216,6 +211,14 @@ export default function RechnungDetailModal({
   const [corrections, setCorrections] = useState<{
     [key: string]: { quantity: number; price: number };
   }>({});
+  // Which line items are explicitly included in the RK being built.
+  // Defaults to every item that still has open quantity (matching the
+  // previous implicit behavior), but is now a real, visible checkbox per
+  // row instead of an inferred state — so a line can be deliberately
+  // deselected without needing to zero out its quantity.
+  const [selectedCorrectionIds, setSelectedCorrectionIds] = useState<any>(
+    new Set(),
+  );
 
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -236,6 +239,7 @@ export default function RechnungDetailModal({
   const [editShippingCost, setEditShippingCost] = useState<number>(0);
   const [editShippingQuantity, setEditShippingQuantity] = useState<number>(1);
   const [editShippingMethod, setEditShippingMethod] = useState<string>("");
+  const [shippingSelected, setShippingSelected] = useState(true);
 
   const linkedDocs = rechnung?.linkedDocuments || {};
   const auftragDocs = sortByCreatedAtDesc(linkedDocs.auftrag || []);
@@ -246,6 +250,7 @@ export default function RechnungDetailModal({
     setData(rechnung);
     setIsEditMode(false);
     setAddressEdit(false);
+    setShippingSelected(true);
     setEditShippingCost(
       rechnung?.shipping_cost !== undefined && rechnung?.shipping_cost !== null
         ? Number(rechnung.shipping_cost)
@@ -265,9 +270,17 @@ export default function RechnungDetailModal({
         "",
     );
 
-    // Initialize corrections with default values for items that have open quantity
+    // Prefill every open-quantity item with its ORIGINAL price (never 0
+    // unless the original line itself was genuinely priced at 0), and
+    // select all of them by default — same starting point as before, but
+    // now each one has a real, individually togglable checkbox rather
+    // than only being excludable by zeroing its quantity.
     if (rechnung?.items) {
-      const initialCorrections: any = {};
+      const initialCorrections: Record<
+        string,
+        { quantity: number; price: number }
+      > = {};
+      const initialSelected = new Set<string>();
       rechnung.items.forEach((item: any) => {
         const openQty = openQuantities[item.id] || 0;
         if (openQty > 0) {
@@ -275,9 +288,14 @@ export default function RechnungDetailModal({
             quantity: openQty,
             price: Number(item.price) || 0,
           };
+          initialSelected.add(item.id);
         }
       });
       setCorrections(initialCorrections);
+      setSelectedCorrectionIds(initialSelected);
+    } else {
+      setCorrections({});
+      setSelectedCorrectionIds(new Set());
     }
   }, [rechnung, openQuantities]);
 
@@ -285,17 +303,47 @@ export default function RechnungDetailModal({
 
   const items = data.items || [];
 
-  // Calculate shipping total
   const shippingTotal = editShippingCost * editShippingQuantity;
 
-  // Subtotal includes items + shipping
-  const netTotal = Number(data.subtotal ?? 0) + shippingTotal;
-  const taxAmount =
-    Number(data.tax_amount ?? 0) +
-    shippingTotal * (Number(data.tax_rate ?? 19) / 100);
-  const grossTotal = netTotal + taxAmount;
+  const showCorrectionUI = !isCorrection && mode === "correction";
+  const showViewOnly = !isCorrection && mode === "view";
 
   const taxRate = Number(data.taxProfile.taxRate ?? 19);
+
+  // Live preview totals while building a correction: only rows that are
+  // both selected AND have a valid quantity contribute.
+  const correctionsSubtotal = showCorrectionUI
+    ? items.reduce((sum: number, item: any) => {
+        if (!selectedCorrectionIds.has(item.id)) return sum;
+        const openQty = openQuantities[item.id] || 0;
+        const corr = corrections[item.id];
+        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+          return sum + corr.quantity * corr.price;
+        }
+        return sum;
+      }, 0)
+    : 0;
+  const correctionsTax = showCorrectionUI
+    ? items.reduce((sum: number, item: any) => {
+        if (!selectedCorrectionIds.has(item.id)) return sum;
+        const openQty = openQuantities[item.id] || 0;
+        const corr = corrections[item.id];
+        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+          const lineTaxRate = Number(item.taxRate ?? taxRate);
+          return sum + corr.quantity * corr.price * (lineTaxRate / 100);
+        }
+        return sum;
+      }, 0)
+    : 0;
+
+  const netTotal = showCorrectionUI
+    ? correctionsSubtotal + (shippingSelected ? shippingTotal : 0)
+    : Number(data.subtotal ?? 0) + shippingTotal;
+  const taxAmount = showCorrectionUI
+    ? correctionsTax + (shippingSelected ? shippingTotal * (taxRate / 100) : 0)
+    : Number(data.tax_amount ?? 0) +
+      shippingTotal * (Number(data.tax_rate ?? 19) / 100);
+  const grossTotal = netTotal + taxAmount;
 
   const invoiceNumber = data.invoice_number || data.rk_number || data.id;
   const companyName =
@@ -305,12 +353,10 @@ export default function RechnungDetailModal({
 
   const netWeightKg = items.reduce((sum: number, it: any) => {
     const qty = Number(it.quantity) || 1;
-    // it.weight is copied from Item.weight, stored in grams — convert to kg.
     const weightGrams = Number(it.weight) || 0;
     return sum + (weightGrams / 1000) * qty;
   }, 0);
   const extraWeightKg = items.reduce(
-    // extraWeight is entered/stored directly in kg — no conversion.
     (sum: number, it: any) => sum + (Number(it.extraWeight) || 0),
     0,
   );
@@ -337,10 +383,6 @@ export default function RechnungDetailModal({
       ? { street: rechnungCustomer.ship_to_address }
       : null);
 
-  // --- Mode flags ----------------------------------------------------------
-  const showCorrectionUI = !isCorrection && mode === "correction";
-  const showViewOnly = !isCorrection && mode === "view";
-
   const handleCorrectionChange = (
     itemId: string,
     field: "quantity" | "price",
@@ -355,9 +397,38 @@ export default function RechnungDetailModal({
     }));
   };
 
+  /** Toggles a line item's inclusion in the RK being built. Turning a
+   * row on ensures it has a corrections entry prefilled with its
+   * original open quantity and original price (never overwriting an
+   * edit already made — only fills in if missing). Turning it off
+   * leaves the entered values intact so re-checking it doesn't lose
+   * anything. Items with no open quantity can't be toggled at all —
+   * there's nothing left on them to correct. */
+  const toggleItemSelected = (item: any) => {
+    const openQty = openQuantities[item.id] || 0;
+    if (openQty <= 0) return;
+    setSelectedCorrectionIds((prev: any) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      return next;
+    });
+    setCorrections((prev) => {
+      if (prev[item.id]) return prev;
+      return {
+        ...prev,
+        [item.id]: {
+          quantity: openQty,
+          price: Number(item.price) || 0,
+        },
+      };
+    });
+  };
+
   const handleCreateCorrections = async () => {
     const correctionsArray = Object.entries(corrections)
       .filter(([itemId, corr]: any) => {
+        if (!selectedCorrectionIds.has(itemId)) return false;
         const openQty = openQuantities[itemId] || 0;
         return corr.quantity > 0 && corr.quantity <= openQty;
       })
@@ -369,7 +440,7 @@ export default function RechnungDetailModal({
 
     if (correctionsArray.length === 0) {
       toast.error(
-        "No valid corrections to create. Please set quantity > 0 for at least one item.",
+        "No valid corrections to create. Please select at least one item with quantity > 0.",
         errorStyles,
       );
       return;
@@ -401,6 +472,7 @@ export default function RechnungDetailModal({
       const res: any = await createRechnungKFromRechnung(
         data.id,
         correctionsArray,
+        { includeShipping: shippingSelected },
       );
 
       if (res?.success) {
@@ -616,15 +688,20 @@ export default function RechnungDetailModal({
     return openQty <= 0;
   });
 
-  const hasCorrections = Object.values(corrections).some(
-    (corr: any) => corr.quantity > 0,
-  );
+  const hasCorrections = Array.from(selectedCorrectionIds).some((id: any) => {
+    const corr = corrections[id];
+    return corr && corr.quantity > 0;
+  });
 
-  const totalItemsToCorrect = Object.values(corrections).filter(
-    (corr: any) => corr.quantity > 0,
+  const totalItemsToCorrect = Array.from(selectedCorrectionIds).filter(
+    (id: any) => {
+      const corr = corrections[id];
+      return corr && corr.quantity > 0;
+    },
   ).length;
 
   const columnCount =
+    (showCorrectionUI ? 1 : 0) +
     1 +
     (isCorrection ? 1 : 0) +
     1 +
@@ -962,6 +1039,11 @@ export default function RechnungDetailModal({
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
+                    {showCorrectionUI && (
+                      <th className="px-2 py-2 text-center font-semibold text-gray-600 w-10">
+                        ✓
+                      </th>
+                    )}
                     <th className="px-2 py-2 text-left font-semibold text-gray-600 w-10">
                       Pos
                     </th>
@@ -1042,6 +1124,7 @@ export default function RechnungDetailModal({
                     const isSaving = savingItemId === item.id;
                     const openQty = openQuantities[item.id] || 0;
                     const isFullyCorrected = openQty <= 0;
+                    const selected = selectedCorrectionIds.has(item.id);
                     const correction = corrections[item.id] || {
                       quantity: 0,
                       price: unitPrice,
@@ -1052,11 +1135,22 @@ export default function RechnungDetailModal({
                       <tr
                         key={item.id || idx}
                         className={
-                          isRowDisabled && showCorrectionUI
+                          showCorrectionUI && (isRowDisabled || !selected)
                             ? "bg-gray-50 opacity-60"
                             : ""
                         }
                       >
+                        {showCorrectionUI && (
+                          <td className="px-2 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              disabled={isFullyCorrected}
+                              onChange={() => toggleItemSelected(item)}
+                              className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                            />
+                          </td>
+                        )}
                         <td className="px-2 py-2 text-gray-500">{idx + 1}</td>
 
                         {isCorrection && (
@@ -1110,6 +1204,7 @@ export default function RechnungDetailModal({
                                   min="0"
                                   max={openQty}
                                   step="1"
+                                  disabled={!selected}
                                   value={correction.quantity}
                                   onChange={(e) =>
                                     handleCorrectionChange(
@@ -1118,7 +1213,11 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-center"
+                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${
+                                    selected
+                                      ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
+                                      : "border-gray-200 bg-gray-100 text-gray-400"
+                                  }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1129,7 +1228,8 @@ export default function RechnungDetailModal({
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.01"
+                                  step="0.001"
+                                  disabled={!selected}
                                   value={correction.price}
                                   onChange={(e) =>
                                     handleCorrectionChange(
@@ -1138,7 +1238,11 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className="w-28 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-right"
+                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${
+                                    selected
+                                      ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
+                                      : "border-gray-200 bg-gray-100 text-gray-400"
+                                  }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1202,18 +1306,36 @@ export default function RechnungDetailModal({
                     );
                   })}
 
-                  {/* Shipping row — shown whenever a shipping method is set,
-                      same rule as AuftragPreviewModal (order.shipping_method),
-                      so a €0 shipping cost with a method still shows a row
-                      instead of disappearing. */}
+                  {/* Shipping row — its "select" checkbox now lives in the
+                      same leftmost column as every other line item's, for
+                      consistency, instead of sitting inside the Open Qty
+                      slot. */}
                   {(editShippingMethod || data.shipping_method) &&
                     (editShippingCost > 0 || editShippingQuantity > 0) && (
-                      <tr className="bg-gray-50/80 border-t-2 border-gray-200">
+                      <tr
+                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${
+                          showCorrectionUI && !shippingSelected
+                            ? "opacity-60"
+                            : ""
+                        }`}
+                      >
+                        {showCorrectionUI && (
+                          <td className="px-2 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={shippingSelected}
+                              onChange={(e) =>
+                                setShippingSelected(e.target.checked)
+                              }
+                              className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                            />
+                          </td>
+                        )}
                         <td className="px-2 py-2 text-gray-400">
                           {items.length + 1}
                         </td>
                         {isCorrection && (
-                          <td className="px-2 py-2 t  ext-gray-400"></td>
+                          <td className="px-2 py-2 text-gray-400"></td>
                         )}
                         <td className="px-2 py-2 text-gray-400">—</td>
                         <td className="px-2 py-2 font-medium text-gray-700">
@@ -1373,7 +1495,7 @@ export default function RechnungDetailModal({
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {data.gelangenheitsbestaetigung_doc ? (
-                    <>
+                    <div className="flex gap-2">
                       <a
                         href={`${process.env.NEXT_PUBLIC_API_URL || ""}${data.gelangenheitsbestaetigung_doc}`}
                         target="_blank"
@@ -1391,7 +1513,7 @@ export default function RechnungDetailModal({
                         <TrashIcon className="w-3.5 h-3.5" />
                         {removingDoc ? "Removing…" : "Remove"}
                       </button>
-                    </>
+                    </div>
                   ) : (
                     <>
                       <span className="text-xs text-amber-700 font-medium">
