@@ -323,7 +323,7 @@ async function calculateOrderTotals(orderId: number): Promise<void> {
   const round2 = (n: number) =>
     isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
 
-  order.subtotal = round2(subtotal);
+  order.subtotal = round2(subtotal + shippingTotal);
   order.tax_amount = round2(taxAmount);
   order.total_amount = round2(total + taxAmount);
   await customerOrderRepo.save(order);

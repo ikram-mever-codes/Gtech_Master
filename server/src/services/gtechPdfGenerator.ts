@@ -887,12 +887,23 @@ export async function generateGtechDocumentPdf(
     const rawCurrency = opts.currency || "EUR";
     const currency = (rawCurrency.toUpperCase() === "EUR" || rawCurrency === "€") ? "€" : rawCurrency;
 
-    // opts.subtotal already includes shipping cost (added server-side in
-    // createRechnungFromAuftrag: totalSubtotal = subtotal + shippingTotal).
-    // Do NOT add shippingTotalNet again here — that caused double-counting in
-    // the Zwischensumme Netto row on the PDF.
     const shippingTotalNet = shippingLineTotal; // reuse the value already computed above
-    const effectiveSubtotal = Number(opts.subtotal || 0);
+    const lineItemsSubtotal = (opts.lineItems || []).reduce((acc, it) => {
+      const lineNet =
+        it.lineTotal !== undefined && it.lineTotal !== null
+          ? Number(it.lineTotal)
+          : (Number(it.quantity ?? 1) * Number(it.unitPrice || 0));
+      return acc + lineNet;
+    }, 0);
+
+    let effectiveSubtotal = Number(opts.subtotal || 0);
+    // If opts.subtotal does not include shipping cost (e.g. for Auftrag PDFs where subtotal equaled lineItemsSubtotal),
+    // add shippingTotalNet so Zwischensumme Netto includes all lines in the table.
+    if (shippingTotalNet > 0 && Math.abs(effectiveSubtotal - lineItemsSubtotal) < 0.05) {
+      effectiveSubtotal += shippingTotalNet;
+    } else if (effectiveSubtotal === 0 && lineItemsSubtotal > 0) {
+      effectiveSubtotal = lineItemsSubtotal + shippingTotalNet;
+    }
 
     doc.font(R).fontSize(9).fillColor("#3F4446");
     doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
