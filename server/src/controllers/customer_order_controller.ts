@@ -1181,6 +1181,7 @@ export const createAuftragFromOffer = async (
       shipping_quantity: offer.shippingQuantity || 1,
       payment_method: effectivePaymentMethod,
       shipping_method: effectiveShippingMethod,
+      shipping_text: offer.shippingText || offer.shippingMethod,
       payment_terms: effectivePaymentTerms,
       delivery_terms: offer.deliveryTerms,
       terms_conditions: offer.termsConditions,
