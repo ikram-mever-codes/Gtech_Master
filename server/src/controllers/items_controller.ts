@@ -1,6 +1,7 @@
 // src/controllers/itemManagementController.ts
 import { Request, Response, NextFunction } from "express";
 import { SalesPrice } from "../models/sales_prices";
+import { PurchasePrice } from "../models/purchase_prices";
 import { AppDataSource } from "../config/database";
 import { Item } from "../models/items";
 import { Parent } from "../models/parents";
@@ -1831,6 +1832,20 @@ export const deleteItem = async (
         .createQueryBuilder()
         .delete()
         .from(OrderItem)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(SalesPrice)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(PurchasePrice)
         .where("item_id = :itemId", { itemId: parseInt(id) })
         .execute();
 

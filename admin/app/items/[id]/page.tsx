@@ -1028,6 +1028,7 @@ const ItemDetailsPage = () => {
         is_rmb_special: updatedData.parent?.isRMBSpecial ? "Y" : "N",
         is_new: updatedData.others?.isNew ? "Y" : "N",
         is_npr: updatedData.others?.isNPR ? "Y" : "N",
+        is_stock_item: updatedData.others?.isStock ? "Y" : "N",
         isLabelPrint: updatedData.isLabelPrint ? true : false,
         supplier_id: toInt(updatedData.supplier_id),
         customer_id: updatedData.customer_id ?? null,
