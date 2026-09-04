@@ -20,18 +20,7 @@ import { IsOptional, IsString, IsInt, IsIn } from "class-validator";
 import { Type } from "class-transformer";
 import { DeepPartial, EntityManager } from "typeorm";
 
-// Fields that used to live directly on RequestedItem but are now sourced
-// from the linked Item. No longer used to strip — kept for the itemId
-// re-linking checks below.
 const SHARED_KEYS = Object.keys(ITEM_FIELD_MAP);
-
-// Whitelist, not blacklist: only these keys are ever written to
-// RequestedItem's own columns. Everything else (shared Item fields,
-// relation ids handled explicitly, or anything the frontend sends that
-// doesn't map to a real column) is dropped here rather than passed
-// through to TypeORM, which throws EntityPropertyNotFoundError instead
-// of ignoring unknown keys. If a field genuinely needs to reach
-// RequestedItem, add it here explicitly — don't fall back to blacklisting.
 function toOwnFields(payload: Record<string, any>): Record<string, any> {
   const own: Record<string, any> = {};
   for (const key of REQUESTED_ITEM_OWN_FIELDS) {
@@ -74,6 +63,9 @@ function withItemFields(entity: any): any {
     itemNameDe: entity.item?.item_name_de ?? null,
     category: entity.item?.category ?? null,
     supplier: entity.item?.supplier ?? null,
+    customer: entity.item?.customer ?? entity.customer ?? null,
+    customer_id: entity.item?.customer_id ?? entity.customerId ?? null,
+    customerId: entity.item?.customer_id ?? entity.customerId ?? null,
   };
 }
 function withNestedCustomer(
@@ -317,6 +309,7 @@ export class RequestedItemController {
           "item",
           "item.category",
           "item.supplier",
+          "item.customer",
         ],
       });
 
@@ -415,25 +408,17 @@ export class RequestedItemController {
         }
       }
 
-      // Derived, not client-supplied. If this business has no linked
-      // Customer yet (star_business_details row with no matching
-      // customer.starBusinessDetailsId), customer stays null — that's a
-      // pre-existing data gap, not something this endpoint should block on.
       const customer = await resolveCustomerForBusiness(
         queryRunner.manager,
         businessId,
       );
 
-      // Resolve or create the master Item (single source of truth for
-      // the shared fields listed in ITEM_FIELD_MAP).
-      const item = await ItemLinkService.resolveItem(queryRunner, body);
+      const item = await ItemLinkService.resolveItem(queryRunner, {
+        ...body,
+        customerId: body.customerId || customer?.id,
+      });
 
       const ownFields = toOwnFields(body);
-      // itemName is item data now — but the RequestedItem column is still
-      // NOT NULL in the DB (no migration for that yet), so it has to be
-      // written on insert regardless. This is a mirror only: every read
-      // in this controller shows item.item_name via withItemFields, this
-      // column is never consulted again.
       const requestedItemData: DeepPartial<RequestedItem> = {
         ...ownFields,
         business,
@@ -620,19 +605,17 @@ export class RequestedItemController {
         linkedItem = await ItemLinkService.backfillItem(
           queryRunner,
           baseFields,
-          body,
+          {
+            ...body,
+            customerId:
+              customer !== undefined
+                ? customer?.id
+                : (existingItem.customer?.id ?? body.customerId),
+          },
         );
       }
-
       const updateData: Record<string, any> = toOwnFields(body);
 
-      // TARIC lives solely on the linked Item (set above via
-      // ItemLinkService), never on RequestedItem itself. REQUESTED_ITEM_OWN_FIELDS
-      // still lists taric_id for legacy reasons, but writing it here creates
-      // a second, independent copy that drifts out of sync with the Item's
-      // real taric_id/taricRel the moment this RequestedItem gets re-linked
-      // to a different Item or backfilled. Drop it so it's never persisted
-      // on this entity.
       delete updateData.taric_id;
 
       updateData.itemId = linkedItem.id;
