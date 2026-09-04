@@ -288,11 +288,12 @@ export default function RechnungDetailModal({
   // Calculate shipping total
   const shippingTotal = editShippingCost * editShippingQuantity;
 
-  // Subtotal includes items + shipping
-  const netTotal = Number(data.subtotal ?? 0) + shippingTotal;
-  const taxAmount =
-    Number(data.tax_amount ?? 0) +
-    shippingTotal * (Number(data.tax_rate ?? 19) / 100);
+  // Subtotal from the DB already includes shipping (backend adds shippingTotal
+  // to items subtotal before saving to rechnung.subtotal). Do NOT add
+  // shippingTotal again here — that caused the displayed subtotal to be
+  // shipping_cost higher than the actual stored/PDF value.
+  const netTotal = Number(data.subtotal ?? 0);
+  const taxAmount = Number(data.tax_amount ?? 0);
   const grossTotal = netTotal + taxAmount;
 
   const taxRate = Number(data.taxProfile.taxRate ?? 19);
