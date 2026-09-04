@@ -797,7 +797,9 @@ export async function generateGtechDocumentPdf(
 
   const shippingMethod = (opts.shippingMethod || "").trim();
   const shippingCostNum = Number(opts.shippingCost || 0);
-  const shippingQtyNum = Number(opts.shippingQuantity || 1);
+  // Use ?? 0 (not || 1) so that a shipping quantity explicitly saved as 0
+  // (meaning "not included") is kept as 0 and the shipping row is not rendered.
+  const shippingQtyNum = Number(opts.shippingQuantity ?? 0);
   const shippingLineTotal = shippingCostNum * shippingQtyNum;
   const shippingTaxRateForRow =
     opts.shippingTaxRate !== undefined && opts.shippingTaxRate !== null
@@ -885,8 +887,12 @@ export async function generateGtechDocumentPdf(
     const rawCurrency = opts.currency || "EUR";
     const currency = (rawCurrency.toUpperCase() === "EUR" || rawCurrency === "€") ? "€" : rawCurrency;
 
-    const shippingTotalNet = Number(opts.shippingCost || 0) * (Number(opts.shippingQuantity) || 1);
-    const effectiveSubtotal = Number(opts.subtotal || 0) + shippingTotalNet;
+    // opts.subtotal already includes shipping cost (added server-side in
+    // createRechnungFromAuftrag: totalSubtotal = subtotal + shippingTotal).
+    // Do NOT add shippingTotalNet again here — that caused double-counting in
+    // the Zwischensumme Netto row on the PDF.
+    const shippingTotalNet = shippingLineTotal; // reuse the value already computed above
+    const effectiveSubtotal = Number(opts.subtotal || 0);
 
     doc.font(R).fontSize(9).fillColor("#3F4446");
     doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
