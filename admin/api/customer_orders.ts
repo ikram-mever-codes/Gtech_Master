@@ -11,11 +11,12 @@ export const createAuftragFromOffer = async (
     price: number;
     itemName?: string;
   }>,
+  kundenreferenz?: string,
 ) => {
   try {
     const response: any = await api.post(
       `/customer-orders/from-offer/${offerId}`,
-      { selectedItems },
+      { selectedItems, kundenreferenz },
     );
     return response;
   } catch (error: any) {

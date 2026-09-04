@@ -29,8 +29,12 @@ export const CreateAuftragModal: React.FC<CreateAuftragModalProps> = ({
 }) => {
   const [items, setItems] = useState<ItemRowState[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [kundenreferenz, setKundenreferenz] = useState("");
 
   useEffect(() => {
+    if (offer) {
+      setKundenreferenz(offer.kundenreferenz || "");
+    }
     if (offer && offer.lineItems && Array.isArray(offer.lineItems)) {
       const initialItems: ItemRowState[] = offer.lineItems.map(
         (item: any, idx: number) => {
@@ -114,7 +118,7 @@ export const CreateAuftragModal: React.FC<CreateAuftragModalProps> = ({
 
     try {
       setSubmitting(true);
-      const res = await createAuftragFromOffer(offer.id, selectedItemsToSubmit);
+      const res = await createAuftragFromOffer(offer.id, selectedItemsToSubmit, kundenreferenz);
       if (res && res.success) {
         toast.success(res.message || "Auftrag created successfully!");
         if (onSuccess) onSuccess();
@@ -176,7 +180,21 @@ export const CreateAuftragModal: React.FC<CreateAuftragModalProps> = ({
             </div>
           </div>
 
-          {/* Items Table */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              Kundenreferenz (Customer Reference)
+            </label>
+            <input
+              type="text"
+              autoFocus
+              maxLength={255}
+              value={kundenreferenz}
+              onChange={(e) => setKundenreferenz(e.target.value)}
+              placeholder="e.g. EURODIMA BE2650931 vom 20.08.2026"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            />
+          </div>
+
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-100 border-b border-gray-200 text-gray-700 text-xs font-semibold uppercase tracking-wider">

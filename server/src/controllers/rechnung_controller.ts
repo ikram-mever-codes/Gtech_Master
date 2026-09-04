@@ -53,12 +53,12 @@ async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
       taxCode: match.tax_code || undefined,
     }
     : {
-        id: null,
-        name: "Frozen",
-        taxCase: undefined,
-        taxRate: Number(taxRate),
-        taxCode: undefined,
-      };
+      id: null,
+      name: "Frozen",
+      taxCase: undefined,
+      taxRate: Number(taxRate),
+      taxCode: undefined,
+    };
 }
 
 async function resolveCustomerTaxProfileForRechnung(
@@ -420,11 +420,11 @@ export const createRechnungFromAuftrag = async (
           sourceLine?.taxRate !== undefined && sourceLine?.taxRate !== null
             ? Number(sourceLine.taxRate)
             : (auftrag.customer?.defaultTaxProfile?.tax_rate !== undefined &&
-               auftrag.customer?.defaultTaxProfile?.tax_rate !== null
-                ? Number(auftrag.customer.defaultTaxProfile.tax_rate)
-                : auftrag.tax_rate !== undefined && auftrag.tax_rate !== null
-                  ? Number(auftrag.tax_rate)
-                  : 19),
+              auftrag.customer?.defaultTaxProfile?.tax_rate !== null
+              ? Number(auftrag.customer.defaultTaxProfile.tax_rate)
+              : auftrag.tax_rate !== undefined && auftrag.tax_rate !== null
+                ? Number(auftrag.tax_rate)
+                : 19),
         highlightColor: sourceLine?.highlightColor || undefined,
         sourceLineItemId: sourceLine?.id || undefined,
         sourceItemId: sourceLine?.sourceItemId || undefined,

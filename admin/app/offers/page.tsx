@@ -26,6 +26,7 @@ import {
   MoveRight,
   FileText,
   Mail,
+  ShoppingCart,
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
@@ -471,6 +472,8 @@ const OffersPage: React.FC<any> = ({
     null,
   );
   const [draftItemsPreview, setDraftItemsPreview] = useState<any[]>([]);
+  const [convertModalOffer, setConvertModalOffer] = useState<any | null>(null);
+  const [convertModalKundenreferenz, setConvertModalKundenreferenz] = useState("");
 
   const [filters, setFilters] = useState<OfferSearchFilters>({
     search: "",
@@ -539,6 +542,7 @@ const OffersPage: React.FC<any> = ({
   const runDirectConversion = async (
     offer: any,
     selectedItemsOverride?: any[],
+    kundenreferenzOverride?: string,
   ): Promise<boolean> => {
     try {
       const lineItems =
@@ -563,7 +567,16 @@ const OffersPage: React.FC<any> = ({
         return false;
       }
 
-      const res = await createAuftragFromOffer(offer.id, selectedItems);
+      const effectiveKundenreferenz =
+        kundenreferenzOverride !== undefined
+          ? kundenreferenzOverride
+          : offer.kundenreferenz;
+
+      const res = await createAuftragFromOffer(
+        offer.id,
+        selectedItems,
+        effectiveKundenreferenz,
+      );
       const createdAuftragId = res?.data?.id;
 
       const nextCount =
@@ -608,29 +621,29 @@ const OffersPage: React.FC<any> = ({
     }
   };
 
-  const handleConvertOfferToAuftrag = async (
+  const handleConvertOfferToAuftrag = (
     offer: any,
     e?: React.MouseEvent,
   ) => {
     if (e) e.stopPropagation();
-    const companyName =
-      offer.customerSnapshot?.companyName ||
-      offer.customerSnapshot?.legalName ||
-      offer.customerSnapshot?.name ||
-      offer.customer?.companyName ||
-      "";
+    setConvertModalKundenreferenz(offer.kundenreferenz || "");
+    setConvertModalOffer(offer);
+  };
 
-    const prompt = window.confirm(
-      `Auftrag erstellen für ${companyName} aus Angebot ${offer.offerNumber} ?`,
-    );
-    if (!prompt) return;
+  const confirmConversionModal = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!convertModalOffer) return;
+
+    const targetOffer = convertModalOffer;
+    const ref = convertModalKundenreferenz;
+    setConvertModalOffer(null);
 
     try {
-      const draftRes = await getOfferDraftItemsPreview(offer.id);
+      const draftRes = await getOfferDraftItemsPreview(targetOffer.id);
       const draftItems = draftRes?.data || [];
       if (draftItems.length > 0) {
         setDraftItemsPreview(draftItems);
-        setDraftConversionOffer(offer);
+        setDraftConversionOffer(targetOffer);
         return;
       }
     } catch (err) {
@@ -640,7 +653,7 @@ const OffersPage: React.FC<any> = ({
       );
     }
 
-    await runDirectConversion(offer);
+    await runDirectConversion(targetOffer, undefined, ref);
   };
 
   const getContrastTextColor = (bgColor?: string) => {
@@ -1046,6 +1059,7 @@ const OffersPage: React.FC<any> = ({
             const ok = await runDirectConversion(
               draftConversionOffer,
               selectedItems,
+              convertModalKundenreferenz,
             );
             if (ok) {
               setDraftConversionOffer(null);
@@ -1054,6 +1068,83 @@ const OffersPage: React.FC<any> = ({
             return ok;
           }}
         />
+      )}
+
+      {convertModalOffer && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 select-none">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-100 rounded-lg text-emerald-700">
+                  <ShoppingCart className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Auftrag erstellen
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Angebot:{" "}
+                    <span className="font-semibold text-gray-700">
+                      {convertModalOffer.offerNumber}
+                    </span>{" "}
+                    • Kunde:{" "}
+                    <span className="font-semibold text-gray-700 truncate max-w-[150px] inline-block align-bottom">
+                      {convertModalOffer.customerSnapshot?.companyName ||
+                        convertModalOffer.customerSnapshot?.legalName ||
+                        convertModalOffer.customerSnapshot?.name ||
+                        convertModalOffer.customer?.companyName ||
+                        "N/A"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConvertModalOffer(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200/60 transition-all"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={confirmConversionModal} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Kundenreferenz (Customer Reference)
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  maxLength={255}
+                  value={convertModalKundenreferenz}
+                  onChange={(e) => setConvertModalKundenreferenz(e.target.value)}
+                  placeholder="e.g. EURODIMA BE2650931 vom 20.08.2026"
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 bg-white shadow-sm"
+                />
+                <p className="text-[11px] text-gray-500 mt-1.5">
+                  Der Cursor springt automatisch hierher. Nach dem Ausfüllen einfach OK klicken oder Enter drücken.
+                </p>
+              </div>
+
+              <div className="flex justify-end items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConvertModalOffer(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-sm font-bold bg-[#2F6B46] text-white hover:bg-[#255638] rounded-xl shadow transition-colors flex items-center gap-2"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  OK (Auftrag erstellen)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </>
   );
