@@ -878,6 +878,7 @@ export const downloadRechnungKPdf = async (
         (rechnungK.customer as any)?.defaultTaxProfile?.key ||
         customerSnap?.tax_profile_case ||
         customerSnap?.taxProfile,
+      kundenreferenz: (rechnungK as any).kundenreferenz || undefined,
       outputFilePath: filePath,
     });
 
