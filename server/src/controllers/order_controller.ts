@@ -88,7 +88,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) { }
+      } catch (e: any) {}
     }
   }
 })();
@@ -206,18 +206,18 @@ export const createOrder = async (
     const dbItems =
       itemIds.length > 0
         ? await itemRepo
-          .createQueryBuilder("i")
-          .where("i.id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("i")
+            .where("i.id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
     const supplierItems =
       itemIds.length > 0
         ? await supplierItemRepo
-          .createQueryBuilder("si")
-          .where("si.item_id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("si")
+            .where("si.item_id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
@@ -296,12 +296,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -490,12 +490,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -533,11 +533,17 @@ export const getAllOrders = async (
 
     if (filter) {
       if (filter === "unassigned_cargo") {
-        qb.andWhere("(o.cargo_id IS NULL OR o.cargo_id = 0 OR cargo.id IS NULL)");
+        qb.andWhere(
+          "(o.cargo_id IS NULL OR o.cargo_id = 0 OR cargo.id IS NULL)",
+        );
       } else if (filter === "purchase_problem") {
-        qb.andWhere("(o.status ILIKE '%purchase%problem%' OR o.problem_status ILIKE '%purchase%problem%')");
+        qb.andWhere(
+          "(o.status ILIKE '%purchase%problem%' OR o.problem_status ILIKE '%purchase%problem%')",
+        );
       } else if (filter === "check_problem") {
-        qb.andWhere("(o.status ILIKE '%check%problem%' OR o.problem_status ILIKE '%check%problem%')");
+        qb.andWhere(
+          "(o.status ILIKE '%check%problem%' OR o.problem_status ILIKE '%check%problem%')",
+        );
       }
     }
 
@@ -557,7 +563,7 @@ export const getAllOrders = async (
         .set({ cargo_id: () => "NULL" as any })
         .where("id IN (:...orphanedOrderIds)", { orphanedOrderIds })
         .execute()
-        .catch(() => { });
+        .catch(() => {});
     }
 
     for (const ord of orders) {
@@ -574,7 +580,7 @@ export const getAllOrders = async (
         ord.order_no = newDeNo;
         try {
           await orderRepo.update(ord.id, { order_no: newDeNo });
-        } catch (_) { }
+        } catch (_) {}
       }
     }
 
@@ -645,7 +651,9 @@ export const getAllOrders = async (
     });
 
     const mappedOrders = orders.map((order) => {
-      const hasValidCargo = Boolean(order.cargo && order.cargo.id && order.cargo_id);
+      const hasValidCargo = Boolean(
+        order.cargo && order.cargo.id && order.cargo_id,
+      );
       const validCargoId = hasValidCargo ? order.cargo_id : null;
 
       return {
@@ -653,11 +661,7 @@ export const getAllOrders = async (
         cargo_id: validCargoId,
         supplier_name:
           order.supplier?.company_name || order.supplier?.name || "Unassigned",
-        customer_name:
-          order.cargo?.customer?.companyName ||
-          order.cargo?.bill_to_display_name ||
-          order.customer?.companyName ||
-          "No Customer",
+        customer_name: order.customer?.companyName || "No Customer",
         items: (order.orderItems || []).map((oi) => {
           const itemDetails =
             oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
@@ -704,7 +708,9 @@ export const getAllOrders = async (
               itemDetails?.item_name ||
               warehouseItem?.item_name_en ||
               warehouseItem?.item_name_de ||
-              (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
+              (oi?.ItemID_DE
+                ? `Unknown (DE: ${oi.ItemID_DE})`
+                : "Unknown Item"),
             model: itemDetails?.model || "-",
             price: finalPrice,
             currency: "CNY",
@@ -717,22 +723,22 @@ export const getAllOrders = async (
             item: itemDetails,
             warehouse_data: warehouseItem
               ? {
-                id: warehouseItem.id,
-                item_no_de: itemDetails?.item_no_de,
-                item_name_de: warehouseItem.item_name_de,
-                item_name_en: warehouseItem.item_name_en,
-                stock_qty: warehouseItem.stock_qty,
-                msq: warehouseItem.msq,
-                buffer: warehouseItem.buffer,
-                is_stock_item: warehouseItem.is_stock_item,
-                is_SnSI: warehouseItem.is_SnSI,
-                ship_class: warehouseItem.ship_class,
-                is_active: warehouseItem.is_active,
-                is_no_auto_order: warehouseItem.is_no_auto_order,
-                category_id: warehouseItem.category_id,
-              }
+                  id: warehouseItem.id,
+                  item_no_de: itemDetails?.item_no_de,
+                  item_name_de: warehouseItem.item_name_de,
+                  item_name_en: warehouseItem.item_name_en,
+                  stock_qty: warehouseItem.stock_qty,
+                  msq: warehouseItem.msq,
+                  buffer: warehouseItem.buffer,
+                  is_stock_item: warehouseItem.is_stock_item,
+                  is_SnSI: warehouseItem.is_SnSI,
+                  ship_class: warehouseItem.ship_class,
+                  is_active: warehouseItem.is_active,
+                  is_no_auto_order: warehouseItem.is_no_auto_order,
+                  category_id: warehouseItem.category_id,
+                }
               : null,
-            cargo_id: hasValidCargo ? (oi.cargo_id || validCargoId) : null,
+            cargo_id: hasValidCargo ? oi.cargo_id || validCargoId : null,
           };
         }),
         orderItems: undefined,
@@ -810,11 +816,7 @@ export const getOrderById = async (
       category_id: order.category_id,
       category_name: order.category?.name,
       customer_id: order.customer_id,
-      customer_name:
-        order.cargo?.customer?.companyName ||
-        order.cargo?.bill_to_display_name ||
-        order.customer?.companyName ||
-        "No Customer",
+      customer_name: order.customer?.companyName || "No Customer",
       supplier_id: order.supplier_id,
       supplier_name: order.supplier?.company_name || order.supplier?.name,
       status: order.status,
@@ -939,12 +941,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -1579,9 +1581,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-    starCustomerDetails?.deliveryAddressLine1 ||
-    businessDetails?.address ||
-    "",
+      starCustomerDetails?.deliveryAddressLine1 ||
+      businessDetails?.address ||
+      "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -1599,9 +1601,9 @@ const resolveCustomerAddress = (
       "",
     country: formatCountry(
       customer.country ||
-      starCustomerDetails?.deliveryCountry ||
-      businessDetails?.country ||
-      "",
+        starCustomerDetails?.deliveryCountry ||
+        businessDetails?.country ||
+        "",
     ),
     phone:
       customer.contactPhoneNumber ||
@@ -1625,7 +1627,8 @@ export const generateCommercialInvoicePDF = async (
       return next(new ErrorHandler("Invalid Invoice ID format.", 400));
     }
 
-    const expandedData = await InvoiceController.fetchExpandedDetailsData(invoiceId);
+    const expandedData =
+      await InvoiceController.fetchExpandedDetailsData(invoiceId);
 
     const invoiceRepo = AppDataSource.getRepository(Invoice);
     let invoice = await invoiceRepo.findOne({
@@ -1649,7 +1652,8 @@ export const generateCommercialInvoicePDF = async (
         .json({ success: false, message: "Invoice not found" });
     }
 
-    const orderNumberVal = invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
+    const orderNumberVal =
+      invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
     let cargo = await AppDataSource.getRepository(Cargo).findOne({
       where: { cargo_no: orderNumberVal },
       relations: [
@@ -1690,10 +1694,19 @@ export const generateCommercialInvoicePDF = async (
         unit: Number(g.unitPrice || 0).toFixed(3),
         price: Number(g.totalPrice || 0).toFixed(2),
       }));
-    } else if (expandedData?.detailedItems && expandedData.detailedItems.length > 0) {
+    } else if (
+      expandedData?.detailedItems &&
+      expandedData.detailedItems.length > 0
+    ) {
       lineItems = expandedData.detailedItems.map((it: any, i: number) => {
         const q = Number(it.qty || it.quantity || 0);
-        const p = Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.unit_price || 0);
+        const p = Number(
+          it.eur_special_price ||
+            it._fallbackEk ||
+            it.unitPrice ||
+            it.unit_price ||
+            0,
+        );
         const tot = Number(it.price || it.total_price || q * p);
         return {
           no: i + 1,
@@ -1717,8 +1730,16 @@ export const generateCommercialInvoicePDF = async (
 
     let totalQty = lineItems.reduce((s, it) => s + it.qty, 0);
     let subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
-    const invoiceGross = Number(expandedData?.invoice?.grossTotal ?? invoice?.grossTotal ?? expandedData?.invoice?.netTotal ?? invoice?.netTotal ?? 0);
-    const freightCost = Number(expandedData?.invoice?.freightCost ?? invoice?.freightCost ?? 0);
+    const invoiceGross = Number(
+      expandedData?.invoice?.grossTotal ??
+        invoice?.grossTotal ??
+        expandedData?.invoice?.netTotal ??
+        invoice?.netTotal ??
+        0,
+    );
+    const freightCost = Number(
+      expandedData?.invoice?.freightCost ?? invoice?.freightCost ?? 0,
+    );
 
     if (subTotal === 0 && invoiceGross > freightCost && totalQty > 0) {
       const netForItems = invoiceGross - freightCost;
@@ -1731,7 +1752,8 @@ export const generateCommercialInvoicePDF = async (
     }
 
     const grandTotal = (subTotal + freightCost).toFixed(2);
-    const customer: any = invoice?.customer || cargo?.customer || expandedData?.invoice?.customer;
+    const customer: any =
+      invoice?.customer || cargo?.customer || expandedData?.invoice?.customer;
     const customerAddress = resolveCustomerAddress(customer);
 
     const GTECH_GMBH = {
@@ -1766,7 +1788,7 @@ export const generateCommercialInvoicePDF = async (
       customerAddress.contact &&
       customer?.legalName &&
       customerAddress.contact.trim().toLowerCase() ===
-      customer.legalName.trim().toLowerCase()
+        customer.legalName.trim().toLowerCase()
     );
     const shipToContact =
       cargo?.ship_to_contact_person ||
@@ -1803,9 +1825,22 @@ export const generateCommercialInvoicePDF = async (
       invoice?.status === "Closed" ||
       (invoice as any)?.isClosed;
 
-    const invoiceNoVal = (invoice?.invoiceNumber || (invoice as any)?.invoice_number || "").replace(/-/g, "").trim();
-    const formattedDateVal = formatGermanDate(invoice?.invoiceDate || (invoice as any)?.invoice_date);
-    const cargoNoVal = (cargo?.cargo_no || invoice?.orderNumber || (invoice as any)?.order_number || "").trim();
+    const invoiceNoVal = (
+      invoice?.invoiceNumber ||
+      (invoice as any)?.invoice_number ||
+      ""
+    )
+      .replace(/-/g, "")
+      .trim();
+    const formattedDateVal = formatGermanDate(
+      invoice?.invoiceDate || (invoice as any)?.invoice_date,
+    );
+    const cargoNoVal = (
+      cargo?.cargo_no ||
+      invoice?.orderNumber ||
+      (invoice as any)?.order_number ||
+      ""
+    ).trim();
 
     const data = {
       invoiceNo: isClosedInvoice
@@ -1927,7 +1962,7 @@ export const generateCommercialInvoicePDF = async (
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
               .text("中国安徽...", 152, 101);
-          } catch (e) { }
+          } catch (e) {}
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -2152,13 +2187,17 @@ export const generateCommercialInvoicePDF = async (
     if (cargo?.cargo_no) {
       remarkLines.push(`${cargo.cargo_no}`);
     }
-    const targetOrderNo = invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
-    const orderForRemark = targetOrderNo ? await AppDataSource.getRepository(Order).findOne({
-      where: { order_no: targetOrderNo },
-    }) : null;
+    const targetOrderNo =
+      invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
+    const orderForRemark = targetOrderNo
+      ? await AppDataSource.getRepository(Order).findOne({
+          where: { order_no: targetOrderNo },
+        })
+      : null;
     const orderComment = orderForRemark?.comment || "";
     if (orderComment) remarkLines.push(orderComment);
-    const invoiceRemark = invoice?.remark || expandedData?.invoice?.remark || "";
+    const invoiceRemark =
+      invoice?.remark || expandedData?.invoice?.remark || "";
     if (invoiceRemark) remarkLines.push(invoiceRemark);
     remarkLines.forEach((line, idx) => {
       doc.text(line, remarkX, itemY + idx * 15);
@@ -2219,7 +2258,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) { }
+    } catch (e) {}
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;
