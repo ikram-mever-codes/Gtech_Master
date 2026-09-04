@@ -2095,6 +2095,7 @@ export const downloadCustomerOrderPdf = async (
         (order.customer as any)?.defaultTaxProfile?.key ||
         customerSnap?.tax_profile_case ||
         customerSnap?.taxProfile,
+      kundenreferenz: (order as any).kundenreferenz || undefined,
       outputFilePath: filePath,
     });
 
