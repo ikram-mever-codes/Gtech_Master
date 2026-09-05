@@ -28,18 +28,6 @@ import {
   PaymentAllocationTargetType,
 } from "../models/payment_allocations";
 
-/** Fetches documents linked to a Rechnung: the originating Auftrag
- * (CustomerOrder, via auftrag_id) and every correction invoice
- * (Rechnung_k) created against it (via original_rechnung_id). Full
- * records, not just ids. */
-
-/**
- * Resolves the display-only tax profile for a frozen Rechnung/RK: matched
- * by rate against tax_profiles, never against the customer. Rechnung and
- * RK tax_rate is set once at creation (copied from the Auftrag) and never
- * recomputed — this only looks up a human-readable name for whatever rate
- * is already stored, it never changes tax_rate itself.
- */
 async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
   const profiles = await taxProfileRepo.find({ where: { is_active: true } });

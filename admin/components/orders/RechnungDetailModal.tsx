@@ -430,6 +430,8 @@ export default function RechnungDetailModal({
   const [data, setData] = useState<any>(rechnung);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [editNotesExtern, setEditNotesExtern] = useState("");
+  const [editNotesIntern, setEditNotesIntern] = useState("");
   const [corrections, setCorrections] = useState<{
     [key: string]: { quantity: number; price: number };
   }>({});
@@ -830,13 +832,14 @@ export default function RechnungDetailModal({
     }
   };
 
-  // --- Address edit handlers ------------------------------------------------
   const startAddressEdit = () => {
     setAddressForm({
       customerSnapshot: { ...(data.customerSnapshot || {}) },
       deliveryAddress: { ...(data.deliveryAddress || {}) },
       ansprechpartner: data.ansprechpartner || "",
     });
+    setEditNotesExtern(data.notes || data.comment || data.notes_external || "");
+    setEditNotesIntern(data.internal_notes || data.internalNotes || "");
     setAddressEdit(true);
   };
 
@@ -863,6 +866,8 @@ export default function RechnungDetailModal({
         customerSnapshot: addressForm.customerSnapshot,
         deliveryAddress: addressForm.deliveryAddress,
         ansprechpartner: addressForm.ansprechpartner,
+        notes: editNotesExtern,
+        internal_notes: editNotesIntern,
       });
       const payload = res?.data ?? res;
       if (res?.success && payload) {
@@ -879,7 +884,6 @@ export default function RechnungDetailModal({
       setSavingAddress(false);
     }
   };
-
   // --- Delete RK (correction invoice) ---------------------------------------
   const handleDeleteRk = async () => {
     if (
@@ -1957,7 +1961,9 @@ export default function RechnungDetailModal({
                       navigator.clipboard.writeText(
                         (showCorrectionUI
                           ? rkNotesIntern
-                          : data.internal_notes || data.internalNotes) || "",
+                          : addressEdit
+                            ? editNotesIntern
+                            : data.internal_notes || data.internalNotes) || "",
                       );
                       toast.success("Internal comment copied to clipboard!");
                     }}
@@ -1976,9 +1982,67 @@ export default function RechnungDetailModal({
                   placeholder="Only visible to the team."
                   onChange={(e) => setRkNotesIntern(e.target.value)}
                 />
+              ) : !isCorrection && addressEdit ? (
+                <textarea
+                  rows={3}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500"
+                  value={editNotesIntern}
+                  placeholder="Only visible to the team."
+                  onChange={(e) => setEditNotesIntern(e.target.value)}
+                />
               ) : (
                 <p className="text-sm text-gray-600">
                   {data.internal_notes || data.internalNotes || "—"}
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Pencil className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment extern
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(
+                        (showCorrectionUI
+                          ? rkNotesExtern
+                          : addressEdit
+                            ? editNotesExtern
+                            : data.notes ||
+                              data.comment ||
+                              data.notes_external) || "",
+                      );
+                      toast.success("External comment copied to clipboard!");
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                    title="Copy External Comment"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  </button>
+                </h3>
+              </div>
+              {showCorrectionUI ? (
+                <textarea
+                  rows={3}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  value={rkNotesExtern}
+                  placeholder="Shown on the correction invoice."
+                  onChange={(e) => setRkNotesExtern(e.target.value)}
+                />
+              ) : !isCorrection && addressEdit ? (
+                <textarea
+                  rows={3}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500"
+                  value={editNotesExtern}
+                  placeholder="Shown to the customer."
+                  onChange={(e) => setEditNotesExtern(e.target.value)}
+                />
+              ) : (
+                <p className="text-sm text-gray-600">
+                  {data.notes || data.comment || data.notes_external || "—"}
                 </p>
               )}
             </div>

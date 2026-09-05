@@ -101,10 +101,17 @@ export const updateRechnung = async (
     deliveryAddress?: any;
     ansprechpartner?: string;
     title?: string;
+    internal_notes?: any;
   },
 ) => {
   try {
-    const response: any = await api.patch(`/rechnungen/${id}`, updates);
+    const { internalNotes, ...rest } = updates;
+    const payload: Record<string, any> = { ...rest };
+    // Backend reads internal_notes (snake_case) — internalNotes was never
+    // translated, so it silently never reached the Rechnung's
+    if (internalNotes !== undefined) payload.internal_notes = internalNotes;
+
+    const response: any = await api.patch(`/rechnungen/${id}`, payload);
     return response;
   } catch (error: any) {
     handleApiError(error, "Failed to update Rechnung");
