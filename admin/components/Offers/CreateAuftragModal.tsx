@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Check, AlertCircle, ShoppingCart } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { formatTaxRate } from "@/utils/decimal";
 import { createAuftragFromOffer } from "@/api/customer_orders";
 
 interface ItemRowState {
@@ -310,7 +311,7 @@ export const CreateAuftragModal: React.FC<CreateAuftragModalProps> = ({
               </span>
             </div>
             <div className="flex justify-between text-gray-600">
-              <span>VAT ({taxRate}%):</span>
+              <span>MwSt. ({formatTaxRate(taxRate)}):</span>
               <span className="font-medium">
                 {taxAmount.toFixed(2)} {currency}
               </span>

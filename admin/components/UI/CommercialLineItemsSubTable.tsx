@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { formatTaxRate } from "@/utils/decimal";
 
 export interface CommercialLineItem {
   id?: string | number;
@@ -94,7 +95,7 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
   const getVatRate = (it: CommercialLineItem): string => {
     const v = it.vatRate ?? it.tax_rate;
     if (v === undefined || v === null || v === "") return "—";
-    return `${Number(v)}%`;
+    return formatTaxRate(v);
   };
 
   const hasShipping = !!(shippingMethod && String(shippingMethod).trim());
@@ -189,7 +190,7 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
                 <td className="px-2 py-2 text-gray-400">—</td>
                 <td className="px-2 py-2 text-gray-700">{shippingMethod}</td>
                 <td className="px-2 py-2 text-center text-gray-600">
-                  {docType === "lieferschein" ? "—" : `${shippingTaxRate}%`}
+                  {docType === "lieferschein" ? "—" : formatTaxRate(shippingTaxRate)}
                 </td>
                 <td className="px-2 py-2 text-right text-gray-600">{shippingQtyNum}</td>
                 <td className="px-2 py-2 text-right text-gray-600">

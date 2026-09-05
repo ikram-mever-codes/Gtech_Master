@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
+import { formatTaxRate } from "@/utils/decimal";
 
 interface SelectedItemState {
   id: string;
@@ -228,7 +229,11 @@ export default function AuftragToRechnungModal({
   useEffect(() => {
     if (!isOpen || !auftrag) return;
 
-    const sourceItems = auftrag.orderItems || auftrag.items || [];
+    const rawSourceItems = auftrag.orderItems || auftrag.items || [];
+    const sourceItems = [...rawSourceItems].sort(
+      (a: any, b: any) =>
+        (Number(a.position) || 0) - (Number(b.position) || 0),
+    );
 
     const mapped: SelectedItemState[] = sourceItems.map(
       (it: any, index: number) => {
@@ -255,17 +260,12 @@ export default function AuftragToRechnungModal({
         return {
           id: String(it.id),
           lineItemId: String(it.id),
-          position: index + 1,
+          position: Number(it.position) || index + 1,
           photo: it.photo || it.item?.photo || it.image,
-          artNr:
-            it.articleNumber ||
-            it.item?.articleNumber ||
-            it.ean ||
-            it.item?.ean ||
-            "—",
+          artNr: it.itemNo || it.material || "—",
           itemName:
             it.itemName || it.item_name || it.item?.item_name || "Line Item",
-          hinweis: it.notes || it.remark_de || it.description || "—",
+          hinweis: it.notes || it.description || "—",
           mwst: Number(it.taxRate || auftrag.tax_rate || 19),
           // "QTY Open" column and the ceiling for "Qty Delivered" — this is
           // what's still open to invoice right now, NOT the original
@@ -476,8 +476,8 @@ export default function AuftragToRechnungModal({
   // Delivered/Delivered/Closed. This is purely a display label; taxRate
   // above always drives the actual calculation.
   const taxProfileLabel = auftrag.taxProfile?.name
-    ? `${auftrag.taxProfile.name} (${taxRate}%)`
-    : `${taxRate}%`;
+    ? `${auftrag.taxProfile.name} (${formatTaxRate(taxRate)})`
+    : formatTaxRate(taxRate);
 
   // Prepayment credit applied to THIS delivery — capped at what's
   // actually available and at the invoice total itself (never negative,
@@ -1170,7 +1170,7 @@ export default function AuftragToRechnungModal({
                         </td>
 
                         {/* MwSt. */}
-                        <td className="px-2 py-2 text-center">{item.mwst}%</td>
+                        <td className="px-2 py-2 text-center">{formatTaxRate(item.mwst)}</td>
 
                         {/* QTY Open */}
                         <td className="px-2 py-2 text-right font-bold">
@@ -1301,7 +1301,7 @@ export default function AuftragToRechnungModal({
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2 text-center text-gray-600">
-                        {taxRate}%
+                        {formatTaxRate(taxRate)}
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2 text-gray-400"></td>
@@ -1370,7 +1370,7 @@ export default function AuftragToRechnungModal({
                 </div>
               )}
               <div className="flex justify-between text-gray-600">
-                <span>VAT ({taxRate}%)</span>
+                <span>MwSt. ({formatTaxRate(taxRate)})</span>
                 <span className="font-medium text-gray-900">
                   {formatDeCurrency(taxAmount)}
                 </span>

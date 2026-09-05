@@ -17,6 +17,7 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { formatTaxRate } from "@/utils/decimal";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
@@ -2383,7 +2384,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     edit={false}
                     value={
                       taxProfile
-                        ? `${taxProfile.name} (${taxProfile.taxRate}%)`
+                        ? `${taxProfile.name} (${formatTaxRate(taxProfile.taxRate)})`
                         : "No tax profile assigned to this customer"
                     }
                   />
@@ -2774,7 +2775,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                     <span>%</span>
                                   </div>
                                 ) : (
-                                  `${lineTaxRate}%`
+                                  formatTaxRate(lineTaxRate)
                                 )}
                               </td>
                               <td className="px-2 py-2">
@@ -2879,7 +2880,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                             </td>
                             <td className="px-0 py-2 text-center text-gray-400"></td>
                             <td className="px-2 py-2 text-center text-gray-600">
-                              {getShippingTaxRate(offer)}%
+                              {formatTaxRate(getShippingTaxRate(offer))}
                             </td>
                             <td className="px-2 py-2">
                               {edit ? (
@@ -3376,7 +3377,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     .filter((g) => g.rate !== 0)
                     .map((g) => (
                       <div key={g.rate} className="flex justify-between">
-                        <span className="text-gray-600">VAT ({g.rate}%)</span>
+                        <span className="text-gray-600">MwSt. ({formatTaxRate(g.rate)})</span>
                         <span className="font-medium">
                           {formatCurrency(g.tax, offer.currency)}
                         </span>
@@ -3391,7 +3392,6 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
 
               {/* LINKED DOCUMENTS */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
-                {/* LINKED DOCUMENTS */}
                 <div className="bg-white rounded-lg p-4 px-2">
                   <div className="flex items-center gap-2 mb-3">
                     <LinkIcon className="h-4 w-4 text-gray-500" />

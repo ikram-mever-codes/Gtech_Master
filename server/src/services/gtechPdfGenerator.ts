@@ -106,6 +106,13 @@ function cleanPdfText(text?: string | null): string {
 
 function formatDate(dateVal: any): string {
   if (!dateVal) return "—";
+  if (dateVal instanceof Date) {
+    const iso = dateVal.toISOString().split("T")[0];
+    const parts = iso.split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
+    }
+  }
   if (typeof dateVal === "string") {
     const trimmed = dateVal.trim();
     const dotParts = trimmed.split(".");
@@ -125,6 +132,11 @@ function formatDate(dateVal: any): string {
   }
   const d = new Date(dateVal);
   if (isNaN(d.getTime())) return String(dateVal);
+  const iso = d.toISOString().split("T")[0];
+  const parts = iso.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
+  }
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
@@ -137,6 +149,14 @@ function formatGermanNum(val: number | string | undefined | null, decimals = 2):
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
+}
+
+function formatTaxRate(val: number | string | undefined | null): string {
+  if (val === null || val === undefined || val === "") return "0%";
+  const num = typeof val === "string" ? parseFloat(val.replace(",", ".")) : Number(val);
+  if (isNaN(num)) return "0%";
+  const rounded = Math.round(num * 100) / 100;
+  return `${String(rounded).replace(".", ",")}%`;
 }
 
 function formatGermanPrice(val: number | string | undefined | null): string {
@@ -737,7 +757,7 @@ export async function generateGtechDocumentPdf(
           (rowIndex + 1).toString(),
           artNrStr,
           itemNameStr,
-          `${formatGermanNum(item.vatRate ?? opts.taxRate ?? 0, 2)}%`,
+          formatTaxRate(item.vatRate ?? opts.taxRate ?? 0),
           String(item.quantity ?? 1),
           formatGermanPrice(item.unitPrice),
           formatGermanNum(item.lineTotal ?? (item.quantity * (item.unitPrice || 0)), 2),
@@ -830,7 +850,7 @@ export async function generateGtechDocumentPdf(
         String(shipRowNum),
         "—",
         shippingMethod,
-        `${formatGermanNum(shippingTaxRateForRow, 2)}%`,
+        formatTaxRate(shippingTaxRateForRow),
         String(shippingQtyNum),
         formatGermanPrice(shippingCostNum),
         formatGermanNum(shippingLineTotal, 2),
@@ -887,12 +907,23 @@ export async function generateGtechDocumentPdf(
     const rawCurrency = opts.currency || "EUR";
     const currency = (rawCurrency.toUpperCase() === "EUR" || rawCurrency === "€") ? "€" : rawCurrency;
 
-    // opts.subtotal already includes shipping cost (added server-side in
-    // createRechnungFromAuftrag: totalSubtotal = subtotal + shippingTotal).
-    // Do NOT add shippingTotalNet again here — that caused double-counting in
-    // the Zwischensumme Netto row on the PDF.
     const shippingTotalNet = shippingLineTotal; // reuse the value already computed above
-    const effectiveSubtotal = Number(opts.subtotal || 0);
+    const lineItemsSubtotal = (opts.lineItems || []).reduce((acc, it) => {
+      const lineNet =
+        it.lineTotal !== undefined && it.lineTotal !== null
+          ? Number(it.lineTotal)
+          : (Number(it.quantity ?? 1) * Number(it.unitPrice || 0));
+      return acc + lineNet;
+    }, 0);
+
+    let effectiveSubtotal = Number(opts.subtotal || 0);
+    // If opts.subtotal does not include shipping cost (e.g. for Auftrag PDFs where subtotal equaled lineItemsSubtotal),
+    // add shippingTotalNet so Zwischensumme Netto includes all lines in the table.
+    if (shippingTotalNet > 0 && Math.abs(effectiveSubtotal - lineItemsSubtotal) < 0.05) {
+      effectiveSubtotal += shippingTotalNet;
+    } else if (effectiveSubtotal === 0 && lineItemsSubtotal > 0) {
+      effectiveSubtotal = lineItemsSubtotal + shippingTotalNet;
+    }
 
     doc.font(R).fontSize(9).fillColor("#3F4446");
     doc.text("Zwischensumme Netto", TOTALS_LABEL_X, yPos);
@@ -975,7 +1006,7 @@ export async function generateGtechDocumentPdf(
       doc
         .font(R)
         .text(
-          `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
+          `MwSt. ${formatTaxRate(entry.rate)}`,
           TOTALS_LABEL_X,
           yPos,
         );

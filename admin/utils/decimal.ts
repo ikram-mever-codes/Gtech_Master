@@ -102,3 +102,19 @@ export function parseAndRoundTo3Decimals(
   if (parsed === null) return null;
   return Math.round(parsed * 1000) / 1000;
 }
+
+export function formatTaxRate(
+  rate: number | string | null | undefined,
+  useGermanComma = true,
+): string {
+  if (rate === null || rate === undefined || rate === "") return "0%";
+  const num =
+    typeof rate === "string" ? parseFlexibleNumber(rate) ?? 0 : Number(rate);
+  if (isNaN(num)) return "0%";
+  const rounded = Math.round(num * 100) / 100;
+  const formatted = useGermanComma
+    ? String(rounded).replace(".", ",")
+    : String(rounded);
+  return `${formatted}%`;
+}
+

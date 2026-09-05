@@ -24,6 +24,7 @@ import {
   uploadGelangenheitsbestaetigung,
   deleteGelangenheitsbestaetigung,
 } from "@/api/rechnungen";
+import { formatTaxRate } from "@/utils/decimal";
 import {
   updateRechnungKItem,
   createRechnungKFromRechnung,
@@ -338,11 +339,10 @@ export default function RechnungDetailModal({
 
   const netTotal = showCorrectionUI
     ? correctionsSubtotal + (shippingSelected ? shippingTotal : 0)
-    : Number(data.subtotal ?? 0) + shippingTotal;
+    : Number(data.subtotal ?? 0);
   const taxAmount = showCorrectionUI
     ? correctionsTax + (shippingSelected ? shippingTotal * (taxRate / 100) : 0)
-    : Number(data.tax_amount ?? 0) +
-      shippingTotal * (Number(data.tax_rate ?? 19) / 100);
+    : Number(data.tax_amount ?? 0);
   const grossTotal = netTotal + taxAmount;
 
   const invoiceNumber = data.invoice_number || data.rk_number || data.id;
@@ -953,8 +953,8 @@ export default function RechnungDetailModal({
                 label="TAX PROFILE"
                 value={
                   data.taxProfile?.name
-                    ? `${data.taxProfile.name} (${data.taxProfile.taxRate}%)`
-                    : `${data.taxProfile.taxRate}%`
+                    ? `${data.taxProfile.name} (${formatTaxRate(data.taxProfile.taxRate)})`
+                    : formatTaxRate(data.taxProfile?.taxRate)
                 }
               />{" "}
               <Field
@@ -1165,7 +1165,7 @@ export default function RechnungDetailModal({
                           </td>
                         )}
                         <td className="px-2 py-2 text-center text-gray-600">
-                          {lineTaxRate}%
+                          {formatTaxRate(lineTaxRate)}
                         </td>
                         {showCorrectionUI && (
                           <>
@@ -1330,7 +1330,7 @@ export default function RechnungDetailModal({
                           <td className="px-2 py-2 text-gray-400"></td>
                         )}
                         <td className="px-2 py-2 text-center text-gray-600">
-                          {taxRate}%
+                          {formatTaxRate(taxRate)}
                         </td>
                         {showCorrectionUI && (
                           <>
@@ -1386,7 +1386,7 @@ export default function RechnungDetailModal({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">MwSt. ({taxRate}%)</span>
+                <span className="text-gray-600">MwSt. ({formatTaxRate(taxRate)})</span>
                 <span className="font-medium">
                   {formatDeCurrency(taxAmount)}
                 </span>

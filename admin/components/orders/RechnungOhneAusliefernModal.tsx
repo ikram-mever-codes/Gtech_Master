@@ -15,6 +15,7 @@ import {
   downloadRechnungOnlyEml,
 } from "@/api/rechnungen";
 import { errorStyles, successStyles } from "@/utils/constants";
+import { formatTaxRate } from "@/utils/decimal";
 
 interface RechnungOhneAusliefernModalProps {
   isOpen: boolean;
@@ -61,8 +62,8 @@ export default function RechnungOhneAusliefernModal({
   // same object the Ausliefern window reads. Purely informational here;
   // the Rechnung this modal creates always copies auftrag.tax_rate as-is.
   const taxProfileLabel = auftrag.taxProfile?.name
-    ? `${auftrag.taxProfile.name} (${taxRate}%)`
-    : `${taxRate}%`;
+    ? `${auftrag.taxProfile.name} (${formatTaxRate(taxRate)})`
+    : formatTaxRate(taxRate);
 
   let netAmount = totalSubtotal;
 
@@ -317,7 +318,7 @@ export default function RechnungOhneAusliefernModal({
               </span>
             </div>
             <div className="flex justify-between text-gray-600 font-medium">
-              <span>MwSt ({taxRate}%):</span>
+              <span>MwSt. ({formatTaxRate(taxRate)}):</span>
               <span className="font-bold text-gray-900">
                 {formatDeCurrency(taxAmount)}
               </span>
