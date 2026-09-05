@@ -139,6 +139,14 @@ function formatGermanNum(val: number | string | undefined | null, decimals = 2):
   });
 }
 
+function formatTaxRate(val: number | string | undefined | null): string {
+  if (val === null || val === undefined || val === "") return "0%";
+  const num = typeof val === "string" ? parseFloat(val.replace(",", ".")) : Number(val);
+  if (isNaN(num)) return "0%";
+  const rounded = Math.round(num * 100) / 100;
+  return `${String(rounded).replace(".", ",")}%`;
+}
+
 function formatGermanPrice(val: number | string | undefined | null): string {
   const num = Number(val) || 0;
   const rounded3 = Math.round(num * 1000) / 1000;
@@ -737,7 +745,7 @@ export async function generateGtechDocumentPdf(
           (rowIndex + 1).toString(),
           artNrStr,
           itemNameStr,
-          `${formatGermanNum(item.vatRate ?? opts.taxRate ?? 0, 2)}%`,
+          formatTaxRate(item.vatRate ?? opts.taxRate ?? 0),
           String(item.quantity ?? 1),
           formatGermanPrice(item.unitPrice),
           formatGermanNum(item.lineTotal ?? (item.quantity * (item.unitPrice || 0)), 2),
@@ -830,7 +838,7 @@ export async function generateGtechDocumentPdf(
         String(shipRowNum),
         "—",
         shippingMethod,
-        `${formatGermanNum(shippingTaxRateForRow, 2)}%`,
+        formatTaxRate(shippingTaxRateForRow),
         String(shippingQtyNum),
         formatGermanPrice(shippingCostNum),
         formatGermanNum(shippingLineTotal, 2),
@@ -986,7 +994,7 @@ export async function generateGtechDocumentPdf(
       doc
         .font(R)
         .text(
-          `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
+          `MwSt. ${formatTaxRate(entry.rate)}`,
           TOTALS_LABEL_X,
           yPos,
         );

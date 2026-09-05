@@ -4247,6 +4247,14 @@ export class OfferController {
         });
       };
 
+      const formatTaxRate = (val: any): string => {
+        if (val === null || val === undefined || val === "") return "0%";
+        const num = typeof val === "string" ? parseFloat(val.replace(",", ".")) : Number(val);
+        if (isNaN(num)) return "0%";
+        const rounded = Math.round(num * 100) / 100;
+        return `${String(rounded).replace(".", ",")}%`;
+      };
+
       const formatGermanPrice = (numVal: any): string => {
         const num = getSafeNumber(numVal);
         const rounded3 = Math.round(num * 1000) / 1000;
@@ -4403,7 +4411,7 @@ export class OfferController {
             (rowIndex + 1).toString(),
             artNrStr,
             itemNameStr,
-            `${formatGermanNum(itemTaxRate, 2)}%`,
+            formatTaxRate(itemTaxRate),
             qtyStr,
             formatGermanPrice(unitPriceNum),
             formatGermanNum(netTotalNum, 2),
@@ -4493,7 +4501,7 @@ export class OfferController {
           String(shipRowNum),
           "—",
           shippingMethod,
-          `${formatGermanNum(shippingTaxRateNum, 2)}%`,
+          formatTaxRate(shippingTaxRateNum),
           String(shippingQtyNum),
           formatGermanPrice(shippingCostNum),
           formatGermanNum(shippingTotal, 2),
@@ -4619,7 +4627,7 @@ export class OfferController {
         doc
           .font(R)
           .text(
-            `MwSt. ${formatGermanNum(entry.rate, 2)}%`,
+            `MwSt. ${formatTaxRate(entry.rate)}`,
             TOTALS_LABEL_X,
             yPos,
           );
