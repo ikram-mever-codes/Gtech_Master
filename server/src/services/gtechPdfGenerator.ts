@@ -106,6 +106,13 @@ function cleanPdfText(text?: string | null): string {
 
 function formatDate(dateVal: any): string {
   if (!dateVal) return "—";
+  if (dateVal instanceof Date) {
+    const iso = dateVal.toISOString().split("T")[0];
+    const parts = iso.split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
+    }
+  }
   if (typeof dateVal === "string") {
     const trimmed = dateVal.trim();
     const dotParts = trimmed.split(".");
@@ -125,6 +132,11 @@ function formatDate(dateVal: any): string {
   }
   const d = new Date(dateVal);
   if (isNaN(d.getTime())) return String(dateVal);
+  const iso = d.toISOString().split("T")[0];
+  const parts = iso.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
+  }
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();

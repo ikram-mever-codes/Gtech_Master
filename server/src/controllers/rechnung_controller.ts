@@ -548,7 +548,11 @@ export const createRechnungFromAuftrag = async (
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,
-      delivery_date: deliveryDate ? new Date(deliveryDate) : undefined,
+      delivery_date: deliveryDate
+        ? new Date(deliveryDate)
+        : (auftrag as any).delivery_date || (auftrag as any).real_delivery_date
+        ? new Date((auftrag as any).delivery_date || (auftrag as any).real_delivery_date)
+        : undefined,
       warehouse: warehouse || "CN",
       subtotal: totalSubtotal,
       tax_rate: taxRate,
@@ -561,7 +565,11 @@ export const createRechnungFromAuftrag = async (
       rechnung_customer_id: savedCustomerSnapshot.id,
       date_created: dateCreatedStr,
       date_emailed: auftrag.date_emailed || undefined,
-      date_delivery: auftrag.date_delivery || undefined,
+      date_delivery:
+        auftrag.date_delivery ||
+        (auftrag as any).deliveryTime ||
+        (auftrag as any).delivery_time ||
+        ((auftrag as any).delivery_date ? String((auftrag as any).delivery_date) : undefined),
       stock_where: auftrag.stock_where || StockWhere.EU,
       discount_percentage: discountPercentage,
       discount_amount: discountAmount,
@@ -851,9 +859,20 @@ export const createRechnungOhneAusliefern = async (
       customer: savedCustomerSnapshot,
       rechnung_customer_id: savedCustomerSnapshot.id,
       date_created: dateCreatedStr,
+      date_delivery:
+        auftrag.date_delivery ||
+        (auftrag as any).deliveryTime ||
+        (auftrag as any).delivery_time ||
+        ((auftrag as any).delivery_date ? String((auftrag as any).delivery_date) : undefined),
+      delivery_date:
+        (auftrag as any).delivery_date || (auftrag as any).real_delivery_date
+          ? new Date((auftrag as any).delivery_date || (auftrag as any).real_delivery_date)
+          : undefined,
       customerSnapshot: auftrag.customerSnapshot || undefined,
       deliveryAddress: auftrag.deliveryAddress || undefined,
       payment_method: auftrag.payment_method || undefined,
+      payment_terms: auftrag.payment_terms || undefined,
+      delivery_terms: auftrag.delivery_terms || undefined,
       shipping_method:
         auftrag.shipping_text || auftrag.shipping_method || undefined,
     });
@@ -1013,10 +1032,21 @@ export const getAllRechnungen = async (
         auftrag: [],
         rechnungenK: [],
       };
-      const title = r.title || linkedDocs.auftrag[0]?.title || undefined;
+      const linkedAuftrag = linkedDocs.auftrag[0];
+      const title = r.title || linkedAuftrag?.title || undefined;
+      const resolvedDeliveryDate =
+        r.date_delivery ||
+        r.delivery_date ||
+        linkedAuftrag?.date_delivery ||
+        linkedAuftrag?.delivery_date ||
+        linkedAuftrag?.deliveryTime ||
+        linkedAuftrag?.delivery_time ||
+        linkedAuftrag?.real_delivery_date;
       return {
         ...r,
         title,
+        date_delivery: resolvedDeliveryDate,
+        delivery_date: resolvedDeliveryDate,
         linkedDocuments: linkedDocs,
         taxProfile: taxProfileByRate.get(Number(r.tax_rate) || 19),
       };
@@ -1158,13 +1188,29 @@ export const getRechnungById = async (
     await attachPaymentStatusToRechnungen([rechnung]);
     await attachPaymentsAndRksToRechnungen([rechnung]);
 
+    const linkedAuftrag = linkedDocuments.auftrag[0];
     const title =
-      rechnung.title || linkedDocuments.auftrag[0]?.title || undefined;
+      rechnung.title || linkedAuftrag?.title || undefined;
+    const resolvedDeliveryDate =
+      (rechnung as any).date_delivery ||
+      (rechnung as any).delivery_date ||
+      linkedAuftrag?.date_delivery ||
+      (linkedAuftrag as any)?.delivery_date ||
+      (linkedAuftrag as any)?.deliveryTime ||
+      (linkedAuftrag as any)?.delivery_time ||
+      linkedAuftrag?.real_delivery_date;
     const taxProfile = await resolveFrozenTaxProfile(rechnung.tax_rate);
 
     res.json({
       success: true,
-      data: { ...rechnung, title, linkedDocuments, taxProfile },
+      data: {
+        ...rechnung,
+        title,
+        date_delivery: resolvedDeliveryDate,
+        delivery_date: resolvedDeliveryDate,
+        linkedDocuments,
+        taxProfile,
+      },
     });
   } catch (error) {
     next(error);
@@ -1487,6 +1533,27 @@ export const downloadRechnungPdf = async (
       (rechnung as any).auftragNo ||
       (rechnung as any).order_no;
 
+    const resolvedDeliveryDate =
+      (rechnung as any).date_delivery ||
+      (rechnung as any).delivery_date ||
+      auftrag?.date_delivery ||
+      (auftrag as any)?.delivery_date ||
+      (auftrag as any)?.deliveryTime ||
+      (auftrag as any)?.delivery_time ||
+      (auftrag as any)?.real_delivery_date;
+
+    const resolvedInvoiceDate =
+      rechnung.date_created ||
+      (rechnung.invoice_date
+        ? rechnung.invoice_date instanceof Date
+          ? rechnung.invoice_date.toISOString().split("T")[0]
+          : String(rechnung.invoice_date)
+        : rechnung.created_at
+        ? rechnung.created_at instanceof Date
+          ? rechnung.created_at.toISOString().split("T")[0]
+          : String(rechnung.created_at)
+        : "");
+
     await generateGtechDocumentPdf({
       documentType: "Rechnung",
       documentNumber: rechnung.invoice_number,
@@ -1498,12 +1565,7 @@ export const downloadRechnungPdf = async (
         ["Kontakt", String(contactName || "")],
         ["Kunde", String(kundeCombined || "")],
         ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
-        [
-          "Datum",
-          String(
-            rechnung.date_created || rechnung.created_at || rechnung.invoice_date || "",
-          ),
-        ],
+        ["Datum", String(resolvedInvoiceDate || "")],
       ] as [string, string][],
       kontaktName: contactName,
       kontaktEmail: (req as any).user?.email,
@@ -1522,16 +1584,15 @@ export const downloadRechnungPdf = async (
       taxRate: defaultTaxRate,
       currency: rechnung.currency || "EUR",
       notes: rechnung.notes,
-      deliveryTime: (rechnung as any).delivery_date || rechnung.date_delivery,
-      deliveryDate: (rechnung as any).delivery_date || rechnung.date_delivery,
-      deliveryTerms: rechnung.delivery_terms,
+      deliveryTime: resolvedDeliveryDate,
+      deliveryDate: resolvedDeliveryDate,
+      deliveryTerms: rechnung.delivery_terms || auftrag?.delivery_terms,
       paymentTerms: (() => {
         const terms = rechnung.payment_terms || auftrag?.payment_terms;
         return terms ? `Zahlungsziel: ${terms} Tage` : undefined;
       })(),
       paymentMethod: rechnung.payment_method || auftrag?.payment_method,
-      invoiceDate:
-        rechnung.date_created || rechnung.invoice_date || rechnung.created_at,
+      invoiceDate: resolvedInvoiceDate,
       payments: pdfPayments.length > 0 ? pdfPayments : undefined,
       rks: pdfRks.length > 0 ? pdfRks : undefined,
       outstandingAmount:
