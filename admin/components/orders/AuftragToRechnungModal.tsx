@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
+import { formatTaxRate } from "@/utils/decimal";
 
 interface SelectedItemState {
   id: string;
@@ -475,8 +476,8 @@ export default function AuftragToRechnungModal({
   // Delivered/Delivered/Closed. This is purely a display label; taxRate
   // above always drives the actual calculation.
   const taxProfileLabel = auftrag.taxProfile?.name
-    ? `${auftrag.taxProfile.name} (${taxRate}%)`
-    : `${taxRate}%`;
+    ? `${auftrag.taxProfile.name} (${formatTaxRate(taxRate)})`
+    : formatTaxRate(taxRate);
 
   // Prepayment credit applied to THIS delivery — capped at what's
   // actually available and at the invoice total itself (never negative,
@@ -1169,7 +1170,7 @@ export default function AuftragToRechnungModal({
                         </td>
 
                         {/* MwSt. */}
-                        <td className="px-2 py-2 text-center">{item.mwst}%</td>
+                        <td className="px-2 py-2 text-center">{formatTaxRate(item.mwst)}</td>
 
                         {/* QTY Open */}
                         <td className="px-2 py-2 text-right font-bold">
@@ -1300,7 +1301,7 @@ export default function AuftragToRechnungModal({
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2 text-center text-gray-600">
-                        {taxRate}%
+                        {formatTaxRate(taxRate)}
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2 text-gray-400"></td>
@@ -1369,7 +1370,7 @@ export default function AuftragToRechnungModal({
                 </div>
               )}
               <div className="flex justify-between text-gray-600">
-                <span>VAT ({taxRate}%)</span>
+                <span>MwSt. ({formatTaxRate(taxRate)})</span>
                 <span className="font-medium text-gray-900">
                   {formatDeCurrency(taxAmount)}
                 </span>

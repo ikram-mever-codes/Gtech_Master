@@ -20,6 +20,7 @@ import {
   TaxProfile,
 } from "@/api/tax_profiles";
 import { toast } from "react-hot-toast";
+import { formatTaxRate } from "@/utils/decimal";
 import MasterPageLayout from "@/components/General/MasterPageLayout";
 import CustomModal from "@/components/UI/CustomModal";
 import CustomButton from "@/components/UI/CustomButton";
@@ -343,7 +344,7 @@ export default function TaxProfilesPage() {
                     {p.tax_case || "—"}
                   </td>
                   <td className="px-6 py-4 text-center font-bold text-gray-800">
-                    {p.tax_rate}%
+                    {formatTaxRate(p.tax_rate)}
                   </td>
                   <td className="px-6 py-4 text-gray-700 font-mono font-bold">
                     {p.revenue_account_no || "—"}
@@ -621,7 +622,7 @@ export default function TaxProfilesPage() {
                     />
                   ) : (
                     <div className="px-3.5 py-2.5 text-sm font-semibold text-gray-900 font-mono">
-                      {selectedTaxProfile.tax_rate}%
+                      {formatTaxRate(selectedTaxProfile.tax_rate)}
                     </div>
                   )}
                 </div>

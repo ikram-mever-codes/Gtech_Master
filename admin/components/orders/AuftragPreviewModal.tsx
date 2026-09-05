@@ -42,6 +42,7 @@ import {
   parseFlexibleNumber,
   formatUnitPriceCurrency,
   parseAndRoundTo3Decimals,
+  formatTaxRate,
 } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 
@@ -1357,7 +1358,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 edit={false}
                 value={
                   taxProfile
-                    ? `${taxProfile.name} (${taxProfile.taxRate}%)`
+                    ? `${taxProfile.name} (${formatTaxRate(taxProfile.taxRate)})`
                     : "No tax profile assigned to this customer"
                 }
               />
@@ -1841,7 +1842,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                               <span>%</span>
                             </div>
                           ) : (
-                            `${lineTaxRate}%`
+                            formatTaxRate(lineTaxRate)
                           )}
                         </td>
                         <td className="px-2 py-2 text-right text-gray-600">
@@ -1949,7 +1950,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       </td>
                       <td className="px-0 py-2 text-center text-gray-400"></td>
                       <td className="px-2 py-2 text-center text-gray-600">
-                        {getShippingTaxRate(order)}%
+                        {formatTaxRate(getShippingTaxRate(order))}
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
                       <td className="px-2 py-2">
@@ -2184,7 +2185,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 .filter((g) => g.rate !== 0)
                 .map((g) => (
                   <div key={g.rate} className="flex justify-between">
-                    <span className="text-gray-600">VAT ({g.rate}%)</span>
+                    <span className="text-gray-600">MwSt. ({formatTaxRate(g.rate)})</span>
                     <span className="font-medium">
                       {formatCurrency(g.tax, order?.currency || "EUR")}
                     </span>

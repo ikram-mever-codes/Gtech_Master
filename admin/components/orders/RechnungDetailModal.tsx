@@ -24,6 +24,7 @@ import {
   uploadGelangenheitsbestaetigung,
   deleteGelangenheitsbestaetigung,
 } from "@/api/rechnungen";
+import { formatTaxRate } from "@/utils/decimal";
 import {
   updateRechnungKItem,
   createRechnungKFromRechnung,
@@ -952,8 +953,8 @@ export default function RechnungDetailModal({
                 label="TAX PROFILE"
                 value={
                   data.taxProfile?.name
-                    ? `${data.taxProfile.name} (${data.taxProfile.taxRate}%)`
-                    : `${data.taxProfile.taxRate}%`
+                    ? `${data.taxProfile.name} (${formatTaxRate(data.taxProfile.taxRate)})`
+                    : formatTaxRate(data.taxProfile?.taxRate)
                 }
               />{" "}
               <Field
@@ -1164,7 +1165,7 @@ export default function RechnungDetailModal({
                           </td>
                         )}
                         <td className="px-2 py-2 text-center text-gray-600">
-                          {lineTaxRate}%
+                          {formatTaxRate(lineTaxRate)}
                         </td>
                         {showCorrectionUI && (
                           <>
@@ -1329,7 +1330,7 @@ export default function RechnungDetailModal({
                           <td className="px-2 py-2 text-gray-400"></td>
                         )}
                         <td className="px-2 py-2 text-center text-gray-600">
-                          {taxRate}%
+                          {formatTaxRate(taxRate)}
                         </td>
                         {showCorrectionUI && (
                           <>
@@ -1385,7 +1386,7 @@ export default function RechnungDetailModal({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">MwSt. ({taxRate}%)</span>
+                <span className="text-gray-600">MwSt. ({formatTaxRate(taxRate)})</span>
                 <span className="font-medium">
                   {formatDeCurrency(taxAmount)}
                 </span>
