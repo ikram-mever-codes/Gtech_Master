@@ -1101,10 +1101,6 @@ export default function RechnungDetailModal({
                   {items.map((item: any, idx: number) => {
                     const qty = Number(item.quantity) || 1;
                     const unitPrice = Number(item.price) || 0;
-                    const lineTotal =
-                      Number(item.total_price) || qty * unitPrice;
-                    const lineTaxRate = Number(item.taxRate ?? taxRate);
-                    const isSaving = savingItemId === item.id;
                     const openQty = openQuantities[item.id] || 0;
                     const isFullyCorrected = openQty <= 0;
                     const selected = selectedCorrectionIds.has(item.id);
@@ -1112,6 +1108,12 @@ export default function RechnungDetailModal({
                       quantity: 0,
                       price: unitPrice,
                     };
+                    const lineTotal =
+                      showCorrectionUI && selected && !isFullyCorrected
+                        ? correction.quantity * correction.price
+                        : Number(item.total_price) || qty * unitPrice;
+                    const lineTaxRate = Number(item.taxRate ?? taxRate);
+                    const isSaving = savingItemId === item.id;
                     const isRowDisabled = isFullyCorrected;
 
                     return (
@@ -1386,7 +1388,9 @@ export default function RechnungDetailModal({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">MwSt. ({formatTaxRate(taxRate)})</span>
+                <span className="text-gray-600">
+                  MwSt. ({formatTaxRate(taxRate)})
+                </span>
                 <span className="font-medium">
                   {formatDeCurrency(taxAmount)}
                 </span>
