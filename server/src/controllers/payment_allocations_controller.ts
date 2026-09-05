@@ -7,6 +7,7 @@ import {
 } from "../models/payment_allocations";
 import { CustomerOrder } from "../models/customer_orders";
 import { Rechnung } from "../models/rechnung";
+import { Rechnung_k } from "../models/rechnung_k";
 
 const round2 = (n: number): number =>
   isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
@@ -382,31 +383,28 @@ export function computeRechnungPaymentStatus(
     total_amount?: any;
   },
   paidAmount: number,
+  correctedAmount: number = 0,
 ): RechnungPaymentStatus {
   const total = Number(rechnung.total_amount) || 0;
-  const paid = round2(paidAmount);
+  const covered = round2(paidAmount + correctedAmount);
 
-  if (total > 0 && paid >= total - 0.01) return "paid";
+  if (total > 0 && covered >= total - 0.01) return "paid";
 
   const dueDate = getEffectiveDueDate(rechnung);
   if (dueDate && dueDate.getTime() < Date.now()) return "overdue";
 
-  return paid > 0.005 ? "partially_paid" : "unpaid";
+  return covered > 0.005 ? "partially_paid" : "unpaid";
 }
 
-/**
- * Attaches paid_amount / open_amount / payment_status to a list of
- * Rechnung rows in one batched query — same pattern as
- * attachAllocationSummaryToInbounds. Mutates the rows in place.
- */
 export async function attachPaymentStatusToRechnungen(
   rechnungen: Rechnung[],
 ): Promise<void> {
   if (rechnungen.length === 0) return;
 
-  const repo = AppDataSource.getRepository(PaymentAllocation);
   const ids = rechnungen.map((r) => r.id);
-  const rows = await repo
+
+  const paymentRepo = AppDataSource.getRepository(PaymentAllocation);
+  const paymentRows = await paymentRepo
     .createQueryBuilder("pa")
     .select("pa.rechnung_id", "id")
     .addSelect("COALESCE(SUM(pa.amount), 0)", "sum")
@@ -418,13 +416,34 @@ export async function attachPaymentStatusToRechnungen(
     .getRawMany();
 
   const paidById = new Map<string, number>(
-    rows.map((r: any) => [r.id, round2(Number(r.sum) || 0)]),
+    paymentRows.map((r: any) => [r.id, round2(Number(r.sum) || 0)]),
+  );
+
+  const rkRepo = AppDataSource.getRepository(Rechnung_k);
+  const rkRows = await rkRepo
+    .createQueryBuilder("rk")
+    .select("rk.original_rechnung_id", "id")
+    .addSelect("COALESCE(SUM(rk.total_amount), 0)", "sum")
+    .where("rk.original_rechnung_id IN (:...ids)", { ids })
+    .groupBy("rk.original_rechnung_id")
+    .getRawMany();
+
+  const correctedById = new Map<string, number>(
+    rkRows.map((r: any) => [r.id, round2(Number(r.sum) || 0)]),
   );
 
   for (const rechnung of rechnungen as any[]) {
     const paid = paidById.get(rechnung.id) || 0;
+    const corrected = correctedById.get(rechnung.id) || 0;
     rechnung.paid_amount = paid;
-    rechnung.open_amount = round2(Number(rechnung.total_amount || 0) - paid);
-    rechnung.payment_status = computeRechnungPaymentStatus(rechnung, paid);
+    rechnung.corrected_amount = corrected;
+    rechnung.open_amount = round2(
+      Number(rechnung.total_amount || 0) - paid - corrected,
+    );
+    rechnung.payment_status = computeRechnungPaymentStatus(
+      rechnung,
+      paid,
+      corrected,
+    );
   }
 }

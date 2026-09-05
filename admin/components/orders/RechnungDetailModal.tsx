@@ -31,6 +31,7 @@ import {
   deleteRechnungK,
 } from "@/api/rechnungen_k";
 import { updateRechnung } from "@/api/rechnungen";
+import { getItemById, updateItem } from "@/api/items";
 import { formatDate } from "@/utils/date";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 
@@ -192,6 +193,226 @@ const sortByCreatedAtDesc = (docs: any[]): any[] =>
     return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
   });
 
+/** Post-RK-creation flow: lets the user mark which corrected lines were
+ * physically returned to GTech and should be booked back into StockEU.
+ * Only lines that trace back to a real Item (sourceItemId) are shown —
+ * a Freizeile has nothing to stock. Fetches each Item's current
+ * is_stock_item/stockEU fresh (not trusted from the RK payload, since
+ * that only knows the RK's own line data, not the Item's live stock
+ * state), and on confirm adds the RK's corrected quantity onto whatever
+ * StockEU currently holds — never overwrites it outright. */
+const StockBookingModal: React.FC<{
+  isOpen: boolean;
+  items: Array<{
+    id: string;
+    itemName: string;
+    itemNo?: string;
+    qty: number;
+    sourceItemId: string;
+  }>;
+  onClose: () => void;
+  onDone: () => void;
+}> = ({ isOpen, items, onClose, onDone }) => {
+  const [rows, setRows] = useState<
+    Array<{
+      sourceItemId: string;
+      itemName: string;
+      itemNo?: string;
+      qty: number;
+      currentStockEU: number;
+      isStock: boolean;
+    }>
+  >([]);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [booking, setBooking] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoadingAll(true);
+    Promise.all(
+      items.map(async (it) => {
+        try {
+          const res: any = await getItemById(Number(it.sourceItemId));
+          const raw = res?.data || {};
+          return {
+            sourceItemId: it.sourceItemId,
+            itemName: it.itemName,
+            itemNo: it.itemNo,
+            qty: it.qty,
+            currentStockEU: Number(raw.stockEU) || 0,
+            isStock: raw.is_stock_item === "Y",
+          };
+        } catch (e) {
+          console.error("Couldn't load item for stock booking:", e);
+          return {
+            sourceItemId: it.sourceItemId,
+            itemName: it.itemName,
+            itemNo: it.itemNo,
+            qty: it.qty,
+            currentStockEU: 0,
+            isStock: false,
+          };
+        }
+      }),
+    ).then((rowsData) => {
+      setRows(rowsData);
+      setLoadingAll(false);
+    });
+  }, [isOpen, items]);
+
+  if (!isOpen) return null;
+
+  const setRowIsStock = (sourceItemId: string, val: boolean) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.sourceItemId === sourceItemId ? { ...r, isStock: val } : r,
+      ),
+    );
+  };
+
+  const handleBook = async () => {
+    const toBook = rows.filter((r) => r.isStock);
+    if (toBook.length === 0) {
+      toast.error("No items marked as stock — nothing to book.", errorStyles);
+      return;
+    }
+    setBooking(true);
+    try {
+      // stockEU is incremented, never set — the RK quantity is what's
+      // being added back on top of whatever's already sitting there.
+      await Promise.all(
+        toBook.map((r) =>
+          updateItem(Number(r.sourceItemId), {
+            is_stock_item: "Y",
+            stockEU: r.currentStockEU + r.qty,
+          }),
+        ),
+      );
+      toast.success(
+        `Booked ${toBook.length} item(s) into StockEU.`,
+        successStyles,
+      );
+      onDone();
+    } catch (err: any) {
+      toast.error(
+        err?.message || "Failed to book quantities into StockEU.",
+        errorStyles,
+      );
+    } finally {
+      setBooking(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <h3 className="text-base font-bold text-gray-900">
+            Artikel ins Lager (StockEU) buchen
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          <p className="text-sm text-gray-600 mb-4">
+            Setze "IsStock" auf Ja für Artikel, die zurückgeschickt wurden und
+            eingelagert werden sollen. Die RK-Menge wird zur aktuellen
+            StockEU-Menge hinzuaddiert.
+          </p>
+          {loadingAll ? (
+            <div className="text-center py-8 text-sm text-gray-400">
+              Loading item stock data…
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                      Art.-Nr.
+                    </th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-600">
+                      Bezeichnung
+                    </th>
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-24">
+                      StockEU jetzt
+                    </th>
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 w-20">
+                      RK Qty
+                    </th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-600 w-24">
+                      IsStock
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {rows.map((r) => (
+                    <tr key={r.sourceItemId}>
+                      <td className="px-2 py-2">{r.itemNo || "—"}</td>
+                      <td className="px-2 py-2">{r.itemName}</td>
+                      <td className="px-2 py-2 text-right">
+                        {r.currentStockEU}
+                      </td>
+                      <td className="px-2 py-2 text-right font-semibold text-amber-700">
+                        {r.qty}
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <select
+                          value={r.isStock ? "Y" : "N"}
+                          onChange={(e) =>
+                            setRowIsStock(
+                              r.sourceItemId,
+                              e.target.value === "Y",
+                            )
+                          }
+                          className="px-2 py-1 text-xs border border-gray-300 rounded"
+                        >
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={booking}
+            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            onClick={handleBook}
+            disabled={booking || loadingAll}
+            className="px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 font-semibold flex items-center gap-2"
+          >
+            {booking ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Booking…
+              </>
+            ) : (
+              "Book Qtys into StockEU"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function RechnungDetailModal({
   isOpen,
   onClose,
@@ -212,17 +433,23 @@ export default function RechnungDetailModal({
   const [corrections, setCorrections] = useState<{
     [key: string]: { quantity: number; price: number };
   }>({});
-  // Which line items are explicitly included in the RK being built.
-  // Defaults to every item that still has open quantity (matching the
-  // previous implicit behavior), but is now a real, visible checkbox per
-  // row instead of an inferred state — so a line can be deliberately
-  // deselected without needing to zero out its quantity.
   const [selectedCorrectionIds, setSelectedCorrectionIds] = useState<any>(
     new Set(),
   );
 
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- Comment fields editable while building a new RK -----------------
+  // Prefilled from the original Rechnung's own comments, but freely
+  // editable here — the values typed are what get saved onto the new RK,
+  // not blindly copied from the original.
+  const [rkNotesExtern, setRkNotesExtern] = useState("");
+  const [rkNotesIntern, setRkNotesIntern] = useState("");
+
+  // --- Stock booking flow after RK creation -----------------------------
+  const [showStockBookingModal, setShowStockBookingModal] = useState(false);
+  const [stockBookingItems, setStockBookingItems] = useState<any[]>([]);
 
   // --- Address-only edit mode (Rechnung window) ---------------------------
   const [addressEdit, setAddressEdit] = useState(false);
@@ -270,6 +497,10 @@ export default function RechnungDetailModal({
         (rechnung?.customerSnapshot as any)?.shipping_method ||
         "",
     );
+    setRkNotesExtern(rechnung?.notes || "");
+    setRkNotesIntern(rechnung?.internal_notes || "");
+    setShowStockBookingModal(false);
+    setStockBookingItems([]);
 
     // Prefill every open-quantity item with its ORIGINAL price (never 0
     // unless the original line itself was genuinely priced at 0), and
@@ -311,8 +542,6 @@ export default function RechnungDetailModal({
 
   const taxRate = Number(data.taxProfile.taxRate ?? 19);
 
-  // Live preview totals while building a correction: only rows that are
-  // both selected AND have a valid quantity contribute.
   const correctionsSubtotal = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
         if (!selectedCorrectionIds.has(item.id)) return sum;
@@ -383,27 +612,30 @@ export default function RechnungDetailModal({
       ? { street: rechnungCustomer.ship_to_address }
       : null);
 
+  /** Clamps quantity to the line's Open Qty and price to the line's
+   * ORIGINAL price — neither can be typed higher than that ceiling. */
   const handleCorrectionChange = (
-    itemId: string,
+    item: any,
     field: "quantity" | "price",
     value: number,
   ) => {
+    const openQty = openQuantities[item.id] || 0;
+    const originalUnitPrice = Number(item.price) || 0;
+    let clamped = value;
+    if (field === "quantity") {
+      clamped = Math.max(0, Math.min(value, openQty));
+    } else {
+      clamped = Math.max(0, Math.min(value, originalUnitPrice));
+    }
     setCorrections((prev: any) => ({
       ...prev,
-      [itemId]: {
-        ...prev[itemId],
-        [field]: value,
+      [item.id]: {
+        ...prev[item.id],
+        [field]: clamped,
       },
     }));
   };
 
-  /** Toggles a line item's inclusion in the RK being built. Turning a
-   * row on ensures it has a corrections entry prefilled with its
-   * original open quantity and original price (never overwriting an
-   * edit already made — only fills in if missing). Turning it off
-   * leaves the entered values intact so re-checking it doesn't lose
-   * anything. Items with no open quantity can't be toggled at all —
-   * there's nothing left on them to correct. */
   const toggleItemSelected = (item: any) => {
     const openQty = openQuantities[item.id] || 0;
     if (openQty <= 0) return;
@@ -423,6 +655,16 @@ export default function RechnungDetailModal({
         },
       };
     });
+  };
+
+  /** Closes out the RK-creation flow — called either immediately (no
+   * stock question needed / user declined it) or after the stock booking
+   * modal is dismissed (booked or skipped). */
+  const finalizeRkCreation = () => {
+    onClose();
+    if (onSwitchTab) onSwitchTab("rk");
+    onCorrectionCreated?.();
+    onChanged?.();
   };
 
   const handleCreateCorrections = async () => {
@@ -449,8 +691,9 @@ export default function RechnungDetailModal({
     const validationErrors: string[] = [];
     for (const corr of correctionsArray) {
       const openQty = openQuantities[corr.itemId] || 0;
+      const item = items.find((i: any) => i.id === corr.itemId);
+      const originalUnitPrice = Number(item?.price) || 0;
       if (corr.quantity > openQty) {
-        const item = items.find((i: any) => i.id === corr.itemId);
         validationErrors.push(
           `Item "${item?.item_name || corr.itemId}": Cannot correct ${corr.quantity} units. Only ${openQty} units remain uncorrected.`,
         );
@@ -458,6 +701,11 @@ export default function RechnungDetailModal({
       if (corr.price < 0) {
         validationErrors.push(
           `Item "${corr.itemId}": Price cannot be negative.`,
+        );
+      }
+      if (corr.price > originalUnitPrice) {
+        validationErrors.push(
+          `Item "${item?.item_name || corr.itemId}": Price cannot exceed the original line price of ${formatDeUnitPrice(originalUnitPrice)}.`,
         );
       }
     }
@@ -472,7 +720,11 @@ export default function RechnungDetailModal({
       const res: any = await createRechnungKFromRechnung(
         data.id,
         correctionsArray,
-        { includeShipping: shippingSelected },
+        {
+          includeShipping: shippingSelected,
+          notes: rkNotesExtern,
+          internalNotes: rkNotesIntern,
+        },
       );
 
       if (res?.success) {
@@ -480,10 +732,35 @@ export default function RechnungDetailModal({
           `Correction invoice created successfully with ${correctionsArray.length} item(s)!`,
           successStyles,
         );
-        onClose();
-        if (onSwitchTab) onSwitchTab("rk");
-        onCorrectionCreated?.();
-        onChanged?.();
+
+        // Only lines backed by a real catalog Item can be booked into
+        // StockEU — a Freizeile/freetext line has nothing to stock.
+        const createdRk = res.data;
+        const stockCandidates = (createdRk?.items || [])
+          .filter((it: any) => it.sourceItemId)
+          .map((it: any) => ({
+            id: it.id,
+            itemName: it.item_name,
+            itemNo: it.itemNo,
+            qty: Number(it.quantity) || 0,
+            sourceItemId: it.sourceItemId,
+          }));
+
+        if (stockCandidates.length > 0) {
+          const wantsStockReturn = window.confirm(
+            "Wurden Artikel an GTech zurückgeschickt und sollen ins Lager (StockEU) eingebucht werden?",
+          );
+          if (wantsStockReturn) {
+            setStockBookingItems(stockCandidates);
+            setShowStockBookingModal(true);
+            setIsCreating(false);
+            // Finalization (close/switch/refresh) is deferred until the
+            // stock modal is closed — this component stays mounted.
+            return;
+          }
+        }
+
+        finalizeRkCreation();
       } else {
         toast.error(
           res?.message || "Failed to create correction invoice.",
@@ -1193,7 +1470,7 @@ export default function RechnungDetailModal({
                                   value={correction.quantity}
                                   onChange={(e) =>
                                     handleCorrectionChange(
-                                      item.id,
+                                      item,
                                       "quantity",
                                       Number(e.target.value),
                                     )
@@ -1213,12 +1490,13 @@ export default function RechnungDetailModal({
                                 <input
                                   type="number"
                                   min="0"
+                                  max={unitPrice}
                                   step="0.001"
                                   disabled={!selected}
                                   value={correction.price}
                                   onChange={(e) =>
                                     handleCorrectionChange(
-                                      item.id,
+                                      item,
                                       "price",
                                       Number(e.target.value),
                                     )
@@ -1291,10 +1569,6 @@ export default function RechnungDetailModal({
                     );
                   })}
 
-                  {/* Shipping row — its "select" checkbox now lives in the
-                      same leftmost column as every other line item's, for
-                      consistency, instead of sitting inside the Open Qty
-                      slot. */}
                   {(editShippingMethod || data.shipping_method) &&
                     (editShippingCost > 0 || editShippingQuantity > 0) && (
                       <tr
@@ -1681,7 +1955,9 @@ export default function RechnungDetailModal({
                     onClick={(e) => {
                       e.stopPropagation();
                       navigator.clipboard.writeText(
-                        data.internal_notes || data.internalNotes || "",
+                        (showCorrectionUI
+                          ? rkNotesIntern
+                          : data.internal_notes || data.internalNotes) || "",
                       );
                       toast.success("Internal comment copied to clipboard!");
                     }}
@@ -1692,9 +1968,19 @@ export default function RechnungDetailModal({
                   </button>
                 </h3>
               </div>
-              <p className="text-sm text-gray-600">
-                {data.internal_notes || data.internalNotes || "—"}
-              </p>
+              {showCorrectionUI ? (
+                <textarea
+                  rows={3}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  value={rkNotesIntern}
+                  placeholder="Only visible to the team."
+                  onChange={(e) => setRkNotesIntern(e.target.value)}
+                />
+              ) : (
+                <p className="text-sm text-gray-600">
+                  {data.internal_notes || data.internalNotes || "—"}
+                </p>
+              )}
             </div>
 
             <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
@@ -1707,7 +1993,11 @@ export default function RechnungDetailModal({
                     onClick={(e) => {
                       e.stopPropagation();
                       navigator.clipboard.writeText(
-                        data.notes || data.comment || data.notes_external || "",
+                        (showCorrectionUI
+                          ? rkNotesExtern
+                          : data.notes ||
+                            data.comment ||
+                            data.notes_external) || "",
                       );
                       toast.success("External comment copied to clipboard!");
                     }}
@@ -1718,9 +2008,19 @@ export default function RechnungDetailModal({
                   </button>
                 </h3>
               </div>
-              <p className="text-sm text-gray-600">
-                {data.notes || data.comment || data.notes_external || "—"}
-              </p>
+              {showCorrectionUI ? (
+                <textarea
+                  rows={3}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  value={rkNotesExtern}
+                  placeholder="Shown on the correction invoice."
+                  onChange={(e) => setRkNotesExtern(e.target.value)}
+                />
+              ) : (
+                <p className="text-sm text-gray-600">
+                  {data.notes || data.comment || data.notes_external || "—"}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1768,6 +2068,21 @@ export default function RechnungDetailModal({
           </div>
         </div>
       </div>
+
+      <StockBookingModal
+        isOpen={showStockBookingModal}
+        items={stockBookingItems}
+        onClose={() => {
+          setShowStockBookingModal(false);
+          setStockBookingItems([]);
+          finalizeRkCreation();
+        }}
+        onDone={() => {
+          setShowStockBookingModal(false);
+          setStockBookingItems([]);
+          finalizeRkCreation();
+        }}
+      />
     </div>
   );
 }

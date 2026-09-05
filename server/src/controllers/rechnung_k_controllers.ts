@@ -276,7 +276,7 @@ export const createRechnungKFromRechnung = async (
 ) => {
   try {
     const { rechnungId } = req.params;
-    const { corrections, includeShipping } = req.body;
+    const { corrections, includeShipping, notes, internal_notes } = req.body;
     const shouldIncludeShipping = includeShipping !== false;
 
     if (
@@ -371,6 +371,17 @@ export const createRechnungKFromRechnung = async (
         continue;
       }
 
+      // Price can never exceed the ORIGINAL line's price — a correction
+      // reduces what the customer owes, it can't invent a higher price
+      // than what was actually billed.
+      const originalUnitPrice = Number(originalItem.price) || 0;
+      if (correctionPrice > originalUnitPrice) {
+        validationErrors.push(
+          `Price for "${originalItem.item_name}" (${correctionPrice}) cannot exceed the original line price of ${originalUnitPrice}.`,
+        );
+        continue;
+      }
+
       validatedCorrections.push({
         originalItem,
         quantity: correctionQty,
@@ -432,10 +443,6 @@ export const createRechnungKFromRechnung = async (
       total_amount: 0,
       discount_percentage: original.discount_percentage,
       discount_amount: original.discount_amount,
-      // Shipping is only carried onto this RK when the user left the
-      // shipping line checked in the create-RK UI. Deselecting it means
-      // this correction is item-only — the customer isn't being charged
-      // or refunded shipping as part of it.
       shipping_cost: shouldIncludeShipping ? original.shipping_cost : 0,
       shipping_quantity: shouldIncludeShipping ? original.shipping_quantity : 0,
       currency: original.currency,
@@ -447,8 +454,11 @@ export const createRechnungKFromRechnung = async (
       delivery_terms: original.delivery_terms,
       terms_conditions: original.terms_conditions,
       status: "open",
-      notes: original.notes,
-      internal_notes: original.internal_notes,
+      // Editable at RK-creation time — falls back to the original
+      // Rechnung's own comments only when nothing was typed for this RK.
+      notes: notes !== undefined ? notes : original.notes,
+      internal_notes:
+        internal_notes !== undefined ? internal_notes : original.internal_notes,
       highlight_color: original.highlight_color,
       rechnung_customer_id: original.rechnung_customer_id,
       customerSnapshot: original.customerSnapshot,
@@ -509,6 +519,7 @@ export const createRechnungKFromRechnung = async (
     next(error);
   }
 };
+
 export const getAllRechnungenK = async (
   _req: Request,
   res: Response,
@@ -838,7 +849,9 @@ export const downloadRechnungKPdf = async (
       metadataItems: [
         ["Kontakt", String(contactName || "")],
         ["Kunde", String(kundeCombined || "")],
-        ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
+        ...(auftragNo
+          ? [["Auftrag", String(auftragNo)] as [string, string]]
+          : []),
         [
           "Datum",
           String(
