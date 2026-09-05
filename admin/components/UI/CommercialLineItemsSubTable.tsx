@@ -93,7 +93,7 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
   };
 
   const getVatRate = (it: CommercialLineItem): string => {
-    const v = it.vatRate ?? it.tax_rate;
+    const v = it.vatRate ?? it.tax_rate ?? taxRate;
     if (v === undefined || v === null || v === "") return "—";
     return formatTaxRate(v);
   };
