@@ -1021,20 +1021,20 @@ const InvoiceListPage: React.FC = () => {
 
   const orderItemsFlat = useMemo(() => {
     let allItems = orders.flatMap((o: any) => {
-      const rawItems = [...(o.items || [])];
+      const rawItems = (o.items || []).map((i: any, idx: number) => ({
+        ...i,
+        _originalIndex: idx,
+      }));
+
       rawItems.sort((a: any, b: any) => {
         const posA =
-          a.position !== undefined && a.position !== null
+          a.position !== undefined && a.position !== null && a.position !== ""
             ? Number(a.position)
-            : a.id
-              ? Number(a.id)
-              : 0;
+            : a._originalIndex;
         const posB =
-          b.position !== undefined && b.position !== null
+          b.position !== undefined && b.position !== null && b.position !== ""
             ? Number(b.position)
-            : b.id
-              ? Number(b.id)
-              : 0;
+            : b._originalIndex;
         return posA - posB;
       });
 

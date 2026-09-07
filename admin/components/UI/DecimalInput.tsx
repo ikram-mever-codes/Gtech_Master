@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { parseFlexibleNumber } from "@/utils/decimal";
 
 export interface DecimalInputProps
@@ -19,14 +19,19 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
   placeholder,
   autoConvertCommaOnBlur = true,
   disabled,
+  onFocus,
+  onBlur,
   ...rest
 }) => {
   const [local, setLocal] = useState(
     value === null || value === undefined ? "" : String(value),
   );
+  const isFocusedRef = useRef(false);
 
   useEffect(() => {
-    setLocal(value === null || value === undefined ? "" : String(value));
+    if (!isFocusedRef.current) {
+      setLocal(value === null || value === undefined ? "" : String(value));
+    }
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,7 +42,13 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
     }
   };
 
-  const handleBlur = () => {
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    isFocusedRef.current = true;
+    if (onFocus) onFocus(e);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    isFocusedRef.current = false;
     let finalStr = local.trim();
     if (autoConvertCommaOnBlur && finalStr.includes(",")) {
       // In CDocs the comma converts to dot
@@ -51,6 +62,7 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
       const parsed = parseFlexibleNumber(finalStr);
       onCommit(parsed, finalStr);
     }
+    if (onBlur) onBlur(e);
   };
 
   return (
@@ -61,6 +73,7 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
       value={local}
       placeholder={placeholder}
       onChange={handleChange}
+      onFocus={handleFocus}
       onBlur={handleBlur}
       disabled={disabled}
       {...rest}

@@ -382,9 +382,6 @@ export default function DraftItemConversionModal({
                         <div className="font-medium text-gray-900">{item.itemName}</div>
                         {item.remarkEx && (
                           <div className="text-[11px] text-gray-500 italic mt-0.5 font-normal">
-                            <span className="font-semibold text-gray-600 not-italic">
-                              RemarkEx:
-                            </span>{" "}
                             {item.remarkEx}
                           </div>
                         )}

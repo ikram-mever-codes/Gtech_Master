@@ -883,7 +883,7 @@ export const downloadRechnungKPdf = async (
       deliveryDate: (rechnungK as any).delivery_date || rechnungK.date_delivery,
       deliveryTerms: rechnungK.delivery_terms,
       paymentTerms: rechnungK.payment_terms
-        ? `Zahlungsziel: ${rechnungK.payment_terms} Tage`
+        ? (() => { const m = String(rechnungK.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnungK.payment_terms}`; })()
         : undefined,
       paymentMethod: rechnungK.payment_method,
       taxProfile:

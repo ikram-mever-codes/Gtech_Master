@@ -216,7 +216,7 @@ export async function generateRechnungLieferscheinEml(
     notes: rechnung.notes,
     deliveryTime: rechnung.date_delivery,
     deliveryTerms: rechnung.delivery_terms,
-    paymentTerms: rechnung.payment_terms ? `Zahlungsziel: ${rechnung.payment_terms} Tage` : undefined,
+    paymentTerms: rechnung.payment_terms ? (() => { const m = String(rechnung.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnung.payment_terms}`; })() : undefined,
     paymentMethod: rechnung.payment_method,
     outputFilePath: rechnungPdfPath,
   });
@@ -529,7 +529,7 @@ export async function generateRechnungOnlyEml(
     notes: rechnung.notes,
     deliveryTime: rechnung.date_delivery,
     deliveryTerms: rechnung.delivery_terms,
-    paymentTerms: rechnung.payment_terms ? `Zahlungsziel: ${rechnung.payment_terms} Tage` : undefined,
+    paymentTerms: rechnung.payment_terms ? (() => { const m = String(rechnung.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnung.payment_terms}`; })() : undefined,
     paymentMethod: rechnung.payment_method,
     outputFilePath: rechnungPdfPath,
   });
@@ -816,7 +816,7 @@ export async function generateAuftragEml(
     deliveryDate: effectiveDeliveryDate,
     deliveryTerms: auftrag.delivery_terms,
     paymentTerms: auftrag.payment_terms
-      ? `Zahlungsziel: ${auftrag.payment_terms} Tage`
+      ? (() => { const m = String(auftrag.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${auftrag.payment_terms}`; })()
       : undefined,
     paymentMethod: auftrag.payment_method,
     outputFilePath: auftragPdfPath,
@@ -1350,7 +1350,7 @@ export async function generateRechnungKEml(
     deliveryDate: (rechnungK as any).delivery_date || rechnungK.date_delivery,
     deliveryTerms: rechnungK.delivery_terms,
     paymentTerms: rechnungK.payment_terms
-      ? `Zahlungsziel: ${rechnungK.payment_terms} Tage`
+      ? (() => { const m = String(rechnungK.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnungK.payment_terms}`; })()
       : undefined,
     paymentMethod: rechnungK.payment_method,
     outputFilePath: rkPdfPath,

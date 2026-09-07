@@ -4,6 +4,7 @@ export type AuditItem = {
   label: string;
   count: number;
   type: string;
+  isPro?: boolean;
 };
 
 export type ControlDataResponse = {

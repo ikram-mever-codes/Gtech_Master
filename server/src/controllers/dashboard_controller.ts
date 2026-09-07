@@ -327,25 +327,19 @@ export const getAuditReports = async (req: Request, res: Response) => {
         controlData: {
           orders: [
             { label: "Orders unassigned to cargo", count: unassignedCargoCount, type: "unassigned_cargo" },
-            { label: "Orders with purchase problem", count: purchaseProblemsCount, type: "purchase_problem" },
-            { label: "Orders with Check Problem", count: checkProblemsCount, type: "check_problem" },
             { label: "RMB Special SET with no value", count: rmbSpecialNoValueCount, type: "rmb_special_no_value" },
             { label: "EUR Special SET with no value", count: eurSpecialNoValueCount, type: "eur_special_no_value" },
-            { label: "Dimention Special SET with no value", count: dimensionSpecialNoValueCount, type: "dimension_special_no_value" },
+            { label: "Dimension Special SET with no value", count: dimensionSpecialNoValueCount, type: "dimension_special_no_value" },
             { label: "Auslandslieferungen OHNE Gelangenheitsbestätigung/Ausfuhrnachweis", count: missingGelangenheitsCount, type: "missing_gelangenheitsbestaetigung" },
           ],
           items: [
-            { label: "Missing Var Values EN", count: missingVarValuesEnCount, type: "missing_var_values_en" },
             { label: "Items with No Taric Code", count: noTaricCodeCount, type: "no_taric" },
-            { label: "Items with mismatched tarics", count: mismatchedTaricsCount, type: "mismatched_tarics" },
+            { label: "Items with mismatched tarics ?", count: mismatchedTaricsCount, type: "mismatched_tarics" },
             { label: "Items with null category", count: nullCategoryCount, type: "null_category" },
-            { label: "Items with wrong shipping class (Na)", count: wrongShippingClassCount, type: "wrong_shipping_class" },
           ],
           suppliers: [
-            { label: "Items without suppliers", count: itemsWithoutSuppliersCount, type: "no_supplier" },
-            { label: "Items without RMB Price", count: itemsWithoutRmbPriceCount, type: "no_rmb_price" },
-            { label: "Items isPO ='No' with URL='null'", count: isPoNoUrlNullCount, type: "is_po_no_url_null" },
-            { label: "Suppliers items isPO ='null'", count: supplierItemsIsPoNullCount, type: "is_po_null" },
+            { label: "Items without suppliers", count: itemsWithoutSuppliersCount, type: "no_supplier", isPro: true },
+            { label: "Items without RMB Price", count: itemsWithoutRmbPriceCount, type: "no_rmb_price", isPro: true },
           ],
           pictures: [
             { label: "Is New Picture Required", count: newPictureRequiredCount, type: "new_picture_required" },
