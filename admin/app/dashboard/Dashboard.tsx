@@ -14,7 +14,7 @@ import {
   Calendar
 } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
-import { getDashboardReports } from "@/api/dashboard";
+import { getDashboardReports, ControlDataResponse } from "@/api/dashboard";
 import { toast } from "react-hot-toast";
 
 function getISOWeekNumber(d: Date = new Date()): number {
@@ -36,27 +36,22 @@ export default function Dashboard() {
     RMB: { label: "Chinese Yuan", rate: "7.92", symbol: "¥" }
   });
 
-  const [controlData, setControlData] = useState({
+  const [controlData, setControlData] = useState<ControlDataResponse>({
     orders: [
       { label: "Orders unassigned to cargo", count: 0, type: "unassigned_cargo" },
-      { label: "Orders with purchase problem", count: 0, type: "purchase_problem" },
-      { label: "Orders with Check Problem", count: 0, type: "check_problem" },
       { label: "RMB Special SET with no value", count: 0, type: "rmb_special_no_value" },
       { label: "EUR Special SET with no value", count: 0, type: "eur_special_no_value" },
-      { label: "Dimension Special SET with no value", count: 0, type: "dimension_special_no_value" }
+      { label: "Dimension Special SET with no value", count: 0, type: "dimension_special_no_value" },
+      { label: "Auslandslieferungen OHNE Gelangenheitsbestätigung/Ausfuhrnachweis", count: 0, type: "missing_gelangenheitsbestaetigung" }
     ],
     items: [
-      { label: "Missing Var Values EN", count: 0, type: "missing_var_values_en" },
       { label: "Items with No Taric Code", count: 0, type: "no_taric" },
-      { label: "Items with mismatched tarics", count: 0, type: "mismatched_tarics" },
-      { label: "Items with null category", count: 0, type: "null_category" },
-      { label: "Items with wrong shipping class (Na)", count: 0, type: "wrong_shipping_class" }
+      { label: "Items with mismatched tarics ?", count: 0, type: "mismatched_tarics" },
+      { label: "Items with null category", count: 0, type: "null_category" }
     ],
     suppliers: [
-      { label: "Items without suppliers", count: 0, type: "no_supplier" },
-      { label: "Items without RMB Price", count: 0, type: "no_rmb_price" },
-      { label: "Items isPO ='No' with URL='null'", count: 0, type: "is_po_no_url_null" },
-      { label: "Suppliers items isPO ='null'", count: 0, type: "is_po_null" }
+      { label: "Items without suppliers", count: 0, type: "no_supplier", isPro: true },
+      { label: "Items without RMB Price", count: 0, type: "no_rmb_price", isPro: true }
     ],
     pictures: [
       { label: "Is New Picture Required", count: 0, type: "new_picture_required" },
@@ -181,13 +176,8 @@ export default function Dashboard() {
               <div className="p-1 rounded bg-[#8CC21B]">
                 <DollarSign className="w-4 h-4 text-white" />
               </div>
-              <h2 className="text-sm sm:text-base font-bold text-[#212529] flex items-center gap-2 flex-wrap">
-                <span>Today</span>
-                <span className="text-[#8CC21B] font-extrabold">{todayDate}</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-white text-[#5e8014] border border-[#8CC21B]/40 shadow-2xs">
-                  CW {calendarWeek}
-                </span>
-                <span>Currency Rates</span>
+              <h2 className="text-sm sm:text-base font-bold text-[#212529]">
+                Exchange Rates
               </h2>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -195,12 +185,9 @@ export default function Dashboard() {
               Live Rates
             </div>
           </div>
-        </div>
 
-        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(currencyRates).map(([key, item]) => (
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div
-              key={key}
               className="bg-[#F8F9FA] rounded-md p-3.5 border border-[#E9ECEF] hover:border-[#8CC21B]/40 hover:bg-white transition-all duration-300 flex justify-between items-center group relative overflow-hidden"
             >
               {isLoading && (
@@ -208,187 +195,206 @@ export default function Dashboard() {
                   <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B]" />
                 </div>
               )}
-              <div className="space-y-0.5">
-                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block font-sans">
-                  {item.label} ({key})
-                </span>
-                <div className="text-xl sm:text-2xl font-extrabold text-[#212529] tracking-tight">
-                  <span className="text-[#8CC21B] font-bold text-lg mr-0.5">{item.symbol}</span>
-                  {item.rate}
-                </div>
+              <div className="text-xl sm:text-2xl font-extrabold text-[#212529] tracking-tight">
+                <span className="text-[#8CC21B] font-bold text-lg mr-1">$</span>
+                <span className="text-[#8CC21B] font-extrabold">{currencyRates.USD?.rate || "1.16"}</span>
+                <span className="text-sm font-bold text-gray-700 ml-2">USD / EUR</span>
               </div>
               <div className="w-9 h-9 rounded-full bg-white border border-[#E9ECEF] flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-[#E8F4D6] group-hover:text-[#6B8F1A] group-hover:border-transparent transition-all duration-300">
-                {key}
+                USD
               </div>
             </div>
-          ))}
+
+            <div
+              className="bg-[#F8F9FA] rounded-md p-3.5 border border-[#E9ECEF] hover:border-[#8CC21B]/40 hover:bg-white transition-all duration-300 flex justify-between items-center group relative overflow-hidden"
+            >
+              {isLoading && (
+                <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-[1px]">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B]" />
+                </div>
+              )}
+              <div className="text-xl sm:text-2xl font-extrabold text-[#212529] tracking-tight">
+                <span className="text-[#8CC21B] font-bold text-lg mr-1">¥</span>
+                <span className="text-[#8CC21B] font-extrabold">{currencyRates.RMB?.rate || "7.79"}</span>
+                <span className="text-sm font-bold text-gray-700 ml-2">RMB / EUR</span>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-white border border-[#E9ECEF] flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-[#E8F4D6] group-hover:text-[#6B8F1A] group-hover:border-transparent transition-all duration-300">
+                RMB
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+
+          <div
+            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+          >
+            {isLoading && (
+              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+              </div>
+            )}
+            <div
+              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
+            >
+              <div className="p-1 rounded bg-blue-50">
+                <ClipboardList className="w-4 h-4 text-blue-600" />
+              </div>
+              <h3 className="text-sm font-bold text-[#212529]">Orders</h3>
+            </div>
+            <div className="p-4 flex flex-col gap-2.5">
+              {controlData.orders.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                  <span
+                    onClick={() => handleNavigation("orders", item.type)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                  >
+                    {item.label}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                      }`}
+                  >
+                    {item.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+          >
+            {isLoading && (
+              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+              </div>
+            )}
+            <div
+              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
+            >
+              <div className="p-1 rounded bg-emerald-50">
+                <Package className="w-4 h-4 text-emerald-600" />
+              </div>
+              <h3 className="text-sm font-bold text-[#212529]">Items</h3>
+            </div>
+            <div className="p-4 flex flex-col gap-2.5">
+              {controlData.items.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                  <span
+                    onClick={() => handleNavigation("items", item.type)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                  >
+                    {item.label}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                      }`}
+                  >
+                    {item.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+          >
+            {isLoading && (
+              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+              </div>
+            )}
+            <div
+              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
+            >
+              <div className="p-1 rounded bg-amber-50">
+                <Truck className="w-4 h-4 text-amber-600" />
+              </div>
+              <h3 className="text-sm font-bold text-[#212529]">Suppliers</h3>
+            </div>
+            <div className="p-4 flex flex-col gap-2.5">
+              {controlData.suppliers.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                  <div className="flex flex-col">
+                    {(item as any).isPro && (
+                      <span className="text-[#D32F2F] font-extrabold text-[12px] uppercase tracking-wide leading-tight">
+                        PRO
+                      </span>
+                    )}
+                    <span
+                      onClick={() => handleNavigation("suppliers", item.type)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                    >
+                      {item.label}
+                    </span>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                      }`}
+                  >
+                    {item.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
+            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
+          >
+            {isLoading && (
+              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+              </div>
+            )}
+            <div
+              className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
+              style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
+            >
+              <div className="p-1 rounded bg-rose-50">
+                <ImageIcon className="w-4 h-4 text-rose-600" />
+              </div>
+              <h3 className="text-sm font-bold text-[#212529]">Pictures</h3>
+            </div>
+            <div className="p-4 flex flex-col gap-2.5">
+              {controlData.pictures.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
+                  <span
+                    onClick={() => handleNavigation("pictures", item.type)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                  >
+                    {item.label}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
+                      ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
+                      : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
+                      }`}
+                  >
+                    {item.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-
-        <div
-          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
-        >
-          {isLoading && (
-            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-            </div>
-          )}
-          <div
-            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-          >
-            <div className="p-1 rounded bg-blue-50">
-              <ClipboardList className="w-4 h-4 text-blue-600" />
-            </div>
-            <h3 className="text-sm font-bold text-[#212529]">Orders</h3>
-          </div>
-          <div className="p-4 flex flex-col gap-2.5">
-            {controlData.orders.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                <span
-                  onClick={() => handleNavigation("orders", item.type)}
-                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                >
-                  {item.label}
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                    }`}
-                >
-                  {item.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
-        >
-          {isLoading && (
-            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-            </div>
-          )}
-          <div
-            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-          >
-            <div className="p-1 rounded bg-emerald-50">
-              <Package className="w-4 h-4 text-emerald-600" />
-            </div>
-            <h3 className="text-sm font-bold text-[#212529]">Items</h3>
-          </div>
-          <div className="p-4 flex flex-col gap-2.5">
-            {controlData.items.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                <span
-                  onClick={() => handleNavigation("items", item.type)}
-                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                >
-                  {item.label}
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                    }`}
-                >
-                  {item.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
-        >
-          {isLoading && (
-            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-            </div>
-          )}
-          <div
-            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-          >
-            <div className="p-1 rounded bg-amber-50">
-              <Truck className="w-4 h-4 text-amber-600" />
-            </div>
-            <h3 className="text-sm font-bold text-[#212529]">Suppliers</h3>
-          </div>
-          <div className="p-4 flex flex-col gap-2.5">
-            {controlData.suppliers.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                <span
-                  onClick={() => handleNavigation("suppliers", item.type)}
-                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                >
-                  {item.label}
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                    }`}
-                >
-                  {item.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden relative"
-          style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)" }}
-        >
-          {isLoading && (
-            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-              <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-            </div>
-          )}
-          <div
-            className="px-4 py-2.5 border-b border-[#E9ECEF] flex items-center gap-2"
-            style={{ background: "linear-gradient(90deg, #F8F9FA 0%, #F1F3F5 100%)" }}
-          >
-            <div className="p-1 rounded bg-rose-50">
-              <ImageIcon className="w-4 h-4 text-rose-600" />
-            </div>
-            <h3 className="text-sm font-bold text-[#212529]">Pictures</h3>
-          </div>
-          <div className="p-4 flex flex-col gap-2.5">
-            {controlData.pictures.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                <span
-                  onClick={() => handleNavigation("pictures", item.type)}
-                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                >
-                  {item.label}
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
-                    ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"
-                    : "bg-[#FFEBEE] text-[#D32F2F] border-[#FFCDD2]"
-                    }`}
-                >
-                  {item.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
-
     </div>
   );
 }
