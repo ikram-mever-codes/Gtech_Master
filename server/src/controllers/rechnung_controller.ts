@@ -1589,7 +1589,9 @@ export const downloadRechnungPdf = async (
       deliveryTerms: rechnung.delivery_terms || auftrag?.delivery_terms,
       paymentTerms: (() => {
         const terms = rechnung.payment_terms || auftrag?.payment_terms;
-        return terms ? `Zahlungsziel: ${terms} Tage` : undefined;
+        if (!terms) return undefined;
+        const dayMatch = String(terms).match(/(\d+)/);
+        return dayMatch ? `Zahlungsziel: ${dayMatch[1]} Tage` : `Zahlungsziel: ${terms}`;
       })(),
       paymentMethod: rechnung.payment_method || auftrag?.payment_method,
       invoiceDate: resolvedInvoiceDate,

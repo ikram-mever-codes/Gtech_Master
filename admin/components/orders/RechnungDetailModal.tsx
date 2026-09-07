@@ -970,9 +970,24 @@ export default function RechnungDetailModal({
                   const terms =
                     data.payment_terms || linkedAuftrag?.payment_terms || "";
                   if (!method && !terms) return "—";
-                  if (method && terms) return `${method}, ${terms} Tage`;
+                  const dayMatch = String(terms).match(/(\d+)/);
+                  const formattedTerms = dayMatch
+                    ? `${dayMatch[1]} Tage`
+                    : terms
+                      ? String(terms)
+                      : "";
+                  if (method && formattedTerms) {
+                    if (
+                      method
+                        .toLowerCase()
+                        .includes(formattedTerms.toLowerCase())
+                    ) {
+                      return method;
+                    }
+                    return `${method}, ${formattedTerms}`;
+                  }
                   if (method) return method;
-                  return `${terms} Tage`;
+                  return formattedTerms;
                 })()}
               />
               <Field

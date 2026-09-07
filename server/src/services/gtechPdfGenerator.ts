@@ -1194,10 +1194,8 @@ export async function generateGtechDocumentPdf(
 
   let combinedPaymentStr = rawPayMethod;
   if (rawPayTerms) {
-    let termsSuffix = rawPayTerms;
-    if (/^\d+$/.test(termsSuffix)) {
-      termsSuffix = `${termsSuffix} Tage`;
-    }
+    const dayMatch = rawPayTerms.match(/(\d+)/);
+    let termsSuffix = dayMatch ? `${dayMatch[1]} Tage` : rawPayTerms;
     if (combinedPaymentStr) {
       if (!combinedPaymentStr.toLowerCase().includes(termsSuffix.toLowerCase())) {
         combinedPaymentStr = `${combinedPaymentStr}, ${termsSuffix}`;

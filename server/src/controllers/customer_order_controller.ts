@@ -2085,7 +2085,7 @@ export const downloadCustomerOrderPdf = async (
       deliveryDate: effectiveDeliveryDate,
       deliveryTerms: order.delivery_terms,
       paymentTerms: order.payment_terms
-        ? `Zahlungsziel: ${order.payment_terms} Tage`
+        ? (() => { const m = String(order.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${order.payment_terms}`; })()
         : undefined,
       paymentMethod: order.payment_method,
       payments: pdfPayments.length > 0 ? pdfPayments : undefined,
