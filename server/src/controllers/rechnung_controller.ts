@@ -1542,6 +1542,23 @@ export const downloadRechnungPdf = async (
           : String(rechnung.created_at)
         : "");
 
+    const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
+    let linkedLieferschein = await lieferscheinRepo.findOne({
+      where: { rechnung_id: rechnung.id },
+    });
+    if (!linkedLieferschein && rechnung.auftrag_id) {
+      linkedLieferschein = await lieferscheinRepo.findOne({
+        where: { auftrag_id: rechnung.auftrag_id },
+      });
+    }
+
+    const isLieferscheinConfirmed = linkedLieferschein
+      ? linkedLieferschein.status === "bestätigt" ||
+        linkedLieferschein.status === "geliefert" ||
+        linkedLieferschein.status === "delivered" ||
+        !!linkedLieferschein.confirmed_at
+      : false;
+
     await generateGtechDocumentPdf({
       documentType: "Rechnung",
       documentNumber: rechnung.invoice_number,
@@ -1557,7 +1574,7 @@ export const downloadRechnungPdf = async (
       ] as [string, string][],
       kontaktName: contactName,
       kontaktEmail: (req as any).user?.email,
-      isDelivered: true,
+      isDelivered: isLieferscheinConfirmed,
       lineItems: items,
       showPrices: true,
       shippingMethod: rechnung.shipping_method,

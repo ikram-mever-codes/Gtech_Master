@@ -97,6 +97,12 @@ export const getAllLieferscheine = async (
         rechnung?.shipping_method ||
         undefined;
 
+      const rawStatus = String(ls.status || "").toLowerCase();
+      const calcStatus =
+        ls.confirmed_at || rawStatus === "bestätigt" || rawStatus === "confirmed" || rawStatus === "open"
+          ? "bestätigt"
+          : ls.status || "vorläufig";
+
       return {
         id: ls.id,
         deliveryNoteNo: ls.delivery_note_number,
@@ -104,7 +110,8 @@ export const getAllLieferscheine = async (
         orderNumber: ls.auftrag_no || ls.order_number,
         title,
         date: ls.delivery_date,
-        status: ls.status,
+        status: calcStatus,
+        confirmedAt: ls.confirmed_at,
         customerName: custName,
         customer: customer || customerSnapshot,
         customerSnapshot: customerSnapshot,
@@ -354,7 +361,9 @@ export const confirmLieferscheinDelivery = async (
     const { deliveryDate } = req.body;
 
     const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
-    const lieferschein = await lieferscheinRepo.findOne({ where: { id } });
+    const lieferschein = await lieferscheinRepo.findOne({
+      where: [{ id: String(id) }, { delivery_note_number: String(id) }],
+    });
 
     if (!lieferschein) {
       res

@@ -1263,11 +1263,14 @@ export async function generateGtechDocumentPdf(
           const isDelivered = opts.isDelivered === true;
           const isAuftrag =
             docType === "Auftrag" || docType === "Auftragsbestätigung";
+          const isRechnung = docType === "Rechnung";
 
-          const label =
-            isOffer || (isAuftrag && !isDelivered)
-              ? "Lieferdatum: voraussichtlich"
-              : "Lieferdatum:";
+          let label = "Lieferdatum:";
+          if (isOffer || ((isAuftrag || isRechnung) && !isDelivered)) {
+            label = "Lieferdatum: voraussichtlich";
+          } else if (isRechnung && isDelivered) {
+            label = "Lieferdatum: bestätigt";
+          }
           doc.text(`${label} ${formatDate(rawDelivery)}`, LEFT_X, yPos);
         } else {
           doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);

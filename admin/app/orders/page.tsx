@@ -1420,6 +1420,17 @@ const OrderPage: React.FC = () => {
         _originalIndex: idx,
       }));
 
+      if (o.order_no && String(o.order_no).includes("2608-10")) {
+        console.log("🔍 [DEBUG ORDERS PAGE] RAW items from API for order 2608-10:", rawItems.map((x: any) => ({
+          id: x.id,
+          position: x.position,
+          remark_de: x.remark_de,
+          remark_order_item: x.remark_order_item,
+          _originalIndex: x._originalIndex,
+          item_name: x.item?.item_name || x.item_name
+        })));
+      }
+
       rawItems.sort((a: any, b: any) => {
         const getSortValue = (item: any, fallbackIdx: number) => {
           if (item.position !== undefined && item.position !== null && item.position !== "") {
@@ -1430,6 +1441,17 @@ const OrderPage: React.FC = () => {
         };
         return getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex);
       });
+
+      if (o.order_no && String(o.order_no).includes("2608-10")) {
+        console.log("🔍 [DEBUG ORDERS PAGE] SORTED items for order 2608-10:", rawItems.map((x: any) => ({
+          id: x.id,
+          position: x.position,
+          remark_de: x.remark_de,
+          remark_order_item: x.remark_order_item,
+          _originalIndex: x._originalIndex,
+          item_name: x.item?.item_name || x.item_name
+        })));
+      }
 
       return rawItems.map((i: any, idx: number) => ({
         ...i,

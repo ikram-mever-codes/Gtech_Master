@@ -17,6 +17,9 @@ export class OrderItem {
   @PrimaryGeneratedColumn()
   id!: number;
 
+  @Column({ type: "int", nullable: true })
+  position?: number;
+
   @Column({ type: "varchar", length: 25, nullable: true })
   master_id!: string;
 

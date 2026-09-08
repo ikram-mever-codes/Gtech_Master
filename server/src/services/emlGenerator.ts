@@ -188,6 +188,13 @@ export async function generateRechnungLieferscheinEml(
     customerSnap.contactName ||
     "";
 
+  const isLieferscheinConfirmed = lieferschein
+    ? lieferschein.status === "bestätigt" ||
+      lieferschein.status === "geliefert" ||
+      lieferschein.status === "delivered" ||
+      !!lieferschein.confirmed_at
+    : false;
+
   await generateGtechDocumentPdf({
     documentType: "Rechnung",
     documentNumber: rechnung.invoice_number || String(rechnung.id),
@@ -202,6 +209,7 @@ export async function generateRechnungLieferscheinEml(
     ],
     kontaktName: contactPersonName,
     kontaktEmail: options?.user?.email,
+    isDelivered: isLieferscheinConfirmed,
     lineItems: rechnungItems,
     showPrices: true,
     shippingMethod: rechnung.shipping_method,

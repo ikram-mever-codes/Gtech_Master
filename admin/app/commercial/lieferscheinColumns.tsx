@@ -327,13 +327,21 @@ export function buildLieferscheinColumns({
       width: "110px",
       align: "center",
       sortKey: "status",
-      sortValue: (row) => (row.status || "vorläufig").toLowerCase(),
+      sortValue: (row) =>
+        row.confirmedAt || row.confirmed_at || row.status === "bestätigt"
+          ? "bestätigt"
+          : (row.status || "vorläufig").toLowerCase(),
       render: (row) => {
-        const rawStatus = (row.status || "vorläufig").toLowerCase();
-        let displayStatus = row.status || "vorläufig";
-        if (rawStatus === "open") {
-          displayStatus = "bestätigt";
-        }
+        const isConfirmed =
+          !!row.confirmedAt ||
+          !!row.confirmed_at ||
+          row.status === "bestätigt" ||
+          row.status === "open";
+        const rawStatus = isConfirmed
+          ? "bestätigt"
+          : (row.status || "vorläufig").toLowerCase();
+        const displayStatus = isConfirmed ? "bestätigt" : row.status || "vorläufig";
+
         const getStatusColor = (s: string) => {
           switch (s?.toLowerCase()) {
             case "vorläufig":
@@ -349,7 +357,9 @@ export function buildLieferscheinColumns({
         };
         return (
           <span
-            className={`text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium ${getStatusColor(rawStatus)}`}
+            className={`text-[11px] px-2 py-0.5 rounded border shadow-xs font-medium ${getStatusColor(
+              rawStatus,
+            )}`}
           >
             {displayStatus}
           </span>

@@ -668,9 +668,12 @@ export const getAllOrders = async (
           "No Customer",
         items: [...(order.orderItems || [])]
           .sort((a: any, b: any) => {
-            const posA = Number(a.position ?? a.id ?? 0);
-            const posB = Number(b.position ?? b.id ?? 0);
-            return posA - posB;
+            const posA = Number(a.position || 0);
+            const posB = Number(b.position || 0);
+            if (posA !== 0 && posB !== 0) return posA - posB;
+            if (posA !== 0) return -1;
+            if (posB !== 0) return 1;
+            return (Number(a.id) || 0) - (Number(b.id) || 0);
           })
           .map((oi) => {
             const itemDetails =

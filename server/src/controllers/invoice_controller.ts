@@ -329,9 +329,18 @@ export class InvoiceController {
           doc.font("Helvetica");
         });
 
-        yPos = 320;
-        doc.fontSize(10).font("Helvetica");
-        doc.text("Lieferdatum", leftAlignX, yPos);
+        const lieferdatumLabel = invoice.isDelivered
+          ? "Lieferdatum: bestätigt"
+          : "Lieferdatum: voraussichtlich";
+        doc.text(
+          `${lieferdatumLabel} ${
+            invoice.deliveryDate
+              ? new Date(invoice.deliveryDate).toLocaleDateString("de-DE")
+              : ""
+          }`.trim(),
+          leftAlignX,
+          yPos,
+        );
         doc.text(
           `Auftrags Nr: ${invoice.orderNumber || ""}`,
           leftAlignX + 250,

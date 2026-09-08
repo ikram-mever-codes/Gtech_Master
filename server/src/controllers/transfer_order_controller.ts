@@ -804,7 +804,7 @@ export async function syncBestellungToLinkedOrder(
       (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0),
     );
     const existingOrderItems = [...(linkedOrder.orderItems || [])].sort(
-      (a, b) => (Number(a.id) || 0) - (Number(b.id) || 0),
+      (a, b) => (Number(a.position ?? a.id) || 0) - (Number(b.position ?? b.id) || 0),
     );
 
     const itemRepo = AppDataSource.getRepository(Item);
@@ -849,6 +849,7 @@ export async function syncBestellungToLinkedOrder(
       if (itemId) targetItem.item_id = itemId;
       targetItem.qty = Math.max(1, Math.round(Number(li.qty) || 1));
       targetItem.remark_de = remarkForChina as any;
+      targetItem.position = li.position ?? (i + 1);
       targetItem.price =
         li.transferPrice !== undefined && li.transferPrice !== null
           ? li.transferPrice
