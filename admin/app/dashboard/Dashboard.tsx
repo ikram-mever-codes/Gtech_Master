@@ -52,10 +52,10 @@ export default function Dashboard() {
       { label: "duplicate EAN", count: 0, type: "duplicate_ean" },
       { label: "Items with No Taric Code", count: 0, type: "no_taric" },
       { label: "Items with mismatched tarics ?", count: 0, type: "mismatched_tarics" },
-      { label: "Items with null category", count: 0, type: "null_category" },
+      { label: "Item without CAT", count: 0, type: "null_category" },
     ],
     suppliers: [
-      { label: "Items PRO without suppliers", count: 0, type: "no_supplier" },
+      { label: "item PRO NOT assigned to company", count: 0, type: "no_supplier" },
       { label: "Items PRO assigned to Supplier ID=1", count: 0, type: "assigned_supplier_1" },
       { label: "Items PRO without RMB Price", count: 0, type: "no_rmb_price" },
       { label: "Items PRO without SP", count: 0, type: "no_sales_price" },
