@@ -50,8 +50,8 @@ export default function Dashboard() {
       { label: "Items with null category", count: 0, type: "null_category" }
     ],
     suppliers: [
-      { label: "Items without suppliers", count: 0, type: "no_supplier", isPro: true },
-      { label: "Items without RMB Price", count: 0, type: "no_rmb_price", isPro: true }
+      { label: "PRO Items without suppliers", count: 0, type: "no_supplier" },
+      { label: "PRO Items without RMB Price", count: 0, type: "no_rmb_price" }
     ],
     pictures: [
       { label: "Is New Picture Required", count: 0, type: "new_picture_required" },
@@ -328,19 +328,12 @@ export default function Dashboard() {
             <div className="p-4 flex flex-col gap-2.5">
               {controlData.suppliers.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center group py-0.5 border-b border-gray-50 last:border-0 last:pb-0">
-                  <div className="flex flex-col">
-                    {(item as any).isPro && (
-                      <span className="text-[#D32F2F] font-extrabold text-[12px] uppercase tracking-wide leading-tight">
-                        PRO
-                      </span>
-                    )}
-                    <span
-                      onClick={() => handleNavigation("suppliers", item.type)}
-                      className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
-                    >
-                      {item.label}
-                    </span>
-                  </div>
+                  <span
+                    onClick={() => handleNavigation("suppliers", item.type)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-semibold cursor-pointer transition-colors leading-tight"
+                  >
+                    {item.label}
+                  </span>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center justify-center min-w-[24px] h-5 border transition-all duration-300 group-hover:scale-105 shadow-sm ${item.count === 0
                       ? "bg-[#E8F4D6] text-[#6B8F1A] border-[#C5E899]"

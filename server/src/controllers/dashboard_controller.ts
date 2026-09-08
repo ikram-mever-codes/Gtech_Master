@@ -338,8 +338,8 @@ export const getAuditReports = async (req: Request, res: Response) => {
             { label: "Items with null category", count: nullCategoryCount, type: "null_category" },
           ],
           suppliers: [
-            { label: "Items without suppliers", count: itemsWithoutSuppliersCount, type: "no_supplier", isPro: true },
-            { label: "Items without RMB Price", count: itemsWithoutRmbPriceCount, type: "no_rmb_price", isPro: true },
+            { label: "Items PRO without suppliers", count: itemsWithoutSuppliersCount, type: "no_supplier" },
+            { label: "Items PRO without RMB Price", count: itemsWithoutRmbPriceCount, type: "no_rmb_price" },
           ],
           pictures: [
             { label: "Is New Picture Required", count: newPictureRequiredCount, type: "new_picture_required" },
