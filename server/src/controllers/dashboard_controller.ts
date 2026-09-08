@@ -206,4 +206,4 @@ export const getAuditReports = async (req: Request, res: Response) => {
       error: (error as any).message,
     });
   }
-};
+}
