@@ -1027,15 +1027,18 @@ const InvoiceListPage: React.FC = () => {
       }));
 
       rawItems.sort((a: any, b: any) => {
-        const posA =
-          a.position !== undefined && a.position !== null && a.position !== ""
-            ? Number(a.position)
-            : a._originalIndex;
-        const posB =
-          b.position !== undefined && b.position !== null && b.position !== ""
-            ? Number(b.position)
-            : b._originalIndex;
-        return posA - posB;
+        const getSortValue = (item: any, fallbackIdx: number) => {
+          if (item.position !== undefined && item.position !== null && item.position !== "") {
+            const p = Number(item.position);
+            if (!isNaN(p)) return p;
+          }
+          if (item.id !== undefined && item.id !== null && item.id !== "") {
+            const idNum = Number(item.id);
+            if (!isNaN(idNum)) return idNum;
+          }
+          return fallbackIdx;
+        };
+        return getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex);
       });
 
       return rawItems.map((i: any, idx: number) => ({
@@ -1159,8 +1162,13 @@ const InvoiceListPage: React.FC = () => {
 
   const handleViewOrder = (order: any) => {
     setViewOrder(order);
+    const sortedItems = [...(order.items || [])].sort((a: any, b: any) => {
+      const posA = Number(a.position ?? a.id ?? 0);
+      const posB = Number(b.position ?? b.id ?? 0);
+      return posA - posB;
+    });
     setViewItems(
-      (order.items || []).map((it: any) => ({
+      sortedItems.map((it: any) => ({
         ...it,
         itemName:
           it.item?.item_name || it.item?.name || it.itemName || "Unknown",

@@ -658,7 +658,13 @@ export const getAllOrders = async (
           order.cargo?.bill_to_display_name ||
           order.customer?.companyName ||
           "No Customer",
-        items: (order.orderItems || []).map((oi) => {
+        items: [...(order.orderItems || [])]
+          .sort((a: any, b: any) => {
+            const posA = Number(a.position ?? a.id ?? 0);
+            const posB = Number(b.position ?? b.id ?? 0);
+            return posA - posB;
+          })
+          .map((oi) => {
           const itemDetails =
             oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
           console.log(itemDetails);

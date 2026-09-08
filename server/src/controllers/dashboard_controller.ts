@@ -7,6 +7,10 @@ import { WarehouseItem } from "../models/warehouse_items";
 import { SupplierItem } from "../models/supplier_items";
 import { VariationValue } from "../models/variation_values";
 import { Rechnung } from "../models/rechnung";
+import { Customer } from "../models/customers";
+import { Inquiry } from "../models/inquiry";
+import { RequestedItem } from "../models/requested_items";
+import { ContactPerson } from "../models/contact_person";
 import fs from "fs";
 import path from "path";
 
@@ -16,7 +20,7 @@ interface CacheData {
 }
 
 let reportsCache: CacheData | null = null;
-const CACHE_TTL = 0;
+const CACHE_TTL = 30000;
 
 export const getAuditReports = async (req: Request, res: Response) => {
   try {
@@ -115,6 +119,13 @@ export const getAuditReports = async (req: Request, res: Response) => {
       itemsWithoutPictureCount,
       multipleParentsPicturesRaw,
       missingGelangenheitsCount,
+      noEanCount,
+      duplicateEanCount,
+      assignedToSupplier1Count,
+      itemsWithoutSalesPriceCount,
+      businessWithoutTaxProfileCount,
+      businessWithoutContactCount,
+      inquiryWithoutRequestItemCount,
     ] = await Promise.all([
       AppDataSource.getRepository(Order)
         .createQueryBuilder("o")
@@ -276,6 +287,66 @@ export const getAuditReports = async (req: Request, res: Response) => {
           "(r.gelangenheitsbestaetigung_doc IS NULL OR r.gelangenheitsbestaetigung_doc = '' OR r.gelangenheitsbestaetigung_doc = 'null')",
         )
         .getCount(),
+
+      AppDataSource.getRepository(Item)
+        .createQueryBuilder("item")
+        .where(activeItemSql)
+        .andWhere("(item.ean IS NULL OR item.ean = '' OR item.ean = 'null')")
+        .getCount(),
+
+      AppDataSource.getRepository(Item)
+        .createQueryBuilder("item")
+        .where(activeItemSql)
+        .andWhere("item.ean IS NOT NULL AND item.ean != '' AND item.ean != 'null'")
+        .andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(Item, "i2")
+            .where("i2.ean = item.ean AND i2.id <> item.id");
+          return `EXISTS ${subQuery.getQuery()}`;
+        })
+        .getCount(),
+
+      AppDataSource.getRepository(Item)
+        .createQueryBuilder("item")
+        .leftJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
+        .where(activeItemSql)
+        .andWhere("(item.supplier_id = 1 OR si.supplier_id = 1)")
+        .getCount(),
+
+      AppDataSource.getRepository(Item)
+        .createQueryBuilder("item")
+        .where(activeItemSql)
+        .andWhere("(item.sales_price IS NULL OR item.sales_price = 0)")
+        .getCount(),
+
+      AppDataSource.getRepository(Customer)
+        .createQueryBuilder("c")
+        .where("c.default_tax_profile_id IS NULL")
+        .getCount(),
+
+      AppDataSource.getRepository(Customer)
+        .createQueryBuilder("c")
+        .leftJoin("c.starBusinessDetails", "sbd")
+        .leftJoin("sbd.contactPersons", "cp")
+        .where("(c.contactName IS NULL OR c.contactName = '')")
+        .andWhere("(c.contactEmail IS NULL OR c.contactEmail = '')")
+        .andWhere("(c.contactPhoneNumber IS NULL OR c.contactPhoneNumber = '')")
+        .andWhere("cp.id IS NULL")
+        .getCount(),
+
+      AppDataSource.getRepository(Inquiry)
+        .createQueryBuilder("inq")
+        .where((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(RequestedItem, "ri")
+            .where("ri.inquiry_id = inq.id");
+          return `NOT EXISTS ${subQuery.getQuery()}`;
+        })
+        .getCount(),
     ]);
 
     const multipleParentsPicturesCount = multipleParentsPicturesRaw;
@@ -327,19 +398,26 @@ export const getAuditReports = async (req: Request, res: Response) => {
         controlData: {
           orders: [
             { label: "Orders unassigned to cargo", count: unassignedCargoCount, type: "unassigned_cargo" },
+            { label: "Inquiry without Request Item", count: inquiryWithoutRequestItemCount, type: "inquiry_without_request_item" },
             { label: "RMB Special SET with no value", count: rmbSpecialNoValueCount, type: "rmb_special_no_value" },
             { label: "EUR Special SET with no value", count: eurSpecialNoValueCount, type: "eur_special_no_value" },
             { label: "Dimension Special SET with no value", count: dimensionSpecialNoValueCount, type: "dimension_special_no_value" },
             { label: "Auslandslieferungen OHNE Gelangenheitsbestätigung/Ausfuhrnachweis", count: missingGelangenheitsCount, type: "missing_gelangenheitsbestaetigung" },
+            { label: "Business without tax profile", count: businessWithoutTaxProfileCount, type: "business_without_tax_profile" },
+            { label: "Businesses WITHOUT contact", count: businessWithoutContactCount, type: "businesses_without_contact" },
           ],
           items: [
+            { label: "Item without EAN", count: noEanCount, type: "no_ean" },
+            { label: "duplicate EAN", count: duplicateEanCount, type: "duplicate_ean" },
             { label: "Items with No Taric Code", count: noTaricCodeCount, type: "no_taric" },
             { label: "Items with mismatched tarics ?", count: mismatchedTaricsCount, type: "mismatched_tarics" },
             { label: "Items with null category", count: nullCategoryCount, type: "null_category" },
           ],
           suppliers: [
             { label: "Items PRO without suppliers", count: itemsWithoutSuppliersCount, type: "no_supplier" },
+            { label: "Items PRO assigned to Supplier ID=1", count: assignedToSupplier1Count, type: "assigned_supplier_1" },
             { label: "Items PRO without RMB Price", count: itemsWithoutRmbPriceCount, type: "no_rmb_price" },
+            { label: "Items PRO without SP", count: itemsWithoutSalesPriceCount, type: "no_sales_price" },
           ],
           pictures: [
             { label: "Is New Picture Required", count: newPictureRequiredCount, type: "new_picture_required" },

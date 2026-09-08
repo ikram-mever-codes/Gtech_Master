@@ -39,26 +39,33 @@ export default function Dashboard() {
   const [controlData, setControlData] = useState<ControlDataResponse>({
     orders: [
       { label: "Orders unassigned to cargo", count: 0, type: "unassigned_cargo" },
+      { label: "Inquiry without Request Item", count: 0, type: "inquiry_without_request_item" },
       { label: "RMB Special SET with no value", count: 0, type: "rmb_special_no_value" },
       { label: "EUR Special SET with no value", count: 0, type: "eur_special_no_value" },
       { label: "Dimension Special SET with no value", count: 0, type: "dimension_special_no_value" },
-      { label: "Auslandslieferungen OHNE Gelangenheitsbestätigung/Ausfuhrnachweis", count: 0, type: "missing_gelangenheitsbestaetigung" }
+      { label: "Auslandslieferungen OHNE Gelangenheitsbestätigung/Ausfuhrnachweis", count: 0, type: "missing_gelangenheitsbestaetigung" },
+      { label: "Business without tax profile", count: 0, type: "business_without_tax_profile" },
+      { label: "Businesses WITHOUT contact", count: 0, type: "businesses_without_contact" },
     ],
     items: [
+      { label: "Item without EAN", count: 0, type: "no_ean" },
+      { label: "duplicate EAN", count: 0, type: "duplicate_ean" },
       { label: "Items with No Taric Code", count: 0, type: "no_taric" },
       { label: "Items with mismatched tarics ?", count: 0, type: "mismatched_tarics" },
-      { label: "Items with null category", count: 0, type: "null_category" }
+      { label: "Items with null category", count: 0, type: "null_category" },
     ],
     suppliers: [
-      { label: "PRO Items without suppliers", count: 0, type: "no_supplier" },
-      { label: "PRO Items without RMB Price", count: 0, type: "no_rmb_price" }
+      { label: "Items PRO without suppliers", count: 0, type: "no_supplier" },
+      { label: "Items PRO assigned to Supplier ID=1", count: 0, type: "assigned_supplier_1" },
+      { label: "Items PRO without RMB Price", count: 0, type: "no_rmb_price" },
+      { label: "Items PRO without SP", count: 0, type: "no_sales_price" },
     ],
     pictures: [
       { label: "Is New Picture Required", count: 0, type: "new_picture_required" },
       { label: "List unused pictures", count: 0, type: "unused_pictures" },
       { label: "Items without picture", count: 0, type: "no_picture" },
-      { label: "Picture with multiple parents", count: 0, type: "multiple_parents_pictures" }
-    ]
+      { label: "Picture with multiple parents", count: 0, type: "multiple_parents_pictures" },
+    ],
   });
 
   useEffect(() => {
