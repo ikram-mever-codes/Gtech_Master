@@ -1184,9 +1184,14 @@ const OrderPage: React.FC = () => {
       if (detail && detail.id) {
         setViewOrder(detail);
       }
-      const lines = detail?.items ?? detail?.data?.items ?? [];
+      let lines = detail?.items ?? detail?.data?.items ?? [];
 
       if (Array.isArray(lines)) {
+        lines = [...lines].sort((a: any, b: any) => {
+          const posA = Number(a.position ?? a.id ?? 0);
+          const posB = Number(b.position ?? b.id ?? 0);
+          return posA - posB;
+        });
         setViewItems(
           lines.map((l: any) => {
             const id = String(l.item_id ?? "");
@@ -1409,9 +1414,30 @@ const OrderPage: React.FC = () => {
     [orders],
   );
   const orderItemsFlat = useMemo(() => {
-    let allItems = orders.flatMap((o: any) =>
-      (o.items || []).map((i: any) => ({
+    let allItems = orders.flatMap((o: any) => {
+      const rawItems = (o.items || []).map((i: any, idx: number) => ({
         ...i,
+        _originalIndex: idx,
+      }));
+
+      rawItems.sort((a: any, b: any) => {
+        const getSortValue = (item: any, fallbackIdx: number) => {
+          if (item.position !== undefined && item.position !== null && item.position !== "") {
+            const p = Number(item.position);
+            if (!isNaN(p)) return p;
+          }
+          if (item.id !== undefined && item.id !== null && item.id !== "") {
+            const idNum = Number(item.id);
+            if (!isNaN(idNum)) return idNum;
+          }
+          return fallbackIdx;
+        };
+        return getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex);
+      });
+
+      return rawItems.map((i: any, idx: number) => ({
+        ...i,
+        position: i.position ?? idx + 1,
         order_id: o.id,
         parentOrder: o,
         order_no: o.order_no,
@@ -1420,8 +1446,8 @@ const OrderPage: React.FC = () => {
         supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
         category_id: o.category_id,
         comment: o.comment,
-      })),
-    );
+      }));
+    });
 
     const filterParam = searchParams.get("filter");
     if (filterParam) {

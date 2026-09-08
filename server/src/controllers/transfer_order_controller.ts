@@ -651,7 +651,9 @@ export const deleteTransferOrderLineItem = async (
 async function createOrderFromBestellung(
   bestellung: TransferOrder,
 ): Promise<{ createdOrderId: number; skippedCount: number } | null> {
-  const allItems = bestellung.orderItems || [];
+  const allItems = [...(bestellung.orderItems || [])].sort(
+    (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0),
+  );
 
   if (allItems.length === 0) {
     return null;
@@ -798,8 +800,12 @@ export async function syncBestellungToLinkedOrder(
 
     await orderRepo.save(linkedOrder);
 
-    const bestellungItems = bestellung.orderItems || [];
-    const existingOrderItems = linkedOrder.orderItems || [];
+    const bestellungItems = [...(bestellung.orderItems || [])].sort(
+      (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0),
+    );
+    const existingOrderItems = [...(linkedOrder.orderItems || [])].sort(
+      (a, b) => (Number(a.id) || 0) - (Number(b.id) || 0),
+    );
 
     const itemRepo = AppDataSource.getRepository(Item);
     const lookupCodes = Array.from(
