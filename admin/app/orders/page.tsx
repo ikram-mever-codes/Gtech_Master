@@ -2775,7 +2775,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Customer",
-                      width: "140px",
+                      width: "110px",
                       render: (row) => {
                         const order = row.parentOrder;
                         const customerName =
@@ -2799,11 +2799,10 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Purpose",
-                      width: "160px",
+                      width: "130px",
                       render: (row) => {
                         const purpose =
-                          row.parentOrder?.title ||
-                          row.parentOrder?.notes ||
+                          row.parentOrder?.comment ||
                           null;
                         return purpose ? (
                           <span
@@ -2819,7 +2818,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Weiterversand",
-                      width: "160px",
+                      width: "130px",
                       align: "center",
                       render: (row) => renderWeiterversandBadge(row),
                     },
