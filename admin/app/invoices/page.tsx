@@ -705,7 +705,6 @@ const InvoiceListPage: React.FC = () => {
 
       if (isItem) {
         await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
-        toast.success("Item reassigned successfully");
       } else {
         const orderId = selectedItem.order_id || selectedItem.id;
         await assignOrdersToCargo(cargoIdNum, [Number(orderId)], false);
@@ -1368,6 +1367,12 @@ const InvoiceListPage: React.FC = () => {
     }
 
     filtered.sort((a, b) => {
+      if (sortField === "createdAt" || sortField === "invoiceDate") {
+        const aTime = new Date(a.invoiceDate || a.createdAt || 0).getTime();
+        const bTime = new Date(b.invoiceDate || b.createdAt || 0).getTime();
+        return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
+      }
+
       let aValue: any = a[sortField];
       let bValue: any = b[sortField];
 
@@ -1915,10 +1920,13 @@ const InvoiceListPage: React.FC = () => {
                                     })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.cargo?.cargo_no ||
-                                      invoice.cargoNo ||
-                                      invoice.orderNumber ||
-                                      "No Cargo"}
+                                    {(() => {
+                                       const cNo = invoice.cargo?.cargo_no || invoice.cargoNo || "";
+                                       if (cNo && !cNo.toUpperCase().startsWith("L")) {
+                                         return cNo;
+                                       }
+                                       return invoice.orderNumber || "No Cargo";
+                                     })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#495057]">
                                     {formatDate(invoice.invoiceDate)}

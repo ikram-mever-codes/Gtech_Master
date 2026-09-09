@@ -642,7 +642,7 @@ export const createRechnungFromAuftrag = async (
       const cciInv = cciInvRepo.create({
         invoice_number: invoiceNo,
         order_number: auftrag.order_no,
-        cargo_no: deliveryNoteNo || auftrag.order_no,
+        cargo_no: undefined,
         invoice_date: now,
         delivery_date: deliveryDate ? new Date(deliveryDate) : now,
         due_date: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
