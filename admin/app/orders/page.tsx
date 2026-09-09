@@ -2732,7 +2732,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Item Name",
-                      width: "250px",
+                      width: "180px",
                       render: (row) => (
                         <div
                           className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
@@ -2744,6 +2744,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Remark",
+                      width: "100px",
                       render: (row) => (
                         <div className="text-gray-500 italic text-xs space-y-0.5">
                           {row.remark_de && (
@@ -2765,7 +2766,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Order_no",
-                      width: "100px",
+                      width: "80px",
                       render: (row) => (
                         <span className="font-mono font-bold text-blue-600">
                           {row.parentOrder?.order_no || "-"}
@@ -2775,7 +2776,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Customer",
-                      width: "110px",
+                      width: "100px",
                       render: (row) => {
                         const order = row.parentOrder;
                         const customerName =
@@ -2799,7 +2800,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Purpose",
-                      width: "130px",
+                      width: "110px",
                       render: (row) => {
                         const purpose =
                           row.parentOrder?.comment ||
@@ -2818,7 +2819,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Weiterversand",
-                      width: "130px",
+                      width: "120px",
                       align: "center",
                       render: (row) => renderWeiterversandBadge(row),
                     },
@@ -2844,13 +2845,13 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "SOID",
-                      width: "70px",
+                      width: "55px",
                       render: (row) => row.supplier_order_id || "-",
                       align: "center",
                     },
                     {
                       header: "Status",
-                      width: "90px",
+                      width: "75px",
                       render: (row) => (
                         <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
                           {row.status || row.item_status || "Open"}
@@ -2860,7 +2861,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Actions",
-                      width: "180px",
+                      width: "145px",
                       align: "center",
                       render: (row) => (
                         <div className="flex items-center justify-center gap-2">
