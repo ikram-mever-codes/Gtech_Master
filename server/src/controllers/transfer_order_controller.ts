@@ -179,8 +179,8 @@ export const createTransferOrderFromAuftrag = async (
     // CEO requirement: OrderRemark for processing (Team Bowang) must be internal comment
     const finalNotes =
       bodyNotes !== undefined &&
-      bodyNotes !== null &&
-      String(bodyNotes).trim() !== ""
+        bodyNotes !== null &&
+        String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
         : auftrag.internal_notes || "";
 
@@ -935,11 +935,10 @@ export const updateTransferOrderStatus = async (
     let message = "Bestellung status updated successfully";
     if (previousStatus === "draft" && status === "to be processed") {
       if (conversionResult) {
-        message += ` — Order created${
-          conversionResult.skippedCount > 0
-            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
-            : ""
-        }.`;
+        message += ` — Order created${conversionResult.skippedCount > 0
+          ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
+          : ""
+          }.`;
       } else {
         message +=
           " — no Order was created (no catalog line items found on this Bestellung).";
@@ -964,25 +963,85 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
   if (!order) return;
 
   const items = order.orderItems || [];
-  const catalogLines = items.filter((li) => !!li.sourceItemId);
-  if (catalogLines.length === 0) return;
+  if (items.length === 0) return;
+
+  const linesWithSourceId = items.filter((li) => !!li.sourceItemId);
+  const linesWithItemNoOnly = items.filter(
+    (li) => !li.sourceItemId && !!(li.itemNo || "").trim(),
+  );
 
   const itemRepo = AppDataSource.getRepository(Item);
   const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
   const orderItemRepo = AppDataSource.getRepository(TransferOrderItem);
 
-  const sourceIds = catalogLines.map((li) => parseInt(li.sourceItemId!, 10));
+  const sourceIds = linesWithSourceId
+    .map((li) => parseInt(li.sourceItemId!, 10))
+    .filter((id) => !isNaN(id));
+
+  let bySourceId = new Map<string, any>();
+  if (sourceIds.length > 0) {
+    const sourceItems = await itemRepo.find({
+      where: { id: In(sourceIds) },
+      select: ["id", "transfer_price_EUR", "item_no_de"],
+    });
+    bySourceId = new Map(sourceItems.map((it: any) => [String(it.id), it]));
+  }
+
+  // Then, resolve lines that have only itemNo (fallback lookup by item_no_de)
+  let byItemNo = new Map<string, any>();
+  if (linesWithItemNoOnly.length > 0) {
+    const codes = Array.from(
+      new Set(
+        linesWithItemNoOnly
+          .map((li) => (li.itemNo || "").trim())
+          .filter((c) => c.length > 0),
+      ),
+    );
+    if (codes.length > 0) {
+      const foundByNo = await itemRepo.find({
+        where: { item_no_de: In(codes) },
+        select: ["id", "transfer_price_EUR", "item_no_de"],
+      });
+      byItemNo = new Map(
+        foundByNo.map((it: any) => [it.item_no_de as string, it]),
+      );
+    }
+  }
 
   if (order.receiver === ReceiverType.SUPPLIER && order.supplier_id) {
-    const supplierItems = await supplierItemRepo.find({
-      where: { item_id: In(sourceIds), supplier_id: order.supplier_id },
-    });
-    const bySourceId = new Map(
+    const allResolvedIds: number[] = [
+      ...sourceIds,
+      ...linesWithItemNoOnly
+        .map((li) => byItemNo.get((li.itemNo || "").trim())?.id)
+        .filter((id): id is number => id !== undefined),
+    ];
+
+    const supplierItems =
+      allResolvedIds.length > 0
+        ? await supplierItemRepo.find({
+          where: {
+            item_id: In(allResolvedIds),
+            supplier_id: order.supplier_id,
+          },
+        })
+        : [];
+    const byItemId = new Map(
       supplierItems.map((si) => [String(si.item_id), si]),
     );
 
-    for (const li of catalogLines) {
-      const match = bySourceId.get(String(li.sourceItemId));
+    for (const li of items) {
+      let resolvedItemId: string | undefined;
+      if (li.sourceItemId) {
+        resolvedItemId = String(parseInt(li.sourceItemId, 10));
+      } else {
+        const code = (li.itemNo || "").trim();
+        const found = code ? byItemNo.get(code) : undefined;
+        if (found) resolvedItemId = String(found.id);
+      }
+
+      if (!resolvedItemId) continue;
+
+      const match = byItemId.get(resolvedItemId);
       li.purchasePrice = match ? Number(match.price_rmb) || 0 : undefined;
       li.purchaseCurrency = match ? match.currency : undefined;
       if (li.purchasePrice !== undefined) {
@@ -991,23 +1050,21 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
       await orderItemRepo.save(li);
     }
   } else {
-    const sourceItems = await itemRepo.find({
-      where: { id: In(sourceIds) },
-      select: ["id", "transfer_price_EUR"],
-    });
-    const bySourceId = new Map(
-      sourceItems.map((it: any) => [String(it.id), it]),
-    );
+    for (const li of items) {
+      let match: any | undefined;
 
-    for (const li of catalogLines) {
-      const match = bySourceId.get(String(li.sourceItemId));
-      li.purchasePrice = match
-        ? Number(match.transfer_price_EUR) || 0
-        : undefined;
-      li.purchaseCurrency = "EUR";
-      if (li.purchasePrice !== undefined) {
-        li.transferPrice = li.purchasePrice;
+      if (li.sourceItemId) {
+        match = bySourceId.get(String(parseInt(li.sourceItemId, 10)));
+      } else {
+        const code = (li.itemNo || "").trim();
+        if (code) match = byItemNo.get(code);
       }
+
+      if (!match) continue;
+
+      li.purchasePrice = Number(match.transfer_price_EUR) || 0;
+      li.purchaseCurrency = "EUR";
+      li.transferPrice = li.purchasePrice;
       await orderItemRepo.save(li);
     }
   }
