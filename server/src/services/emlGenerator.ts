@@ -191,8 +191,8 @@ export async function generateRechnungLieferscheinEml(
 
   const lieferscheinPdfPath = path.join(lieferscheineDir, `lieferschein_${lieferscheinNo}.pdf`);
   lieferscheinPdfOpts.outputFilePath = lieferscheinPdfPath;
-
   await generateGtechDocumentPdf(lieferscheinPdfOpts);
+
   const rechnungPdfBuffer = fs.readFileSync(rechnungPdfPath);
   const lieferscheinPdfBuffer = fs.readFileSync(lieferscheinPdfPath);
 

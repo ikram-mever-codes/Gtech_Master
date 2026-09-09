@@ -57,6 +57,7 @@ import {
 } from "@/api/supplier_orders";
 
 import { getAllCustomers } from "@/api/customers";
+import { getWeiterversandServiceProviders } from "@/api/weiterversand_service_providers";
 import {
   getAllSuppliers,
   getSupplierItems,
@@ -196,6 +197,7 @@ const OrderPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [cargos, setCargos] = useState<CargoType[]>([]);
+  const [wvProviders, setWvProviders] = useState<any[]>([]);
   const [supplierOrdersList, setSupplierOrdersList] = useState<SupplierOrder[]>(
     [],
   );
@@ -401,6 +403,51 @@ const OrderPage: React.FC = () => {
     });
     return list;
   }, [orders, reprintSearch, itemById]);
+
+  const wvProviderMap = useMemo(() => {
+    const map = new Map<string, string>();
+    wvProviders.forEach((p: any) => {
+      if (p.id) map.set(String(p.id), p.name || p.service_provider_name || "");
+    });
+    return map;
+  }, [wvProviders]);
+
+  const renderWeiterversandBadge = (row: any) => {
+    const order = row.parentOrder;
+    if (!order) return <span className="text-gray-300">-</span>;
+
+    const isWV =
+      order.is_weiterversand === true ||
+      order.is_weiterversand === 1 ||
+      order.is_weiterversand === "true" ||
+      order.is_weiterversand === "1" ||
+      order.is_weiterversand === "Yes" ||
+      order.isWeiterversand === true;
+
+    if (!isWV) {
+      return <span className="text-gray-400 text-xs font-medium">Nein</span>;
+    }
+
+    const customerObj = order.customer || customers.find((c) => String(c.id) === String(order.customer_id));
+    const customerName = customerObj?.companyName || customerObj?.company_name || order.customer_name || "";
+
+    const providerName =
+      order.weiterversandServiceProvider?.name ||
+      order.weiterversand_service_provider_name ||
+      wvProviderMap.get(String(order.weiterversand_service_provider_id || order.weiterversandServiceProviderId || "")) ||
+      order.weiterversand_service_provider ||
+      "";
+
+    const labelText = providerName
+      ? `${customerName ? customerName + "-" : ""}WV-${providerName}`
+      : `${customerName ? customerName + "-" : ""}Weiterversand`;
+
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm whitespace-nowrap">
+        {labelText}
+      </span>
+    );
+  };
   const orderItemDetailsMap = useMemo(() => {
     const map = new Map<string, any>();
     orders.forEach((o: any) => {
@@ -825,6 +872,9 @@ const OrderPage: React.FC = () => {
     fetchSuppliers();
     fetchAllItems();
     fetchCargos();
+    getWeiterversandServiceProviders()
+      .then((res: any) => setWvProviders(Array.isArray(res) ? res : res?.data || []))
+      .catch(() => {});
   }, [fetchCustomers, fetchCategories, fetchSuppliers, fetchAllItems]);
 
   useEffect(() => {
@@ -2552,6 +2602,12 @@ const OrderPage: React.FC = () => {
                       align: "center",
                     },
                     {
+                      header: "Weiterversand",
+                      width: "160px",
+                      align: "center",
+                      render: (row) => renderWeiterversandBadge(row),
+                    },
+                    {
                       header: "QTY",
                       width: "60px",
                       align: "center",
@@ -2716,6 +2772,12 @@ const OrderPage: React.FC = () => {
                         </span>
                       ),
                       align: "center",
+                    },
+                    {
+                      header: "Weiterversand",
+                      width: "160px",
+                      align: "center",
+                      render: (row) => renderWeiterversandBadge(row),
                     },
                     {
                       header: "QTY",
