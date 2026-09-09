@@ -2774,6 +2774,50 @@ const OrderPage: React.FC = () => {
                       align: "center",
                     },
                     {
+                      header: "Customer",
+                      width: "140px",
+                      render: (row) => {
+                        const order = row.parentOrder;
+                        const customerName =
+                          order?.customer?.companyName ||
+                          order?.customer?.company_name ||
+                          order?.customerSnapshot?.companyName ||
+                          order?.customerSnapshot?.company_name ||
+                          order?.customer_name ||
+                          customers.find(
+                            (c) => String(c.id) === String(order?.customer_id),
+                          )?.companyName ||
+                          null;
+                        return customerName ? (
+                          <span className="text-gray-800 font-medium text-xs">
+                            {customerName}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        );
+                      },
+                    },
+                    {
+                      header: "Purpose",
+                      width: "160px",
+                      render: (row) => {
+                        const purpose =
+                          row.parentOrder?.title ||
+                          row.parentOrder?.notes ||
+                          null;
+                        return purpose ? (
+                          <span
+                            className="text-gray-600 text-xs line-clamp-2 leading-tight"
+                            title={purpose}
+                          >
+                            {purpose}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        );
+                      },
+                    },
+                    {
                       header: "Weiterversand",
                       width: "160px",
                       align: "center",
