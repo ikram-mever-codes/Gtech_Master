@@ -1070,6 +1070,8 @@ const InvoiceListPage: React.FC = () => {
         order_status: o.status,
         item_status: i.status || "NSO",
         supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
+        customer_id: o.customer_id || o.customer?.id,
+        customer: o.customer,
         category_id: o.category_id,
         comment: o.comment,
       }));

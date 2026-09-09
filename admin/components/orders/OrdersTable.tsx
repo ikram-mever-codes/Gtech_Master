@@ -252,6 +252,8 @@ export default function OrdersTable({
           row.order?.customer?.companyName ||
           row.order?.customer?.name ||
           row.order?.customer_name ||
+          row.parentOrder?.customer?.companyName ||
+          row.parentOrder?.customer?.name ||
           "-";
         return (
           <div className="truncate max-w-[100px] font-medium text-xs text-gray-700" title={name}>
@@ -265,7 +267,7 @@ export default function OrdersTable({
       header: "Purpose / Zweck",
       width: "95px",
       render: (row) => {
-        const text = row.remarks_cn || row.remark_de || row.order?.comment || "-";
+        const text = row.remarks_cn || row.remark_de || row.comment || row.order?.comment || row.parentOrder?.comment || "-";
         return (
           <div className="line-clamp-2 max-w-[95px]" title={text}>
             {text}
