@@ -2061,46 +2061,6 @@ export default function RechnungDetailModal({
                 </p>
               )}
             </div>
-
-            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
-              <div className="flex items-center gap-2 mb-3">
-                <Pencil className="h-4 w-4 text-gray-500" />
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
-                  Comment extern
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(
-                        (showCorrectionUI
-                          ? rkNotesExtern
-                          : data.notes ||
-                            data.comment ||
-                            data.notes_external) || "",
-                      );
-                      toast.success("External comment copied to clipboard!");
-                    }}
-                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
-                    title="Copy External Comment"
-                  >
-                    <ClipboardDocumentIcon className="w-4 h-4" />
-                  </button>
-                </h3>
-              </div>
-              {showCorrectionUI ? (
-                <textarea
-                  rows={3}
-                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  value={rkNotesExtern}
-                  placeholder="Shown on the correction invoice."
-                  onChange={(e) => setRkNotesExtern(e.target.value)}
-                />
-              ) : (
-                <p className="text-sm text-gray-600">
-                  {data.notes || data.comment || data.notes_external || "—"}
-                </p>
-              )}
-            </div>
           </div>
         </div>
 
