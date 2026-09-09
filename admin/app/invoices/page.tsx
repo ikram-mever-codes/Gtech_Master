@@ -698,36 +698,35 @@ const InvoiceListPage: React.FC = () => {
     if (!selectedItem || !targetCargoId) return;
     try {
       const cargoIdNum = Number(targetCargoId);
+      const isOrder = !!selectedItem.order_no || activeInvTab === "orders";
 
-      if (activeInvTab === "orders") {
+      if (isOrder) {
         await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)], false);
         toast.success(
-          `Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`,
+          `Order ${selectedItem.order_no || selectedItem.id} assigned to Cargo ${targetCargoId}`,
         );
-        setShowREModal(false);
-        await fetchOrders();
       } else {
         await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
-
         toast.success("Item reassigned successfully");
-        setShowREModal(false);
-
-        const invId = Object.keys(expandedStates).find((key) =>
-          expandedStates[key].data?.detailedItems?.some(
-            (it: any) => it.id === selectedItem.id,
-          ),
-        );
-
-        if (invId) {
-          setExpandedStates((prev) => {
-            const newState = { ...prev };
-            delete newState[invId];
-            return newState;
-          });
-        }
-
-        await loadInvoices();
       }
+
+      setShowREModal(false);
+
+      const invId = Object.keys(expandedStates).find((key) =>
+        expandedStates[key].data?.detailedItems?.some(
+          (it: any) => it.id === selectedItem.id,
+        ),
+      );
+
+      if (invId) {
+        setExpandedStates((prev) => {
+          const newState = { ...prev };
+          delete newState[invId];
+          return newState;
+        });
+      }
+
+      await Promise.all([loadInvoices(), fetchOrders()]);
     } catch (err) {
       console.error(err);
       toast.error("Failed to assign/reassign cargo");
