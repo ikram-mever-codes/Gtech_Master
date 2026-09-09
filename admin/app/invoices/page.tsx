@@ -1377,17 +1377,31 @@ const InvoiceListPage: React.FC = () => {
 
     filtered.sort((a, b) => {
       if (sortField === "createdAt" || sortField === "invoiceDate") {
-        const aTime = new Date(a.invoiceDate || a.createdAt || 0).getTime();
-        const bTime = new Date(b.invoiceDate || b.createdAt || 0).getTime();
-        return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
+        const aTime = new Date(a.createdAt || a.invoiceDate || 0).getTime();
+        const bTime = new Date(b.createdAt || b.invoiceDate || 0).getTime();
+        if (aTime !== bTime) {
+          return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
+        }
+        return sortDirection === "asc"
+          ? String(a.id).localeCompare(String(b.id))
+          : String(b.id).localeCompare(String(a.id));
       }
 
       let aValue: any = a[sortField];
       let bValue: any = b[sortField];
 
       if (sortField === "customer") {
-        aValue = a.customer?.companyName || "";
-        bValue = b.customer?.companyName || "";
+        aValue = a.customer?.companyName || a.bill_to || "";
+        bValue = b.customer?.companyName || b.bill_to || "";
+      } else if (sortField === "cargoNo") {
+        aValue = a.cargoNo || a.cargo?.cargo_no || "";
+        bValue = b.cargoNo || b.cargo?.cargo_no || "";
+      } else if (sortField === "customItemCount") {
+        aValue = a.customItemCount ?? a.items?.length ?? 0;
+        bValue = b.customItemCount ?? b.items?.length ?? 0;
+      } else if (sortField === "customTotalQty") {
+        aValue = a.customTotalQty ?? 0;
+        bValue = b.customTotalQty ?? 0;
       }
 
       if (aValue == null && bValue == null) return 0;
@@ -1395,9 +1409,8 @@ const InvoiceListPage: React.FC = () => {
       if (bValue == null) return sortDirection === "asc" ? -1 : 1;
 
       if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortDirection === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
+        const comp = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: "base" });
+        return sortDirection === "asc" ? comp : -comp;
       }
 
       if (typeof aValue === "number" && typeof bValue === "number") {
@@ -1850,41 +1863,127 @@ const InvoiceListPage: React.FC = () => {
                                 #
                               </th>
                             )}
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              <div className="flex items-center gap-1.5">ID</div>
+                            <th
+                              onClick={() => handleSort("id")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>ID</span>
+                                {sortField === "id" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
                             </th>
                             {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Invoice No
+                              <th
+                                onClick={() => handleSort("invoiceNumber")}
+                                className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>Invoice No</span>
+                                  {sortField === "invoiceNumber" && (
+                                    <span className="text-xs text-emerald-600 font-bold">
+                                      {sortDirection === "asc" ? "↑" : "↓"}
+                                    </span>
+                                  )}
+                                </div>
                               </th>
                             )}
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Bill To
+                            <th
+                              onClick={() => handleSort("customer")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Bill To</span>
+                                {sortField === "customer" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
                             </th>
                             <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
                               Ship To
                             </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Cargo No.
+                            <th
+                              onClick={() => handleSort("cargoNo")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Cargo No.</span>
+                                {sortField === "cargoNo" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
                             </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Date created"
-                                : "Closed Date"}
+                            <th
+                              onClick={() => handleSort("createdAt")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>
+                                  {activeInvTab === "open_invoices"
+                                    ? "Date created"
+                                    : "Closed Date"}
+                                </span>
+                                {sortField === "createdAt" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
                             </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "Count Item"
-                                : "Item Count"}
+                            <th
+                              onClick={() => handleSort("customItemCount")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>
+                                  {activeInvTab === "open_invoices"
+                                    ? "Count Item"
+                                    : "Item Count"}
+                                </span>
+                                {sortField === "customItemCount" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
                             </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              {activeInvTab === "open_invoices"
-                                ? "QTY"
-                                : "Total Qty"}
+                            <th
+                              onClick={() => handleSort("customTotalQty")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>
+                                  {activeInvTab === "open_invoices"
+                                    ? "QTY"
+                                    : "Total Qty"}
+                                </span>
+                                {sortField === "customTotalQty" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
                             </th>
                             {activeInvTab === "closed_invoices" && (
-                              <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                Total Price
+                              <th
+                                onClick={() => handleSort("grossTotal")}
+                                className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>Total Price</span>
+                                  {sortField === "grossTotal" && (
+                                    <span className="text-xs text-emerald-600 font-bold">
+                                      {sortDirection === "asc" ? "↑" : "↓"}
+                                    </span>
+                                  )}
+                                </div>
                               </th>
                             )}
                           </tr>

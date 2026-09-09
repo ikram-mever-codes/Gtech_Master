@@ -835,7 +835,7 @@ export class InvoiceController {
           "customer.starCustomerDetails",
           "items",
         ],
-        order: { invoiceDate: "DESC" },
+        order: { createdAt: "DESC", invoiceDate: "DESC" },
       });
 
       console.log(
@@ -1103,7 +1103,7 @@ export class InvoiceController {
       const cciInvoiceRepo = AppDataSource.getRepository(CCIInvoice);
       const cciInvoices = await cciInvoiceRepo.find({
         relations: ["customer", "items"],
-        order: { invoice_date: "DESC" },
+        order: { created_at: "DESC", invoice_date: "DESC" },
       });
 
       await Promise.all(
@@ -1191,6 +1191,7 @@ export class InvoiceController {
             invoiceNumber: cci.invoice_number,
             orderNumber: cci.order_number,
             invoiceDate: cci.invoice_date,
+            createdAt: cci.created_at || cci.invoice_date,
             deliveryDate: cci.delivery_date,
             dueDate: cci.due_date,
             netTotal: Number(cci.net_total || 0),
