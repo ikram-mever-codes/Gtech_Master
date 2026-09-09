@@ -100,11 +100,7 @@ export default function OrdersTable({
       header: "Item name",
       width: "140px",
       render: (row) => {
-        const text = row.item_name ||
-          row.itemName ||
-          row.item?.item_name ||
-          row.item?.name ||
-          "Unknown";
+        const text = row.item_name || row.itemName || row.item?.item_name || row.item?.name || "Unknown";
         return (
           <div
             className="line-clamp-2 max-w-[140px] leading-tight break-words"

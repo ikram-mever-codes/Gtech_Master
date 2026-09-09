@@ -460,6 +460,18 @@ export const getItems = async (
             .having("COUNT(DISTINCT sub_item.parent_id) > 1");
           return `item.photo IN ${subQuery.getQuery()}`;
         });
+      } else if (filterParam === "assigned_supplier_1") {
+        idQb.andWhere(
+          "(item.supplier_id = 1 OR EXISTS (SELECT 1 FROM supplier_item si WHERE si.item_id = item.id AND si.is_default = 'Y' AND si.supplier_id = 1))",
+        );
+      } else if (filterParam === "no_ean") {
+        idQb.andWhere("(item.ean IS NULL OR item.ean = '' OR item.ean = 'null')");
+      } else if (filterParam === "duplicate_ean") {
+        idQb.andWhere(
+          "(item.ean IS NOT NULL AND item.ean != '' AND item.ean != 'null' AND EXISTS (SELECT 1 FROM item i2 WHERE i2.ean = item.ean AND i2.id <> item.id))",
+        );
+      } else if (filterParam === "no_sales_price") {
+        idQb.andWhere("(item.sales_price IS NULL OR item.sales_price = 0)");
       }
     }
 

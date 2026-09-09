@@ -1569,11 +1569,17 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const shippingTotalForDisplay = edit
     ? (form.shippingCost || 0) * (form.shippingQuantity || 1)
     : (offer?.shippingCost || 0) * (offer?.shippingQuantity || 1);
+
+  const lineItemsSubtotal = visibleLineItems.reduce(
+    (acc: number, li: any) => acc + getLineItemTotal(li, pricingMode),
+    0,
+  );
+  const subtotalForDisplay = lineItemsSubtotal + shippingTotalForDisplay;
+
   const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
   const displayTotal =
-    (offer?.subtotal || 0) -
+    subtotalForDisplay -
     (offer?.discountAmount || 0) +
-    shippingTotalForDisplay * discountFactor +
     vatTaxSum;
 
   // --- Linked documents (Aufträge) -----------------------------------------
@@ -3358,7 +3364,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium">
                       {formatCurrency(
-                        (offer.subtotal || 0) + shippingTotalForDisplay,
+                        subtotalForDisplay,
                         offer.currency,
                       )}
                     </span>

@@ -127,6 +127,13 @@ export default function Dashboard() {
         router.push(`/invoices?tab=order_items&filter=${type}`);
       } else if (type === "missing_gelangenheitsbestaetigung") {
         router.push(`/commercial?tab=rechnung&filter=${type}`);
+      } else if (type === "inquiry_without_request_item") {
+        router.push(`/inquiry?filter=${type}`);
+      } else if (
+        type === "business_without_tax_profile" ||
+        type === "businesses_without_contact"
+      ) {
+        router.push(`/bussinesses?filter=${type}`);
       } else {
         router.push(`/invoices?tab=order_items&filter=${type}`);
       }

@@ -289,6 +289,7 @@ export class InquiryController {
         contactPersonId,
         isAssembly,
         tags,
+        filter,
       } = request.query;
 
       const queryBuilder = this.inquiryRepository
@@ -391,6 +392,13 @@ export class InquiryController {
         queryBuilder.andWhere("inquiry.isAssembly = :isAssembly", {
           isAssembly: isAssembly === "true",
         });
+      }
+
+      const filterParam = ((filter as string) || "").trim();
+      if (filterParam === "inquiry_without_request_item") {
+        queryBuilder.andWhere(
+          "NOT EXISTS (SELECT 1 FROM requested_item ri WHERE ri.inquiry_id = inquiry.id)",
+        );
       }
 
       const skip = (Number(page) - 1) * Number(limit);

@@ -9,6 +9,7 @@ import { Customer } from "../models/customers";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
+import { buildRechnungPdfOptions } from "../services/pdfOptionsBuilder";
 import {
   generateRechnungLieferscheinEml,
   generateRechnungOnlyEml,
@@ -1559,62 +1560,17 @@ export const downloadRechnungPdf = async (
         !!linkedLieferschein.confirmed_at
       : false;
 
-    await generateGtechDocumentPdf({
-      documentType: "Rechnung",
-      documentNumber: rechnung.invoice_number,
-      documentTitle: rechnung.title || "",
-      customerSnapshot: customerSnap,
-      customerEntity: rechnung.customer,
-      deliveryAddress: rechnung.deliveryAddress,
-      metadataItems: [
-        ["Kontakt", String(contactName || "")],
-        ["Kunde", String(kundeCombined || "")],
-        ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
-        ["Datum", String(resolvedInvoiceDate || "")],
-      ] as [string, string][],
-      kontaktName: contactName,
-      kontaktEmail: (req as any).user?.email,
-      isDelivered: isLieferscheinConfirmed,
-      lineItems: items,
-      showPrices: true,
-      shippingMethod: rechnung.shipping_method,
-      shippingCost: Number(rechnung.shipping_cost || 0),
-      shippingQuantity: Number(rechnung.shipping_quantity ?? 0),
-      shippingTaxRate: defaultTaxRate,
-      discountPercentage: Number(rechnung.discount_percentage || 0),
-      discountAmount: Number(rechnung.discount_amount || 0),
-      subtotal: Number(rechnung.subtotal || 0),
-      taxAmount: Number(rechnung.tax_amount || 0),
-      totalAmount: Number(rechnung.total_amount || 0),
-      taxRate: defaultTaxRate,
-      currency: rechnung.currency || "EUR",
-      notes: rechnung.notes,
-      deliveryTime: resolvedDeliveryDate,
-      deliveryDate: resolvedDeliveryDate,
-      deliveryTerms: rechnung.delivery_terms || auftrag?.delivery_terms,
-      paymentTerms: (() => {
-        const terms = rechnung.payment_terms || auftrag?.payment_terms;
-        if (!terms) return undefined;
-        const dayMatch = String(terms).match(/(\d+)/);
-        return dayMatch ? `Zahlungsziel: ${dayMatch[1]} Tage` : `Zahlungsziel: ${terms}`;
-      })(),
-      paymentMethod: rechnung.payment_method || auftrag?.payment_method,
-      invoiceDate: resolvedInvoiceDate,
-      payments: pdfPayments.length > 0 ? pdfPayments : undefined,
-      rks: pdfRks.length > 0 ? pdfRks : undefined,
-      outstandingAmount:
-        pdfPayments.length > 0 || pdfRks.length > 0
-          ? outstandingAmount
-          : undefined,
-      taxProfile:
-        rechnung.tax_profile_case ||
-        (rechnung.customer as any)?.tax_profile_case ||
-        (rechnung.customer as any)?.defaultTaxProfile?.key ||
-        customerSnap?.tax_profile_case ||
-        customerSnap?.taxProfile,
-      kundenreferenz: (rechnung as any).kundenreferenz || undefined,
+    const { options: pdfOpts } = await buildRechnungPdfOptions(rechnung, {
+      user: (req as any).user,
       outputFilePath: filePath,
     });
+    pdfOpts.payments = pdfPayments.length > 0 ? pdfPayments : undefined;
+    pdfOpts.rks = pdfRks.length > 0 ? pdfRks : undefined;
+    pdfOpts.outstandingAmount =
+      pdfPayments.length > 0 || pdfRks.length > 0 ? outstandingAmount : undefined;
+    pdfOpts.kundenreferenz = (rechnung as any).kundenreferenz || undefined;
+
+    await generateGtechDocumentPdf(pdfOpts);
 
     const rawTitle =
       (rechnung as any).title ||
