@@ -1140,7 +1140,7 @@ export const generateLabelPDF = async (
       /[/\\?%*:|"<>\s]/g,
       "-",
     );
-    const qtyLabel = item.qty_label || 0;
+    const qtyLabel = item.qty_label ?? item.qty ?? 0;
 
     const now = new Date();
     const year = now.getFullYear();
@@ -1196,7 +1196,7 @@ export const generateLabelPDF = async (
     doc.text(qtyOrderText, qtyOrderX, row1ValueY + 1.5);
 
     doc.font("Helvetica-Bold").fontSize(10);
-    doc.text(`${item.qty_label || 0}`, qtyLabelColStart, row1ValueY);
+    doc.text(`${qtyLabel}`, qtyLabelColStart, row1ValueY);
 
     try {
       doc.image(logoSource, colLogo, 14, { width: 40 });
