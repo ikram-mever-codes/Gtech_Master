@@ -124,6 +124,22 @@ export const generateInvoicesForOrders = async (
         console.log(`[InvoiceSync] Cleaned up standalone order invoice for orderNo: ${orderNo}`);
       }
     }
+
+    const nonCargoInvoices = await invoiceRepo
+      .createQueryBuilder("inv")
+      .where("inv.orderNumber LIKE 'B%' OR inv.orderNumber LIKE 'L%'")
+      .getMany();
+
+    for (const inv of nonCargoInvoices) {
+      const linkedCargo = await cargoRepo.findOne({
+        where: { cargo_no: inv.orderNumber },
+      });
+      if (!linkedCargo || !linkedCargo.cargo_no?.toUpperCase().startsWith("C")) {
+        await invoiceItemRepo.delete({ invoice: { id: inv.id } });
+        await invoiceRepo.delete(inv.id);
+        console.log(`[InvoiceSync] Cleaned up non-Cargo dummy invoice: ${inv.orderNumber}`);
+      }
+    }
   } catch (e) {
     console.error("[InvoiceSync] Failed to sync invoices:", e);
   }
@@ -137,6 +153,22 @@ const syncInvoiceRecord = async (
   invoiceItemRepo: any,
   customerRepo: any,
 ) => {
+  const isOfficialCargo = orderNumber && orderNumber.trim().toUpperCase().startsWith("C");
+  if (!isOfficialCargo) {
+    const existingCargo = await AppDataSource.getRepository(Cargo).findOne({
+      where: { cargo_no: orderNumber },
+    });
+    if (!existingCargo || !existingCargo.cargo_no?.trim().toUpperCase().startsWith("C")) {
+      const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber } });
+      if (existingInvoice) {
+        await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+        await invoiceRepo.delete(existingInvoice.id);
+        console.log(`[InvoiceSync] Removed non-Cargo invoice ${orderNumber}`);
+      }
+      return;
+    }
+  }
+
   let invoice = await invoiceRepo.findOne({
     where: { orderNumber },
     relations: ["items"],
@@ -443,7 +475,18 @@ export const createCargo = async (
       rawCargoNo !== defaultPrefix &&
       !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
 
-    if (!rawCargoNo || rawCargoNo === defaultPrefix) {
+    if (!rawCargoNo || rawCargoNo === defaultPrefix || isCustomText) {
+      if (isCustomText) {
+        const existingRemark = (cargoData.remark || cargoData.note || "").trim();
+        if (existingRemark) {
+          if (!existingRemark.includes(rawCargoNo)) {
+            cargoData.remark = `${existingRemark} - ${rawCargoNo}`;
+          }
+        } else {
+          cargoData.remark = rawCargoNo;
+        }
+        cargoData.note = cargoData.remark;
+      }
       try {
         cargoData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
       } catch (err) {
@@ -452,16 +495,6 @@ export const createCargo = async (
           err,
         );
       }
-    } else if (isCustomText) {
-      const existingRemark = (cargoData.remark || cargoData.note || "").trim();
-      if (existingRemark) {
-        if (!existingRemark.includes(rawCargoNo)) {
-          cargoData.remark = `${existingRemark} - ${rawCargoNo}`;
-        }
-      } else {
-        cargoData.remark = rawCargoNo;
-      }
-      cargoData.note = cargoData.remark;
     }
 
     const cargo = cargoRepo.create(cargoData as Partial<Cargo>);
@@ -531,6 +564,12 @@ export const updateCargo = async (
         updateData.remark = rawCargoNo;
       }
       updateData.note = updateData.remark;
+
+      try {
+        updateData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
+      } catch (err) {
+        console.warn("Could not generate sequence cargo_no on update:", err);
+      }
     }
 
     const oldCargoNo = cargo.cargo_no;

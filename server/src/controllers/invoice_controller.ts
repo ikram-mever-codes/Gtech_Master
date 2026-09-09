@@ -333,11 +333,10 @@ export class InvoiceController {
           ? "Lieferdatum: bestätigt"
           : "Lieferdatum: voraussichtlich";
         doc.text(
-          `${lieferdatumLabel} ${
-            invoice.deliveryDate
-              ? new Date(invoice.deliveryDate).toLocaleDateString("de-DE")
-              : ""
-          }`.trim(),
+          `${lieferdatumLabel} ${invoice.deliveryDate
+            ? new Date(invoice.deliveryDate).toLocaleDateString("de-DE")
+            : ""
+            }`.trim(),
           leftAlignX,
           yPos,
         );
@@ -1045,16 +1044,13 @@ export class InvoiceController {
               `[InvoiceTotalDebug] ${inv.invoiceNumber || inv.id} (${cargo?.cargo_no || inv.orderNumber}): itemsNet=${itemsTotalPrice.toFixed(2)}, freight=${freight.toFixed(2)}, grossTotal=${calculatedGrossTotal.toFixed(2)}`,
             );
 
-            const cargoNo =
-              cargo?.cargo_no ||
-              (inv.orderNumber && !orderIdMap.has(inv.orderNumber)
-                ? inv.orderNumber
-                : undefined);
+            const validCargo = cargo && cargo.cargo_no && cargo.cargo_no.trim().toUpperCase().startsWith("C") ? cargo : null;
+            const validCargoNo = validCargo?.cargo_no || (inv.orderNumber && inv.orderNumber.trim().toUpperCase().startsWith("C") ? inv.orderNumber : undefined);
 
             const order = orders.find((o) => o.order_no === inv.orderNumber);
             const orderComment =
               order?.comment ||
-              cargoCommentMap.get(cargo?.cargo_no || "") ||
+              cargoCommentMap.get(validCargo?.cargo_no || "") ||
               cargoCommentMap.get(inv.orderNumber || "") ||
               "";
 
@@ -1085,15 +1081,19 @@ export class InvoiceController {
               ship_to: rawShipTo,
               customItemCount,
               customTotalQty,
-              cargoNo: cargoNo || inv.orderNumber,
-              cargoId: cargo?.id || null,
-              cargo_id: cargo?.id || null,
-              cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null,
+              cargoNo: validCargoNo || null,
+              cargoId: validCargo?.id || null,
+              cargo_id: validCargo?.id || null,
+              cargo: validCargo ? { id: validCargo.id, cargo_no: validCargo.cargo_no } : null,
               orderComment,
             };
           })
         )
-      ).filter((inv): inv is any => inv !== null);
+      ).filter((inv): inv is any => {
+        if (!inv) return false;
+        const cNo = (inv.cargoNo || inv.cargo?.cargo_no || "").trim();
+        return Boolean(cNo && cNo.toUpperCase().startsWith("C"));
+      });
 
       const finalDataMap = new Map();
       data.forEach((inv) => {
@@ -1136,7 +1136,7 @@ export class InvoiceController {
                 (s: number, it: any) =>
                   s +
                   Number(it.qty || it.quantity || 0) *
-                    Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0),
+                  Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0),
                 0,
               );
               const dQty = exp.detailedItems.reduce(

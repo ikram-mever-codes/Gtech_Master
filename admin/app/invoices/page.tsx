@@ -1301,15 +1301,22 @@ const InvoiceListPage: React.FC = () => {
     let filtered = invoices || [];
 
     if (activeInvTab === "open_invoices") {
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.status !== "paid" && invoice.status !== "cancelled",
-      );
+      filtered = filtered.filter((invoice) => {
+        const cNo = (invoice.cargoNo || invoice.cargo?.cargo_no || "").trim();
+        return (
+          invoice.status !== "paid" &&
+          invoice.status !== "cancelled" &&
+          cNo.toUpperCase().startsWith("C")
+        );
+      });
     } else if (activeInvTab === "closed_invoices") {
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.status === "paid" || invoice.status === "cancelled",
-      );
+      filtered = filtered.filter((invoice) => {
+        const cNo = (invoice.cargoNo || invoice.cargo?.cargo_no || "").trim();
+        return (
+          (invoice.status === "paid" || invoice.status === "cancelled") &&
+          cNo.toUpperCase().startsWith("C")
+        );
+      });
     }
 
     if (searchTerm) {
@@ -1924,12 +1931,9 @@ const InvoiceListPage: React.FC = () => {
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {(() => {
-                                       const cNo = invoice.cargo?.cargo_no || invoice.cargoNo || "";
-                                       if (cNo && !cNo.toUpperCase().startsWith("L")) {
-                                         return cNo;
-                                       }
-                                       return invoice.orderNumber || "No Cargo";
-                                     })()}
+                                      const cNo = (invoice.cargo?.cargo_no || invoice.cargoNo || "").trim();
+                                      return cNo.toUpperCase().startsWith("C") ? cNo : "-";
+                                    })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#495057]">
                                     {formatDate(invoice.invoiceDate)}
@@ -2007,10 +2011,10 @@ const InvoiceListPage: React.FC = () => {
                                   : "Cargo No."}
                               </span>
                               <span className="font-medium text-[#212529]">
-                                {invoice.cargo?.cargo_no ||
-                                  invoice.cargoNo ||
-                                  invoice.orderNumber ||
-                                  "-"}
+                                {(() => {
+                                  const cNo = (invoice.cargo?.cargo_no || invoice.cargoNo || "").trim();
+                                  return cNo.toUpperCase().startsWith("C") ? cNo : "-";
+                                })()}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs">
@@ -2244,10 +2248,10 @@ const InvoiceListPage: React.FC = () => {
                     </span>
                     <span className="text-sm font-semibold text-gray-800 block mt-1">
                       Cargo:{" "}
-                      {selectedInvoice.cargo?.cargo_no ||
-                        selectedInvoice.cargoNo ||
-                        selectedInvoice.orderNumber ||
-                        "No Cargo"}
+                      {(() => {
+                        const cNo = (selectedInvoice.cargo?.cargo_no || selectedInvoice.cargoNo || "").trim();
+                        return cNo.toUpperCase().startsWith("C") ? cNo : "N/A";
+                      })()}
                     </span>
                     <span className="text-xs text-gray-500 block mt-0.5">
                       Date: {formatDate(selectedInvoice.invoiceDate)}
