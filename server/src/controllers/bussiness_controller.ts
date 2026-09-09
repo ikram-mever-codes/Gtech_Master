@@ -27,6 +27,7 @@ import { CustomerOrder } from "../models/customer_orders";
 import { RechnungCustomer } from "../models/rechnung_customer";
 import { TransferOrder } from "../models/transfer_order";
 import { TaxProfile } from "../models/tax_profile";
+import { ContactPerson } from "../models/contact_person";
 
 export const BUSINESS_SOURCE = {
   GOOGLE_MAPS: "Google Maps",
@@ -1992,6 +1993,7 @@ export const getAllBusinesses = async (
       sortBy = "createdAt",
       sortOrder = "DESC",
       tags,
+      filter,
     } = req.query;
 
     const pageNum = parseInt(page as string);
@@ -2006,6 +2008,25 @@ export const getAllBusinesses = async (
       .leftJoinAndSelect("businessDetails.countryEntity", "businessCountry")
       .leftJoinAndSelect("customer.starCustomerDetails", "starCustomerDetails")
       .leftJoinAndSelect("customer.tags", "tags");
+
+    const filterParam = ((filter as string) || "").trim();
+    if (filterParam === "business_without_tax_profile") {
+      queryBuilder.andWhere("customer.default_tax_profile_id IS NULL");
+    } else if (
+      filterParam === "businesses_without_contact" ||
+      filterParam === "business_without_contact"
+    ) {
+      queryBuilder
+        .leftJoin("customer.starBusinessDetails", "sbd_filter")
+        .leftJoin(
+          ContactPerson,
+          "cp_filter",
+          "cp_filter.star_business_details_id = sbd_filter.id",
+        )
+        .andWhere(
+          "(customer.contactName IS NULL OR customer.contactName = '') AND (customer.contactEmail IS NULL OR customer.contactEmail = '') AND (customer.contactPhoneNumber IS NULL OR customer.contactPhoneNumber = '') AND cp_filter.id IS NULL",
+        );
+    }
 
     if (tags) {
       const tagIds = (tags as string).split(",");

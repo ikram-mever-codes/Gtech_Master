@@ -132,6 +132,7 @@ export interface SearchFilters {
   maxRating?: number;
   verified?: boolean;
   tags?: string;
+  filter?: string;
 }
 
 export interface LocationSearchPayload {

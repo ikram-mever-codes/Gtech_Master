@@ -698,36 +698,38 @@ const InvoiceListPage: React.FC = () => {
     if (!selectedItem || !targetCargoId) return;
     try {
       const cargoIdNum = Number(targetCargoId);
+      const isItem =
+        activeInvTab === "order_items" ||
+        !!selectedItem.item_id ||
+        !!selectedItem.parentOrder;
 
-      if (activeInvTab === "orders") {
-        await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)], false);
-        toast.success(
-          `Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`,
-        );
-        setShowREModal(false);
-        await fetchOrders();
-      } else {
+      if (isItem) {
         await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
-
-        toast.success("Item reassigned successfully");
-        setShowREModal(false);
-
-        const invId = Object.keys(expandedStates).find((key) =>
-          expandedStates[key].data?.detailedItems?.some(
-            (it: any) => it.id === selectedItem.id,
-          ),
+      } else {
+        const orderId = selectedItem.order_id || selectedItem.id;
+        await assignOrdersToCargo(cargoIdNum, [Number(orderId)], false);
+        toast.success(
+          `Order ${selectedItem.order_no || orderId} assigned to Cargo ${targetCargoId}`,
         );
-
-        if (invId) {
-          setExpandedStates((prev) => {
-            const newState = { ...prev };
-            delete newState[invId];
-            return newState;
-          });
-        }
-
-        await loadInvoices();
       }
+
+      setShowREModal(false);
+
+      const invId = Object.keys(expandedStates).find((key) =>
+        expandedStates[key].data?.detailedItems?.some(
+          (it: any) => it.id === selectedItem.id,
+        ),
+      );
+
+      if (invId) {
+        setExpandedStates((prev) => {
+          const newState = { ...prev };
+          delete newState[invId];
+          return newState;
+        });
+      }
+
+      await Promise.all([loadInvoices(), fetchOrders()]);
     } catch (err) {
       console.error(err);
       toast.error("Failed to assign/reassign cargo");
@@ -1068,6 +1070,8 @@ const InvoiceListPage: React.FC = () => {
         order_status: o.status,
         item_status: i.status || "NSO",
         supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
+        customer_id: o.customer_id || o.customer?.id,
+        customer: o.customer,
         category_id: o.category_id,
         comment: o.comment,
       }));
@@ -1365,6 +1369,12 @@ const InvoiceListPage: React.FC = () => {
     }
 
     filtered.sort((a, b) => {
+      if (sortField === "createdAt" || sortField === "invoiceDate") {
+        const aTime = new Date(a.invoiceDate || a.createdAt || 0).getTime();
+        const bTime = new Date(b.invoiceDate || b.createdAt || 0).getTime();
+        return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
+      }
+
       let aValue: any = a[sortField];
       let bValue: any = b[sortField];
 
@@ -1792,6 +1802,7 @@ const InvoiceListPage: React.FC = () => {
               onAssignSupplier={handleAssignSupplier}
               onSplit={handleOpenSplitModal}
               router={router}
+              cargos={cargos}
             />
           </div>
         )}
@@ -1912,10 +1923,13 @@ const InvoiceListPage: React.FC = () => {
                                     })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.cargo?.cargo_no ||
-                                      invoice.cargoNo ||
-                                      invoice.orderNumber ||
-                                      "No Cargo"}
+                                    {(() => {
+                                       const cNo = invoice.cargo?.cargo_no || invoice.cargoNo || "";
+                                       if (cNo && !cNo.toUpperCase().startsWith("L")) {
+                                         return cNo;
+                                       }
+                                       return invoice.orderNumber || "No Cargo";
+                                     })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#495057]">
                                     {formatDate(invoice.invoiceDate)}
@@ -2959,13 +2973,11 @@ const InvoiceListPage: React.FC = () => {
               isOpen={showREModal}
               onClose={() => setShowREModal(false)}
               title={
-                selectedItem.cargo_id
-                  ? selectedItem.order_no
-                    ? `Reassign Order No: ${selectedItem.order_no}`
-                    : `Reassign Item ID: ${selectedItem.id}`
-                  : selectedItem.order_no
-                    ? `Assign Order No: ${selectedItem.order_no}`
-                    : `Assign Item ID: ${selectedItem.id}`
+                activeInvTab === "order_items" || selectedItem.item_id
+                  ? `Reassign Item ID: ${selectedItem.id} (Order: ${selectedItem.order_no || selectedItem.order_id})`
+                  : selectedItem.cargo_id
+                    ? `Reassign Order No: ${selectedItem.order_no || selectedItem.id}`
+                    : `Assign Order No: ${selectedItem.order_no || selectedItem.id}`
               }
             >
               <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">

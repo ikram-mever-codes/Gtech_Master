@@ -817,6 +817,7 @@ const CombinedInquiriesPageContent = () => {
         ...inquiryFilters,
         page: 1,
         limit: 10000,
+        ...(searchParams.get("filter") ? { filter: searchParams.get("filter") } : {}),
         ...(selectedCustomerId ? { customerId: selectedCustomerId } : {}),
       };
       const response = await getAllInquiries(filters);

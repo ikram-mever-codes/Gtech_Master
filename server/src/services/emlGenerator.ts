@@ -10,6 +10,13 @@ import { Customer } from "../models/customers";
 import { ContactPerson } from "../models/contact_person";
 import { generateGtechDocumentPdf } from "./gtechPdfGenerator";
 import { parseFlexibleNumber } from "../utils/decimal";
+import {
+  buildRechnungPdfOptions,
+  buildLieferscheinPdfOptions,
+  buildAuftragPdfOptions,
+  buildOfferPdfOptions,
+  buildRechnungKPdfOptions,
+} from "./pdfOptionsBuilder";
 
 interface ContactInfo {
   name: string;
@@ -166,102 +173,26 @@ export async function generateRechnungLieferscheinEml(
     `rechnung_${rechnung.invoice_number || rechnung.id}.pdf`
   );
 
-  const rechnungItems = (rechnung.items || []).map((it: any, idx: number) => ({
-    position: it.position || idx + 1,
-    artNr: it.itemNo || it.material || "—",
-    bezeichnung: it.item_name || it.description || "Item",
-    remarks: it.remark || it.notes || "-",
-    vatRate: it.taxRate ?? rechnung.tax_rate ?? 19,
-    quantity: Number(it.quantity || 1),
-    unitPrice: Number(it.unit_price_eur || it.price || 0),
-    lineTotal: Number(
-      it.total_price ||
-      it.lineTotal ||
-      Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0)
-    ),
-  }));
-
-  const contactPersonName =
-    rechnung.ansprechpartner ||
-    options?.user?.name ||
-    options?.user?.username ||
-    customerSnap.contactName ||
-    "";
-
-  const isLieferscheinConfirmed = lieferschein
-    ? lieferschein.status === "bestätigt" ||
-      lieferschein.status === "geliefert" ||
-      lieferschein.status === "delivered" ||
-      !!lieferschein.confirmed_at
-    : false;
-
-  await generateGtechDocumentPdf({
-    documentType: "Rechnung",
-    documentNumber: rechnung.invoice_number || String(rechnung.id),
-    documentTitle: rechnung.title || "",
-    customerSnapshot: customerSnap,
-    customerEntity: rechnung.customer,
-    deliveryAddress: rechnung.deliveryAddress,
-    metadataItems: [
-      ["Kontakt", contactPersonName],
-      ["Kunde", kundeCombined],
-      ["Datum", formatDateStr(rechnung.invoice_date || rechnung.date_created || rechnung.created_at)],
-    ],
-    kontaktName: contactPersonName,
-    kontaktEmail: options?.user?.email,
-    isDelivered: isLieferscheinConfirmed,
-    lineItems: rechnungItems,
-    showPrices: true,
-    shippingMethod: rechnung.shipping_method,
-    shippingCost: Number(rechnung.shipping_cost || 0),
-    discountPercentage: Number(rechnung.discount_percentage || 0),
-    discountAmount: Number(rechnung.discount_amount || 0),
-    subtotal: Number(rechnung.subtotal || 0),
-    taxAmount: Number(rechnung.tax_amount || 0),
-    totalAmount: Number(rechnung.total_amount || 0),
-    taxRate: Number(rechnung.tax_rate || 19),
-    currency: rechnung.currency || "EUR",
-    notes: rechnung.notes,
-    deliveryTime: rechnung.date_delivery,
-    deliveryTerms: rechnung.delivery_terms,
-    paymentTerms: rechnung.payment_terms ? (() => { const m = String(rechnung.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnung.payment_terms}`; })() : undefined,
-    paymentMethod: rechnung.payment_method,
+  const { options: rechnungPdfOpts } = await buildRechnungPdfOptions(rechnung, {
+    user: options?.user,
     outputFilePath: rechnungPdfPath,
   });
 
-  const lieferscheinNo = lieferschein?.delivery_note_number || `LS-${rechnung.invoice_number || rechnung.id}`;
+  await generateGtechDocumentPdf(rechnungPdfOpts);
+
+  const { options: lieferscheinPdfOpts, lieferscheinNo } = await buildLieferscheinPdfOptions(
+    rechnung,
+    lieferschein,
+    {
+      user: options?.user,
+      outputFilePath: undefined,
+    }
+  );
+
   const lieferscheinPdfPath = path.join(lieferscheineDir, `lieferschein_${lieferscheinNo}.pdf`);
+  lieferscheinPdfOpts.outputFilePath = lieferscheinPdfPath;
 
-  const lieferscheinItems = (rechnung.items || []).map((it: any, idx: number) => ({
-    position: it.position || idx + 1,
-    artNr: it.itemNo || it.material || "—",
-    bezeichnung: it.item_name || it.description || "Item",
-    remarks: it.remark || it.notes || "-",
-    quantity: Number(it.quantity || 1),
-  }));
-
-  await generateGtechDocumentPdf({
-    documentType: "Lieferschein",
-    documentNumber: lieferscheinNo,
-    documentTitle: (lieferschein as any)?.title || rechnung.title || "",
-    customerSnapshot: customerSnap,
-    customerEntity: rechnung.customer,
-    deliveryAddress: rechnung.deliveryAddress,
-    metadataItems: [
-      ["Kontakt", contactPersonName],
-      ["Kunde", kundeCombined],
-      ["Datum", formatDateStr(rechnung.invoice_date || rechnung.created_at)],
-      ["Lieferdatum", formatDateStr(rechnung.date_delivery || rechnung.delivery_date)],
-    ],
-    kontaktName: contactPersonName,
-    kontaktEmail: options?.user?.email,
-    lineItems: lieferscheinItems,
-    showPrices: false,
-    notes: rechnung.notes,
-    deliveryTime: rechnung.date_delivery,
-    outputFilePath: lieferscheinPdfPath,
-  });
-
+  await generateGtechDocumentPdf(lieferscheinPdfOpts);
   const rechnungPdfBuffer = fs.readFileSync(rechnungPdfPath);
   const lieferscheinPdfBuffer = fs.readFileSync(lieferscheinPdfPath);
 
@@ -487,64 +418,15 @@ export async function generateRechnungOnlyEml(
     `rechnung_${rechnung.invoice_number || rechnung.id}.pdf`
   );
 
-  const rechnungItems = (rechnung.items || []).map((it: any, idx: number) => ({
-    position: it.position || idx + 1,
-    artNr: it.itemNo || it.material || "—",
-    bezeichnung: it.item_name || it.description || "Item",
-    remarks: it.remark || it.notes || "-",
-    vatRate: it.taxRate ?? rechnung.tax_rate ?? 19,
-    quantity: Number(it.quantity || 1),
-    unitPrice: Number(it.unit_price_eur || it.price || 0),
-    lineTotal: Number(
-      it.total_price ||
-      it.lineTotal ||
-      Number(it.quantity || 1) * Number(it.unit_price_eur || it.price || 0)
-    ),
-  }));
-
-  const contactPersonName =
-    rechnung.ansprechpartner ||
-    options?.user?.name ||
-    options?.user?.username ||
-    customerSnap.contactName ||
-    "";
-
-  await generateGtechDocumentPdf({
-    documentType: "Rechnung",
-    documentNumber: rechnung.invoice_number || String(rechnung.id),
-    documentTitle: rechnung.title || "",
-    customerSnapshot: customerSnap,
-    customerEntity: rechnung.customer,
-    deliveryAddress: rechnung.deliveryAddress,
-    metadataItems: [
-      ["Kontakt", contactPersonName],
-      ["Kunde", kundeCombined],
-      ["Datum", formatDateStr(rechnung.invoice_date || rechnung.date_created || rechnung.created_at)],
-    ],
-    kontaktName: contactPersonName,
-    kontaktEmail: options?.user?.email,
-    lineItems: rechnungItems,
-    showPrices: true,
-    shippingMethod: rechnung.shipping_method,
-    shippingCost: Number(rechnung.shipping_cost || 0),
-    discountPercentage: Number(rechnung.discount_percentage || 0),
-    discountAmount: Number(rechnung.discount_amount || 0),
-    subtotal: Number(rechnung.subtotal || 0),
-    taxAmount: Number(rechnung.tax_amount || 0),
-    totalAmount: Number(rechnung.total_amount || 0),
-    taxRate: Number(rechnung.tax_rate || 19),
-    currency: rechnung.currency || "EUR",
-    notes: rechnung.notes,
-    deliveryTime: rechnung.date_delivery,
-    deliveryTerms: rechnung.delivery_terms,
-    paymentTerms: rechnung.payment_terms ? (() => { const m = String(rechnung.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnung.payment_terms}`; })() : undefined,
-    paymentMethod: rechnung.payment_method,
+  const { options: rechnungPdfOpts } = await buildRechnungPdfOptions(rechnung, {
+    user: options?.user,
     outputFilePath: rechnungPdfPath,
   });
 
+  await generateGtechDocumentPdf(rechnungPdfOpts);
+
   const rechnungPdfBuffer = fs.readFileSync(rechnungPdfPath);
   const rechnungBase64 = rechnungPdfBuffer.toString("base64");
-
   const primaryEmail = contactPersons[0]?.email || rechnung.customer?.email || "";
 
   let contactGreetingName = "";
@@ -625,7 +507,6 @@ export async function generateRechnungOnlyEml(
     contactPersons,
   };
 }
-
 
 export async function generateAuftragEml(
   auftragId: number | string,
@@ -755,84 +636,15 @@ export async function generateAuftragEml(
     `auftrag_${auftrag.order_no || auftrag.id}.pdf`
   );
 
-  const rawItems = (auftrag.orderItems || [])
-    .slice()
-    .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
-
-  const items = rawItems.map((it: any, idx: number) => {
-    const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
-    const unitPrice = Number(it.price || 0);
-    const lineTotal =
-      it.lineTotal !== undefined && it.lineTotal !== null
-        ? Number(it.lineTotal)
-        : qty * unitPrice;
-    return {
-      position: it.position || idx + 1,
-      artNr: it.itemNo || it.material || "—",
-      bezeichnung: it.itemName || it.description || "Item",
-      remarks: it.notes || it.remark_ex || "-",
-      vatRate:
-        it.taxRate !== undefined && it.taxRate !== null
-          ? Number(it.taxRate)
-          : defaultTaxRate,
-      quantity: qty,
-      unitPrice: unitPrice,
-      lineTotal: lineTotal,
-    };
-  });
-
-  const isDelivered =
-    String(auftrag.auftrag_status || auftrag.status || "").toLowerCase() === "delivered" ||
-    String(auftrag.auftrag_status || auftrag.status || "").toLowerCase() === "closed" ||
-    !!auftrag.real_delivery_date;
-
-  const effectiveDeliveryDate =
-    (isDelivered && auftrag.real_delivery_date) ||
-    auftrag.date_delivery ||
-    auftrag.delivery_terms;
-
-  await generateGtechDocumentPdf({
-    documentType: "Auftrag" as any,
-    documentNumber: auftrag.order_no,
-    documentTitle: auftrag.title || "",
-    customerSnapshot: customerSnap,
-    customerEntity: auftrag.customer,
-    deliveryAddress: auftrag.deliveryAddress,
-    metadataItems: [
-      ["Kontakt", contactPersonName],
-      ["Kunde", kundeCombined],
-      ["Datum", auftrag.date_created || auftrag.created_at],
-    ],
-    kontaktName: contactPersonName,
-    kontaktEmail: options?.user?.email,
-    isDelivered: isDelivered,
-    lineItems: items,
-    showPrices: true,
-    shippingMethod: auftrag.shipping_method,
-    shippingCost: Number(auftrag.shipping_cost || 0),
-    shippingQuantity: Number(auftrag.shipping_quantity || 1),
-    shippingTaxRate: defaultTaxRate,
-    discountPercentage: Number(auftrag.discount_percentage || 0),
-    discountAmount: Number(auftrag.discount_amount || 0),
-    subtotal: Number(auftrag.subtotal || 0),
-    taxAmount: Number(auftrag.tax_amount || 0),
-    totalAmount: Number(auftrag.total_amount || 0),
-    taxRate: defaultTaxRate,
-    currency: auftrag.currency || "EUR",
-    notes: auftrag.notes,
-    deliveryTime: effectiveDeliveryDate,
-    deliveryDate: effectiveDeliveryDate,
-    deliveryTerms: auftrag.delivery_terms,
-    paymentTerms: auftrag.payment_terms
-      ? (() => { const m = String(auftrag.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${auftrag.payment_terms}`; })()
-      : undefined,
-    paymentMethod: auftrag.payment_method,
+  const { options: auftragPdfOpts } = await buildAuftragPdfOptions(auftrag, {
+    user: options?.user,
     outputFilePath: auftragPdfPath,
   });
 
+  await generateGtechDocumentPdf(auftragPdfOpts);
+
   const auftragPdfBuffer = fs.readFileSync(auftragPdfPath);
   const auftragBase64 = auftragPdfBuffer.toString("base64");
-
   const primaryEmail = contactPersons[0]?.email || customerSnap.email || "";
 
   let contactGreetingName = "";
@@ -1007,10 +819,10 @@ export async function generateOfferEml(
   const customerSnap = offer.customerSnapshot || {};
   const customerCompName = String(
     (customerSnap as any).companyName ||
-      (customerSnap as any).company_name ||
-      (customerSnap as any).legalName ||
-      (customerSnap as any).displayName ||
-      ""
+    (customerSnap as any).company_name ||
+    (customerSnap as any).legalName ||
+    (customerSnap as any).displayName ||
+    ""
   ).trim();
   const customerNum = String((customerSnap as any).customerNumber || "").trim();
   let kundeCombined = "—";
@@ -1029,68 +841,12 @@ export async function generateOfferEml(
     `angebot_${offer.offerNumber || offer.id}.pdf`
   );
 
-  const rawItems = (offer.lineItems || [])
-    .slice()
-    .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
-
-  const items = rawItems.map((it: any, idx: number) => {
-    const qty = parseFlexibleNumber(it.baseQuantity) || 1;
-    const unitPrice = Number(it.basePrice || 0);
-    const lineTotal = Number(it.lineTotal || qty * unitPrice);
-    return {
-      position: it.position || idx + 1,
-      artNr: (it as any).sourceItemId || (it as any).material || "—",
-      bezeichnung: it.itemName || (it as any).description || "Item",
-      remarks: it.notes || "-",
-      vatRate: Number(it.taxRate ?? offer.taxRate ?? 19),
-      quantity: qty,
-      unitPrice: unitPrice,
-      lineTotal: lineTotal,
-    };
-  });
-
-  const formatDateStr = (dateVal: any): string => {
-    if (!dateVal) return "—";
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return String(dateVal);
-    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
-  };
-
-  await generateGtechDocumentPdf({
-    documentType: "Angebot" as any,
-    documentNumber: offer.offerNumber,
-    documentTitle: offer.title || "",
-    customerSnapshot: customerSnap,
-    deliveryAddress: offer.deliveryAddress,
-    metadataItems: [
-      ["Kontakt", contactPersonName],
-      ["Kunde", kundeCombined],
-      ["Datum", formatDateStr(offer.createdAt)],
-    ],
-    kontaktName: contactPersonName,
-    kontaktEmail: options?.user?.email,
-    lineItems: items,
-    showPrices: true,
-    shippingMethod: offer.shippingMethod,
-    shippingCost: Number(offer.shippingCost || 0),
-    shippingQuantity: Number(offer.shippingQuantity || 1),
-    shippingTaxRate: Number(offer.shippingTaxRate ?? offer.taxRate ?? 19),
-    discountPercentage: Number(offer.discountPercentage || 0),
-    discountAmount: Number(offer.discountAmount || 0),
-    subtotal: Number(offer.subtotal || 0),
-    taxAmount: Number(offer.taxAmount || 0),
-    totalAmount: Number(offer.totalAmount || 0),
-    taxRate: Number(offer.taxRate || 19),
-    currency: offer.currency || "EUR",
-    notes: offer.notes,
-    deliveryTime: offer.deliveryTime,
-    deliveryTerms: offer.deliveryTerms,
-    paymentTerms: offer.paymentDueDays
-      ? `Zahlungsziel: ${offer.paymentDueDays} Tage`
-      : undefined,
-    paymentMethod: offer.paymentMethod,
+  const { options: offerPdfOpts } = await buildOfferPdfOptions(offer, {
+    user: options?.user,
     outputFilePath: offerPdfPath,
   });
+
+  await generateGtechDocumentPdf(offerPdfOpts);
 
   const offerPdfBuffer = fs.readFileSync(offerPdfPath);
   const offerBase64 = offerPdfBuffer.toString("base64");
@@ -1291,79 +1047,12 @@ export async function generateRechnungKEml(
     `rechnung_k_${rechnungK.invoice_number || rechnungK.id}.pdf`
   );
 
-  const items = (rechnungK.items || []).map((it: any, idx: number) => {
-    const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
-    const unitPrice = Number(it.unit_price_eur || it.price || 0);
-    const lineTotal =
-      it.total_price !== undefined && it.total_price !== null
-        ? Number(it.total_price)
-        : it.lineTotal !== undefined && it.lineTotal !== null
-          ? Number(it.lineTotal)
-          : qty * unitPrice;
-    return {
-      position: it.position || idx + 1,
-      artNr: it.itemNo || it.material || "—",
-      bezeichnung: it.item_name || it.description || "Item",
-      remarks: it.notes || it.remark_ex || "-",
-      vatRate:
-        it.taxRate !== undefined && it.taxRate !== null
-          ? Number(it.taxRate)
-          : defaultTaxRate,
-      quantity: qty,
-      unitPrice: unitPrice,
-      lineTotal: lineTotal,
-    };
-  });
-
-  const formatDateStr = (dateVal: any): string => {
-    if (!dateVal) return "—";
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return String(dateVal);
-    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
-  };
-
-  await generateGtechDocumentPdf({
-    documentType: "RK" as any,
-    documentNumber: rechnungK.invoice_number,
-    documentTitle: rechnungK.title || "",
-    customerSnapshot: customerSnap,
-    customerEntity: rechnungK.customer,
-    deliveryAddress: rechnungK.deliveryAddress,
-    metadataItems: [
-      ["Kontakt", contactPersonName],
-      ["Kunde", kundeCombined],
-      [
-        "Datum",
-        formatDateStr(rechnungK.date_created || rechnungK.created_at || rechnungK.invoice_date),
-      ],
-    ],
-    kontaktName: contactPersonName,
-    kontaktEmail: options?.user?.email,
-    isDelivered: true,
-    lineItems: items,
-    showPrices: true,
-    shippingMethod: rechnungK.shipping_method,
-    shippingCost: Number(rechnungK.shipping_cost || 0),
-    shippingQuantity: Number(rechnungK.shipping_quantity || 1),
-    shippingTaxRate: defaultTaxRate,
-    discountPercentage: Number(rechnungK.discount_percentage || 0),
-    discountAmount: Number(rechnungK.discount_amount || 0),
-    subtotal: Number(rechnungK.subtotal || 0),
-    taxAmount: Number(rechnungK.tax_amount || 0),
-    totalAmount: Number(rechnungK.total_amount || 0),
-    taxRate: defaultTaxRate,
-    currency: rechnungK.currency || "EUR",
-    notes: rechnungK.notes,
-    deliveryTime: (rechnungK as any).delivery_date || rechnungK.date_delivery,
-    deliveryDate: (rechnungK as any).delivery_date || rechnungK.date_delivery,
-    deliveryTerms: rechnungK.delivery_terms,
-    paymentTerms: rechnungK.payment_terms
-      ? (() => { const m = String(rechnungK.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnungK.payment_terms}`; })()
-      : undefined,
-    paymentMethod: rechnungK.payment_method,
+  const { options: rkPdfOpts } = await buildRechnungKPdfOptions(rechnungK, {
+    user: options?.user,
     outputFilePath: rkPdfPath,
   });
 
+  await generateGtechDocumentPdf(rkPdfOpts);
   const rkPdfBuffer = fs.readFileSync(rkPdfPath);
   const rkBase64 = rkPdfBuffer.toString("base64");
 

@@ -387,6 +387,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
           : undefined,
         stage: filters.stage || undefined,
         tags: filters.tags || undefined,
+        filter: searchParams?.get("filter") || undefined,
         sortBy: "createdAt",
         sortOrder: "desc",
       };

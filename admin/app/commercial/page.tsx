@@ -802,33 +802,38 @@ const InvoiceListPage: React.FC = () => {
     if (!selectedItem || !targetCargoId) return;
     try {
       const cargoIdNum = Number(targetCargoId);
+      const isItem = !!selectedItem.item_id || !!selectedItem.parentOrder;
 
-      if (activeInvTab === "bestellung" || activeInvTab === "auftrag") {
-        await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)], false);
-        toast.success(
-          `Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`,
-        );
-        setShowREModal(false);
-        await tabData.refetchOrders();
-      } else {
+      if (isItem) {
         await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
-
         toast.success("Item reassigned successfully");
-        setShowREModal(false);
-
-        const invId = Object.keys(expandedStates).find((key) =>
-          expandedStates[key].data?.detailedItems?.some(
-            (it: any) => it.id === selectedItem.id,
-          ),
+      } else {
+        const orderId = selectedItem.order_id || selectedItem.id;
+        await assignOrdersToCargo(cargoIdNum, [Number(orderId)], false);
+        toast.success(
+          `Order ${selectedItem.order_no || orderId} assigned to Cargo ${targetCargoId}`,
         );
-        if (invId) {
-          setExpandedStates((prev: any) => {
-            const newState = { ...prev };
-            delete newState[invId];
-            return newState;
-          });
-        }
       }
+
+      setShowREModal(false);
+
+      const invId = Object.keys(expandedStates).find((key) =>
+        expandedStates[key].data?.detailedItems?.some(
+          (it: any) => it.id === selectedItem.id,
+        ),
+      );
+      if (invId) {
+        setExpandedStates((prev: any) => {
+          const newState = { ...prev };
+          delete newState[invId];
+          return newState;
+        });
+      }
+
+      await Promise.all([
+        tabData.refetchOrders(),
+        tabData.refetchLieferscheine(),
+      ]);
     } catch (err) {
       console.error(err);
       toast.error("Failed to assign/reassign cargo");
@@ -1090,24 +1095,6 @@ const InvoiceListPage: React.FC = () => {
         purchaseCurrency: it.purchaseCurrency || "EUR",
         position: it.position || 1,
       }));
-
-      // The filter above only keeps catalog-linked lines (sourceItemId
-      // present) — a Bestellung line needs a linkable Item to order from a
-      // supplier. If ALL of the Auftrag's lines are Freizeile/freetext, this
-      // comes out empty even though the Auftrag itself isn't. Catch that
-      // here with a clear message instead of letting the generic backend
-      // "Minimum 1 item" error confuse the user into thinking the Auftrag
-      // has no items at all.
-      // if (items.length === 0) {
-      //   const droppedCount = sourceLineItems.length;
-      //   toast.error(
-      //     droppedCount > 0
-      //       ? `This Auftrag has ${droppedCount} line item(s), but none are linked to a catalog item (sourceItemId). Freizeile/freetext lines can't be converted to a Bestellung — link them to an Item first.`
-      //       : "This Auftrag has no line items to convert.",
-      //     errorStyles,
-      //   );
-      //   return;
-      // }
 
       const res: any = await createBestellungFromAuftrag(auftrag.id, items);
       if (res?.success) {

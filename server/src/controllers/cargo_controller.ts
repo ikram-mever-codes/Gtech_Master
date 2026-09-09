@@ -77,15 +77,27 @@ export const generateInvoicesForOrders = async (
         .map((co) => co.order_id)
         .filter(Boolean);
 
-      const whereConditions: any[] = [{ cargo_id: cargo.id }];
+      let rawItems: OrderItem[] = [];
       if (orderIdsFromCargo.length > 0) {
-        whereConditions.push({ order_id: In(orderIdsFromCargo) });
+        rawItems = await orderItemRepo
+          .createQueryBuilder("oi")
+          .leftJoinAndSelect("oi.item", "item")
+          .leftJoinAndSelect("item.taric", "taric")
+          .leftJoinAndSelect("oi.order", "order")
+          .where(
+            "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIdsFromCargo)))",
+            { cargoId: cargo.id, orderIdsFromCargo },
+          )
+          .getMany();
+      } else {
+        rawItems = await orderItemRepo
+          .createQueryBuilder("oi")
+          .leftJoinAndSelect("oi.item", "item")
+          .leftJoinAndSelect("item.taric", "taric")
+          .leftJoinAndSelect("oi.order", "order")
+          .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
+          .getMany();
       }
-
-      const rawItems = await orderItemRepo.find({
-        where: whereConditions,
-        relations: ["item", "item.taric", "order"],
-      });
 
       const itemMap = new Map();
       rawItems.forEach((oi) => itemMap.set(oi.id, oi));
@@ -384,7 +396,7 @@ export const getCargoById = async (
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
         .where(
-          "(oi.cargo_id = :cargoId OR (oi.cargo_id IS NULL AND oi.order_id IN (:...orderIds)))",
+          "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
           { cargoId: cargo.id, orderIds },
         )
         .getMany();
@@ -701,7 +713,7 @@ export const assignOrdersToCargo = async (
           .createQueryBuilder()
           .update(OrderItem)
           .set({ cargo_id: cargo.id })
-          .where("order_id = :orderId", { orderId: order.id })
+          .where("order_id = :orderId AND (cargo_id IS NULL OR cargo_id = 0)", { orderId: order.id })
           .execute();
 
         order.cargo_id = cargo.id;
@@ -795,7 +807,7 @@ export const getCargoOrders = async (
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
         .where(
-          "(oi.cargo_id = :cargoId OR (oi.cargo_id IS NULL AND oi.order_id IN (:...orderIds)))",
+          "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
           { cargoId: Number(id), orderIds },
         )
         .getMany();

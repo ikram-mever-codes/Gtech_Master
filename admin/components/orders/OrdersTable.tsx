@@ -32,6 +32,7 @@ export type OrdersTableProps = {
   suppliers: any[];
   onAssignSupplier: (itemId: number | string, supplierId: number, baseItemId?: number | string) => Promise<void>;
   router: any;
+  cargos?: any[];
 };
 
 export default function OrdersTable({
@@ -54,6 +55,7 @@ export default function OrdersTable({
   suppliers,
   onAssignSupplier,
   router,
+  cargos = [],
 }: OrdersTableProps) {
   const [editingSupplierId, setEditingSupplierId] = useState<number | string | null>(null);
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string | number>>(new Set());
@@ -100,11 +102,7 @@ export default function OrdersTable({
       header: "Item name",
       width: "140px",
       render: (row) => {
-        const text = row.item_name ||
-          row.itemName ||
-          row.item?.item_name ||
-          row.item?.name ||
-          "Unknown";
+        const text = row.item_name || row.itemName || row.item?.item_name || row.item?.name || "Unknown";
         return (
           <div
             className="line-clamp-2 max-w-[140px] leading-tight break-words"
@@ -243,14 +241,35 @@ export default function OrdersTable({
         );
       },
     },
+    {
+      header: "Customer",
+      width: "100px",
+      render: (row) => {
+        const name =
+          row.customer?.companyName ||
+          row.customer?.name ||
+          row.customer_name ||
+          row.order?.customer?.companyName ||
+          row.order?.customer?.name ||
+          row.order?.customer_name ||
+          row.parentOrder?.customer?.companyName ||
+          row.parentOrder?.customer?.name ||
+          "-";
+        return (
+          <div className="truncate max-w-[100px] font-medium text-xs text-gray-700" title={name}>
+            {name}
+          </div>
+        );
+      },
+    },
     { header: "Order No.", width: "65px", render: (row) => row.order_no },
     {
-      header: "Remarks",
-      width: "90px",
+      header: "Purpose / Zweck",
+      width: "95px",
       render: (row) => {
-        const text = row.remarks_cn || row.remark_de || "-";
+        const text = row.remarks_cn || row.remark_de || row.comment || row.order?.comment || row.parentOrder?.comment || "-";
         return (
-          <div className="line-clamp-2 max-w-[90px]" title={text}>
+          <div className="line-clamp-2 max-w-[95px]" title={text}>
             {text}
           </div>
         );
@@ -264,8 +283,20 @@ export default function OrdersTable({
     },
     {
       header: "Cargo",
-      width: "35px",
-      render: (row) => row.cargo_id || "-",
+      width: "80px",
+      render: (row) => {
+        const cargoId = row.cargo_id;
+        const cargoObj = row.cargo || cargos?.find((c: any) => String(c.id) === String(cargoId));
+        const cNo = cargoObj?.cargo_no || (cargoId && cargoId !== 0 && cargoId !== "0" && cargoId !== "-" && cargoId !== "null" ? String(cargoId) : null);
+        if (!cNo) return "-";
+        const cType = cargoObj?.cargo_type?.cargo_type || cargoObj?.cargo_type || "";
+        return (
+          <div className="flex flex-col text-[11px] leading-tight text-center">
+            <span className="font-semibold text-gray-800">{cNo}</span>
+            {cType && <span className="text-[9px] text-gray-500">{cType}</span>}
+          </div>
+        );
+      },
       align: "center",
     },
     {
@@ -437,30 +468,46 @@ export default function OrdersTable({
       align: "center",
     },
     {
-      header: "Catgy",
-      width: "65px",
-      render: (row) => getCategoryName(row.category_id),
-      align: "center",
+      header: "Customer",
+      width: "110px",
+      render: (row) => {
+        const name =
+          row.customer?.companyName ||
+          row.customer?.name ||
+          row.customer_name ||
+          (row.customer_id ? `Customer #${row.customer_id}` : "-");
+        return (
+          <div className="truncate max-w-[110px] font-medium text-xs text-gray-700" title={name}>
+            {name}
+          </div>
+        );
+      },
+      align: "left",
     },
     {
       header: "Cargo",
-      width: "55px",
-      render: (row) =>
-        row.cargo_id &&
-          row.cargo_id !== 0 &&
-          row.cargo_id !== "0" &&
-          row.cargo_id !== "-" &&
-          row.cargo_id !== "null"
-          ? row.cargo_id
-          : "-",
+      width: "100px",
+      render: (row) => {
+        const cargoId = row.cargo_id;
+        const cargoObj = row.cargo || cargos?.find((c: any) => String(c.id) === String(cargoId));
+        const cNo = cargoObj?.cargo_no || (cargoId && cargoId !== 0 && cargoId !== "0" && cargoId !== "-" && cargoId !== "null" ? String(cargoId) : null);
+        if (!cNo) return "-";
+        const cType = cargoObj?.cargo_type?.cargo_type || cargoObj?.cargo_type || "";
+        return (
+          <div className="flex flex-col text-[11px] leading-tight text-center">
+            <span className="font-semibold text-gray-800">{cNo}</span>
+            {cType && <span className="text-[9px] text-gray-500">{cType}</span>}
+          </div>
+        );
+      },
       align: "center",
     },
     {
-      header: "Comment",
-      width: "160px",
+      header: "Purpose / Zweck",
+      width: "150px",
       render: (row) => (
-        <div className="line-clamp-2 max-w-[160px] leading-tight" title={row.comment}>
-          {row.comment || "-"}
+        <div className="line-clamp-2 max-w-[150px] leading-tight" title={row.comment || row.purpose || "-"}>
+          {row.comment || row.purpose || "-"}
         </div>
       ),
       align: "left",
@@ -468,7 +515,7 @@ export default function OrdersTable({
     {
       header: "Created",
       width: "65px",
-      render: (row) => (row.created_at ? formatDate(row.created_at) : "-"),
+      render: (row) => (row.created_at ? formatDate(row.created_at, true) : "-"),
       align: "center",
     },
     {
@@ -476,7 +523,7 @@ export default function OrdersTable({
       width: "65px",
       render: (row) =>
         row.date_emailed && row.date_emailed !== "-"
-          ? formatDate(row.date_emailed)
+          ? formatDate(row.date_emailed, true)
           : "-",
       align: "center",
     },
@@ -485,7 +532,7 @@ export default function OrdersTable({
       width: "65px",
       render: (row) =>
         row.date_delivery && row.date_delivery !== "-"
-          ? formatDate(row.date_delivery)
+          ? formatDate(row.date_delivery, true)
           : "-",
       align: "center",
     },
