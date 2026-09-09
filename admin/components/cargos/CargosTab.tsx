@@ -915,7 +915,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                                             <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Assigned Orders ({details.orders.length})</h4>
                                                                         </div>
                                                                         <div className="divide-y divide-gray-100 max-h-[250px] overflow-y-auto">
-                                                                            {details.orders.map((o: any) => (
+                                                                            {details.orders.filter((o: any) => o != null).map((o: any) => (
                                                                                 <div key={o.id} className="p-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                                                                     <div>
                                                                                         <div className="text-sm font-semibold text-gray-800">{o.order_no}</div>
@@ -943,7 +943,7 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                                                     </tr>
                                                                                 </thead>
                                                                                 <tbody className="divide-y divide-gray-100">
-                                                                                    {details.orderItems.map((oi: any) => (
+                                                                                    {details.orderItems.filter((oi: any) => oi != null).map((oi: any) => (
                                                                                         <tr key={oi.id} className="hover:bg-gray-50 transition-colors">
                                                                                             <td className="px-3 py-2 font-medium text-gray-800 max-w-[180px] truncate">{oi.item?.item_name || "Unknown"}</td>
                                                                                             <td className="px-3 py-2 text-gray-500">
