@@ -1800,6 +1800,7 @@ const InvoiceListPage: React.FC = () => {
               onAssignSupplier={handleAssignSupplier}
               onSplit={handleOpenSplitModal}
               router={router}
+              cargos={cargos}
             />
           </div>
         )}

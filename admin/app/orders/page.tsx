@@ -2828,6 +2828,7 @@ const OrderPage: React.FC = () => {
                   setShowSPModal(true);
                 }}
                 router={router}
+                cargos={cargos}
               />
             </>
           )}
