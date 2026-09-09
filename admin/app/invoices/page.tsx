@@ -698,16 +698,20 @@ const InvoiceListPage: React.FC = () => {
     if (!selectedItem || !targetCargoId) return;
     try {
       const cargoIdNum = Number(targetCargoId);
-      const isOrder = !!selectedItem.order_no || activeInvTab === "orders";
+      const isItem =
+        activeInvTab === "order_items" ||
+        !!selectedItem.item_id ||
+        !!selectedItem.parentOrder;
 
-      if (isOrder) {
-        await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)], false);
-        toast.success(
-          `Order ${selectedItem.order_no || selectedItem.id} assigned to Cargo ${targetCargoId}`,
-        );
-      } else {
+      if (isItem) {
         await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
         toast.success("Item reassigned successfully");
+      } else {
+        const orderId = selectedItem.order_id || selectedItem.id;
+        await assignOrdersToCargo(cargoIdNum, [Number(orderId)], false);
+        toast.success(
+          `Order ${selectedItem.order_no || orderId} assigned to Cargo ${targetCargoId}`,
+        );
       }
 
       setShowREModal(false);
@@ -2958,13 +2962,11 @@ const InvoiceListPage: React.FC = () => {
               isOpen={showREModal}
               onClose={() => setShowREModal(false)}
               title={
-                selectedItem.cargo_id
-                  ? selectedItem.order_no
-                    ? `Reassign Order No: ${selectedItem.order_no}`
-                    : `Reassign Item ID: ${selectedItem.id}`
-                  : selectedItem.order_no
-                    ? `Assign Order No: ${selectedItem.order_no}`
-                    : `Assign Item ID: ${selectedItem.id}`
+                activeInvTab === "order_items" || selectedItem.item_id
+                  ? `Reassign Item ID: ${selectedItem.id} (Order: ${selectedItem.order_no || selectedItem.order_id})`
+                  : selectedItem.cargo_id
+                    ? `Reassign Order No: ${selectedItem.order_no || selectedItem.id}`
+                    : `Assign Order No: ${selectedItem.order_no || selectedItem.id}`
               }
             >
               <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
