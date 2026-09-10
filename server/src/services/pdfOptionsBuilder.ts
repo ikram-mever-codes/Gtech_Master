@@ -117,8 +117,18 @@ export async function buildRechnungPdfOptions(
     rechnung.invoice_date || rechnung.date_created || rechnung.created_at,
   );
   const resolvedDeliveryDate = formatDateStr(
-    rechnung.date_delivery || rechnung.delivery_date,
+    rechnung.date_delivery || rechnung.delivery_date || auftrag?.date_delivery,
   );
+  const rawConfirmedDate =
+    rechnung.date_delivery_confirmed ||
+    rechnung.real_delivery_date ||
+    linkedLieferschein?.date_delivery_confirmed ||
+    (linkedLieferschein as any)?.real_delivery_date ||
+    (isLieferscheinConfirmed ? linkedLieferschein?.confirmed_at || linkedLieferschein?.delivery_date : undefined) ||
+    auftrag?.real_delivery_date ||
+    auftrag?.date_delivery_confirmed;
+
+  const resolvedDeliveryDateConfirmed = rawConfirmedDate ? formatDateStr(rawConfirmedDate) : undefined;
 
   const defaultTaxRate = Number(rechnung.tax_rate ?? 19);
   const subtotal = Number(rechnung.subtotal || 0);
@@ -197,6 +207,7 @@ export async function buildRechnungPdfOptions(
     notes: rechnung.notes,
     deliveryTime: resolvedDeliveryDate,
     deliveryDate: resolvedDeliveryDate,
+    deliveryDateConfirmed: resolvedDeliveryDateConfirmed,
     deliveryTerms: rechnung.delivery_terms || auftrag?.delivery_terms,
     paymentTerms: paymentTermsFormatted,
     paymentMethod: rechnung.payment_method || auftrag?.payment_method,
@@ -494,9 +505,11 @@ export async function buildAuftragPdfOptions(
     !!auftrag.real_delivery_date;
 
   const effectiveDeliveryDate =
-    (isDelivered && auftrag.real_delivery_date) ||
     auftrag.date_delivery ||
     auftrag.delivery_terms;
+
+  const resolvedDeliveryDateConfirmed =
+    auftrag.real_delivery_date || auftrag.date_delivery_confirmed;
 
   const paymentTermsFormatted = auftrag.payment_terms
     ? (() => {
@@ -552,6 +565,7 @@ export async function buildAuftragPdfOptions(
     notes: auftrag.notes,
     deliveryTime: effectiveDeliveryDate,
     deliveryDate: effectiveDeliveryDate,
+    deliveryDateConfirmed: resolvedDeliveryDateConfirmed,
     deliveryTerms: auftrag.delivery_terms,
     paymentTerms: paymentTermsFormatted,
     paymentMethod: auftrag.payment_method,

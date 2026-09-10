@@ -211,6 +211,9 @@ export class CustomerOrder {
   @Column({ type: "date", nullable: true })
   real_delivery_date?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  date_delivery_confirmed?: string;
+
   @Column({ type: "boolean", default: false })
   is_weiterversand!: boolean;
 

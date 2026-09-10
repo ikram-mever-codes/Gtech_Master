@@ -233,6 +233,7 @@ export interface PdfDocumentOptions {
   notes?: string;
   deliveryTime?: string | Date;
   deliveryDate?: string | Date;
+  deliveryDateConfirmed?: string | Date;
   isDelivered?: boolean;
   deliveryTerms?: string;
   paymentTerms?: string;
@@ -1218,7 +1219,7 @@ export async function generateGtechDocumentPdf(
     const dayMatch = rawPayTerms.match(/(\d+)/);
     if (dayMatch) {
       const dueDays = parseInt(dayMatch[1], 10);
-      const baseDateRaw = opts.invoiceDate || opts.deliveryDate || opts.deliveryTime;
+      const baseDateRaw = opts.deliveryDateConfirmed || opts.invoiceDate || opts.deliveryDate || opts.deliveryTime;
       if (baseDateRaw) {
         let baseDate: Date;
         const rawStr = String(baseDateRaw).trim();
@@ -1242,40 +1243,46 @@ export async function generateGtechDocumentPdf(
     }
   }
   const deliveryInput = opts.deliveryTime || opts.deliveryDate;
-  if (deliveryInput) {
-    const rawDelivery = String(deliveryInput).trim();
-    if (rawDelivery) {
-      const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawDelivery);
-      const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawDelivery);
-      const parsed = new Date(rawDelivery);
-      const isValidDate =
-        (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
-        /\d{4}/.test(rawDelivery);
+  const confirmedDeliveryInput = opts.deliveryDateConfirmed;
 
-      const hasLieferdatumInMetadata = (opts.metadataItems || []).some(([k]) =>
-        k.toLowerCase().includes("lieferdatum")
-      );
+  const hasLieferdatumInMetadata = (opts.metadataItems || []).some(([k]) =>
+    k.toLowerCase().includes("lieferdatum")
+  );
 
-      if (!hasLieferdatumInMetadata || !isValidDate) {
+  if (!hasLieferdatumInMetadata && (deliveryInput || confirmedDeliveryInput)) {
+    if (deliveryInput) {
+      const rawDelivery = String(deliveryInput).trim();
+      if (rawDelivery) {
+        const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawDelivery);
+        const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawDelivery);
+        const parsed = new Date(rawDelivery);
+        const isValidDate =
+          (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
+          /\d{4}/.test(rawDelivery);
+
         if (isValidDate) {
-          const docType = String(opts.documentType || "");
-          const isOffer = docType === "Angebot";
-          const isDelivered = opts.isDelivered === true;
-          const isAuftrag =
-            docType === "Auftrag" || docType === "Auftragsbestätigung";
-          const isRechnung = docType === "Rechnung";
-
-          let label = "Lieferdatum:";
-          if (isOffer || ((isAuftrag || isRechnung) && !isDelivered)) {
-            label = "Lieferdatum: voraussichtlich";
-          } else if (isRechnung && isDelivered) {
-            label = "Lieferdatum: bestätigt";
-          }
-          doc.text(`${label} ${formatDate(rawDelivery)}`, LEFT_X, yPos);
+          doc.text(`Voraussichtliches Lieferdatum: ${formatDate(rawDelivery)}`, LEFT_X, yPos);
         } else {
           doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
         }
         yPos += 14;
+      }
+    }
+
+    if (confirmedDeliveryInput) {
+      const rawConfirmed = String(confirmedDeliveryInput).trim();
+      if (rawConfirmed) {
+        const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawConfirmed);
+        const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawConfirmed);
+        const parsed = new Date(rawConfirmed);
+        const isValidDate =
+          (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
+          /\d{4}/.test(rawConfirmed);
+
+        if (isValidDate) {
+          doc.text(`Bestätigtes Lieferdatum: ${formatDate(rawConfirmed)}`, LEFT_X, yPos);
+          yPos += 14;
+        }
       }
     }
   }
