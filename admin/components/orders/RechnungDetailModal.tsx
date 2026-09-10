@@ -1239,8 +1239,20 @@ export default function RechnungDetailModal({
                 }
               />{" "}
               <Field
-                label="Delivery Date"
-                value={deliveryDate ? formatDate(deliveryDate) : ""}
+                label="Lieferdatum vorläufig"
+                value={
+                  data.date_delivery || data.delivery_date
+                    ? formatDate(data.date_delivery || data.delivery_date)
+                    : "—"
+                }
+              />
+              <Field
+                label="Lieferdatum bestätigt"
+                value={
+                  data.date_delivery_confirmed || data.real_delivery_date
+                    ? formatDate(data.date_delivery_confirmed || data.real_delivery_date)
+                    : "—"
+                }
               />
               <Field
                 label="Payment method"
