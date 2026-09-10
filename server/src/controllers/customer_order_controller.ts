@@ -1,4 +1,5 @@
 import { In, IsNull } from "typeorm";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import {
@@ -2125,11 +2126,7 @@ export const downloadCustomerOrderPdf = async (
       (order as any).items?.[0]?.item_name ||
       (order as any).items?.[0]?.itemName ||
       "";
-    const cleanTitle = String(rawTitle || "")
-      .trim()
-      .replace(/[^\w-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
     const docNo = String(order.order_no || order.id || "order")
       .trim()
       .replace(/[\s_]+/g, "_");

@@ -4,6 +4,7 @@ import PDFDocument from "pdfkit";
 import bwipjs from "bwip-js";
 import path from "path";
 import ErrorHandler from "../utils/errorHandler";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
@@ -1888,10 +1889,7 @@ export const generateCommercialInvoicePDF = async (
 
     const safeInvoiceNo = (data.invoiceNo || "").trim() || "CI";
     const safeCargoNo = (data.cargoNo || "").trim() || "NoCargo";
-    const filename = `${safeInvoiceNo}_${safeCargoNo}.pdf`.replace(
-      /[/\\?%*:|"<>\s]/g,
-      "_",
-    );
+    const filename = sanitizeFilename(`${safeInvoiceNo}_${safeCargoNo}.pdf`);
 
     const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");
