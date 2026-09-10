@@ -171,9 +171,9 @@ async function getLinkedDocumentsForAuftrag(
   const [offer, rechnungen, rechnungenK, bestellungen] = await Promise.all([
     safeOfferId
       ? offerRepo.findOne({
-          where: { id: safeOfferId },
-          select: ["id", "offerNumber", "createdAt"],
-        })
+        where: { id: safeOfferId },
+        select: ["id", "offerNumber", "createdAt"],
+      })
       : Promise.resolve(null),
     rechnungRepo.find({
       where: { auftrag_id: auftragId },
@@ -231,9 +231,9 @@ async function getLinkedDocumentsForAuftraege(
   const [offers, rechnungen, rechnungenK, bestellungen] = await Promise.all([
     offerIds.length
       ? offerRepo.find({
-          where: { id: In(offerIds) },
-          select: ["id", "offerNumber", "createdAt"],
-        })
+        where: { id: In(offerIds) },
+        select: ["id", "offerNumber", "createdAt"],
+      })
       : Promise.resolve([]),
     rechnungRepo.find({
       where: { auftrag_id: In(auftragIds) },
@@ -536,12 +536,12 @@ async function resolveAuftragTaxProfile(
       profile: frozenMatch
         ? mapTaxProfile(frozenMatch)
         : {
-            id: null,
-            name: "Frozen",
-            taxCase: undefined,
-            taxRate: Number(order.tax_rate) || 19,
-            taxCode: undefined,
-          },
+          id: null,
+          name: "Frozen",
+          taxCase: undefined,
+          taxRate: Number(order.tax_rate) || 19,
+          taxCode: undefined,
+        },
       changed: false,
     };
   }
@@ -619,12 +619,12 @@ export const getAllCustomerOrders = async (
           frozenMatch
             ? mapTaxProfile(frozenMatch)
             : {
-                id: null,
-                name: "Frozen",
-                taxCase: undefined,
-                taxRate: Number(order.tax_rate) || 19,
-                taxCode: undefined,
-              },
+              id: null,
+              name: "Frozen",
+              taxCase: undefined,
+              taxRate: Number(order.tax_rate) || 19,
+              taxCode: undefined,
+            },
         );
         continue;
       }
@@ -1108,8 +1108,8 @@ export const createAuftragFromOffer = async (
         photo,
         specification: lineItem?.specification || "",
         description: lineItem?.description || "",
-        weight: lineItem?.weight || undefined,
-        extraWeight: lineItem?.extraWeight || undefined,
+        weight: lineItem?.weight ?? src?.weight ?? undefined,
+        extraWeight: lineItem?.extraWeight ?? src?.extraWeight ?? undefined,
         quantity: qty,
         price: price,
         taxRate:
@@ -1281,6 +1281,25 @@ export const getCustomerOrderById = async (
         order.total_amount = refreshed.total_amount;
         order.tax_rate = refreshed.tax_rate;
       }
+    }
+
+    const itemsMissingWeight = (order.orderItems || []).filter(
+      (li: any) => (li.weight === null || li.weight === undefined) && li.sourceItemId,
+    );
+    if (itemsMissingWeight.length > 0) {
+      const missingIds = Array.from(
+        new Set(itemsMissingWeight.map((li: any) => Number(li.sourceItemId)).filter(Boolean)),
+      );
+      const sourceItems = await AppDataSource.getRepository(Item).find({
+        where: { id: In(missingIds) },
+      });
+      const weightById = new Map(sourceItems.map((it: any) => [String(it.id), it.weight]));
+      (order.orderItems as any[]).forEach((li: any) => {
+        if ((li.weight === null || li.weight === undefined) && li.sourceItemId) {
+          const w = weightById.get(String(li.sourceItemId));
+          if (w !== undefined && w !== null) li.weight = w;
+        }
+      });
     }
 
     res.json({
@@ -1957,7 +1976,7 @@ export const downloadCustomerOrderPdf = async (
       order.tax_rate !== undefined && order.tax_rate !== null
         ? Number(order.tax_rate)
         : order.customer?.defaultTaxProfile?.tax_rate !== undefined &&
-            order.customer?.defaultTaxProfile?.tax_rate !== null
+          order.customer?.defaultTaxProfile?.tax_rate !== null
           ? Number(order.customer.defaultTaxProfile.tax_rate)
           : 19;
 
