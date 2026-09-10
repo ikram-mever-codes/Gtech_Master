@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { buildRechnungPdfOptions } from "../services/pdfOptionsBuilder";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import {
   generateRechnungLieferscheinEml,
   generateRechnungOnlyEml,
@@ -1578,11 +1579,7 @@ export const downloadRechnungPdf = async (
       (rawItems?.[0] as any)?.item_name ||
       (rawItems?.[0] as any)?.description ||
       "";
-    const cleanTitle = String(rawTitle || "")
-      .trim()
-      .replace(/[^\w-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
     const docNo = String(rechnung.invoice_number || rechnung.id || "rechnung")
       .trim()
       .replace(/[\s_]+/g, "_");

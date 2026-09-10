@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { generateRechnungKEml } from "../services/emlGenerator";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
 import { TaxProfile } from "../models/tax_profile";
@@ -902,11 +903,7 @@ export const downloadRechnungKPdf = async (
       (rawItems?.[0] as any)?.item_name ||
       (rawItems?.[0] as any)?.description ||
       "";
-    const cleanTitle = String(rawTitle || "")
-      .trim()
-      .replace(/[^\w-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
     const docNo = String(rechnungK.invoice_number || rechnungK.id || "rk")
       .trim()
       .replace(/[\s_]+/g, "_");

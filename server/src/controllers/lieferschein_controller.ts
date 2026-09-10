@@ -9,6 +9,7 @@ import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { NumberSequenceService } from "../services/number_sequence_service";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 
 export const createLieferscheinFromRechnung = async (
   rechnung: Rechnung,
@@ -634,11 +635,7 @@ export const downloadLieferscheinPdf = async (
       (lieferschein as any)?.items?.[0]?.item_name ||
       (rechnung as any)?.items?.[0]?.item_name ||
       "";
-    const cleanTitle = String(rawTitle || "")
-      .trim()
-      .replace(/[^\w-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
     const docNo = String(
       lieferschein.delivery_note_number || lieferschein.id || "lieferschein",
     )
