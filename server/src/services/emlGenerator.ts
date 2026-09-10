@@ -10,6 +10,7 @@ import { Customer } from "../models/customers";
 import { ContactPerson } from "../models/contact_person";
 import { generateGtechDocumentPdf } from "./gtechPdfGenerator";
 import { parseFlexibleNumber } from "../utils/decimal";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import {
   buildRechnungPdfOptions,
   buildLieferscheinPdfOptions,
@@ -191,8 +192,8 @@ export async function generateRechnungLieferscheinEml(
 
   const lieferscheinPdfPath = path.join(lieferscheineDir, `lieferschein_${lieferscheinNo}.pdf`);
   lieferscheinPdfOpts.outputFilePath = lieferscheinPdfPath;
-
   await generateGtechDocumentPdf(lieferscheinPdfOpts);
+
   const rechnungPdfBuffer = fs.readFileSync(rechnungPdfPath);
   const lieferscheinPdfBuffer = fs.readFileSync(lieferscheinPdfPath);
 
@@ -222,11 +223,7 @@ export async function generateRechnungLieferscheinEml(
     (rechnung as any).title ||
     (rechnung as any).items?.[0]?.item_name ||
     "";
-  const cleanTitle = String(rawTitle || "")
-    .trim()
-    .replace(/[^\w-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
   const rechnungDocNo = String(rechnung.invoice_number || rechnung.id || "rechnung").trim().replace(/[\s_]+/g, "_");
   const lieferscheinDocNo = String(lieferscheinNo || "lieferschein").trim().replace(/[\s_]+/g, "_");
 
@@ -446,11 +443,7 @@ export async function generateRechnungOnlyEml(
     : `Hallo guten Tag,`;
 
   const rawTitle = auftragTitle || (rechnung as any).title || "";
-  const cleanTitle = String(rawTitle || "")
-    .trim()
-    .replace(/[^\w-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
   const rechnungDocNo = String(rechnung.invoice_number || rechnung.id || "rechnung").trim().replace(/[\s_]+/g, "_");
 
   const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";
@@ -669,11 +662,7 @@ export async function generateAuftragEml(
     (auftrag as any)?.order_items?.[0]?.item_name ||
     (auftrag as any)?.items?.[0]?.item_name ||
     "";
-  const cleanTitle = String(rawTitle || "")
-    .trim()
-    .replace(/[^\w-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
   const docNo = String(auftrag.order_no || auftrag.id || "order").trim().replace(/[\s_]+/g, "_");
 
   const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";
@@ -870,11 +859,7 @@ export async function generateOfferEml(
     : `Hallo guten Tag,`;
 
   const rawTitle = offerTitle || "";
-  const cleanTitle = String(rawTitle || "")
-    .trim()
-    .replace(/[^\w-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
   const docNo = String(offer.offerNumber || offer.id || "angebot").trim().replace(/[\s_]+/g, "_");
 
   const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";
@@ -1075,11 +1060,7 @@ export async function generateRechnungKEml(
     : `Hallo guten Tag,`;
 
   const rawTitle = rkTitle || "";
-  const cleanTitle = String(rawTitle || "")
-    .trim()
-    .replace(/[^\w-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
   const docNo = String(rechnungK.invoice_number || rechnungK.id || "rechnungskorrektur").trim().replace(/[\s_]+/g, "_");
 
   const subjectTitle = cleanTitle ? cleanTitle.replace(/_/g, " ") : "";

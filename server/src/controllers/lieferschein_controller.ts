@@ -9,6 +9,7 @@ import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { NumberSequenceService } from "../services/number_sequence_service";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 
 export const createLieferscheinFromRechnung = async (
   rechnung: Rechnung,
@@ -379,11 +380,48 @@ export const confirmLieferscheinDelivery = async (
       (req as any).user?.email ||
       "Admin";
 
-    lieferschein.delivery_date = confirmedDate;
+    const confirmedDateStr = confirmedDate.toISOString().split("T")[0];
+    lieferschein.date_delivery_confirmed = confirmedDateStr;
     lieferschein.status = "bestätigt";
     lieferschein.confirmed_at = new Date();
     lieferschein.confirmed_by = confirmedBy;
     await lieferscheinRepo.save(lieferschein);
+
+    if (lieferschein.rechnung_id) {
+      try {
+        const rechnungRepo = AppDataSource.getRepository(Rechnung);
+        const rechnung = await rechnungRepo.findOne({ where: { id: lieferschein.rechnung_id } });
+        if (rechnung) {
+          rechnung.date_delivery_confirmed = confirmedDateStr;
+          rechnung.real_delivery_date = confirmedDateStr;
+          await rechnungRepo.save(rechnung);
+
+          if (rechnung.auftrag_id) {
+            const auftragRepo = AppDataSource.getRepository(CustomerOrder);
+            const auftrag = await auftragRepo.findOne({ where: { id: rechnung.auftrag_id } });
+            if (auftrag) {
+              auftrag.real_delivery_date = confirmedDateStr;
+              auftrag.date_delivery_confirmed = confirmedDateStr;
+              await auftragRepo.save(auftrag);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error updating confirmed delivery date on linked Rechnung/Auftrag:", err);
+      }
+    } else if (lieferschein.auftrag_id) {
+      try {
+        const auftragRepo = AppDataSource.getRepository(CustomerOrder);
+        const auftrag = await auftragRepo.findOne({ where: { id: lieferschein.auftrag_id } });
+        if (auftrag) {
+          auftrag.real_delivery_date = confirmedDateStr;
+          auftrag.date_delivery_confirmed = confirmedDateStr;
+          await auftragRepo.save(auftrag);
+        }
+      } catch (err) {
+        console.error("Error updating confirmed delivery date on linked Auftrag:", err);
+      }
+    }
 
     res.json({
       success: true,
@@ -634,11 +672,7 @@ export const downloadLieferscheinPdf = async (
       (lieferschein as any)?.items?.[0]?.item_name ||
       (rechnung as any)?.items?.[0]?.item_name ||
       "";
-    const cleanTitle = String(rawTitle || "")
-      .trim()
-      .replace(/[^\w-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
     const docNo = String(
       lieferschein.delivery_note_number || lieferschein.id || "lieferschein",
     )

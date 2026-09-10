@@ -4,6 +4,7 @@ import PDFDocument from "pdfkit";
 import bwipjs from "bwip-js";
 import path from "path";
 import ErrorHandler from "../utils/errorHandler";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
@@ -1140,7 +1141,7 @@ export const generateLabelPDF = async (
       /[/\\?%*:|"<>\s]/g,
       "-",
     );
-    const qtyLabel = item.qty_label || 0;
+    const qtyLabel = item.qty_label ?? item.qty ?? 0;
 
     const now = new Date();
     const year = now.getFullYear();
@@ -1196,7 +1197,7 @@ export const generateLabelPDF = async (
     doc.text(qtyOrderText, qtyOrderX, row1ValueY + 1.5);
 
     doc.font("Helvetica-Bold").fontSize(10);
-    doc.text(`${item.qty_label || 0}`, qtyLabelColStart, row1ValueY);
+    doc.text(`${qtyLabel}`, qtyLabelColStart, row1ValueY);
 
     try {
       doc.image(logoSource, colLogo, 14, { width: 40 });
@@ -1888,10 +1889,7 @@ export const generateCommercialInvoicePDF = async (
 
     const safeInvoiceNo = (data.invoiceNo || "").trim() || "CI";
     const safeCargoNo = (data.cargoNo || "").trim() || "NoCargo";
-    const filename = `${safeInvoiceNo}_${safeCargoNo}.pdf`.replace(
-      /[/\\?%*:|"<>\s]/g,
-      "_",
-    );
+    const filename = sanitizeFilename(`${safeInvoiceNo}_${safeCargoNo}.pdf`);
 
     const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import CustomModal from "@/components/UI/CustomModal";
 import { toast } from "react-hot-toast";
 import { createBestellungFromAuftrag } from "@/api/transfer_orders";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight, Info } from "lucide-react";
 
 interface ItemRow {
   sourceLineItemId: string;
@@ -13,7 +13,6 @@ interface ItemRow {
   material?: string;
   specification?: string;
   description?: string;
-  price: number;
   max_qty: number;
   qty: number;
   selected: boolean;
@@ -48,7 +47,6 @@ export default function AuftragToBestellungModal({
           material: it.material || undefined,
           specification: it.specification || undefined,
           description: it.description || undefined,
-          price: Number(it.price || it.unitPrice || 0),
           max_qty: originalQty,
           qty: originalQty, // Default qty is MAX
           selected: true,
@@ -57,10 +55,10 @@ export default function AuftragToBestellungModal({
       setItems(mapped);
       setNotes(
         auftrag.internal_notes ||
-          auftrag.comment_internal ||
-          auftrag.comment ||
-          auftrag.notes ||
-          "",
+        auftrag.comment_internal ||
+        auftrag.comment ||
+        auftrag.notes ||
+        "",
       );
     }
   }, [auftrag]);
@@ -100,7 +98,6 @@ export default function AuftragToBestellungModal({
         sourceLineItemId: it.sourceLineItemId,
         qty: it.qty,
         max_qty: it.max_qty,
-        price: it.price,
         itemName: it.itemName,
         itemNo: it.itemNo,
         material: it.material,
@@ -125,10 +122,6 @@ export default function AuftragToBestellungModal({
     }
   };
 
-  const calcSubtotal = items
-    .filter((i) => i.selected)
-    .reduce((sum, i) => sum + i.qty * i.price, 0);
-
   return (
     <CustomModal
       isOpen={isOpen}
@@ -138,11 +131,7 @@ export default function AuftragToBestellungModal({
       footer={
         <div className="flex items-center justify-between w-full">
           <div className="text-xs text-gray-500 font-medium">
-            Subtotal:{" "}
-            <span className="font-bold text-gray-900">
-              €{calcSubtotal.toFixed(2)}
-            </span>{" "}
-            ({selectedCount} item{selectedCount === 1 ? "" : "s"} selected)
+            {selectedCount} item{selectedCount === 1 ? "" : "s"} selected
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -191,6 +180,15 @@ export default function AuftragToBestellungModal({
           </p>
         </div>
 
+        <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+          <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+          <p>
+            <span className="font-semibold">Transfer prices</span> will be
+            automatically loaded from the item catalog after the Bestellung is
+            created. No manual entry required.
+          </p>
+        </div>
+
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <table className="w-full text-xs text-left border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-700 font-bold uppercase tracking-wider text-[11px]">
@@ -198,8 +196,6 @@ export default function AuftragToBestellungModal({
                 <th className="p-3 w-10 text-center">Select</th>
                 <th className="p-3">Item Name</th>
                 <th className="p-3 w-28 text-center">Qty (Max)</th>
-                <th className="p-3 w-24 text-right">Price</th>
-                <th className="p-3 w-28 text-right">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
@@ -222,6 +218,11 @@ export default function AuftragToBestellungModal({
                     <div className="font-semibold text-gray-900">
                       {row.itemName}
                     </div>
+                    {row.itemNo && (
+                      <div className="text-[11px] text-gray-400 font-mono">
+                        {row.itemNo}
+                      </div>
+                    )}
                     {row.description && (
                       <div className="text-[11px] text-gray-400 truncate max-w-xs">
                         {row.description}
@@ -245,12 +246,6 @@ export default function AuftragToBestellungModal({
                         / {row.max_qty}
                       </span>
                     </div>
-                  </td>
-                  <td className="p-3 text-right font-medium text-gray-700">
-                    €{Number(row.price).toFixed(2)}
-                  </td>
-                  <td className="p-3 text-right font-bold text-gray-900">
-                    €{(row.qty * row.price).toFixed(2)}
                   </td>
                 </tr>
               ))}

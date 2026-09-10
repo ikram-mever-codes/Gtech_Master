@@ -1,4 +1,5 @@
 import { IsNull } from "typeorm";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { SalesPrice } from "../models/sales_prices";
 import { Request, Response } from "express";
 import { AppDataSource } from "../config/database";
@@ -4911,11 +4912,7 @@ export class OfferController {
         offer.items?.[0]?.itemName ||
         offer.items?.[0]?.description ||
         "";
-      const cleanTitle = String(rawTitle || "")
-        .trim()
-        .replace(/[^\w-]/g, "_")
-        .replace(/_+/g, "_")
-        .replace(/^_+|_+$/g, "");
+      const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
       const downloadFileName = cleanTitle
         ? `Angebot_${docNo}_GTech_${cleanTitle}.pdf`
         : `Angebot_${docNo}_GTech.pdf`;

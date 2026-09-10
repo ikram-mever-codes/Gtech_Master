@@ -68,6 +68,12 @@ export class Rechnung {
   @Column({ type: "varchar", length: 255, nullable: true })
   date_delivery?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  date_delivery_confirmed?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  real_delivery_date?: string;
+
   @Column({ type: "varchar", length: 50, nullable: true })
   warehouse?: string;
 

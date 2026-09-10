@@ -1367,7 +1367,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 }
               />
               <Field
-                label="Delivery Date"
+                label="Lieferdatum vorläufig"
                 edit={effectiveEdit && canEditCommercial}
                 value={
                   order.date_delivery ? formatDate(order.date_delivery) : ""
@@ -1378,6 +1378,20 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   className={inputCls}
                   value={toDateInputValue(form.dateDelivery)}
                   onChange={(e) => patch({ dateDelivery: e.target.value })}
+                />
+              </Field>
+              <Field
+                label="Lieferdatum bestätigt"
+                edit={effectiveEdit && canEditCommercial}
+                value={
+                  order.real_delivery_date ? formatDate(order.real_delivery_date) : ""
+                }
+              >
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={toDateInputValue(form.realDeliveryDate)}
+                  onChange={(e) => patch({ realDeliveryDate: e.target.value })}
                 />
               </Field>
               <Field

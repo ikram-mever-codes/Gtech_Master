@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { buildRechnungPdfOptions } from "../services/pdfOptionsBuilder";
+import { sanitizeFilename } from "../utils/sanitizeFilename";
 import {
   generateRechnungLieferscheinEml,
   generateRechnungOnlyEml,
@@ -540,8 +541,8 @@ export const createRechnungFromAuftrag = async (
       delivery_date: deliveryDate
         ? new Date(deliveryDate)
         : (auftrag as any).delivery_date || (auftrag as any).real_delivery_date
-        ? new Date((auftrag as any).delivery_date || (auftrag as any).real_delivery_date)
-        : undefined,
+          ? new Date((auftrag as any).delivery_date || (auftrag as any).real_delivery_date)
+          : undefined,
       warehouse: warehouse || "CN",
       subtotal: totalSubtotal,
       tax_rate: taxRate,
@@ -559,6 +560,14 @@ export const createRechnungFromAuftrag = async (
         (auftrag as any).deliveryTime ||
         (auftrag as any).delivery_time ||
         ((auftrag as any).delivery_date ? String((auftrag as any).delivery_date) : undefined),
+      date_delivery_confirmed:
+        auftrag.real_delivery_date ||
+        auftrag.date_delivery_confirmed ||
+        undefined,
+      real_delivery_date:
+        auftrag.real_delivery_date ||
+        auftrag.date_delivery_confirmed ||
+        undefined,
       stock_where: auftrag.stock_where || StockWhere.EU,
       discount_percentage: discountPercentage,
       discount_amount: discountAmount,
@@ -1538,10 +1547,10 @@ export const downloadRechnungPdf = async (
           ? rechnung.invoice_date.toISOString().split("T")[0]
           : String(rechnung.invoice_date)
         : rechnung.created_at
-        ? rechnung.created_at instanceof Date
-          ? rechnung.created_at.toISOString().split("T")[0]
-          : String(rechnung.created_at)
-        : "");
+          ? rechnung.created_at instanceof Date
+            ? rechnung.created_at.toISOString().split("T")[0]
+            : String(rechnung.created_at)
+          : "");
 
     const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
     let linkedLieferschein = await lieferscheinRepo.findOne({
@@ -1555,9 +1564,9 @@ export const downloadRechnungPdf = async (
 
     const isLieferscheinConfirmed = linkedLieferschein
       ? linkedLieferschein.status === "bestätigt" ||
-        linkedLieferschein.status === "geliefert" ||
-        linkedLieferschein.status === "delivered" ||
-        !!linkedLieferschein.confirmed_at
+      linkedLieferschein.status === "geliefert" ||
+      linkedLieferschein.status === "delivered" ||
+      !!linkedLieferschein.confirmed_at
       : false;
 
     const { options: pdfOpts } = await buildRechnungPdfOptions(rechnung, {
@@ -1578,11 +1587,7 @@ export const downloadRechnungPdf = async (
       (rawItems?.[0] as any)?.item_name ||
       (rawItems?.[0] as any)?.description ||
       "";
-    const cleanTitle = String(rawTitle || "")
-      .trim()
-      .replace(/[^\w-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    const cleanTitle = sanitizeFilename(String(rawTitle || "").trim());
     const docNo = String(rechnung.invoice_number || rechnung.id || "rechnung")
       .trim()
       .replace(/[\s_]+/g, "_");

@@ -42,6 +42,9 @@ export class Lieferschein {
   delivery_date!: Date;
 
   @Column({ type: "varchar", length: 255, nullable: true })
+  date_delivery_confirmed?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
   date_created?: string;
 
   // --- References ---

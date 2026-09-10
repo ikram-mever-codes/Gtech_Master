@@ -117,8 +117,18 @@ export async function buildRechnungPdfOptions(
     rechnung.invoice_date || rechnung.date_created || rechnung.created_at,
   );
   const resolvedDeliveryDate = formatDateStr(
-    rechnung.date_delivery || rechnung.delivery_date,
+    rechnung.date_delivery || rechnung.delivery_date || auftrag?.date_delivery,
   );
+  const rawConfirmedDate =
+    rechnung.date_delivery_confirmed ||
+    rechnung.real_delivery_date ||
+    linkedLieferschein?.date_delivery_confirmed ||
+    (linkedLieferschein as any)?.real_delivery_date ||
+    (isLieferscheinConfirmed ? linkedLieferschein?.confirmed_at || linkedLieferschein?.delivery_date : undefined) ||
+    auftrag?.real_delivery_date ||
+    auftrag?.date_delivery_confirmed;
+
+  const resolvedDeliveryDateConfirmed = rawConfirmedDate ? formatDateStr(rawConfirmedDate) : undefined;
 
   const defaultTaxRate = Number(rechnung.tax_rate ?? 19);
   const subtotal = Number(rechnung.subtotal || 0);
@@ -197,6 +207,7 @@ export async function buildRechnungPdfOptions(
     notes: rechnung.notes,
     deliveryTime: resolvedDeliveryDate,
     deliveryDate: resolvedDeliveryDate,
+    deliveryDateConfirmed: resolvedDeliveryDateConfirmed,
     deliveryTerms: rechnung.delivery_terms || auftrag?.delivery_terms,
     paymentTerms: paymentTermsFormatted,
     paymentMethod: rechnung.payment_method || auftrag?.payment_method,
@@ -293,6 +304,13 @@ export async function buildLieferscheinPdfOptions(
 
   const formatDateStr = (dateVal: any): string => {
     if (!dateVal) return "";
+    if (typeof dateVal === "string") {
+      const trimmed = dateVal.trim();
+      const parts = trimmed.split(".");
+      if (parts.length === 3 && parts[2].length === 4) {
+        return `${parts[0].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[2]}`;
+      }
+    }
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return String(dateVal);
     const day = String(d.getDate()).padStart(2, "0");
@@ -313,20 +331,58 @@ export async function buildLieferscheinPdfOptions(
     lieferschein?.delivery_note_number ||
     `LS-${rechnung.invoice_number || rechnung.id}`;
 
-  const items = (rechnung.items || []).map((it: any, idx: number) => ({
+  const rawStatus = String(lieferschein?.status || "").toLowerCase().trim();
+  let displayStatus = "bestätigt";
+  if (rawStatus === "vorläufig" || rawStatus === "open" || rawStatus === "draft") {
+    displayStatus = "vorläufig";
+  } else if (rawStatus === "storniert" || rawStatus === "cancelled") {
+    displayStatus = "storniert";
+  } else if (rawStatus === "bestätigt" || rawStatus === "confirmed" || rawStatus === "closed") {
+    displayStatus = "bestätigt";
+  } else if (rawStatus) {
+    displayStatus = lieferschein?.status || "bestätigt";
+  }
+
+  const isDelivered =
+    rawStatus === "bestätigt" ||
+    rawStatus === "confirmed" ||
+    rawStatus === "closed" ||
+    rawStatus === "geliefert" ||
+    rawStatus === "delivered" ||
+    !!lieferschein?.confirmed_at;
+
+  const rawItems = (rechnung.items || [])
+    .slice()
+    .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
+
+  const items = rawItems.map((it: any, idx: number) => ({
     position: it.position || idx + 1,
     artNr: it.itemNo || it.material || "—",
     bezeichnung: it.item_name || it.description || "Item",
-    remarks: it.remark || it.notes || "-",
-    quantity: Number(it.quantity || 1),
+    remarks: it.notes || it.remark_ex || "-",
+    quantity: Number(it.quantity !== undefined && it.quantity !== null ? it.quantity : 1),
   }));
 
+  const effectiveShippingMethod =
+    auftrag?.shipping_text ||
+    auftrag?.shipping_method ||
+    rechnung.shipping_method;
+
   const metadataItems: [string, string][] = [
+    ["Status", String(displayStatus || "")],
     ["Kontakt", String(contactName || "")],
     ["Kunde", String(kundeCombined || "")],
     ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
-    ["Datum", String(resolvedDate || "")],
+    [
+      "Datum",
+      String(formatDateStr(lieferschein?.date_created || lieferschein?.created_at)),
+    ],
   ];
+
+  const kundenreferenz =
+    (lieferschein as any)?.kundenreferenz ||
+    rechnung.kundenreferenz ||
+    undefined;
 
   const options: PdfDocumentOptions = {
     documentType: "Lieferschein",
@@ -338,13 +394,15 @@ export async function buildLieferscheinPdfOptions(
     metadataItems,
     kontaktName: contactName,
     kontaktEmail: ctx?.user?.email,
+    isDelivered,
     lineItems: items,
     showPrices: false,
-    shippingMethod: rechnung.shipping_method,
+    shippingMethod: effectiveShippingMethod,
     notes: lieferschein?.notes || rechnung.notes,
-    deliveryTime: resolvedDate,
-    deliveryDate: resolvedDate,
+    deliveryTime: lieferschein?.delivery_date || rechnung.delivery_date,
+    deliveryDate: lieferschein?.delivery_date || rechnung.delivery_date,
     deliveryTerms: rechnung.delivery_terms || auftrag?.delivery_terms,
+    kundenreferenz,
     outputFilePath: ctx?.outputFilePath || "",
   };
 
@@ -447,9 +505,11 @@ export async function buildAuftragPdfOptions(
     !!auftrag.real_delivery_date;
 
   const effectiveDeliveryDate =
-    (isDelivered && auftrag.real_delivery_date) ||
     auftrag.date_delivery ||
     auftrag.delivery_terms;
+
+  const resolvedDeliveryDateConfirmed =
+    auftrag.real_delivery_date || auftrag.date_delivery_confirmed;
 
   const paymentTermsFormatted = auftrag.payment_terms
     ? (() => {
@@ -505,6 +565,7 @@ export async function buildAuftragPdfOptions(
     notes: auftrag.notes,
     deliveryTime: effectiveDeliveryDate,
     deliveryDate: effectiveDeliveryDate,
+    deliveryDateConfirmed: resolvedDeliveryDateConfirmed,
     deliveryTerms: auftrag.delivery_terms,
     paymentTerms: paymentTermsFormatted,
     paymentMethod: auftrag.payment_method,

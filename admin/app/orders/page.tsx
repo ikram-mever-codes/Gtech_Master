@@ -57,6 +57,7 @@ import {
 } from "@/api/supplier_orders";
 
 import { getAllCustomers } from "@/api/customers";
+import { getWeiterversandServiceProviders } from "@/api/weiterversand_service_providers";
 import {
   getAllSuppliers,
   getSupplierItems,
@@ -196,6 +197,7 @@ const OrderPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [cargos, setCargos] = useState<CargoType[]>([]);
+  const [wvProviders, setWvProviders] = useState<any[]>([]);
   const [supplierOrdersList, setSupplierOrdersList] = useState<SupplierOrder[]>(
     [],
   );
@@ -401,6 +403,51 @@ const OrderPage: React.FC = () => {
     });
     return list;
   }, [orders, reprintSearch, itemById]);
+
+  const wvProviderMap = useMemo(() => {
+    const map = new Map<string, string>();
+    wvProviders.forEach((p: any) => {
+      if (p.id) map.set(String(p.id), p.name || p.service_provider_name || "");
+    });
+    return map;
+  }, [wvProviders]);
+
+  const renderWeiterversandBadge = (row: any) => {
+    const order = row.parentOrder;
+    if (!order) return <span className="text-gray-300">-</span>;
+
+    const isWV =
+      order.is_weiterversand === true ||
+      order.is_weiterversand === 1 ||
+      order.is_weiterversand === "true" ||
+      order.is_weiterversand === "1" ||
+      order.is_weiterversand === "Yes" ||
+      order.isWeiterversand === true;
+
+    if (!isWV) {
+      return <span className="text-gray-400 text-xs font-medium">Nein</span>;
+    }
+
+    const customerObj = order.customer || customers.find((c) => String(c.id) === String(order.customer_id));
+    const customerName = customerObj?.companyName || customerObj?.company_name || order.customer_name || "";
+
+    const providerName =
+      order.weiterversandServiceProvider?.name ||
+      order.weiterversand_service_provider_name ||
+      wvProviderMap.get(String(order.weiterversand_service_provider_id || order.weiterversandServiceProviderId || "")) ||
+      order.weiterversand_service_provider ||
+      "";
+
+    const labelText = providerName
+      ? `${customerName ? customerName + "-" : ""}WV-${providerName}`
+      : `${customerName ? customerName + "-" : ""}Weiterversand`;
+
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm whitespace-nowrap">
+        {labelText}
+      </span>
+    );
+  };
   const orderItemDetailsMap = useMemo(() => {
     const map = new Map<string, any>();
     orders.forEach((o: any) => {
@@ -825,6 +872,9 @@ const OrderPage: React.FC = () => {
     fetchSuppliers();
     fetchAllItems();
     fetchCargos();
+    getWeiterversandServiceProviders()
+      .then((res: any) => setWvProviders(Array.isArray(res) ? res : res?.data || []))
+      .catch(() => {});
   }, [fetchCustomers, fetchCategories, fetchSuppliers, fetchAllItems]);
 
   useEffect(() => {
@@ -2552,6 +2602,12 @@ const OrderPage: React.FC = () => {
                       align: "center",
                     },
                     {
+                      header: "Weiterversand",
+                      width: "160px",
+                      align: "center",
+                      render: (row) => renderWeiterversandBadge(row),
+                    },
+                    {
                       header: "QTY",
                       width: "60px",
                       align: "center",
@@ -2676,7 +2732,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Item Name",
-                      width: "250px",
+                      width: "180px",
                       render: (row) => (
                         <div
                           className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
@@ -2688,6 +2744,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Remark",
+                      width: "100px",
                       render: (row) => (
                         <div className="text-gray-500 italic text-xs space-y-0.5">
                           {row.remark_de && (
@@ -2709,13 +2766,62 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Order_no",
-                      width: "100px",
+                      width: "80px",
                       render: (row) => (
                         <span className="font-mono font-bold text-blue-600">
                           {row.parentOrder?.order_no || "-"}
                         </span>
                       ),
                       align: "center",
+                    },
+                    {
+                      header: "Customer",
+                      width: "100px",
+                      render: (row) => {
+                        const order = row.parentOrder;
+                        const customerName =
+                          order?.customer?.companyName ||
+                          order?.customer?.company_name ||
+                          order?.customerSnapshot?.companyName ||
+                          order?.customerSnapshot?.company_name ||
+                          order?.customer_name ||
+                          customers.find(
+                            (c) => String(c.id) === String(order?.customer_id),
+                          )?.companyName ||
+                          null;
+                        return customerName ? (
+                          <span className="text-gray-800 font-medium text-xs">
+                            {customerName}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        );
+                      },
+                    },
+                    {
+                      header: "Purpose",
+                      width: "110px",
+                      render: (row) => {
+                        const purpose =
+                          row.parentOrder?.comment ||
+                          null;
+                        return purpose ? (
+                          <span
+                            className="text-gray-600 text-xs line-clamp-2 leading-tight"
+                            title={purpose}
+                          >
+                            {purpose}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        );
+                      },
+                    },
+                    {
+                      header: "Weiterversand",
+                      width: "120px",
+                      align: "center",
+                      render: (row) => renderWeiterversandBadge(row),
                     },
                     {
                       header: "QTY",
@@ -2739,13 +2845,13 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "SOID",
-                      width: "70px",
+                      width: "55px",
                       render: (row) => row.supplier_order_id || "-",
                       align: "center",
                     },
                     {
                       header: "Status",
-                      width: "90px",
+                      width: "75px",
                       render: (row) => (
                         <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
                           {row.status || row.item_status || "Open"}
@@ -2755,7 +2861,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Actions",
-                      width: "180px",
+                      width: "145px",
                       align: "center",
                       render: (row) => (
                         <div className="flex items-center justify-center gap-2">
