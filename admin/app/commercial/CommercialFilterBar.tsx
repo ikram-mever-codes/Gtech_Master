@@ -6,6 +6,7 @@ import { CommercialFilters } from "@/utils/commercialFilters";
 import type { InvoiceTab } from "../../hooks/useCommercialTabData";
 
 export enum AuftragStatus {
+  PARTIALLY_DELIVERED_AND_OPEN = "partially_delivered_and_open",
   OPEN = "open",
   PARTIALLY_DELIVERED = "partially_delivered",
   DELIVERED = "delivered",
@@ -152,6 +153,12 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
               </>
             ) : activeInvTab === "auftrag" ? (
               <>
+                <option
+                  value={AuftragStatus.PARTIALLY_DELIVERED_AND_OPEN}
+                  className="text-gray-900 font-normal"
+                >
+                  Partially-delivered & open
+                </option>
                 <option
                   value={AuftragStatus.OPEN}
                   className="text-gray-900 font-normal"

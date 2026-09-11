@@ -79,13 +79,25 @@ export default function OrderDetailsModal({
           </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-            Comment
-          </label>
-          <p className="text-gray-800 text-sm font-medium leading-relaxed">
-            {viewOrder.comment || "-"}
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {viewOrder.bestellung_zweck && (
+            <div className="space-y-1">
+              <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                Purpose (Zweck)
+              </label>
+              <p className="text-blue-700 font-bold text-sm bg-blue-50 px-2 py-1 rounded inline-block">
+                {viewOrder.bestellung_zweck}
+              </p>
+            </div>
+          )}
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+              Comment
+            </label>
+            <p className="text-gray-800 text-sm font-medium leading-relaxed">
+              {viewOrder.bestellung_notes || viewOrder.comment || "-"}
+            </p>
+          </div>
         </div>
 
         <div className="mt-8">

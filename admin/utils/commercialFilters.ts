@@ -17,7 +17,7 @@ export const initialCommercialFilters: CommercialFilters = {
   customerName: "",
   valueOperator: "=",
   valueAmount: "",
-  status: "",
+  status: "partially_delivered_and_open",
   rechnungFilter: "all",
   datePreset: "all",
   dateFrom: "",

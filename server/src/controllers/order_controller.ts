@@ -20,6 +20,7 @@ import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { InvoiceController } from "./invoice_controller";
+import { TransferOrder } from "../models/transfer_order";
 
 const _cjkFontCandidates: string[] = [
   path.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
@@ -550,6 +551,18 @@ export const getAllOrders = async (
 
     const orders = await qb.getMany();
 
+    const orderNos = orders.map((o) => o.order_no).filter(Boolean);
+    const transferOrders =
+      orderNos.length > 0
+        ? await AppDataSource.getRepository(TransferOrder).find({
+          where: { order_no: In(orderNos) },
+          select: ["order_no", "zweck", "notes"],
+        })
+        : [];
+    const transferOrderMap = new Map<string, { zweck: string; notes: string | undefined }>(
+      transferOrders.map((to) => [to.order_no, { zweck: to.zweck, notes: to.notes }]),
+    );
+
     const orphanedOrderIds: number[] = [];
     orders.forEach((order) => {
       if (order.cargo_id && !order.cargo) {
@@ -671,6 +684,8 @@ export const getAllOrders = async (
           order.cargo?.bill_to_display_name ||
           order.customer?.companyName ||
           "No Customer",
+        bestellung_zweck: transferOrderMap.get(order.order_no)?.zweck || null,
+        bestellung_notes: transferOrderMap.get(order.order_no)?.notes || null,
         items: [...(order.orderItems || [])]
           .sort((a: any, b: any) => {
             const posA = Number(a.position || 0);

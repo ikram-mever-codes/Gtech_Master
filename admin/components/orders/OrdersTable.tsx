@@ -265,12 +265,29 @@ export default function OrdersTable({
     { header: "Order No.", width: "65px", render: (row) => row.order_no },
     {
       header: "Purpose / Zweck",
-      width: "95px",
+      width: "110px",
       render: (row) => {
-        const text = row.remarks_cn || row.remark_de || row.comment || row.order?.comment || row.parentOrder?.comment || "-";
+        const zweck = row.bestellung_zweck || row.order?.bestellung_zweck || row.parentOrder?.bestellung_zweck;
+        const comment = row.bestellung_notes || row.comment || row.order?.comment || row.parentOrder?.comment || row.remarks_cn || row.remark_de;
+        const fullTooltip = [
+          zweck ? `Zweck: ${zweck}` : null,
+          comment ? `Comment: ${comment}` : null,
+        ].filter(Boolean).join(" | ") || "-";
+
         return (
-          <div className="line-clamp-2 max-w-[95px]" title={text}>
-            {text}
+          <div className="flex flex-col text-xs leading-tight max-w-[110px]" title={fullTooltip}>
+            {zweck && (
+              <span className="font-semibold text-blue-700 bg-blue-50 px-1 rounded w-fit text-[10px] truncate max-w-full mb-0.5">
+                {zweck}
+              </span>
+            )}
+            {comment ? (
+              <span className="text-gray-600 text-[11px] line-clamp-2">
+                {comment}
+              </span>
+            ) : !zweck ? (
+              <span className="text-gray-400">-</span>
+            ) : null}
           </div>
         );
       },
@@ -505,11 +522,31 @@ export default function OrdersTable({
     {
       header: "Purpose / Zweck",
       width: "150px",
-      render: (row) => (
-        <div className="line-clamp-2 max-w-[150px] leading-tight" title={row.comment || row.purpose || "-"}>
-          {row.comment || row.purpose || "-"}
-        </div>
-      ),
+      render: (row) => {
+        const zweck = row.bestellung_zweck || row.purpose;
+        const comment = row.bestellung_notes || row.comment;
+        const fullTooltip = [
+          zweck ? `Zweck: ${zweck}` : null,
+          comment ? `Comment: ${comment}` : null,
+        ].filter(Boolean).join(" | ") || "-";
+
+        return (
+          <div className="flex flex-col text-xs leading-tight max-w-[150px]" title={fullTooltip}>
+            {zweck && (
+              <span className="font-semibold text-blue-700 bg-blue-50 px-1 rounded w-fit text-[11px] truncate max-w-full mb-0.5">
+                {zweck}
+              </span>
+            )}
+            {comment ? (
+              <span className="text-gray-600 text-[11px] line-clamp-2">
+                {comment}
+              </span>
+            ) : !zweck ? (
+              <span className="text-gray-400">-</span>
+            ) : null}
+          </div>
+        );
+      },
       align: "left",
     },
     {
