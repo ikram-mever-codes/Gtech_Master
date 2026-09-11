@@ -28,7 +28,6 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
   itemId,
   isEditEnabled = true,
 }) => {
-
   const [data, setData] = useState<SalesPricesForItem | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -252,8 +251,8 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
       setSelectedCustomerData(customerData);
       setNewCustomerName(
         customerData.companyName ||
-        customerData.legalName ||
-        "Selected customer",
+          customerData.legalName ||
+          "Selected customer",
       );
     } else {
       setSelectedCustomerData(null);
@@ -328,18 +327,36 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={() => openIndividualModal(row)}
-                      className={`px-2 py-0.5 rounded transition-colors text-sm ${row.individual
-                          ? "font-semibold text-gray-900 hover:bg-gray-100"
-                          : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                        }`}
-                    >
-                      {row.individual
-                        ? formatPrice(row.individual.unitPriceEur)
-                        : "+ add"}
-                    </button>
+                    {row.individual ? (
+                      <div className="inline-flex items-center gap-1 group">
+                        <button
+                          onClick={() => openIndividualModal(row)}
+                          className="font-semibold text-gray-900 hover:bg-gray-100 px-2 py-0.5 rounded text-sm"
+                        >
+                          {formatPrice(row.individual.unitPriceEur)}
+                        </button>
+                        <button
+                          onClick={() =>
+                            removeEntry(
+                              row.individual!.id,
+                              `the base price for ${row.customerName}`,
+                            )
+                          }
+                          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-rose-600 transition-opacity"
+                        >
+                          <TrashIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => openIndividualModal(row)}
+                        className="px-2 py-0.5 rounded transition-colors text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        + add
+                      </button>
+                    )}
                   </td>
+
                   {tierQuantities.map((q) => {
                     const tier = row.tiers.find((t) => t.minQuantity === q);
                     return (
