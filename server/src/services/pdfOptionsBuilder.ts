@@ -511,15 +511,24 @@ export async function buildAuftragPdfOptions(
     String(auftrag.status || "").toLowerCase() === "closed" ||
     !!auftrag.real_delivery_date;
 
-  const effectiveDeliveryDate = auftrag.date_delivery
+  const vorlaeufigeDate = auftrag.date_delivery
     ? formatDateStr(auftrag.date_delivery)
-    : auftrag.delivery_terms;
+    : undefined;
 
-  const resolvedDeliveryDateConfirmed = auftrag.date_delivery_confirmed
-    ? formatDateStr(auftrag.date_delivery_confirmed)
-    : auftrag.real_delivery_date
+  const bestaetigteDate =
+    auftrag.real_delivery_date
       ? formatDateStr(auftrag.real_delivery_date)
-      : undefined;
+      : auftrag.date_delivery_confirmed
+        ? formatDateStr(auftrag.date_delivery_confirmed)
+        : undefined;
+
+  const isSameDate = vorlaeufigeDate && bestaetigteDate && vorlaeufigeDate === bestaetigteDate;
+
+  const effectiveDeliveryDate = isSameDate
+    ? undefined
+    : (vorlaeufigeDate ?? auftrag.delivery_terms);
+
+  const resolvedDeliveryDateConfirmed = bestaetigteDate || undefined;
 
   const paymentTermsFormatted = auftrag.payment_terms
     ? (() => {
