@@ -331,18 +331,6 @@ async function calculateOrderTotals(orderId: number): Promise<void> {
   await customerOrderRepo.save(order);
 }
 
-/**
- * Attaches computed delivered/open quantity to every order item across the
- * given orders, in a single batched query against rechnung_item — same
- * pattern as attachStockInfoToOrders below.
- *
- * quantity on CustomerOrderItem is the fixed ordered amount and is never
- * mutated. "Delivered" is derived by summing rechnung_item.quantity for
- * every Rechnung line that traces back to this order line
- * (sourceLineItemId), and "open" is quantity - delivered, floored at 0.
- * This is computed on every read rather than stored, so it can't drift out
- * of sync with the actual Rechnungen the way a stored counter could.
- */
 async function attachDeliveredQuantityToOrders(
   orders: CustomerOrder[],
 ): Promise<void> {

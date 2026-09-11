@@ -306,6 +306,31 @@ export const updateLieferscheinStatus = async (
 /**
  * Update Lieferschein delivery date
  */
+function parseDateNoon(input: any): Date {
+  if (!input) return new Date();
+  if (input instanceof Date) return input;
+  const str = String(input).trim();
+  const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = parseInt(isoMatch[2], 10) - 1;
+    const d = parseInt(isoMatch[3], 10);
+    return new Date(y, m, d, 12, 0, 0);
+  }
+  const dotMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (dotMatch) {
+    const d = parseInt(dotMatch[1], 10);
+    const m = parseInt(dotMatch[2], 10) - 1;
+    const y = parseInt(dotMatch[3], 10);
+    return new Date(y, m, d, 12, 0, 0);
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0);
+  }
+  return new Date();
+}
+
 export const updateLieferscheinDeliveryDate = async (
   req: Request,
   res: Response,
@@ -336,7 +361,7 @@ export const updateLieferscheinDeliveryDate = async (
       return;
     }
 
-    lieferschein.delivery_date = new Date(deliveryDate);
+    lieferschein.delivery_date = parseDateNoon(deliveryDate);
     await lieferscheinRepo.save(lieferschein);
 
     res.json({
@@ -394,13 +419,14 @@ export const confirmLieferscheinDelivery = async (
       }
     }
     if (!confirmedDateStr) {
-      const d = deliveryDate ? new Date(deliveryDate) : new Date();
+      const d = deliveryDate ? parseDateNoon(deliveryDate) : new Date();
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       const dd = String(d.getDate()).padStart(2, "0");
       confirmedDateStr = `${yyyy}-${mm}-${dd}`;
     }
 
+    lieferschein.delivery_date = parseDateNoon(confirmedDateStr);
     lieferschein.date_delivery_confirmed = confirmedDateStr;
     lieferschein.status = "bestätigt";
     lieferschein.confirmed_at = new Date();
