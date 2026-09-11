@@ -317,24 +317,6 @@ export async function buildLieferscheinPdfOptions(
     ctx?.user?.username ||
     "";
 
-  const formatDateStr = (dateVal: any): string => {
-    if (!dateVal) return "";
-    if (typeof dateVal === "string") {
-      const trimmed = dateVal.trim();
-      const parts = trimmed.split(".");
-      if (parts.length === 3 && parts[2].length === 4) {
-        return `${parts[0].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[2]}`;
-      }
-    }
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return String(dateVal);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}.${month}.${year}`;
-  };
-
-
   const lieferscheinNo =
     lieferschein?.delivery_note_number ||
     `LS-${rechnung.invoice_number || rechnung.id}`;
