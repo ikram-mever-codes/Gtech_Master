@@ -1247,40 +1247,42 @@ export async function generateGtechDocumentPdf(
   );
 
   if (!hasLieferdatumInMetadata && (deliveryInput || confirmedDeliveryInput)) {
-    if (deliveryInput) {
-      const rawDelivery = String(deliveryInput).trim();
-      if (rawDelivery) {
-        const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawDelivery);
-        const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawDelivery);
-        const parsed = new Date(rawDelivery);
-        const isValidDate =
-          (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
-          /\d{4}/.test(rawDelivery);
+    const tryFormatDelivery = (val: string): string | null => {
+      const raw = val.trim();
+      if (!raw) return null;
+      const isIso = /^\d{4}-\d{2}-\d{2}/.test(raw);
+      const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(raw);
+      const parsed = new Date(raw);
+      const isValidDate =
+        (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
+        /\d{4}/.test(raw);
+      return isValidDate ? formatDate(raw) : null;
+    };
 
-        if (isValidDate) {
-          const deliveryLabel = opts.documentType === "Lieferschein"
-            ? "Lieferdatum:"
-            : "Voraussichtliches Lieferdatum:";
-          doc.text(`${deliveryLabel} ${formatDate(rawDelivery)}`, LEFT_X, yPos);
-        } else {
-          doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
-        }
+    if (opts.documentType === "Lieferschein") {
+      const dateToShow = deliveryInput ? tryFormatDelivery(String(deliveryInput)) : null;
+      if (dateToShow) {
+        doc.text(`Lieferdatum: ${dateToShow}`, LEFT_X, yPos);
         yPos += 14;
       }
-    }
+    } else {
+      const vorlaeufigeStr = deliveryInput ? tryFormatDelivery(String(deliveryInput)) : null;
+      const bestaetigtStr = confirmedDeliveryInput ? tryFormatDelivery(String(confirmedDeliveryInput)) : null;
 
-    if (confirmedDeliveryInput) {
-      const rawConfirmed = String(confirmedDeliveryInput).trim();
-      if (rawConfirmed) {
-        const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawConfirmed);
-        const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawConfirmed);
-        const parsed = new Date(rawConfirmed);
-        const isValidDate =
-          (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
-          /\d{4}/.test(rawConfirmed);
+      if (vorlaeufigeStr || bestaetigtStr) {
+        const labelText = "Lieferdatum:";
+        const labelWidth = doc.widthOfString(labelText + "  ");
 
-        if (isValidDate) {
-          doc.text(`Bestätigtes Lieferdatum: ${formatDate(rawConfirmed)}`, LEFT_X, yPos);
+        if (vorlaeufigeStr && bestaetigtStr) {
+          doc.text(`${labelText}  voraussichtlich ${vorlaeufigeStr}`, LEFT_X, yPos);
+          yPos += 14;
+          doc.text(`bestätigt ${bestaetigtStr}`, LEFT_X + labelWidth, yPos);
+          yPos += 14;
+        } else if (bestaetigtStr) {
+          doc.text(`${labelText}  bestätigt ${bestaetigtStr}`, LEFT_X, yPos);
+          yPos += 14;
+        } else if (vorlaeufigeStr) {
+          doc.text(`${labelText}  voraussichtlich ${vorlaeufigeStr}`, LEFT_X, yPos);
           yPos += 14;
         }
       }

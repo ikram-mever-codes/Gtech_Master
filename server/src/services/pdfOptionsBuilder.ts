@@ -138,12 +138,11 @@ export async function buildRechnungPdfOptions(
   );
   const rawConfirmedDate =
     rechnung.date_delivery_confirmed ||
-    rechnung.real_delivery_date ||
     linkedLieferschein?.date_delivery_confirmed ||
+    auftrag?.date_delivery_confirmed ||
+    rechnung.real_delivery_date ||
     (linkedLieferschein as any)?.real_delivery_date ||
-    (isLieferscheinConfirmed ? linkedLieferschein?.confirmed_at : undefined) ||
-    auftrag?.real_delivery_date ||
-    auftrag?.date_delivery_confirmed;
+    auftrag?.real_delivery_date;
 
   const resolvedDeliveryDateConfirmed = rawConfirmedDate ? formatDateStr(rawConfirmedDate) : undefined;
 
@@ -516,10 +515,10 @@ export async function buildAuftragPdfOptions(
     ? formatDateStr(auftrag.date_delivery)
     : auftrag.delivery_terms;
 
-  const resolvedDeliveryDateConfirmed = auftrag.real_delivery_date
-    ? formatDateStr(auftrag.real_delivery_date)
-    : auftrag.date_delivery_confirmed
-      ? formatDateStr(auftrag.date_delivery_confirmed)
+  const resolvedDeliveryDateConfirmed = auftrag.date_delivery_confirmed
+    ? formatDateStr(auftrag.date_delivery_confirmed)
+    : auftrag.real_delivery_date
+      ? formatDateStr(auftrag.real_delivery_date)
       : undefined;
 
   const paymentTermsFormatted = auftrag.payment_terms
