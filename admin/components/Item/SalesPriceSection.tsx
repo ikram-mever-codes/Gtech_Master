@@ -342,7 +342,7 @@ export const SalesPriceSection: React.FC<SalesPriceSectionProps> = ({
                               `the base price for ${row.customerName}`,
                             )
                           }
-                          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-rose-600 transition-opacity"
+                          className=" text-rose-600 transition-opacity"
                         >
                           <TrashIcon className="w-3 h-3" />
                         </button>
