@@ -196,13 +196,9 @@ export const datumColumn: ColumnDef<any> = {
       row.invoice_date ||
       row.offer_date ||
       row.date;
-    if (typeof rawDate === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)) {
-      const [d, m] = rawDate.split(".");
-      return <span className="text-sm text-gray-800 font-normal">{`${d}.${m}.`}</span>;
-    }
     return (
       <span className="text-sm text-gray-800 font-normal">
-        {rawDate ? formatDate(rawDate) : "—"}
+        {rawDate ? formatDate(rawDate, true) : "—"}
       </span>
     );
   },
@@ -373,11 +369,7 @@ export const lieferdatumColumn: ColumnDef<any> = {
       row.due_date ||
       row.dueDate;
     if (!rawDate) return <span className="text-gray-400 font-normal text-sm">—</span>;
-    if (typeof rawDate === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)) {
-      const [d, m] = rawDate.split(".");
-      return <span className="text-sm text-gray-600 font-normal">{`${d}.${m}.`}</span>;
-    }
-    return <span className="text-sm text-gray-600 font-normal">{formatDate(rawDate)}</span>;
+    return <span className="text-sm text-gray-600 font-normal">{formatDate(rawDate, true)}</span>;
   },
 };
 

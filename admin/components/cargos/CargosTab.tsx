@@ -79,7 +79,7 @@ const formatDateInput = (dateString: string | Date | undefined | null) => {
 };
 
 const formatCargoDateShort = (dateString: string | Date | undefined | null) => {
-    return formatDate(dateString);
+    return formatDate(dateString, true);
 };
 
 const CargosTab = React.forwardRef<any, CargosTabProps>(({
