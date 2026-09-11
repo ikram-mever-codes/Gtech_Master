@@ -540,8 +540,8 @@ export const createRechnungFromAuftrag = async (
       invoice_date: now,
       delivery_date: deliveryDate
         ? new Date(deliveryDate)
-        : (auftrag as any).delivery_date || (auftrag as any).real_delivery_date
-          ? new Date((auftrag as any).delivery_date || (auftrag as any).real_delivery_date)
+        : (auftrag as any).delivery_date
+          ? new Date((auftrag as any).delivery_date)
           : undefined,
       warehouse: warehouse || "CN",
       subtotal: totalSubtotal,
