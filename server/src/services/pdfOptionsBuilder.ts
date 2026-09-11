@@ -319,23 +319,6 @@ export async function buildLieferscheinPdfOptions(
     return `${day}.${month}.${year}`;
   };
 
-  const lieferscheinConfirmedDate =
-    lieferschein?.date_delivery_confirmed ||
-    (lieferschein as any)?.real_delivery_date ||
-    (isDelivered && lieferschein?.confirmed_at ? lieferschein.confirmed_at : undefined);
-
-  const resolvedDate = formatDateStr(
-    lieferscheinConfirmedDate ||
-    lieferschein?.delivery_date ||
-    rechnung.invoice_date ||
-    rechnung.created_at,
-  );
-
-  const resolvedPreliminaryDate = formatDateStr(
-    lieferschein?.delivery_date ||
-    rechnung.date_delivery ||
-    auftrag?.date_delivery,
-  );
 
   const lieferscheinNo =
     lieferschein?.delivery_note_number ||
@@ -360,6 +343,24 @@ export async function buildLieferscheinPdfOptions(
     rawStatus === "geliefert" ||
     rawStatus === "delivered" ||
     !!lieferschein?.confirmed_at;
+
+  const lieferscheinConfirmedDate =
+    lieferschein?.date_delivery_confirmed ||
+    (lieferschein as any)?.real_delivery_date ||
+    (isDelivered && lieferschein?.confirmed_at ? lieferschein.confirmed_at : undefined);
+
+  const resolvedDate = formatDateStr(
+    lieferscheinConfirmedDate ||
+    lieferschein?.delivery_date ||
+    rechnung.invoice_date ||
+    rechnung.created_at,
+  );
+
+  const resolvedPreliminaryDate = formatDateStr(
+    lieferschein?.delivery_date ||
+    rechnung.date_delivery ||
+    auftrag?.date_delivery,
+  );
 
   const rawItems = (rechnung.items || [])
     .slice()
