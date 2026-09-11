@@ -14,7 +14,7 @@ import {
   deleteRechnungK,
   updateRechnungK,
 } from "@/api/rechnungen_k";
-
+import Link from "next/link";
 import { Plus, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
 
 import { getExpandedInvoiceDetails, updateInvoice } from "@/api/invoice";
@@ -113,7 +113,6 @@ import { buildRkColumns } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
 import { buildPaymentInboundColumns } from "./paymentInboundColumns";
 import PaymentInboundAssignModal from "./PaymentInboundAssignModal";
-import { AnyAaaaRecord } from "dns";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -459,7 +458,8 @@ const InvoiceListPage: React.FC = () => {
   const isAnyFilterActive = useMemo(() => {
     const isStatusActive =
       activeInvTab === "auftrag"
-        ? docFilters.status !== "partially_delivered_and_open" && !!docFilters.status
+        ? docFilters.status !== "partially_delivered_and_open" &&
+          !!docFilters.status
         : !!docFilters.status;
 
     return (
@@ -667,7 +667,10 @@ const InvoiceListPage: React.FC = () => {
     );
   };
 
-  const handleReorderOrderItem = (item_id: string, direction: "up" | "down") => {
+  const handleReorderOrderItem = (
+    item_id: string,
+    direction: "up" | "down",
+  ) => {
     setOrderItems((prev: any[]) => {
       const idx = prev.findIndex((x: any) => x.item_id === item_id);
       if (idx === -1) return prev;
@@ -1303,12 +1306,12 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev: any) =>
         prev
           ? {
-            ...prev,
-            title: invoiceEditForm.title,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              title: invoiceEditForm.title,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1583,11 +1586,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-          item.customer?.id ||
-          item.customer_id ||
-          item.customerSnapshot?.customerNumber ||
-          item.customerSnapshot?.id ||
-          "",
+            item.customer?.id ||
+            item.customer_id ||
+            item.customerSnapshot?.customerNumber ||
+            item.customerSnapshot?.id ||
+            "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1595,12 +1598,12 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-          item.customer_name ||
-          item.bill_to ||
-          item.ship_to ||
-          item.customerSnapshot?.companyName ||
-          item.customerSnapshot?.name ||
-          "",
+            item.customer_name ||
+            item.bill_to ||
+            item.ship_to ||
+            item.customerSnapshot?.companyName ||
+            item.customerSnapshot?.name ||
+            "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -1695,7 +1698,7 @@ const InvoiceListPage: React.FC = () => {
       if (res?.success) {
         toast.success(
           res.message ||
-          `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
+            `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
           successStyles,
         );
         await tabData.refetchOrders();
@@ -1900,11 +1903,18 @@ const InvoiceListPage: React.FC = () => {
             )}
           </div>
         </div>
+
         <div className="flex overflow-x-auto mb-6 border-b border-gray-100 pb-px">
           {invoiceTabs.map((tab) => (
-            <button
+            <Link
               key={tab.id}
-              onClick={() => {
+              href={`?tab=${tab.id}`}
+              scroll={false}
+              onClick={(e) => {
+                // Keep this a real, bookmarkable/right-clickable link, but let
+                // the existing state logic (tab switch, filter reset, page reset)
+                // run instead of a full page navigation.
+                e.preventDefault();
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
                 if (tab.id === "auftrag" && !docFilters.status) {
@@ -1919,13 +1929,14 @@ const InvoiceListPage: React.FC = () => {
                   setDocFilters((prev) => ({ ...prev, status: "" }));
                 }
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
-            </button>
+            </Link>
           ))}
         </div>
         <CommercialFilterBar
@@ -1975,10 +1986,10 @@ const InvoiceListPage: React.FC = () => {
                 let amt = 0;
                 const shipping = Number(
                   item.shippingCost ||
-                  item.shipping_cost ||
-                  item.freightCost ||
-                  item.freight_cost ||
-                  0,
+                    item.shipping_cost ||
+                    item.freightCost ||
+                    item.freight_cost ||
+                    0,
                 );
 
                 if (
@@ -1986,9 +1997,15 @@ const InvoiceListPage: React.FC = () => {
                   (activeInvTab as string) === "payments"
                 ) {
                   amt = Number(item.amount || item.total || 0);
-                } else if (item.subtotal !== undefined && item.subtotal !== null) {
+                } else if (
+                  item.subtotal !== undefined &&
+                  item.subtotal !== null
+                ) {
                   amt = Number(item.subtotal) + shipping;
-                } else if (item.sub_total !== undefined && item.sub_total !== null) {
+                } else if (
+                  item.sub_total !== undefined &&
+                  item.sub_total !== null
+                ) {
                   amt = Number(item.sub_total) + shipping;
                 } else if (
                   item.netTotal !== undefined &&
@@ -2009,7 +2026,9 @@ const InvoiceListPage: React.FC = () => {
                 ) {
                   amt = Number(item.netAmount);
                 } else if (
-                  Array.isArray(item.items || item.orderItems || item.lineItems) &&
+                  Array.isArray(
+                    item.items || item.orderItems || item.lineItems,
+                  ) &&
                   (item.items || item.orderItems || item.lineItems).length > 0
                 ) {
                   const lineItems =
@@ -2018,10 +2037,10 @@ const InvoiceListPage: React.FC = () => {
                     lineItems.reduce((acc: number, it: any) => {
                       const p = Number(
                         it.price ||
-                        it.sales_price ||
-                        it.unit_price ||
-                        it.net_price ||
-                        0,
+                          it.sales_price ||
+                          it.unit_price ||
+                          it.net_price ||
+                          0,
                       );
                       const q = Number(it.quantity || it.qty || 1);
                       return acc + p * q;
@@ -2029,10 +2048,10 @@ const InvoiceListPage: React.FC = () => {
                 } else {
                   const gross = Number(
                     item.total_amount ||
-                    item.totalAmount ||
-                    item.total ||
-                    item.grossTotal ||
-                    0,
+                      item.totalAmount ||
+                      item.total ||
+                      item.grossTotal ||
+                      0,
                   );
                   const taxRate = Number(item.tax_rate || item.taxRate || 19);
                   amt = gross > 0 ? gross / (1 + taxRate / 100) : 0;
@@ -2070,7 +2089,6 @@ const InvoiceListPage: React.FC = () => {
                 return "";
               }}
               getRowStyle={(row: any) => {
-
                 // A manually chosen highlight_color (SystemColourSelect on
                 // the order) always wins over the automatic status colour
                 // below — it's an explicit per-order choice.
@@ -2137,7 +2155,10 @@ const InvoiceListPage: React.FC = () => {
                 } else if (activeInvTab === "lieferschein") {
                   setSelectedLieferscheinForDetail(row);
                   setShowLieferscheinDetailModal(true);
-                } else if (activeInvTab === "payment_inbound" || activeInvTab === "payments") {
+                } else if (
+                  activeInvTab === "payment_inbound" ||
+                  activeInvTab === "payments"
+                ) {
                   setSelectedInboundForAssign(row);
                   tabData.ensureLoaded("auftrag");
                   tabData.ensureLoaded("rechnung");
@@ -2186,10 +2207,11 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                        ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                        : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                        }`}
+                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                        currentPage === i + 1
+                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                      }`}
                     >
                       {i + 1}
                     </button>
@@ -2260,7 +2282,9 @@ const InvoiceListPage: React.FC = () => {
           targetCargoId={targetCargoId}
           setTargetCargoId={setTargetCargoId}
           onConfirm={handleReassignItem}
-          onCargoCreated={(newCargo) => setCargos((prev) => [...prev, newCargo])}
+          onCargoCreated={(newCargo) =>
+            setCargos((prev) => [...prev, newCargo])
+          }
         />
         <SplitModal
           isOpen={showSPModal}
