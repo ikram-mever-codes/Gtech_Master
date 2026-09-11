@@ -373,6 +373,12 @@ export const confirmLieferscheinDelivery = async (
       return;
     }
 
+    const confirmedBy =
+      (req as any).user?.name ||
+      (req as any).user?.username ||
+      (req as any).user?.email ||
+      "Admin";
+
     let confirmedDateStr = "";
     if (deliveryDate && typeof deliveryDate === "string" && deliveryDate.trim()) {
       const trimmed = deliveryDate.trim();
