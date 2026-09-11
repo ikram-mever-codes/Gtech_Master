@@ -28,22 +28,7 @@ const formatWeight = (kg: number): string =>
     maximumFractionDigits: 1,
   })} kg`;
 
-const formatFullDate = (val: any): string => {
-  if (!val) return "—";
-  if (typeof val === "string") {
-    const trimmed = val.trim();
-    const parts = trimmed.split(".");
-    if (parts.length === 3 && parts[2].length === 4) {
-      const day = parts[0].padStart(2, "0");
-      const month = parts[1].padStart(2, "0");
-      const year = parts[2];
-      return `${day}.${month}.${year}`;
-    }
-  }
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return String(val);
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
-};
+const formatFullDate = (val: any): string => formatDate(val);
 
 const COUNTRY_CODES: Record<string, string> = {
   germany: "DE",
@@ -211,14 +196,33 @@ export default function LieferscheinDetailModal({
   const [showStornierConfirm, setShowStornierConfirm] = useState(false);
   const [isStorniering, setIsStorniering] = useState(false);
 
+  const getLocalTodayIso = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  const toIsoDateStr = (val: any): string => {
+    if (!val) return getLocalTodayIso();
+    const str = String(val).trim();
+    const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return isoMatch[0];
+    const dotMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if (dotMatch) {
+      return `${dotMatch[3]}-${dotMatch[2].padStart(2, "0")}-${dotMatch[1].padStart(2, "0")}`;
+    }
+    return getLocalTodayIso();
+  };
+
   useEffect(() => {
     setData(lieferschein);
     setIsEditMode(false);
     if (lieferschein?.date) {
-      setDeliveryDate(lieferschein.date);
+      const iso = toIsoDateStr(lieferschein.date);
+      setDeliveryDate(iso);
+      setPickedDate(iso);
+    } else {
+      setPickedDate(getLocalTodayIso());
     }
-    const today = new Date().toISOString().split("T")[0];
-    setPickedDate(today);
   }, [lieferschein]);
 
   if (!isOpen || !data) return null;
@@ -311,9 +315,14 @@ export default function LieferscheinDetailModal({
     }
   };
 
+  const handleConfirmSavedDate = () => {
+    const targetDate = deliveryDate || (data?.date ? toIsoDateStr(data.date) : getLocalTodayIso());
+    setPendingDeliveryDate(targetDate);
+    setShowConfirmPopup(true);
+  };
+
   const handleLieferdatumHeute = () => {
-    const today = new Date().toISOString().split("T")[0];
-    setPendingDeliveryDate(today);
+    setPendingDeliveryDate(getLocalTodayIso());
     setShowConfirmPopup(true);
   };
 
@@ -443,13 +452,23 @@ export default function LieferscheinDetailModal({
                 <>
                   <button
                     type="button"
+                    onClick={handleConfirmSavedDate}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all"
+                    title="Bestätigt das eingetragene Lieferdatum"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Lieferung {deliveryDate || data?.date ? `(${formatFullDate(deliveryDate || data?.date)})` : ""} bestätigen
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handleLieferdatumHeute}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-all"
                     title="Setzt heute als Lieferdatum und bestätigt"
                   >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    Lieferdatum HEUTE
+                    Heute ({formatFullDate(getLocalTodayIso())})
                   </button>
+
                   <div className="relative">
                     <button
                       type="button"
@@ -458,7 +477,7 @@ export default function LieferscheinDetailModal({
                       title="Datum wählen und bestätigen"
                     >
                       <Calendar className="w-3.5 h-3.5" />
-                      bestätige Lieferdatum
+                      Datum wählen
                     </button>
                     {showDatePicker && (
                       <div className="absolute right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl p-3 z-10 min-w-[220px]">
