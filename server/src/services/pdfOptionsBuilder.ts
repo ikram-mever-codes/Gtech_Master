@@ -105,6 +105,26 @@ export async function buildRechnungPdfOptions(
 
   const formatDateStr = (dateVal: any): string => {
     if (!dateVal) return "";
+    if (typeof dateVal === "string") {
+      const trimmed = dateVal.trim();
+      if (!trimmed) return "";
+      const dotParts = trimmed.split(".");
+      if (dotParts.length === 3 && dotParts[2].length === 4) {
+        return `${dotParts[0].padStart(2, "0")}.${dotParts[1].padStart(2, "0")}.${dotParts[2]}`;
+      }
+      const isoPart = trimmed.split("T")[0];
+      const dashParts = isoPart.split("-");
+      if (dashParts.length === 3 && dashParts[0].length === 4) {
+        return `${dashParts[2].padStart(2, "0")}.${dashParts[1].padStart(2, "0")}.${dashParts[0]}`;
+      }
+    }
+    if (dateVal instanceof Date) {
+      if (isNaN(dateVal.getTime())) return "";
+      const day = String(dateVal.getDate()).padStart(2, "0");
+      const month = String(dateVal.getMonth() + 1).padStart(2, "0");
+      const year = dateVal.getFullYear();
+      return `${day}.${month}.${year}`;
+    }
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return String(dateVal);
     const day = String(d.getDate()).padStart(2, "0");

@@ -106,15 +106,9 @@ function cleanPdfText(text?: string | null): string {
 
 function formatDate(dateVal: any): string {
   if (!dateVal) return "—";
-  if (dateVal instanceof Date) {
-    const iso = dateVal.toISOString().split("T")[0];
-    const parts = iso.split("-");
-    if (parts.length === 3 && parts[0].length === 4) {
-      return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
-    }
-  }
   if (typeof dateVal === "string") {
     const trimmed = dateVal.trim();
+    if (!trimmed) return "—";
     const dotParts = trimmed.split(".");
     if (dotParts.length === 3 && dotParts[2].length === 4) {
       const day = dotParts[0].padStart(2, "0");
@@ -122,7 +116,8 @@ function formatDate(dateVal: any): string {
       const year = dotParts[2];
       return `${day}.${month}.${year}`;
     }
-    const dashParts = trimmed.split("T")[0].split("-");
+    const isoPart = trimmed.split("T")[0];
+    const dashParts = isoPart.split("-");
     if (dashParts.length === 3 && dashParts[0].length === 4) {
       const year = dashParts[0];
       const month = dashParts[1].padStart(2, "0");
@@ -130,13 +125,15 @@ function formatDate(dateVal: any): string {
       return `${day}.${month}.${year}`;
     }
   }
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return "—";
+    const day = String(dateVal.getDate()).padStart(2, "0");
+    const month = String(dateVal.getMonth() + 1).padStart(2, "0");
+    const year = dateVal.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
   const d = new Date(dateVal);
   if (isNaN(d.getTime())) return String(dateVal);
-  const iso = d.toISOString().split("T")[0];
-  const parts = iso.split("-");
-  if (parts.length === 3 && parts[0].length === 4) {
-    return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
-  }
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();

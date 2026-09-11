@@ -373,14 +373,28 @@ export const confirmLieferscheinDelivery = async (
       return;
     }
 
-    const confirmedDate = deliveryDate ? new Date(deliveryDate) : new Date();
-    const confirmedBy =
-      (req as any).user?.name ||
-      (req as any).user?.username ||
-      (req as any).user?.email ||
-      "Admin";
+    let confirmedDateStr = "";
+    if (deliveryDate && typeof deliveryDate === "string" && deliveryDate.trim()) {
+      const trimmed = deliveryDate.trim();
+      const isoPart = trimmed.split("T")[0];
+      const dashParts = isoPart.split("-");
+      if (dashParts.length === 3 && dashParts[0].length === 4) {
+        confirmedDateStr = `${dashParts[0]}-${dashParts[1].padStart(2, "0")}-${dashParts[2].padStart(2, "0")}`;
+      } else {
+        const dotParts = trimmed.split(".");
+        if (dotParts.length === 3 && dotParts[2].length === 4) {
+          confirmedDateStr = `${dotParts[2]}-${dotParts[1].padStart(2, "0")}-${dotParts[0].padStart(2, "0")}`;
+        }
+      }
+    }
+    if (!confirmedDateStr) {
+      const d = deliveryDate ? new Date(deliveryDate) : new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      confirmedDateStr = `${yyyy}-${mm}-${dd}`;
+    }
 
-    const confirmedDateStr = confirmedDate.toISOString().split("T")[0];
     lieferschein.date_delivery_confirmed = confirmedDateStr;
     lieferschein.status = "bestätigt";
     lieferschein.confirmed_at = new Date();
