@@ -1868,7 +1868,7 @@ const InvoiceListPage: React.FC = () => {
                               className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
                             >
                               <div className="flex items-center gap-1">
-                                <span>ID</span>
+                                <span></span>
                                 {sortField === "id" && (
                                   <span className="text-xs text-emerald-600 font-bold">
                                     {sortDirection === "asc" ? "↑" : "↓"}
@@ -1927,7 +1927,7 @@ const InvoiceListPage: React.FC = () => {
                               <div className="flex items-center gap-1">
                                 <span>
                                   {activeInvTab === "open_invoices"
-                                    ? "Date created"
+                                    ? "Date "
                                     : "Closed Date"}
                                 </span>
                                 {sortField === "createdAt" && (
@@ -2035,7 +2035,7 @@ const InvoiceListPage: React.FC = () => {
                                     })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {formatDate(invoice.invoiceDate)}
+                                    {formatDate(invoice.invoiceDate, true)}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {invoice.customItemCount ??

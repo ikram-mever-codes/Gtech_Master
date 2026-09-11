@@ -235,7 +235,7 @@ const PackingListTab: React.FC<PackingListTabProps> = ({ searchTerm: externalSea
                     <td className="py-3 px-4 text-[13px] text-[#212529]">{item.cargoNo || "-"}</td>
                     <td className="py-3 px-4 text-[13px] text-[#212529]">{item.invoiceNumber}</td>
                     <td className="py-3 px-4 text-[13px] text-[#212529]">
-                      {item.invoiceDate ? formatDate(item.invoiceDate) : "-"}
+                      {item.invoiceDate ? formatDate(item.invoiceDate, true) : "-"}
                     </td>
                     <td className="py-3 px-4 text-[13px] text-[#212529] text-center">
                       {item.customItemCount || item.items?.length || 0}

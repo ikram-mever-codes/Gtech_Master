@@ -1261,7 +1261,10 @@ export async function generateGtechDocumentPdf(
           /\d{4}/.test(rawDelivery);
 
         if (isValidDate) {
-          doc.text(`Voraussichtliches Lieferdatum: ${formatDate(rawDelivery)}`, LEFT_X, yPos);
+          const deliveryLabel = opts.documentType === "Lieferschein"
+            ? "Lieferdatum:"
+            : "Voraussichtliches Lieferdatum:";
+          doc.text(`${deliveryLabel} ${formatDate(rawDelivery)}`, LEFT_X, yPos);
         } else {
           doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
         }

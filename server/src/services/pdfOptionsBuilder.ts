@@ -117,14 +117,14 @@ export async function buildRechnungPdfOptions(
     rechnung.invoice_date || rechnung.date_created || rechnung.created_at,
   );
   const resolvedDeliveryDate = formatDateStr(
-    rechnung.date_delivery || rechnung.delivery_date || auftrag?.date_delivery,
+    rechnung.date_delivery || auftrag?.date_delivery,
   );
   const rawConfirmedDate =
     rechnung.date_delivery_confirmed ||
     rechnung.real_delivery_date ||
     linkedLieferschein?.date_delivery_confirmed ||
     (linkedLieferschein as any)?.real_delivery_date ||
-    (isLieferscheinConfirmed ? linkedLieferschein?.confirmed_at || linkedLieferschein?.delivery_date : undefined) ||
+    (isLieferscheinConfirmed ? linkedLieferschein?.confirmed_at : undefined) ||
     auftrag?.real_delivery_date ||
     auftrag?.date_delivery_confirmed;
 
@@ -319,13 +319,6 @@ export async function buildLieferscheinPdfOptions(
     return `${day}.${month}.${year}`;
   };
 
-  const resolvedDate = formatDateStr(
-    lieferschein?.delivery_date ||
-    lieferschein?.date_created ||
-    lieferschein?.created_at ||
-    rechnung.invoice_date ||
-    rechnung.created_at,
-  );
 
   const lieferscheinNo =
     lieferschein?.delivery_note_number ||
@@ -350,6 +343,24 @@ export async function buildLieferscheinPdfOptions(
     rawStatus === "geliefert" ||
     rawStatus === "delivered" ||
     !!lieferschein?.confirmed_at;
+
+  const lieferscheinConfirmedDate =
+    lieferschein?.date_delivery_confirmed ||
+    (lieferschein as any)?.real_delivery_date ||
+    (isDelivered && lieferschein?.confirmed_at ? lieferschein.confirmed_at : undefined);
+
+  const resolvedDate = formatDateStr(
+    lieferscheinConfirmedDate ||
+    lieferschein?.delivery_date ||
+    rechnung.invoice_date ||
+    rechnung.created_at,
+  );
+
+  const resolvedPreliminaryDate = formatDateStr(
+    lieferschein?.delivery_date ||
+    rechnung.date_delivery ||
+    auftrag?.date_delivery,
+  );
 
   const rawItems = (rechnung.items || [])
     .slice()
@@ -399,8 +410,8 @@ export async function buildLieferscheinPdfOptions(
     showPrices: false,
     shippingMethod: effectiveShippingMethod,
     notes: lieferschein?.notes || rechnung.notes,
-    deliveryTime: lieferschein?.delivery_date || rechnung.delivery_date,
-    deliveryDate: lieferschein?.delivery_date || rechnung.delivery_date,
+    deliveryTime: resolvedDate || resolvedPreliminaryDate || undefined,
+    deliveryDate: resolvedDate || resolvedPreliminaryDate || undefined,
     deliveryTerms: rechnung.delivery_terms || auftrag?.delivery_terms,
     kundenreferenz,
     outputFilePath: ctx?.outputFilePath || "",

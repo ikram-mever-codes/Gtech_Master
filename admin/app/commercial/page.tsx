@@ -457,16 +457,21 @@ const InvoiceListPage: React.FC = () => {
   );
 
   const isAnyFilterActive = useMemo(() => {
+    const isStatusActive =
+      activeInvTab === "auftrag"
+        ? docFilters.status !== "partially_delivered_and_open" && !!docFilters.status
+        : !!docFilters.status;
+
     return (
       !!docFilters.documentNo.trim() ||
       !!docFilters.customerNo.trim() ||
       !!docFilters.customerName.trim() ||
       !!docFilters.valueAmount.trim() ||
-      !!docFilters.status ||
+      isStatusActive ||
       docFilters.datePreset !== "all" ||
       !!searchTerm
     );
-  }, [docFilters, searchTerm]);
+  }, [docFilters, searchTerm, activeInvTab]);
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewOrder, setViewOrder] = useState<any>(null);
@@ -1625,7 +1630,16 @@ const InvoiceListPage: React.FC = () => {
             : activeInvTab === "rechnung"
               ? String(item.payment_status || "unpaid").toLowerCase()
               : String(item.status || "").toLowerCase();
-        if (itemStatus !== status.toLowerCase()) return false;
+
+        if (status.toLowerCase() === "partially_delivered_and_open") {
+          if (activeInvTab === "auftrag") {
+            if (itemStatus !== "partially_delivered" && itemStatus !== "open") {
+              return false;
+            }
+          }
+        } else if (itemStatus !== status.toLowerCase()) {
+          return false;
+        }
       }
       if (datePreset && datePreset !== "all") {
         const docDate =
@@ -1893,6 +1907,17 @@ const InvoiceListPage: React.FC = () => {
               onClick={() => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
+                if (tab.id === "auftrag" && !docFilters.status) {
+                  setDocFilters((prev) => ({
+                    ...prev,
+                    status: "partially_delivered_and_open",
+                  }));
+                } else if (
+                  tab.id !== "auftrag" &&
+                  docFilters.status === "partially_delivered_and_open"
+                ) {
+                  setDocFilters((prev) => ({ ...prev, status: "" }));
+                }
               }}
               className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
                 ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
@@ -1909,7 +1934,14 @@ const InvoiceListPage: React.FC = () => {
           setDocFilters={setDocFilters}
           isAnyFilterActive={isAnyFilterActive}
           onReset={() => {
-            setDocFilters(initialCommercialFilters);
+            setDocFilters(
+              activeInvTab === "auftrag"
+                ? {
+                    ...initialCommercialFilters,
+                    status: "partially_delivered_and_open",
+                  }
+                : { ...initialCommercialFilters, status: "" },
+            );
             setSearchTerm("");
           }}
         />
