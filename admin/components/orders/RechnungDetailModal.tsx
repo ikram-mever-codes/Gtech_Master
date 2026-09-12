@@ -1250,7 +1250,9 @@ export default function RechnungDetailModal({
                 label="Lieferdatum bestätigt"
                 value={
                   data.date_delivery_confirmed || data.real_delivery_date
-                    ? formatDate(data.date_delivery_confirmed || data.real_delivery_date)
+                    ? formatDate(
+                        data.date_delivery_confirmed || data.real_delivery_date,
+                      )
                     : "—"
                 }
               />
@@ -1423,14 +1425,21 @@ export default function RechnungDetailModal({
                     const lineTaxRate = Number(item.taxRate ?? taxRate);
                     const isSaving = savingItemId === item.id;
                     const isRowDisabled = isFullyCorrected;
+                    const isFreitextLine = (item: any): boolean =>
+                      !item?.itemNo && !item?.sourceItemId;
+                    const FREIZEILE_ROW_COLOR = "#D8964A";
+                    const isFreizeile = isFreitextLine(item);
+                    const rowIsDimmed =
+                      showCorrectionUI && (isRowDisabled || !selected);
 
                     return (
                       <tr
                         key={item.id || idx}
-                        className={
-                          showCorrectionUI && (isRowDisabled || !selected)
-                            ? "bg-gray-50 opacity-60"
-                            : ""
+                        className={rowIsDimmed ? "bg-gray-50 opacity-60" : ""}
+                        style={
+                          !rowIsDimmed && isFreizeile
+                            ? { backgroundColor: FREIZEILE_ROW_COLOR }
+                            : undefined
                         }
                       >
                         {showCorrectionUI && (

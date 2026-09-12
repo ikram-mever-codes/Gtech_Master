@@ -64,9 +64,9 @@ export const getAllLieferscheine = async (
     );
     const auftraege = auftragIds.length
       ? await customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "title"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "title"],
+        })
       : [];
     const auftragTitleById = new Map(
       auftraege.map((a: any) => [a.id, a.title]),
@@ -100,7 +100,10 @@ export const getAllLieferscheine = async (
 
       const rawStatus = String(ls.status || "").toLowerCase();
       const calcStatus =
-        ls.confirmed_at || rawStatus === "bestätigt" || rawStatus === "confirmed" || rawStatus === "open"
+        ls.confirmed_at ||
+        rawStatus === "bestätigt" ||
+        rawStatus === "confirmed" ||
+        rawStatus === "open"
           ? "bestätigt"
           : ls.status || "vorläufig";
 
@@ -125,6 +128,7 @@ export const getAllLieferscheine = async (
           id: item.id,
           itemName: item.item_name || "—",
           itemNo: item.itemNo || "—",
+          sourceItemId: item.sourceItemId,
           quantity: item.quantity,
           remark: item.remark || item.notes,
           weight: item.weight,
@@ -390,7 +394,9 @@ export const confirmLieferscheinDelivery = async (
     if (lieferschein.rechnung_id) {
       try {
         const rechnungRepo = AppDataSource.getRepository(Rechnung);
-        const rechnung = await rechnungRepo.findOne({ where: { id: lieferschein.rechnung_id } });
+        const rechnung = await rechnungRepo.findOne({
+          where: { id: lieferschein.rechnung_id },
+        });
         if (rechnung) {
           rechnung.date_delivery_confirmed = confirmedDateStr;
           rechnung.real_delivery_date = confirmedDateStr;
@@ -398,7 +404,9 @@ export const confirmLieferscheinDelivery = async (
 
           if (rechnung.auftrag_id) {
             const auftragRepo = AppDataSource.getRepository(CustomerOrder);
-            const auftrag = await auftragRepo.findOne({ where: { id: rechnung.auftrag_id } });
+            const auftrag = await auftragRepo.findOne({
+              where: { id: rechnung.auftrag_id },
+            });
             if (auftrag) {
               auftrag.real_delivery_date = confirmedDateStr;
               auftrag.date_delivery_confirmed = confirmedDateStr;
@@ -407,19 +415,27 @@ export const confirmLieferscheinDelivery = async (
           }
         }
       } catch (err) {
-        console.error("Error updating confirmed delivery date on linked Rechnung/Auftrag:", err);
+        console.error(
+          "Error updating confirmed delivery date on linked Rechnung/Auftrag:",
+          err,
+        );
       }
     } else if (lieferschein.auftrag_id) {
       try {
         const auftragRepo = AppDataSource.getRepository(CustomerOrder);
-        const auftrag = await auftragRepo.findOne({ where: { id: lieferschein.auftrag_id } });
+        const auftrag = await auftragRepo.findOne({
+          where: { id: lieferschein.auftrag_id },
+        });
         if (auftrag) {
           auftrag.real_delivery_date = confirmedDateStr;
           auftrag.date_delivery_confirmed = confirmedDateStr;
           await auftragRepo.save(auftrag);
         }
       } catch (err) {
-        console.error("Error updating confirmed delivery date on linked Auftrag:", err);
+        console.error(
+          "Error updating confirmed delivery date on linked Auftrag:",
+          err,
+        );
       }
     }
 
@@ -631,7 +647,9 @@ export const downloadLieferscheinPdf = async (
         ["Status", String(displayStatus || "")],
         ["Kontakt", String(contactName || "")],
         ["Kunde", String(kundeCombined || "")],
-        ...(auftragNo ? [["Auftrag", String(auftragNo)] as [string, string]] : []),
+        ...(auftragNo
+          ? [["Auftrag", String(auftragNo)] as [string, string]]
+          : []),
         [
           "Datum",
           String(
