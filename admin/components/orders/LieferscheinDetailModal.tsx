@@ -4,7 +4,17 @@ import React, { useState, useEffect } from "react";
 import { XMarkIcon, ClipboardDocumentIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { errorStyles, successStyles } from "@/utils/constants";
-import { Loader2, FileText, Pencil, Save, X, Truck, Calendar, CheckCircle, Ban } from "lucide-react";
+import {
+  Loader2,
+  FileText,
+  Pencil,
+  Save,
+  X,
+  Truck,
+  Calendar,
+  CheckCircle,
+  Ban,
+} from "lucide-react";
 import { formatDate } from "@/utils/date";
 import {
   updateLieferscheinStatus,
@@ -83,7 +93,12 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   const postalCode = (addr.postalCode || addr.postal_code || "").trim();
   const city = (addr.city || "").trim();
 
-  if (postalCode && city && street.includes(postalCode) && street.includes(city)) {
+  if (
+    postalCode &&
+    city &&
+    street.includes(postalCode) &&
+    street.includes(city)
+  ) {
     street = street
       .replace(new RegExp(`,?\\s*${postalCode}\\s+${city}`, "gi"), "")
       .replace(/,?\s*(Germany|Deutschland|DE)\s*/gi, "")
@@ -156,10 +171,13 @@ const ConfirmDeliveryPopup: React.FC<ConfirmDeliveryPopupProps> = ({
     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
       <div className="flex items-center gap-3 mb-4">
         <CheckCircle className="w-6 h-6 text-emerald-500 shrink-0" />
-        <h3 className="text-base font-bold text-gray-900">Lieferung bestätigen</h3>
+        <h3 className="text-base font-bold text-gray-900">
+          Lieferung bestätigen
+        </h3>
       </div>
       <p className="text-sm text-gray-700 leading-relaxed mb-6">
-        Wurde Lieferung <strong>{deliveryNoteNo}</strong>{title ? ` – ${title}` : ""} an Kunde{" "}
+        Wurde Lieferung <strong>{deliveryNoteNo}</strong>
+        {title ? ` – ${title}` : ""} an Kunde{" "}
         <strong>{customerDisplayName}</strong> erfolgreich am{" "}
         <strong>{deliveryDate}</strong> geliefert?
       </p>
@@ -176,7 +194,11 @@ const ConfirmDeliveryPopup: React.FC<ConfirmDeliveryPopupProps> = ({
           disabled={isLoading}
           className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 flex items-center gap-2 disabled:opacity-50"
         >
-          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <CheckCircle className="w-4 h-4" />
+          )}
           Ja, bestätigen
         </button>
       </div>
@@ -252,7 +274,7 @@ export default function LieferscheinDetailModal({
 
   const netWeightKg = items.reduce((sum: number, it: any) => {
     const qty = Number(it.quantity) || 1;
-    return sum + (Number(it.weight) || 0) * qty / 1000;
+    return sum + ((Number(it.weight) || 0) * qty) / 1000;
   }, 0);
   const extraWeightKg = items.reduce(
     (sum: number, it: any) => sum + (Number(it.extraWeight) || 0),
@@ -264,7 +286,10 @@ export default function LieferscheinDetailModal({
     legalName: companyName,
     contactName: customer.contactName || snapshot.contactName,
     address:
-      customer.billToAddress || snapshot.billToAddress || customer.bill_to_address || snapshot.address,
+      customer.billToAddress ||
+      snapshot.billToAddress ||
+      customer.bill_to_address ||
+      snapshot.address,
     postalCode: customer.postalCode || snapshot.postalCode,
     city: customer.city || snapshot.city,
     country: customer.country || snapshot.country,
@@ -275,22 +300,24 @@ export default function LieferscheinDetailModal({
 
   const deliveryAddr = data.deliveryAddress
     ? {
-      legalName: data.deliveryAddress.addressName,
-      contactName: data.deliveryAddress.contactName,
-      street: data.deliveryAddress.street,
-      postalCode: data.deliveryAddress.postalCode,
-      city: data.deliveryAddress.city,
-      country: data.deliveryAddress.country,
-      contactPhone: data.deliveryAddress.contactPhone,
-    }
+        legalName: data.deliveryAddress.addressName,
+        contactName: data.deliveryAddress.contactName,
+        street: data.deliveryAddress.street,
+        postalCode: data.deliveryAddress.postalCode,
+        city: data.deliveryAddress.city,
+        country: data.deliveryAddress.country,
+        contactPhone: data.deliveryAddress.contactPhone,
+      }
     : {
-      street: customer.shipToAddress || snapshot.street || customer.ship_to_address,
-      city: customer.city || snapshot.city || customer.deliveryCity,
-      postalCode: customer.postalCode || snapshot.postalCode,
-      country: customer.country || snapshot.country,
-      contactName: customer.contactName || snapshot.contactName,
-      contactPhone: customer.phone || snapshot.phone || customer.contactPhoneNumber,
-    };
+        street:
+          customer.shipToAddress || snapshot.street || customer.ship_to_address,
+        city: customer.city || snapshot.city || customer.deliveryCity,
+        postalCode: customer.postalCode || snapshot.postalCode,
+        country: customer.country || snapshot.country,
+        contactName: customer.contactName || snapshot.contactName,
+        contactPhone:
+          customer.phone || snapshot.phone || customer.contactPhoneNumber,
+      };
 
   const handleSaveDeliveryDate = async () => {
     if (!deliveryDate) {
@@ -305,7 +332,10 @@ export default function LieferscheinDetailModal({
       onChanged?.();
       setIsEditMode(false);
     } catch (error: any) {
-      toast.error(error?.message || "Failed to update delivery date.", errorStyles);
+      toast.error(
+        error?.message || "Failed to update delivery date.",
+        errorStyles,
+      );
     } finally {
       setIsSaving(false);
     }
@@ -327,7 +357,10 @@ export default function LieferscheinDetailModal({
   const handleConfirmDelivery = async () => {
     setIsConfirming(true);
     try {
-      const result = await confirmLieferscheinDelivery(data.id, pendingDeliveryDate);
+      const result = await confirmLieferscheinDelivery(
+        data.id,
+        pendingDeliveryDate,
+      );
       toast.success("Lieferung erfolgreich bestätigt!", successStyles);
       setData((prev: any) => ({
         ...prev,
@@ -379,13 +412,20 @@ export default function LieferscheinDetailModal({
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
             <div className="flex items-center gap-3 mb-4">
               <Ban className="w-6 h-6 text-rose-500 shrink-0" />
-              <h3 className="text-base font-bold text-gray-900">Lieferschein stornieren?</h3>
+              <h3 className="text-base font-bold text-gray-900">
+                Lieferschein stornieren?
+              </h3>
             </div>
             <p className="text-sm text-gray-700 mb-6">
-              Möchten Sie Lieferschein <strong>{deliveryNoteNo}</strong> wirklich stornieren? Diese Aktion kann nicht rückgängig gemacht werden.
+              Möchten Sie Lieferschein <strong>{deliveryNoteNo}</strong>{" "}
+              wirklich stornieren? Diese Aktion kann nicht rückgängig gemacht
+              werden.
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowStornierConfirm(false)} className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button
+                onClick={() => setShowStornierConfirm(false)}
+                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
                 Abbrechen
               </button>
               <button
@@ -393,7 +433,11 @@ export default function LieferscheinDetailModal({
                 disabled={isStorniering}
                 className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 flex items-center gap-2 disabled:opacity-50"
               >
-                {isStorniering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                {isStorniering ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Ban className="w-4 h-4" />
+                )}
                 Stornieren
               </button>
             </div>
@@ -410,7 +454,9 @@ export default function LieferscheinDetailModal({
                 <p className="text-lg font-bold text-gray-900 truncate">
                   Lieferschein {deliveryNoteNo}
                 </p>
-                <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getStatusColor(status)}`}>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getStatusColor(status)}`}
+                >
                   {status === "open" ? "bestätigt" : status}
                 </span>
                 {highlightColor && (
@@ -462,7 +508,9 @@ export default function LieferscheinDetailModal({
                     </button>
                     {showDatePicker && (
                       <div className="absolute right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl p-3 z-10 min-w-[220px]">
-                        <p className="text-xs font-semibold text-gray-500 mb-2">Lieferdatum wählen</p>
+                        <p className="text-xs font-semibold text-gray-500 mb-2">
+                          Lieferdatum wählen
+                        </p>
                         <input
                           type="date"
                           value={pickedDate}
@@ -499,8 +547,8 @@ export default function LieferscheinDetailModal({
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-2 text-sm text-blue-700">
                 <Save className="w-4 h-4" />
                 <span>
-                  <strong>Edit Mode Enabled:</strong> You can modify the delivery
-                  date. Click &quot;Save&quot; to apply changes.
+                  <strong>Edit Mode Enabled:</strong> You can modify the
+                  delivery date. Click &quot;Save&quot; to apply changes.
                 </span>
               </div>
             )}
@@ -618,9 +666,17 @@ export default function LieferscheinDetailModal({
                       const qty = Number(item.quantity) || 1;
                       const weight = (Number(item.weight) || 0) / 1000;
                       const totalWeight = qty * weight;
-
+                      const isFreizeile = !item?.sourceItemId;
+                      const FREIZEILE_ROW_COLOR = "#D8964A";
                       return (
-                        <tr key={item.id || idx}>
+                        <tr
+                          key={item.id || idx}
+                          style={
+                            isFreizeile
+                              ? { backgroundColor: FREIZEILE_ROW_COLOR }
+                              : undefined
+                          }
+                        >
                           <td className="px-2 py-2 text-gray-500">{idx + 1}</td>
                           <td className="px-2 py-2">
                             <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
@@ -679,7 +735,9 @@ export default function LieferscheinDetailModal({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigator.clipboard.writeText(data.internal_notes || data.internalNotes || "");
+                        navigator.clipboard.writeText(
+                          data.internal_notes || data.internalNotes || "",
+                        );
                         toast.success("Internal comment copied to clipboard!");
                       }}
                       className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
@@ -703,7 +761,13 @@ export default function LieferscheinDetailModal({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigator.clipboard.writeText(data.notes || data.comment || data.notes_external || data.remark || "");
+                        navigator.clipboard.writeText(
+                          data.notes ||
+                            data.comment ||
+                            data.notes_external ||
+                            data.remark ||
+                            "",
+                        );
                         toast.success("External comment copied to clipboard!");
                       }}
                       className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
@@ -714,7 +778,11 @@ export default function LieferscheinDetailModal({
                   </h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {data.notes || data.comment || data.notes_external || data.remark || "—"}
+                  {data.notes ||
+                    data.comment ||
+                    data.notes_external ||
+                    data.remark ||
+                    "—"}
                 </p>
               </div>
             </div>
