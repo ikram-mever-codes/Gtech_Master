@@ -817,7 +817,9 @@ const CombinedInquiriesPageContent = () => {
         ...inquiryFilters,
         page: 1,
         limit: 10000,
-        ...(searchParams.get("filter") ? { filter: searchParams.get("filter") } : {}),
+        ...(searchParams.get("filter")
+          ? { filter: searchParams.get("filter") }
+          : {}),
         ...(selectedCustomerId ? { customerId: selectedCustomerId } : {}),
       };
       const response = await getAllInquiries(filters);
@@ -1626,8 +1628,8 @@ const CombinedInquiriesPageContent = () => {
               <FilterResetIcon
                 isActive={Boolean(
                   inquiryFilters.tags ||
-                    inquiryFilters.requestItemTags ||
-                    selectedCustomerId,
+                  inquiryFilters.requestItemTags ||
+                  selectedCustomerId,
                 )}
                 onReset={() => {
                   setInquiryFilters((prev: any) => ({
@@ -2596,7 +2598,6 @@ const CombinedInquiriesPageContent = () => {
                       placeholder="Enter inquiry description"
                     />
                   </div>
-
                   <div className="col-span-2 grid grid-cols-4 gap-4">
                     <div className="col-span-1">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2696,502 +2697,514 @@ const CombinedInquiriesPageContent = () => {
                       </label>
                     </div>
                   </div>
-                  <div
-                    className={`col-span-2 rounded-xl p-4 mt-2 space-y-4 transition-colors ${inquiryFormData.isAssembly ? "bg-orange-100/50 border border-orange-200" : "bg-gray-50/80 border border-gray-200"}`}
-                  >
-                    <div className="grid grid-cols-4 gap-3 items-end">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          {inquiryFormData.isAssembly
-                            ? "Assembly Picture"
-                            : "Item Picture"}
-                        </label>
-                        <div className="flex items-center gap-2">
-                          {inquiryFormData.image ? (
-                            <div className="relative w-10 h-10 rounded border border-gray-300 overflow-hidden bg-gray-50 flex-shrink-0">
-                              <img
-                                src={inquiryFormData.image}
-                                alt="Assembly"
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    image: "",
-                                  })
-                                }
-                                className="absolute top-0 right-0 bg-red-600 text-white rounded-bl p-0.5 hover:bg-red-700"
-                                title="Remove image"
-                              >
-                                <XMarkIcon className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="w-10 h-10 rounded border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 flex-shrink-0">
-                              <PhotoIcon className="w-5 h-5" />
-                            </div>
-                          )}
-                          <label
-                            className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-all ${
-                              uploadingAssemblyImage
-                                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                            }`}
-                          >
-                            {uploadingAssemblyImage
-                              ? "Uploading..."
-                              : inquiryFormData.image
-                                ? "Change"
-                                : "Upload"}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              disabled={
-                                uploadingAssemblyImage ||
-                                (inquiryModalMode === "edit" &&
-                                  !editModeEnabled)
-                              }
-                              onChange={handleAssemblyImageUpload}
-                            />
+                  {inquiryFormData.isAssembly && (
+                    <div
+                      className={`col-span-2 rounded-xl p-4 mt-2 space-y-4 transition-colors ${inquiryFormData.isAssembly ? "bg-orange-100/50 border border-orange-200" : "bg-gray-50/80 border border-gray-200"}`}
+                    >
+                      <div className="grid grid-cols-4 gap-3 items-end">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            {inquiryFormData.isAssembly
+                              ? "Assembly Picture"
+                              : "Item Picture"}
                           </label>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          ItemName*
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.name}
-                          readOnly
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          ItemNo*
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.itemNo || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              itemNo: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter item number"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Prio
-                        </label>
-                        <select
-                          value={inquiryFormData.priority}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              priority: e.target.value as any,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {getPriorityOptions().map((priority) => (
-                            <option key={priority.value} value={priority.value}>
-                              {priority.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-4 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Qty
-                        </label>
-                        <input
-                          type="number"
-                          value={inquiryFormData.qty}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              qty: parseInt(e.target.value),
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          min="1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Interval
-                        </label>
-                        <select
-                          value={inquiryFormData.interval || "Monatlich"}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              interval: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {getAvailableIntervals().map((interval) => (
-                            <option key={interval.value} value={interval.value}>
-                              {interval.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Asana Link
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.asanaLink || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              asanaLink: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Link to Asana"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Status
-                        </label>
-                        <select
-                          value={inquiryFormData.requestStatus || "Draft"}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              requestStatus: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {getRequestStatuses().map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Purchase Price
-                        </label>
-                        <input
-                          type="number"
-                          value={inquiryFormData.purchasePrice || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              purchasePrice:
-                                parseFloat(e.target.value) || undefined,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Currency Purchase
-                        </label>
-                        <select
-                          value={inquiryFormData.purchasePriceCurrency}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              purchasePriceCurrency: e.target.value as any,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {getAvailableCurrencies().map((currency) => (
-                            <option key={currency.value} value={currency.value}>
-                              {currency.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          TARIC
-                        </label>
-                        <select
-                          value={inquiryFormData.taric || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              taric: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select TARIC Code</option>
-                          {tarics.map((taric) => (
-                            <option key={taric.id} value={taric.code}>
-                              {formatTaricDisplay(taric)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-4 gap-3 border-t border-orange-200/50 pt-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Weight (kg)
-                        </label>
-                        <input
-                          type="number"
-                          value={inquiryFormData.weight || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              weight: parseFloat(e.target.value) || undefined,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          step="0.001"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Length (cm)
-                        </label>
-                        <input
-                          type="number"
-                          value={inquiryFormData.length || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              length: parseFloat(e.target.value) || undefined,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          step="0.1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Width (cm)
-                        </label>
-                        <input
-                          type="number"
-                          value={inquiryFormData.width || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              width: parseFloat(e.target.value) || undefined,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          step="0.1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Height (cm)
-                        </label>
-                        <input
-                          type="number"
-                          value={inquiryFormData.height || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              height: parseFloat(e.target.value) || undefined,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          step="0.1"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 border-t border-orange-200/50 pt-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Urgency (text field)
-                        </label>
-                        <textarea
-                          value={inquiryFormData.urgency1 || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              urgency1: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          rows={3}
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          placeholder="Enter urgency details..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Urgency (text field)
-                        </label>
-                        <textarea
-                          value={inquiryFormData.urgency2 || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              urgency2: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          rows={3}
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          placeholder="Enter quality criteria / urgency..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Pain Points (tags)
-                        </label>
-                        <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white rounded-lg focus-within:ring-2 focus-within:ring-orange-500/50 transition-all">
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {inquiryFormData.painPoints?.map((tag, i) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-800 border border-orange-200"
-                              >
-                                {tag}
+                          <div className="flex items-center gap-2">
+                            {inquiryFormData.image ? (
+                              <div className="relative w-10 h-10 rounded border border-gray-300 overflow-hidden bg-gray-50 flex-shrink-0">
+                                <img
+                                  src={inquiryFormData.image}
+                                  alt="Assembly"
+                                  className="w-full h-full object-cover"
+                                />
                                 <button
                                   type="button"
                                   onClick={() =>
                                     setInquiryFormData({
                                       ...inquiryFormData,
-                                      painPoints:
-                                        inquiryFormData.painPoints?.filter(
-                                          (_, idx) => idx !== i,
-                                        ),
+                                      image: "",
                                     })
                                   }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="ml-1 text-orange-400 hover:text-orange-600 focus:outline-none"
+                                  className="absolute top-0 right-0 bg-red-600 text-white rounded-bl p-0.5 hover:bg-red-700"
+                                  title="Remove image"
                                 >
-                                  <XMarkIcon className="h-3 w-3" />
+                                  <XMarkIcon className="w-3 h-3" />
                                 </button>
-                              </span>
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={inquiryTagInput}
-                              onChange={(e) =>
-                                setInquiryTagInput(e.target.value)
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === ",") {
-                                  e.preventDefault();
-                                  handleAddInquiryPainPoint();
-                                }
-                              }}
-                              disabled={
-                                inquiryModalMode === "edit" && !editModeEnabled
-                              }
-                              placeholder="Type tag..."
-                              className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleAddInquiryPainPoint}
-                              disabled={
-                                (inquiryModalMode === "edit" &&
-                                  !editModeEnabled) ||
-                                !inquiryTagInput.trim()
-                              }
-                              className="p-1 text-orange-500 hover:text-orange-700 transition-colors disabled:text-gray-300"
+                              </div>
+                            ) : (
+                              <div className="w-10 h-10 rounded border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 flex-shrink-0">
+                                <PhotoIcon className="w-5 h-5" />
+                              </div>
+                            )}
+                            <label
+                              className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-all ${
+                                uploadingAssemblyImage
+                                  ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                              }`}
                             >
-                              <PlusIcon className="h-5 w-5" />
-                            </button>
+                              {uploadingAssemblyImage
+                                ? "Uploading..."
+                                : inquiryFormData.image
+                                  ? "Change"
+                                  : "Upload"}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={
+                                  uploadingAssemblyImage ||
+                                  (inquiryModalMode === "edit" &&
+                                    !editModeEnabled)
+                                }
+                                onChange={handleAssemblyImageUpload}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            ItemName*
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.name}
+                            readOnly
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            ItemNo*
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.itemNo || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                itemNo: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="Enter item number"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Prio
+                          </label>
+                          <select
+                            value={inquiryFormData.priority}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                priority: e.target.value as any,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getPriorityOptions().map((priority) => (
+                              <option
+                                key={priority.value}
+                                value={priority.value}
+                              >
+                                {priority.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Qty
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.qty}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                qty: parseInt(e.target.value),
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Interval
+                          </label>
+                          <select
+                            value={inquiryFormData.interval || "Monatlich"}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                interval: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getAvailableIntervals().map((interval) => (
+                              <option
+                                key={interval.value}
+                                value={interval.value}
+                              >
+                                {interval.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Asana Link
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.asanaLink || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                asanaLink: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="Link to Asana"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Status
+                          </label>
+                          <select
+                            value={inquiryFormData.requestStatus || "Draft"}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                requestStatus: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getRequestStatuses().map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Purchase Price
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.purchasePrice || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                purchasePrice:
+                                  parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Currency Purchase
+                          </label>
+                          <select
+                            value={inquiryFormData.purchasePriceCurrency}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                purchasePriceCurrency: e.target.value as any,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getAvailableCurrencies().map((currency) => (
+                              <option
+                                key={currency.value}
+                                value={currency.value}
+                              >
+                                {currency.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            TARIC
+                          </label>
+                          <select
+                            value={inquiryFormData.taric || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                taric: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            <option value="">Select TARIC Code</option>
+                            {tarics.map((taric) => (
+                              <option key={taric.id} value={taric.code}>
+                                {formatTaricDisplay(taric)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3 border-t border-orange-200/50 pt-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Weight (kg)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.weight || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                weight: parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.001"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Length (cm)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.length || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                length: parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Width (cm)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.width || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                width: parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Height (cm)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.height || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                height: parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.1"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 border-t border-orange-200/50 pt-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Urgency (text field)
+                          </label>
+                          <textarea
+                            value={inquiryFormData.urgency1 || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                urgency1: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            placeholder="Enter urgency details..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Urgency (text field)
+                          </label>
+                          <textarea
+                            value={inquiryFormData.urgency2 || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                urgency2: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            placeholder="Enter quality criteria / urgency..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Pain Points (tags)
+                          </label>
+                          <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white rounded-lg focus-within:ring-2 focus-within:ring-orange-500/50 transition-all">
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {inquiryFormData.painPoints?.map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-800 border border-orange-200"
+                                >
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setInquiryFormData({
+                                        ...inquiryFormData,
+                                        painPoints:
+                                          inquiryFormData.painPoints?.filter(
+                                            (_, idx) => idx !== i,
+                                          ),
+                                      })
+                                    }
+                                    disabled={
+                                      inquiryModalMode === "edit" &&
+                                      !editModeEnabled
+                                    }
+                                    className="ml-1 text-orange-400 hover:text-orange-600 focus:outline-none"
+                                  >
+                                    <XMarkIcon className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={inquiryTagInput}
+                                onChange={(e) =>
+                                  setInquiryTagInput(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === ",") {
+                                    e.preventDefault();
+                                    handleAddInquiryPainPoint();
+                                  }
+                                }}
+                                disabled={
+                                  inquiryModalMode === "edit" &&
+                                  !editModeEnabled
+                                }
+                                placeholder="Type tag..."
+                                className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddInquiryPainPoint}
+                                disabled={
+                                  (inquiryModalMode === "edit" &&
+                                    !editModeEnabled) ||
+                                  !inquiryTagInput.trim()
+                                }
+                                className="p-1 text-orange-500 hover:text-orange-700 transition-colors disabled:text-gray-300"
+                              >
+                                <PlusIcon className="h-5 w-5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
+                      {inquiryFormData.isAssembly && (
+                        <div className="pt-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Assembly Instructions
+                          </label>
+                          <textarea
+                            value={inquiryFormData.assemblyInstructions}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                assemblyInstructions: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            rows={2}
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            placeholder="Enter assembly instructions..."
+                          />
+                        </div>
+                      )}
                     </div>
-                    {inquiryFormData.isAssembly && (
-                      <div className="pt-2">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Assembly Instructions
-                        </label>
-                        <textarea
-                          value={inquiryFormData.assemblyInstructions}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              assemblyInstructions: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          rows={2}
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                          placeholder="Enter assembly instructions..."
-                        />
-                      </div>
-                    )}
-                  </div>
+                  )}{" "}
                 </div>
               </div>
             </div>
