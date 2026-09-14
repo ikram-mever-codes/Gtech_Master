@@ -930,14 +930,14 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                                             </thead>
                                                                             <tbody className="divide-y divide-gray-100">
                                                                                 {details.orderItems.filter((oi: any) => oi != null).map((oi: any) => {
-                                                                                    const itemName = oi.item?.item_name || "—";
-                                                                                    const itemNo = oi.item?.material || oi.item?.item_no || "—";
+                                                                                    const itemName = oi.item?.item_name || oi.itemName || "—";
+                                                                                    const itemNo = oi.item?.item_no_de || oi.item?.material || oi.master_id || "—";
                                                                                     const ean = oi.item?.ean || oi.item?.model || "—";
-                                                                                    const customerName = oi.order?.customer?.companyName || oi.order?.customer?.displayName || oi.order?.customer?.legalName || "—";
-                                                                                    const orderNo = oi.order?.order_no || "—";
-                                                                                    const qty = oi.qty ?? 1;
-                                                                                    const rawPrice = oi.eur_special_price ?? oi.price;
-                                                                                    const priceStr = rawPrice !== undefined && rawPrice !== null ? `€${Number(rawPrice).toFixed(2)}` : "—";
+                                                                                    const customerName = oi.order?.customer?.companyName || oi.order?.customer?.displayName || "—";
+                                                                                    const orderNo = oi.order?.order_no || (oi.order_id ? `#${oi.order_id}` : "—");
+                                                                                    const qty = oi.qty ?? oi.quantity ?? 1;
+                                                                                    const rawPrice = oi.eur_special_price ?? oi.price ?? oi.unitPrice;
+                                                                                    const priceStr = rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) ? `€${Number(rawPrice).toFixed(2)}` : "—";
 
                                                                                     return (
                                                                                         <tr key={oi.id} className="hover:bg-gray-50 transition-colors">
