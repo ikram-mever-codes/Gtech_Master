@@ -490,6 +490,7 @@ export default function OrdersTable({
       render: (row) => {
         const name =
           row.customer?.companyName ||
+          row.customer?.displayName ||
           row.customer?.name ||
           row.customer_name ||
           (row.customer_id ? `Customer #${row.customer_id}` : "-");
