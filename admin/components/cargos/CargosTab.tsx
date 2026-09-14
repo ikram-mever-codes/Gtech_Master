@@ -900,16 +900,12 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                             }
                                                             return (
                                                                 <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                                                                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                                                                        <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                                            Assigned Order Items ({details.orderItems.length})
-                                                                        </h4>
-                                                                    </div>
+
                                                                     <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
                                                                         <table className="w-full text-left text-xs text-gray-600">
                                                                             <thead className="bg-gray-100 border-b border-gray-200">
                                                                                 <tr>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Item Name</th>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">OrderItem</th>
                                                                                     <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Item No</th>
                                                                                     <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">EAN</th>
                                                                                     <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Customer</th>
