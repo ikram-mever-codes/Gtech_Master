@@ -881,16 +881,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                             <tr className="bg-gray-50/50 border-t border-b border-gray-100">
                                                 <td colSpan={13} className="px-6 py-4">
                                                     <div>
-                                                        <div className="text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wider flex items-center gap-1.5 select-none">
-                                                            <ClipboardList className="h-4 w-4 text-blue-500" />
-                                                            <span>
-                                                                Assigned Orders &amp; Items for Cargo No:{" "}
-                                                                <strong className="text-gray-800">
-                                                                    {cargo.cargo_no || cargo.id}
-                                                                </strong>
-                                                            </span>
-                                                        </div>
-
                                                         {(() => {
                                                             const details = cargoDetailsMap[cargo.id] || { orders: [], orderItems: [], loading: false };
                                                             if (details.loading) {
@@ -1230,4 +1220,5 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
         </div>
     );
 });
+
 export default CargosTab;
