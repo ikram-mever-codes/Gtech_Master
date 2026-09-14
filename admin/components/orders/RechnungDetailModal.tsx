@@ -117,9 +117,38 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
     .filter(Boolean)
     .join(", ");
 
+  const custId =
+    addr?.customerId ||
+    addr?.customer_id ||
+    addr?.id ||
+    addr?.businessId ||
+    addr?.original_customer_id;
+
+  const renderCustomerName = (name: string, isBold: boolean = false) => {
+    const cls = isBold ? "font-bold text-gray-900" : "";
+    if (custId) {
+      return (
+        <div className={cls}>
+          <a
+            href={`/bussinesses/${custId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#8CC21B] hover:underline cursor-pointer"
+          >
+            {name}
+          </a>
+        </div>
+      );
+    }
+    return <div className={cls}>{name}</div>;
+  };
+
   return (
     <div className="space-y-1 text-sm text-gray-700">
-      {addr.legalName && <div>{addr.legalName}</div>}
+      {addr.companyName && renderCustomerName(addr.companyName, true)}
+      {addr.legalName &&
+        addr.legalName !== addr.companyName &&
+        renderCustomerName(addr.legalName, false)}
       {addr.contactName && <div>{addr.contactName}</div>}
       {addressLine && (
         <div className="whitespace-normal break-words">{addressLine}</div>
@@ -595,7 +624,18 @@ export default function RechnungDetailModal({
   const rechnungCustomer = data.customer || {};
   const snapshot = data.customerSnapshot || null;
 
+  const custId =
+    data.customer_id ||
+    data.customerId ||
+    data.customer?.id ||
+    snapshot?.id ||
+    snapshot?.customer_id ||
+    snapshot?.original_customer_id ||
+    snapshot?.businessId;
+
   const billingAddr = {
+    customerId: custId,
+    companyName: companyName,
     legalName: companyName,
     contactName: snapshot?.contactName,
     address:
@@ -1025,7 +1065,18 @@ export default function RechnungDetailModal({
                 )}
             </div>
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
-              <span>{companyName}</span>
+              {custId ? (
+                <a
+                  href={`/bussinesses/${custId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
+                >
+                  {companyName}
+                </a>
+              ) : (
+                <span>{companyName}</span>
+              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -1467,7 +1518,27 @@ export default function RechnungDetailModal({
                           {item.itemNo || item.material || "—"}
                         </td>
                         <td className="px-2 py-2">
-                          {item.item_name || "Line Item"}
+                          {(() => {
+                            const masterId =
+                              item.sourceItemId ||
+                              item.source_item_id ||
+                              item.itemId ||
+                              item.item_id ||
+                              item.masterItemId ||
+                              item.item?.id;
+                            return masterId ? (
+                              <a
+                                href={`/items/${masterId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
+                              >
+                                {item.item_name || item.itemName || "Line Item"}
+                              </a>
+                            ) : (
+                              item.item_name || item.itemName || "Line Item"
+                            );
+                          })()}
                         </td>
                         {showViewOnly && (
                           <td className="px-2 py-2 text-gray-600">
