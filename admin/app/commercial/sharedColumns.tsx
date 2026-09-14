@@ -213,12 +213,12 @@ export const kundeColumn: ColumnDef<any> = {
   sortKey: "customer",
   sortValue: (row) =>
     (
-      row.customer?.display_name ||
-      row.customerSnapshot?.displayName ||
-      row.customer?.displayName ||
-      row.customerSnapshot?.companyName ||
-      row.customer?.company_name ||
       row.customer?.companyName ||
+      row.customer?.displayName ||
+      row.customer?.display_name ||
+      row.customer?.company_name ||
+      row.customerSnapshot?.displayName ||
+      row.customerSnapshot?.companyName ||
       row.customerName ||
       row.supplier?.displayName ||
       row.supplier?.company_name ||
@@ -227,12 +227,12 @@ export const kundeColumn: ColumnDef<any> = {
     ).toLowerCase(),
   render: (row) => {
     const text =
-      row.customer?.display_name ||
-      row.customerSnapshot?.displayName ||
-      row.customer?.displayName ||
-      row.customerSnapshot?.companyName ||
-      row.customer?.company_name ||
       row.customer?.companyName ||
+      row.customer?.displayName ||
+      row.customer?.display_name ||
+      row.customer?.company_name ||
+      row.customerSnapshot?.displayName ||
+      row.customerSnapshot?.companyName ||
       row.customerName ||
       row.supplier?.displayName ||
       row.supplier?.company_name ||

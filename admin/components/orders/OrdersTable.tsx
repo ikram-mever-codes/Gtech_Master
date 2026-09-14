@@ -407,16 +407,6 @@ export default function OrdersTable({
         >
           <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
         </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(row);
-          }}
-          title="Edit Order"
-          className="px-2 py-1 text-[10px] font-bold bg-[#2F6B46] text-white rounded-[4px] hover:bg-[#255638] transition shadow-md"
-        >
-          Edit
-        </button>
       </div>
     );
   };
@@ -490,6 +480,7 @@ export default function OrdersTable({
       render: (row) => {
         const name =
           row.customer?.companyName ||
+          row.customer?.displayName ||
           row.customer?.name ||
           row.customer_name ||
           (row.customer_id ? `Customer #${row.customer_id}` : "-");

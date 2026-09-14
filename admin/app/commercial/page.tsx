@@ -1360,13 +1360,13 @@ const InvoiceListPage: React.FC = () => {
         const cust = r.customer || {};
         const snap = r.customerSnapshot || {};
         const dispName =
-          cust.display_name ||
+          cust.companyName ||
           cust.displayName ||
+          cust.display_name ||
+          cust.company_name ||
           snap.displayName ||
           snap.display_name ||
           snap.companyName ||
-          cust.company_name ||
-          cust.companyName ||
           cust.name ||
           "";
         return {
@@ -1382,8 +1382,8 @@ const InvoiceListPage: React.FC = () => {
             displayName: dispName,
             display_name: dispName,
             companyName:
-              cust.company_name ||
               cust.companyName ||
+              cust.company_name ||
               cust.name ||
               snap.companyName ||
               "—",
@@ -1436,13 +1436,13 @@ const InvoiceListPage: React.FC = () => {
         const cust = rk.customer || {};
         const snap = rk.customerSnapshot || {};
         const dispName =
-          cust.display_name ||
+          cust.companyName ||
           cust.displayName ||
+          cust.display_name ||
+          cust.company_name ||
           snap.displayName ||
           snap.display_name ||
           snap.companyName ||
-          cust.company_name ||
-          cust.companyName ||
           cust.name ||
           "";
         return {
@@ -1460,8 +1460,8 @@ const InvoiceListPage: React.FC = () => {
             displayName: dispName,
             display_name: dispName,
             companyName:
-              cust.company_name ||
               cust.companyName ||
+              cust.company_name ||
               cust.name ||
               snap.companyName ||
               "—",
@@ -1482,14 +1482,14 @@ const InvoiceListPage: React.FC = () => {
         const cust = ls.customer || {};
         const snap = ls.customerSnapshot || {};
         const dispName =
-          cust.display_name ||
+          cust.companyName ||
           cust.displayName ||
+          cust.display_name ||
+          cust.company_name ||
           snap.displayName ||
           snap.display_name ||
           snap.companyName ||
-          cust.companyName ||
           ls.customerName ||
-          cust.company_name ||
           "";
         return {
           ...ls,

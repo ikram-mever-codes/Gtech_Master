@@ -22,6 +22,7 @@ import { WarehouseItem } from "../models/warehouse_items";
 import path from "path";
 import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
+import { buildAuftragPdfOptions } from "../services/pdfOptionsBuilder";
 import { generateAuftragEml } from "../services/emlGenerator";
 import { Rechnung } from "../models/rechnung";
 import { Rechnung_k } from "../models/rechnung_k";
@@ -330,18 +331,6 @@ async function calculateOrderTotals(orderId: number): Promise<void> {
   await customerOrderRepo.save(order);
 }
 
-/**
- * Attaches computed delivered/open quantity to every order item across the
- * given orders, in a single batched query against rechnung_item — same
- * pattern as attachStockInfoToOrders below.
- *
- * quantity on CustomerOrderItem is the fixed ordered amount and is never
- * mutated. "Delivered" is derived by summing rechnung_item.quantity for
- * every Rechnung line that traces back to this order line
- * (sourceLineItemId), and "open" is quantity - delivered, floored at 0.
- * This is computed on every read rather than stored, so it can't drift out
- * of sync with the actual Rechnungen the way a stored counter could.
- */
 async function attachDeliveredQuantityToOrders(
   orders: CustomerOrder[],
 ): Promise<void> {
@@ -1973,84 +1962,19 @@ export const downloadCustomerOrderPdf = async (
       return;
     }
 
-    const defaultTaxRate =
-      order.tax_rate !== undefined && order.tax_rate !== null
-        ? Number(order.tax_rate)
-        : order.customer?.defaultTaxProfile?.tax_rate !== undefined &&
-          order.customer?.defaultTaxProfile?.tax_rate !== null
-          ? Number(order.customer.defaultTaxProfile.tax_rate)
-          : 19;
-
-    const customerSnap = order.customerSnapshot || order.customer || {};
-    const contactName =
-      (req as any).user?.name || (req as any).user?.username || "Admin";
-    const customerCompName = (
-      customerSnap.companyName ||
-      customerSnap.legalName ||
-      ""
-    ).trim();
-    const customerNum = (customerSnap.customerNumber || "").trim();
-    let kundeCombined = "—";
-    if (customerCompName && customerNum)
-      kundeCombined = `${customerCompName} · ${customerNum}`;
-    else if (customerCompName) kundeCombined = customerCompName;
-    else if (customerNum) kundeCombined = customerNum;
-
     const uploadsDir = path.join(__dirname, "../../uploads/customer_orders");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
     const filePath = path.join(
       uploadsDir,
       `auftrag_${order.order_no || order.id}.pdf`,
     );
 
-    const isFreetext = (it: any) =>
-      !it.sourceItemId && !it.material && (it.itemName || it.description);
-
-    const rawItems = (order.orderItems || [])
-      .slice()
-      .sort(
-        (a: any, b: any) =>
-          (Number(a.position) || 0) - (Number(b.position) || 0),
-      );
-
-    const items = rawItems.map((it: any, idx: number) => {
-      const qty =
-        it.quantity !== undefined && it.quantity !== null
-          ? Number(it.quantity)
-          : 1;
-      const unitPrice = Number(it.price || 0);
-      const lineTotal =
-        it.lineTotal !== undefined && it.lineTotal !== null
-          ? Number(it.lineTotal)
-          : qty * unitPrice;
-      return {
-        position: it.position || idx + 1,
-        artNr: it.itemNo || it.material || "—",
-        bezeichnung: it.itemName || it.description || "Item",
-        remarks: it.notes || it.remark_ex || "-",
-        vatRate:
-          it.taxRate !== undefined && it.taxRate !== null
-            ? Number(it.taxRate)
-            : defaultTaxRate,
-        quantity: qty,
-        unitPrice: unitPrice,
-        lineTotal: lineTotal,
-      };
+    const { options: pdfOpts } = await buildAuftragPdfOptions(order, {
+      user: (req as any).user,
+      outputFilePath: filePath,
     });
-
-    const isDelivered =
-      order.auftrag_status === AuftragStatus.DELIVERED ||
-      order.auftrag_status === ("delivered" as any) ||
-      order.auftrag_status === AuftragStatus.CLOSED ||
-      order.auftrag_status === ("closed" as any) ||
-      String(order.status || "").toLowerCase() === "delivered" ||
-      String(order.status || "").toLowerCase() === "completed" ||
-      String(order.status || "").toLowerCase() === "closed" ||
-      !!order.real_delivery_date;
-
-    const effectiveDeliveryDate =
-      (isDelivered && order.real_delivery_date) ||
-      order.date_delivery ||
-      order.delivery_terms;
 
     const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
     const allocations = await allocationRepo.find({
@@ -2072,53 +1996,12 @@ export const downloadCustomerOrderPdf = async (
     const orderTotal = Number(order.total_amount || 0);
     const outstandingAmount = Math.max(0, orderTotal - totalPaid);
 
-    await generateGtechDocumentPdf({
-      documentType: "Auftrag" as any,
-      documentNumber: order.order_no,
-      documentTitle: order.title || "",
-      customerSnapshot: customerSnap,
-      customerEntity: order.customer,
-      deliveryAddress: order.deliveryAddress,
-      metadataItems: [
-        ["Kontakt", contactName],
-        ["Kunde", kundeCombined],
-        ["Datum", order.date_created || order.created_at],
-      ],
-      kontaktName: contactName,
-      kontaktEmail: (req as any).user?.email,
-      isDelivered: isDelivered,
-      lineItems: items,
-      showPrices: true,
-      shippingMethod: order.shipping_text || order.shipping_method,
-      shippingCost: Number(order.shipping_cost || 0),
-      shippingQuantity: Number(order.shipping_quantity || 1),
-      shippingTaxRate: defaultTaxRate,
-      discountPercentage: Number(order.discount_percentage || 0),
-      discountAmount: Number(order.discount_amount || 0),
-      subtotal: Number(order.subtotal || 0),
-      taxAmount: Number(order.tax_amount || 0),
-      totalAmount: Number(order.total_amount || 0),
-      taxRate: defaultTaxRate,
-      currency: order.currency || "EUR",
-      notes: order.notes,
-      deliveryTime: effectiveDeliveryDate,
-      deliveryDate: effectiveDeliveryDate,
-      deliveryTerms: order.delivery_terms,
-      paymentTerms: order.payment_terms
-        ? (() => { const m = String(order.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${order.payment_terms}`; })()
-        : undefined,
-      paymentMethod: order.payment_method,
-      payments: pdfPayments.length > 0 ? pdfPayments : undefined,
-      outstandingAmount: pdfPayments.length > 0 ? outstandingAmount : undefined,
-      taxProfile:
-        (order as any).tax_profile_case ||
-        (order.customer as any)?.tax_profile_case ||
-        (order.customer as any)?.defaultTaxProfile?.key ||
-        customerSnap?.tax_profile_case ||
-        customerSnap?.taxProfile,
-      kundenreferenz: (order as any).kundenreferenz || undefined,
-      outputFilePath: filePath,
-    });
+    if (pdfPayments.length > 0) {
+      pdfOpts.payments = pdfPayments;
+      pdfOpts.outstandingAmount = outstandingAmount;
+    }
+
+    await generateGtechDocumentPdf(pdfOpts);
 
     const rawTitle =
       order.title ||

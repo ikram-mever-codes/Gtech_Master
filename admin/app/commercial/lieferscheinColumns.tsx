@@ -107,9 +107,11 @@ const LieferscheinActionMenu: React.FC<{
   const isVorlaeufig = status === "vorläufig";
 
   const displayName =
+    row.customer?.companyName ||
+    row.customer?.displayName ||
+    row.customer?.display_name ||
     row.customerSnapshot?.displayName ||
     row.customerSnapshot?.display_name ||
-    row.customer?.display_name ||
     row.customerName ||
     "—";
 

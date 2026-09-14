@@ -106,15 +106,9 @@ function cleanPdfText(text?: string | null): string {
 
 function formatDate(dateVal: any): string {
   if (!dateVal) return "—";
-  if (dateVal instanceof Date) {
-    const iso = dateVal.toISOString().split("T")[0];
-    const parts = iso.split("-");
-    if (parts.length === 3 && parts[0].length === 4) {
-      return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
-    }
-  }
   if (typeof dateVal === "string") {
     const trimmed = dateVal.trim();
+    if (!trimmed) return "—";
     const dotParts = trimmed.split(".");
     if (dotParts.length === 3 && dotParts[2].length === 4) {
       const day = dotParts[0].padStart(2, "0");
@@ -122,7 +116,8 @@ function formatDate(dateVal: any): string {
       const year = dotParts[2];
       return `${day}.${month}.${year}`;
     }
-    const dashParts = trimmed.split("T")[0].split("-");
+    const isoPart = trimmed.split("T")[0];
+    const dashParts = isoPart.split("-");
     if (dashParts.length === 3 && dashParts[0].length === 4) {
       const year = dashParts[0];
       const month = dashParts[1].padStart(2, "0");
@@ -130,13 +125,15 @@ function formatDate(dateVal: any): string {
       return `${day}.${month}.${year}`;
     }
   }
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return "—";
+    const day = String(dateVal.getDate()).padStart(2, "0");
+    const month = String(dateVal.getMonth() + 1).padStart(2, "0");
+    const year = dateVal.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
   const d = new Date(dateVal);
   if (isNaN(d.getTime())) return String(dateVal);
-  const iso = d.toISOString().split("T")[0];
-  const parts = iso.split("-");
-  if (parts.length === 3 && parts[0].length === 4) {
-    return `${parts[2].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[0]}`;
-  }
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
@@ -1250,40 +1247,42 @@ export async function generateGtechDocumentPdf(
   );
 
   if (!hasLieferdatumInMetadata && (deliveryInput || confirmedDeliveryInput)) {
-    if (deliveryInput) {
-      const rawDelivery = String(deliveryInput).trim();
-      if (rawDelivery) {
-        const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawDelivery);
-        const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawDelivery);
-        const parsed = new Date(rawDelivery);
-        const isValidDate =
-          (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
-          /\d{4}/.test(rawDelivery);
+    const tryFormatDelivery = (val: string): string | null => {
+      const raw = val.trim();
+      if (!raw) return null;
+      const isIso = /^\d{4}-\d{2}-\d{2}/.test(raw);
+      const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(raw);
+      const parsed = new Date(raw);
+      const isValidDate =
+        (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
+        /\d{4}/.test(raw);
+      return isValidDate ? formatDate(raw) : null;
+    };
 
-        if (isValidDate) {
-          const deliveryLabel = opts.documentType === "Lieferschein"
-            ? "Lieferdatum:"
-            : "Voraussichtliches Lieferdatum:";
-          doc.text(`${deliveryLabel} ${formatDate(rawDelivery)}`, LEFT_X, yPos);
-        } else {
-          doc.text(`Lieferzeit: ${rawDelivery}`, LEFT_X, yPos);
-        }
+    if (opts.documentType === "Lieferschein") {
+      const dateToShow = deliveryInput ? tryFormatDelivery(String(deliveryInput)) : null;
+      if (dateToShow) {
+        doc.text(`Lieferdatum: ${dateToShow}`, LEFT_X, yPos);
         yPos += 14;
       }
-    }
+    } else {
+      const vorlaeufigeStr = deliveryInput ? tryFormatDelivery(String(deliveryInput)) : null;
+      const bestaetigtStr = confirmedDeliveryInput ? tryFormatDelivery(String(confirmedDeliveryInput)) : null;
 
-    if (confirmedDeliveryInput) {
-      const rawConfirmed = String(confirmedDeliveryInput).trim();
-      if (rawConfirmed) {
-        const isIso = /^\d{4}-\d{2}-\d{2}/.test(rawConfirmed);
-        const isGermanDate = /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawConfirmed);
-        const parsed = new Date(rawConfirmed);
-        const isValidDate =
-          (isIso || isGermanDate || !isNaN(parsed.getTime())) &&
-          /\d{4}/.test(rawConfirmed);
+      if (vorlaeufigeStr || bestaetigtStr) {
+        const labelText = "Lieferdatum:";
+        const labelWidth = doc.widthOfString(labelText + "  ");
 
-        if (isValidDate) {
-          doc.text(`Bestätigtes Lieferdatum: ${formatDate(rawConfirmed)}`, LEFT_X, yPos);
+        if (vorlaeufigeStr && bestaetigtStr) {
+          doc.text(`${labelText}  voraussichtlich ${vorlaeufigeStr}`, LEFT_X, yPos);
+          yPos += 14;
+          doc.text(`bestätigt ${bestaetigtStr}`, LEFT_X + labelWidth, yPos);
+          yPos += 14;
+        } else if (bestaetigtStr) {
+          doc.text(`${labelText}  bestätigt ${bestaetigtStr}`, LEFT_X, yPos);
+          yPos += 14;
+        } else if (vorlaeufigeStr) {
+          doc.text(`${labelText}  voraussichtlich ${vorlaeufigeStr}`, LEFT_X, yPos);
           yPos += 14;
         }
       }

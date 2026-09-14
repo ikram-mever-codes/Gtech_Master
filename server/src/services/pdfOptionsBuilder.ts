@@ -18,6 +18,36 @@ export interface BuildPdfContextOptions {
   outputFilePath?: string;
 }
 
+function formatDateStr(dateVal: any): string {
+  if (!dateVal) return "";
+  if (typeof dateVal === "string") {
+    const trimmed = dateVal.trim();
+    if (!trimmed) return "";
+    const dotParts = trimmed.split(".");
+    if (dotParts.length === 3 && dotParts[2].length === 4) {
+      return `${dotParts[0].padStart(2, "0")}.${dotParts[1].padStart(2, "0")}.${dotParts[2]}`;
+    }
+    const isoPart = trimmed.split("T")[0];
+    const dashParts = isoPart.split("-");
+    if (dashParts.length === 3 && dashParts[0].length === 4) {
+      return `${dashParts[2].padStart(2, "0")}.${dashParts[1].padStart(2, "0")}.${dashParts[0]}`;
+    }
+  }
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return "";
+    const day = String(dateVal.getDate()).padStart(2, "0");
+    const month = String(dateVal.getMonth() + 1).padStart(2, "0");
+    const year = dateVal.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return String(dateVal);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}.${month}.${year}`;
+}
+
 export async function buildRechnungPdfOptions(
   rechnungInput: Rechnung | number | string,
   ctx?: BuildPdfContextOptions,
@@ -52,8 +82,6 @@ export async function buildRechnungPdfOptions(
     }
   }
 
-
-  // Load Auftrag if linked
   let auftrag: CustomerOrder | null = null;
   if (rechnung.auftrag_id) {
     try {
@@ -65,7 +93,6 @@ export async function buildRechnungPdfOptions(
 
   const auftragNo = rechnung.auftrag_no || auftrag?.order_no || undefined;
 
-  // Load Lieferschein if linked
   const lieferscheinRepo = AppDataSource.getRepository(Lieferschein);
   let linkedLieferschein = await lieferscheinRepo.findOne({
     where: { rechnung_id: rechnung.id },
@@ -103,16 +130,6 @@ export async function buildRechnungPdfOptions(
     ctx?.user?.username ||
     "";
 
-  const formatDateStr = (dateVal: any): string => {
-    if (!dateVal) return "";
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return String(dateVal);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}.${month}.${year}`;
-  };
-
   const resolvedInvoiceDate = formatDateStr(
     rechnung.invoice_date || rechnung.date_created || rechnung.created_at,
   );
@@ -121,12 +138,11 @@ export async function buildRechnungPdfOptions(
   );
   const rawConfirmedDate =
     rechnung.date_delivery_confirmed ||
-    rechnung.real_delivery_date ||
     linkedLieferschein?.date_delivery_confirmed ||
+    auftrag?.date_delivery_confirmed ||
+    rechnung.real_delivery_date ||
     (linkedLieferschein as any)?.real_delivery_date ||
-    (isLieferscheinConfirmed ? linkedLieferschein?.confirmed_at : undefined) ||
-    auftrag?.real_delivery_date ||
-    auftrag?.date_delivery_confirmed;
+    auftrag?.real_delivery_date;
 
   const resolvedDeliveryDateConfirmed = rawConfirmedDate ? formatDateStr(rawConfirmedDate) : undefined;
 
@@ -135,13 +151,11 @@ export async function buildRechnungPdfOptions(
   const discountAmount = Number(rechnung.discount_amount || 0);
   const shippingCost = Number(rechnung.shipping_cost || 0);
 
-  // Compute tax amount if 0/null on entity
   let taxAmount = Number(rechnung.tax_amount || 0);
   if (taxAmount <= 0 && subtotal > 0 && defaultTaxRate > 0) {
     taxAmount = Math.round((subtotal - discountAmount) * (defaultTaxRate / 100) * 100) / 100;
   }
 
-  // Compute total amount if 0/null on entity
   let totalAmount = Number(rechnung.total_amount || 0);
   if (totalAmount <= 0 && subtotal > 0) {
     totalAmount = Math.round((subtotal - discountAmount + taxAmount + shippingCost) * 100) / 100;
@@ -301,24 +315,6 @@ export async function buildLieferscheinPdfOptions(
     ctx?.user?.name ||
     ctx?.user?.username ||
     "";
-
-  const formatDateStr = (dateVal: any): string => {
-    if (!dateVal) return "";
-    if (typeof dateVal === "string") {
-      const trimmed = dateVal.trim();
-      const parts = trimmed.split(".");
-      if (parts.length === 3 && parts[2].length === 4) {
-        return `${parts[0].padStart(2, "0")}.${parts[1].padStart(2, "0")}.${parts[2]}`;
-      }
-    }
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return String(dateVal);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}.${month}.${year}`;
-  };
-
 
   const lieferscheinNo =
     lieferschein?.delivery_note_number ||
@@ -515,12 +511,24 @@ export async function buildAuftragPdfOptions(
     String(auftrag.status || "").toLowerCase() === "closed" ||
     !!auftrag.real_delivery_date;
 
-  const effectiveDeliveryDate =
-    auftrag.date_delivery ||
-    auftrag.delivery_terms;
+  const vorlaeufigeDate = auftrag.date_delivery
+    ? formatDateStr(auftrag.date_delivery)
+    : undefined;
 
-  const resolvedDeliveryDateConfirmed =
-    auftrag.real_delivery_date || auftrag.date_delivery_confirmed;
+  const bestaetigteDate =
+    auftrag.real_delivery_date
+      ? formatDateStr(auftrag.real_delivery_date)
+      : auftrag.date_delivery_confirmed
+        ? formatDateStr(auftrag.date_delivery_confirmed)
+        : undefined;
+
+  const isSameDate = vorlaeufigeDate && bestaetigteDate && vorlaeufigeDate === bestaetigteDate;
+
+  const effectiveDeliveryDate = isSameDate
+    ? undefined
+    : (vorlaeufigeDate ?? auftrag.delivery_terms);
+
+  const resolvedDeliveryDateConfirmed = bestaetigteDate || undefined;
 
   const paymentTermsFormatted = auftrag.payment_terms
     ? (() => {

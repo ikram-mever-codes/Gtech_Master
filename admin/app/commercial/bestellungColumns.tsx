@@ -266,14 +266,14 @@ export function buildBestellungColumns({
       sortKey: "customer",
       sortValue: (row) =>
         (
-          row.customerSnapshot?.displayName ||
-          row.customerSnapshot?.display_name ||
+          row.customer?.companyName ||
           row.customer?.displayName ||
           row.customer?.display_name ||
-          row.customerSnapshot?.companyName ||
           row.customer?.company_name ||
-          row.customer?.companyName ||
           row.customer?.name ||
+          row.customerSnapshot?.displayName ||
+          row.customerSnapshot?.display_name ||
+          row.customerSnapshot?.companyName ||
           row.customer_name ||
           row.supplier?.displayName ||
           row.supplier?.display_name ||
@@ -284,14 +284,14 @@ export function buildBestellungColumns({
         ).toLowerCase(),
       render: (row) => {
         const text =
-          row.customerSnapshot?.displayName ||
-          row.customerSnapshot?.display_name ||
+          row.customer?.companyName ||
           row.customer?.displayName ||
           row.customer?.display_name ||
-          row.customerSnapshot?.companyName ||
           row.customer?.company_name ||
-          row.customer?.companyName ||
           row.customer?.name ||
+          row.customerSnapshot?.displayName ||
+          row.customerSnapshot?.display_name ||
+          row.customerSnapshot?.companyName ||
           row.customer_name ||
           row.supplier?.displayName ||
           row.supplier?.display_name ||
