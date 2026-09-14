@@ -183,8 +183,8 @@ export const createTransferOrderFromAuftrag = async (
     // CEO requirement: OrderRemark for processing (Team Bowang) must be internal comment
     const finalNotes =
       bodyNotes !== undefined &&
-        bodyNotes !== null &&
-        String(bodyNotes).trim() !== ""
+      bodyNotes !== null &&
+      String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
         : auftrag.internal_notes || "";
 
@@ -316,13 +316,23 @@ export const deleteTransferOrder = async (
       res.status(404).json({ success: false, message: "Bestellung not found" });
       return;
     }
+
+    if (order.order_no) {
+      const orderRepo = AppDataSource.getRepository(Order);
+      await orderRepo
+        .createQueryBuilder()
+        .update(Order)
+        .set({ is_deleted: true })
+        .where("order_no = :orderNo", { orderNo: order.order_no })
+        .execute();
+    }
+
     await transferOrderRepo.remove(order);
     res.json({ success: true, message: "Bestellung deleted successfully" });
   } catch (error) {
     next(error);
   }
 };
-
 // In the updateTransferOrder controller, add customer_id handling
 export const updateTransferOrder = async (
   req: Request,
@@ -950,10 +960,11 @@ export const updateTransferOrderStatus = async (
     let message = "Bestellung status updated successfully";
     if (previousStatus === "draft" && status === "to be processed") {
       if (conversionResult) {
-        message += ` — Order created${conversionResult.skippedCount > 0
-          ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
-          : ""
-          }.`;
+        message += ` — Order created${
+          conversionResult.skippedCount > 0
+            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
+            : ""
+        }.`;
       } else {
         message +=
           " — no Order was created (no catalog line items found on this Bestellung).";
@@ -1034,11 +1045,11 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
     const supplierItems =
       allResolvedIds.length > 0
         ? await supplierItemRepo.find({
-          where: {
-            item_id: In(allResolvedIds),
-            supplier_id: order.supplier_id,
-          },
-        })
+            where: {
+              item_id: In(allResolvedIds),
+              supplier_id: order.supplier_id,
+            },
+          })
         : [];
     const byItemId = new Map(
       supplierItems.map((si) => [String(si.item_id), si]),
