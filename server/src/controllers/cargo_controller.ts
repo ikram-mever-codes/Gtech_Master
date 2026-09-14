@@ -427,6 +427,8 @@ export const getCargoById = async (
       orderItems = await orderItemRepo
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
+        .leftJoinAndSelect("oi.order", "order")
+        .leftJoinAndSelect("order.customer", "customer")
         .where(
           "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
           { cargoId: cargo.id, orderIds },
@@ -436,6 +438,8 @@ export const getCargoById = async (
       orderItems = await orderItemRepo
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
+        .leftJoinAndSelect("oi.order", "order")
+        .leftJoinAndSelect("order.customer", "customer")
         .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
         .getMany();
     }
@@ -845,6 +849,8 @@ export const getCargoOrders = async (
       orderItems = await orderItemRepo2
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
+        .leftJoinAndSelect("oi.order", "order")
+        .leftJoinAndSelect("order.customer", "customer")
         .where(
           "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
           { cargoId: Number(id), orderIds },
@@ -854,6 +860,8 @@ export const getCargoOrders = async (
       orderItems = await orderItemRepo2
         .createQueryBuilder("oi")
         .leftJoinAndSelect("oi.item", "item")
+        .leftJoinAndSelect("oi.order", "order")
+        .leftJoinAndSelect("order.customer", "customer")
         .where("oi.cargo_id = :cargoId", { cargoId: Number(id) })
         .getMany();
     }

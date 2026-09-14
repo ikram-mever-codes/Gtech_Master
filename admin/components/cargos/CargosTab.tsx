@@ -909,54 +909,64 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                                 );
                                                             }
                                                             return (
-                                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                                                                        <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                                                                            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Assigned Orders ({details.orders.length})</h4>
-                                                                        </div>
-                                                                        <div className="divide-y divide-gray-100 max-h-[250px] overflow-y-auto">
-                                                                            {details.orders.filter((o: any) => o != null).map((o: any) => (
-                                                                                <div key={o.id} className="p-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                                                                    <div>
-                                                                                        <div className="text-sm font-semibold text-gray-800">{o.order_no}</div>
-                                                                                        <div className="text-xs text-gray-400">ID: {o.id}</div>
-                                                                                    </div>
-                                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.order_status === "Delivered" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>
-                                                                                        {o.order_status}
-                                                                                    </span>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
+                                                                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                                                                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                                                        <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                                                            Assigned Order Items ({details.orderItems.length})
+                                                                        </h4>
                                                                     </div>
-                                                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                                                                        <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                                                                            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Assigned Order Items ({details.orderItems.length})</h4>
-                                                                        </div>
-                                                                        <div className="overflow-x-auto max-h-[250px] overflow-y-auto">
-                                                                            <table className="w-full text-left text-xs text-gray-600">
-                                                                                <thead className="bg-gray-100 border-b border-gray-200">
-                                                                                    <tr>
-                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500">Item Name</th>
-                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500">Model / EAN</th>
-                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500 text-center">Qty</th>
-                                                                                        <th className="px-3 py-2 font-semibold uppercase text-gray-500 text-right">Price</th>
-                                                                                    </tr>
-                                                                                </thead>
-                                                                                <tbody className="divide-y divide-gray-100">
-                                                                                    {details.orderItems.filter((oi: any) => oi != null).map((oi: any) => (
+                                                                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                                                                        <table className="w-full text-left text-xs text-gray-600">
+                                                                            <thead className="bg-gray-100 border-b border-gray-200">
+                                                                                <tr>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Item Name</th>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Item No</th>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">EAN</th>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Customer</th>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Order No</th>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500 text-center">QTY</th>
+                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500 text-right">Price</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="divide-y divide-gray-100">
+                                                                                {details.orderItems.filter((oi: any) => oi != null).map((oi: any) => {
+                                                                                    const itemName = oi.item?.item_name || "—";
+                                                                                    const itemNo = oi.item?.material || oi.item?.item_no || "—";
+                                                                                    const ean = oi.item?.ean || oi.item?.model || "—";
+                                                                                    const customerName = oi.order?.customer?.companyName || oi.order?.customer?.displayName || oi.order?.customer?.legalName || "—";
+                                                                                    const orderNo = oi.order?.order_no || "—";
+                                                                                    const qty = oi.qty ?? 1;
+                                                                                    const rawPrice = oi.eur_special_price ?? oi.price;
+                                                                                    const priceStr = rawPrice !== undefined && rawPrice !== null ? `€${Number(rawPrice).toFixed(2)}` : "—";
+
+                                                                                    return (
                                                                                         <tr key={oi.id} className="hover:bg-gray-50 transition-colors">
-                                                                                            <td className="px-3 py-2 font-medium text-gray-800 max-w-[180px] truncate">{oi.item?.item_name || "Unknown"}</td>
-                                                                                            <td className="px-3 py-2 text-gray-500">
-                                                                                                <div>{oi.item?.model || "-"}</div>
-                                                                                                <div className="text-[10px] text-gray-400">{oi.item?.ean || "-"}</div>
+                                                                                            <td className="px-3 py-2 font-medium text-gray-800 max-w-[200px] truncate" title={itemName}>
+                                                                                                {itemName}
                                                                                             </td>
-                                                                                            <td className="px-3 py-2 text-center text-gray-800 font-semibold">{oi.qty || 1}</td>
-                                                                                            <td className="px-3 py-2 text-right text-gray-800 font-semibold">€{Number(oi.eur_special_price || oi.price || 0).toFixed(2)}</td>
+                                                                                            <td className="px-3 py-2 text-gray-700 font-mono">
+                                                                                                {itemNo}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-gray-500 font-mono">
+                                                                                                {ean}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate" title={customerName}>
+                                                                                                {customerName}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-blue-700 font-semibold">
+                                                                                                {orderNo}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-center text-gray-800 font-semibold">
+                                                                                                {qty}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-right text-gray-800 font-semibold">
+                                                                                                {priceStr}
+                                                                                            </td>
                                                                                         </tr>
-                                                                                    ))}
-                                                                                </tbody>
-                                                                            </table>
-                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </tbody>
+                                                                        </table>
                                                                     </div>
                                                                 </div>
                                                             );
