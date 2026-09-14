@@ -1551,15 +1551,17 @@ export class InvoiceController {
         ...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders]),
       ];
 
-      const whereConditions: any[] = [{ cargo_id: cargo.id }];
-      if (allOrderIds.length > 0) {
-        whereConditions.push({ order_id: In(allOrderIds) });
-      }
-
       orderItems = await orderItemRepository.find({
-        where: whereConditions,
+        where: { cargo_id: cargo.id },
         relations: ["item", "item.taric", "item.purchasePrices", "order"],
       });
+
+      if (orderItems.length === 0 && allOrderIds.length > 0) {
+        orderItems = await orderItemRepository.find({
+          where: { order_id: In(allOrderIds) },
+          relations: ["item", "item.taric", "item.purchasePrices", "order"],
+        });
+      }
     }
 
     if (orderItems.length === 0 && orderNumber) {
@@ -1954,15 +1956,17 @@ export class InvoiceController {
             .map((co) => co.order_id)
             .filter(Boolean);
 
-          const whereConditions: any[] = [{ cargo_id: cargo.id }];
-          if (orderIdsFromCargo.length > 0) {
-            whereConditions.push({ order_id: In(orderIdsFromCargo) });
-          }
-
           orderItems = await orderItemRepository.find({
-            where: whereConditions,
+            where: { cargo_id: cargo.id },
             relations: ["item", "item.taric", "order"],
           });
+
+          if (orderItems.length === 0 && orderIdsFromCargo.length > 0) {
+            orderItems = await orderItemRepository.find({
+              where: { order_id: In(orderIdsFromCargo) },
+              relations: ["item", "item.taric", "order"],
+            });
+          }
 
           const itemMap = new Map();
           orderItems.forEach((oi) => itemMap.set(oi.id, oi));
