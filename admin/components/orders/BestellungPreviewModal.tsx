@@ -366,9 +366,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
-  const [orderItemSupplierById, setOrderItemSupplierById] = useState<
-    Record<string, number | undefined>
-  >({});
+  const [orderItemSupplierById, setOrderItemSupplierById] = useState<any>({});
   // For create mode
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -1622,75 +1620,117 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
-            <div className="flex items-center gap-2 mb-3">
-              <LinkIcon className="h-4 w-4 text-gray-500" />
-              <h3 className="text-sm font-bold text-gray-900">
-                Linked documents
-              </h3>
-            </div>
-            {isCreate ||
-            (linkedAuftragDocs.length === 0 && linkedCargoDocs.length === 0) ? (
-              <p className="text-sm text-gray-500">No linked documents yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {linkedAuftragDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Auftrag
-                    </p>
-                    {linkedAuftragDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                            onSwitchToAuftrag?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.order_no}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {linkedCargoDocs.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                      Cargo
-                    </p>
-                    {linkedCargoDocs.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSwitchToCargo?.(doc.id);
-                          }}
-                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
-                        >
-                          {doc.cargo_no}{" "}
-                          <span className="text-xs text-gray-400">→</span>
-                        </button>
-                        <span className="text-gray-400 text-xs">
-                          {formatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Linked documents
+                </h3>
               </div>
-            )}
+              {isCreate ||
+              (linkedAuftragDocs.length === 0 &&
+                linkedCargoDocs.length === 0) ? (
+                <p className="text-sm text-gray-500">
+                  No linked documents yet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {linkedAuftragDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Auftrag
+                      </p>
+                      {linkedAuftragDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToAuftrag?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.order_no}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {linkedCargoDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Cargo
+                      </p>
+                      {linkedCargoDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToCargo?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.cargo_no}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <PencilIcon className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  Comment intern
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(
+                        form.notes || displayOrder.notes || "",
+                      );
+                      toast.success("Comment copied to clipboard!");
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
+                    title="Copy Comment"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  </button>
+                </h3>
+              </div>
+              {edit || isCreate ? (
+                <textarea
+                  rows={3}
+                  className={inputCls}
+                  value={form.notes}
+                  placeholder="Notes for this Bestellung."
+                  onChange={(e) => patch({ notes: e.target.value })}
+                />
+              ) : (
+                <p className="text-sm text-gray-600">
+                  {displayOrder.notes || "—"}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
