@@ -1647,6 +1647,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            onClose();
                             onSwitchToAuftrag?.(doc.id);
                           }}
                           className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"

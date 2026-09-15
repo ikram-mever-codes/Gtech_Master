@@ -283,6 +283,7 @@ const InvoiceListPage: React.FC = () => {
   };
   const handleSwitchToAuftrag = (auftragId: string | number) => {
     setActiveInvTab("auftrag");
+
     setTimeout(() => {
       handleOpenAuftragPreview(auftragId);
     }, 100);
