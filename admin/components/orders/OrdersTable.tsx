@@ -123,6 +123,24 @@ export default function OrdersTable({
     },
     { header: "QTY", width: "35px", render: (row) => row.qty, align: "center" },
     {
+      header: "Cargo",
+      width: "80px",
+      render: (row) => {
+        const cargoId = row.cargo_id;
+        const cargoObj = row.cargo || cargos?.find((c: any) => String(c.id) === String(cargoId));
+        const cNo = cargoObj?.cargo_no || (cargoId && cargoId !== 0 && cargoId !== "0" && cargoId !== "-" && cargoId !== "null" ? String(cargoId) : null);
+        if (!cNo) return "-";
+        const cType = cargoObj?.cargo_type?.cargo_type || cargoObj?.cargo_type || "";
+        return (
+          <div className="flex flex-col text-[11px] leading-tight text-center">
+            <span className="font-semibold text-gray-800">{cNo}</span>
+            {cType && <span className="text-[9px] text-gray-500">{cType}</span>}
+          </div>
+        );
+      },
+      align: "center",
+    },
+    {
       header: "Total",
       width: "45px",
       render: (row) => {
@@ -296,24 +314,6 @@ export default function OrdersTable({
       header: "Status",
       width: "45px",
       render: (row) => row.item_status || row.status || "-",
-      align: "center",
-    },
-    {
-      header: "Cargo",
-      width: "80px",
-      render: (row) => {
-        const cargoId = row.cargo_id;
-        const cargoObj = row.cargo || cargos?.find((c: any) => String(c.id) === String(cargoId));
-        const cNo = cargoObj?.cargo_no || (cargoId && cargoId !== 0 && cargoId !== "0" && cargoId !== "-" && cargoId !== "null" ? String(cargoId) : null);
-        if (!cNo) return "-";
-        const cType = cargoObj?.cargo_type?.cargo_type || cargoObj?.cargo_type || "";
-        return (
-          <div className="flex flex-col text-[11px] leading-tight text-center">
-            <span className="font-semibold text-gray-800">{cNo}</span>
-            {cType && <span className="text-[9px] text-gray-500">{cType}</span>}
-          </div>
-        );
-      },
       align: "center",
     },
     {
@@ -492,24 +492,7 @@ export default function OrdersTable({
       },
       align: "left",
     },
-    {
-      header: "Cargo",
-      width: "100px",
-      render: (row) => {
-        const cargoId = row.cargo_id;
-        const cargoObj = row.cargo || cargos?.find((c: any) => String(c.id) === String(cargoId));
-        const cNo = cargoObj?.cargo_no || (cargoId && cargoId !== 0 && cargoId !== "0" && cargoId !== "-" && cargoId !== "null" ? String(cargoId) : null);
-        if (!cNo) return "-";
-        const cType = cargoObj?.cargo_type?.cargo_type || cargoObj?.cargo_type || "";
-        return (
-          <div className="flex flex-col text-[11px] leading-tight text-center">
-            <span className="font-semibold text-gray-800">{cNo}</span>
-            {cType && <span className="text-[9px] text-gray-500">{cType}</span>}
-          </div>
-        );
-      },
-      align: "center",
-    },
+
     {
       header: "Purpose / Zweck",
       width: "150px",
