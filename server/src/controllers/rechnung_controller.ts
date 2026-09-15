@@ -29,6 +29,9 @@ import {
   PaymentAllocation,
   PaymentAllocationTargetType,
 } from "../models/payment_allocations";
+import { Order } from "../models/orders";
+import { CargoOrder } from "../models/cargo_orders";
+import { TransferOrder } from "../models/transfer_order";
 
 async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
@@ -113,8 +116,100 @@ async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   };
 }
 
+export async function getCargosByAuftragIds(
+  auftragIds: number[],
+): Promise<Map<number, any[]>> {
+  const result = new Map<number, any[]>();
+  if (auftragIds.length === 0) return result;
+
+  const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+  const orderRepo = AppDataSource.getRepository(Order);
+  const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+
+  // Step 1: Auftrag -> Bestellung(en)
+  const bestellungen = await transferOrderRepo.find({
+    where: { auftrag_id: In(auftragIds) },
+    select: ["id", "auftrag_id", "order_no"],
+  });
+  if (bestellungen.length === 0) return result;
+
+  const bestellungOrderNos = Array.from(
+    new Set(bestellungen.map((b) => b.order_no).filter(Boolean)),
+  );
+  const auftragIdByBestellungOrderNo = new Map<string, number>();
+  bestellungen.forEach((b) => {
+    if (b.order_no && b.auftrag_id) {
+      auftragIdByBestellungOrderNo.set(b.order_no, b.auftrag_id);
+    }
+  });
+
+  // Step 2: Bestellung.order_no -> internal Order -> Cargo
+  const matchingOrders = await orderRepo
+    .createQueryBuilder("o")
+    .leftJoin("o.cargo", "cargo")
+    .where("o.order_no IN (:...orderNos)", { orderNos: bestellungOrderNos })
+    .andWhere("o.is_deleted = false")
+    .select([
+      "o.id",
+      "o.order_no",
+      "o.cargo_id",
+      "cargo.id",
+      "cargo.cargo_no",
+      "cargo.cargo_status",
+      "cargo.created_at",
+    ])
+    .getMany();
+
+  const orderIdByOrderNo = new Map<string, number>();
+  const directCargoByOrderId = new Map<number, any>();
+  matchingOrders.forEach((o: any) => {
+    orderIdByOrderNo.set(o.order_no, o.id);
+    if (o.cargo) directCargoByOrderId.set(o.id, o.cargo);
+  });
+
+  const orderIds = matchingOrders.map((o) => o.id);
+  const cargoOrders = orderIds.length
+    ? await cargoOrderRepo.find({
+        where: { order_id: In(orderIds) },
+        relations: ["cargo"],
+      })
+    : [];
+
+  const cargosByOrderId = new Map<number, Map<number, any>>();
+  const addCargo = (orderId: number, cargo: any) => {
+    if (!cargo) return;
+    if (!cargosByOrderId.has(orderId)) cargosByOrderId.set(orderId, new Map());
+    cargosByOrderId.get(orderId)!.set(cargo.id, cargo);
+  };
+  directCargoByOrderId.forEach((cargo, orderId) => addCargo(orderId, cargo));
+  cargoOrders.forEach((co) => {
+    if (co.order_id && co.cargo) addCargo(co.order_id, co.cargo);
+  });
+
+  // Step 3: fold back up to Auftrag id (an Auftrag can have >1 Bestellung)
+  for (const [bestellungOrderNo, auftragId] of auftragIdByBestellungOrderNo) {
+    const orderId = orderIdByOrderNo.get(bestellungOrderNo);
+    if (orderId === undefined) continue;
+    const cargoMap = cargosByOrderId.get(orderId);
+    if (!cargoMap) continue;
+
+    if (!result.has(auftragId)) result.set(auftragId, []);
+    const existing = result.get(auftragId)!;
+    const existingIds = new Set(existing.map((c) => c.id));
+    cargoMap.forEach((cargo) => {
+      if (!existingIds.has(cargo.id)) existing.push(cargo);
+    });
+  }
+
+  return result;
+}
+
 async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
-  const empty = () => ({ auftrag: [] as any[], rechnungenK: [] as any[] });
+  const empty = () => ({
+    auftrag: [] as any[],
+    rechnungenK: [] as any[],
+    cargos: [] as any[],
+  });
   const result = new Map<string, ReturnType<typeof empty>>();
   rechnungen.forEach((r) => result.set(r.id, empty()));
 
@@ -155,11 +250,18 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
 
   const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
 
+  // Cargo, resolved via the Bestellung linked to each Auftrag.
+  const cargosByAuftragId = await getCargosByAuftragIds(auftragIds);
+
   for (const r of rechnungen) {
     if (!r.auftrag_id) continue;
     const bucket = result.get(r.id);
     const auftrag = auftragById.get(r.auftrag_id);
-    if (bucket && auftrag) bucket.auftrag.push(auftrag);
+    if (bucket && auftrag) {
+      bucket.auftrag.push(auftrag);
+      const cargos = cargosByAuftragId.get(r.auftrag_id);
+      if (cargos) bucket.cargos.push(...cargos);
+    }
   }
 
   for (const rk of rechnungenK) {

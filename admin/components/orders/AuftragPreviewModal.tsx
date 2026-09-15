@@ -57,6 +57,7 @@ interface AuftragPreviewModalProps {
   onSwitchToBestellung?: (bestellungId: string | number) => void;
   onSwitchToRechnung?: (rechnungId: string) => void;
   onSwitchToRechnungK?: (rechnungKId: string) => void;
+  onSwitchToCargo?: (cargoId: string | number) => void;
 }
 
 const inputCls =
@@ -402,6 +403,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   onSwitchToBestellung,
   onSwitchToRechnung,
   onSwitchToRechnungK,
+  onSwitchToCargo,
 }) => {
   const { user: currentUser } = useSelector((state: RootState) => state.user);
   const [order, setOrder] = useState<any>(null);
@@ -456,6 +458,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     rechnungen: "Rechnung",
     rechnungenK: "RK",
     bestellungen: "Bestellung",
+    cargos: "Cargo",
   };
 
   const linkedDocumentsByType = order?.linkedDocuments || {
@@ -463,7 +466,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     rechnungen: [],
     rechnungenK: [],
     bestellungen: [],
+    cargos: [],
   };
+
   const linkedDocsCount = (
     Object.keys(LINKED_DOC_LABELS) as (keyof typeof linkedDocumentsByType)[]
   ).reduce(
@@ -474,6 +479,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const getLinkedDocDisplayNumber = (kind: string, doc: any): string => {
     if (kind === "offers") return doc.offerNumber || doc.id;
     if (kind === "bestellungen") return doc.order_no || doc.id;
+    if (kind === "cargos") return doc.cargo_no || doc.id;
     return doc.invoice_number || doc.id;
   };
 
@@ -2319,6 +2325,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                               ) {
                                 onClose();
                                 onSwitchToRechnungK(doc.id);
+                              } else if (key === "cargos" && onSwitchToCargo) {
+                                onClose();
+                                onSwitchToCargo(doc.id);
                               } else {
                                 console.warn(
                                   `AuftragPreviewModal: no navigation callback provided for "${key}"`,

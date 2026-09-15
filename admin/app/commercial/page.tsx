@@ -278,6 +278,15 @@ const InvoiceListPage: React.FC = () => {
     setShowBestellungPreviewModal(true);
   };
 
+  const handleSwitchToCargo = (cargoId: string | number) => {
+    router.push("/invoices?tab=cargos");
+  };
+  const handleSwitchToAuftrag = (auftragId: string | number) => {
+    setActiveInvTab("auftrag");
+    setTimeout(() => {
+      handleOpenAuftragPreview(auftragId);
+    }, 100);
+  };
   const handleOpenOfferModal = (id: string | null = null) => {
     setSelectedOfferId(id);
     setShowOfferModal(true);
@@ -2474,6 +2483,7 @@ const InvoiceListPage: React.FC = () => {
             onSwitchToRechnungK={(rechnungKId: string) => {
               handleOpenRechnungKDetail({ id: rechnungKId });
             }}
+            onSwitchToCargo={handleSwitchToCargo}
           />
         )}
         {showBestellungPreviewModal && selectedBestellungId && (
@@ -2489,6 +2499,8 @@ const InvoiceListPage: React.FC = () => {
             }}
             onChanged={() => tabData.refetchBestellungen()}
             userRole={user?.role}
+            onSwitchToAuftrag={handleSwitchToAuftrag}
+            onSwitchToCargo={handleSwitchToCargo}
           />
         )}
         {showAuftragToRechnungModal && (
@@ -2769,6 +2781,7 @@ const InvoiceListPage: React.FC = () => {
             onSwitchToRechnungK={(rechnungKId: string) => {
               handleOpenRechnungKDetail({ id: rechnungKId });
             }}
+            onSwitchToCargo={handleSwitchToCargo}
           />
         )}
 
@@ -2805,6 +2818,7 @@ const InvoiceListPage: React.FC = () => {
                 );
               }
             }}
+            onSwitchToCargo={handleSwitchToCargo}
           />
         )}
         {showLieferscheinDetailModal && selectedLieferscheinForDetail && (

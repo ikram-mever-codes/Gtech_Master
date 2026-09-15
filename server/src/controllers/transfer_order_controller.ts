@@ -17,6 +17,7 @@ import {
 import { Customer } from "../models/customers";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
+import { CargoOrder } from "../models/cargo_orders";
 
 async function calculateTransferOrderTotals(orderId: number): Promise<void> {
   const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
@@ -242,9 +243,101 @@ export const createTransferOrderFromAuftrag = async (
   }
 };
 
-// ---------------------------------------------------------------------
-// Core CRUD
-// ---------------------------------------------------------------------
+async function getLinkedDocumentsForBestellungen(
+  bestellungen: TransferOrder[],
+): Promise<Map<number, { auftrag: any[]; cargos: any[] }>> {
+  const result = new Map<number, { auftrag: any[]; cargos: any[] }>();
+  bestellungen.forEach((b) => result.set(b.id, { auftrag: [], cargos: [] }));
+
+  if (bestellungen.length === 0) return result;
+
+  const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+  const orderRepo = AppDataSource.getRepository(Order);
+  const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+
+  // --- Auftrag: direct link via auftrag_id ---------------------------
+  const auftragIds = Array.from(
+    new Set(
+      bestellungen
+        .map((b) => b.auftrag_id)
+        .filter((id): id is number => typeof id === "number"),
+    ),
+  );
+  const auftraege = auftragIds.length
+    ? await customerOrderRepo.find({
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "title", "created_at"],
+      })
+    : [];
+  const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
+
+  for (const b of bestellungen) {
+    if (b.auftrag_id) {
+      const a = auftragById.get(b.auftrag_id);
+      if (a) result.get(b.id)!.auftrag.push(a);
+    }
+  }
+
+  // --- Cargo: indirect via the internal Order sharing the same order_no
+  const orderNos = Array.from(
+    new Set(bestellungen.map((b) => b.order_no).filter(Boolean)),
+  );
+
+  const matchingOrders = orderNos.length
+    ? await orderRepo
+        .createQueryBuilder("o")
+        .leftJoin("o.cargo", "cargo")
+        .where("o.order_no IN (:...orderNos)", { orderNos })
+        .andWhere("o.is_deleted = false")
+        .select([
+          "o.id",
+          "o.order_no",
+          "o.cargo_id",
+          "cargo.id",
+          "cargo.cargo_no",
+          "cargo.cargo_status",
+          "cargo.created_at",
+        ])
+        .getMany()
+    : [];
+
+  const orderIdByOrderNo = new Map<string, number>();
+  const directCargoByOrderId = new Map<number, any>();
+  matchingOrders.forEach((o: any) => {
+    orderIdByOrderNo.set(o.order_no, o.id);
+    if (o.cargo) directCargoByOrderId.set(o.id, o.cargo);
+  });
+
+  const orderIds = matchingOrders.map((o) => o.id);
+  const cargoOrders = orderIds.length
+    ? await cargoOrderRepo.find({
+        where: { order_id: In(orderIds) },
+        relations: ["cargo"],
+      })
+    : [];
+
+  const cargosByOrderId = new Map<number, Map<number, any>>();
+  const addCargo = (orderId: number, cargo: any) => {
+    if (!cargo) return;
+    if (!cargosByOrderId.has(orderId)) cargosByOrderId.set(orderId, new Map());
+    cargosByOrderId.get(orderId)!.set(cargo.id, cargo);
+  };
+  directCargoByOrderId.forEach((cargo, orderId) => addCargo(orderId, cargo));
+  cargoOrders.forEach((co) => {
+    if (co.order_id && co.cargo) addCargo(co.order_id, co.cargo);
+  });
+
+  for (const b of bestellungen) {
+    const orderId = orderIdByOrderNo.get(b.order_no);
+    if (orderId === undefined) continue;
+    const cargoMap = cargosByOrderId.get(orderId);
+    if (cargoMap) {
+      result.get(b.id)!.cargos.push(...Array.from(cargoMap.values()));
+    }
+  }
+
+  return result;
+}
 
 export const getAllTransferOrders = async (
   _req: Request,
@@ -257,12 +350,23 @@ export const getAllTransferOrders = async (
       order: { created_at: "DESC" },
       relations: ["orderItems", "customer", "supplier"],
     });
-    res.json({ success: true, data: orders });
+
+    const linkedDocumentsByBestellungId =
+      await getLinkedDocumentsForBestellungen(orders);
+
+    const ordersWithLinkedDocuments = orders.map((order: any) => ({
+      ...order,
+      linkedDocuments: linkedDocumentsByBestellungId.get(order.id) || {
+        auftrag: [],
+        cargos: [],
+      },
+    }));
+
+    res.json({ success: true, data: ordersWithLinkedDocuments });
   } catch (error) {
     next(error);
   }
 };
-
 export const getTransferOrderById = async (
   req: Request,
   res: Response,
@@ -295,7 +399,14 @@ export const getTransferOrderById = async (
       }
     }
 
-    res.json({ success: true, data: order });
+    const linkedDocumentsByBestellungId =
+      await getLinkedDocumentsForBestellungen([order]);
+    const linkedDocuments = linkedDocumentsByBestellungId.get(order.id) || {
+      auftrag: [],
+      cargos: [],
+    };
+
+    res.json({ success: true, data: { ...order, linkedDocuments } });
   } catch (error) {
     next(error);
   }

@@ -42,7 +42,10 @@ interface BestellungPreviewModalProps {
   userRole?: UserRole;
   initialEdit?: boolean;
   isCreate?: boolean;
+  onSwitchToAuftrag?: (auftragId: string | number) => void;
+  onSwitchToCargo?: (cargoId: string | number) => void;
 }
+
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 
@@ -264,10 +267,11 @@ const ItemRow: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${selected
-        ? "border-primary bg-primary/5"
-        : "border-gray-200 hover:bg-gray-50"
-        }`}
+      className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+        selected
+          ? "border-primary bg-primary/5"
+          : "border-gray-200 hover:bg-gray-50"
+      }`}
     >
       <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
         {thumb ? (
@@ -324,13 +328,17 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
   userRole,
   initialEdit = false,
   isCreate = false,
+  onSwitchToAuftrag,
+  onSwitchToCargo,
 }) => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState<any>({});
-  const [pendingPrices, setPendingPrices] = useState<Record<string, string>>({});
+  const [pendingPrices, setPendingPrices] = useState<Record<string, string>>(
+    {},
+  );
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [newLine, setNewLine] = useState({ itemName: "", qty: 0 });
@@ -370,7 +378,11 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     if (!isOpen) return;
     getAllGtechCompanies()
       .then((res: any) => {
-        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+            ? res
+            : [];
         setGtechCompanies(list);
       })
       .catch(() => setGtechCompanies([]));
@@ -380,7 +392,8 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
     const hk =
       gtechCompanies.find(
         (c) =>
-          (c.display_name && c.display_name.toLowerCase().includes("hong kong")) ||
+          (c.display_name &&
+            c.display_name.toLowerCase().includes("hong kong")) ||
           (c.legal_name && c.legal_name.toLowerCase().includes("hong kong")) ||
           (c.country && c.country.toLowerCase().includes("hong kong")),
       ) || gtechCompanies[0];
@@ -424,6 +437,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       setLoading(false);
     }
   }, [orderId, isCreate]);
+
+  const sortByCreatedAtDesc = (docs: any[]): any[] =>
+    [...(docs || [])].sort((a, b) => {
+      const timeA = new Date(a?.created_at || 0).getTime();
+      const timeB = new Date(b?.created_at || 0).getTime();
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
 
   useEffect(() => {
     console.log("BestellungPreviewModal mounted", {
@@ -690,9 +710,9 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               transferPrice: parseFloat(raw) || 0,
               purchasePrice: parseFloat(raw) || 0,
             }).catch((e) =>
-              console.error(`Failed to save price for line ${lineItemId}:`, e)
-            )
-          )
+              console.error(`Failed to save price for line ${lineItemId}:`, e),
+            ),
+          ),
         );
         setPendingPrices({});
       }
@@ -750,14 +770,14 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       } else {
         toast.error(
           res.message ||
-          `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
+            `Failed to ${isCreate ? "create" : "update"} Bestellung.`,
           errorStyles,
         );
       }
     } catch (e: any) {
       toast.error(
         e.message ||
-        `An error occurred while ${isCreate ? "creating" : "saving"}.`,
+          `An error occurred while ${isCreate ? "creating" : "saving"}.`,
         errorStyles,
       );
     } finally {
@@ -923,8 +943,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
       const pendingRaw = pendingPrices[String(item.id)];
       const effectivePrice =
         pendingRaw !== undefined
-          ? parseFlexibleNumber(pendingRaw) ?? 0
-          : (parseFlexibleNumber(item?.purchasePrice ?? item?.transferPrice ?? 0) ?? 0);
+          ? (parseFlexibleNumber(pendingRaw) ?? 0)
+          : (parseFlexibleNumber(
+              item?.purchasePrice ?? item?.transferPrice ?? 0,
+            ) ?? 0);
       const qty = parseFlexibleNumber(item?.qty) ?? 1;
       total += qty * effectivePrice;
 
@@ -946,9 +968,12 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
 
   const visibleLineItems = order?.orderItems
     ? [...order.orderItems].sort(
-      (a: any, b: any) => (a.position || 0) - (b.position || 0),
-    )
+        (a: any, b: any) => (a.position || 0) - (b.position || 0),
+      )
     : [];
+  const linkedDocs = order?.linkedDocuments || {};
+  const linkedAuftragDocs = sortByCreatedAtDesc(linkedDocs.auftrag || []);
+  const linkedCargoDocs = sortByCreatedAtDesc(linkedDocs.cargos || []);
 
   // Loading state for existing order
   // Loading state - only show when NOT in create mode AND (loading OR no order)
@@ -1007,16 +1032,17 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 {title}
               </p>
               <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${(form.zweck || displayOrder.zweck) === "direkt"
-                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                  : (form.zweck || displayOrder.zweck) === "periodisch"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : (form.zweck || displayOrder.zweck) === "ReserveEU"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : (form.zweck || displayOrder.zweck) === "ReserveCN"
-                        ? "bg-rose-50 text-rose-700 border-rose-200"
-                        : "bg-blue-50 text-blue-700 border-blue-200"
-                  }`}
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                  (form.zweck || displayOrder.zweck) === "direkt"
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : (form.zweck || displayOrder.zweck) === "periodisch"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : (form.zweck || displayOrder.zweck) === "ReserveEU"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : (form.zweck || displayOrder.zweck) === "ReserveCN"
+                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
               >
                 {form.zweck || displayOrder.zweck || "direkt"}
               </span>
@@ -1413,14 +1439,17 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                           ) : (
                             <div className="text-right text-gray-600">
                               {item.purchasePrice !== null &&
-                                item.purchasePrice !== undefined
-                                ? formatUnitPrice(item.purchasePrice, lineCurrency)
-                                : item.transferPrice !== null &&
-                                  item.transferPrice !== undefined
-                                  ? formatUnitPrice(
-                                    item.transferPrice,
+                              item.purchasePrice !== undefined
+                                ? formatUnitPrice(
+                                    item.purchasePrice,
                                     lineCurrency,
                                   )
+                                : item.transferPrice !== null &&
+                                    item.transferPrice !== undefined
+                                  ? formatUnitPrice(
+                                      item.transferPrice,
+                                      lineCurrency,
+                                    )
                                   : "—"}
                             </div>
                           )}
@@ -1560,13 +1589,13 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                      visibleLineItems[0]?.extraWeight === undefined
+                    visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : (
-                        parseFlexibleNumber(
-                          visibleLineItems[0].extraWeight,
-                        ) ?? 0
-                      ).toFixed(1)
+                          parseFlexibleNumber(
+                            visibleLineItems[0].extraWeight,
+                          ) ?? 0
+                        ).toFixed(1)
                   }
                   placeholder="0"
                   disabled={visibleLineItems.length === 0 || isCreate}
@@ -1593,52 +1622,74 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
-              <div className="flex items-center gap-2 mb-3">
-                <LinkIcon className="h-4 w-4 text-gray-500" />
-                <h3 className="text-sm font-bold text-gray-900">
-                  Linked documents
-                </h3>
-              </div>
+          <div className="bg-white rounded-lg p-4 px-2 border border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <LinkIcon className="h-4 w-4 text-gray-500" />
+              <h3 className="text-sm font-bold text-gray-900">
+                Linked documents
+              </h3>
+            </div>
+            {isCreate ||
+            (linkedAuftragDocs.length === 0 && linkedCargoDocs.length === 0) ? (
               <p className="text-sm text-gray-500">No linked documents yet.</p>
-            </div>
-
-            <div className="bg-white rounded-lg px-2 p-4 border border-gray-100">
-              <div className="flex items-center gap-2 mb-3">
-                <PencilIcon className="h-4 w-4 text-gray-500" />
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
-                  Comment intern
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(
-                        form.notes || displayOrder.notes || "",
-                      );
-                      toast.success("Comment copied to clipboard!");
-                    }}
-                    className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 rounded cursor-pointer font-normal"
-                    title="Copy Comment"
-                  >
-                    <ClipboardDocumentIcon className="w-4 h-4" />
-                  </button>
-                </h3>
+            ) : (
+              <div className="space-y-3">
+                {linkedAuftragDocs.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      Auftrag
+                    </p>
+                    {linkedAuftragDocs.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSwitchToAuftrag?.(doc.id);
+                          }}
+                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                        >
+                          {doc.order_no}{" "}
+                          <span className="text-xs text-gray-400">→</span>
+                        </button>
+                        <span className="text-gray-400 text-xs">
+                          {formatDate(doc.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {linkedCargoDocs.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      Cargo
+                    </p>
+                    {linkedCargoDocs.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSwitchToCargo?.(doc.id);
+                          }}
+                          className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                        >
+                          {doc.cargo_no}{" "}
+                          <span className="text-xs text-gray-400">→</span>
+                        </button>
+                        <span className="text-gray-400 text-xs">
+                          {formatDate(doc.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              {edit || isCreate ? (
-                <textarea
-                  rows={3}
-                  className={inputCls}
-                  value={form.notes}
-                  placeholder="Notes for this Bestellung."
-                  onChange={(e) => patch({ notes: e.target.value })}
-                />
-              ) : (
-                <p className="text-sm text-gray-600">
-                  {displayOrder.notes || "—"}
-                </p>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
