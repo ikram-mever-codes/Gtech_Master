@@ -245,3 +245,6 @@ export class CustomerOrder {
   @UpdateDateColumn()
   updated_at!: Date;
 }
+
+// Lieferschein
+// 18.08.
