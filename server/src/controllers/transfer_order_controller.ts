@@ -914,10 +914,18 @@ export async function syncBestellungToLinkedOrder(
     const orderRepo = AppDataSource.getRepository(Order);
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
 
-    const linkedOrder = await orderRepo.findOne({
+    let linkedOrder = await orderRepo.findOne({
       where: { order_no: bestellung.order_no },
       relations: ["orderItems"],
     });
+
+    if (!linkedOrder && bestellung.status !== "draft") {
+      await createOrderFromBestellung(bestellung);
+      linkedOrder = await orderRepo.findOne({
+        where: { order_no: bestellung.order_no },
+        relations: ["orderItems"],
+      });
+    }
 
     if (!linkedOrder) return;
 

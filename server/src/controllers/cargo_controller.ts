@@ -376,8 +376,14 @@ export const getAllCargos = async (
       });
     }
 
-    const dataWithCounts = cargos.map((c) => ({
+    const cargoTypes = await AppDataSource.getRepository(CargoType).find();
+    const cargoTypeMap = new Map<number, string>();
+    cargoTypes.forEach((ct) => cargoTypeMap.set(ct.id, ct.type));
+
+    const dataWithCounts = cargos.map((c: any) => ({
       ...c,
+      cargo_type: c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id) ? cargoTypeMap.get(c.cargo_type_id) : c.cargo_type,
+      cargo_type_name: c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id) ? cargoTypeMap.get(c.cargo_type_id) : c.cargo_type_name,
       assignedItemsCount: itemCountsMap[c.id] || 0,
     }));
 

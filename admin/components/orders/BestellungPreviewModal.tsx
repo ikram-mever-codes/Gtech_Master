@@ -1124,11 +1124,26 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 ) : (
                   <div className="text-sm text-gray-900">
                     {(() => {
+                      const custId =
+                        selectedCustomerId ||
+                        displayOrder.customer_id ||
+                        displayOrder.customer?.id;
                       const cust = customers.find(
-                        (c) =>
-                          String(c.id) === String(displayOrder.customer_id),
+                        (c) => String(c.id) === String(custId),
                       );
-                      return cust?.companyName || cust?.name || "—";
+                      const name = cust?.companyName || cust?.name || "—";
+                      return custId ? (
+                        <a
+                          href={`/bussinesses/${custId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
+                        >
+                          {name}
+                        </a>
+                      ) : (
+                        <span>{name}</span>
+                      );
                     })()}
                   </div>
                 )}
@@ -1212,7 +1227,16 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
               <Field
                 label="Customer"
                 edit={false}
-                value={displayOrder.customer?.companyName || "—"}
+                value={
+                  <a
+                    href={`/bussinesses/${displayOrder.customer_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
+                  >
+                    {displayOrder.customer?.companyName || "—"}
+                  </a>
+                }
               />
             )}
 
@@ -1369,7 +1393,27 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                               }
                             />
                           ) : (
-                            <span>{item.itemName || "—"}</span>
+                            (() => {
+                              const masterId =
+                                item.sourceItemId ||
+                                item.source_item_id ||
+                                item.itemId ||
+                                item.item_id ||
+                                item.masterItemId ||
+                                item.item?.id;
+                              return masterId ? (
+                                <a
+                                  href={`/items/${masterId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
+                                >
+                                  {item.itemName || "—"}
+                                </a>
+                              ) : (
+                                <span>{item.itemName || "—"}</span>
+                              );
+                            })()
                           )}
                         </td>
                         <td className="px-2 py-2">

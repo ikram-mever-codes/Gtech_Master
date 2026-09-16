@@ -498,7 +498,7 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                           {
                             header: "Duty rate",
                             render: (it: any) =>
-                              it.dutyRate
+                              it.dutyRate !== null && it.dutyRate !== undefined
                                 ? `${Number(it.dutyRate).toFixed(2)}`
                                 : "-",
                             width: "80px",
@@ -559,7 +559,7 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                           {
                             header: "Duty rate",
                             render: (it: any) =>
-                              it.dutyRate
+                              it.dutyRate !== null && it.dutyRate !== undefined
                                 ? `${Number(it.dutyRate).toFixed(2)}`
                                 : "-",
                             width: "80px",

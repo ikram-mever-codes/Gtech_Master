@@ -72,6 +72,8 @@ import {
 } from "@/api/orders";
 import { getAllCargos, CargoType, assignOrdersToCargo } from "@/api/cargos";
 import CargoCreateModal from "@/components/cargos/CargoCreateModal";
+import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
+import { getAllGtechCompanies, GtechCompany } from "@/api/gtech_companies";
 import { getAllTaricsSimple, getItems, updateItem } from "@/api/items";
 import { getAllSuppliers, getSupplierItems } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
@@ -153,7 +155,7 @@ interface Invoice {
   remark?: string;
   customTotalQty?: number;
   cargoId?: number | null;
-  cargo?: { id: number; cargo_no?: string } | null;
+  cargo?: { id: number; cargo_no?: string; cargo_type?: any; cargo_type_id?: number; cargo_type_name?: string } | null;
 }
 
 interface FilterOptions {
@@ -290,6 +292,8 @@ const InvoiceListPage: React.FC = () => {
   const [showCargoCreateModal, setShowCargoCreateModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [cargos, setCargos] = useState<CargoType[]>([]);
+  const [cargoTypesList, setCargoTypesList] = useState<CargoTypeObj[]>([]);
+  const [gtechCompanies, setGtechCompanies] = useState<GtechCompany[]>([]);
   const [splitQty, setSplitQty] = useState<number>(0);
   const [newQty, setNewQty] = useState<number>(0);
   const [targetCargoId, setTargetCargoId] = useState<string>("");
@@ -685,10 +689,95 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const getCargoTypeNameFromInvoice = useCallback(
+    (invoice: Invoice) => {
+      const invCargo: any = invoice.cargo;
+      const cNo = (invCargo?.cargo_no || invoice.cargoNo || "").trim().toLowerCase();
+      const cargoId = invCargo?.id || invoice.cargoId || (invoice as any).cargo_id;
+
+      if (typeof invCargo?.cargo_type === "string" && invCargo.cargo_type.trim()) {
+        return invCargo.cargo_type.trim();
+      }
+      if (typeof invCargo?.cargo_type_name === "string" && invCargo.cargo_type_name.trim()) {
+        return invCargo.cargo_type_name.trim();
+      }
+      if (invCargo?.cargo_type?.type && typeof invCargo.cargo_type.type === "string") {
+        return invCargo.cargo_type.type.trim();
+      }
+
+      const matchedCargo: any = cargos.find(
+        (c: any) =>
+          (cNo && c.cargo_no && String(c.cargo_no).trim().toLowerCase() === cNo) ||
+          (cargoId && String(c.id) === String(cargoId)),
+      );
+
+      if (matchedCargo) {
+        if (typeof matchedCargo.cargo_type === "string" && matchedCargo.cargo_type.trim()) {
+          return matchedCargo.cargo_type.trim();
+        }
+        if (typeof matchedCargo.cargo_type_name === "string" && matchedCargo.cargo_type_name.trim()) {
+          return matchedCargo.cargo_type_name.trim();
+        }
+        if (matchedCargo.cargo_type?.type && typeof matchedCargo.cargo_type.type === "string") {
+          return matchedCargo.cargo_type.type.trim();
+        }
+        const typeId = matchedCargo.cargo_type_id || matchedCargo.cargo_type?.id;
+        if (typeId !== undefined && typeId !== null) {
+          const ct = cargoTypesList.find((t: any) => String(t.id) === String(typeId));
+          if (ct) return ct.type || (ct as any).cargo_type || "-";
+        }
+      }
+
+      const directTypeId = invCargo?.cargo_type_id || (invoice as any).cargo_type_id;
+      if (directTypeId !== undefined && directTypeId !== null) {
+        const ct = cargoTypesList.find((t: any) => String(t.id) === String(directTypeId));
+        if (ct) return ct.type || (ct as any).cargo_type || "-";
+      }
+
+      return "-";
+    },
+    [cargos, cargoTypesList],
+  );
+
+  const getBillToDisplayName = useCallback(
+    (invoice: Invoice) => {
+      const billTo = (typeof invoice.bill_to === "string" ? invoice.bill_to : "").trim();
+      const custName = (invoice.customer?.companyName || "").trim();
+      const raw = billTo || custName;
+      if (!raw) return "N/A";
+
+      const matched = gtechCompanies.find(
+        (g) =>
+          (g.legal_name && g.legal_name.trim().toLowerCase() === raw.toLowerCase()) ||
+          (g.display_name && g.display_name.trim().toLowerCase() === raw.toLowerCase()) ||
+          (g.legal_name && raw.toLowerCase().includes(g.legal_name.trim().toLowerCase())) ||
+          (g.display_name && raw.toLowerCase().includes(g.display_name.trim().toLowerCase())),
+      );
+
+      if (matched && matched.display_name) {
+        return matched.display_name;
+      }
+
+      return raw;
+    },
+    [gtechCompanies],
+  );
+
   useEffect(() => {
-    getAllCargos({ limit: 1000, availableOnly: true }).then((res) => {
-      if (res.success) setCargos(res.data);
+    getAllCargos({ limit: 1000 }).then((res: any) => {
+      const data = res?.data?.cargos || res?.data?.data || res?.data || res;
+      if (Array.isArray(data)) setCargos(data);
     });
+    getAllCargoTypes().then((res: any) => {
+      const data = res?.data?.data || res?.data || res;
+      if (Array.isArray(data)) setCargoTypesList(data);
+    });
+    getAllGtechCompanies()
+      .then((res: any) => {
+        const data = res?.data?.data || res?.data || res;
+        if (Array.isArray(data)) setGtechCompanies(data);
+      })
+      .catch(() => {});
     getAllTaricsSimple().then((res) => {
       if (res.success) setTarics(res.data);
     });
@@ -1863,19 +1952,21 @@ const InvoiceListPage: React.FC = () => {
                                 #
                               </th>
                             )}
-                            <th
-                              onClick={() => handleSort("id")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span></span>
-                                {sortField === "id" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
+                            {activeInvTab === "closed_invoices" && (
+                              <th
+                                onClick={() => handleSort("id")}
+                                className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>ID</span>
+                                  {sortField === "id" && (
+                                    <span className="text-xs text-emerald-600 font-bold">
+                                      {sortDirection === "asc" ? "↑" : "↓"}
+                                    </span>
+                                  )}
+                                </div>
+                              </th>
+                            )}
                             {activeInvTab === "closed_invoices" && (
                               <th
                                 onClick={() => handleSort("invoiceNumber")}
@@ -1920,6 +2011,9 @@ const InvoiceListPage: React.FC = () => {
                                 )}
                               </div>
                             </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              CargoType
+                            </th>
                             <th
                               onClick={() => handleSort("createdAt")}
                               className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
@@ -1936,6 +2030,9 @@ const InvoiceListPage: React.FC = () => {
                                   </span>
                                 )}
                               </div>
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Remark
                             </th>
                             <th
                               onClick={() => handleSort("customItemCount")}
@@ -1971,21 +2068,19 @@ const InvoiceListPage: React.FC = () => {
                                 )}
                               </div>
                             </th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th
-                                onClick={() => handleSort("grossTotal")}
-                                className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                              >
-                                <div className="flex items-center justify-end gap-1">
-                                  <span>Total Price</span>
-                                  {sortField === "grossTotal" && (
-                                    <span className="text-xs text-emerald-600 font-bold">
-                                      {sortDirection === "asc" ? "↑" : "↓"}
-                                    </span>
-                                  )}
-                                </div>
-                              </th>
-                            )}
+                            <th
+                              onClick={() => handleSort("grossTotal")}
+                              className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{activeInvTab === "open_invoices" ? "TotalAmount" : "Total Price"}</span>
+                                {sortField === "grossTotal" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F1F3F5]">
@@ -2003,22 +2098,18 @@ const InvoiceListPage: React.FC = () => {
                                       {startIndex + index + 1}
                                     </td>
                                   )}
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-bold">
-                                    {invoice.id.slice(-5).toUpperCase()}
-                                  </td>
+                                  {activeInvTab === "closed_invoices" && (
+                                    <td className="py-4 px-4 text-xs text-[#212529] font-bold">
+                                      {invoice.id.slice(-5).toUpperCase()}
+                                    </td>
+                                  )}
                                   {activeInvTab === "closed_invoices" && (
                                     <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
                                       {invoice.invoiceNumber || "N/A"}
                                     </td>
                                   )}
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {(() => {
-                                      const v = invoice.bill_to;
-                                      if (!v || typeof v === "object")
-                                        return "N/A";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "N/A";
-                                    })()}
+                                    {getBillToDisplayName(invoice)}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#6C757D]">
                                     {(() => {
@@ -2034,8 +2125,14 @@ const InvoiceListPage: React.FC = () => {
                                       return cNo.toUpperCase().startsWith("C") ? cNo : "-";
                                     })()}
                                   </td>
+                                  <td className="py-4 px-4 text-xs text-[#212529]">
+                                    {getCargoTypeNameFromInvoice(invoice)}
+                                  </td>
                                   <td className="py-4 px-4 text-xs text-[#495057]">
                                     {formatDate(invoice.invoiceDate, true)}
+                                  </td>
+                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
+                                    {invoice.remark || "-"}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {invoice.customItemCount ??
@@ -2051,17 +2148,15 @@ const InvoiceListPage: React.FC = () => {
                                       ) ??
                                       0}
                                   </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                      {calculateInvoiceTotal(invoice).toLocaleString(
-                                        undefined,
-                                        {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        },
-                                      )}
-                                    </td>
-                                  )}
+                                  <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                    {calculateInvoiceTotal(invoice).toLocaleString(
+                                      undefined,
+                                      {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      },
+                                    )}
+                                  </td>
                                 </tr>
                               </React.Fragment>
                             );
@@ -2557,7 +2652,7 @@ const InvoiceListPage: React.FC = () => {
                                 {
                                   header: "Duty rate",
                                   render: (it: any) =>
-                                    it.dutyRate
+                                    it.dutyRate !== null && it.dutyRate !== undefined
                                       ? `${Number(it.dutyRate).toFixed(2)}`
                                       : "-",
                                   width: "80px",
@@ -2616,7 +2711,7 @@ const InvoiceListPage: React.FC = () => {
                                 {
                                   header: "Duty rate",
                                   render: (it: any) =>
-                                    it.dutyRate
+                                    it.dutyRate !== null && it.dutyRate !== undefined
                                       ? `${Number(it.dutyRate).toFixed(2)}`
                                       : "-",
                                   width: "80px",

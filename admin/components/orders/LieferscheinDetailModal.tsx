@@ -91,9 +91,38 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
       .replace(/,\s*$/, "");
   }
 
+  const custId =
+    addr?.customerId ||
+    addr?.customer_id ||
+    addr?.id ||
+    addr?.businessId ||
+    addr?.original_customer_id;
+
+  const renderCustomerName = (name: string, isBold: boolean = false) => {
+    const cls = isBold ? "font-bold text-gray-900" : "font-medium";
+    if (custId) {
+      return (
+        <div className={cls}>
+          <a
+            href={`/bussinesses/${custId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#8CC21B] hover:underline cursor-pointer"
+          >
+            {name}
+          </a>
+        </div>
+      );
+    }
+    return <div className={cls}>{name}</div>;
+  };
+
   return (
     <div className="space-y-0.5 text-sm text-gray-700">
-      {addr.legalName && <div className="font-medium">{addr.legalName}</div>}
+      {addr.companyName && renderCustomerName(addr.companyName, true)}
+      {addr.legalName &&
+        addr.legalName !== addr.companyName &&
+        renderCustomerName(addr.legalName, false)}
       {addr.contactName && <div>{addr.contactName}</div>}
       {street && <div>{street}</div>}
       {(postalCode || city) && (
@@ -286,7 +315,18 @@ export default function LieferscheinDetailModal({
   );
   const totalWeightKg = netWeightKg + extraWeightKg;
 
+  const custId =
+    data.customerId ||
+    data.customer_id ||
+    customer.id ||
+    snapshot.id ||
+    snapshot.customer_id ||
+    snapshot.original_customer_id ||
+    snapshot.businessId;
+
   const billingAddr = {
+    customerId: custId,
+    companyName: companyName,
     legalName: companyName,
     contactName: customer.contactName || snapshot.contactName,
     address:
@@ -716,7 +756,27 @@ export default function LieferscheinDetailModal({
                             {item.itemNo || item.material || "—"}
                           </td>
                           <td className="px-2 py-2">
-                            {item.itemName || item.item_name || "Line Item"}
+                            {(() => {
+                              const masterId =
+                                item.sourceItemId ||
+                                item.source_item_id ||
+                                item.itemId ||
+                                item.item_id ||
+                                item.masterItemId ||
+                                item.item?.id;
+                              return masterId ? (
+                                <a
+                                  href={`/items/${masterId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
+                                >
+                                  {item.itemName || item.item_name || "Line Item"}
+                                </a>
+                              ) : (
+                                item.itemName || item.item_name || "Line Item"
+                              );
+                            })()}
                           </td>
                           <td className="px-2 py-2 text-right font-medium">
                             {qty}

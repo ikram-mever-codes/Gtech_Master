@@ -891,10 +891,10 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                                                                     </div>
                                                                 );
                                                             }
-                                                            if (details.orders.length === 0 && details.orderItems.length === 0) {
+                                                            if (details.orderItems.length === 0) {
                                                                 return (
                                                                     <div className="text-sm text-gray-400 py-2">
-                                                                        No assigned orders or items.
+                                                                        No assigned order items.
                                                                     </div>
                                                                 );
                                                             }

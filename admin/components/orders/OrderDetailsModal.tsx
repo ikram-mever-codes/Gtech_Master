@@ -70,7 +70,7 @@ export default function OrderDetailsModal({
             </label>
             <p className="text-gray-900 font-bold">
               {viewOrder.supplier_name &&
-              viewOrder.supplier_name !== "Unassigned"
+                viewOrder.supplier_name !== "Unassigned"
                 ? viewOrder.supplier_name
                 : viewOrder.supplier_id
                   ? getSupplierName(viewOrder.supplier_id)
@@ -92,7 +92,7 @@ export default function OrderDetailsModal({
           )}
           <div className="space-y-1">
             <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-              Comment
+              Comment intern
             </label>
             <p className="text-gray-800 text-sm font-medium leading-relaxed">
               {viewOrder.bestellung_notes || viewOrder.comment || "-"}
@@ -149,13 +149,12 @@ export default function OrderDetailsModal({
                 width: "120px",
                 render: (row) => (
                   <span
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      row.status === "NSO"
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === "NSO"
                         ? "bg-amber-100 text-amber-700"
                         : row.status === "SO"
                           ? "bg-blue-100 text-blue-700"
                           : "bg-green-100 text-green-700"
-                    }`}
+                      }`}
                   >
                     {row.status || "NSO"}
                   </span>

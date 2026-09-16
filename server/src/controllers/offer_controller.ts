@@ -3765,6 +3765,7 @@ export class OfferController {
         const shippingQty = getSafeNumber(offerData.shippingQuantity) || 1;
         const shippingTotal = shippingCost * shippingQty;
         if (shippingTotal > 0) {
+          subtotal += shippingTotal;
           const shipRate =
             offerData.shippingTaxRate !== undefined &&
               offerData.shippingTaxRate !== null
