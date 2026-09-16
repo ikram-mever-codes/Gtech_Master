@@ -1,6 +1,6 @@
-
 export function sanitizeFilename(input: string): string {
   return String(input || "")
+    .normalize("NFC")
     .replace(/ä/g, "ae")
     .replace(/ö/g, "oe")
     .replace(/ü/g, "ue")

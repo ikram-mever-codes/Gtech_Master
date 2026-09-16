@@ -1,6 +1,6 @@
 import { api, handleApiError } from "@/utils/api";
 import { toast } from "react-hot-toast";
-import { loadingStyles, successStyles } from "@/utils/constants";
+import { loadingStyles, successStyles, BASE_URL } from "@/utils/constants";
 import { downloadBlob, getFilenameFromResponse } from "@/utils/blobUtils";
 
 export type PricingMode = "classic" | "matrix";
@@ -495,7 +495,11 @@ export const downloadOfferPdf = async (id: string, offerNumber?: string) => {
       response,
       `Angebot_${String(offer.offerNumber || offerNumber || id).replace(/[\s_]+/g, "_")}_GTech.pdf`,
     );
-    downloadBlob(blob, filename);
+    downloadBlob(blob, filename, false);
+
+    const pdfUrl = `${BASE_URL}/offers/${id}/download-pdf/${encodeURIComponent(filename)}`;
+    window.open(pdfUrl, "_blank");
+
     toast.dismiss();
     return true;
   } catch (error) {

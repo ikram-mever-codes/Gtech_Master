@@ -58,6 +58,7 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const contentPdf = await pdfLib.PDFDocument.load(contentBytes);
 
     const mergedPdf = await pdfLib.PDFDocument.create();
+    mergedPdf.setTitle(path.basename(contentPdfPath, ".pdf"));
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
@@ -256,6 +257,9 @@ export async function generateGtechDocumentPdf(
     margin: 0,
     size: "A4",
     bufferPages: true,
+    info: {
+      Title: path.basename(opts.outputFilePath, ".pdf"),
+    },
   });
 
   const MM = (v: number) => v * 2.8346;

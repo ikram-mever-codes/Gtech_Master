@@ -16,6 +16,7 @@ router.use(authenticateUser);
 router.get("/", getAllLieferscheine);
 
 router.get("/:id/download-pdf", downloadLieferscheinPdf);
+router.get("/:id/download-pdf/:filename", downloadLieferscheinPdf);
 
 router.get("/:id", getLieferscheinById);
 
