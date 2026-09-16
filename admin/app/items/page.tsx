@@ -110,10 +110,10 @@ const FETCH_ALL_LIMIT = 100000;
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
   return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
     }`;
 };
 
@@ -1351,8 +1351,8 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${parent.is_active === "Y"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                    : "bg-gray-50 text-gray-600 border-gray-200"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                  : "bg-gray-50 text-gray-600 border-gray-200"
                   }`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
@@ -1420,8 +1420,8 @@ const ItemsManagementPage: React.FC = () => {
                     })
                   }
                   className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${w.is_stock_item === "Y"
-                      ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
-                      : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
+                    ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
+                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
                     }`}
                 >
                   {w.is_stock_item === "Y" ? "Remove Stock" : "Add Stock"}
@@ -1712,15 +1712,15 @@ const ItemsManagementPage: React.FC = () => {
                       <FilterResetIcon
                         isActive={Boolean(
                           filters.search ||
-                            filters.eanSearch ||
-                            filters.status ||
-                            (filters.category && filters.category !== "PRO") ||
-                            filters.supplier ||
-                            (filters.isActive && filters.isActive !== "Y") ||
-                            filters.tags ||
-                            filters.company ||
-                            filters.isLabel ||
-                            filters.isStock,
+                          filters.eanSearch ||
+                          filters.status ||
+                          (filters.category && filters.category !== "PRO") ||
+                          filters.supplier ||
+                          (filters.isActive && filters.isActive !== "Y") ||
+                          filters.tags ||
+                          filters.company ||
+                          filters.isLabel ||
+                          filters.isStock,
                         )}
                         onReset={() =>
                           setFilters({
@@ -1748,8 +1748,8 @@ const ItemsManagementPage: React.FC = () => {
                             setFilters({ ...filters, search: e.target.value })
                           }
                           className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
-                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                              : "text-gray-900 border-gray-300 bg-white"
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-900 border-gray-300 bg-white"
                             }`}
                         />
                         {filters.search && (
@@ -1777,8 +1777,8 @@ const ItemsManagementPage: React.FC = () => {
                             })
                           }
                           className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
-                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                              : "text-gray-900 border-gray-300 bg-white"
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-900 border-gray-300 bg-white"
                             }`}
                         />
                         {filters.eanSearch && (
@@ -1825,8 +1825,8 @@ const ItemsManagementPage: React.FC = () => {
                           setFilters({ ...filters, isLabel: e.target.value })
                         }
                         className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-400 border-gray-300 bg-white"
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-400 border-gray-300 bg-white"
                           }`}
                       >
                         <option value="">isLabel...</option>
@@ -1842,8 +1842,8 @@ const ItemsManagementPage: React.FC = () => {
                           setFilters({ ...filters, isStock: e.target.value })
                         }
                         className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isStock
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-400 border-gray-300 bg-white"
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-400 border-gray-300 bg-white"
                           }`}
                       >
                         <option value="">IsStock QTY...</option>
@@ -1879,8 +1879,8 @@ const ItemsManagementPage: React.FC = () => {
                           setFilters({ ...filters, category: e.target.value })
                         }
                         className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-400 border-gray-300 bg-white"
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-400 border-gray-300 bg-white"
                           }`}
                       >
                         <option value="">Category</option>
@@ -1906,8 +1906,8 @@ const ItemsManagementPage: React.FC = () => {
                           setFilters({ ...filters, isActive: e.target.value })
                         }
                         className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isActive && filters.isActive !== "Y"
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-900 border-gray-300 bg-white"
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-900 border-gray-300 bg-white"
                           }`}
                       >
                         <option value="Y">Active</option>

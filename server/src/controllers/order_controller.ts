@@ -950,11 +950,19 @@ export const deleteOrder = async (
 
     const orderRepository = queryRunner.manager.getRepository(Order);
     const orderItemsRepository = queryRunner.manager.getRepository(OrderItem);
+    const cargoOrderRepository = queryRunner.manager.getRepository(CargoOrder);
 
     const order = await orderRepository.findOne({
       where: { id: Number(orderId) },
     });
     if (!order) return next(new ErrorHandler("Order not found", 404));
+
+    await cargoOrderRepository
+      .createQueryBuilder()
+      .delete()
+      .from(CargoOrder)
+      .where("order_id = :order_id", { order_id: order.id })
+      .execute();
 
     await orderItemsRepository
       .createQueryBuilder()
