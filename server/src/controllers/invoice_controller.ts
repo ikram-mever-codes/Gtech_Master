@@ -1107,12 +1107,12 @@ export class InvoiceController {
               cargo_id: validCargo?.id || null,
               cargo: validCargo
                 ? {
-                    id: validCargo.id,
-                    cargo_no: validCargo.cargo_no,
-                    cargo_type_id: validCargo.cargo_type_id,
-                    cargo_type: cargoTypeName || null,
-                    cargo_type_name: cargoTypeName || null,
-                  }
+                  id: validCargo.id,
+                  cargo_no: validCargo.cargo_no,
+                  cargo_type_id: validCargo.cargo_type_id,
+                  cargo_type: cargoTypeName || null,
+                  cargo_type_name: cargoTypeName || null,
+                }
                 : null,
               orderComment,
             };
