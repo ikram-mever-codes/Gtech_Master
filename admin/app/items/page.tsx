@@ -1460,7 +1460,9 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <div className="text-sm text-gray-900">
-                {taric.duty_rate ? `${taric.duty_rate}%` : "-"}
+                {taric.duty_rate !== null && taric.duty_rate !== undefined
+                  ? `${taric.duty_rate}%`
+                  : "-"}
               </div>
             </td>
             <td className="px-4 py-3">

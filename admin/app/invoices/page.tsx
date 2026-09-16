@@ -2557,7 +2557,7 @@ const InvoiceListPage: React.FC = () => {
                                 {
                                   header: "Duty rate",
                                   render: (it: any) =>
-                                    it.dutyRate
+                                    it.dutyRate !== null && it.dutyRate !== undefined
                                       ? `${Number(it.dutyRate).toFixed(2)}`
                                       : "-",
                                   width: "80px",
@@ -2616,7 +2616,7 @@ const InvoiceListPage: React.FC = () => {
                                 {
                                   header: "Duty rate",
                                   render: (it: any) =>
-                                    it.dutyRate
+                                    it.dutyRate !== null && it.dutyRate !== undefined
                                       ? `${Number(it.dutyRate).toFixed(2)}`
                                       : "-",
                                   width: "80px",
