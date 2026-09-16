@@ -6,7 +6,7 @@ export interface CommercialFilters {
   valueAmount: string;
   status: string;
   rechnungFilter: "all" | "with_rechnung" | "without_rechnung";
-  datePreset: "all" | "today" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
+  datePreset: "all" | "today" | "last_30_days" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
   dateFrom: string;
   dateTo: string;
 }
@@ -88,6 +88,13 @@ export const isDateInPreset = (
 
   if (preset === "today") {
     return d >= startOfToday && d <= endOfToday;
+  }
+
+  if (preset === "last_30_days") {
+    const startOf30DaysAgo = new Date(now);
+    startOf30DaysAgo.setDate(now.getDate() - 30);
+    startOf30DaysAgo.setHours(0, 0, 0, 0);
+    return d >= startOf30DaysAgo && d <= endOfToday;
   }
 
   if (preset === "this_month") {
