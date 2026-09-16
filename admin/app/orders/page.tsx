@@ -2776,7 +2776,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Customer",
-                      width: "100px",
+                      width: "140px",
                       render: (row) => {
                         const order = row.parentOrder;
                         const customerName =
@@ -2789,12 +2789,51 @@ const OrderPage: React.FC = () => {
                             (c) => String(c.id) === String(order?.customer_id),
                           )?.companyName ||
                           null;
-                        return customerName ? (
-                          <span className="text-gray-800 font-medium text-xs">
-                            {customerName}
+
+                        if (!customerName) {
+                          return <span className="text-gray-300">-</span>;
+                        }
+
+                        const isWV =
+                          order?.is_weiterversand === true ||
+                          order?.is_weiterversand === 1 ||
+                          order?.is_weiterversand === "true" ||
+                          order?.is_weiterversand === "1" ||
+                          order?.is_weiterversand === "Yes" ||
+                          order?.isWeiterversand === true;
+
+                        if (!isWV) {
+                          return (
+                            <span className="text-gray-800 font-medium text-xs">
+                              {customerName}
+                            </span>
+                          );
+                        }
+
+                        const providerName =
+                          order?.weiterversandServiceProvider?.name ||
+                          order?.weiterversand_service_provider_name ||
+                          wvProviderMap.get(
+                            String(
+                              order?.weiterversand_service_provider_id ||
+                                order?.weiterversandServiceProviderId ||
+                                "",
+                            ),
+                          ) ||
+                          order?.weiterversand_service_provider ||
+                          "";
+
+                        const customerWVText = providerName
+                          ? `${customerName}-WV-${providerName}`
+                          : `${customerName}-Weiterversand`;
+
+                        return (
+                          <span
+                            className="text-gray-800 font-bold text-xs"
+                            title={customerWVText}
+                          >
+                            {customerWVText}
                           </span>
-                        ) : (
-                          <span className="text-gray-300">-</span>
                         );
                       },
                     },
