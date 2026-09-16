@@ -14,6 +14,7 @@ import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { CargoOrder } from "../models/cargo_orders";
+import { CargoType } from "../models/cargo_types";
 import { In, Like } from "typeorm";
 import { getRMBPriceFromSupplier } from "./items_controller";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
@@ -851,6 +852,19 @@ export class InvoiceController {
       const orderIds = orders.map((o) => o.id);
       const orderToCargoMap = new Map();
 
+      const cargoTypes = await AppDataSource.getRepository(CargoType).find();
+      const cargoTypeMap = new Map<number, string>();
+      cargoTypes.forEach((ct) => cargoTypeMap.set(ct.id, ct.type));
+
+      const enrichCargo = (c: any) => {
+        if (!c) return c;
+        if (c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id)) {
+          c.cargo_type = cargoTypeMap.get(c.cargo_type_id);
+          c.cargo_type_name = cargoTypeMap.get(c.cargo_type_id);
+        }
+        return c;
+      };
+
       if (orderIds.length > 0) {
         const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
           where: { order_id: In(orderIds) },
@@ -858,6 +872,7 @@ export class InvoiceController {
         });
         cargoOrders.forEach((co) => {
           if (co.cargo && co.order) {
+            enrichCargo(co.cargo);
             orderToCargoMap.set(co.order.order_no, co.cargo);
           }
         });
@@ -866,15 +881,19 @@ export class InvoiceController {
       const allCargos = await AppDataSource.getRepository(Cargo).find({
         relations: ["customer"],
       });
-      allCargos.forEach((c) => {
+      allCargos.forEach((c: any) => {
+        enrichCargo(c);
         if (c.cargo_no) {
           orderToCargoMap.set(c.cargo_no, c);
         }
       });
 
-      orders.forEach((o) => {
-        if (o.cargo && !orderToCargoMap.has(o.order_no)) {
-          orderToCargoMap.set(o.order_no, o.cargo);
+      orders.forEach((o: any) => {
+        if (o.cargo) {
+          enrichCargo(o.cargo);
+          if (!orderToCargoMap.has(o.order_no)) {
+            orderToCargoMap.set(o.order_no, o.cargo);
+          }
         }
       });
 
@@ -1074,6 +1093,8 @@ export class InvoiceController {
               inv.customer?.legalName ||
               "-";
 
+            const cargoTypeName = validCargo?.cargo_type || validCargo?.cargo_type_name || (validCargo?.cargo_type_id ? cargoTypeMap.get(validCargo.cargo_type_id) : undefined);
+
             return {
               ...inv,
               grossTotal: calculatedGrossTotal,
@@ -1084,7 +1105,15 @@ export class InvoiceController {
               cargoNo: validCargoNo || null,
               cargoId: validCargo?.id || null,
               cargo_id: validCargo?.id || null,
-              cargo: validCargo ? { id: validCargo.id, cargo_no: validCargo.cargo_no } : null,
+              cargo: validCargo
+                ? {
+                    id: validCargo.id,
+                    cargo_no: validCargo.cargo_no,
+                    cargo_type_id: validCargo.cargo_type_id,
+                    cargo_type: cargoTypeName || null,
+                    cargo_type_name: cargoTypeName || null,
+                  }
+                : null,
               orderComment,
             };
           })
