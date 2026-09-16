@@ -82,6 +82,10 @@ router.get(
   offerController.generateAndDownloadPdf.bind(offerController),
 );
 router.get(
+  "/:id/download-pdf/:filename",
+  offerController.generateAndDownloadPdf.bind(offerController),
+);
+router.get(
   "/:id/download-eml",
   OfferController.downloadOfferEml,
 );

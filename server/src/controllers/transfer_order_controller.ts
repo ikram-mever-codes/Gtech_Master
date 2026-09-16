@@ -925,6 +925,29 @@ export async function syncBestellungToLinkedOrder(
         where: { order_no: bestellung.order_no },
         relations: ["orderItems"],
       });
+
+      if (!linkedOrder) {
+        const now = new Date();
+        const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
+          now.getMonth() + 1
+        )
+          .toString()
+          .padStart(2, "0")}.${now.getFullYear()}`;
+
+        const newOrder = orderRepo.create({
+          order_no: bestellung.order_no,
+          customer_id: bestellung.customer_id || undefined,
+          status: 1,
+          comment:
+            [bestellung.title, bestellung.notes].filter(Boolean).join(" — ") ||
+            `Created automatically from Bestellung ${bestellung.order_no}`,
+          supplier_id: bestellung.supplier_id || undefined,
+          date_created: bestellung.date_created || dateCreatedStr,
+          date_delivery: bestellung.date_delivery || undefined,
+        });
+        linkedOrder = await orderRepo.save(newOrder);
+        linkedOrder.orderItems = [];
+      }
     }
 
     if (!linkedOrder) return;
@@ -978,9 +1001,8 @@ export async function syncBestellungToLinkedOrder(
         ? Number(li.sourceItemId)
         : catalogItem?.id;
 
-      const remarkForChina = li.remark_order_item?.trim()
-        ? li.remark_order_item.trim()
-        : null;
+      const remarkForChina =
+        li.remark_order_item?.trim() || li.itemName?.trim() || null;
 
       let targetItem = existingOrderItems[i];
       if (!targetItem) {
@@ -1009,6 +1031,37 @@ export async function syncBestellungToLinkedOrder(
     }
   } catch (err) {
     console.error("Error in syncBestellungToLinkedOrder:", err);
+  }
+}
+
+export async function ensureAllToBeProcessedBestellungenAreSynced(): Promise<void> {
+  try {
+    const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+    const orderRepo = AppDataSource.getRepository(Order);
+
+    const toBeProcessedOrders = await transferOrderRepo.find({
+      where: [
+        { status: "to be processed" as any },
+        { status: "partially delivered" as any },
+        { status: "delivered" as any },
+      ],
+      relations: ["orderItems"],
+    });
+
+    for (const b of toBeProcessedOrders) {
+      const linked = await orderRepo.findOne({
+        where: { order_no: b.order_no },
+        relations: ["orderItems"],
+      });
+      const bItemsCount = b.orderItems?.length || 0;
+      const linkedItemsCount = linked?.orderItems?.length || 0;
+
+      if (!linked || bItemsCount !== linkedItemsCount) {
+        await syncBestellungToLinkedOrder(b.id);
+      }
+    }
+  } catch (err) {
+    console.error("Error in ensureAllToBeProcessedBestellungenAreSynced:", err);
   }
 }
 export const updateTransferOrderStatus = async (
@@ -1049,25 +1102,16 @@ export const updateTransferOrderStatus = async (
     bestellung.status = status;
     await transferOrderRepo.save(bestellung);
 
-    let conversionResult: {
-      createdOrderId: number;
-      skippedCount: number;
-    } | null = null;
-
-    // Only fires on the exact draft → "to be processed" transition, so a
-    // Bestellung is never converted more than once even if it's later
-    // moved back and forth between statuses.
-    if (previousStatus === "draft" && status === "to be processed") {
+    let message = "Bestellung status updated successfully";
+    if (status !== "draft") {
       try {
-        conversionResult = await createOrderFromBestellung(bestellung);
+        await syncBestellungToLinkedOrder(bestellung.id);
+        message += " — Order synced to Orders and Order Items.";
       } catch (conversionErr) {
         console.error(
-          `Failed to create Order/OrderItems from Bestellung ${bestellung.order_no}:`,
+          `Failed to sync Order/OrderItems for Bestellung ${bestellung.order_no}:`,
           conversionErr,
         );
-        // The status change itself already committed above and stays in
-        // effect — don't roll it back over a downstream conversion
-        // failure, just surface it in the response message.
       }
     }
 
@@ -1075,20 +1119,6 @@ export const updateTransferOrderStatus = async (
       where: { id: bestellung.id },
       relations: ["orderItems", "customer"],
     });
-
-    let message = "Bestellung status updated successfully";
-    if (previousStatus === "draft" && status === "to be processed") {
-      if (conversionResult) {
-        message += ` — Order created${
-          conversionResult.skippedCount > 0
-            ? ` (${conversionResult.skippedCount} Freizeile line(s) skipped)`
-            : ""
-        }.`;
-      } else {
-        message +=
-          " — no Order was created (no catalog line items found on this Bestellung).";
-      }
-    }
 
     res.json({
       success: true,
@@ -1287,6 +1317,10 @@ export const createTransferOrder = async (
     });
 
     const savedOrder = await transferOrderRepo.save(transferOrder);
+
+    if (savedOrder.status !== "draft") {
+      await syncBestellungToLinkedOrder(savedOrder.id);
+    }
 
     const fullOrder = await transferOrderRepo.findOne({
       where: { id: savedOrder.id },

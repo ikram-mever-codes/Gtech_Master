@@ -27,7 +27,24 @@ export const downloadBlob = (blob: Blob, filename: string, openInNewTab = true) 
     link.click();
 
     if (openInNewTab && (blob.type === "application/pdf" || filename.toLowerCase().endsWith(".pdf"))) {
-        window.open(url, "_blank");
+        const encodedName = encodeURIComponent(filename);
+        const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${filename}</title>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
+        embed, iframe, object { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <embed src="${url}#name=${encodedName}&filename=${encodedName}&title=${encodedName}" type="application/pdf" width="100%" height="100%" />
+</body>
+</html>`;
+        const htmlBlob = new Blob([htmlContent], { type: "text/html" });
+        const htmlUrl = window.URL.createObjectURL(htmlBlob);
+        window.open(htmlUrl, "_blank");
     }
 
     setTimeout(() => {

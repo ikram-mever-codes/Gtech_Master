@@ -22,6 +22,7 @@ router.post("/from-rechnung/:rechnungId", createRechnungKFromRechnung);
 router.get("/", getAllRechnungenK);
 
 router.get("/:id/download-pdf", downloadRechnungKPdf);
+router.get("/:id/download-pdf/:filename", downloadRechnungKPdf);
 router.get("/:id/download-eml", downloadRechnungKEml);
 
 router.get("/:id", getRechnungKById);

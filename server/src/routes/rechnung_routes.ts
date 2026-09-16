@@ -28,6 +28,7 @@ router.get("/prepayments/auftrag/:auftragId", getPrepaymentsForAuftrag);
 router.get("/", getAllRechnungen);
 router.get("/lieferscheine", getLieferscheine);
 router.get("/:id/download-pdf", downloadRechnungPdf);
+router.get("/:id/download-pdf/:filename", downloadRechnungPdf);
 router.get("/:id/download-eml", downloadRechnungEml);
 router.get("/:id/download-eml-only", downloadRechnungEmlOnly);
 router.get("/:id", getRechnungById);

@@ -1,6 +1,6 @@
 import { api, handleApiError } from "@/utils/api";
 import { toast } from "react-hot-toast";
-import { loadingStyles } from "@/utils/constants";
+import { loadingStyles, BASE_URL } from "@/utils/constants";
 import { downloadBlob, getFilenameFromResponse } from "@/utils/blobUtils";
 
 export const getAllLieferscheine = async () => {
@@ -110,7 +110,11 @@ export const downloadLieferscheinPdf = async (
       response,
       `Lieferschein_${String(deliveryNoteNo || id).replace(/[\s_]+/g, "_")}_GTech.pdf`,
     );
-    downloadBlob(blob, filename);
+    downloadBlob(blob, filename, false);
+
+    const pdfUrl = `${BASE_URL}/lieferscheine/${id}/download-pdf/${encodeURIComponent(filename)}`;
+    window.open(pdfUrl, "_blank");
+
     toast.dismiss();
     return true;
   } catch (error) {

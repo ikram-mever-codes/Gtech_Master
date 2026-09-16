@@ -21,6 +21,7 @@ import { generateInvoicesForOrders } from "./cargo_controller";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { InvoiceController } from "./invoice_controller";
 import { TransferOrder } from "../models/transfer_order";
+import { ensureAllToBeProcessedBestellungenAreSynced } from "./transfer_order_controller";
 
 const _cjkFontCandidates: string[] = [
   path.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
@@ -507,6 +508,8 @@ export const getAllOrders = async (
   next: NextFunction,
 ) => {
   try {
+    await ensureAllToBeProcessedBestellungenAreSynced();
+
     const orderRepo = AppDataSource.getRepository(Order);
     const warehouseRepo = AppDataSource.getRepository(WarehouseItem);
     const { search = "", status = "", filter = "" } = (req.query || {}) as any;
@@ -526,9 +529,10 @@ export const getAllOrders = async (
       .addOrderBy("oi.id", "ASC");
 
     if (search) {
-      qb.andWhere("(o.order_no LIKE :search OR o.comment LIKE :search)", {
-        search: `%${search}%`,
-      });
+      qb.where(
+        "(o.order_no ILIKE :search OR o.comment ILIKE :search OR oi.remark_de ILIKE :search OR item.item_name ILIKE :search OR item.item_no_de ILIKE :search)",
+        { search: `%${search}%` },
+      );
       if (status) qb.andWhere("o.status = :status", { status });
     } else if (status) {
       qb.andWhere("o.status = :status", { status });
