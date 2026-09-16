@@ -410,9 +410,6 @@ export default function AuftragToRechnungModal({
     return val ?? 0;
   };
 
-  /** True if this line, as currently selected/quantified, would block
-   * "Generate Rechnung & Lieferschein" — only stock lines can be invalid,
-   * and only while selected with a qty exceeding what's on hand. */
   const isStockInvalid = (item: SelectedItemState): boolean => {
     console.log(
       `This is item for stock invalidity check: ${JSON.stringify(item)}`,
