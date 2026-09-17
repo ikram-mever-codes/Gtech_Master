@@ -68,6 +68,7 @@ import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomModal from "@/components/UI/CustomModal";
 import PageHeader from "@/components/UI/PageHeader";
+import { ReassignModal } from "@/app/commercial/orderitemactionsmodal";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { ShoppingCart, Search, RefreshCw } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -3424,70 +3425,15 @@ const OrderPage: React.FC = () => {
         </CustomModal>
       )}
       {showREModal && selectedItem && (
-        <CustomModal
+        <ReassignModal
           isOpen={showREModal}
           onClose={() => setShowREModal(false)}
-          width="max-w-2xl"
-          title={
-            selectedItem.cargo_id
-              ? (selectedItem.order_no
-                ? `Reassign Order No: ${selectedItem.order_no}`
-                : `Reassign Item ID: ${selectedItem.id}`)
-              : (selectedItem.order_no
-                ? `Assign Order No: ${selectedItem.order_no}`
-                : `Assign Item ID: ${selectedItem.id}`)
-          }
-        >
-          <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
-            <div>
-              <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
-                Select Target Cargo
-              </label>
-              <Select
-                className="text-sm"
-                menuPortalTarget={typeof window !== "undefined" ? document.body : undefined}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                options={cargos
-                  .filter((c) => {
-                    const status = (c.cargo_status || "").trim().toLowerCase();
-                    return status !== "shipped" && status !== "delivered";
-                  })
-                  .map((c) => ({
-                    value: String(c.id),
-                    label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                  }))}
-                value={
-                  cargos
-                    .map((c) => ({
-                      value: String(c.id),
-                      label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                    }))
-                    .find((opt) => opt.value === String(targetCargoId)) || null
-                }
-                onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
-                placeholder="Search or Select Cargo..."
-                isSearchable
-                isClearable
-              />
-            </div>
-            <div className="flex justify-end gap-3 mt-8">
-              <button
-                onClick={() => setShowREModal(false)}
-                className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReassignItemAction}
-                disabled={!targetCargoId}
-                className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
-              >
-                <ArrowRightCircleIcon className="h-4 w-4" />
-                {selectedItem.cargo_id ? "Confirm Reassign" : "Confirm Assign"}
-              </button>
-            </div>
-          </div>
-        </CustomModal>
+          selectedItem={selectedItem}
+          cargos={cargos}
+          targetCargoId={targetCargoId}
+          setTargetCargoId={setTargetCargoId}
+          onConfirm={handleReassignItemAction}
+        />
       )}
 
       {isSOEditing && (

@@ -1706,24 +1706,85 @@ export const generateCommercialInvoicePDF = async (
 
     const orderNumberVal =
       invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
-    let cargo = await AppDataSource.getRepository(Cargo).findOne({
-      where: { cargo_no: orderNumberVal },
-      relations: [
-        "customer",
-        "customer.businessDetails",
-        "customer.starCustomerDetails",
-      ],
-    });
 
-    if (!cargo && orderNumberVal) {
+    let cargo: any = null;
+    const expCargoNo = expandedData?.cargo?.cargo_no;
+    const expCargoId = expandedData?.cargo?.id;
+
+    if (expCargoNo && typeof expCargoNo === "string" && expCargoNo.trim()) {
       cargo = await AppDataSource.getRepository(Cargo).findOne({
-        where: { cargo_no: Like(`%${orderNumberVal}%`) },
+        where: { cargo_no: expCargoNo.trim() },
         relations: [
           "customer",
           "customer.businessDetails",
           "customer.starCustomerDetails",
         ],
       });
+    }
+
+    if (!cargo && expCargoId && typeof expCargoId === "number") {
+      cargo = await AppDataSource.getRepository(Cargo).findOne({
+        where: { id: expCargoId },
+        relations: [
+          "customer",
+          "customer.businessDetails",
+          "customer.starCustomerDetails",
+        ],
+      });
+    }
+
+    if (!cargo && orderNumberVal) {
+      cargo = await AppDataSource.getRepository(Cargo).findOne({
+        where: { cargo_no: orderNumberVal },
+        relations: [
+          "customer",
+          "customer.businessDetails",
+          "customer.starCustomerDetails",
+        ],
+      });
+
+      if (!cargo) {
+        cargo = await AppDataSource.getRepository(Cargo).findOne({
+          where: { cargo_no: Like(`%${orderNumberVal}%`) },
+          relations: [
+            "customer",
+            "customer.businessDetails",
+            "customer.starCustomerDetails",
+          ],
+        });
+      }
+
+      if (!cargo) {
+        const matchingOrder = await AppDataSource.getRepository(Order).findOne({
+          where: { order_no: orderNumberVal },
+        });
+        if (matchingOrder) {
+          if (matchingOrder.cargo_id) {
+            cargo = await AppDataSource.getRepository(Cargo).findOne({
+              where: { id: matchingOrder.cargo_id },
+              relations: [
+                "customer",
+                "customer.businessDetails",
+                "customer.starCustomerDetails",
+              ],
+            });
+          }
+          if (!cargo) {
+            const co = await AppDataSource.getRepository(CargoOrder).findOne({
+              where: { order_id: matchingOrder.id },
+              relations: [
+                "cargo",
+                "cargo.customer",
+                "cargo.customer.businessDetails",
+                "cargo.customer.starCustomerDetails",
+              ],
+            });
+            if (co?.cargo) {
+              cargo = co.cargo;
+            }
+          }
+        }
+      }
     }
 
     type LineItem = {
@@ -1889,6 +1950,9 @@ export const generateCommercialInvoicePDF = async (
     );
     const cargoNoVal = (
       cargo?.cargo_no ||
+      expandedData?.cargo?.cargo_no ||
+      (invoice as any)?.cargoNo ||
+      (invoice as any)?.cargo_no ||
       invoice?.orderNumber ||
       (invoice as any)?.order_number ||
       ""
