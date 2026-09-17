@@ -1006,6 +1006,17 @@ export const createAuftragFromOffer = async (
 
     const getDeNo = (it: any): string =>
       it.item_no_de || it.parent?.de_no || "";
+
+    // A Freizeile is free text with no catalog backing whatsoever — it
+    // must never be resolved to, or converted into, a real Item, no
+    // matter what other (possibly stray) fields are set on it. Checked
+    // strictly here, BEFORE resolveBackingItem is ever called, so a
+    // leaked/incorrect isAssemblyItem or requestedItemId flag on a
+    // genuinely free-text line can't accidentally pull in a backing Item
+    // and get it converted below.
+    const isFreitextLine = (li: any): boolean =>
+      !li?.sourceItemId && !li?.isAssemblyItem && !li?.requestedItemId;
+
     const backingItemByLineItemId = new Map<string, any>();
     const linesToSave: any[] = [];
     const itemsToSave: any[] = [];
@@ -1015,6 +1026,11 @@ export const createAuftragFromOffer = async (
         (li: any) => li.id === selItem.lineItemId,
       );
       if (!lineItem) continue;
+
+      // Freizeile lines skip backing-item resolution entirely — there is
+      // nothing to convert, and nothing here should ever create or touch
+      // an Item on their behalf.
+      if (isFreitextLine(lineItem)) continue;
 
       const backingItem = await resolveBackingItem(
         lineItem,

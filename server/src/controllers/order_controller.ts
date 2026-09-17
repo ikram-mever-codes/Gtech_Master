@@ -752,7 +752,9 @@ export const getAllOrders = async (
                 itemDetails?.item_name ||
                 warehouseItem?.item_name_en ||
                 warehouseItem?.item_name_de ||
-                (oi.remark_de && oi.remark_de.trim() ? oi.remark_de.trim() : null) ||
+                (oi.remark_de && oi.remark_de.trim()
+                  ? oi.remark_de.trim()
+                  : null) ||
                 (oi?.ItemID_DE
                   ? `Unknown (DE: ${oi.ItemID_DE})`
                   : "Unknown Item"),
