@@ -337,7 +337,9 @@ export const getAllCargos = async (
     const limitNum = Math.max(1, Math.min(1000, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const qb = cargoRepo.createQueryBuilder("cargo");
+    const qb = cargoRepo
+      .createQueryBuilder("cargo")
+      .leftJoinAndSelect("cargo.customer", "customer");
 
     if (status) {
       const statuses = status.split(",").map((s: string) => s.trim());
@@ -408,18 +410,23 @@ export const getAllCargos = async (
     const cargoTypeMap = new Map<number, string>();
     cargoTypes.forEach((ct) => cargoTypeMap.set(ct.id, ct.type));
 
-    const dataWithCounts = cargos.map((c: any) => ({
-      ...c,
-      cargo_type:
-        c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id)
-          ? cargoTypeMap.get(c.cargo_type_id)
-          : c.cargo_type,
-      cargo_type_name:
-        c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id)
-          ? cargoTypeMap.get(c.cargo_type_id)
-          : c.cargo_type_name,
-      assignedItemsCount: itemCountsMap[c.id] || 0,
-    }));
+    const dataWithCounts = cargos.map((c: any) => {
+      const cargoNoDisplay =
+        c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+      return {
+        ...c,
+        cargo_no: cargoNoDisplay,
+        cargo_type:
+          c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id)
+            ? cargoTypeMap.get(c.cargo_type_id)
+            : c.cargo_type,
+        cargo_type_name:
+          c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id)
+            ? cargoTypeMap.get(c.cargo_type_id)
+            : c.cargo_type_name,
+        assignedItemsCount: itemCountsMap[c.id] || 0,
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -498,6 +505,39 @@ export const getCargoById = async (
   }
 };
 
+export const getNextDraftCargoNumber = async (): Promise<string> => {
+  const cargoRepo = AppDataSource.getRepository(Cargo);
+
+  try {
+    const emptyCargos = await cargoRepo
+      .createQueryBuilder("cargo")
+      .where("cargo.cargo_no IS NULL OR TRIM(cargo.cargo_no) = ''")
+      .getMany();
+
+    for (const ec of emptyCargos) {
+      ec.cargo_no = `Cdraft-${ec.id}`;
+      await cargoRepo.save(ec);
+    }
+  } catch (e) {
+    console.warn("Could not backfill empty cargo_no records:", e);
+  }
+
+  const allCargos = await cargoRepo
+    .createQueryBuilder("cargo")
+    .select(["cargo.id", "cargo.cargo_no"])
+    .getMany();
+
+  let maxNum = 0;
+  for (const c of allCargos) {
+    const match = (c.cargo_no || "").match(/^Cdraft-(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return `Cdraft-${maxNum + 1}`;
+};
+
 export const createCargo = async (
   req: Request,
   res: Response,
@@ -517,6 +557,7 @@ export const createCargo = async (
     const isCustomText =
       rawCargoNo &&
       rawCargoNo !== defaultPrefix &&
+      !/^Cdraft-\d+$/i.test(rawCargoNo) &&
       !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
 
     if (!rawCargoNo || rawCargoNo === defaultPrefix || isCustomText) {
@@ -536,12 +577,9 @@ export const createCargo = async (
         cargoData.note = cargoData.remark;
       }
       try {
-        cargoData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
+        cargoData.cargo_no = await getNextDraftCargoNumber();
       } catch (err) {
-        console.warn(
-          "Could not generate cargo number using sequence service:",
-          err,
-        );
+        console.warn("Could not generate draft cargo number:", err);
       }
     }
 

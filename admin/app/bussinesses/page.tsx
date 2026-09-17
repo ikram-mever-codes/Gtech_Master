@@ -59,6 +59,7 @@ import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { syncEntityTags } from "@/api/tags";
 import {
   getAllBusinesses,
+  getBusinessById,
   exportBusinessesToCSV,
   deleteBusiness,
   createBusiness,
@@ -205,13 +206,12 @@ const slugFromWebsite = (website?: string) => {
 };
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
       ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
       : isEmptySelect
         ? "text-gray-400 border-gray-300 bg-white"
         : "text-gray-900 border-gray-300 bg-white"
-  }`;
+    }`;
 };
 
 const CombinedBusinessContactsContent: React.FC = () => {
@@ -230,6 +230,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const itemsPerPage = 30;
   const displayNameTouched = useRef(false);
   const starPortalTouched = useRef(false);
+  const lastHandledBIdRef = useRef<string | null>(null);
   const [expandedBusinessIds, setExpandedBusinessIds] = useState<Set<string>>(
     new Set(),
   );
@@ -632,16 +633,83 @@ const CombinedBusinessContactsContent: React.FC = () => {
   }, [allBusinesses, clientFilters]);
 
   useEffect(() => {
-    if (businessIdHandled) return;
-    const bId = searchParams?.get("businessId");
-    if (bId && allBusinesses.length > 0) {
-      const found = allBusinesses.find((b) => b.id === bId);
+    const rawBId = searchParams?.get("businessId");
+    if (!rawBId) {
+      lastHandledBIdRef.current = null;
+      return;
+    }
+    if (loading) return;
+
+    const bId = rawBId.trim();
+    let decodedBId = bId;
+    try {
+      decodedBId = decodeURIComponent(bId).trim();
+    } catch (e) {}
+
+    if (lastHandledBIdRef.current === bId || lastHandledBIdRef.current === decodedBId) return;
+
+    if (allBusinesses.length > 0) {
+      const targetRaw = bId.toLowerCase();
+      const targetDecoded = decodedBId.toLowerCase();
+
+      const found = allBusinesses.find((b: any) => {
+        const idStr = String(b.id || "").trim().toLowerCase();
+        const numStr = String(b.customerNumber || "").trim().toLowerCase();
+        const debtorStr = String(b.debtor_no || "").trim().toLowerCase();
+        const sbdStr = String(b.starBusinessDetailsId || "").trim().toLowerCase();
+        const nameStr = String(b.displayName || b.companyName || b.name || "").trim().toLowerCase();
+        const legalStr = String(b.legalName || "").trim().toLowerCase();
+        return (
+          idStr === targetRaw || idStr === targetDecoded ||
+          numStr === targetRaw || numStr === targetDecoded ||
+          debtorStr === targetRaw || debtorStr === targetDecoded ||
+          sbdStr === targetRaw || sbdStr === targetDecoded ||
+          nameStr === targetRaw || nameStr === targetDecoded ||
+          legalStr === targetRaw || legalStr === targetDecoded
+        );
+      });
+
       if (found) {
+        lastHandledBIdRef.current = bId;
         openBusinessModal(found, false);
-        setBusinessIdHandled(true);
+        return;
+      }
+
+      const fuzzyFound = allBusinesses.find((b: any) => {
+        const nameStr = String(b.displayName || b.companyName || b.name || "").trim().toLowerCase();
+        const legalStr = String(b.legalName || "").trim().toLowerCase();
+        return (
+          nameStr.includes(targetDecoded) ||
+          targetDecoded.includes(nameStr) ||
+          legalStr.includes(targetDecoded) ||
+          targetDecoded.includes(legalStr) ||
+          nameStr.includes(targetRaw) ||
+          targetRaw.includes(nameStr)
+        );
+      });
+
+      if (fuzzyFound) {
+        lastHandledBIdRef.current = bId;
+        openBusinessModal(fuzzyFound, false);
+        return;
       }
     }
-  }, [searchParams, allBusinesses, businessIdHandled]);
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bId);
+    if (isUUID) {
+      lastHandledBIdRef.current = bId;
+      getBusinessById(bId, true)
+        .then((res: any) => {
+          const biz = res?.data || res;
+          if (biz && (biz.id || biz.companyName || biz.name)) {
+            openBusinessModal(biz, false);
+          }
+        })
+        .catch((err) => {
+          console.error("Could not find business by ID parameter:", err);
+        });
+    }
+  }, [searchParams, allBusinesses, loading]);
   const { sortBy, sortOrder, handleSort } = useTableSort();
 
   const sortedFilteredBusinesses = useMemo(() => {
@@ -1047,18 +1115,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const autoDisplay = displayNameTouched.current
         ? prev.displayName
         : generateDisplayName(
-            prev.companyName,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          allBusinesses,
+          editingBusinessId,
+        );
       const autoStar = starPortalTouched.current
         ? prev.starPortalLinkName
         : generateStarPortalLinkName(
-            prev.companyName,
-            prev.website,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          prev.website,
+          allBusinesses,
+          editingBusinessId,
+        );
       return {
         ...prev,
         displayName: autoDisplay,
@@ -1187,7 +1255,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         defaultShippingMethod: businessForm.defaultShippingMethod || null,
         defaultPaymentDueDays:
           businessForm.defaultPaymentDueDays !== undefined &&
-          businessForm.defaultPaymentDueDays !== null
+            businessForm.defaultPaymentDueDays !== null
             ? parseInt(businessForm.defaultPaymentDueDays)
             : 7,
       };
@@ -1225,6 +1293,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     resetBusinessForm();
     setBusinessModalMode("create");
     updateBusinessIdInUrl(null);
+    lastHandledBIdRef.current = null;
   };
   const handleDeleteBusiness = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this business?"))
@@ -1239,8 +1308,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     } catch (err: any) {
       toast.error(
         err?.response?.data?.message ||
-          err?.message ||
-          "Failed to delete business",
+        err?.message ||
+        "Failed to delete business",
       );
     }
   };
@@ -1362,11 +1431,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
               <FilterResetIcon
                 isActive={Boolean(
                   clientFilters.companyName ||
-                    clientFilters.customerNumber ||
-                    clientFilters.postalCode ||
-                    clientFilters.city ||
-                    clientFilters.country ||
-                    filters.tags,
+                  clientFilters.customerNumber ||
+                  clientFilters.postalCode ||
+                  clientFilters.city ||
+                  clientFilters.country ||
+                  filters.tags,
                 )}
                 onReset={resetFilters}
               />
@@ -1548,7 +1617,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 }}
                                 title={
                                   !business.contacts ||
-                                  business.contacts.length === 0
+                                    business.contacts.length === 0
                                     ? "No contacts yet"
                                     : expandedBusinessIds.has(business.id)
                                       ? "Hide contacts"
@@ -1573,15 +1642,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
                                       ? sortTags(
-                                          business.tags,
-                                          business.tagOrder,
-                                        ).map((tag: any) => (
-                                          <TagBadge
-                                            key={tag.id}
-                                            tag={tag}
-                                            size="sm"
-                                          />
-                                        ))
+                                        business.tags,
+                                        business.tagOrder,
+                                      ).map((tag: any) => (
+                                        <TagBadge
+                                          key={tag.id}
+                                          tag={tag}
+                                          size="sm"
+                                        />
+                                      ))
                                       : null}
                                   </div>
                                 </div>
@@ -2194,15 +2263,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   >
                     {dbCountries.length > 0
                       ? dbCountries.map((c) => (
-                          <option key={c.id} value={c.iso2}>
-                            {c.iso2} - {c.name}
-                          </option>
-                        ))
+                        <option key={c.id} value={c.iso2}>
+                          {c.iso2} - {c.name}
+                        </option>
+                      ))
                       : COUNTRY_OPTIONS.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 {/* Row 3: Email | Phone | Web URL | Company Label Print Logo | Note (wider, spans rows 3-4) */}
@@ -2290,11 +2359,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     />
                     <label
                       htmlFor="labelLogoInput"
-                      className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${
-                        businessFieldDisabled
+                      className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
                           ? "opacity-50 cursor-not-allowed"
                           : "cursor-pointer hover:bg-white"
-                      }`}
+                        }`}
                     >
                       Upload
                     </label>
@@ -2447,12 +2515,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {(dbShippingMethods.length > 0
                       ? dbShippingMethods.map((sm: any) => sm.name)
                       : [
-                          "Standard shipping",
-                          "Express shipping",
-                          "Freight",
-                          "Courier",
-                          "Pickup",
-                        ]
+                        "Standard shipping",
+                        "Express shipping",
+                        "Freight",
+                        "Courier",
+                        "Pickup",
+                      ]
                     ).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -2479,13 +2547,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {(dbPaymentMethods.length > 0
                       ? dbPaymentMethods.map((pm: any) => pm.name)
                       : [
-                          "Prepayment",
-                          "Bank transfer",
-                          "Cash on delivery",
-                          "Invoice",
-                          "Credit card",
-                          "PayPal",
-                        ]
+                        "Prepayment",
+                        "Bank transfer",
+                        "Cash on delivery",
+                        "Invoice",
+                        "Credit card",
+                        "PayPal",
+                      ]
                     ).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -2527,11 +2595,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           })
                         }
                         disabled={businessFieldDisabled || !isKaufAufRechnung}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg transition-all font-medium ${
-                          businessFieldDisabled || !isKaufAufRechnung
+                        className={`w-full px-3 py-2 text-sm border rounded-lg transition-all font-medium ${businessFieldDisabled || !isKaufAufRechnung
                             ? "bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed"
                             : "bg-white/70 text-gray-900 border-gray-300/80 focus:ring-2 focus:ring-gray-500/50 focus:border-transparent"
-                        }`}
+                          }`}
                         placeholder="7"
                         title={
                           !isKaufAufRechnung
@@ -2704,18 +2771,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
               </span>
               <button
                 type="button"
-                className={`${
-                  editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                  } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                 role="switch"
                 aria-checked={editModeEnabled}
                 onClick={() => setEditModeEnabled(!editModeEnabled)}
               >
                 <span
                   aria-hidden="true"
-                  className={`${
-                    editModeEnabled ? "translate-x-5" : "translate-x-0"
-                  } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                  className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
+                    } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                 />
               </button>
             </div>
@@ -3157,11 +3222,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
         }}
         title={
           businessNoteData
-            ? `Note · ${
-                businessNoteData.displayName ||
-                businessNoteData.companyName ||
-                businessNoteData.name
-              }`
+            ? `Note · ${businessNoteData.displayName ||
+            businessNoteData.companyName ||
+            businessNoteData.name
+            }`
             : "Note"
         }
         width="max-w-2xl"

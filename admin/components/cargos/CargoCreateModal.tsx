@@ -45,7 +45,7 @@ const CargoCreateModal: React.FC<CargoCreateModalProps> = ({
         return {
             customer_id: undefined,
             cargo_type_id: undefined,
-            cargo_no: `C${yy}${mm}-`,
+            cargo_no: "",
             pickup_date: "",
             dep_date: "",
             eta: "",
