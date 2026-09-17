@@ -68,6 +68,15 @@ export const generateInvoicesForOrders = async (
       });
       if (!cargo) continue;
 
+      // Only auto-sync invoices for cargos still in Open status. Once a
+      // cargo has Shipped or been Delivered, its invoice lifecycle is
+      // handled manually (markAsPaid/cancel) — regenerating a fresh
+      // "draft" invoice for it here was the root cause of deleted
+      // invoices silently reappearing on every page load.
+      if (cargo.cargo_status !== "Open") {
+        continue;
+      }
+
       const linkedCargoOrders = await AppDataSource.getRepository(
         CargoOrder,
       ).find({
@@ -103,7 +112,9 @@ export const generateInvoicesForOrders = async (
       rawItems.forEach((oi) => itemMap.set(oi.id, oi));
       const items = Array.from(itemMap.values());
 
-      console.log(`[InvoiceSync] Cargo ${cargoNo}: found ${items.length} order items. Syncing invoice record...`);
+      console.log(
+        `[InvoiceSync] Cargo ${cargoNo}: found ${items.length} order items. Syncing invoice record...`,
+      );
       await syncInvoiceRecord(
         cargoNo,
         items,
@@ -121,7 +132,9 @@ export const generateInvoicesForOrders = async (
       if (existingInvoice) {
         await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
         await invoiceRepo.delete(existingInvoice.id);
-        console.log(`[InvoiceSync] Cleaned up standalone order invoice for orderNo: ${orderNo}`);
+        console.log(
+          `[InvoiceSync] Cleaned up standalone order invoice for orderNo: ${orderNo}`,
+        );
       }
     }
 
@@ -134,10 +147,15 @@ export const generateInvoicesForOrders = async (
       const linkedCargo = await cargoRepo.findOne({
         where: { cargo_no: inv.orderNumber },
       });
-      if (!linkedCargo || !linkedCargo.cargo_no?.toUpperCase().startsWith("C")) {
+      if (
+        !linkedCargo ||
+        !linkedCargo.cargo_no?.toUpperCase().startsWith("C")
+      ) {
         await invoiceItemRepo.delete({ invoice: { id: inv.id } });
         await invoiceRepo.delete(inv.id);
-        console.log(`[InvoiceSync] Cleaned up non-Cargo dummy invoice: ${inv.orderNumber}`);
+        console.log(
+          `[InvoiceSync] Cleaned up non-Cargo dummy invoice: ${inv.orderNumber}`,
+        );
       }
     }
   } catch (e) {
@@ -153,13 +171,19 @@ const syncInvoiceRecord = async (
   invoiceItemRepo: any,
   customerRepo: any,
 ) => {
-  const isOfficialCargo = orderNumber && orderNumber.trim().toUpperCase().startsWith("C");
+  const isOfficialCargo =
+    orderNumber && orderNumber.trim().toUpperCase().startsWith("C");
   if (!isOfficialCargo) {
     const existingCargo = await AppDataSource.getRepository(Cargo).findOne({
       where: { cargo_no: orderNumber },
     });
-    if (!existingCargo || !existingCargo.cargo_no?.trim().toUpperCase().startsWith("C")) {
-      const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber } });
+    if (
+      !existingCargo ||
+      !existingCargo.cargo_no?.trim().toUpperCase().startsWith("C")
+    ) {
+      const existingInvoice = await invoiceRepo.findOne({
+        where: { orderNumber },
+      });
       if (existingInvoice) {
         await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
         await invoiceRepo.delete(existingInvoice.id);
@@ -175,7 +199,9 @@ const syncInvoiceRecord = async (
   });
 
   if (!invoice && items.length === 0) {
-    console.log(`[InvoiceSync] Cargo ${orderNumber}: no existing invoice and 0 items. Skipping.`);
+    console.log(
+      `[InvoiceSync] Cargo ${orderNumber}: no existing invoice and 0 items. Skipping.`,
+    );
     return;
   }
 
@@ -216,8 +242,8 @@ const syncInvoiceRecord = async (
   const manualTaricsList =
     uniqueCodes.length > 0
       ? await AppDataSource.getRepository(Taric).find({
-        where: { code: In(uniqueCodes) },
-      })
+          where: { code: In(uniqueCodes) },
+        })
       : [];
   const manualTaricMap = new Map(manualTaricsList.map((t) => [t.code, t]));
 
@@ -286,7 +312,9 @@ const syncInvoiceRecord = async (
   if (customer) invoice.customer = customer;
 
   await invoiceRepo.save(invoice);
-  console.log(`[InvoiceSync] Successfully saved invoice record for cargo/order ${orderNumber} (InvoiceNo: ${invoice.invoiceNumber}, Status: ${invoice.status}, GrossTotal: ${grossTotal}, Items: ${invoiceItems.length}).`);
+  console.log(
+    `[InvoiceSync] Successfully saved invoice record for cargo/order ${orderNumber} (InvoiceNo: ${invoice.invoiceNumber}, Status: ${invoice.status}, GrossTotal: ${grossTotal}, Items: ${invoiceItems.length}).`,
+  );
 };
 
 export const getAllCargos = async (
@@ -382,8 +410,14 @@ export const getAllCargos = async (
 
     const dataWithCounts = cargos.map((c: any) => ({
       ...c,
-      cargo_type: c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id) ? cargoTypeMap.get(c.cargo_type_id) : c.cargo_type,
-      cargo_type_name: c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id) ? cargoTypeMap.get(c.cargo_type_id) : c.cargo_type_name,
+      cargo_type:
+        c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id)
+          ? cargoTypeMap.get(c.cargo_type_id)
+          : c.cargo_type,
+      cargo_type_name:
+        c.cargo_type_id && cargoTypeMap.has(c.cargo_type_id)
+          ? cargoTypeMap.get(c.cargo_type_id)
+          : c.cargo_type_name,
       assignedItemsCount: itemCountsMap[c.id] || 0,
     }));
 
@@ -487,7 +521,11 @@ export const createCargo = async (
 
     if (!rawCargoNo || rawCargoNo === defaultPrefix || isCustomText) {
       if (isCustomText) {
-        const existingRemark = (cargoData.remark || cargoData.note || "").trim();
+        const existingRemark = (
+          cargoData.remark ||
+          cargoData.note ||
+          ""
+        ).trim();
         if (existingRemark) {
           if (!existingRemark.includes(rawCargoNo)) {
             cargoData.remark = `${existingRemark} - ${rawCargoNo}`;
@@ -558,13 +596,13 @@ export const updateCargo = async (
     } = req.body;
 
     const rawCargoNo = (updateData.cargo_no || "").trim();
-    const isCustomText =
-      rawCargoNo &&
-      !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
+    const isCustomText = rawCargoNo && !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
 
     if (isCustomText) {
       const existingRemark = (
-        updateData.remark !== undefined ? updateData.remark : (cargo.remark || cargo.note || "")
+        updateData.remark !== undefined
+          ? updateData.remark
+          : cargo.remark || cargo.note || ""
       ).trim();
       if (existingRemark) {
         if (!existingRemark.includes(rawCargoNo)) {
@@ -576,7 +614,8 @@ export const updateCargo = async (
       updateData.note = updateData.remark;
 
       try {
-        updateData.cargo_no = await NumberSequenceService.getNextNumber("cargo");
+        updateData.cargo_no =
+          await NumberSequenceService.getNextNumber("cargo");
       } catch (err) {
         console.warn("Could not generate sequence cargo_no on update:", err);
       }
@@ -762,7 +801,9 @@ export const assignOrdersToCargo = async (
           .createQueryBuilder()
           .update(OrderItem)
           .set({ cargo_id: cargo.id })
-          .where("order_id = :orderId AND (cargo_id IS NULL OR cargo_id = 0)", { orderId: order.id })
+          .where("order_id = :orderId AND (cargo_id IS NULL OR cargo_id = 0)", {
+            orderId: order.id,
+          })
           .execute();
 
         order.cargo_id = cargo.id;
