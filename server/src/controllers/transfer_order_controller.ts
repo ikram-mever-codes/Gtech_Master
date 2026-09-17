@@ -802,8 +802,7 @@ async function createOrderFromBestellung(
     itemByDeNo = new Map(foundItems.map((it) => [it.item_no_de as string, it]));
   }
 
-  const resolved: { line: TransferOrderItem; itemId: number }[] = [];
-  let skippedCount = 0;
+  const resolved: { line: TransferOrderItem; itemId: number | undefined }[] = [];
 
   for (const li of allItems) {
     let itemId: number | undefined;
@@ -818,18 +817,10 @@ async function createOrderFromBestellung(
       itemId = matched?.id;
     }
 
-    if (itemId === undefined) {
-      skippedCount++;
-      continue;
-    }
-
     resolved.push({ line: li, itemId });
   }
 
   if (resolved.length === 0) {
-    console.warn(
-      `Bestellung ${bestellung.order_no}: no line items could be resolved to a catalog Item — skipping Order creation (${skippedCount} line(s) skipped).`,
-    );
     return null;
   }
 
@@ -876,7 +867,7 @@ async function createOrderFromBestellung(
 
     const orderItemEntities = resolved.map(({ line: li, itemId }) =>
       orderItemRepo.create({
-        item_id: itemId,
+        item_id: itemId || undefined,
         order_id: savedOrder.id,
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
         remark_de: li.remark_order_item?.trim()
@@ -894,10 +885,10 @@ async function createOrderFromBestellung(
   });
 
   console.log(
-    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${resolved.length} item(s), ${skippedCount} line(s) skipped (no resolvable catalog Item).`,
+    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${resolved.length} item(s).`,
   );
 
-  return { createdOrderId, skippedCount };
+  return { createdOrderId, skippedCount: 0 };
 }
 
 export async function syncBestellungToLinkedOrder(
@@ -1002,7 +993,7 @@ export async function syncBestellungToLinkedOrder(
         : catalogItem?.id;
 
       const remarkForChina =
-        li.remark_order_item?.trim() || li.itemName?.trim() || null;
+        li.remark_order_item?.trim() || li.itemName?.trim() || li.description?.trim() || null;
 
       let targetItem = existingOrderItems[i];
       if (!targetItem) {
@@ -1012,7 +1003,7 @@ export async function syncBestellungToLinkedOrder(
         });
       }
 
-      if (itemId) targetItem.item_id = itemId;
+      targetItem.item_id = (itemId || undefined) as any;
       targetItem.qty = Math.max(1, Math.round(Number(li.qty) || 1));
       targetItem.remark_de = remarkForChina as any;
       targetItem.position = li.position ?? i + 1;
