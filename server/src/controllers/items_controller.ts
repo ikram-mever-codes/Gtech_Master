@@ -830,6 +830,7 @@ export const getItemById = async (
       model: item.model || "",
       remark: item.remark || "",
       remark_ex: item.remark_ex || "",
+      remark_cn: item.remark_cn || "",
       supplier_id: item.supplier_id,
       supplier_name: item.supplier?.company_name || item.supplier?.name || "",
       customer_id: item.customer_id || null,
