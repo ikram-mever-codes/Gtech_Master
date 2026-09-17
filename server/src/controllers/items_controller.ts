@@ -197,8 +197,8 @@ export const getItems = async (
       .select("item.id")
       .addSelect("item.created_at")
       .leftJoin("item.parent", "parent")
-      .leftJoin("item.category", "category")
-      .andWhere("item.isDraft = false");
+      .leftJoin("item.category", "category");
+    // .andWhere("item.isDraft = true");
 
     // Filter by specific item IDs
     if (idsStr) {
@@ -465,7 +465,9 @@ export const getItems = async (
           "(item.supplier_id = 1 OR EXISTS (SELECT 1 FROM supplier_item si WHERE si.item_id = item.id AND si.is_default = 'Y' AND si.supplier_id = 1))",
         );
       } else if (filterParam === "no_ean") {
-        idQb.andWhere("(item.ean IS NULL OR item.ean = '' OR item.ean = 'null')");
+        idQb.andWhere(
+          "(item.ean IS NULL OR item.ean = '' OR item.ean = 'null')",
+        );
       } else if (filterParam === "duplicate_ean") {
         idQb.andWhere(
           "(item.ean IS NOT NULL AND item.ean != '' AND item.ean != 'null' AND EXISTS (SELECT 1 FROM item i2 WHERE i2.ean = item.ean AND i2.id <> item.id))",
@@ -591,11 +593,13 @@ export const getItems = async (
         ean: item.ean || null,
         ItemID_DE: item.ItemID_DE || null,
         is_active:
-          item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
+          item.isActive === "N" ||
+          item.isActive === "0" ||
+          item.isActive === "No"
             ? "N"
             : warehouseData
-            ? warehouseData.is_active
-            : item.isActive || "N",
+              ? warehouseData.is_active
+              : item.isActive || "N",
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
@@ -817,8 +821,8 @@ export const getItemById = async (
         item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
           ? "N"
           : primaryWarehouseItem
-          ? primaryWarehouseItem.is_active
-          : item.isActive || "N",
+            ? primaryWarehouseItem.is_active
+            : item.isActive || "N",
       created_at: item.created_at,
       name: item.item_name || "",
       nameCN: item.item_name_cn || "",
@@ -840,8 +844,8 @@ export const getItemById = async (
         item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
           ? false
           : primaryWarehouseItem
-          ? primaryWarehouseItem.is_active === "Y"
-          : item.isActive === "Y",
+            ? primaryWarehouseItem.is_active === "Y"
+            : item.isActive === "Y",
       tags: item.tags || [],
       tagOrder: item.tagOrder,
       is_updated: item.is_updated,
@@ -912,11 +916,13 @@ export const getItemById = async (
         nameEN:
           primaryWarehouseItem?.item_name_en || item.parent?.name_en || "",
         isActive:
-          item.isActive === "N" || item.isActive === "0" || item.isActive === "No"
+          item.isActive === "N" ||
+          item.isActive === "0" ||
+          item.isActive === "No"
             ? false
             : primaryWarehouseItem
-            ? primaryWarehouseItem.is_active === "Y"
-            : item.isActive === "Y",
+              ? primaryWarehouseItem.is_active === "Y"
+              : item.isActive === "Y",
         isStock: warehouseItems.some((wi: any) => (wi.stock_qty || 0) > 0),
         qty: warehouseItems
           .reduce((sum, wi: any) => sum + (wi.stock_qty || 0), 0)
@@ -1637,7 +1643,9 @@ export const updateItem = async (
     if (warehouseItem) {
       if (req.body.isActive !== undefined) {
         const activeStr =
-          req.body.isActive === "Y" || req.body.isActive === true || req.body.isActive === "Yes"
+          req.body.isActive === "Y" ||
+          req.body.isActive === true ||
+          req.body.isActive === "Yes"
             ? "Y"
             : "N";
         warehouseItem.is_active = activeStr;
