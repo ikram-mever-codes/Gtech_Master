@@ -746,7 +746,7 @@ async function createOrderFromBestellung(
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
         remark_de: li.remark_order_item?.trim()
           ? li.remark_order_item.trim()
-          : undefined,
+          : (li.itemName?.trim() || li.description?.trim() || undefined),
         price:
           li.transferPrice !== undefined && li.transferPrice !== null
             ? li.transferPrice
@@ -903,14 +903,14 @@ export async function ensureAllToBeProcessedBestellungenAreSynced(): Promise<voi
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const orderRepo = AppDataSource.getRepository(Order);
 
-    const toBeProcessedOrders = await transferOrderRepo.find({
-      where: [
-        { status: "to be processed" as any },
-        { status: "partially delivered" as any },
-        { status: "delivered" as any },
-      ],
-      relations: ["orderItems"],
-    });
+    const toBeProcessedOrders = await transferOrderRepo
+      .createQueryBuilder("to")
+      .leftJoinAndSelect("to.orderItems", "orderItems")
+      .where("LOWER(to.status) != :draftStatus AND LOWER(to.status) != :emptyStatus", {
+        draftStatus: "draft",
+        emptyStatus: "",
+      })
+      .getMany();
 
     for (const b of toBeProcessedOrders) {
       const linked = await orderRepo.findOne({
