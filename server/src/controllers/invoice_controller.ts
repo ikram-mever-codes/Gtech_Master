@@ -1324,6 +1324,35 @@ export class InvoiceController {
     });
 
     if (cciInvoice) {
+      try {
+        const linkedInv = await invoiceRepository.findOne({ where: { id: cciInvoice.id } });
+        const searchCargoNo = cciInvoice.cargo_no || linkedInv?.orderNumber || "";
+        if (searchCargoNo) {
+          const directCargo = await cargoRepository.findOne({
+            where: [
+              { cargo_no: searchCargoNo },
+              { remark: Like(`%${searchCargoNo}%`) },
+              { note: Like(`%${searchCargoNo}%`) }
+            ]
+          });
+          if (directCargo && directCargo.cargo_no && directCargo.cargo_no !== cciInvoice.cargo_no) {
+            const isOfficialSeq = /^C\d{4,6}-\d+$/i.test(directCargo.cargo_no);
+            if (isOfficialSeq) {
+              console.log(`[CCI_SYNC] Auto-updating already closed invoice ${cciInvoice.invoice_number} cargo_no from "${cciInvoice.cargo_no}" to official "${directCargo.cargo_no}"`);
+              cciInvoice.cargo_no = directCargo.cargo_no;
+              await cciInvoiceRepo.save(cciInvoice);
+              if (linkedInv) {
+                linkedInv.orderNumber = directCargo.cargo_no;
+                (linkedInv as any).cargoNo = directCargo.cargo_no;
+                await invoiceRepository.save(linkedInv);
+              }
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn("Auto-sync existing closed invoice cargo_no failed:", syncErr);
+      }
+
       const detailedItems = await Promise.all(
         (cciInvoice.items || []).map(async (ci) => {
           let itemPrice =
@@ -2725,6 +2754,12 @@ export class InvoiceController {
               finalCargoNo = cargo.cargo_no;
             }
           }
+
+          if (finalCargoNo && finalCargoNo !== targetCargoNo) {
+            invoice.orderNumber = finalCargoNo;
+            (invoice as any).cargoNo = finalCargoNo;
+            await invoiceRepository.save(invoice);
+          }
         } catch (err) {
           console.warn(
             "Error processing cargo transition on invoice closure:",
@@ -2732,10 +2767,23 @@ export class InvoiceController {
           );
         }
 
+        try {
+          const pdfUrl = await InvoiceController.generateInvoicePDF(invoice);
+          if (pdfUrl) {
+            invoice.pdfUrl = pdfUrl;
+            await invoiceRepository.save(invoice);
+          }
+        } catch (pdfErr) {
+          console.warn(
+            "Could not regenerate invoice PDF with official CargoNo:",
+            pdfErr,
+          );
+        }
+
         const cciInvoice = cciInvoiceRepo.create({
           id: invoice.id,
           invoice_number: invoice.invoiceNumber,
-          order_number: invoice.orderNumber,
+          order_number: invoice.orderNumber || finalCargoNo,
           cargo_no: finalCargoNo,
           invoice_date: invoice.invoiceDate || new Date(),
           delivery_date: invoice.deliveryDate || new Date(),

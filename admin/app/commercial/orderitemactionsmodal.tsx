@@ -37,10 +37,13 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
       const status = (c.cargo_status || "").trim().toLowerCase();
       return status !== "shipped" && status !== "delivered";
     })
-    .map((c) => ({
-      value: String(c.id),
-      label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-    }));
+    .map((c) => {
+      const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+      return {
+        value: String(c.id),
+        label: `${cargoName} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
+      };
+    });
 
   return (
     <>
@@ -154,10 +157,13 @@ export const SplitModal: React.FC<SplitModalProps> = ({
       const status = (c.cargo_status || "").trim().toLowerCase();
       return status !== "shipped" && status !== "delivered";
     })
-    .map((c) => ({
-      value: String(c.id),
-      label: `${c.cargo_no} (${c.cargo_status})`,
-    }));
+    .map((c) => {
+      const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+      return {
+        value: String(c.id),
+        label: `${cargoName} (${c.cargo_status})`,
+      };
+    });
 
   return (
     <CustomModal
