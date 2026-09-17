@@ -384,7 +384,6 @@ export const getAllCargos = async (
 
     const [cargos, total] = await qb
       .orderBy("cargo.id", "DESC")
-      .groupBy("cargo.id")
       .skip(skip)
       .take(limitNum)
       .getManyAndCount();
