@@ -29,17 +29,21 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
   onCargoCreated,
 }) => {
   const [showCargoCreate, setShowCargoCreate] = useState(false);
+  const [showAllCargos, setShowAllCargos] = useState(false);
 
   if (!isOpen || !selectedItem) return null;
 
   const cargoOptions = cargos
     .filter((c) => {
       const status = (c.cargo_status || "").trim().toLowerCase();
+      if (!showAllCargos) {
+        return status === "open" || !status || status === "";
+      }
       return status !== "delivered" && status !== "cancelled";
     })
     .map((c) => {
       const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
-      const typeName = (c as any).cargo_type_name || (c as any).cargo_type || "";
+      const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
       const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
       const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
       const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
@@ -48,6 +52,17 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
         label: fullLabel,
       };
     });
+
+  const allFormattedOptions = cargos.map((c) => {
+    const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
+    const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
+    const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+    const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
+    const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
+    return { value: String(c.id), label: fullLabel };
+  });
+
+  const selectedValue = allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) || null;
 
   return (
     <>
@@ -66,9 +81,20 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
       >
         <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
           <div className="space-y-3">
-            <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
-              Select Target Cargo
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-bold text-gray-800 uppercase tracking-wide">
+                Select Target Cargo
+              </label>
+              <label className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer border select-none transition-all border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showAllCargos}
+                  onChange={(e) => setShowAllCargos(e.target.checked)}
+                  className="rounded border-gray-300 text-[#10B981] focus:ring-[#10B981] h-3.5 w-3.5 cursor-pointer"
+                />
+                <span>All</span>
+              </label>
+            </div>
             <Select
               className="text-sm"
               menuPortalTarget={
@@ -76,10 +102,7 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
               }
               styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
               options={cargoOptions}
-              value={
-                cargoOptions.find((opt) => opt.value === String(targetCargoId)) ||
-                null
-              }
+              value={selectedValue}
               onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
               placeholder="Search or Select Cargo..."
               isSearchable
@@ -154,16 +177,21 @@ export const SplitModal: React.FC<SplitModalProps> = ({
   setSplitRemarks,
   onConfirm,
 }) => {
+  const [showAllCargos, setShowAllCargos] = useState(false);
+
   if (!isOpen || !selectedItem) return null;
 
   const cargoOptions = cargos
     .filter((c) => {
       const status = (c.cargo_status || "").trim().toLowerCase();
+      if (!showAllCargos) {
+        return status === "open" || !status || status === "";
+      }
       return status !== "delivered" && status !== "cancelled";
     })
     .map((c) => {
       const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
-      const typeName = (c as any).cargo_type_name || (c as any).cargo_type || "";
+      const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
       const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
       const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
       const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
@@ -172,6 +200,17 @@ export const SplitModal: React.FC<SplitModalProps> = ({
         label: fullLabel,
       };
     });
+
+  const allFormattedOptions = cargos.map((c) => {
+    const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
+    const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
+    const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+    const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
+    const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
+    return { value: String(c.id), label: fullLabel };
+  });
+
+  const selectedValue = allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) || null;
 
   return (
     <CustomModal
@@ -201,18 +240,27 @@ export const SplitModal: React.FC<SplitModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">
-            Target Cargo (Optional)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-bold text-gray-700">
+              Target Cargo (Optional)
+            </label>
+            <label className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer border select-none transition-all border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700">
+              <input
+                type="checkbox"
+                checked={showAllCargos}
+                onChange={(e) => setShowAllCargos(e.target.checked)}
+                className="rounded border-gray-300 text-[#10B981] focus:ring-[#10B981] h-3.5 w-3.5 cursor-pointer"
+              />
+              <span>All</span>
+            </label>
+          </div>
           <Select
             menuPortalTarget={
               typeof window !== "undefined" ? document.body : undefined
             }
             styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
             options={cargoOptions}
-            value={
-              cargoOptions.find((opt) => opt.value === targetCargoId) || null
-            }
+            value={selectedValue}
             onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
             placeholder="Select cargo..."
             isClearable

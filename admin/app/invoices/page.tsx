@@ -83,6 +83,7 @@ import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { ShoppingCart, Truck } from "lucide-react";
 
 import { toast } from "react-hot-toast";
+import { ReassignModal, SplitModal } from "@/app/commercial/orderitemactionsmodal";
 import CustomModal from "@/components/UI/CustomModal";
 import SegmentedControl from "@/components/UI/SegmentedControl";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
@@ -3166,180 +3167,34 @@ const InvoiceListPage: React.FC = () => {
         )}
 
         {showREModal && selectedItem && (
-          <>
-            <CustomModal
-              isOpen={showREModal}
-              onClose={() => setShowREModal(false)}
-              title={
-                activeInvTab === "order_items" || selectedItem.item_id
-                  ? `Reassign Item ID: ${selectedItem.id} (Order: ${selectedItem.order_no || selectedItem.order_id})`
-                  : selectedItem.cargo_id
-                    ? `Reassign Order No: ${selectedItem.order_no || selectedItem.id}`
-                    : `Assign Order No: ${selectedItem.order_no || selectedItem.id}`
-              }
-            >
-              <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
-                <div>
-                  <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
-                    Select Target Cargo
-                  </label>
-                  <Select
-                    className="text-sm"
-                    menuPortalTarget={
-                      typeof window !== "undefined" ? document.body : undefined
-                    }
-                    styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                    options={cargos
-                      .filter((c) => {
-                        const status = (c.cargo_status || "")
-                          .trim()
-                          .toLowerCase();
-                        return status !== "shipped" && status !== "delivered";
-                      })
-                      .map((c) => ({
-                        value: String(c.id),
-                        label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                      }))}
-                    value={
-                      cargos
-                        .map((c) => ({
-                          value: String(c.id),
-                          label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                        }))
-                        .find((opt) => opt.value === String(targetCargoId)) ||
-                      null
-                    }
-                    onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
-                    placeholder="Search or Select Cargo..."
-                    isSearchable
-                    isClearable
-                  />
-
-                  <button
-                    onClick={() => setShowCargoCreateModal(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 mt-3 text-sm font-bold text-[#8CC21B] border-2 border-dashed border-[#8CC21B] rounded-[6px] hover:bg-[#8CC21B]/10 transition-all"
-                  >
-                    <span className="text-lg leading-none">+</span>
-                    create new cargo
-                  </button>
-                </div>
-                <div className="flex justify-end gap-3 mt-8">
-                  <button
-                    onClick={() => setShowREModal(false)}
-                    className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleReassignItem}
-                    disabled={!targetCargoId}
-                    className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    {selectedItem.cargo_id
-                      ? "Confirm Reassign"
-                      : "Confirm Assign"}
-                  </button>
-                </div>
-              </div>
-            </CustomModal>
-            <CargoCreateModal
-              isOpen={showCargoCreateModal}
-              onClose={() => setShowCargoCreateModal(false)}
-              onCreated={(newCargo) => {
-                setCargos((prev) => [...prev, newCargo]);
-                setTargetCargoId(String(newCargo.id));
-                setShowCargoCreateModal(false);
-              }}
-            />
-          </>
+          <ReassignModal
+            isOpen={showREModal}
+            onClose={() => setShowREModal(false)}
+            selectedItem={selectedItem}
+            cargos={cargos}
+            targetCargoId={targetCargoId}
+            setTargetCargoId={setTargetCargoId}
+            onConfirm={handleReassignItem}
+            onCargoCreated={(newCargo) => {
+              setCargos((prev) => [...prev, newCargo]);
+            }}
+          />
         )}
 
         {showSPModal && selectedItem && (
-          <CustomModal
+          <SplitModal
             isOpen={showSPModal}
             onClose={() => setShowSPModal(false)}
-            title="Split Item Position Across Cargos"
-          >
-            <div className="p-4 space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Split Quantity:
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={splitQty}
-                    onChange={(e) => setSplitQty(Number(e.target.value))}
-                    min={1}
-                    max={selectedItem.qty - 1}
-                    className="w-full border-2 border-[#10B981] rounded-xl p-3 text-lg outline-none focus:ring-0 shadow-sm"
-                    placeholder="Enter quantity to split"
-                  />
-                </div>
-                <p className="text-[10px] text-gray-500 mt-2 px-1">
-                  Available to split: {selectedItem.qty}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Target Cargo (Optional)
-                </label>
-                <Select
-                  menuPortalTarget={
-                    typeof window !== "undefined" ? document.body : undefined
-                  }
-                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
-                  options={cargos
-                    .filter((c) => {
-                      const status = (c.cargo_status || "")
-                        .trim()
-                        .toLowerCase();
-                      return status !== "shipped" && status !== "delivered";
-                    })
-                    .map((c) => ({
-                      value: String(c.id),
-                      label: `${c.cargo_no} (${c.cargo_status})`,
-                    }))}
-                  value={
-                    cargos
-                      .map((c) => ({
-                        value: String(c.id),
-                        label: `${c.cargo_no} (${c.cargo_status})`,
-                      }))
-                      .find((opt) => opt.value === targetCargoId) || null
-                  }
-                  onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
-                  placeholder="Select cargo..."
-                  isClearable
-                  className="text-sm shadow-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Review (CN)
-                </label>
-                <textarea
-                  value={splitRemarks}
-                  onChange={(e) => setSplitRemarks(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-[#10B981] min-h-[100px]"
-                  placeholder="Chinese review or split notes..."
-                />
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={handleSplitItem}
-                  disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
-                  className="w-full sm:w-auto px-10 py-3 bg-[#10B981] text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-                >
-                  Split & Move Item Position
-                </button>
-              </div>
-            </div>
-          </CustomModal>
+            selectedItem={selectedItem}
+            cargos={cargos}
+            splitQty={splitQty}
+            setSplitQty={setSplitQty}
+            targetCargoId={targetCargoId}
+            setTargetCargoId={setTargetCargoId}
+            splitRemarks={splitRemarks}
+            setSplitRemarks={setSplitRemarks}
+            onConfirm={handleSplitItem}
+          />
         )}
 
         {showTaricModal && selectedTaricGroup && (
