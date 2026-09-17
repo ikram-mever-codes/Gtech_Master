@@ -819,7 +819,7 @@ const InvoiceListPage: React.FC = () => {
         const data = res?.data?.data || res?.data || res;
         if (Array.isArray(data)) setGtechCompanies(data);
       })
-      .catch(() => {});
+      .catch(() => { });
     getAllTaricsSimple().then((res) => {
       if (res.success) setTarics(res.data);
     });
@@ -2026,6 +2026,23 @@ const InvoiceListPage: React.FC = () => {
                               </th>
                             )}
                             <th
+                              onClick={() => handleSort("createdAt")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>
+                                  {activeInvTab === "open_invoices"
+                                    ? "Date "
+                                    : "Closed Date"}
+                                </span>
+                                {sortField === "createdAt" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th
                               onClick={() => handleSort("customer")}
                               className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
                             >
@@ -2056,23 +2073,6 @@ const InvoiceListPage: React.FC = () => {
                             </th>
                             <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
                               CargoType
-                            </th>
-                            <th
-                              onClick={() => handleSort("createdAt")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>
-                                  {activeInvTab === "open_invoices"
-                                    ? "Date "
-                                    : "Closed Date"}
-                                </span>
-                                {sortField === "createdAt" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
                             </th>
                             <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
                               Remark
@@ -2136,9 +2136,8 @@ const InvoiceListPage: React.FC = () => {
                                   onClick={() =>
                                     handleOpenInvoiceDetails(invoice)
                                   }
-                                  className={`hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium ${
-                                    isExpanded ? "bg-[#F8F9FA]" : ""
-                                  }`}
+                                  className={`hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium ${isExpanded ? "bg-[#F8F9FA]" : ""
+                                    }`}
                                 >
                                   <td
                                     className="py-4 px-3 text-center"
@@ -2174,6 +2173,9 @@ const InvoiceListPage: React.FC = () => {
                                       {invoice.invoiceNumber || "N/A"}
                                     </td>
                                   )}
+                                  <td className="py-4 px-4 text-xs text-[#495057]">
+                                    {formatDate(invoice.invoiceDate, true)}
+                                  </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {getBillToDisplayName(invoice)}
                                   </td>
@@ -2193,9 +2195,6 @@ const InvoiceListPage: React.FC = () => {
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {getCargoTypeNameFromInvoice(invoice)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {formatDate(invoice.invoiceDate, true)}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#6C757D]">
                                     {invoice.remark || "-"}
@@ -2272,7 +2271,7 @@ const InvoiceListPage: React.FC = () => {
                                                       const qty = Number(it.qty || it.quantity || 0);
                                                       const unitPrice = Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0);
                                                       const totalPrice = Number(it.totalPrice || (qty * unitPrice));
-                                                      
+
                                                       return (
                                                         <tr key={it.id || idx} className="hover:bg-gray-50 transition-colors">
                                                           <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
@@ -2737,7 +2736,6 @@ const InvoiceListPage: React.FC = () => {
                       <div className="space-y-2">
                         <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2 flex items-center justify-between">
                           <span>Items shown in invoice based on Taric</span>
-                          <span className="text-[10px] text-gray-500 font-normal">Click "View Items" to see detailed items for any TARIC code</span>
                         </h4>
                         <SpreadSheet
                           data={(
@@ -2812,30 +2810,7 @@ const InvoiceListPage: React.FC = () => {
                                     })}`,
                                   width: "110px",
                                 },
-                                {
-                                  header: "Order Items",
-                                  render: (group: any) => {
-                                    const gId = group.id || group.taricId || group.taricCode;
-                                    const isExp = expandedTaricGroupKey === gId;
-                                    return (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setExpandedTaricGroupKey(isExp ? null : gId);
-                                        }}
-                                        className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded border transition-all shadow-sm ${
-                                          isExp
-                                            ? "bg-[#8CC21B] text-white border-[#8CC21B]"
-                                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
-                                        }`}
-                                      >
-                                        <ChevronDown className={`w-3 h-3 transition-transform ${isExp ? "rotate-180" : ""}`} />
-                                        {isExp ? "Hide Items" : "View Items"}
-                                      </button>
-                                    );
-                                  },
-                                  width: "110px",
-                                },
+
                               ]
                               : [
                                 {
@@ -2897,30 +2872,6 @@ const InvoiceListPage: React.FC = () => {
                                       minimumFractionDigits: 2,
                                       maximumFractionDigits: 2,
                                     })}`,
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Order Items",
-                                  render: (group: any) => {
-                                    const gId = group.id || group.taricId || group.taricCode;
-                                    const isExp = expandedTaricGroupKey === gId;
-                                    return (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setExpandedTaricGroupKey(isExp ? null : gId);
-                                        }}
-                                        className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded border transition-all shadow-sm ${
-                                          isExp
-                                            ? "bg-[#8CC21B] text-white border-[#8CC21B]"
-                                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
-                                        }`}
-                                      >
-                                        <ChevronDown className={`w-3 h-3 transition-transform ${isExp ? "rotate-180" : ""}`} />
-                                        {isExp ? "Hide Items" : "View Items"}
-                                      </button>
-                                    );
-                                  },
                                   width: "110px",
                                 },
                                 {
@@ -3053,10 +3004,6 @@ const InvoiceListPage: React.FC = () => {
                                   width: "110px",
                                   align: "left",
                                 },
-                                {
-                                  value: "",
-                                  width: "110px",
-                                }
                               ]
                               : [
                                 {
@@ -3096,10 +3043,6 @@ const InvoiceListPage: React.FC = () => {
                                   })}`,
                                   width: "110px",
                                   align: "left",
-                                },
-                                {
-                                  value: "",
-                                  width: "110px",
                                 },
                                 {
                                   value: "",
