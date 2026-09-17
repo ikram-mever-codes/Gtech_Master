@@ -35,13 +35,17 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
   const cargoOptions = cargos
     .filter((c) => {
       const status = (c.cargo_status || "").trim().toLowerCase();
-      return status !== "shipped" && status !== "delivered";
+      return status !== "delivered" && status !== "cancelled";
     })
     .map((c) => {
+      const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
+      const typeName = (c as any).cargo_type_name || (c as any).cargo_type || "";
       const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+      const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
+      const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
       return {
         value: String(c.id),
-        label: `${cargoName} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
+        label: fullLabel,
       };
     });
 
@@ -155,13 +159,17 @@ export const SplitModal: React.FC<SplitModalProps> = ({
   const cargoOptions = cargos
     .filter((c) => {
       const status = (c.cargo_status || "").trim().toLowerCase();
-      return status !== "shipped" && status !== "delivered";
+      return status !== "delivered" && status !== "cancelled";
     })
     .map((c) => {
+      const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
+      const typeName = (c as any).cargo_type_name || (c as any).cargo_type || "";
       const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+      const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
+      const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
       return {
         value: String(c.id),
-        label: `${cargoName} (${c.cargo_status})`,
+        label: fullLabel,
       };
     });
 

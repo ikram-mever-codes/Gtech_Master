@@ -309,7 +309,9 @@ export const getAllCargos = async (
     const limitNum = Math.max(1, Math.min(1000, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const qb = cargoRepo.createQueryBuilder("cargo");
+    const qb = cargoRepo
+      .createQueryBuilder("cargo")
+      .leftJoinAndSelect("cargo.customer", "customer");
 
     if (status) {
       const statuses = status.split(",").map((s: string) => s.trim());
