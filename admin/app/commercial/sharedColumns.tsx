@@ -226,7 +226,7 @@ export const kundeColumn: ColumnDef<any> = {
       ""
     ).toLowerCase(),
   render: (row) => {
-    const text =
+    const rawText =
       row.customer?.companyName ||
       row.customer?.displayName ||
       row.customer?.display_name ||
@@ -238,12 +238,42 @@ export const kundeColumn: ColumnDef<any> = {
       row.supplier?.company_name ||
       row.supplier?.name ||
       "—";
+
+    const isWV =
+      row.is_weiterversand === true ||
+      row.is_weiterversand === 1 ||
+      row.is_weiterversand === "true" ||
+      row.is_weiterversand === "1" ||
+      row.is_weiterversand === "Yes" ||
+      row.isWeiterversand === true;
+
+    if (!isWV || rawText === "—") {
+      return (
+        <div
+          className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
+          title={rawText}
+        >
+          {rawText}
+        </div>
+      );
+    }
+
+    const providerName =
+      row.weiterversandServiceProvider?.name ||
+      row.weiterversand_service_provider_name ||
+      row.weiterversand_service_provider ||
+      "";
+
+    const displayText = providerName
+      ? `${rawText}-WV-${providerName}`
+      : `${rawText}-Weiterversand`;
+
     return (
       <div
-        className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
-        title={text}
+        className="truncate max-w-[160px] text-sm font-bold text-gray-900"
+        title={displayText}
       >
-        {text}
+        {displayText}
       </div>
     );
   },

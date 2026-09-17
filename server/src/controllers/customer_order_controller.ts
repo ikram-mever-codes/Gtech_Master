@@ -21,6 +21,7 @@ import {
 import { WarehouseItem } from "../models/warehouse_items";
 import path from "path";
 import fs from "fs";
+import { Order } from "../models/orders";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { buildAuftragPdfOptions } from "../services/pdfOptionsBuilder";
 import { generateAuftragEml } from "../services/emlGenerator";
@@ -175,9 +176,9 @@ async function getLinkedDocumentsForAuftrag(
     await Promise.all([
       safeOfferId
         ? offerRepo.findOne({
-            where: { id: safeOfferId },
-            select: ["id", "offerNumber", "createdAt"],
-          })
+          where: { id: safeOfferId },
+          select: ["id", "offerNumber", "createdAt"],
+        })
         : Promise.resolve(null),
       rechnungRepo.find({
         where: { auftrag_id: auftragId },
@@ -241,9 +242,9 @@ async function getLinkedDocumentsForAuftraege(
     await Promise.all([
       offerIds.length
         ? offerRepo.find({
-            where: { id: In(offerIds) },
-            select: ["id", "offerNumber", "createdAt"],
-          })
+          where: { id: In(offerIds) },
+          select: ["id", "offerNumber", "createdAt"],
+        })
         : Promise.resolve([]),
       rechnungRepo.find({
         where: { auftrag_id: In(auftragIds) },
@@ -541,12 +542,12 @@ async function resolveAuftragTaxProfile(
       profile: frozenMatch
         ? mapTaxProfile(frozenMatch)
         : {
-            id: null,
-            name: "Frozen",
-            taxCase: undefined,
-            taxRate: Number(order.tax_rate) || 19,
-            taxCode: undefined,
-          },
+          id: null,
+          name: "Frozen",
+          taxCase: undefined,
+          taxRate: Number(order.tax_rate) || 19,
+          taxCode: undefined,
+        },
       changed: false,
     };
   }
@@ -624,12 +625,12 @@ export const getAllCustomerOrders = async (
           frozenMatch
             ? mapTaxProfile(frozenMatch)
             : {
-                id: null,
-                name: "Frozen",
-                taxCase: undefined,
-                taxRate: Number(order.tax_rate) || 19,
-                taxCode: undefined,
-              },
+              id: null,
+              name: "Frozen",
+              taxCase: undefined,
+              taxRate: Number(order.tax_rate) || 19,
+              taxCode: undefined,
+            },
         );
         continue;
       }
@@ -1481,11 +1482,43 @@ export const updateCustomerOrder = async (
     if (finalTracking !== undefined)
       auftrag.weiterversand_tracking = finalTracking;
 
-    // Only update stock_where if the order has stock items
+    if (finalIsWeiterversand !== undefined || finalProviderId !== undefined) {
+      try {
+        const orderRepo = AppDataSource.getRepository(Order);
+        const updatePayload: any = {};
+        if (finalIsWeiterversand !== undefined) {
+          updatePayload.is_weiterversand = Boolean(finalIsWeiterversand);
+        }
+        if (finalProviderId !== undefined) {
+          updatePayload.weiterversand_service_provider_id = finalProviderId
+            ? Number(finalProviderId)
+            : null;
+        }
+
+        const orderConditions: any[] = [];
+        if (auftrag.title && auftrag.title.trim()) {
+          orderConditions.push({ comment: auftrag.title.trim() });
+        }
+        if (auftrag.order_no) {
+          orderConditions.push({ order_no: auftrag.order_no });
+          orderConditions.push({ order_no: auftrag.order_no.replace(/^B/, "DE") });
+        }
+
+        if (orderConditions.length > 0) {
+          const matchingOrders = await orderRepo.find({ where: orderConditions });
+          for (const mOrd of matchingOrders) {
+            Object.assign(mOrd, updatePayload);
+            await orderRepo.save(mOrd);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to sync Weiterversand to Order table:", e);
+      }
+    }
+
     if (stock_where !== undefined) {
       const hasStock = await hasStockItems(Number(id));
       if (hasStock) {
-        // Validate that the value is either "EU" or "CN"
         if (stock_where === StockWhere.EU || stock_where === StockWhere.CN) {
           auftrag.stock_where = stock_where;
         } else {
@@ -1496,7 +1529,6 @@ export const updateCustomerOrder = async (
           return;
         }
       } else {
-        // If no stock items, remove stock_where if it exists
         auftrag.stock_where = undefined as any;
       }
     }

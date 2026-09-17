@@ -15,6 +15,7 @@ import { Category } from "./categories";
 import { Supplier } from "./suppliers";
 import { Cargo } from "./cargos";
 import { Customer } from "./customers";
+import { WeiterversandServiceProvider } from "./weiterversand_service_provider";
 
 @Entity()
 export class Order {
@@ -69,6 +70,16 @@ export class Order {
   @ManyToOne(() => Cargo)
   @JoinColumn({ name: "cargo_id" })
   cargo?: Cargo;
+
+  @Column({ type: "boolean", default: false, nullable: true })
+  is_weiterversand?: boolean;
+
+  @Column({ type: "int", nullable: true })
+  weiterversand_service_provider_id?: number;
+
+  @ManyToOne(() => WeiterversandServiceProvider, { nullable: true })
+  @JoinColumn({ name: "weiterversand_service_provider_id" })
+  weiterversandServiceProvider?: WeiterversandServiceProvider;
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order)
   orderItems!: OrderItem[];

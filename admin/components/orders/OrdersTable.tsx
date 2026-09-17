@@ -261,21 +261,47 @@ export default function OrdersTable({
     },
     {
       header: "Customer",
-      width: "100px",
+      width: "120px",
       render: (row) => {
-        const name =
+        const order = row.parentOrder || row.order || row;
+        const rawName =
           row.customer?.companyName ||
           row.customer?.name ||
           row.customer_name ||
-          row.order?.customer?.companyName ||
-          row.order?.customer?.name ||
-          row.order?.customer_name ||
-          row.parentOrder?.customer?.companyName ||
-          row.parentOrder?.customer?.name ||
+          order?.customer?.companyName ||
+          order?.customer?.name ||
+          order?.customer_name ||
           "-";
+
+        const isWV =
+          order?.is_weiterversand === true ||
+          order?.is_weiterversand === 1 ||
+          order?.is_weiterversand === "true" ||
+          order?.is_weiterversand === "1" ||
+          order?.is_weiterversand === "Yes" ||
+          order?.isWeiterversand === true;
+
+        if (!isWV || rawName === "-") {
+          return (
+            <div className="truncate max-w-[120px] font-medium text-xs text-gray-700" title={rawName}>
+              {rawName}
+            </div>
+          );
+        }
+
+        const providerName =
+          order?.weiterversandServiceProvider?.name ||
+          order?.weiterversand_service_provider_name ||
+          order?.weiterversand_service_provider ||
+          "";
+
+        const displayText = providerName
+          ? `${rawName}-WV-${providerName}`
+          : `${rawName}-Weiterversand`;
+
         return (
-          <div className="truncate max-w-[100px] font-medium text-xs text-gray-700" title={name}>
-            {name}
+          <div className="truncate max-w-[130px] font-bold text-xs text-gray-900" title={displayText}>
+            {displayText}
           </div>
         );
       },
@@ -476,17 +502,44 @@ export default function OrdersTable({
     },
     {
       header: "Customer",
-      width: "110px",
+      width: "130px",
       render: (row) => {
-        const name =
+        const rawName =
           row.customer?.companyName ||
           row.customer?.displayName ||
           row.customer?.name ||
           row.customer_name ||
           (row.customer_id ? `Customer #${row.customer_id}` : "-");
+
+        const isWV =
+          row.is_weiterversand === true ||
+          row.is_weiterversand === 1 ||
+          row.is_weiterversand === "true" ||
+          row.is_weiterversand === "1" ||
+          row.is_weiterversand === "Yes" ||
+          row.isWeiterversand === true;
+
+        if (!isWV || rawName === "-") {
+          return (
+            <div className="truncate max-w-[130px] font-medium text-xs text-gray-700" title={rawName}>
+              {rawName}
+            </div>
+          );
+        }
+
+        const providerName =
+          row.weiterversandServiceProvider?.name ||
+          row.weiterversand_service_provider_name ||
+          row.weiterversand_service_provider ||
+          "";
+
+        const displayText = providerName
+          ? `${rawName}-WV-${providerName}`
+          : `${rawName}-Weiterversand`;
+
         return (
-          <div className="truncate max-w-[110px] font-medium text-xs text-gray-700" title={name}>
-            {name}
+          <div className="truncate max-w-[140px] font-bold text-xs text-gray-900" title={displayText}>
+            {displayText}
           </div>
         );
       },
