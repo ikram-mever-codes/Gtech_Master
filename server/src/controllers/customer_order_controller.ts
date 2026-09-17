@@ -35,6 +35,7 @@ import {
   PaymentAllocation,
   PaymentAllocationTargetType,
 } from "../models/payment_allocations";
+import { getCargosByAuftragIds } from "./rechnung_controller";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
 const customerRepo = AppDataSource.getRepository(Customer);
@@ -170,35 +171,40 @@ async function getLinkedDocumentsForAuftrag(
 
   const safeOfferId = isValidUuid(offerId) ? offerId : null;
 
-  const [offer, rechnungen, rechnungenK, bestellungen] = await Promise.all([
-    safeOfferId
-      ? offerRepo.findOne({
-        where: { id: safeOfferId },
-        select: ["id", "offerNumber", "createdAt"],
-      })
-      : Promise.resolve(null),
-    rechnungRepo.find({
-      where: { auftrag_id: auftragId },
-      select: ["id", "invoice_number", "created_at", "auftrag_id"],
-      order: { created_at: "DESC" },
-    }),
-    rechnungKRepo.find({
-      where: { auftrag_id: auftragId },
-      select: ["id", "invoice_number", "created_at", "auftrag_id"],
-      order: { created_at: "DESC" },
-    }),
-    transferOrderRepo.find({
-      where: { auftrag_id: auftragId },
-      select: ["id", "order_no", "created_at", "auftrag_id"],
-      order: { created_at: "DESC" },
-    }),
-  ]);
+  const [offer, rechnungen, rechnungenK, bestellungen, cargosByAuftragId] =
+    await Promise.all([
+      safeOfferId
+        ? offerRepo.findOne({
+            where: { id: safeOfferId },
+            select: ["id", "offerNumber", "createdAt"],
+          })
+        : Promise.resolve(null),
+      rechnungRepo.find({
+        where: { auftrag_id: auftragId },
+        select: ["id", "invoice_number", "created_at", "auftrag_id"],
+        order: { created_at: "DESC" },
+      }),
+      rechnungKRepo.find({
+        where: { auftrag_id: auftragId },
+        select: ["id", "invoice_number", "created_at", "auftrag_id"],
+        order: { created_at: "DESC" },
+      }),
+      transferOrderRepo.find({
+        where: { auftrag_id: auftragId },
+        select: ["id", "order_no", "created_at", "auftrag_id"],
+        order: { created_at: "DESC" },
+      }),
+      // Cargo, resolved via the Bestellung(en) linked to this Auftrag —
+      // same chain as the Rechnung/RK linked-docs helpers use.
+      getCargosByAuftragIds([auftragId]),
+    ]);
 
   return {
     offers: offer ? [offer] : [],
     rechnungen,
     rechnungenK,
     bestellungen,
+    cargos: cargosByAuftragId.get(auftragId) || [],
   };
 }
 
@@ -211,6 +217,7 @@ async function getLinkedDocumentsForAuftraege(
     rechnungen: [] as any[],
     rechnungenK: [] as any[],
     bestellungen: [] as any[],
+    cargos: [] as any[],
   });
 
   const result = new Map<number, ReturnType<typeof empty>>();
@@ -230,29 +237,32 @@ async function getLinkedDocumentsForAuftraege(
     new Set(Array.from(offerIdByAuftragId.values()).filter(isValidUuid)),
   );
 
-  const [offers, rechnungen, rechnungenK, bestellungen] = await Promise.all([
-    offerIds.length
-      ? offerRepo.find({
-        where: { id: In(offerIds) },
-        select: ["id", "offerNumber", "createdAt"],
-      })
-      : Promise.resolve([]),
-    rechnungRepo.find({
-      where: { auftrag_id: In(auftragIds) },
-      select: ["id", "invoice_number", "created_at", "auftrag_id"],
-      order: { created_at: "DESC" },
-    }),
-    rechnungKRepo.find({
-      where: { auftrag_id: In(auftragIds) },
-      select: ["id", "invoice_number", "created_at", "auftrag_id"],
-      order: { created_at: "DESC" },
-    }),
-    transferOrderRepo.find({
-      where: { auftrag_id: In(auftragIds) },
-      select: ["id", "order_no", "created_at", "auftrag_id"],
-      order: { created_at: "DESC" },
-    }),
-  ]);
+  const [offers, rechnungen, rechnungenK, bestellungen, cargosByAuftragId] =
+    await Promise.all([
+      offerIds.length
+        ? offerRepo.find({
+            where: { id: In(offerIds) },
+            select: ["id", "offerNumber", "createdAt"],
+          })
+        : Promise.resolve([]),
+      rechnungRepo.find({
+        where: { auftrag_id: In(auftragIds) },
+        select: ["id", "invoice_number", "created_at", "auftrag_id"],
+        order: { created_at: "DESC" },
+      }),
+      rechnungKRepo.find({
+        where: { auftrag_id: In(auftragIds) },
+        select: ["id", "invoice_number", "created_at", "auftrag_id"],
+        order: { created_at: "DESC" },
+      }),
+      transferOrderRepo.find({
+        where: { auftrag_id: In(auftragIds) },
+        select: ["id", "order_no", "created_at", "auftrag_id"],
+        order: { created_at: "DESC" },
+      }),
+      // Cargo, resolved via the Bestellung(en) linked to each Auftrag.
+      getCargosByAuftragIds(auftragIds),
+    ]);
 
   const offerById = new Map(offers.map((o: any) => [o.id, o]));
 
@@ -277,9 +287,14 @@ async function getLinkedDocumentsForAuftraege(
   push("rechnungenK", rechnungenK);
   push("bestellungen", bestellungen);
 
+  for (const auftragId of auftragIds) {
+    const bucket = result.get(auftragId);
+    const cargos = cargosByAuftragId.get(auftragId);
+    if (bucket && cargos) bucket.cargos.push(...cargos);
+  }
+
   return result;
 }
-
 async function calculateOrderTotals(orderId: number): Promise<void> {
   const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
   const order = await customerOrderRepo.findOne({
@@ -460,7 +475,7 @@ export const getOfferDraftItemsPreview = async (
           salesPrice:
             li.basePrice !== undefined && li.basePrice !== null
               ? Number(li.basePrice)
-              : backingItem.sales_price ?? null,
+              : (backingItem.sales_price ?? null),
           isDimWeightEstimated: backingItem.is_dim_weight_estimated,
           remarkEx: li.notes || backingItem.remark_ex || null,
         });
@@ -526,12 +541,12 @@ async function resolveAuftragTaxProfile(
       profile: frozenMatch
         ? mapTaxProfile(frozenMatch)
         : {
-          id: null,
-          name: "Frozen",
-          taxCase: undefined,
-          taxRate: Number(order.tax_rate) || 19,
-          taxCode: undefined,
-        },
+            id: null,
+            name: "Frozen",
+            taxCase: undefined,
+            taxRate: Number(order.tax_rate) || 19,
+            taxCode: undefined,
+          },
       changed: false,
     };
   }
@@ -609,12 +624,12 @@ export const getAllCustomerOrders = async (
           frozenMatch
             ? mapTaxProfile(frozenMatch)
             : {
-              id: null,
-              name: "Frozen",
-              taxCase: undefined,
-              taxRate: Number(order.tax_rate) || 19,
-              taxCode: undefined,
-            },
+                id: null,
+                name: "Frozen",
+                taxCase: undefined,
+                taxRate: Number(order.tax_rate) || 19,
+                taxCode: undefined,
+              },
         );
         continue;
       }
@@ -1214,10 +1229,7 @@ export const createAuftragFromOffer = async (
     next(error);
   }
 };
-// ============================================================================
-// From earlier in this conversation — tax-profile attachment + DE default
-// fallback already applied. Unchanged since that fix.
-// ============================================================================
+
 export const getCustomerOrderById = async (
   req: Request,
   res: Response,
@@ -1274,18 +1286,28 @@ export const getCustomerOrderById = async (
     }
 
     const itemsMissingWeight = (order.orderItems || []).filter(
-      (li: any) => (li.weight === null || li.weight === undefined) && li.sourceItemId,
+      (li: any) =>
+        (li.weight === null || li.weight === undefined) && li.sourceItemId,
     );
     if (itemsMissingWeight.length > 0) {
       const missingIds = Array.from(
-        new Set(itemsMissingWeight.map((li: any) => Number(li.sourceItemId)).filter(Boolean)),
+        new Set(
+          itemsMissingWeight
+            .map((li: any) => Number(li.sourceItemId))
+            .filter(Boolean),
+        ),
       );
       const sourceItems = await AppDataSource.getRepository(Item).find({
         where: { id: In(missingIds) },
       });
-      const weightById = new Map(sourceItems.map((it: any) => [String(it.id), it.weight]));
+      const weightById = new Map(
+        sourceItems.map((it: any) => [String(it.id), it.weight]),
+      );
       (order.orderItems as any[]).forEach((li: any) => {
-        if ((li.weight === null || li.weight === undefined) && li.sourceItemId) {
+        if (
+          (li.weight === null || li.weight === undefined) &&
+          li.sourceItemId
+        ) {
           const w = weightById.get(String(li.sourceItemId));
           if (w !== undefined && w !== null) li.weight = w;
         }

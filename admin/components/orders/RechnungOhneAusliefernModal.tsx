@@ -50,17 +50,18 @@ export default function RechnungOhneAusliefernModal({
   if (!isOpen || !auftrag) return null;
 
   const orderItems = auftrag.orderItems || auftrag.items || [];
-  const totalSubtotal = orderItems.reduce(
+  const itemsSubtotal = orderItems.reduce(
     (sum: number, item: any) =>
       sum +
       (Number(item.price) || 0) * (Number(item.quantity || item.qty) || 1),
     0,
   );
+  const shippingCost = Number(auftrag.shipping_cost) || 0;
+  const shippingQuantity = Number(auftrag.shipping_quantity) || 1;
+  const shippingTotal = shippingCost * shippingQuantity;
+  const totalSubtotal = itemsSubtotal + shippingTotal;
   const taxRate = Number(auftrag.tax_rate ?? 19);
-  // Auftrag already carries a live-resolved (while OPEN) or frozen (once
-  // Partially Delivered/Delivered/Closed) taxProfile from the backend —
-  // same object the Ausliefern window reads. Purely informational here;
-  // the Rechnung this modal creates always copies auftrag.tax_rate as-is.
+
   const taxProfileLabel = auftrag.taxProfile?.name
     ? `${auftrag.taxProfile.name} (${formatTaxRate(taxRate)})`
     : formatTaxRate(taxRate);

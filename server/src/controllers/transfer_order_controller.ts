@@ -17,6 +17,7 @@ import {
 import { Customer } from "../models/customers";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
+import { CargoOrder } from "../models/cargo_orders";
 
 async function calculateTransferOrderTotals(orderId: number): Promise<void> {
   const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
@@ -78,7 +79,6 @@ export const createTransferOrderFromAuftrag = async (
   try {
     const { auftragId } = req.params;
     const { selectedItems, notes: bodyNotes } = req.body;
-    console.log("Selected Items:", JSON.stringify(selectedItems, null, 2));
 
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       res.status(400).json({
@@ -117,8 +117,13 @@ export const createTransferOrderFromAuftrag = async (
 
     const orderItemsToCreate: Partial<TransferOrderItem>[] = [];
 
-    // Filter selectedItems to only include catalog items (those with sourceItemId)
-    const catalogItems = selectedItems;
+    const catalogItems = selectedItems.filter((selItem: any) => {
+      const lineItem = (auftrag.orderItems || []).find(
+        (li) => String(li.id) === String(selItem.sourceLineItemId),
+      );
+      const sourceItemId = selItem.sourceItemId || lineItem?.sourceItemId;
+      return !!sourceItemId;
+    });
 
     if (catalogItems.length === 0) {
       res.status(400).json({
@@ -179,8 +184,8 @@ export const createTransferOrderFromAuftrag = async (
     // CEO requirement: OrderRemark for processing (Team Bowang) must be internal comment
     const finalNotes =
       bodyNotes !== undefined &&
-        bodyNotes !== null &&
-        String(bodyNotes).trim() !== ""
+      bodyNotes !== null &&
+      String(bodyNotes).trim() !== ""
         ? String(bodyNotes).trim()
         : auftrag.internal_notes || "";
 
@@ -238,9 +243,101 @@ export const createTransferOrderFromAuftrag = async (
   }
 };
 
-// ---------------------------------------------------------------------
-// Core CRUD
-// ---------------------------------------------------------------------
+async function getLinkedDocumentsForBestellungen(
+  bestellungen: TransferOrder[],
+): Promise<Map<number, { auftrag: any[]; cargos: any[] }>> {
+  const result = new Map<number, { auftrag: any[]; cargos: any[] }>();
+  bestellungen.forEach((b) => result.set(b.id, { auftrag: [], cargos: [] }));
+
+  if (bestellungen.length === 0) return result;
+
+  const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
+  const orderRepo = AppDataSource.getRepository(Order);
+  const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+
+  // --- Auftrag: direct link via auftrag_id ---------------------------
+  const auftragIds = Array.from(
+    new Set(
+      bestellungen
+        .map((b) => b.auftrag_id)
+        .filter((id): id is number => typeof id === "number"),
+    ),
+  );
+  const auftraege = auftragIds.length
+    ? await customerOrderRepo.find({
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "title", "created_at"],
+      })
+    : [];
+  const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
+
+  for (const b of bestellungen) {
+    if (b.auftrag_id) {
+      const a = auftragById.get(b.auftrag_id);
+      if (a) result.get(b.id)!.auftrag.push(a);
+    }
+  }
+
+  // --- Cargo: indirect via the internal Order sharing the same order_no
+  const orderNos = Array.from(
+    new Set(bestellungen.map((b) => b.order_no).filter(Boolean)),
+  );
+
+  const matchingOrders = orderNos.length
+    ? await orderRepo
+        .createQueryBuilder("o")
+        .leftJoin("o.cargo", "cargo")
+        .where("o.order_no IN (:...orderNos)", { orderNos })
+        .andWhere("o.is_deleted = false")
+        .select([
+          "o.id",
+          "o.order_no",
+          "o.cargo_id",
+          "cargo.id",
+          "cargo.cargo_no",
+          "cargo.cargo_status",
+          "cargo.created_at",
+        ])
+        .getMany()
+    : [];
+
+  const orderIdByOrderNo = new Map<string, number>();
+  const directCargoByOrderId = new Map<number, any>();
+  matchingOrders.forEach((o: any) => {
+    orderIdByOrderNo.set(o.order_no, o.id);
+    if (o.cargo) directCargoByOrderId.set(o.id, o.cargo);
+  });
+
+  const orderIds = matchingOrders.map((o) => o.id);
+  const cargoOrders = orderIds.length
+    ? await cargoOrderRepo.find({
+        where: { order_id: In(orderIds) },
+        relations: ["cargo"],
+      })
+    : [];
+
+  const cargosByOrderId = new Map<number, Map<number, any>>();
+  const addCargo = (orderId: number, cargo: any) => {
+    if (!cargo) return;
+    if (!cargosByOrderId.has(orderId)) cargosByOrderId.set(orderId, new Map());
+    cargosByOrderId.get(orderId)!.set(cargo.id, cargo);
+  };
+  directCargoByOrderId.forEach((cargo, orderId) => addCargo(orderId, cargo));
+  cargoOrders.forEach((co) => {
+    if (co.order_id && co.cargo) addCargo(co.order_id, co.cargo);
+  });
+
+  for (const b of bestellungen) {
+    const orderId = orderIdByOrderNo.get(b.order_no);
+    if (orderId === undefined) continue;
+    const cargoMap = cargosByOrderId.get(orderId);
+    if (cargoMap) {
+      result.get(b.id)!.cargos.push(...Array.from(cargoMap.values()));
+    }
+  }
+
+  return result;
+}
 
 export const getAllTransferOrders = async (
   _req: Request,
@@ -253,12 +350,23 @@ export const getAllTransferOrders = async (
       order: { created_at: "DESC" },
       relations: ["orderItems", "customer", "supplier"],
     });
-    res.json({ success: true, data: orders });
+
+    const linkedDocumentsByBestellungId =
+      await getLinkedDocumentsForBestellungen(orders);
+
+    const ordersWithLinkedDocuments = orders.map((order: any) => ({
+      ...order,
+      linkedDocuments: linkedDocumentsByBestellungId.get(order.id) || {
+        auftrag: [],
+        cargos: [],
+      },
+    }));
+
+    res.json({ success: true, data: ordersWithLinkedDocuments });
   } catch (error) {
     next(error);
   }
 };
-
 export const getTransferOrderById = async (
   req: Request,
   res: Response,
@@ -291,7 +399,14 @@ export const getTransferOrderById = async (
       }
     }
 
-    res.json({ success: true, data: order });
+    const linkedDocumentsByBestellungId =
+      await getLinkedDocumentsForBestellungen([order]);
+    const linkedDocuments = linkedDocumentsByBestellungId.get(order.id) || {
+      auftrag: [],
+      cargos: [],
+    };
+
+    res.json({ success: true, data: { ...order, linkedDocuments } });
   } catch (error) {
     next(error);
   }
@@ -312,13 +427,23 @@ export const deleteTransferOrder = async (
       res.status(404).json({ success: false, message: "Bestellung not found" });
       return;
     }
+
+    if (order.order_no) {
+      const orderRepo = AppDataSource.getRepository(Order);
+      await orderRepo
+        .createQueryBuilder()
+        .update(Order)
+        .set({ is_deleted: true })
+        .where("order_no = :orderNo", { orderNo: order.order_no })
+        .execute();
+    }
+
     await transferOrderRepo.remove(order);
     res.json({ success: true, message: "Bestellung deleted successfully" });
   } catch (error) {
     next(error);
   }
 };
-
 // In the updateTransferOrder controller, add customer_id handling
 export const updateTransferOrder = async (
   req: Request,
@@ -661,10 +786,6 @@ async function createOrderFromBestellung(
 
   const itemRepo = AppDataSource.getRepository(Item);
 
-  // Look up every line's Item by item_no_de — using itemNo first, falling
-  // back to material — regardless of whether sourceItemId is set. Nothing
-  // is skipped: a line with no matching Item still becomes an OrderItem,
-  // just with item_id left unset (OrderItem.item_id is nullable).
   const lookupCodes = Array.from(
     new Set(
       allItems
@@ -681,18 +802,36 @@ async function createOrderFromBestellung(
     itemByDeNo = new Map(foundItems.map((it) => [it.item_no_de as string, it]));
   }
 
-  const resolved: { line: TransferOrderItem; itemId?: number }[] = allItems.map(
-    (li) => {
-      if (li.sourceItemId) {
-        const parsed = Number(li.sourceItemId);
-        if (!isNaN(parsed)) return { line: li, itemId: parsed };
-      }
+  const resolved: { line: TransferOrderItem; itemId: number }[] = [];
+  let skippedCount = 0;
+
+  for (const li of allItems) {
+    let itemId: number | undefined;
+
+    if (li.sourceItemId) {
+      const parsed = Number(li.sourceItemId);
+      if (!isNaN(parsed)) itemId = parsed;
+    }
+    if (itemId === undefined) {
       const code = (li.itemNo || "").trim();
       const matched = code ? itemByDeNo.get(code) : undefined;
-      return { line: li, itemId: matched?.id };
-    },
-  );
-  const skippedCount = resolved.filter((r) => r.itemId === undefined).length;
+      itemId = matched?.id;
+    }
+
+    if (itemId === undefined) {
+      skippedCount++;
+      continue;
+    }
+
+    resolved.push({ line: li, itemId });
+  }
+
+  if (resolved.length === 0) {
+    console.warn(
+      `Bestellung ${bestellung.order_no}: no line items could be resolved to a catalog Item — skipping Order creation (${skippedCount} line(s) skipped).`,
+    );
+    return null;
+  }
 
   const now = new Date();
   const dateCreatedStr = `${now.getDate().toString().padStart(2, "0")}.${(
@@ -735,10 +874,6 @@ async function createOrderFromBestellung(
     const savedOrder = await orderRepo.save(order);
     createdOrderId = savedOrder.id;
 
-    // Every line becomes an OrderItem — item_id is set when a catalog
-    // match was found, left undefined otherwise. remark_de always
-    // includes the line's own itemName so an unresolved line is still
-    // identifiable in the created Order.
     const orderItemEntities = resolved.map(({ line: li, itemId }) =>
       orderItemRepo.create({
         item_id: itemId,
@@ -759,7 +894,7 @@ async function createOrderFromBestellung(
   });
 
   console.log(
-    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${resolved.length} item(s), ${skippedCount} line(s) had no matching catalog Item.`,
+    `Bestellung ${bestellung.order_no} → created Order ${bestellung.order_no} (id ${createdOrderId}) with ${resolved.length} item(s), ${skippedCount} line(s) skipped (no resolvable catalog Item).`,
   );
 
   return { createdOrderId, skippedCount };
@@ -835,7 +970,8 @@ export async function syncBestellungToLinkedOrder(
       (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0),
     );
     const existingOrderItems = [...(linkedOrder.orderItems || [])].sort(
-      (a, b) => (Number(a.position ?? a.id) || 0) - (Number(b.position ?? b.id) || 0),
+      (a, b) =>
+        (Number(a.position ?? a.id) || 0) - (Number(b.position ?? b.id) || 0),
     );
 
     const itemRepo = AppDataSource.getRepository(Item);
@@ -879,7 +1015,7 @@ export async function syncBestellungToLinkedOrder(
       if (itemId) targetItem.item_id = itemId;
       targetItem.qty = Math.max(1, Math.round(Number(li.qty) || 1));
       targetItem.remark_de = remarkForChina as any;
-      targetItem.position = li.position ?? (i + 1);
+      targetItem.position = li.position ?? i + 1;
       targetItem.price =
         li.transferPrice !== undefined && li.transferPrice !== null
           ? li.transferPrice
@@ -1058,11 +1194,11 @@ async function refreshLineItemPurchasePrices(orderId: number): Promise<void> {
     const supplierItems =
       allResolvedIds.length > 0
         ? await supplierItemRepo.find({
-          where: {
-            item_id: In(allResolvedIds),
-            supplier_id: order.supplier_id,
-          },
-        })
+            where: {
+              item_id: In(allResolvedIds),
+              supplier_id: order.supplier_id,
+            },
+          })
         : [];
     const byItemId = new Map(
       supplierItems.map((si) => [String(si.item_id), si]),

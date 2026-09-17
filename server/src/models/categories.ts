@@ -22,7 +22,7 @@ export class Category {
   @Column({ type: "varchar", length: 255, nullable: true })
   name?: string;
 
-  @Column({ type: "varchar", length: 5, unique: true }) // ADDED: unique: true
+  @Column({ type: "varchar", length: 5, unique: true })
   de_cat!: string;
 
   @OneToMany(() => Order, (order) => order.category)

@@ -14,6 +14,7 @@ import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
 import { TaxProfile } from "../models/tax_profile";
+import { getCargosByAuftragIds } from "./rechnung_controller";
 
 /** Fetches documents linked to a correction invoice (Rechnung_k): the
  * original Rechnung it was created from, and the originating Auftrag
@@ -41,34 +42,21 @@ async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
 }
 
 async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
-  const rechnungRepo = AppDataSource.getRepository(Rechnung);
-  const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
-
-  const [originalRechnung, auftrag] = await Promise.all([
-    rechnungK.original_rechnung_id
-      ? rechnungRepo.findOne({
-          where: { id: rechnungK.original_rechnung_id },
-          select: ["id", "invoice_number", "title", "created_at"],
-        })
-      : Promise.resolve(null),
-    rechnungK.auftrag_id
-      ? customerOrderRepo.findOne({
-          where: { id: rechnungK.auftrag_id },
-          select: ["id", "order_no", "title", "created_at"],
-        })
-      : Promise.resolve(null),
-  ]);
-
-  return {
-    rechnung: originalRechnung ? [originalRechnung] : [],
-    auftrag: auftrag ? [auftrag] : [],
-  };
+  const map = await getLinkedDocumentsForRechnungenK([rechnungK]);
+  return (
+    map.get(rechnungK.id) || {
+      rechnung: [] as any[],
+      auftrag: [] as any[],
+      cargos: [] as any[],
+    }
+  );
 }
-
-/** Same as above, batched for many Rechnung_k at once. Returns a Map keyed
- * by rechnungK id. */
 async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
-  const empty = () => ({ rechnung: [] as any[], auftrag: [] as any[] });
+  const empty = () => ({
+    rechnung: [] as any[],
+    auftrag: [] as any[],
+    cargos: [] as any[],
+  });
   const result = new Map<string, ReturnType<typeof empty>>();
   rechnungenK.forEach((rk) => result.set(rk.id, empty()));
 
@@ -110,6 +98,9 @@ async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
   const rechnungById = new Map(rechnungen.map((r: any) => [r.id, r]));
   const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
 
+  // Cargo, resolved via the Bestellung linked to each Auftrag.
+  const cargosByAuftragId = await getCargosByAuftragIds(auftragIds);
+
   for (const rk of rechnungenK) {
     const bucket = result.get(rk.id);
     if (!bucket) continue;
@@ -119,13 +110,16 @@ async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
     }
     if (rk.auftrag_id) {
       const auftrag = auftragById.get(rk.auftrag_id);
-      if (auftrag) bucket.auftrag.push(auftrag);
+      if (auftrag) {
+        bucket.auftrag.push(auftrag);
+        const cargos = cargosByAuftragId.get(rk.auftrag_id);
+        if (cargos) bucket.cargos.push(...cargos);
+      }
     }
   }
 
   return result;
 }
-/** Recomputes subtotal/tax/total on a correction invoice from its items */
 async function recalculateRechnungKTotals(rechnungKId: string): Promise<void> {
   const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
   const rechnungK = await rechnungKRepo.findOne({
@@ -884,7 +878,12 @@ export const downloadRechnungKPdf = async (
       deliveryDate: (rechnungK as any).delivery_date || rechnungK.date_delivery,
       deliveryTerms: rechnungK.delivery_terms,
       paymentTerms: rechnungK.payment_terms
-        ? (() => { const m = String(rechnungK.payment_terms).match(/(\d+)/); return m ? `Zahlungsziel: ${m[1]} Tage` : `Zahlungsziel: ${rechnungK.payment_terms}`; })()
+        ? (() => {
+            const m = String(rechnungK.payment_terms).match(/(\d+)/);
+            return m
+              ? `Zahlungsziel: ${m[1]} Tage`
+              : `Zahlungsziel: ${rechnungK.payment_terms}`;
+          })()
         : undefined,
       paymentMethod: rechnungK.payment_method,
       taxProfile:

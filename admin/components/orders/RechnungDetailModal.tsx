@@ -192,6 +192,7 @@ interface RechnungDetailModalProps {
   onSwitchToAuftrag?: (auftragId: string | number) => void;
   onSwitchToRechnung?: (rechnungId: string) => void;
   onSwitchToRechnungK?: (rechnungKId: string) => void;
+  onSwitchToCargo?: (cargoId: string | number) => void;
 }
 
 const EditableCell: React.FC<{
@@ -456,6 +457,7 @@ export default function RechnungDetailModal({
   onSwitchToAuftrag,
   onSwitchToRechnung,
   onSwitchToRechnungK,
+  onSwitchToCargo,
 }: RechnungDetailModalProps) {
   const [data, setData] = useState<any>(rechnung);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
@@ -505,7 +507,7 @@ export default function RechnungDetailModal({
   const auftragDocs = sortByCreatedAtDesc(linkedDocs.auftrag || []);
   const rechnungenKDocs = sortByCreatedAtDesc(linkedDocs.rechnungenK || []);
   const rechnungDocs = sortByCreatedAtDesc(linkedDocs.rechnung || []);
-
+  const cargoDocs = sortByCreatedAtDesc(linkedDocs.cargos || []);
   useEffect(() => {
     setData(rechnung);
     setIsEditMode(false);
@@ -1307,7 +1309,9 @@ export default function RechnungDetailModal({
                 label="Lieferdatum bestätigt"
                 value={
                   data.date_delivery_confirmed || data.real_delivery_date
-                    ? formatDate(data.date_delivery_confirmed || data.real_delivery_date)
+                    ? formatDate(
+                        data.date_delivery_confirmed || data.real_delivery_date,
+                      )
                     : "—"
                 }
               />
@@ -1480,14 +1484,21 @@ export default function RechnungDetailModal({
                     const lineTaxRate = Number(item.taxRate ?? taxRate);
                     const isSaving = savingItemId === item.id;
                     const isRowDisabled = isFullyCorrected;
+                    const isFreitextLine = (item: any): boolean =>
+                      !item?.itemNo && !item?.sourceItemId;
+                    const FREIZEILE_ROW_COLOR = "#D8964A";
+                    const isFreizeile = isFreitextLine(item);
+                    const rowIsDimmed =
+                      showCorrectionUI && (isRowDisabled || !selected);
 
                     return (
                       <tr
                         key={item.id || idx}
-                        className={
-                          showCorrectionUI && (isRowDisabled || !selected)
-                            ? "bg-gray-50 opacity-60"
-                            : ""
+                        className={rowIsDimmed ? "bg-gray-50 opacity-60" : ""}
+                        style={
+                          !rowIsDimmed && isFreizeile
+                            ? { backgroundColor: FREIZEILE_ROW_COLOR }
+                            : undefined
                         }
                       >
                         {showCorrectionUI && (
@@ -1919,8 +1930,9 @@ export default function RechnungDetailModal({
                 </h3>
               </div>
               {auftragDocs.length === 0 &&
-                rechnungenKDocs.length === 0 &&
-                rechnungDocs.length === 0 ? (
+              rechnungenKDocs.length === 0 &&
+              rechnungDocs.length === 0 &&
+              cargoDocs.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No linked documents yet.
                 </p>
@@ -2029,6 +2041,35 @@ export default function RechnungDetailModal({
                             className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
                           >
                             {doc.order_no}{" "}
+                            <span className="text-xs text-gray-400">→</span>
+                          </button>
+                          <span className="text-gray-400 text-xs">
+                            {formatDate(doc.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {cargoDocs.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Cargo
+                      </p>
+                      {cargoDocs.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex justify-between items-center text-gray-700 hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onSwitchToCargo?.(doc.id);
+                            }}
+                            className="text-sm font-medium text-[#8CC21B] hover:text-[#7ab318] hover:underline flex items-center gap-1"
+                          >
+                            {doc.cargo_no}{" "}
                             <span className="text-xs text-gray-400">→</span>
                           </button>
                           <span className="text-gray-400 text-xs">

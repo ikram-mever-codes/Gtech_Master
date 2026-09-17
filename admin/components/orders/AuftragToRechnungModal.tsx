@@ -231,8 +231,7 @@ export default function AuftragToRechnungModal({
 
     const rawSourceItems = auftrag.orderItems || auftrag.items || [];
     const sourceItems = [...rawSourceItems].sort(
-      (a: any, b: any) =>
-        (Number(a.position) || 0) - (Number(b.position) || 0),
+      (a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0),
     );
 
     const mapped: SelectedItemState[] = sourceItems.map(
@@ -411,10 +410,10 @@ export default function AuftragToRechnungModal({
     return val ?? 0;
   };
 
-  /** True if this line, as currently selected/quantified, would block
-   * "Generate Rechnung & Lieferschein" — only stock lines can be invalid,
-   * and only while selected with a qty exceeding what's on hand. */
   const isStockInvalid = (item: SelectedItemState): boolean => {
+    console.log(
+      `This is item for stock invalidity check: ${JSON.stringify(item)}`,
+    );
     if (item.is_stock_item !== "Y" || !item.selected) return false;
     const available = getAvailableStock(item);
     return available !== null && item.qty > available;
@@ -1148,9 +1147,7 @@ export default function AuftragToRechnungModal({
                                 Math.min(
                                   6,
                                   (item.hinweis || "").split("\n").length ||
-                                    Math.ceil(
-                                      (item.hinweis || "").length / 22,
-                                    ),
+                                    Math.ceil((item.hinweis || "").length / 22),
                                 ),
                               )}
                               value={item.hinweis}
@@ -1170,7 +1167,9 @@ export default function AuftragToRechnungModal({
                         </td>
 
                         {/* MwSt. */}
-                        <td className="px-2 py-2 text-center">{formatTaxRate(item.mwst)}</td>
+                        <td className="px-2 py-2 text-center">
+                          {formatTaxRate(item.mwst)}
+                        </td>
 
                         {/* QTY Open */}
                         <td className="px-2 py-2 text-right font-bold">
