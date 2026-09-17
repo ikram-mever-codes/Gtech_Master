@@ -45,6 +45,7 @@ import {
   formatTaxRate,
 } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
+import { getItemLink } from "@/utils/itemLink";
 
 interface AuftragPreviewModalProps {
   isOpen: boolean;
@@ -194,11 +195,12 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
     .join(", ");
 
   const custId =
-    addr?.customerId ||
+    addr?.original_customer_id ||
     addr?.customer_id ||
-    addr?.id ||
+    addr?.customerId ||
     addr?.businessId ||
-    addr?.original_customer_id;
+    addr?.companyName ||
+    addr?.legalName;
 
   const renderCustomerName = (name: string, isBold: boolean = false) => {
     const cls = isBold ? "font-bold text-gray-900" : "";
@@ -206,7 +208,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
       return (
         <div className={cls}>
           <a
-            href={`/bussinesses/${custId}`}
+            href={`/bussinesses?businessId=${custId}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#8CC21B] hover:underline cursor-pointer"
@@ -1250,13 +1252,14 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     addr={{
                       ...order.customerSnapshot,
                       customerId:
+                        order.customer?.id ||
                         order.customerId ||
                         order.customer_id ||
-                        order.customer?.id ||
-                        order.customerSnapshot?.customerId ||
-                        order.customerSnapshot?.customer_id ||
                         order.customerSnapshot?.original_customer_id ||
-                        order.customerSnapshot?.id,
+                        order.customerSnapshot?.customer_id ||
+                        order.customerSnapshot?.businessId ||
+                        order.customer?.companyName ||
+                        order.customerSnapshot?.companyName,
                     }}
                     emptyText="No customer snapshot."
                   />
@@ -1846,16 +1849,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                             />
                           ) : (
                             (() => {
-                              const masterId =
-                                item.sourceItemId ||
-                                item.source_item_id ||
-                                item.itemId ||
-                                item.item_id ||
-                                item.masterItemId ||
-                                item.item?.id;
-                              return masterId ? (
+                              const href = getItemLink(item);
+                              return href ? (
                                 <a
-                                  href={`/items/${masterId}`}
+                                  href={href}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="font-medium text-[#8CC21B] hover:underline cursor-pointer"

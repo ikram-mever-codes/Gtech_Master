@@ -2,6 +2,7 @@
 
 import React from "react";
 import { formatTaxRate } from "@/utils/decimal";
+import { getItemLink } from "@/utils/itemLink";
 
 export interface CommercialLineItem {
   id?: string | number;
@@ -162,9 +163,22 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
                     {item.itemNo || item.material || "—"}
                   </td>
                   <td className="px-2 py-2">
-                    <div className="font-medium text-gray-900">
-                      {item.itemName || item.item_name || item.name || "—"}
-                    </div>
+                    {(() => {
+                      const href = getItemLink(item);
+                      const name = item.itemName || item.item_name || item.name || "—";
+                      return href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-[#8CC21B] hover:underline cursor-pointer block"
+                        >
+                          {name}
+                        </a>
+                      ) : (
+                        <div className="font-medium text-gray-900">{name}</div>
+                      );
+                    })()}
                     {remarkEx && (
                       <div className="text-xs text-gray-500 mt-0.5 leading-snug">
                         {remarkEx}

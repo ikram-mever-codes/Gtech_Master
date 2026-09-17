@@ -727,6 +727,23 @@ const CombinedInquiriesPageContent = () => {
   useEffect(() => {
     if (urlParamHandled) return;
     const inquiryId = searchParams.get("inquiryId");
+    const requestId = searchParams.get("requestId");
+
+    if (requestId && allInquiries.length > 0) {
+      for (const inquiry of allInquiries) {
+        const req = (inquiry.requests || []).find(
+          (r: any) => String(r.id) === String(requestId) || String(r.itemId) === String(requestId)
+        );
+        if (req) {
+          setSelectedRequestForDetail(req);
+          setSelectedRequestInquiryId(inquiry.id);
+          setShowRequestDetailModal(true);
+          setUrlParamHandled(true);
+          return;
+        }
+      }
+    }
+
     if (inquiryId && allInquiries.length > 0) {
       const inquiry = allInquiries.find((i) => i.id === inquiryId);
       if (inquiry) {

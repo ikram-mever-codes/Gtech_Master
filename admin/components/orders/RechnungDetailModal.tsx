@@ -34,6 +34,7 @@ import { updateRechnung } from "@/api/rechnungen";
 import { getItemById, updateItem } from "@/api/items";
 import { formatDate } from "@/utils/date";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import { getItemLink, getCustomerLink } from "@/utils/itemLink";
 
 const formatDeCurrency = (val: number) => {
   const num = isNaN(val) || !isFinite(val) ? 0 : val;
@@ -118,11 +119,11 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
     .join(", ");
 
   const custId =
+    addr?.original_customer_id ||
     addr?.customerId ||
-    addr?.customer_id ||
-    addr?.id ||
     addr?.businessId ||
-    addr?.original_customer_id;
+    addr?.companyName ||
+    addr?.legalName;
 
   const renderCustomerName = (name: string, isBold: boolean = false) => {
     const cls = isBold ? "font-bold text-gray-900" : "";
@@ -130,7 +131,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
       return (
         <div className={cls}>
           <a
-            href={`/bussinesses/${custId}`}
+            href={getCustomerLink(custId)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#8CC21B] hover:underline cursor-pointer"
@@ -523,10 +524,10 @@ export default function RechnungDetailModal({
     );
     setEditShippingMethod(
       rechnung?.shipping_method ||
-        rechnung?.auftrag?.shipping_method ||
-        (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
-        (rechnung?.customerSnapshot as any)?.shipping_method ||
-        "",
+      rechnung?.auftrag?.shipping_method ||
+      (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
+      (rechnung?.customerSnapshot as any)?.shipping_method ||
+      "",
     );
     setRkNotesExtern(rechnung?.notes || "");
     setRkNotesIntern(rechnung?.internal_notes || "");
@@ -575,26 +576,26 @@ export default function RechnungDetailModal({
 
   const correctionsSubtotal = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-        if (!selectedCorrectionIds.has(item.id)) return sum;
-        const openQty = openQuantities[item.id] || 0;
-        const corr = corrections[item.id];
-        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-          return sum + corr.quantity * corr.price;
-        }
-        return sum;
-      }, 0)
+      if (!selectedCorrectionIds.has(item.id)) return sum;
+      const openQty = openQuantities[item.id] || 0;
+      const corr = corrections[item.id];
+      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+        return sum + corr.quantity * corr.price;
+      }
+      return sum;
+    }, 0)
     : 0;
   const correctionsTax = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-        if (!selectedCorrectionIds.has(item.id)) return sum;
-        const openQty = openQuantities[item.id] || 0;
-        const corr = corrections[item.id];
-        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-          const lineTaxRate = Number(item.taxRate ?? taxRate);
-          return sum + corr.quantity * corr.price * (lineTaxRate / 100);
-        }
-        return sum;
-      }, 0)
+      if (!selectedCorrectionIds.has(item.id)) return sum;
+      const openQty = openQuantities[item.id] || 0;
+      const corr = corrections[item.id];
+      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+        const lineTaxRate = Number(item.taxRate ?? taxRate);
+        return sum + corr.quantity * corr.price * (lineTaxRate / 100);
+      }
+      return sum;
+    }, 0)
     : 0;
 
   const netTotal = showCorrectionUI
@@ -625,15 +626,20 @@ export default function RechnungDetailModal({
   const snapshot = data.customerSnapshot || null;
 
   const custId =
-    data.customer_id ||
-    data.customerId ||
-    data.customer?.id ||
-    snapshot?.id ||
-    snapshot?.customer_id ||
     snapshot?.original_customer_id ||
-    snapshot?.businessId;
+    rechnungCustomer?.original_customer_id ||
+    data.original_customer_id ||
+    (data.customer?.id && data.customer?.id !== snapshot?.id ? data.customer.id : null) ||
+    (companyName !== "—" ? companyName : null) ||
+    rechnungCustomer?.companyName ||
+    snapshot?.companyName;
 
   const billingAddr = {
+    ...snapshot,
+    original_customer_id:
+      snapshot?.original_customer_id ||
+      rechnungCustomer?.original_customer_id ||
+      data.original_customer_id,
     customerId: custId,
     companyName: companyName,
     legalName: companyName,
@@ -1067,7 +1073,7 @@ export default function RechnungDetailModal({
             <h2 className="text-sm font-medium text-gray-500 truncate mt-0.5 flex items-center gap-1">
               {custId ? (
                 <a
-                  href={`/bussinesses/${custId}`}
+                  href={getCustomerLink(custId)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
@@ -1519,16 +1525,10 @@ export default function RechnungDetailModal({
                         </td>
                         <td className="px-2 py-2">
                           {(() => {
-                            const masterId =
-                              item.sourceItemId ||
-                              item.source_item_id ||
-                              item.itemId ||
-                              item.item_id ||
-                              item.masterItemId ||
-                              item.item?.id;
-                            return masterId ? (
+                            const href = getItemLink(item);
+                            return href ? (
                               <a
-                                href={`/items/${masterId}`}
+                                href={href}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
@@ -1552,11 +1552,10 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${
-                                  isFullyCorrected
+                                className={`font-semibold ${isFullyCorrected
                                     ? "text-green-600"
                                     : "text-amber-600"
-                                }`}
+                                  }`}
                               >
                                 {openQty}
                               </span>
@@ -1577,11 +1576,10 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${
-                                    selected
+                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${selected
                                       ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
                                       : "border-gray-200 bg-gray-100 text-gray-400"
-                                  }`}
+                                    }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1603,11 +1601,10 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${
-                                    selected
+                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${selected
                                       ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
                                       : "border-gray-200 bg-gray-100 text-gray-400"
-                                  }`}
+                                    }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1674,11 +1671,10 @@ export default function RechnungDetailModal({
                   {(editShippingMethod || data.shipping_method) &&
                     (editShippingCost > 0 || editShippingQuantity > 0) && (
                       <tr
-                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${
-                          showCorrectionUI && !shippingSelected
+                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${showCorrectionUI && !shippingSelected
                             ? "opacity-60"
                             : ""
-                        }`}
+                          }`}
                       >
                         {showCorrectionUI && (
                           <td className="px-2 py-2 text-center">
@@ -1883,11 +1879,10 @@ export default function RechnungDetailModal({
                         ⚠ Not uploaded yet
                       </span>
                       <label
-                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                          uploadingDoc
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
                             ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                             : "bg-amber-600 text-white hover:bg-amber-700"
-                        }`}
+                          }`}
                       >
                         {uploadingDoc ? (
                           <>
@@ -1924,8 +1919,8 @@ export default function RechnungDetailModal({
                 </h3>
               </div>
               {auftragDocs.length === 0 &&
-              rechnungenKDocs.length === 0 &&
-              rechnungDocs.length === 0 ? (
+                rechnungenKDocs.length === 0 &&
+                rechnungDocs.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No linked documents yet.
                 </p>
@@ -2110,8 +2105,8 @@ export default function RechnungDetailModal({
                           : addressEdit
                             ? editNotesExtern
                             : data.notes ||
-                              data.comment ||
-                              data.notes_external) || "",
+                            data.comment ||
+                            data.notes_external) || "",
                       );
                       toast.success("External comment copied to clipboard!");
                     }}
@@ -2165,11 +2160,10 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-                  hasCorrections && !isCreating
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
                     ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 {isCreating ? (
                   <>

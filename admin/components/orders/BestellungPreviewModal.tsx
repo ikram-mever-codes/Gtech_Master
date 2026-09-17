@@ -32,6 +32,7 @@ import { errorStyles, successStyles } from "@/utils/constants";
 import { parseFlexibleNumber, parseAndRoundTo3Decimals } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
 import { formatCurrency } from "@/api/customer_orders";
+import { getItemLink, getCustomerLink } from "@/utils/itemLink";
 
 interface BestellungPreviewModalProps {
   isOpen: boolean;
@@ -1110,7 +1111,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                       const name = cust?.companyName || cust?.name || "—";
                       return custId ? (
                         <a
-                          href={`/bussinesses/${custId}`}
+                          href={getCustomerLink(custId)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
@@ -1205,7 +1206,7 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                 edit={false}
                 value={
                   <a
-                    href={`/bussinesses/${displayOrder.customer_id}`}
+                    href={getCustomerLink(displayOrder.customer_id)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
@@ -1370,16 +1371,10 @@ export const BestellungPreviewModal: React.FC<BestellungPreviewModalProps> = ({
                             />
                           ) : (
                             (() => {
-                              const masterId =
-                                item.sourceItemId ||
-                                item.source_item_id ||
-                                item.itemId ||
-                                item.item_id ||
-                                item.masterItemId ||
-                                item.item?.id;
-                              return masterId ? (
+                              const href = getItemLink(item);
+                              return href ? (
                                 <a
-                                  href={`/items/${masterId}`}
+                                  href={href}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="font-medium text-[#8CC21B] hover:underline cursor-pointer"

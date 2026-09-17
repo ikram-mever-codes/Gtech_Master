@@ -57,6 +57,7 @@ import {
   formatMatrixPrice,
 } from "@/utils/decimal";
 import { formatDate } from "@/utils/offers";
+import { getItemLink } from "@/utils/itemLink";
 import { PrinterIcon } from "lucide-react";
 
 type PricingMode = "classic" | "matrix";
@@ -441,11 +442,12 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
     .join(", ");
 
   const custId =
-    addr?.customerId ||
+    addr?.original_customer_id ||
     addr?.customer_id ||
-    addr?.id ||
+    addr?.customerId ||
     addr?.businessId ||
-    addr?.original_customer_id;
+    addr?.companyName ||
+    addr?.legalName;
 
   const renderCustomerName = (name: string, isBold: boolean = false) => {
     const cls = isBold ? "font-bold text-gray-900" : "";
@@ -453,7 +455,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
       return (
         <div className={cls}>
           <a
-            href={`/bussinesses/${custId}`}
+            href={`/bussinesses?businessId=${custId}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#8CC21B] hover:underline cursor-pointer"
@@ -2761,16 +2763,10 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                                   />
                                 ) : (
                                   (() => {
-                                    const masterId =
-                                      item.sourceItemId ||
-                                      item.source_item_id ||
-                                      item.itemId ||
-                                      item.item_id ||
-                                      item.masterItemId ||
-                                      item.item?.id;
-                                    return masterId ? (
+                                    const itemHref = getItemLink(item);
+                                    return itemHref ? (
                                       <a
-                                        href={`/items/${masterId}`}
+                                        href={itemHref}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="font-medium text-[#8CC21B] hover:underline cursor-pointer"

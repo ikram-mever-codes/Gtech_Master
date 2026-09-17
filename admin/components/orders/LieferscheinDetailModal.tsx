@@ -13,6 +13,7 @@ import {
   stornierLieferschein,
 } from "@/api/lieferscheine";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import { getItemLink, getCustomerLink } from "@/utils/itemLink";
 
 const formatDeCurrency = (val: number) => {
   const num = isNaN(val) || !isFinite(val) ? 0 : val;
@@ -77,11 +78,11 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   }
 
   const custId =
+    addr?.original_customer_id ||
     addr?.customerId ||
-    addr?.customer_id ||
-    addr?.id ||
     addr?.businessId ||
-    addr?.original_customer_id;
+    addr?.companyName ||
+    addr?.legalName;
 
   const renderCustomerName = (name: string, isBold: boolean = false) => {
     const cls = isBold ? "font-bold text-gray-900" : "font-medium";
@@ -89,7 +90,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
       return (
         <div className={cls}>
           <a
-            href={`/bussinesses/${custId}`}
+            href={getCustomerLink(custId)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#8CC21B] hover:underline cursor-pointer"
@@ -294,15 +295,22 @@ export default function LieferscheinDetailModal({
   const totalWeightKg = netWeightKg + extraWeightKg;
 
   const custId =
-    data.customerId ||
-    data.customer_id ||
-    customer.id ||
-    snapshot.id ||
-    snapshot.customer_id ||
-    snapshot.original_customer_id ||
-    snapshot.businessId;
+    snapshot?.original_customer_id ||
+    customer?.original_customer_id ||
+    data.rechnung?.customerSnapshot?.original_customer_id ||
+    data.rechnung?.customer?.original_customer_id ||
+    data.original_customer_id ||
+    (customer?.id && customer?.id !== snapshot?.id ? customer.id : null) ||
+    (companyName !== "—" ? companyName : null) ||
+    customer?.companyName ||
+    snapshot?.companyName;
 
   const billingAddr = {
+    ...snapshot,
+    original_customer_id:
+      snapshot?.original_customer_id ||
+      customer?.original_customer_id ||
+      data.rechnung?.customerSnapshot?.original_customer_id,
     customerId: custId,
     companyName: companyName,
     legalName: companyName,
@@ -701,16 +709,10 @@ export default function LieferscheinDetailModal({
                           </td>
                           <td className="px-2 py-2">
                             {(() => {
-                              const masterId =
-                                item.sourceItemId ||
-                                item.source_item_id ||
-                                item.itemId ||
-                                item.item_id ||
-                                item.masterItemId ||
-                                item.item?.id;
-                              return masterId ? (
+                              const href = getItemLink(item);
+                              return href ? (
                                 <a
-                                  href={`/items/${masterId}`}
+                                  href={href}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="font-medium text-[#8CC21B] hover:underline cursor-pointer"

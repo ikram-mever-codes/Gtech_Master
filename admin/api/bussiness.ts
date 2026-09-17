@@ -181,12 +181,14 @@ export const getAllBusinesses = async (filters: SearchFilters = {}) => {
   }
 };
 
-export const getBusinessById = async (id: string) => {
+export const getBusinessById = async (id: string, suppressToast: boolean = false) => {
   try {
     const response = await api.get(`/businesses/${id}`);
     return response.data;
   } catch (error) {
-    handleApiError(error, "Failed to fetch business");
+    if (!suppressToast) {
+      handleApiError(error, "Failed to fetch business");
+    }
     throw error;
   }
 };
