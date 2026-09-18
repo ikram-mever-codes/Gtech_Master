@@ -2774,6 +2774,29 @@ export class InvoiceController {
             } else if (cargo.cargo_no) {
               finalCargoNo = cargo.cargo_no;
             }
+
+            const cargoOrders = await cargoOrderRepo.find({
+              where: { cargo_id: cargo.id },
+            });
+            const linkedOrderIds = cargoOrders
+              .map((co) => co.order_id)
+              .filter(Boolean);
+            if (linkedOrderIds.length > 0) {
+              await AppDataSource.getRepository(OrderItem)
+                .createQueryBuilder()
+                .update(OrderItem)
+                .set({ cargo_id: cargo.id })
+                .where("order_id IN (:...linkedOrderIds)", { linkedOrderIds })
+                .execute()
+                .catch(() => {});
+              await orderRepo
+                .createQueryBuilder()
+                .update(Order)
+                .set({ cargo_id: cargo.id })
+                .where("id IN (:...linkedOrderIds)", { linkedOrderIds })
+                .execute()
+                .catch(() => {});
+            }
           }
 
           if (finalCargoNo && finalCargoNo !== targetCargoNo) {
