@@ -512,7 +512,6 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                               )}`,
                             width: "110px",
                           },
-
                         ]
                         : [
                           {
@@ -578,7 +577,6 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                               )}`,
                             width: "110px",
                           },
-
                           {
                             header: "Operation",
                             render: (group: any) => (
@@ -703,7 +701,6 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                             width: "110px",
                             align: "left",
                           },
-                          { value: "", width: "110px" },
                         ]
                         : [
                           {
@@ -740,7 +737,6 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                             width: "110px",
                             align: "left",
                           },
-                          { value: "", width: "110px" },
                           { value: "", width: "100px" },
                         ]
                     }
