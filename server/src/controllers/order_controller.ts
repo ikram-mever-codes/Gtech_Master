@@ -843,7 +843,7 @@ export const getAllOrders = async (
                   category_id: warehouseItem.category_id,
                 }
                 : null,
-              cargo_id: hasValidCargo ? oi.cargo_id || validCargoId : null,
+              cargo_id: oi.cargo_id || (hasValidCargo ? validCargoId : null),
             };
           }),
         orderItems: undefined,
