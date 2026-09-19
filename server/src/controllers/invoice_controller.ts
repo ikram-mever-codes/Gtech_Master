@@ -1601,7 +1601,7 @@ export class InvoiceController {
         .filter(Boolean);
 
       const ordersInCargo = await orderRepository.find({
-        where: [{ cargo_id: cargo.id }],
+        where: [{ cargo_id: cargo.id, is_deleted: false }],
       });
       const orderIdsFromOrders = ordersInCargo.map((o) => o.id).filter(Boolean);
 
@@ -1609,16 +1609,30 @@ export class InvoiceController {
         ...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders]),
       ];
 
-      orderItems = await orderItemRepository.find({
-        where: { cargo_id: cargo.id },
-        relations: ["item", "item.taric", "item.purchasePrices", "order"],
-      });
+      orderItems = await orderItemRepository
+        .createQueryBuilder("oi")
+        .leftJoinAndSelect("oi.item", "item")
+        .leftJoinAndSelect("item.taric", "taric")
+        .leftJoinAndSelect("item.purchasePrices", "purchasePrices")
+        .leftJoinAndSelect("oi.order", "order")
+        .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
+        .andWhere(
+          "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+        )
+        .getMany();
 
       if (orderItems.length === 0 && allOrderIds.length > 0) {
-        orderItems = await orderItemRepository.find({
-          where: { order_id: In(allOrderIds) },
-          relations: ["item", "item.taric", "item.purchasePrices", "order"],
-        });
+        orderItems = await orderItemRepository
+          .createQueryBuilder("oi")
+          .leftJoinAndSelect("oi.item", "item")
+          .leftJoinAndSelect("item.taric", "taric")
+          .leftJoinAndSelect("item.purchasePrices", "purchasePrices")
+          .leftJoinAndSelect("oi.order", "order")
+          .where("oi.order_id IN (:...allOrderIds)", { allOrderIds })
+          .andWhere(
+            "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+          )
+          .getMany();
       }
     }
 
@@ -1630,7 +1644,7 @@ export class InvoiceController {
       const uniqueTokens = [...new Set(tokens)];
 
       const matchingOrders = await orderRepository.find({
-        where: uniqueTokens.map((t) => ({ order_no: Like(`%${t}%`) })),
+        where: uniqueTokens.map((t) => ({ order_no: Like(`%${t}%`), is_deleted: false })),
       });
 
       if (matchingOrders.length > 0) {
@@ -1645,10 +1659,17 @@ export class InvoiceController {
           cargo = foundCargoOrder.cargo;
         }
 
-        orderItems = await orderItemRepository.find({
-          where: { order_id: In(matchingOrderIds) },
-          relations: ["item", "item.taric", "item.purchasePrices", "order"],
-        });
+        orderItems = await orderItemRepository
+          .createQueryBuilder("oi")
+          .leftJoinAndSelect("oi.item", "item")
+          .leftJoinAndSelect("item.taric", "taric")
+          .leftJoinAndSelect("item.purchasePrices", "purchasePrices")
+          .leftJoinAndSelect("oi.order", "order")
+          .where("oi.order_id IN (:...matchingOrderIds)", { matchingOrderIds })
+          .andWhere(
+            "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+          )
+          .getMany();
       }
     }
 
@@ -2752,6 +2773,29 @@ export class InvoiceController {
               await cargoRepo.save(cargo);
             } else if (cargo.cargo_no) {
               finalCargoNo = cargo.cargo_no;
+            }
+
+            const cargoOrders = await cargoOrderRepo.find({
+              where: { cargo_id: cargo.id },
+            });
+            const linkedOrderIds = cargoOrders
+              .map((co) => co.order_id)
+              .filter(Boolean);
+            if (linkedOrderIds.length > 0) {
+              await AppDataSource.getRepository(OrderItem)
+                .createQueryBuilder()
+                .update(OrderItem)
+                .set({ cargo_id: cargo.id })
+                .where("order_id IN (:...linkedOrderIds)", { linkedOrderIds })
+                .execute()
+                .catch(() => {});
+              await orderRepo
+                .createQueryBuilder()
+                .update(Order)
+                .set({ cargo_id: cargo.id })
+                .where("id IN (:...linkedOrderIds)", { linkedOrderIds })
+                .execute()
+                .catch(() => {});
             }
           }
 

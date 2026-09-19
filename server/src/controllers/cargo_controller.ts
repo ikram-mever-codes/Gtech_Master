@@ -97,6 +97,9 @@ export const generateInvoicesForOrders = async (
             "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIdsFromCargo)))",
             { cargoId: cargo.id, orderIdsFromCargo },
           )
+          .andWhere(
+            "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+          )
           .getMany();
       } else {
         rawItems = await orderItemRepo
@@ -105,6 +108,9 @@ export const generateInvoicesForOrders = async (
           .leftJoinAndSelect("item.taric", "taric")
           .leftJoinAndSelect("oi.order", "order")
           .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
+          .andWhere(
+            "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+          )
           .getMany();
       }
 
@@ -394,9 +400,13 @@ export const getAllCargos = async (
       const orderItemRepo = AppDataSource.getRepository(OrderItem);
       const counts = await orderItemRepo
         .createQueryBuilder("oi")
+        .leftJoin("oi.order", "o")
         .select("oi.cargo_id", "cargoId")
         .addSelect("COUNT(oi.id)", "count")
         .where("oi.cargo_id IN (:...cargoIds)", { cargoIds })
+        .andWhere(
+          "(o.is_deleted = false OR o.is_deleted IS NULL OR oi.order_id IS NULL)",
+        )
         .groupBy("oi.cargo_id")
         .getRawMany();
 
@@ -460,36 +470,37 @@ export const getCargoById = async (
       relations: ["order"],
     });
 
-    const orderIds = cargoOrders.map((co) => co.order_id);
+    const activeCargoOrders = cargoOrders.filter(
+      (co) => co.order && !co.order.is_deleted,
+    );
+    const orderIds = activeCargoOrders.map((co) => co.order_id);
 
     let orderItems: any[] = [];
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
+    const qb = orderItemRepo
+      .createQueryBuilder("oi")
+      .leftJoinAndSelect("oi.item", "item")
+      .leftJoinAndSelect("oi.order", "order")
+      .leftJoinAndSelect("order.customer", "customer");
+
     if (orderIds.length > 0) {
-      orderItems = await orderItemRepo
-        .createQueryBuilder("oi")
-        .leftJoinAndSelect("oi.item", "item")
-        .leftJoinAndSelect("oi.order", "order")
-        .leftJoinAndSelect("order.customer", "customer")
-        .where(
-          "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
-          { cargoId: cargo.id, orderIds },
-        )
-        .getMany();
+      qb.where(
+        "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
+        { cargoId: cargo.id, orderIds },
+      );
     } else {
-      orderItems = await orderItemRepo
-        .createQueryBuilder("oi")
-        .leftJoinAndSelect("oi.item", "item")
-        .leftJoinAndSelect("oi.order", "order")
-        .leftJoinAndSelect("order.customer", "customer")
-        .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
-        .getMany();
+      qb.where("oi.cargo_id = :cargoId", { cargoId: cargo.id });
     }
+    qb.andWhere(
+      "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+    );
+    orderItems = await qb.getMany();
 
     res.status(200).json({
       success: true,
       data: {
         ...cargo,
-        orders: cargoOrders.map((co) => co.order),
+        orders: activeCargoOrders.map((co) => co.order),
         orderItems,
       },
     });
@@ -921,34 +932,35 @@ export const getCargoOrders = async (
       relations: ["order"],
     });
 
-    const orderIds = cargoOrders.map((co) => co.order_id);
+    const activeCargoOrders = cargoOrders.filter(
+      (co) => co.order && !co.order.is_deleted,
+    );
+    const orderIds = activeCargoOrders.map((co) => co.order_id);
     let orderItems: any[] = [];
     const orderItemRepo2 = AppDataSource.getRepository(OrderItem);
+    const qb = orderItemRepo2
+      .createQueryBuilder("oi")
+      .leftJoinAndSelect("oi.item", "item")
+      .leftJoinAndSelect("oi.order", "order")
+      .leftJoinAndSelect("order.customer", "customer");
+
     if (orderIds.length > 0) {
-      orderItems = await orderItemRepo2
-        .createQueryBuilder("oi")
-        .leftJoinAndSelect("oi.item", "item")
-        .leftJoinAndSelect("oi.order", "order")
-        .leftJoinAndSelect("order.customer", "customer")
-        .where(
-          "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
-          { cargoId: Number(id), orderIds },
-        )
-        .getMany();
+      qb.where(
+        "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
+        { cargoId: Number(id), orderIds },
+      );
     } else {
-      orderItems = await orderItemRepo2
-        .createQueryBuilder("oi")
-        .leftJoinAndSelect("oi.item", "item")
-        .leftJoinAndSelect("oi.order", "order")
-        .leftJoinAndSelect("order.customer", "customer")
-        .where("oi.cargo_id = :cargoId", { cargoId: Number(id) })
-        .getMany();
+      qb.where("oi.cargo_id = :cargoId", { cargoId: Number(id) });
     }
+    qb.andWhere(
+      "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+    );
+    orderItems = await qb.getMany();
 
     res.status(200).json({
       success: true,
       data: {
-        orders: cargoOrders.map((co) => co.order),
+        orders: activeCargoOrders.map((co) => co.order),
         orderItems,
       },
     });

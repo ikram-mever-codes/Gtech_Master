@@ -602,22 +602,24 @@ export const getAllOrders = async (
       }
     });
 
+    const missingCargoIds = orders
+      .filter((o) => o.cargo_id && !o.cargo)
+      .map((o) => Number(o.cargo_id))
+      .filter(Boolean);
 
-    const orphanedOrderIds: number[] = [];
-    orders.forEach((order) => {
-      if (order.cargo_id && !order.cargo) {
-        orphanedOrderIds.push(order.id);
-        order.cargo_id = null as any;
-      }
-    });
-    if (orphanedOrderIds.length > 0) {
-      orderRepo
-        .createQueryBuilder()
-        .update(Order)
-        .set({ cargo_id: () => "NULL" as any })
-        .where("id IN (:...orphanedOrderIds)", { orphanedOrderIds })
-        .execute()
-        .catch(() => { });
+    if (missingCargoIds.length > 0) {
+      const cargoRepo = AppDataSource.getRepository(Cargo);
+      const fetchedCargos = await cargoRepo.find({
+        where: { id: In(missingCargoIds) },
+        relations: ["customer"],
+      });
+      const cargoMap = new Map(fetchedCargos.map((c) => [c.id, c]));
+      orders.forEach((o) => {
+        if (o.cargo_id && !o.cargo) {
+          const found = cargoMap.get(Number(o.cargo_id));
+          if (found) o.cargo = found;
+        }
+      });
     }
 
     for (const ord of orders) {
@@ -843,7 +845,7 @@ export const getAllOrders = async (
                   category_id: warehouseItem.category_id,
                 }
                 : null,
-              cargo_id: hasValidCargo ? oi.cargo_id || validCargoId : null,
+              cargo_id: oi.cargo_id || (hasValidCargo ? validCargoId : null),
             };
           }),
         orderItems: undefined,
