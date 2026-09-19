@@ -32,6 +32,7 @@ import {
 import { Order } from "../models/orders";
 import { CargoOrder } from "../models/cargo_orders";
 import { TransferOrder } from "../models/transfer_order";
+import { getPaymentsForRechnungIds } from "./payment_allocations_controller";
 
 async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
@@ -209,6 +210,7 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
     auftrag: [] as any[],
     rechnungenK: [] as any[],
     cargos: [] as any[],
+    payments: { allocations: [] as any[], paid_amount: 0 },
   });
   const result = new Map<string, ReturnType<typeof empty>>();
   rechnungen.forEach((r) => result.set(r.id, empty()));
@@ -227,10 +229,12 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   );
   const rechnungIds = rechnungen.map((r) => r.id);
 
-  const [auftraege, rechnungenK] = await Promise.all([
+  const [auftraege, rechnungenK, paymentsByRechnungId] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
           where: { id: In(auftragIds) },
+          // total_amount added — the frontend compares this against
+          // each Rechnung's own total_amount to flag a differing amount.
           select: [
             "id",
             "order_no",
@@ -238,14 +242,23 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
             "created_at",
             "payment_terms",
             "payment_method",
+            "total_amount",
           ],
         })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
-      select: ["id", "invoice_number", "created_at", "original_rechnung_id"],
+      select: [
+        "id",
+        "invoice_number",
+        "created_at",
+        "original_rechnung_id",
+        "total_amount",
+      ],
       order: { created_at: "DESC" },
     }),
+    // Payments assigned to each Rechnung, in one batched query.
+    getPaymentsForRechnungIds(rechnungIds),
   ]);
 
   const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
@@ -254,14 +267,20 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const cargosByAuftragId = await getCargosByAuftragIds(auftragIds);
 
   for (const r of rechnungen) {
-    if (!r.auftrag_id) continue;
     const bucket = result.get(r.id);
-    const auftrag = auftragById.get(r.auftrag_id);
-    if (bucket && auftrag) {
-      bucket.auftrag.push(auftrag);
-      const cargos = cargosByAuftragId.get(r.auftrag_id);
-      if (cargos) bucket.cargos.push(...cargos);
+    if (!bucket) continue;
+
+    if (r.auftrag_id) {
+      const auftrag = auftragById.get(r.auftrag_id);
+      if (auftrag) {
+        bucket.auftrag.push(auftrag);
+        const cargos = cargosByAuftragId.get(r.auftrag_id);
+        if (cargos) bucket.cargos.push(...cargos);
+      }
     }
+
+    const payments = paymentsByRechnungId.get(r.id);
+    if (payments) bucket.payments = payments;
   }
 
   for (const rk of rechnungenK) {

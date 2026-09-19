@@ -444,10 +444,6 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
   const [showItemPicker, setShowItemPicker] = useState(false);
-  // Three-field item search backed by the new autocompleteItems endpoint
-  // — same pattern just implemented in BestellungPreviewModal (strict
-  // AND-across-words match, debounced, ranked results). Replaces the old
-  // single itemPickerSearch client-side filter over a 1000-item preload.
   const [searchEan, setSearchEan] = useState("");
   const [searchItemNo, setSearchItemNo] = useState("");
   const [searchName, setSearchName] = useState("");
@@ -498,6 +494,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     cargos: [],
   };
 
+  const amountsDiffer = (a: any, b: any): boolean => {
+    const numA = Number(a) || 0;
+    const numB = Number(b) || 0;
+    return Math.abs(numA - numB) > 0.01;
+  };
+
   const linkedDocsCount = (
     Object.keys(LINKED_DOC_LABELS) as (keyof typeof linkedDocumentsByType)[]
   ).reduce(
@@ -510,6 +512,18 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     if (kind === "bestellungen") return doc.order_no || doc.id;
     if (kind === "cargos") return doc.cargo_no || doc.id;
     return doc.invoice_number || doc.id;
+  };
+
+  const getLinkedDocAmountDiff = (kind: string, doc: any): string | null => {
+    if (kind !== "rechnungen") return null;
+    const auftragTotal = order?.total_amount;
+    if (doc.total_amount === undefined || auftragTotal === undefined)
+      return null;
+    if (!amountsDiffer(doc.total_amount, auftragTotal)) return null;
+    return formatCurrency(
+      Number(doc.total_amount) || 0,
+      order?.currency || "EUR",
+    );
   };
 
   const getLinkedDocDate = (doc: any): string =>
@@ -2334,7 +2348,9 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   </span>
                 )}
               </div>
-              {linkedDocsCount > 0 ? (
+              {linkedDocsCount > 0 ||
+              (order?.linkedDocuments?.payments?.allocations?.length || 0) >
+                0 ? (
                 <div className="space-y-3">
                   {(
                     Object.keys(
@@ -2406,11 +2422,27 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                                     →
                                   </span>
                                 </button>
-                                {displayDate && (
-                                  <span className="text-gray-400 text-xs">
-                                    {formatDate(displayDate)}
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  {(() => {
+                                    const amountDiff = getLinkedDocAmountDiff(
+                                      key,
+                                      doc,
+                                    );
+                                    return amountDiff ? (
+                                      <span
+                                        className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5"
+                                        title="Different amount than Auftrag"
+                                      >
+                                        {amountDiff}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                  {displayDate && (
+                                    <span className="text-gray-400 text-xs">
+                                      {formatDate(displayDate)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
@@ -2418,6 +2450,61 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       </div>
                     );
                   })}
+
+                  {(order?.linkedDocuments?.payments?.allocations?.length ||
+                    0) > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Zahlung
+                      </p>
+                      <div className="space-y-1.5 text-sm">
+                        {order.linkedDocuments.payments.allocations.map(
+                          (alloc: any) => {
+                            const allocAmount = Number(alloc.amount) || 0;
+                            const auftragTotal = order?.total_amount;
+                            const differs =
+                              auftragTotal !== undefined &&
+                              amountsDiffer(
+                                order.linkedDocuments.payments.paid_amount,
+                                auftragTotal,
+                              );
+                            return (
+                              <div
+                                key={alloc.id}
+                                className="flex justify-between items-center text-gray-700"
+                              >
+                                <span className="text-sm">
+                                  {alloc.paymentInbound?.payer_name ||
+                                    alloc.paymentInbound?.source ||
+                                    "Zahlung"}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${
+                                      differs
+                                        ? "text-amber-700 bg-amber-50 border-amber-200"
+                                        : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                    }`}
+                                  >
+                                    {formatCurrency(
+                                      allocAmount,
+                                      order?.currency || "EUR",
+                                    )}
+                                  </span>
+                                  <span className="text-gray-400 text-xs">
+                                    {formatDate(
+                                      alloc.paymentInbound?.received_date ||
+                                        alloc.created_at,
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">

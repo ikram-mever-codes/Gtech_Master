@@ -474,10 +474,6 @@ export default function RechnungDetailModal({
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- Comment fields editable while building a new RK -----------------
-  // Prefilled from the original Rechnung's own comments, but freely
-  // editable here — the values typed are what get saved onto the new RK,
-  // not blindly copied from the original.
   const [rkNotesExtern, setRkNotesExtern] = useState("");
   const [rkNotesIntern, setRkNotesIntern] = useState("");
 
@@ -508,6 +504,10 @@ export default function RechnungDetailModal({
   const rechnungenKDocs = sortByCreatedAtDesc(linkedDocs.rechnungenK || []);
   const rechnungDocs = sortByCreatedAtDesc(linkedDocs.rechnung || []);
   const cargoDocs = sortByCreatedAtDesc(linkedDocs.cargos || []);
+  const paymentsData = linkedDocs.payments || {
+    allocations: [],
+    paid_amount: 0,
+  };
   useEffect(() => {
     setData(rechnung);
     setIsEditMode(false);
@@ -526,21 +526,16 @@ export default function RechnungDetailModal({
     );
     setEditShippingMethod(
       rechnung?.shipping_method ||
-      rechnung?.auftrag?.shipping_method ||
-      (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
-      (rechnung?.customerSnapshot as any)?.shipping_method ||
-      "",
+        rechnung?.auftrag?.shipping_method ||
+        (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
+        (rechnung?.customerSnapshot as any)?.shipping_method ||
+        "",
     );
     setRkNotesExtern(rechnung?.notes || "");
     setRkNotesIntern(rechnung?.internal_notes || "");
     setShowStockBookingModal(false);
     setStockBookingItems([]);
 
-    // Prefill every open-quantity item with its ORIGINAL price (never 0
-    // unless the original line itself was genuinely priced at 0), and
-    // select all of them by default — same starting point as before, but
-    // now each one has a real, individually togglable checkbox rather
-    // than only being excludable by zeroing its quantity.
     if (rechnung?.items) {
       const initialCorrections: Record<
         string,
@@ -576,28 +571,50 @@ export default function RechnungDetailModal({
 
   const taxRate = Number(data.taxProfile.taxRate ?? 19);
 
+  const amountsDiffer = (a: any, b: any): boolean => {
+    const numA = Number(a) || 0;
+    const numB = Number(b) || 0;
+    return Math.abs(numA - numB) > 0.01;
+  };
+  const renderAmountDiffBadge = (
+    docTotal: any,
+    rechnungTotal: any,
+    currencyLabel: (n: number) => string,
+  ) => {
+    if (docTotal === undefined || rechnungTotal === undefined) return null;
+    if (!amountsDiffer(docTotal, rechnungTotal)) return null;
+    return (
+      <span
+        className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5"
+        title="Different amount"
+      >
+        {currencyLabel(Number(docTotal) || 0)}
+      </span>
+    );
+  };
+
   const correctionsSubtotal = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-      if (!selectedCorrectionIds.has(item.id)) return sum;
-      const openQty = openQuantities[item.id] || 0;
-      const corr = corrections[item.id];
-      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-        return sum + corr.quantity * corr.price;
-      }
-      return sum;
-    }, 0)
+        if (!selectedCorrectionIds.has(item.id)) return sum;
+        const openQty = openQuantities[item.id] || 0;
+        const corr = corrections[item.id];
+        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+          return sum + corr.quantity * corr.price;
+        }
+        return sum;
+      }, 0)
     : 0;
   const correctionsTax = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-      if (!selectedCorrectionIds.has(item.id)) return sum;
-      const openQty = openQuantities[item.id] || 0;
-      const corr = corrections[item.id];
-      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-        const lineTaxRate = Number(item.taxRate ?? taxRate);
-        return sum + corr.quantity * corr.price * (lineTaxRate / 100);
-      }
-      return sum;
-    }, 0)
+        if (!selectedCorrectionIds.has(item.id)) return sum;
+        const openQty = openQuantities[item.id] || 0;
+        const corr = corrections[item.id];
+        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+          const lineTaxRate = Number(item.taxRate ?? taxRate);
+          return sum + corr.quantity * corr.price * (lineTaxRate / 100);
+        }
+        return sum;
+      }, 0)
     : 0;
 
   const netTotal = showCorrectionUI
@@ -631,7 +648,9 @@ export default function RechnungDetailModal({
     snapshot?.original_customer_id ||
     rechnungCustomer?.original_customer_id ||
     data.original_customer_id ||
-    (data.customer?.id && data.customer?.id !== snapshot?.id ? data.customer.id : null) ||
+    (data.customer?.id && data.customer?.id !== snapshot?.id
+      ? data.customer.id
+      : null) ||
     (companyName !== "—" ? companyName : null) ||
     rechnungCustomer?.companyName ||
     snapshot?.companyName;
@@ -1563,10 +1582,11 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${isFullyCorrected
+                                className={`font-semibold ${
+                                  isFullyCorrected
                                     ? "text-green-600"
                                     : "text-amber-600"
-                                  }`}
+                                }`}
                               >
                                 {openQty}
                               </span>
@@ -1587,10 +1607,11 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${selected
+                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${
+                                    selected
                                       ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
                                       : "border-gray-200 bg-gray-100 text-gray-400"
-                                    }`}
+                                  }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1612,10 +1633,11 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${selected
+                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${
+                                    selected
                                       ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
                                       : "border-gray-200 bg-gray-100 text-gray-400"
-                                    }`}
+                                  }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1682,10 +1704,11 @@ export default function RechnungDetailModal({
                   {(editShippingMethod || data.shipping_method) &&
                     (editShippingCost > 0 || editShippingQuantity > 0) && (
                       <tr
-                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${showCorrectionUI && !shippingSelected
+                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${
+                          showCorrectionUI && !shippingSelected
                             ? "opacity-60"
                             : ""
-                          }`}
+                        }`}
                       >
                         {showCorrectionUI && (
                           <td className="px-2 py-2 text-center">
@@ -1890,10 +1913,11 @@ export default function RechnungDetailModal({
                         ⚠ Not uploaded yet
                       </span>
                       <label
-                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          uploadingDoc
                             ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                             : "bg-amber-600 text-white hover:bg-amber-700"
-                          }`}
+                        }`}
                       >
                         {uploadingDoc ? (
                           <>
@@ -1932,7 +1956,8 @@ export default function RechnungDetailModal({
               {auftragDocs.length === 0 &&
               rechnungenKDocs.length === 0 &&
               rechnungDocs.length === 0 &&
-              cargoDocs.length === 0 ? (
+              cargoDocs.length === 0 &&
+              paymentsData.allocations.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No linked documents yet.
                 </p>
@@ -1959,9 +1984,16 @@ export default function RechnungDetailModal({
                             {doc.order_no}{" "}
                             <span className="text-xs text-gray-400">→</span>
                           </button>
-                          <span className="text-gray-400 text-xs">
-                            {formatDate(doc.created_at)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {renderAmountDiffBadge(
+                              doc.total_amount,
+                              data.total_amount,
+                              formatDeCurrency,
+                            )}
+                            <span className="text-gray-400 text-xs">
+                              {formatDate(doc.created_at)}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1987,9 +2019,16 @@ export default function RechnungDetailModal({
                             {doc.invoice_number}{" "}
                             <span className="text-xs text-gray-400">→</span>
                           </button>
-                          <span className="text-gray-400 text-xs">
-                            {formatDate(doc.created_at)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {renderAmountDiffBadge(
+                              doc.total_amount,
+                              data.total_amount,
+                              formatDeCurrency,
+                            )}
+                            <span className="text-gray-400 text-xs">
+                              {formatDate(doc.created_at)}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2043,9 +2082,16 @@ export default function RechnungDetailModal({
                             {doc.order_no}{" "}
                             <span className="text-xs text-gray-400">→</span>
                           </button>
-                          <span className="text-gray-400 text-xs">
-                            {formatDate(doc.created_at)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {renderAmountDiffBadge(
+                              doc.total_amount,
+                              data.total_amount,
+                              formatDeCurrency,
+                            )}
+                            <span className="text-gray-400 text-xs">
+                              {formatDate(doc.created_at)}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2077,6 +2123,51 @@ export default function RechnungDetailModal({
                           </span>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {paymentsData.allocations.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Zahlung
+                      </p>
+                      <div className="space-y-1.5 text-sm">
+                        {paymentsData.allocations.map((alloc: any) => {
+                          const differs = amountsDiffer(
+                            paymentsData.paid_amount,
+                            data.total_amount,
+                          );
+                          return (
+                            <div
+                              key={alloc.id}
+                              className="flex justify-between items-center text-gray-700"
+                            >
+                              <span className="text-sm">
+                                {alloc.paymentInbound?.payer_name ||
+                                  alloc.paymentInbound?.source ||
+                                  "Zahlung"}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${
+                                    differs
+                                      ? "text-amber-700 bg-amber-50 border-amber-200"
+                                      : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                  }`}
+                                >
+                                  {formatDeCurrency(Number(alloc.amount) || 0)}
+                                </span>
+                                <span className="text-gray-400 text-xs">
+                                  {formatDate(
+                                    alloc.paymentInbound?.received_date ||
+                                      alloc.created_at,
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2146,8 +2237,8 @@ export default function RechnungDetailModal({
                           : addressEdit
                             ? editNotesExtern
                             : data.notes ||
-                            data.comment ||
-                            data.notes_external) || "",
+                              data.comment ||
+                              data.notes_external) || "",
                       );
                       toast.success("External comment copied to clipboard!");
                     }}
@@ -2201,10 +2292,11 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+                  hasCorrections && !isCreating
                     ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
+                }`}
               >
                 {isCreating ? (
                   <>

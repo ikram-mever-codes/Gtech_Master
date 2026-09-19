@@ -37,6 +37,7 @@ import {
   PaymentAllocationTargetType,
 } from "../models/payment_allocations";
 import { getCargosByAuftragIds } from "./rechnung_controller";
+import { getPaymentsForAuftragIds } from "./payment_allocations_controller";
 
 const salesPriceRepository = AppDataSource.getRepository(SalesPrice);
 const customerRepo = AppDataSource.getRepository(Customer);
@@ -172,33 +173,50 @@ async function getLinkedDocumentsForAuftrag(
 
   const safeOfferId = isValidUuid(offerId) ? offerId : null;
 
-  const [offer, rechnungen, rechnungenK, bestellungen, cargosByAuftragId] =
-    await Promise.all([
-      safeOfferId
-        ? offerRepo.findOne({
+  const [
+    offer,
+    rechnungen,
+    rechnungenK,
+    bestellungen,
+    cargosByAuftragId,
+    paymentsByAuftragId,
+  ] = await Promise.all([
+    safeOfferId
+      ? offerRepo.findOne({
           where: { id: safeOfferId },
           select: ["id", "offerNumber", "createdAt"],
         })
-        : Promise.resolve(null),
-      rechnungRepo.find({
-        where: { auftrag_id: auftragId },
-        select: ["id", "invoice_number", "created_at", "auftrag_id"],
-        order: { created_at: "DESC" },
-      }),
-      rechnungKRepo.find({
-        where: { auftrag_id: auftragId },
-        select: ["id", "invoice_number", "created_at", "auftrag_id"],
-        order: { created_at: "DESC" },
-      }),
-      transferOrderRepo.find({
-        where: { auftrag_id: auftragId },
-        select: ["id", "order_no", "created_at", "auftrag_id"],
-        order: { created_at: "DESC" },
-      }),
-      // Cargo, resolved via the Bestellung(en) linked to this Auftrag —
-      // same chain as the Rechnung/RK linked-docs helpers use.
-      getCargosByAuftragIds([auftragId]),
-    ]);
+      : Promise.resolve(null),
+    rechnungRepo.find({
+      where: { auftrag_id: auftragId },
+      select: [
+        "id",
+        "invoice_number",
+        "created_at",
+        "auftrag_id",
+        "total_amount",
+      ],
+      order: { created_at: "DESC" },
+    }),
+    rechnungKRepo.find({
+      where: { auftrag_id: auftragId },
+      select: [
+        "id",
+        "invoice_number",
+        "created_at",
+        "auftrag_id",
+        "total_amount",
+      ],
+      order: { created_at: "DESC" },
+    }),
+    transferOrderRepo.find({
+      where: { auftrag_id: auftragId },
+      select: ["id", "order_no", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+    getCargosByAuftragIds([auftragId]),
+    getPaymentsForAuftragIds([auftragId]),
+  ]);
 
   return {
     offers: offer ? [offer] : [],
@@ -206,6 +224,10 @@ async function getLinkedDocumentsForAuftrag(
     rechnungenK,
     bestellungen,
     cargos: cargosByAuftragId.get(auftragId) || [],
+    payments: paymentsByAuftragId.get(auftragId) || {
+      allocations: [],
+      paid_amount: 0,
+    },
   };
 }
 
@@ -219,6 +241,7 @@ async function getLinkedDocumentsForAuftraege(
     rechnungenK: [] as any[],
     bestellungen: [] as any[],
     cargos: [] as any[],
+    payments: { allocations: [] as any[], paid_amount: 0 },
   });
 
   const result = new Map<number, ReturnType<typeof empty>>();
@@ -231,39 +254,56 @@ async function getLinkedDocumentsForAuftraege(
   const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
   const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
 
-  // Only well-formed UUIDs go into the Offer query — anything else in
-  // offer_id is stray data and is silently skipped rather than crashing
-  // the whole request.
   const offerIds = Array.from(
     new Set(Array.from(offerIdByAuftragId.values()).filter(isValidUuid)),
   );
 
-  const [offers, rechnungen, rechnungenK, bestellungen, cargosByAuftragId] =
-    await Promise.all([
-      offerIds.length
-        ? offerRepo.find({
+  const [
+    offers,
+    rechnungen,
+    rechnungenK,
+    bestellungen,
+    cargosByAuftragId,
+    paymentsByAuftragId,
+  ] = await Promise.all([
+    offerIds.length
+      ? offerRepo.find({
           where: { id: In(offerIds) },
           select: ["id", "offerNumber", "createdAt"],
         })
-        : Promise.resolve([]),
-      rechnungRepo.find({
-        where: { auftrag_id: In(auftragIds) },
-        select: ["id", "invoice_number", "created_at", "auftrag_id"],
-        order: { created_at: "DESC" },
-      }),
-      rechnungKRepo.find({
-        where: { auftrag_id: In(auftragIds) },
-        select: ["id", "invoice_number", "created_at", "auftrag_id"],
-        order: { created_at: "DESC" },
-      }),
-      transferOrderRepo.find({
-        where: { auftrag_id: In(auftragIds) },
-        select: ["id", "order_no", "created_at", "auftrag_id"],
-        order: { created_at: "DESC" },
-      }),
-      // Cargo, resolved via the Bestellung(en) linked to each Auftrag.
-      getCargosByAuftragIds(auftragIds),
-    ]);
+      : Promise.resolve([]),
+    rechnungRepo.find({
+      where: { auftrag_id: In(auftragIds) },
+      select: [
+        "id",
+        "invoice_number",
+        "created_at",
+        "auftrag_id",
+        "total_amount",
+      ],
+      order: { created_at: "DESC" },
+    }),
+    rechnungKRepo.find({
+      where: { auftrag_id: In(auftragIds) },
+      select: [
+        "id",
+        "invoice_number",
+        "created_at",
+        "auftrag_id",
+        "total_amount",
+      ],
+      order: { created_at: "DESC" },
+    }),
+    transferOrderRepo.find({
+      where: { auftrag_id: In(auftragIds) },
+      select: ["id", "order_no", "created_at", "auftrag_id"],
+      order: { created_at: "DESC" },
+    }),
+    // Cargo, resolved via the Bestellung(en) linked to each Auftrag.
+    getCargosByAuftragIds(auftragIds),
+    // Payments assigned to each Auftrag, in one batched query.
+    getPaymentsForAuftragIds(auftragIds),
+  ]);
 
   const offerById = new Map(offers.map((o: any) => [o.id, o]));
 
@@ -290,12 +330,18 @@ async function getLinkedDocumentsForAuftraege(
 
   for (const auftragId of auftragIds) {
     const bucket = result.get(auftragId);
+    if (!bucket) continue;
+
     const cargos = cargosByAuftragId.get(auftragId);
-    if (bucket && cargos) bucket.cargos.push(...cargos);
+    if (cargos) bucket.cargos.push(...cargos);
+
+    const payments = paymentsByAuftragId.get(auftragId);
+    if (payments) bucket.payments = payments;
   }
 
   return result;
 }
+
 async function calculateOrderTotals(orderId: number): Promise<void> {
   const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
   const order = await customerOrderRepo.findOne({
@@ -542,12 +588,12 @@ async function resolveAuftragTaxProfile(
       profile: frozenMatch
         ? mapTaxProfile(frozenMatch)
         : {
-          id: null,
-          name: "Frozen",
-          taxCase: undefined,
-          taxRate: Number(order.tax_rate) || 19,
-          taxCode: undefined,
-        },
+            id: null,
+            name: "Frozen",
+            taxCase: undefined,
+            taxRate: Number(order.tax_rate) || 19,
+            taxCode: undefined,
+          },
       changed: false,
     };
   }
@@ -625,12 +671,12 @@ export const getAllCustomerOrders = async (
           frozenMatch
             ? mapTaxProfile(frozenMatch)
             : {
-              id: null,
-              name: "Frozen",
-              taxCase: undefined,
-              taxRate: Number(order.tax_rate) || 19,
-              taxCode: undefined,
-            },
+                id: null,
+                name: "Frozen",
+                taxCase: undefined,
+                taxRate: Number(order.tax_rate) || 19,
+                taxCode: undefined,
+              },
         );
         continue;
       }
@@ -1517,11 +1563,15 @@ export const updateCustomerOrder = async (
         }
         if (auftrag.order_no) {
           orderConditions.push({ order_no: auftrag.order_no });
-          orderConditions.push({ order_no: auftrag.order_no.replace(/^B/, "DE") });
+          orderConditions.push({
+            order_no: auftrag.order_no.replace(/^B/, "DE"),
+          });
         }
 
         if (orderConditions.length > 0) {
-          const matchingOrders = await orderRepo.find({ where: orderConditions });
+          const matchingOrders = await orderRepo.find({
+            where: orderConditions,
+          });
           for (const mOrd of matchingOrders) {
             Object.assign(mOrd, updatePayload);
             await orderRepo.save(mOrd);
