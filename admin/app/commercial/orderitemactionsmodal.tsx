@@ -18,6 +18,26 @@ interface ReassignModalProps {
   onCargoCreated?: (newCargo: CargoType) => void;
 }
 
+export const formatCargoOptionLabel = (c: CargoType): string => {
+  let custName =
+    (c as any).customer?.companyName ||
+    c.ship_to_company_name ||
+    c.bill_to_company_name ||
+    "";
+  if (custName.toLowerCase().includes("gtech")) {
+    custName = "";
+  }
+  const typeName =
+    (c as any).cargo_type_name ||
+    (c as any).cargo_type?.cargo_type ||
+    (c as any).cargo_type ||
+    "";
+  const cargoName =
+    c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
+  const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
+  return [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
+};
+
 export const ReassignModal: React.FC<ReassignModalProps> = ({
   isOpen,
   onClose,
@@ -41,26 +61,15 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
       }
       return status !== "delivered" && status !== "cancelled";
     })
-    .map((c) => {
-      const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
-      const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
-      const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
-      const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
-      const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
-      return {
-        value: String(c.id),
-        label: fullLabel,
-      };
-    });
+    .map((c) => ({
+      value: String(c.id),
+      label: formatCargoOptionLabel(c),
+    }));
 
-  const allFormattedOptions = cargos.map((c) => {
-    const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
-    const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
-    const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
-    const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
-    const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
-    return { value: String(c.id), label: fullLabel };
-  });
+  const allFormattedOptions = cargos.map((c) => ({
+    value: String(c.id),
+    label: formatCargoOptionLabel(c),
+  }));
 
   const selectedValue = allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) || null;
 
@@ -189,26 +198,15 @@ export const SplitModal: React.FC<SplitModalProps> = ({
       }
       return status !== "delivered" && status !== "cancelled";
     })
-    .map((c) => {
-      const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
-      const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
-      const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
-      const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
-      const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
-      return {
-        value: String(c.id),
-        label: fullLabel,
-      };
-    });
+    .map((c) => ({
+      value: String(c.id),
+      label: formatCargoOptionLabel(c),
+    }));
 
-  const allFormattedOptions = cargos.map((c) => {
-    const custName = (c as any).customer?.companyName || c.ship_to_company_name || c.bill_to_company_name || "";
-    const typeName = (c as any).cargo_type_name || (c as any).cargo_type?.cargo_type || (c as any).cargo_type || "";
-    const cargoName = c.cargo_no && c.cargo_no.trim() ? c.cargo_no : `Cdraft-${c.id}`;
-    const statusStr = c.cargo_status ? `(${c.cargo_status})` : "";
-    const fullLabel = [custName, typeName, cargoName, statusStr].filter(Boolean).join(" ");
-    return { value: String(c.id), label: fullLabel };
-  });
+  const allFormattedOptions = cargos.map((c) => ({
+    value: String(c.id),
+    label: formatCargoOptionLabel(c),
+  }));
 
   const selectedValue = allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) || null;
 
