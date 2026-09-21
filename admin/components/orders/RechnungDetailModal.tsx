@@ -35,6 +35,7 @@ import { getItemById, updateItem } from "@/api/items";
 import { formatDate } from "@/utils/date";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import { getItemLink, getCustomerLink } from "@/utils/itemLink";
+import { getAllUsers } from "@/api/user";
 
 const formatDeCurrency = (val: number) => {
   const num = isNaN(val) || !isFinite(val) ? 0 : val;
@@ -493,6 +494,7 @@ export default function RechnungDetailModal({
     ansprechpartner: string;
   }>({ customerSnapshot: {}, deliveryAddress: {}, ansprechpartner: "" });
   const [savingAddress, setSavingAddress] = useState(false);
+  const [systemUsers, setSystemUsers] = useState<any[]>([]);
 
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [removingDoc, setRemovingDoc] = useState(false);
@@ -564,6 +566,18 @@ export default function RechnungDetailModal({
       setSelectedCorrectionIds(new Set());
     }
   }, [rechnung, openQuantities]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    getAllUsers()
+      .then((res: any) => {
+        const list = res?.data || res || [];
+        if (Array.isArray(list)) {
+          setSystemUsers(list.filter((u: any) => (u.role || "").toLowerCase() !== "purchasing"));
+        }
+      })
+      .catch((err) => console.error("Error fetching system users:", err));
+  }, [isOpen]);
 
   if (!isOpen || !data) return null;
 
@@ -1272,9 +1286,8 @@ export default function RechnungDetailModal({
                   Ansprechpartner
                 </p>
                 {addressEdit ? (
-                  <input
+                  <select
                     className={addressInputCls}
-                    placeholder="Ansprechpartner"
                     value={addressForm.ansprechpartner}
                     onChange={(e) =>
                       setAddressForm((f) => ({
@@ -1282,7 +1295,25 @@ export default function RechnungDetailModal({
                         ansprechpartner: e.target.value,
                       }))
                     }
-                  />
+                  >
+                    <option value="">Select Ansprechpartner...</option>
+                    {systemUsers.map((u: any) => {
+                      const val = u.name || u.email;
+                      return (
+                        <option key={u.id || u.email} value={val}>
+                          {val}
+                        </option>
+                      );
+                    })}
+                    {addressForm.ansprechpartner &&
+                      !systemUsers.some(
+                        (u: any) => (u.name || u.email) === addressForm.ansprechpartner
+                      ) && (
+                        <option value={addressForm.ansprechpartner}>
+                          {addressForm.ansprechpartner}
+                        </option>
+                      )}
+                  </select>
                 ) : (
                   <div className="text-sm text-gray-900 break-words">
                     {data.ansprechpartner || "—"}

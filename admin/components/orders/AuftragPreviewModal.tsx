@@ -32,6 +32,7 @@ import {
 import { autocompleteItems } from "@/api/items";
 import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
+import { getAllUsers } from "@/api/user";
 import {
   getWeiterversandServiceProviders,
   WeiterversandServiceProvider,
@@ -443,6 +444,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const [form, setForm] = useState<any>({});
   const [dbPaymentMethods, setDbPaymentMethods] = useState<any[]>([]);
   const [dbShippingMethods, setDbShippingMethods] = useState<any[]>([]);
+  const [systemUsers, setSystemUsers] = useState<any[]>([]);
   const [showItemPicker, setShowItemPicker] = useState(false);
   // Three-field item search backed by the new autocompleteItems endpoint
   // — same pattern just implemented in BestellungPreviewModal (strict
@@ -574,6 +576,18 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     setSearchItemNo("");
     setSearchName("");
     fetchOrder();
+
+    getAllUsers()
+      .then((res: any) => {
+        const list = res?.data || res || [];
+        if (Array.isArray(list)) {
+          const nonPurchasing = list.filter(
+            (u: any) => (u.role || "").toLowerCase() !== "purchasing"
+          );
+          setSystemUsers(nonPurchasing);
+        }
+      })
+      .catch((err) => console.error("Error fetching system users:", err));
   }, [isOpen, orderId, fetchOrder]);
 
   useEffect(() => {
@@ -617,7 +631,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
     return {
       title: o.title || item1Title || "",
-      ansprechpartner: o.ansprechpartner || "",
+      ansprechpartner: o.ansprechpartner || currentUser?.name || currentUser?.email || "",
       kundenreferenz: o.kundenreferenz || "",
       status: o.status || "Draft",
       currency: o.currency || "EUR",
@@ -1560,15 +1574,31 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       Ansprechpartner
                     </label>
                     {effectiveEdit && canEditCommercial ? (
-                      <input
-                        type="text"
+                      <select
                         className={inputCls}
                         value={form.ansprechpartner || ""}
-                        placeholder="Ansprechpartner"
                         onChange={(e) =>
                           patch({ ansprechpartner: e.target.value })
                         }
-                      />
+                      >
+                        <option value="">Select Ansprechpartner...</option>
+                        {systemUsers.map((u: any) => {
+                          const val = u.name || u.email;
+                          return (
+                            <option key={u.id || u.email} value={val}>
+                              {val}
+                            </option>
+                          );
+                        })}
+                        {form.ansprechpartner &&
+                          !systemUsers.some(
+                            (u: any) => (u.name || u.email) === form.ansprechpartner
+                          ) && (
+                            <option value={form.ansprechpartner}>
+                              {form.ansprechpartner}
+                            </option>
+                          )}
+                      </select>
                     ) : (
                       <div className="text-sm font-medium text-gray-800 py-1.5">
                         {order.ansprechpartner || "—"}

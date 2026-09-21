@@ -13,7 +13,7 @@ import { getAllPaymentMethods } from "@/api/payment_methods";
 import { getAllShippingMethods } from "@/api/shipping_methods";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
-import { getMe } from "@/api/user";
+import { getMe, getAllUsers } from "@/api/user";
 
 const PAYMENT_METHODS = [
   "Prepayment (Vorkasse)",
@@ -114,6 +114,7 @@ export default function AuftragCreateModal({
 
   const [title, setTitle] = useState("");
   const [ansprechpartner, setAnsprechpartner] = useState("");
+  const [systemUsers, setSystemUsers] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
   const [notes, setNotes] = useState("");
@@ -228,12 +229,17 @@ export default function AuftragCreateModal({
       getAllCustomers({ limit: 1000 }).catch(() => ({ data: [] })),
       getAllPaymentMethods(true).catch(() => ({ data: [] })),
       getAllShippingMethods(true).catch(() => ({ data: [] })),
+      getAllUsers().catch(() => ({ data: [] })),
     ])
-      .then(([custRes, pmRes, smRes]: any) => {
+      .then(([custRes, pmRes, smRes, usersRes]: any) => {
         const custData = custRes?.data?.businesses ?? custRes?.data ?? custRes;
         setCustomers(Array.isArray(custData) ? custData : []);
         if (pmRes?.data) setDbPaymentMethods(pmRes.data);
         if (smRes?.data) setDbShippingMethods(smRes.data);
+        const userList = usersRes?.data || usersRes || [];
+        if (Array.isArray(userList)) {
+          setSystemUsers(userList.filter((u: any) => (u.role || "").toLowerCase() !== "purchasing"));
+        }
       })
       .catch((err) =>
         console.error("Error loading customers/payment methods:", err),
@@ -584,12 +590,29 @@ export default function AuftragCreateModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Ansprechpartner
             </label>
-            <input
+            <select
               value={ansprechpartner}
               onChange={(e) => setAnsprechpartner(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
-              placeholder="Defaults to logged-in user if left empty"
-            />
+            >
+              <option value="">Select Ansprechpartner...</option>
+              {systemUsers.map((u: any) => {
+                const val = u.name || u.email;
+                return (
+                  <option key={u.id || u.email} value={val}>
+                    {val}
+                  </option>
+                );
+              })}
+              {ansprechpartner &&
+                !systemUsers.some(
+                  (u: any) => (u.name || u.email) === ansprechpartner
+                ) && (
+                  <option value={ansprechpartner}>
+                    {ansprechpartner}
+                  </option>
+                )}
+            </select>
           </div>
 
           <div>
