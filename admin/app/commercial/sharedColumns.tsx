@@ -247,17 +247,6 @@ export const kundeColumn: ColumnDef<any> = {
       row.is_weiterversand === "Yes" ||
       row.isWeiterversand === true;
 
-    if (!isWV || rawText === "—") {
-      return (
-        <div
-          className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
-          title={rawText}
-        >
-          {rawText}
-        </div>
-      );
-    }
-
     const providerName =
       row.weiterversandServiceProvider?.name ||
       row.weiterversand_service_provider_name ||
@@ -269,11 +258,21 @@ export const kundeColumn: ColumnDef<any> = {
       : `${rawText}-Weiterversand`;
 
     return (
-      <div
-        className="truncate max-w-[160px] text-sm font-bold text-gray-900"
-        title={displayText}
-      >
-        {displayText}
+      <div className="flex flex-col leading-snug">
+        <div
+          className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
+          title={rawText}
+        >
+          {rawText}
+        </div>
+        {isWV && (
+          <div
+            className="inline-block mt-0.5 px-1 py-0.2 text-[11px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate"
+            title={displayText}
+          >
+            {displayText}
+          </div>
+        )}
       </div>
     );
   },

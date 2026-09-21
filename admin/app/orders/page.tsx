@@ -2602,12 +2602,7 @@ const OrderPage: React.FC = () => {
                       render: (row) => row.parentOrder?.order_no || "-",
                       align: "center",
                     },
-                    {
-                      header: "Weiterversand",
-                      width: "160px",
-                      align: "center",
-                      render: (row) => renderWeiterversandBadge(row),
-                    },
+
                     {
                       header: "QTY",
                       width: "60px",
@@ -2777,7 +2772,7 @@ const OrderPage: React.FC = () => {
                     },
                     {
                       header: "Customer",
-                      width: "140px",
+                      width: "160px",
                       render: (row) => {
                         const order = row.parentOrder;
                         const customerName =
@@ -2803,14 +2798,6 @@ const OrderPage: React.FC = () => {
                           order?.is_weiterversand === "Yes" ||
                           order?.isWeiterversand === true;
 
-                        if (!isWV) {
-                          return (
-                            <span className="text-gray-800 font-medium text-xs">
-                              {customerName}
-                            </span>
-                          );
-                        }
-
                         const providerName =
                           order?.weiterversandServiceProvider?.name ||
                           order?.weiterversand_service_provider_name ||
@@ -2829,12 +2816,19 @@ const OrderPage: React.FC = () => {
                           : `${customerName}-Weiterversand`;
 
                         return (
-                          <span
-                            className="text-gray-800 font-bold text-xs"
-                            title={customerWVText}
-                          >
-                            {customerWVText}
-                          </span>
+                          <div className="flex flex-col leading-snug">
+                            <span className="text-gray-800 font-medium text-xs">
+                              {customerName}
+                            </span>
+                            {isWV && (
+                              <span
+                                className="inline-block mt-0.5 px-1 py-0.2 text-[11px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate"
+                                title={customerWVText}
+                              >
+                                {customerWVText}
+                              </span>
+                            )}
+                          </div>
                         );
                       },
                     },
@@ -2856,12 +2850,6 @@ const OrderPage: React.FC = () => {
                           <span className="text-gray-300">-</span>
                         );
                       },
-                    },
-                    {
-                      header: "Weiterversand",
-                      width: "120px",
-                      align: "center",
-                      render: (row) => renderWeiterversandBadge(row),
                     },
                     {
                       header: "QTY",
