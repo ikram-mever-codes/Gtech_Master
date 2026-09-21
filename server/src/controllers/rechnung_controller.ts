@@ -838,6 +838,7 @@ export const createRechnungFromAuftrag = async (
     next(error);
   }
 };
+
 export const createRechnungOhneAusliefern = async (
   req: Request,
   res: Response,
@@ -860,10 +861,17 @@ export const createRechnungOhneAusliefern = async (
     }
 
     const orderItems = auftrag.orderItems || [];
-    const auftragSubtotal = orderItems.reduce(
+    const itemsSubtotal = orderItems.reduce(
       (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
       0,
     );
+    // Shipping is part of the Auftrag's real total, so it must be part of
+    // the base this Rechnung is calculated from too — otherwise
+    // "Gesamtbetrag (100%)" silently undercounts by the shipping cost.
+    const shippingCost = Number(auftrag.shipping_cost) || 0;
+    const shippingQuantity = Number(auftrag.shipping_quantity) || 1;
+    const shippingTotal = shippingCost * shippingQuantity;
+    const auftragSubtotal = itemsSubtotal + shippingTotal;
 
     let invoiceSubtotal = auftragSubtotal;
     let descriptionText = `Rechnung zu Auftrag ${auftrag.order_no}${auftrag.title ? ` ${auftrag.title}` : ""}`;
@@ -909,6 +917,25 @@ export const createRechnungOhneAusliefern = async (
         relations: ["businessDetails"],
       });
     }
+
+    // Fälligkeit / due date: Auftrag's own payment_terms (if it holds a
+    // usable number of days) -> Customer's defaultPaymentDueDays -> 7
+    // days, in that order. Computed once here and stored on the Rechnung
+    // itself so the frontend never has to re-derive it from a
+    // payment_terms string that may not contain a number (e.g. "Vorkasse").
+    const auftragTermsMatch = String(auftrag.payment_terms || "").match(/\d+/);
+    const auftragDueDays = auftragTermsMatch
+      ? parseInt(auftragTermsMatch[0], 10)
+      : NaN;
+    const customerDueDays = Number(originalCust?.defaultPaymentDueDays) || 0;
+    const dueDays =
+      !isNaN(auftragDueDays) && auftragDueDays > 0
+        ? auftragDueDays
+        : customerDueDays > 0
+          ? customerDueDays
+          : 7;
+    const dueDate = new Date(now);
+    dueDate.setDate(dueDate.getDate() + dueDays);
 
     const dispName =
       auftrag.customerSnapshot?.displayName ||
@@ -972,6 +999,7 @@ export const createRechnungOhneAusliefern = async (
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,
+      due_date: dueDate,
       subtotal: invoiceSubtotal,
       tax_rate: taxRate,
       tax_amount: taxAmount,
@@ -1002,12 +1030,26 @@ export const createRechnungOhneAusliefern = async (
       payment_method: auftrag.payment_method || undefined,
       payment_terms: auftrag.payment_terms || undefined,
       delivery_terms: auftrag.delivery_terms || undefined,
-      shipping_method:
-        auftrag.shipping_text || auftrag.shipping_method || undefined,
+      // Settings-defined shipping method only — NOT auftrag.shipping_text,
+      // which is a freely user-edited string and may not match the
+      // canonical method name from Settings anymore.
+      shipping_method: auftrag.shipping_method || undefined,
+      // Shipping is already folded into invoiceSubtotal above (as part of
+      // the single line item's total) rather than being its own line —
+      // explicitly zeroed so the Rechnung view never renders a separate
+      // (phantom) shipping row. shipping_quantity defaults to 1 at the
+      // entity level, so this must be passed explicitly, not omitted.
+      shipping_cost: 0,
+      shipping_quantity: 0,
     });
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
     const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
 
+    // A Vorkasse/prepayment Rechnung never carries the Auftrag's real
+    // line items or a separate shipping line — exactly one adjustable
+    // line, at the full invoiced amount (items + shipping already
+    // merged into invoiceSubtotal above), taxed at the Auftrag's own
+    // tax profile rate.
     const itemEntity = rechnungItemRepo.create({
       rechnungId: savedRechnung.id,
       item_name: descriptionText,

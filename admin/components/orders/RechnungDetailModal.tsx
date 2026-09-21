@@ -1366,6 +1366,18 @@ export default function RechnungDetailModal({
               <Field
                 label="Fällig am"
                 value={(() => {
+                  // Prefer the real due_date stored on the Rechnung
+                  // itself (set at creation time, with the full
+                  // Auftrag payment_terms -> Customer default -> 7-day
+                  // fallback chain already applied server-side).
+                  if (data.due_date) {
+                    const d = new Date(data.due_date);
+                    if (!isNaN(d.getTime())) return formatDate(d);
+                  }
+
+                  // Fallback for older Rechnungen created before
+                  // due_date was persisted — same computed logic as
+                  // before.
                   const linkedAuftrag = auftragDocs[0] || data.auftrag;
                   const rawTerms =
                     data.payment_terms || linkedAuftrag?.payment_terms || "";
