@@ -166,7 +166,7 @@ interface BestellungColumnsArgs {
 }
 
 const valueNetCalc = (row: any) => {
-  const shipping = Number(row.shipping_cost ?? row.freightCost ?? row.shippingCost ?? 0);
+  const shipping = Number(row.shipping_cost ?? row.shippingCost ?? 0);
   const items = row.items || row.orderItems || [];
   if (items.length > 0) {
     const itemsTotal = items.reduce((sum: number, it: any) => {

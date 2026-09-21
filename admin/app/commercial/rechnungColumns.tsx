@@ -27,7 +27,7 @@ interface RechnungColumnsArgs {
 
 const valueNetCalc = (row: any) => {
   const itemsNet = Number(row.subtotal ?? row.netTotal ?? 0);
-  const shipping = Number(row.shipping_cost ?? row.freightCost ?? row.shippingCost ?? 0);
+  const shipping = Number(row.shipping_cost ?? row.shippingCost ?? 0);
   if (itemsNet > 0) {
     return itemsNet + shipping;
   }
