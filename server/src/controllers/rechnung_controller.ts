@@ -845,7 +845,8 @@ export const createRechnungOhneAusliefern = async (
 ) => {
   try {
     const { auftragId } = req.params;
-    const { amountType, calculationType, value, notes } = req.body;
+    const { amountType, calculationType, value, notes, lineItemText } =
+      req.body;
 
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
     const auftrag = await customerOrderRepo.findOne({
@@ -865,7 +866,7 @@ export const createRechnungOhneAusliefern = async (
     );
 
     let invoiceSubtotal = auftragSubtotal;
-    let descriptionText = `Rechnung ohne Ausliefern zu Auftrag ${auftrag.order_no}`;
+    let descriptionText = `Rechnung zu Auftrag ${auftrag.order_no}${auftrag.title ? ` ${auftrag.title}` : ""}`;
 
     const parsedValue = Number(value) || 0;
 
@@ -873,11 +874,13 @@ export const createRechnungOhneAusliefern = async (
       if (calculationType === "percentage") {
         const pct = Math.min(100, Math.max(0.01, parsedValue));
         invoiceSubtotal = (auftragSubtotal * pct) / 100;
-        descriptionText = `${pct}% Teilrechnung zu Auftrag ${auftrag.order_no}`;
       } else if (calculationType === "fixed") {
         invoiceSubtotal = parsedValue > 0 ? parsedValue : auftragSubtotal;
-        descriptionText = `Teilrechnung zu Auftrag ${auftrag.order_no}`;
       }
+    }
+
+    if (typeof lineItemText === "string" && lineItemText.trim()) {
+      descriptionText = lineItemText.trim();
     }
 
     const taxRate = Number(auftrag.tax_rate ?? 19);
@@ -1003,46 +1006,21 @@ export const createRechnungOhneAusliefern = async (
         auftrag.shipping_text || auftrag.shipping_method || undefined,
     });
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
-
     const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
 
-    if (amountType === "full" && orderItems.length > 0) {
-      const itemsToCreate = orderItems.map((item, index) => {
-        const qty = Number(item.quantity) || 1;
-        const price = Number(item.price || 0);
-        const lineTotal = qty * price;
-        return rechnungItemRepo.create({
-          rechnungId: savedRechnung.id,
-          item_name: item.itemName || "Item",
-          itemNo: item.itemNo || item.material || undefined,
-          material: item.material || undefined,
-          photo: item.photo || undefined,
-          specification: item.specification || undefined,
-          description: item.description || undefined,
-          quantity: qty,
-          price: price,
-          unit_price_eur: price,
-          total_price: lineTotal,
-          order_no: auftrag.order_no,
-          position: index + 1,
-          lineTotal: lineTotal,
-        });
-      });
-      await rechnungItemRepo.save(itemsToCreate);
-    } else {
-      const itemEntity = rechnungItemRepo.create({
-        rechnungId: savedRechnung.id,
-        item_name: descriptionText,
-        quantity: 1,
-        price: invoiceSubtotal,
-        unit_price_eur: invoiceSubtotal,
-        total_price: invoiceSubtotal,
-        order_no: auftrag.order_no,
-        position: 1,
-        lineTotal: invoiceSubtotal,
-      });
-      await rechnungItemRepo.save(itemEntity);
-    }
+    const itemEntity = rechnungItemRepo.create({
+      rechnungId: savedRechnung.id,
+      item_name: descriptionText,
+      quantity: 1,
+      price: invoiceSubtotal,
+      unit_price_eur: invoiceSubtotal,
+      total_price: invoiceSubtotal,
+      taxRate: taxRate,
+      order_no: auftrag.order_no,
+      position: 1,
+      lineTotal: invoiceSubtotal,
+    });
+    await rechnungItemRepo.save(itemEntity);
 
     const fullRechnung = await rechnungRepo.findOne({
       where: { id: savedRechnung.id },

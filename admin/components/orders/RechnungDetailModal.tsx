@@ -1506,7 +1506,8 @@ export default function RechnungDetailModal({
                     const isFreitextLine = (item: any): boolean =>
                       !item?.itemNo && !item?.sourceItemId;
                     const FREIZEILE_ROW_COLOR = "#D8964A";
-                    const isFreizeile = isFreitextLine(item);
+                    const isFreizeile =
+                      !data.is_prepayment && isFreitextLine(item);
                     const rowIsDimmed =
                       showCorrectionUI && (isRowDisabled || !selected);
 

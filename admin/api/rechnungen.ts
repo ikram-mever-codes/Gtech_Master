@@ -33,6 +33,7 @@ export const createRechnungOhneAusliefern = async (
     calculationType?: "percentage" | "fixed";
     value?: number;
     notes?: string;
+    lineItemText?: string;
   },
 ) => {
   try {
