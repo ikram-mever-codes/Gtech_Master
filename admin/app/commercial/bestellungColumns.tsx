@@ -166,13 +166,28 @@ interface BestellungColumnsArgs {
 }
 
 const valueNetCalc = (row: any) => {
-  if (row.isCustomerOrder || row.subtotal !== undefined) {
-    return Number(row.subtotal ?? row.total_amount ?? 0);
+  const shipping = Number(row.shipping_cost ?? row.freightCost ?? row.shippingCost ?? 0);
+  const items = row.items || row.orderItems || [];
+  if (items.length > 0) {
+    const itemsTotal = items.reduce((sum: number, it: any) => {
+      const qty = Number(it.qty ?? it.quantity ?? 1);
+      const price = Number(
+        it.eur_special_price ??
+          it.price ??
+          it.unitPrice ??
+          it.transferPrice ??
+          it.unit_price_eur ??
+          it.rmb_price ??
+          0,
+      );
+      return sum + qty * price;
+    }, 0);
+    return itemsTotal + shipping;
   }
-  return (row.items || []).reduce(
-    (sum: number, it: any) => sum + Number(it.price || 0) * Number(it.qty || 0),
-    0,
-  );
+  if (row.subtotal !== undefined && row.subtotal !== null) {
+    return Number(row.subtotal);
+  }
+  return Number(row.total_amount ?? 0);
 };
 
 const getZweckBadgeStyle = (zweck: string) => {

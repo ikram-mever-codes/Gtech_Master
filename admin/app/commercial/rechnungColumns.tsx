@@ -25,7 +25,15 @@ interface RechnungColumnsArgs {
   rechnungenK?: any[];
 }
 
-const valueNetCalc = (row: any) => Number(row.netTotal || row.grossTotal || 0);
+const valueNetCalc = (row: any) => {
+  const itemsNet = Number(row.subtotal ?? row.netTotal ?? 0);
+  const shipping = Number(row.shipping_cost ?? row.freightCost ?? row.shippingCost ?? 0);
+  if (itemsNet > 0) {
+    return itemsNet + shipping;
+  }
+  const gross = Number(row.grossTotal || 0);
+  return gross > 0 ? Math.max(0, gross - Number(row.taxAmount || 0)) : 0;
+};
 const itemCountCalc = (row: any) =>
   row.customItemCount ?? row.items?.length ?? 0;
 
