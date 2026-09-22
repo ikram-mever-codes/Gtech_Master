@@ -80,6 +80,30 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
           />
         </div>
 
+        <div className="w-28 shrink-0">
+          <input
+            type="text"
+            placeholder="ItemNo..."
+            value={docFilters.itemNo}
+            onChange={(e) =>
+              setDocFilters((p) => ({ ...p, itemNo: e.target.value }))
+            }
+            className={getInputClass(!!docFilters.itemNo)}
+          />
+        </div>
+
+        <div className="w-36 shrink-0">
+          <input
+            type="text"
+            placeholder="ItemName..."
+            value={docFilters.itemName}
+            onChange={(e) =>
+              setDocFilters((p) => ({ ...p, itemName: e.target.value }))
+            }
+            className={getInputClass(!!docFilters.itemName)}
+          />
+        </div>
+
         <div className="flex items-center gap-1 w-36 shrink-0">
           <select
             value={docFilters.valueOperator}

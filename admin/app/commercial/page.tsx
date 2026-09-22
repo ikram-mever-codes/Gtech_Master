@@ -469,13 +469,15 @@ const InvoiceListPage: React.FC = () => {
     const isStatusActive =
       activeInvTab === "auftrag"
         ? docFilters.status !== "partially_delivered_and_open" &&
-          !!docFilters.status
+        !!docFilters.status
         : !!docFilters.status;
 
     return (
       !!docFilters.documentNo.trim() ||
       !!docFilters.customerNo.trim() ||
       !!docFilters.customerName.trim() ||
+      !!docFilters.itemNo.trim() ||
+      !!docFilters.itemName.trim() ||
       !!docFilters.valueAmount.trim() ||
       isStatusActive ||
       docFilters.datePreset !== "all" ||
@@ -1316,12 +1318,12 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev: any) =>
         prev
           ? {
-              ...prev,
-              title: invoiceEditForm.title,
-              description: invoiceEditForm.description,
-              freightCost: invoiceEditForm.freightCost,
-              remark: invoiceEditForm.remark,
-            }
+            ...prev,
+            title: invoiceEditForm.title,
+            description: invoiceEditForm.description,
+            freightCost: invoiceEditForm.freightCost,
+            remark: invoiceEditForm.remark,
+          }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1576,6 +1578,8 @@ const InvoiceListPage: React.FC = () => {
       documentNo,
       customerNo,
       customerName,
+      itemNo,
+      itemName,
       valueOperator,
       valueAmount,
       status,
@@ -1596,11 +1600,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-            item.customer?.id ||
-            item.customer_id ||
-            item.customerSnapshot?.customerNumber ||
-            item.customerSnapshot?.id ||
-            "",
+          item.customer?.id ||
+          item.customer_id ||
+          item.customerSnapshot?.customerNumber ||
+          item.customerSnapshot?.id ||
+          "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1608,14 +1612,85 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-            item.customer_name ||
-            item.bill_to ||
-            item.ship_to ||
-            item.customerSnapshot?.companyName ||
-            item.customerSnapshot?.name ||
-            "",
+          item.customer_name ||
+          item.bill_to ||
+          item.ship_to ||
+          item.customerSnapshot?.companyName ||
+          item.customerSnapshot?.name ||
+          "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
+      }
+      if (itemNo && itemNo.trim()) {
+        const s = itemNo.toLowerCase().trim();
+        const lineItems =
+          item.items ||
+          item.orderItems ||
+          item.lineItems ||
+          item.offer_items ||
+          item.transfer_order_items ||
+          item.invoice_items ||
+          item.rechnung_k_items ||
+          item.delivery_note_items ||
+          [];
+        const hasMatch = lineItems.some((line: any) => {
+          const noStr = String(
+            line.itemNo ||
+            line.item_no ||
+            line.material ||
+            line.article_no ||
+            line.ItemNo ||
+            line.item?.item_no ||
+            line.item?.material ||
+            "",
+          ).toLowerCase();
+          return noStr.includes(s);
+        });
+        if (!hasMatch) return false;
+      }
+      if (itemName && itemName.trim()) {
+        const s = itemName.toLowerCase().trim();
+        const lineItems =
+          item.items ||
+          item.orderItems ||
+          item.lineItems ||
+          item.offer_items ||
+          item.transfer_order_items ||
+          item.invoice_items ||
+          item.rechnung_k_items ||
+          item.delivery_note_items ||
+          [];
+        const hasMatchLine = lineItems.some((line: any) => {
+          const nameStr = String(
+            line.itemName ||
+            line.item_name ||
+            line.name ||
+            line.title ||
+            line.item?.item_name ||
+            line.item?.name ||
+            "",
+          ).toLowerCase();
+          const remarkStr = String(
+            line.remark ||
+            line.remarks ||
+            line.remark_de ||
+            line.remark_ex ||
+            line.remarkEX ||
+            line.notes ||
+            line.description ||
+            line.freizeile ||
+            line.text ||
+            "",
+          ).toLowerCase();
+          return nameStr.includes(s) || remarkStr.includes(s);
+        });
+
+        const shippingStr = String(
+          item.shipping_method || item.shippingMethod || item.shipping_line || "",
+        ).toLowerCase();
+        const hasMatchShipping = shippingStr.includes(s);
+
+        if (!hasMatchLine && !hasMatchShipping) return false;
       }
       if (valueAmount.trim()) {
         let val = 0;
@@ -1631,12 +1706,6 @@ const InvoiceListPage: React.FC = () => {
         if (!isValueMatching(val, valueOperator, valueAmount)) return false;
       }
       if (status) {
-        // Auftrag rows are keyed by the delivery lifecycle
-        // (open/partially_delivered/delivered/closed) via auftrag_status;
-        // Rechnung rows are keyed by the derived payment lifecycle
-        // (paid/partially_paid/unpaid/overdue) via payment_status. Neither
-        // matches the generic `status` field other document types use —
-        // match against the right field per tab.
         const itemStatus =
           activeInvTab === "auftrag"
             ? String(item.auftrag_status || item.status || "open").toLowerCase()
@@ -1708,7 +1777,7 @@ const InvoiceListPage: React.FC = () => {
       if (res?.success) {
         toast.success(
           res.message ||
-            `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
+          `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
           successStyles,
         );
         await tabData.refetchOrders();
@@ -1939,11 +2008,10 @@ const InvoiceListPage: React.FC = () => {
                   setDocFilters((prev) => ({ ...prev, status: "" }));
                 }
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
-                activeInvTab === tab.id
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
                   ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
                   : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-              }`}
+                }`}
             >
               {tab.label}
             </Link>
@@ -1958,9 +2026,9 @@ const InvoiceListPage: React.FC = () => {
             setDocFilters(
               activeInvTab === "auftrag"
                 ? {
-                    ...initialCommercialFilters,
-                    status: "partially_delivered_and_open",
-                  }
+                  ...initialCommercialFilters,
+                  status: "partially_delivered_and_open",
+                }
                 : { ...initialCommercialFilters, status: "" },
             );
             setSearchTerm("");
@@ -1996,10 +2064,10 @@ const InvoiceListPage: React.FC = () => {
                 let amt = 0;
                 const shipping = Number(
                   item.shippingCost ||
-                    item.shipping_cost ||
-                    item.freightCost ||
-                    item.freight_cost ||
-                    0,
+                  item.shipping_cost ||
+                  item.freightCost ||
+                  item.freight_cost ||
+                  0,
                 );
 
                 if (
@@ -2047,10 +2115,10 @@ const InvoiceListPage: React.FC = () => {
                     lineItems.reduce((acc: number, it: any) => {
                       const p = Number(
                         it.price ||
-                          it.sales_price ||
-                          it.unit_price ||
-                          it.net_price ||
-                          0,
+                        it.sales_price ||
+                        it.unit_price ||
+                        it.net_price ||
+                        0,
                       );
                       const q = Number(it.quantity || it.qty || 1);
                       return acc + p * q;
@@ -2058,10 +2126,10 @@ const InvoiceListPage: React.FC = () => {
                 } else {
                   const gross = Number(
                     item.total_amount ||
-                      item.totalAmount ||
-                      item.total ||
-                      item.grossTotal ||
-                      0,
+                    item.totalAmount ||
+                    item.total ||
+                    item.grossTotal ||
+                    0,
                   );
                   const taxRate = Number(item.tax_rate || item.taxRate || 19);
                   amt = gross > 0 ? gross / (1 + taxRate / 100) : 0;
@@ -2217,11 +2285,10 @@ const InvoiceListPage: React.FC = () => {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
-                        currentPage === i + 1
+                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
                           ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
                           : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       {i + 1}
                     </button>
