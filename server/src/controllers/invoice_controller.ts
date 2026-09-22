@@ -99,7 +99,7 @@ export class InvoiceController {
 
       const dueDays =
         customer.defaultPaymentDueDays !== undefined &&
-          customer.defaultPaymentDueDays !== null
+        customer.defaultPaymentDueDays !== null
           ? customer.defaultPaymentDueDays
           : 7;
 
@@ -215,7 +215,7 @@ export class InvoiceController {
                   .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
                   .fontSize(8)
                   .text("中国安徽...", leftAlignX + 220, yPos);
-              } catch (e) { }
+              } catch (e) {}
             }
             doc.font("Helvetica");
           }
@@ -284,8 +284,9 @@ export class InvoiceController {
         doc.text(invoice.customer?.addressLine1 || "", leftAlignX, yPos);
         yPos += 12;
         doc.text(
-          `${invoice.customer?.postalCode || ""} ${invoice.customer?.city || ""
-            }`.trim(),
+          `${invoice.customer?.postalCode || ""} ${
+            invoice.customer?.city || ""
+          }`.trim(),
           leftAlignX,
           yPos,
         );
@@ -334,10 +335,11 @@ export class InvoiceController {
           ? "Lieferdatum: bestätigt"
           : "Lieferdatum: voraussichtlich";
         doc.text(
-          `${lieferdatumLabel} ${invoice.deliveryDate
-            ? new Date(invoice.deliveryDate).toLocaleDateString("de-DE")
-            : ""
-            }`.trim(),
+          `${lieferdatumLabel} ${
+            invoice.deliveryDate
+              ? new Date(invoice.deliveryDate).toLocaleDateString("de-DE")
+              : ""
+          }`.trim(),
           leftAlignX,
           yPos,
         );
@@ -527,14 +529,16 @@ export class InvoiceController {
         }
 
         doc.text(
-          `Zahlungsart: ${invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
+          `Zahlungsart: ${
+            invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
           }`,
           leftAlignX,
           yPos,
         );
         yPos += 15;
         doc.text(
-          `Versandart: ${invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
+          `Versandart: ${
+            invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
           }`,
           leftAlignX,
           yPos,
@@ -542,7 +546,7 @@ export class InvoiceController {
         yPos += 15;
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-            invoice.customer?.defaultPaymentDueDays !== null
+          invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         const dueDateLabel = invoice.dueDate
@@ -702,7 +706,7 @@ export class InvoiceController {
       if (invoiceData.deliveryDate) {
         const dueDays =
           invoice.customer?.defaultPaymentDueDays !== undefined &&
-            invoice.customer?.defaultPaymentDueDays !== null
+          invoice.customer?.defaultPaymentDueDays !== null
             ? invoice.customer.defaultPaymentDueDays
             : 7;
         invoiceData.dueDate = calculateDueDate(
@@ -817,9 +821,6 @@ export class InvoiceController {
         ].filter(Boolean);
 
         if (cIds.length > 0 || oIds.length > 0) {
-          console.log(
-            `[InvoiceSync] Triggering auto-sync for ${cIds.length} cargos (${cIds.join(", ")}) and ${oIds.length} orders...`,
-          );
           await generateInvoicesForOrders(oIds, cIds);
         }
       } catch (syncErr) {
@@ -839,20 +840,38 @@ export class InvoiceController {
         order: { createdAt: "DESC", invoiceDate: "DESC" },
       });
 
-      console.log(
-        `[InvoiceController.getAllInvoices] Fetched ${invoices.length} total invoice records from DB.`,
+      const orderNumbers = Array.from(
+        new Set(invoices.map((i) => i.orderNumber).filter(Boolean)),
       );
 
-      const orderNumbers = invoices.map((i) => i.orderNumber).filter(Boolean);
-      const orders = await AppDataSource.getRepository(Order).find({
-        where: { order_no: In(orderNumbers) },
-        relations: ["cargo", "cargo.customer"],
-      });
+      const orderRepo = AppDataSource.getRepository(Order);
+      const cargoRepo = AppDataSource.getRepository(Cargo);
+      const cargoTypeRepo = AppDataSource.getRepository(CargoType);
 
-      const orderIds = orders.map((o) => o.id);
-      const orderToCargoMap = new Map();
+      // orders, cargoTypes, and cargos-matching-orderNumbers are all
+      // independent of each other — run them concurrently instead of
+      // sequentially.
+      const [orders, cargoTypes, cargosByOrderNo] = await Promise.all([
+        orderNumbers.length > 0
+          ? orderRepo.find({
+              where: { order_no: In(orderNumbers) },
+              relations: ["cargo", "cargo.customer"],
+            })
+          : Promise.resolve([]),
+        cargoTypeRepo.find(),
+        // Replaces a full-table Cargo scan: only cargos whose cargo_no is
+        // one of this batch's invoice.orderNumber values can ever be
+        // looked up below (orderToCargoMap is only ever read by
+        // inv.orderNumber / order.order_no), so scope the fetch instead
+        // of pulling every cargo in the system.
+        orderNumbers.length > 0
+          ? cargoRepo.find({
+              where: { cargo_no: In(orderNumbers) },
+              relations: ["customer"],
+            })
+          : Promise.resolve([]),
+      ]);
 
-      const cargoTypes = await AppDataSource.getRepository(CargoType).find();
       const cargoTypeMap = new Map<number, string>();
       cargoTypes.forEach((ct) => cargoTypeMap.set(ct.id, ct.type));
 
@@ -864,6 +883,9 @@ export class InvoiceController {
         }
         return c;
       };
+
+      const orderIds = orders.map((o) => o.id);
+      const orderToCargoMap = new Map();
 
       if (orderIds.length > 0) {
         const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
@@ -878,10 +900,7 @@ export class InvoiceController {
         });
       }
 
-      const allCargos = await AppDataSource.getRepository(Cargo).find({
-        relations: ["customer"],
-      });
-      allCargos.forEach((c: any) => {
+      cargosByOrderNo.forEach((c: any) => {
         enrichCargo(c);
         if (c.cargo_no) {
           orderToCargoMap.set(c.cargo_no, c);
@@ -897,16 +916,29 @@ export class InvoiceController {
         }
       });
 
-      const allCargoIds = allCargos.map((c) => c.id).filter(Boolean);
+      // Same scoping principle for comments: only the cargo ids actually
+      // reachable from this batch of invoices/orders are ever looked up
+      // in cargoCommentMap below (via validCargo?.cargo_no or
+      // inv.orderNumber) — so gather just those ids instead of every
+      // cargo id in the whole system.
+      const relevantCargoIds = Array.from(
+        new Set(
+          [
+            ...cargosByOrderNo.map((c) => c.id),
+            ...orders.map((o: any) => o.cargo?.id).filter(Boolean),
+          ].filter(Boolean),
+        ),
+      );
+
       const cargoCommentMap = new Map<string, string>();
-      if (allCargoIds.length > 0) {
-        const allCargoOrders = await AppDataSource.getRepository(
+      if (relevantCargoIds.length > 0) {
+        const relevantCargoOrders = await AppDataSource.getRepository(
           CargoOrder,
         ).find({
-          where: { cargo_id: In(allCargoIds) },
+          where: { cargo_id: In(relevantCargoIds) },
           relations: ["cargo", "order"],
         });
-        allCargoOrders.forEach((co) => {
+        relevantCargoOrders.forEach((co) => {
           if (
             co.cargo?.cargo_no &&
             co.order?.comment &&
@@ -918,23 +950,23 @@ export class InvoiceController {
       }
 
       const orderItemsRaw = await AppDataSource.manager.query(`
-        SELECT 
-          oi.order_id, 
-          oi.cargo_id, 
-          SUM(oi.qty) as total_qty, 
-          COUNT(oi.id) as count_items,
-          SUM(oi.qty * COALESCE(
-            NULLIF(oi.eur_special_price, 0), 
-            NULLIF(oi.price, 0), 
-            NULLIF(i."transfer_price (EUR)", 0),
-            NULLIF(i.price, 0), 
-            CASE WHEN oi.rmb_special_price > 0 THEN oi.rmb_special_price * 0.13 ELSE 0 END,
-            0
-          )) as total_price
-        FROM order_item oi
-        LEFT JOIN item i ON i.id = oi.item_id
-        GROUP BY oi.order_id, oi.cargo_id
-      `);
+      SELECT 
+        oi.order_id, 
+        oi.cargo_id, 
+        SUM(oi.qty) as total_qty, 
+        COUNT(oi.id) as count_items,
+        SUM(oi.qty * COALESCE(
+          NULLIF(oi.eur_special_price, 0), 
+          NULLIF(oi.price, 0), 
+          NULLIF(i."transfer_price (EUR)", 0),
+          NULLIF(i.price, 0), 
+          CASE WHEN oi.rmb_special_price > 0 THEN oi.rmb_special_price * 0.13 ELSE 0 END,
+          0
+        )) as total_price
+      FROM order_item oi
+      LEFT JOIN item i ON i.id = oi.item_id
+      GROUP BY oi.order_id, oi.cargo_id
+    `);
 
       const orderItemSummaryByOrderId = new Map();
       const orderItemSummaryByCargoId = new Map();
@@ -968,161 +1000,141 @@ export class InvoiceController {
       const orderIdMap = new Map();
       orders.forEach((o) => orderIdMap.set(o.order_no, o.id));
 
-      const data = (
-        await Promise.all(
-          invoices.map(async (inv) => {
-            const cargo = orderToCargoMap.get(inv.orderNumber);
+      // No more per-invoice fetchExpandedDetailsData call here — that was
+      // the N+1 bottleneck (one expensive multi-query lookup per invoice
+      // on every page load). The aggregate orderItemsRaw query above
+      // already covers exactly the same numbers via
+      // orderItemSummaryByCargoId / orderItemSummaryByOrderId, used below
+      // as the primary source instead of a fallback.
+      const data = invoices
+        .map((inv) => {
+          const cargo = orderToCargoMap.get(inv.orderNumber);
 
-            let customItemCount = 0;
-            let customTotalQty = 0;
-            let itemsTotalPrice = 0;
+          let customItemCount = 0;
+          let customTotalQty = 0;
+          let itemsTotalPrice = 0;
 
-            try {
-              const exp = await InvoiceController.fetchExpandedDetailsData(inv.id);
-              if (exp?.taricGroups && exp.taricGroups.length > 0) {
-                const taricSum = exp.taricGroups.reduce(
-                  (s: number, g: any) => s + Number(g.totalPrice || 0),
-                  0,
-                );
-                const taricQty = exp.taricGroups.reduce(
-                  (s: number, g: any) => s + Number(g.totalQty || 0),
-                  0,
-                );
-                if (taricSum > 0) itemsTotalPrice = taricSum;
-                if (taricQty > 0) customTotalQty = taricQty;
-                if (exp.taricGroups.length > 0)
-                  customItemCount = exp.taricGroups.length;
-              } else if (exp?.detailedItems && exp.detailedItems.length > 0) {
-                const itemSum = exp.detailedItems.reduce(
-                  (s: number, it: any) =>
-                    s +
-                    Number(it.qty || it.quantity || 0) *
-                    Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0),
-                  0,
-                );
-                const itemQty = exp.detailedItems.reduce(
-                  (s: number, it: any) => s + Number(it.qty || it.quantity || 0),
-                  0,
-                );
-                if (itemSum > 0) itemsTotalPrice = itemSum;
-                if (itemQty > 0) customTotalQty = itemQty;
-                if (exp.detailedItems.length > 0)
-                  customItemCount = exp.detailedItems.length;
-              }
-            } catch (e) {
-              console.warn(`[InvoiceController.getAllInvoices] Expanded details failed for ${inv.id}:`, e);
-            }
-
-            if (customItemCount === 0 && cargo && orderItemSummaryByCargoId.has(cargo.id)) {
-              const stats = orderItemSummaryByCargoId.get(cargo.id);
+          if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
+            const stats = orderItemSummaryByCargoId.get(cargo.id);
+            customItemCount = stats.count_items;
+            customTotalQty = stats.total_qty;
+            itemsTotalPrice = Number(stats.total_price || 0);
+          } else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
+            const orderId = orderIdMap.get(inv.orderNumber);
+            if (orderItemSummaryByOrderId.has(orderId)) {
+              const stats = orderItemSummaryByOrderId.get(orderId);
               customItemCount = stats.count_items;
               customTotalQty = stats.total_qty;
-              if (itemsTotalPrice === 0) itemsTotalPrice = Number(stats.total_price || 0);
-            } else if (customItemCount === 0 && inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
-              const orderId = orderIdMap.get(inv.orderNumber);
-              if (orderItemSummaryByOrderId.has(orderId)) {
-                const stats = orderItemSummaryByOrderId.get(orderId);
-                customItemCount = stats.count_items;
-                customTotalQty = stats.total_qty;
-                if (itemsTotalPrice === 0) itemsTotalPrice = Number(stats.total_price || 0);
-              }
+              itemsTotalPrice = Number(stats.total_price || 0);
             }
-            if (customItemCount === 0 && inv.items) {
-              customItemCount = inv.items.length;
-              customTotalQty = inv.items.reduce(
-                (sum, item) => sum + Number(item.quantity || 0),
-                0,
-              );
-            }
-            if (itemsTotalPrice === 0 && inv.items && inv.items.length > 0) {
-              itemsTotalPrice = inv.items.reduce(
-                (sum, item) =>
-                  sum +
-                  Number(item.quantity || 0) *
-                  Number(item.unitPrice || item.netPrice || (item as any).price || 0),
-                0,
-              );
-            }
+          }
 
-            const freight = Number(inv.freightCost || 0);
-            let calculatedGrossTotal = 0;
-            if (itemsTotalPrice > 0) {
-              calculatedGrossTotal = itemsTotalPrice + freight;
-            } else {
-              const dbGross = Number(inv.grossTotal || 0);
-              if (dbGross > freight) {
-                calculatedGrossTotal = dbGross;
-              } else if (dbGross > 0 && freight > 0) {
-                calculatedGrossTotal = dbGross + freight;
-              } else {
-                calculatedGrossTotal = Math.max(dbGross, freight);
-              }
-            }
-
-            console.log(
-              `[InvoiceTotalDebug] ${inv.invoiceNumber || inv.id} (${cargo?.cargo_no || inv.orderNumber}): itemsNet=${itemsTotalPrice.toFixed(2)}, freight=${freight.toFixed(2)}, grossTotal=${calculatedGrossTotal.toFixed(2)}`,
+          if (customItemCount === 0 && inv.items) {
+            customItemCount = inv.items.length;
+            customTotalQty = inv.items.reduce(
+              (sum, item) => sum + Number(item.quantity || 0),
+              0,
             );
+          }
+          if (itemsTotalPrice === 0 && inv.items && inv.items.length > 0) {
+            itemsTotalPrice = inv.items.reduce(
+              (sum, item) =>
+                sum +
+                Number(item.quantity || 0) *
+                  Number(
+                    item.unitPrice || item.netPrice || (item as any).price || 0,
+                  ),
+              0,
+            );
+          }
 
-            const validCargo = cargo && cargo.cargo_no && cargo.cargo_no.trim().toUpperCase().startsWith("C") ? cargo : null;
-            const validCargoNo = validCargo?.cargo_no || (inv.orderNumber && inv.orderNumber.trim().toUpperCase().startsWith("C") ? inv.orderNumber : undefined);
+          const freight = Number(inv.freightCost || 0);
+          let calculatedGrossTotal = 0;
+          if (itemsTotalPrice > 0) {
+            calculatedGrossTotal = itemsTotalPrice + freight;
+          } else {
+            const dbGross = Number(inv.grossTotal || 0);
+            if (dbGross > freight) {
+              calculatedGrossTotal = dbGross;
+            } else if (dbGross > 0 && freight > 0) {
+              calculatedGrossTotal = dbGross + freight;
+            } else {
+              calculatedGrossTotal = Math.max(dbGross, freight);
+            }
+          }
 
-            const order = orders.find((o) => o.order_no === inv.orderNumber);
-            const orderComment =
-              order?.comment ||
-              cargoCommentMap.get(validCargo?.cargo_no || "") ||
-              cargoCommentMap.get(inv.orderNumber || "") ||
-              "";
+          const validCargo =
+            cargo &&
+            cargo.cargo_no &&
+            cargo.cargo_no.trim().toUpperCase().startsWith("C")
+              ? cargo
+              : null;
+          const validCargoNo =
+            validCargo?.cargo_no ||
+            (inv.orderNumber &&
+            inv.orderNumber.trim().toUpperCase().startsWith("C")
+              ? inv.orderNumber
+              : undefined);
 
-            const rawBillTo = "GTech Industries GmbH";
+          const order = orders.find((o) => o.order_no === inv.orderNumber);
+          const orderComment =
+            order?.comment ||
+            cargoCommentMap.get(validCargo?.cargo_no || "") ||
+            cargoCommentMap.get(inv.orderNumber || "") ||
+            "";
 
-            const shipCompanyCandidate =
-              typeof cargo?.ship_to_company_name === "string" &&
-                cargo.ship_to_company_name.trim().length > 1 &&
-                !isStreetAddress(cargo.ship_to_company_name)
-                ? cargo.ship_to_company_name.trim()
-                : typeof cargo?.ship_to_display_name === "string" &&
+          const rawBillTo = "GTech Industries GmbH";
+
+          const shipCompanyCandidate =
+            typeof cargo?.ship_to_company_name === "string" &&
+            cargo.ship_to_company_name.trim().length > 1 &&
+            !isStreetAddress(cargo.ship_to_company_name)
+              ? cargo.ship_to_company_name.trim()
+              : typeof cargo?.ship_to_display_name === "string" &&
                   cargo.ship_to_display_name.trim().length > 1 &&
                   !isStreetAddress(cargo.ship_to_display_name)
-                  ? cargo.ship_to_display_name.trim()
-                  : undefined;
+                ? cargo.ship_to_display_name.trim()
+                : undefined;
 
-            const rawShipTo =
-              shipCompanyCandidate ||
-              inv.customer?.companyName ||
-              cargo?.customer?.companyName ||
-              inv.customer?.legalName ||
-              "-";
+          const rawShipTo =
+            shipCompanyCandidate ||
+            inv.customer?.companyName ||
+            cargo?.customer?.companyName ||
+            inv.customer?.legalName ||
+            "-";
 
-            const cargoTypeName = validCargo?.cargo_type || validCargo?.cargo_type_name || (validCargo?.cargo_type_id ? cargoTypeMap.get(validCargo.cargo_type_id) : undefined);
+          const cargoTypeName =
+            validCargo?.cargo_type ||
+            validCargo?.cargo_type_name ||
+            (validCargo?.cargo_type_id
+              ? cargoTypeMap.get(validCargo.cargo_type_id)
+              : undefined);
 
-            return {
-              ...inv,
-              grossTotal: calculatedGrossTotal,
-              bill_to: rawBillTo,
-              ship_to: rawShipTo,
-              customItemCount,
-              customTotalQty,
-              cargoNo: validCargoNo || null,
-              cargoId: validCargo?.id || null,
-              cargo_id: validCargo?.id || null,
-              cargo: validCargo
-                ? {
+          if (!validCargoNo) return null;
+
+          return {
+            ...inv,
+            grossTotal: calculatedGrossTotal,
+            bill_to: rawBillTo,
+            ship_to: rawShipTo,
+            customItemCount,
+            customTotalQty,
+            cargoNo: validCargoNo,
+            cargoId: validCargo?.id || null,
+            cargo_id: validCargo?.id || null,
+            cargo: validCargo
+              ? {
                   id: validCargo.id,
                   cargo_no: validCargo.cargo_no,
                   cargo_type_id: validCargo.cargo_type_id,
                   cargo_type: cargoTypeName || null,
                   cargo_type_name: cargoTypeName || null,
                 }
-                : null,
-              orderComment,
-            };
-          })
-        )
-      ).filter((inv): inv is any => {
-        if (!inv) return false;
-        const cNo = (inv.cargoNo || inv.cargo?.cargo_no || "").trim();
-        return Boolean(cNo && cNo.toUpperCase().startsWith("C"));
-      });
+              : null,
+            orderComment,
+          };
+        })
+        .filter((inv): inv is any => inv !== null);
 
       const finalDataMap = new Map();
       data.forEach((inv) => {
@@ -1135,125 +1147,82 @@ export class InvoiceController {
         order: { created_at: "DESC", invoice_date: "DESC" },
       });
 
-      await Promise.all(
-        cciInvoices.map(async (cci) => {
-          let customItemCount = cci.items?.length || 0;
-          let customTotalQty =
-            cci.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0;
-          const cargoNo = cci.cargo_no || cci.order_number || "";
+      // No more per-CCI fetchExpandedDetailsData call — each CCIInvoice's
+      // own frozen "items" relation (already eagerly loaded above) is the
+      // authoritative snapshot for a closed invoice, so it's used
+      // directly instead of re-deriving it via an expensive per-row call.
+      cciInvoices.forEach((cci) => {
+        const items = cci.items || [];
+        const customItemCount = items.length;
+        const customTotalQty = items.reduce(
+          (s, it) => s + (it.quantity || 0),
+          0,
+        );
+        const cargoNo = cci.cargo_no || cci.order_number || "";
 
-          let cciGrossTotal = 0;
-          let itemsSum = 0;
+        const itemsSum = items.reduce((s, it) => {
+          const qty = Number(it.quantity || 0);
+          const unitPrice =
+            Number(it.unit_price || 0) ||
+            Number((it as any).price || 0) ||
+            Number((it as any).unitPrice || 0) ||
+            Number((it as any).net_price || 0) ||
+            Number((it as any).total_price || 0);
+          return s + qty * unitPrice;
+        }, 0);
 
-          try {
-            const exp = await InvoiceController.fetchExpandedDetailsData(cci.id);
-            if (exp?.taricGroups && exp.taricGroups.length > 0) {
-              const taricSum = exp.taricGroups.reduce(
-                (s: number, g: any) => s + Number(g.totalPrice || 0),
-                0,
-              );
-              const taricQty = exp.taricGroups.reduce(
-                (s: number, g: any) => s + Number(g.totalQty || 0),
-                0,
-              );
-              if (taricSum > 0) itemsSum = taricSum;
-              if (taricQty > 0) customTotalQty = taricQty;
-              if (exp.taricGroups.length > 0)
-                customItemCount = exp.taricGroups.length;
-            } else if (exp?.detailedItems && exp.detailedItems.length > 0) {
-              const dSum = exp.detailedItems.reduce(
-                (s: number, it: any) =>
-                  s +
-                  Number(it.qty || it.quantity || 0) *
-                  Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0),
-                0,
-              );
-              const dQty = exp.detailedItems.reduce(
-                (s: number, it: any) => s + Number(it.qty || it.quantity || 0),
-                0,
-              );
-              if (dSum > 0) itemsSum = dSum;
-              if (dQty > 0) customTotalQty = dQty;
-              if (exp.detailedItems.length > 0)
-                customItemCount = exp.detailedItems.length;
-            }
-          } catch (e) {
-            console.warn(`[InvoiceController.getAllInvoices] fetchExpandedDetailsData failed for CCI ${cci.id}:`, e);
-          }
+        const freight = Number(cci.freight_cost || 0);
+        let cciGrossTotal: number;
+        if (itemsSum > 0) {
+          cciGrossTotal = itemsSum + freight;
+        } else {
+          const dbGross = Number(cci.gross_total || 0);
+          cciGrossTotal =
+            dbGross > freight
+              ? dbGross
+              : dbGross > 0 && freight > 0
+                ? dbGross + freight
+                : Math.max(dbGross, freight);
+        }
 
-          if (itemsSum === 0 && cci.items && cci.items.length > 0) {
-            itemsSum = (cci.items || []).reduce(
-              (s, it) => {
-                const qty = Number(it.quantity || 0);
-                const unitPrice =
-                  Number(it.unit_price || 0) ||
-                  Number((it as any).price || 0) ||
-                  Number((it as any).unitPrice || 0) ||
-                  Number((it as any).net_price || 0) ||
-                  Number((it as any).total_price || 0);
-                return s + qty * unitPrice;
-              },
-              0,
-            );
-          }
-
-          const freight = Number(cci.freight_cost || 0);
-          if (itemsSum > 0) {
-            cciGrossTotal = itemsSum + freight;
-          } else {
-            const dbGross = Number(cci.gross_total || 0);
-            if (dbGross > freight) {
-              cciGrossTotal = dbGross;
-            } else if (dbGross > 0 && freight > 0) {
-              cciGrossTotal = dbGross + freight;
-            } else {
-              cciGrossTotal = Math.max(dbGross, freight);
-            }
-          }
-
-          console.log(
-            `[InvoiceTotalDebug CCI] ${cci.invoice_number || cci.id} (${cargoNo}): itemsSum=${itemsSum.toFixed(2)}, freight=${freight.toFixed(2)}, grossTotal=${cciGrossTotal.toFixed(2)}`,
-          );
-
-          finalDataMap.set(cci.id, {
-            id: cci.id,
-            invoiceNumber: cci.invoice_number,
-            orderNumber: cci.order_number,
-            invoiceDate: cci.invoice_date,
-            createdAt: cci.created_at || cci.invoice_date,
-            deliveryDate: cci.delivery_date,
-            dueDate: cci.due_date,
-            netTotal: Number(cci.net_total || 0),
-            taxAmount: Number(cci.tax_amount || 0),
-            grossTotal: cciGrossTotal,
-            freightCost: Number(cci.freight_cost || 0),
-            description: cci.description || "",
-            remark: cci.remark || "",
-            status: cci.status || "closed",
-            bill_to: "GTech Industries GmbH",
-            ship_to:
-              cci.customer?.company_name ||
-              (cci.customer?.ship_to_address &&
-                !isStreetAddress(cci.customer.ship_to_address)
-                ? cci.customer.ship_to_address
-                : "-"),
-            customItemCount,
-            customTotalQty,
-            cargoNo: cargoNo,
-            cargoId: cargoNo || null,
-            cargo_id: cargoNo || null,
-            cargo: cargoNo ? { id: cargoNo, cargo_no: cargoNo } : null,
-            customer: cci.customer
-              ? {
+        finalDataMap.set(cci.id, {
+          id: cci.id,
+          invoiceNumber: cci.invoice_number,
+          orderNumber: cci.order_number,
+          invoiceDate: cci.invoice_date,
+          createdAt: cci.created_at || cci.invoice_date,
+          deliveryDate: cci.delivery_date,
+          dueDate: cci.due_date,
+          netTotal: Number(cci.net_total || 0),
+          taxAmount: Number(cci.tax_amount || 0),
+          grossTotal: cciGrossTotal,
+          freightCost: Number(cci.freight_cost || 0),
+          description: cci.description || "",
+          remark: cci.remark || "",
+          status: cci.status || "closed",
+          bill_to: "GTech Industries GmbH",
+          ship_to:
+            cci.customer?.company_name ||
+            (cci.customer?.ship_to_address &&
+            !isStreetAddress(cci.customer.ship_to_address)
+              ? cci.customer.ship_to_address
+              : "-"),
+          customItemCount,
+          customTotalQty,
+          cargoNo,
+          cargoId: cargoNo || null,
+          cargo_id: cargoNo || null,
+          cargo: cargoNo ? { id: cargoNo, cargo_no: cargoNo } : null,
+          customer: cci.customer
+            ? {
                 id: cci.customer.original_customer_id || cci.customer.id,
                 companyName: cci.customer.company_name,
                 email: cci.customer.email,
               }
-              : null,
-            items: cci.items,
-          });
-        })
-      );
+            : null,
+          items,
+        });
+      });
 
       return res
         .status(200)
@@ -1263,7 +1232,6 @@ export class InvoiceController {
       return next(error);
     }
   };
-
   static getInvoiceById = async (
     req: Request,
     res: Response,
@@ -1325,20 +1293,29 @@ export class InvoiceController {
 
     if (cciInvoice) {
       try {
-        const linkedInv = await invoiceRepository.findOne({ where: { id: cciInvoice.id } });
-        const searchCargoNo = cciInvoice.cargo_no || linkedInv?.orderNumber || "";
+        const linkedInv = await invoiceRepository.findOne({
+          where: { id: cciInvoice.id },
+        });
+        const searchCargoNo =
+          cciInvoice.cargo_no || linkedInv?.orderNumber || "";
         if (searchCargoNo) {
           const directCargo = await cargoRepository.findOne({
             where: [
               { cargo_no: searchCargoNo },
               { remark: Like(`%${searchCargoNo}%`) },
-              { note: Like(`%${searchCargoNo}%`) }
-            ]
+              { note: Like(`%${searchCargoNo}%`) },
+            ],
           });
-          if (directCargo && directCargo.cargo_no && directCargo.cargo_no !== cciInvoice.cargo_no) {
+          if (
+            directCargo &&
+            directCargo.cargo_no &&
+            directCargo.cargo_no !== cciInvoice.cargo_no
+          ) {
             const isOfficialSeq = /^C\d{4,6}-\d+$/i.test(directCargo.cargo_no);
             if (isOfficialSeq) {
-              console.log(`[CCI_SYNC] Auto-updating already closed invoice ${cciInvoice.invoice_number} cargo_no from "${cciInvoice.cargo_no}" to official "${directCargo.cargo_no}"`);
+              console.log(
+                `[CCI_SYNC] Auto-updating already closed invoice ${cciInvoice.invoice_number} cargo_no from "${cciInvoice.cargo_no}" to official "${directCargo.cargo_no}"`,
+              );
               cciInvoice.cargo_no = directCargo.cargo_no;
               await cciInvoiceRepo.save(cciInvoice);
               if (linkedInv) {
@@ -1350,7 +1327,10 @@ export class InvoiceController {
           }
         }
       } catch (syncErr) {
-        console.warn("Auto-sync existing closed invoice cargo_no failed:", syncErr);
+        console.warn(
+          "Auto-sync existing closed invoice cargo_no failed:",
+          syncErr,
+        );
       }
 
       const detailedItems = await Promise.all(
@@ -1369,7 +1349,7 @@ export class InvoiceController {
                 where: { id: Number(ci.item_id) },
                 relations: ["taric", "purchasePrices"],
               });
-            } catch (e) { }
+            } catch (e) {}
           }
           if (!masterItem && ci.item_name) {
             try {
@@ -1377,7 +1357,7 @@ export class InvoiceController {
                 where: { item_name: ci.item_name.trim() },
                 relations: ["taric", "purchasePrices"],
               });
-            } catch (e) { }
+            } catch (e) {}
           }
           if (!masterItem && ci.ean && ci.ean !== "-" && ci.ean !== "Unknown") {
             try {
@@ -1385,12 +1365,15 @@ export class InvoiceController {
                 where: { ean: ci.ean.trim() },
                 relations: ["taric", "purchasePrices"],
               });
-            } catch (e) { }
+            } catch (e) {}
           }
 
           if (itemPrice === 0 && masterItem) {
             let rmbPrice = 0;
-            if (masterItem.purchasePrices && masterItem.purchasePrices.length > 0) {
+            if (
+              masterItem.purchasePrices &&
+              masterItem.purchasePrices.length > 0
+            ) {
               const pp = masterItem.purchasePrices.find(
                 (p: any) => Number(p.unit_price_cny) > 0,
               );
@@ -1425,19 +1408,20 @@ export class InvoiceController {
               id: masterItem?.id || ci.item_id,
               item_name: masterItem?.item_name || ci.item_name,
               ean: finalEan,
-              taric: ci.taric_code || masterItem?.taric?.code
-                ? {
-                  code: ci.taric_code || masterItem?.taric?.code,
-                  name_en:
-                    ci.taric_name_en ||
-                    masterItem?.taric?.name_en ||
-                    masterItem?.item_name ||
-                    ci.item_name,
-                  duty_rate: Number(
-                    ci.duty_rate || masterItem?.taric?.duty_rate || 0,
-                  ),
-                }
-                : null,
+              taric:
+                ci.taric_code || masterItem?.taric?.code
+                  ? {
+                      code: ci.taric_code || masterItem?.taric?.code,
+                      name_en:
+                        ci.taric_name_en ||
+                        masterItem?.taric?.name_en ||
+                        masterItem?.item_name ||
+                        ci.item_name,
+                      duty_rate: Number(
+                        ci.duty_rate || masterItem?.taric?.duty_rate || 0,
+                      ),
+                    }
+                  : null,
             },
             order: { order_no: ci.order_no || cciInvoice.order_number },
           };
@@ -1464,27 +1448,38 @@ export class InvoiceController {
         const group = taricGroupsMap.get(groupKey);
         group.totalQty += Number(oi.qty || 0);
         group.totalPrice +=
-          Number(oi.qty || 0) * Number(oi._fallbackEk || oi.eur_special_price || 0);
+          Number(oi.qty || 0) *
+          Number(oi._fallbackEk || oi.eur_special_price || 0);
       });
 
-      const linkedInv = await invoiceRepository.findOne({ where: { id: cciInvoice.id } });
+      const linkedInv = await invoiceRepository.findOne({
+        where: { id: cciInvoice.id },
+      });
       let cciTotalGross = Number(
         cciInvoice.gross_total ||
-        cciInvoice.net_total ||
-        linkedInv?.grossTotal ||
-        linkedInv?.netTotal ||
-        0,
+          cciInvoice.net_total ||
+          linkedInv?.grossTotal ||
+          linkedInv?.netTotal ||
+          0,
       );
       if (cciTotalGross === 0 && detailedItems.length > 0) {
-        cciTotalGross = detailedItems.reduce(
-          (s, it) => s + Number(it.qty || 0) * Number(it.eur_special_price || 0),
-          0,
-        ) + Number(cciInvoice.freight_cost || 0);
+        cciTotalGross =
+          detailedItems.reduce(
+            (s, it) =>
+              s + Number(it.qty || 0) * Number(it.eur_special_price || 0),
+            0,
+          ) + Number(cciInvoice.freight_cost || 0);
       }
 
       let taricGroups = Array.from(taricGroupsMap.values());
-      const sumTaricPrice = taricGroups.reduce((s, g) => s + (g.totalPrice || 0), 0);
-      const sumTaricQty = taricGroups.reduce((s, g) => s + (g.totalQty || 0), 0);
+      const sumTaricPrice = taricGroups.reduce(
+        (s, g) => s + (g.totalPrice || 0),
+        0,
+      );
+      const sumTaricQty = taricGroups.reduce(
+        (s, g) => s + (g.totalQty || 0),
+        0,
+      );
 
       if (sumTaricPrice === 0 && cciTotalGross > 0 && sumTaricQty > 0) {
         const freight = Number(cciInvoice.freight_cost || 0);
@@ -1494,11 +1489,16 @@ export class InvoiceController {
           g.totalPrice = (g.totalQty / sumTaricQty) * targetAmount;
         });
 
-        const totalDetailedQty = detailedItems.reduce((s, it) => s + Number(it.qty || 0), 0);
+        const totalDetailedQty = detailedItems.reduce(
+          (s, it) => s + Number(it.qty || 0),
+          0,
+        );
         if (totalDetailedQty > 0) {
           detailedItems.forEach((it) => {
-            const itemNet = (Number(it.qty || 0) / totalDetailedQty) * netForTaric;
-            it.eur_special_price = Number(it.qty || 0) > 0 ? itemNet / Number(it.qty || 0) : 0;
+            const itemNet =
+              (Number(it.qty || 0) / totalDetailedQty) * netForTaric;
+            it.eur_special_price =
+              Number(it.qty || 0) > 0 ? itemNet / Number(it.qty || 0) : 0;
             it.price = itemNet;
             it.unit_price = it.eur_special_price;
             it.unitPrice = it.eur_special_price;
@@ -1508,12 +1508,14 @@ export class InvoiceController {
       }
 
       taricGroups = taricGroups.map((g: any) => {
-        g.unitPrice = g.totalQty > 0 ? (g.totalPrice / g.totalQty).toFixed(2) : "0.00";
+        g.unitPrice =
+          g.totalQty > 0 ? (g.totalPrice / g.totalQty).toFixed(2) : "0.00";
         return g;
       });
 
       const effectiveFreight = Number(cciInvoice.freight_cost || 0);
-      const effectiveGross = cciTotalGross > 0 ? cciTotalGross : (sumTaricPrice + effectiveFreight);
+      const effectiveGross =
+        cciTotalGross > 0 ? cciTotalGross : sumTaricPrice + effectiveFreight;
 
       return {
         invoice: {
@@ -1523,7 +1525,9 @@ export class InvoiceController {
           invoiceDate: cciInvoice.invoice_date,
           deliveryDate: cciInvoice.delivery_date,
           dueDate: cciInvoice.due_date,
-          netTotal: cciInvoice.net_total || Math.max(0, effectiveGross - effectiveFreight),
+          netTotal:
+            cciInvoice.net_total ||
+            Math.max(0, effectiveGross - effectiveFreight),
           taxAmount: cciInvoice.tax_amount,
           grossTotal: effectiveGross,
           freightCost: effectiveFreight,
@@ -1532,24 +1536,24 @@ export class InvoiceController {
           status: cciInvoice.status,
           customer: cciInvoice.customer
             ? {
-              id:
-                cciInvoice.customer.original_customer_id ||
-                cciInvoice.customer.id,
-              companyName: cciInvoice.customer.company_name,
-              email: cciInvoice.customer.email,
-            }
+                id:
+                  cciInvoice.customer.original_customer_id ||
+                  cciInvoice.customer.id,
+                companyName: cciInvoice.customer.company_name,
+                email: cciInvoice.customer.email,
+              }
             : null,
         },
         cargo: cciInvoice.cargo_no
           ? {
-            id: cciInvoice.cargo_no,
-            cargo_no: cciInvoice.cargo_no,
-            ship_to:
-              cciInvoice.customer?.company_name ||
-              cciInvoice.customer?.ship_to_address ||
-              null,
-            bill_to: "GTech Industries GmbH",
-          }
+              id: cciInvoice.cargo_no,
+              cargo_no: cciInvoice.cargo_no,
+              ship_to:
+                cciInvoice.customer?.company_name ||
+                cciInvoice.customer?.ship_to_address ||
+                null,
+              bill_to: "GTech Industries GmbH",
+            }
           : null,
         orderNosInCargo: [cciInvoice.order_number].filter(Boolean),
         detailedItems,
@@ -1644,7 +1648,10 @@ export class InvoiceController {
       const uniqueTokens = [...new Set(tokens)];
 
       const matchingOrders = await orderRepository.find({
-        where: uniqueTokens.map((t) => ({ order_no: Like(`%${t}%`), is_deleted: false })),
+        where: uniqueTokens.map((t) => ({
+          order_no: Like(`%${t}%`),
+          is_deleted: false,
+        })),
       });
 
       if (matchingOrders.length > 0) {
@@ -1683,10 +1690,10 @@ export class InvoiceController {
       orderItems = invoice.items.map((invItem: any) => {
         const p = Number(
           invItem.unitPrice ||
-          invItem.netPrice ||
-          invItem.unit_price ||
-          invItem.price ||
-          0,
+            invItem.netPrice ||
+            invItem.unit_price ||
+            invItem.price ||
+            0,
         );
         return {
           id: invItem.id,
@@ -1754,8 +1761,8 @@ export class InvoiceController {
     const manualTarics =
       uniqueManualCodes.length > 0
         ? await AppDataSource.getRepository(Taric).find({
-          where: { code: In(uniqueManualCodes) },
-        })
+            where: { code: In(uniqueManualCodes) },
+          })
         : [];
     const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -1771,7 +1778,7 @@ export class InvoiceController {
                 where: { id: Number(itemId) },
                 relations: ["taric", "purchasePrices"],
               });
-            } catch (e) { }
+            } catch (e) {}
           }
           if (!item && oi.item_name) {
             try {
@@ -1779,7 +1786,7 @@ export class InvoiceController {
                 where: { item_name: oi.item_name.trim() },
                 relations: ["taric", "purchasePrices"],
               });
-            } catch (e) { }
+            } catch (e) {}
           }
           if (!item && oi.ean && oi.ean !== "-" && oi.ean !== "Unknown") {
             try {
@@ -1787,7 +1794,7 @@ export class InvoiceController {
                 where: { ean: oi.ean.trim() },
                 relations: ["taric", "purchasePrices"],
               });
-            } catch (e) { }
+            } catch (e) {}
           }
         }
 
@@ -1801,7 +1808,11 @@ export class InvoiceController {
               oi.supplier_id || item?.supplier_id,
             )) || 0;
         }
-        if (!rmbPrice && item?.purchasePrices && item.purchasePrices.length > 0) {
+        if (
+          !rmbPrice &&
+          item?.purchasePrices &&
+          item.purchasePrices.length > 0
+        ) {
           const pp = item.purchasePrices.find(
             (p: any) => Number(p.unit_price_cny) > 0,
           );
@@ -1828,7 +1839,7 @@ export class InvoiceController {
           item: item || oi.item,
           v:
             ((item?.length || 0) * (item?.width || 0) * (item?.height || 0)) /
-            1000 || 0,
+              1000 || 0,
           w: item?.weight || 0,
           _effectiveTaricCode: getEffectiveTaricCode(oi),
           _fallbackEan: ean,
@@ -1891,14 +1902,18 @@ export class InvoiceController {
 
     let invoiceGross = Number(invoice.grossTotal || invoice.netTotal || 0);
     if (invoiceGross === 0 && itemsWithFallbacks.length > 0) {
-      invoiceGross = itemsWithFallbacks.reduce(
-        (s, it) => s + Number(it.qty || 0) * Number(it._fallbackEk || 0),
-        0,
-      ) + Number(invoice.freightCost || 0);
+      invoiceGross =
+        itemsWithFallbacks.reduce(
+          (s, it) => s + Number(it.qty || 0) * Number(it._fallbackEk || 0),
+          0,
+        ) + Number(invoice.freightCost || 0);
     }
 
     let taricGroups = Array.from(taricGroupsMap.values());
-    const sumTaricPrice = taricGroups.reduce((s, g) => s + (g.totalPrice || 0), 0);
+    const sumTaricPrice = taricGroups.reduce(
+      (s, g) => s + (g.totalPrice || 0),
+      0,
+    );
     const sumTaricQty = taricGroups.reduce((s, g) => s + (g.totalQty || 0), 0);
 
     if (sumTaricPrice === 0 && invoiceGross > 0 && sumTaricQty > 0) {
@@ -1911,7 +1926,8 @@ export class InvoiceController {
     }
 
     taricGroups = taricGroups.map((g: any) => {
-      g.unitPrice = g.totalQty > 0 ? (g.totalPrice / g.totalQty).toFixed(2) : "0.00";
+      g.unitPrice =
+        g.totalQty > 0 ? (g.totalPrice / g.totalQty).toFixed(2) : "0.00";
       return g;
     });
 
@@ -2889,8 +2905,8 @@ export class InvoiceController {
             const totalPrice = qty * unitPrice;
             const validItemId =
               item?.id &&
-                !isNaN(Number(item.id)) &&
-                Number.isInteger(Number(item.id))
+              !isNaN(Number(item.id)) &&
+              Number.isInteger(Number(item.id))
                 ? Number(item.id)
                 : null;
 
@@ -2916,8 +2932,8 @@ export class InvoiceController {
           invoice.items.forEach((invItem: any) => {
             const validItemId =
               invItem.item_id &&
-                !isNaN(Number(invItem.item_id)) &&
-                Number.isInteger(Number(invItem.item_id))
+              !isNaN(Number(invItem.item_id)) &&
+              Number.isInteger(Number(invItem.item_id))
                 ? Number(invItem.item_id)
                 : null;
             itemsToSave.push(
