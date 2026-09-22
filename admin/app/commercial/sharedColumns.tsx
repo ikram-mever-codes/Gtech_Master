@@ -8,20 +8,51 @@ import { formatCountryCode } from "@/utils/address";
 
 export function hasContactPersonEmail(row: any): boolean {
   if (!row) return false;
-  const email =
-    row.customerSnapshot?.contactEmail ||
-    row.customerSnapshot?.contact_email ||
-    row.customerSnapshot?.email ||
-    row.customerSnapshot?.contactPersonEmail ||
-    row.customer?.contactPersonEmail ||
-    row.customer?.contact_email ||
-    row.customer?.email ||
-    row.customer?.contactPerson?.email ||
-    row.contactPersonEmail ||
-    row.contact_email ||
-    row.contactEmail ||
-    row.email;
-  return typeof email === "string" && email.trim().length > 0 && email.includes("@");
+
+  const directEmails = [
+    row.customerSnapshot?.contactEmail,
+    row.customerSnapshot?.contact_email,
+    row.customerSnapshot?.email,
+    row.customerSnapshot?.contactPersonEmail,
+    row.customer?.contactPersonEmail,
+    row.customer?.contact_email,
+    row.customer?.email,
+    row.customer?.contactPerson?.email,
+    row.contactPersonEmail,
+    row.contact_email,
+    row.contactEmail,
+    row.email,
+  ];
+
+  for (const email of directEmails) {
+    if (typeof email === "string" && email.trim().length > 0 && email.includes("@")) {
+      return true;
+    }
+  }
+
+  const contactArrays = [
+    row.contacts,
+    row.contactPersons,
+    row.customer?.contacts,
+    row.customer?.contactPersons,
+    row.customerSnapshot?.contacts,
+    row.customerSnapshot?.contactPersons,
+    row.customer?.starBusinessDetails?.contacts,
+  ];
+
+  for (const arr of contactArrays) {
+    if (Array.isArray(arr)) {
+      for (const item of arr) {
+        if (!item) continue;
+        const itemEmail = item.email || item.contactEmail || item.contact_email;
+        if (typeof itemEmail === "string" && itemEmail.trim().length > 0 && itemEmail.includes("@")) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 export function buildExpandColumn(
