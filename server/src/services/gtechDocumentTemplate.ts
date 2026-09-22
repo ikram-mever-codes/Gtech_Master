@@ -48,9 +48,11 @@ export function fontRegular(fonts: GtechFonts): string {
   return fonts.regular !== "Helvetica" ? "Inter-Regular" : "Helvetica";
 }
 export function fontMedium(fonts: GtechFonts): string {
+  if (fonts.medium === fonts.regular && fonts.regular !== "Helvetica") return "Inter-Regular";
   return fonts.medium !== "Helvetica" ? "Inter-Medium" : "Helvetica";
 }
 export function fontSemiBold(fonts: GtechFonts): string {
+  if (fonts.semiBold === fonts.regular && fonts.regular !== "Helvetica") return "Inter-Regular";
   return fonts.semiBold !== "Helvetica-Bold" ? "Inter-SemiBold" : "Helvetica-Bold";
 }
 

@@ -25,16 +25,8 @@ export function resolveGtechFonts(): GtechFonts {
     resolve("Inter-Regular.ttf") ||
     "Helvetica";
 
-  const medium =
-    resolve("Inter-Medium.ttf") ||
-    resolve("Inter-Regular.ttf") ||
-    "Helvetica";
-
-  const semiBold =
-    resolve("Inter-SemiBold.ttf") ||
-    resolve("Inter-Bold.ttf") ||
-    "Helvetica-Bold";
-
+  const medium = regular;
+  const semiBold = regular;
   const serif = "Times-Roman";
 
   return { regular, medium, semiBold, serif };
