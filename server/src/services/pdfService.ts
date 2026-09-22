@@ -140,8 +140,8 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
 
         doc.fontSize(7).fillColor("#555555");
         doc.text("GTech Industries Limited: 3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
-        doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 85);
-        doc.text("中国安徽省马鞍山市博望区博望区博望汇盛广场内西大丰冶金厂区", 40, 95);
+        doc.text("GTech Establishment China: Wangyun West Road Jinding Factory Area, Bowang, Ma'anshan, Anhui", 40, 85);
+        doc.text("安徽省，马鞍山市，博望区，望云西路，金鼎厂区内，吉泰工业有限公司", 40, 95);
 
         doc.fillColor("#000000").font(boldFont).fontSize(20).text("Purchase Order", 0, 130, { align: "center" });
 

@@ -819,8 +819,6 @@ export async function generateGtechDocumentPdf(
 
   const shippingMethod = (opts.shippingMethod || "").trim();
   const shippingCostNum = Number(opts.shippingCost || 0);
-  // Use ?? 0 (not || 1) so that a shipping quantity explicitly saved as 0
-  // (meaning "not included") is kept as 0 and the shipping row is not rendered.
   const shippingQtyNum = Number(opts.shippingQuantity ?? 0);
   const shippingLineTotal = shippingCostNum * shippingQtyNum;
   const shippingTaxRateForRow =
@@ -830,7 +828,7 @@ export async function generateGtechDocumentPdf(
         ? Number(opts.taxRate)
         : 0;
 
-  if (shippingMethod) {
+  if (shippingMethod && (shippingCostNum > 0 || shippingQtyNum > 0)) {
     const totalItemCount = opts.lineItems ? opts.lineItems.length : 0;
     const shipRowNum = totalItemCount + 1;
     const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
@@ -909,7 +907,7 @@ export async function generateGtechDocumentPdf(
     const rawCurrency = opts.currency || "EUR";
     const currency = (rawCurrency.toUpperCase() === "EUR" || rawCurrency === "€") ? "€" : rawCurrency;
 
-    const shippingTotalNet = shippingLineTotal; // reuse the value already computed above
+    const shippingTotalNet = shippingLineTotal;
     const lineItemsSubtotal = (opts.lineItems || []).reduce((acc, it) => {
       const lineNet =
         it.lineTotal !== undefined && it.lineTotal !== null
@@ -919,8 +917,6 @@ export async function generateGtechDocumentPdf(
     }, 0);
 
     let effectiveSubtotal = Number(opts.subtotal || 0);
-    // If opts.subtotal does not include shipping cost (e.g. for Auftrag PDFs where subtotal equaled lineItemsSubtotal),
-    // add shippingTotalNet so Zwischensumme Netto includes all lines in the table.
     if (shippingTotalNet > 0 && Math.abs(effectiveSubtotal - lineItemsSubtotal) < 0.05) {
       effectiveSubtotal += shippingTotalNet;
     } else if (effectiveSubtotal === 0 && lineItemsSubtotal > 0) {

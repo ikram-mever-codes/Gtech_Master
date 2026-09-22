@@ -113,7 +113,9 @@ export const createPaymentAllocation = async (
       return;
     }
 
-    const requestedAmount = round2(Number(amount));
+    const requestedAmount = round2(
+      Number(typeof amount === "string" ? amount.replace(",", ".") : amount),
+    );
     if (!requestedAmount || requestedAmount <= 0) {
       res.status(400).json({
         success: false,

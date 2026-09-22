@@ -99,9 +99,13 @@ export const CommercialLineItemsSubTable: React.FC<CommercialLineItemsSubTablePr
     return formatTaxRate(v);
   };
 
-  const hasShipping = !!(shippingMethod && String(shippingMethod).trim());
   const shippingCostNum = Number(shippingCost ?? 0);
-  const shippingQtyNum = Number(shippingQuantity ?? 1);
+  const shippingQtyNum = Number(shippingQuantity ?? 0);
+  const hasShipping = !!(
+    shippingMethod &&
+    String(shippingMethod).trim() &&
+    (shippingCostNum > 0 || shippingQtyNum > 0)
+  );
   const shippingTaxRate = taxRate !== undefined && taxRate !== null ? Number(taxRate) : 0;
 
   if (visibleItems.length === 0 && !hasShipping) {

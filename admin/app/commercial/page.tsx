@@ -2009,8 +2009,8 @@ const InvoiceListPage: React.FC = () => {
                 }
               }}
               className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
                 }`}
             >
               {tab.label}
@@ -2286,8 +2286,8 @@ const InvoiceListPage: React.FC = () => {
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
                       className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                          ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                          : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                        ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                        : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
                         }`}
                     >
                       {i + 1}
@@ -2610,7 +2610,7 @@ const InvoiceListPage: React.FC = () => {
           <CustomModal
             isOpen={showInboundModal}
             onClose={() => setShowInboundModal(false)}
-            title="Manual Payment Inbound Entry"
+            title=""
             width="max-w-lg"
           >
             <form

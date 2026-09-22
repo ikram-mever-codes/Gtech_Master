@@ -2113,7 +2113,7 @@ export const generateCommercialInvoicePDF = async (
       75,
     );
     doc.text(
-      "GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui",
+      "GTech Establishment China: Wangyun West Road Jinding Factory Area, Bowang, Ma'anshan, Anhui",
       40,
       88,
     );
@@ -2122,7 +2122,7 @@ export const generateCommercialInvoicePDF = async (
     if (fontSource) {
       try {
         const chineseAddress =
-          "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
+          "安徽省，马鞍山市，博望区，望云西路，金鼎厂区内，吉泰工业有限公司";
         doc
           .font(fontSource, 0)
           .fontSize(9)
@@ -2136,7 +2136,7 @@ export const generateCommercialInvoicePDF = async (
             doc
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
-              .text("中国安徽...", 152, 101);
+              .text("安徽省...", 152, 101);
           } catch (e) { }
         }
         doc.font("Helvetica").fillColor("#000000");
@@ -2146,12 +2146,23 @@ export const generateCommercialInvoicePDF = async (
     const rightX = 412;
     const rightW = 143;
 
-    doc
-      .fillColor("black")
-      .font("Helvetica-Bold")
-      .fontSize(10.5)
-      .text("BILL TO:", 40, addrY - 3)
-      .text("SHIP TO:", 205, addrY - 3);
+    const hasShipToAddress = !!(
+      (data.shipTo.company && data.shipTo.company.trim()) ||
+      (data.shipTo.contact && data.shipTo.contact.trim()) ||
+      (data.shipTo.street && data.shipTo.street.trim()) ||
+      (data.shipTo.city && data.shipTo.city.trim()) ||
+      (data.shipTo.country && data.shipTo.country.trim()) ||
+      (data.shipTo.phone && data.shipTo.phone.trim())
+    );
+
+    if (hasShipToAddress) {
+      doc
+        .fillColor("black")
+        .font("Helvetica-Bold")
+        .fontSize(10.5)
+        .text("BILL TO:", 40, addrY - 3)
+        .text("SHIP TO:", 205, addrY - 3);
+    }
 
     const bName = GTECH_GMBH.name;
     const bStreet = GTECH_GMBH.street;
@@ -2160,8 +2171,9 @@ export const generateCommercialInvoicePDF = async (
     const bPhone = GTECH_GMBH.phone;
     const bEori = GTECH_GMBH.eori;
 
-    let billY = addrY + 12;
+    let billY = hasShipToAddress ? addrY + 12 : addrY;
     doc
+      .fillColor("black")
       .font("Helvetica-Bold")
       .fontSize(10.5)
       .text(bName, 40, billY, { width: 155 });
@@ -2195,16 +2207,20 @@ export const generateCommercialInvoicePDF = async (
       data.shipTo.company ||
       ""
     ).trim();
-    doc
-      .fillColor("black")
-      .font("Helvetica-Bold")
-      .fontSize(10.5)
-      .text(primaryShipName, 205, shipNameY, { width: 350, lineBreak: false });
+
+    if (hasShipToAddress && primaryShipName) {
+      doc
+        .fillColor("black")
+        .font("Helvetica-Bold")
+        .fontSize(10.5)
+        .text(primaryShipName, 205, shipNameY, { width: 350, lineBreak: false });
+    }
 
     const metaY = shipNameY + 15;
     doc
       .font("Helvetica")
       .fontSize(10)
+      .fillColor("black")
       .text("Customer No.: ", rightX, metaY, { continued: true, width: rightW })
       .font("Helvetica-Bold")
       .text(data.customerNo || "N/A");
@@ -2219,26 +2235,28 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica-Bold")
       .text(data.cargoNo);
 
-    let shipY = metaY;
-    doc.font("Helvetica").fontSize(9.5);
-    if (data.shipTo.contact && primaryShipName !== data.shipTo.contact) {
-      doc.text(data.shipTo.contact, 205, shipY, { width: 195 });
-      shipY = doc.y + 1;
-    }
-    if (data.shipTo.street) {
-      doc.text(data.shipTo.street, 205, shipY, { width: 195 });
-      shipY = doc.y + 1;
-    }
-    if (data.shipTo.city) {
-      doc.text(data.shipTo.city, 205, shipY, { width: 195 });
-      shipY = doc.y + 1;
-    }
-    if (data.shipTo.country) {
-      doc.text(data.shipTo.country, 205, shipY, { width: 195 });
-      shipY = doc.y + 1;
-    }
-    if (data.shipTo.phone) {
-      doc.text(data.shipTo.phone, 205, shipY, { width: 195 });
+    if (hasShipToAddress) {
+      let shipY = metaY;
+      doc.font("Helvetica").fontSize(9.5);
+      if (data.shipTo.contact && primaryShipName !== data.shipTo.contact) {
+        doc.text(data.shipTo.contact, 205, shipY, { width: 195 });
+        shipY = doc.y + 1;
+      }
+      if (data.shipTo.street) {
+        doc.text(data.shipTo.street, 205, shipY, { width: 195 });
+        shipY = doc.y + 1;
+      }
+      if (data.shipTo.city) {
+        doc.text(data.shipTo.city, 205, shipY, { width: 195 });
+        shipY = doc.y + 1;
+      }
+      if (data.shipTo.country) {
+        doc.text(data.shipTo.country, 205, shipY, { width: 195 });
+        shipY = doc.y + 1;
+      }
+      if (data.shipTo.phone) {
+        doc.text(data.shipTo.phone, 205, shipY, { width: 195 });
+      }
     }
 
     doc
@@ -2335,14 +2353,14 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica-Bold")
       .fontSize(11)
       .text("Total :", 360, itemY, { underline: true });
-    doc.text(totalQty.toString(), 425, itemY, { underline: true });
+    doc.text(`${totalQty} pcs`, 415, itemY, { underline: true });
     doc.text(`${grandTotal} €`, 485, itemY, {
       width: 70,
       align: "right",
       underline: true,
     });
 
-    itemY += 25;
+    itemY += 20;
     if (itemY + 110 > pageH - footerReserve) {
       doc.addPage();
       itemY = 50;
@@ -2350,12 +2368,36 @@ export const generateCommercialInvoicePDF = async (
     doc
       .fontSize(10)
       .font("Helvetica-Bold")
+      .fillColor("#000000")
       .text(
         "* Unit price is calculated and can have errors from rounding",
         40,
         itemY,
       );
-    itemY += 25;
+    itemY += 16;
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#000000")
+      .text(
+        "We hereby confirm that no raw material from Russia were used",
+        40,
+        itemY,
+        { lineBreak: false },
+      );
+    itemY += 13;
+    doc.text(
+      "in the production of the goods mentioned in this invoice.",
+      40,
+      itemY,
+      { lineBreak: false },
+    );
+
+    itemY += 22;
+    if (itemY + 40 > pageH - footerReserve) {
+      doc.addPage();
+      itemY = 50;
+    }
     doc.fontSize(10).font("Helvetica").text("Remark:", 40, itemY);
     const remarkX = 100;
     const remarkLines: string[] = [];
@@ -2377,30 +2419,6 @@ export const generateCommercialInvoicePDF = async (
     remarkLines.forEach((line, idx) => {
       doc.text(line, remarkX, itemY + idx * 15);
     });
-    const nextRemarkY = itemY + Math.max(remarkLines.length, 1) * 15;
-
-    itemY = nextRemarkY + 30;
-    if (itemY + 30 > pageH - footerReserve) {
-      doc.addPage();
-      itemY = 50;
-    }
-    doc
-      .fontSize(9)
-      .font("Helvetica")
-      .fillColor("#000000")
-      .text(
-        "We hereby confirm that no raw material from Russia were used",
-        100,
-        itemY,
-        { lineBreak: false },
-      );
-    itemY += 14;
-    doc.text(
-      "in the production of the goods mentioned in this invoice.",
-      100,
-      itemY,
-      { lineBreak: false },
-    );
 
     const originalBottomMargin = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;

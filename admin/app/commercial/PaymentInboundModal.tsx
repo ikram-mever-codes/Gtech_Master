@@ -81,9 +81,18 @@ export const PaymentInboundModal: React.FC<PaymentInboundModalProps> = ({
 
   if (!isOpen) return null;
 
+  const parseAmount = (val: string | number): number => {
+    if (typeof val === "number") return isNaN(val) ? 0 : val;
+    if (!val) return 0;
+    const cleanStr = String(val).trim().replace(",", ".");
+    const num = parseFloat(cleanStr);
+    return isNaN(num) ? 0 : num;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.amount || Number(form.amount) <= 0) {
+    const parsedAmount = parseAmount(form.amount);
+    if (!form.amount || parsedAmount <= 0) {
       toast.error("Please enter a valid amount > 0");
       return;
     }
@@ -95,7 +104,7 @@ export const PaymentInboundModal: React.FC<PaymentInboundModalProps> = ({
         res = await updatePaymentInbound(editingInbound.id, {
           payment_account_id: form.paymentAccountId || undefined,
           received_date: form.receivedDate,
-          amount: Number(form.amount),
+          amount: parsedAmount,
           currency_code: form.currencyCode || "EUR",
           payer_name: form.payerName,
           reference: form.reference,
@@ -104,7 +113,7 @@ export const PaymentInboundModal: React.FC<PaymentInboundModalProps> = ({
         res = await createPaymentInbound({
           payment_account_id: form.paymentAccountId || undefined,
           received_date: form.receivedDate,
-          amount: Number(form.amount),
+          amount: parsedAmount,
           currency_code: form.currencyCode || "EUR",
           payer_name: form.payerName,
           reference: form.reference,

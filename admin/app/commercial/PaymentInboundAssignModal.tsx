@@ -43,6 +43,11 @@ const getDocCustomerName = (doc: any): string =>
   "—";
 
 const getDocTotal = (doc: any): number => {
+  const directTotal = Number(
+    doc.total_amount ?? doc.totalAmount ?? doc.grossTotal ?? 0,
+  );
+  if (directTotal > 0) return directTotal;
+
   const subtotal = Number(doc.subtotal ?? 0);
   const shippingCost = Number(doc.shipping_cost ?? doc.shippingCost ?? 0);
   const shippingQty = Number(
@@ -50,15 +55,13 @@ const getDocTotal = (doc: any): number => {
   );
   const shippingTotal = shippingCost * shippingQty;
   const discountAmount = Number(doc.discount_amount ?? doc.discountAmount ?? 0);
-  const taxRate = Number(doc.tax_rate ?? doc.taxRate ?? 19);
+  const taxRate = Number(
+    doc.tax_rate ?? doc.taxRate ?? doc.taxProfile?.taxRate ?? 19,
+  );
 
-  if (subtotal > 0 || shippingTotal > 0) {
-    const net = subtotal - discountAmount + shippingTotal;
-    const tax = net * (taxRate / 100);
-    return net + tax;
-  }
-
-  return Number(doc.total_amount ?? doc.grossTotal ?? 0);
+  const net = Math.max(0, subtotal - discountAmount + shippingTotal);
+  const tax = net * (taxRate / 100);
+  return net + tax;
 };
 export const PaymentInboundAssignModal: React.FC<
   PaymentInboundAssignModalProps
