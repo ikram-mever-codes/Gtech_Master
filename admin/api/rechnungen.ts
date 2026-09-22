@@ -100,6 +100,7 @@ export const updateRechnung = async (
     customerSnapshot?: any;
     deliveryAddress?: any;
     ansprechpartner?: string;
+    kundenreferenz?: string;
     title?: string;
     internal_notes?: any;
   },
@@ -107,8 +108,6 @@ export const updateRechnung = async (
   try {
     const { internalNotes, ...rest } = updates;
     const payload: Record<string, any> = { ...rest };
-    // Backend reads internal_notes (snake_case) — internalNotes was never
-    // translated, so it silently never reached the Rechnung's
     if (internalNotes !== undefined) payload.internal_notes = internalNotes;
 
     const response: any = await api.patch(`/rechnungen/${id}`, payload);
@@ -118,7 +117,6 @@ export const updateRechnung = async (
     throw error;
   }
 };
-
 export const downloadRechnungPdf = async (
   id: string | number,
   invoiceNo?: string,

@@ -1387,6 +1387,27 @@ export const updateRechnung = async (
       return;
     }
 
+    const isRestrictedFieldBeingUpdated =
+      customerSnapshot !== undefined ||
+      deliveryAddress !== undefined ||
+      notes !== undefined ||
+      internal_notes !== undefined ||
+      ansprechpartner !== undefined ||
+      kundenreferenz !== undefined;
+
+    if (isRestrictedFieldBeingUpdated) {
+      const createdDate =
+        rechnung.created_at || rechnung.date_created || rechnung.invoice_date;
+      if (!isWithinEditableWindow(createdDate)) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Rechnung details can only be edited within 3 months after creation.",
+        });
+        return;
+      }
+    }
+
     if (gelangenheitsbestaetigung_doc !== undefined)
       rechnung.gelangenheitsbestaetigung_doc = gelangenheitsbestaetigung_doc;
     if (tax_profile_case !== undefined)

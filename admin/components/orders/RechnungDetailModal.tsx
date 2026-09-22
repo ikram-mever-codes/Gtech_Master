@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LinkIcon,
   XMarkIcon,
@@ -58,10 +58,18 @@ const formatDeUnitPrice = (val: number) => {
 };
 
 const formatWeight = (kg: number): string =>
-  `${(isNaN(kg) || !isFinite(kg) ? 0 : kg).toLocaleString("de-DE", {
+  `${(kg || 0).toLocaleString("de-DE", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })} kg`;
+
+const THREE_MONTHS_MS = 1000 * 60 * 60 * 24 * 30 * 3;
+const isWithin3Months = (dateVal: any): boolean => {
+  if (!dateVal) return true;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return true;
+  return Date.now() - d.getTime() <= THREE_MONTHS_MS;
+};
 
 const COUNTRY_CODES: Record<string, string> = {
   germany: "DE",
@@ -492,9 +500,23 @@ export default function RechnungDetailModal({
     customerSnapshot: any;
     deliveryAddress: any;
     ansprechpartner: string;
-  }>({ customerSnapshot: {}, deliveryAddress: {}, ansprechpartner: "" });
+    kundenreferenz: string;
+  }>({
+    customerSnapshot: {},
+    deliveryAddress: {},
+    ansprechpartner: "",
+    kundenreferenz: "",
+  });
   const [savingAddress, setSavingAddress] = useState(false);
   const [systemUsers, setSystemUsers] = useState<any[]>([]);
+
+  const isEditableWindow = useMemo(
+    () =>
+      isWithin3Months(
+        data?.created_at || data?.date_created || data?.invoice_date,
+      ),
+    [data],
+  );
 
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [removingDoc, setRemovingDoc] = useState(false);
@@ -899,6 +921,7 @@ export default function RechnungDetailModal({
       customerSnapshot: { ...(data.customerSnapshot || {}) },
       deliveryAddress: { ...(data.deliveryAddress || {}) },
       ansprechpartner: data.ansprechpartner || "",
+      kundenreferenz: data.kundenreferenz || "",
     });
     setEditNotesExtern(data.notes || data.comment || data.notes_external || "");
     setEditNotesIntern(data.internal_notes || data.internalNotes || "");
@@ -928,6 +951,7 @@ export default function RechnungDetailModal({
         customerSnapshot: addressForm.customerSnapshot,
         deliveryAddress: addressForm.deliveryAddress,
         ansprechpartner: addressForm.ansprechpartner,
+        kundenreferenz: addressForm.kundenreferenz,
         notes: editNotesExtern,
         internal_notes: editNotesIntern,
       });
@@ -1116,7 +1140,7 @@ export default function RechnungDetailModal({
             </h2>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            {!isCorrection && (
+            {!isCorrection && isEditableWindow && (
               <ViewEditToggle
                 isEditEnabled={addressEdit}
                 onToggle={() =>
@@ -1317,6 +1341,28 @@ export default function RechnungDetailModal({
                 ) : (
                   <div className="text-sm text-gray-900 break-words">
                     {data.ansprechpartner || "—"}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                  Kundenreferenz
+                </p>
+                {addressEdit ? (
+                  <input
+                    className={addressInputCls}
+                    placeholder="Kundenreferenz..."
+                    value={addressForm.kundenreferenz}
+                    onChange={(e) =>
+                      setAddressForm((f) => ({
+                        ...f,
+                        kundenreferenz: e.target.value,
+                      }))
+                    }
+                  />
+                ) : (
+                  <div className="text-sm text-gray-900 break-words">
+                    {data.kundenreferenz || "—"}
                   </div>
                 )}
               </div>

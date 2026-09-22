@@ -40,7 +40,7 @@ async function resolveContactDetails(
           contactEmail = matchedUser.email;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return { contactName, contactEmail };
