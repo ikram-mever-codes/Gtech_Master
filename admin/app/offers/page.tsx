@@ -153,7 +153,33 @@ const getVatGroups = (
         tax: adjustedBase * (rate / 100),
       };
     })
-    .sort((a, b) => b.rate - a.rate);
+};
+
+export const getOfferGrossTotal = (off: any): number => {
+  if (!off) return 0;
+  const totalAmt = Number(off.totalAmount ?? off.total_amount ?? off.grossTotal ?? off.gross_total ?? 0);
+
+  const lineItems = off.lineItems || off.items || [];
+  if (lineItems.length > 0) {
+    const vatGroups = getVatGroups(off, lineItems);
+    const netSum = vatGroups.reduce((acc, g) => acc + g.base, 0);
+    const taxSum = vatGroups.reduce((acc, g) => acc + g.tax, 0);
+    const calculatedGross = netSum + taxSum;
+    if (calculatedGross > 0) return calculatedGross;
+  }
+
+  if (totalAmt > 0) return totalAmt;
+
+  const subtotal = Number(off.subtotal ?? off.sub_total ?? 0);
+  const taxAmount = Number(off.taxAmount ?? off.tax_amount ?? 0);
+  const shipping = Number(off.shippingCost ?? off.shipping_cost ?? 0);
+
+  if (subtotal > 0 || taxAmount > 0) {
+    return subtotal + taxAmount;
+  }
+
+  const taxRate = Number(off.taxProfile?.taxRate ?? off.taxRate ?? 19);
+  return (subtotal + shipping) * (1 + taxRate / 100);
 };
 
 const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
@@ -725,37 +751,7 @@ const OffersPage: React.FC<any> = ({
     });
   }, [offers, docFilters]);
 
-  const getOfferNetTotal = (off: any): number => {
-    const shipping = Number(
-      off.shippingCost ||
-        off.shipping_cost ||
-        0,
-    );
 
-    if (off.subtotal !== undefined && off.subtotal !== null) {
-      return Number(off.subtotal) + shipping;
-    }
-    if (off.sub_total !== undefined && off.sub_total !== null) {
-      return Number(off.sub_total) + shipping;
-    }
-    if (
-      off.netTotal !== undefined &&
-      off.netTotal !== null &&
-      Number(off.netTotal) > 0
-    ) {
-      return Number(off.netTotal);
-    }
-    if (
-      off.net_total !== undefined &&
-      off.net_total !== null &&
-      Number(off.net_total) > 0
-    ) {
-      return Number(off.net_total);
-    }
-    const gross = Number(off.totalAmount || off.total_amount || 0);
-    const taxRate = Number(off.taxRate || off.tax_rate || 19);
-    return gross > 0 ? gross / (1 + taxRate / 100) : 0;
-  };
 
   const offerColumns: ColumnDef<any>[] = useMemo(
     () => [
@@ -806,7 +802,7 @@ const OffersPage: React.FC<any> = ({
           );
         },
       },
-      buildNettowertColumn((row: any) => getOfferNetTotal(row)),
+      buildNettowertColumn((row: any) => getOfferGrossTotal(row)),
       {
         header: "Status",
         width: "90px",
@@ -928,7 +924,7 @@ const OffersPage: React.FC<any> = ({
           expandedRowIds={expandedOfferIds}
           summaryCount={displayOffers.length}
           summaryTotal={displayOffers.reduce((sum: number, off: any) => {
-            const val = getOfferNetTotal(off);
+            const val = getOfferGrossTotal(off);
             return sum + (isNaN(val) ? 0 : val);
           }, 0)}
           renderRowDetails={(row) => (

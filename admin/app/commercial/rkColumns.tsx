@@ -140,15 +140,38 @@ interface RkColumnsArgs {
   onView: (row: any) => void;
 }
 
-const valueNetCalc = (row: any) => {
-  const itemsNet = Number(row.subtotal ?? row.netTotal ?? 0);
-  const shipping = Number(row.shipping_cost ?? row.shippingCost ?? 0);
-  if (itemsNet > 0) {
-    return itemsNet + shipping;
+export const getRkGrossTotal = (row: any): number => {
+  if (!row) return 0;
+
+  const gross = Number(row.grossTotal ?? row.gross_total ?? 0);
+  if (gross > 0) return gross;
+
+  const subtotal = Number(row.subtotal ?? row.netTotal ?? row.sub_total ?? 0);
+  const taxAmount = Number(row.taxAmount ?? row.tax_amount ?? 0);
+  if (subtotal > 0 || taxAmount > 0) {
+    return subtotal + taxAmount;
   }
-  const gross = Number(row.grossTotal || row.total_amount || 0);
-  return gross > 0 ? Math.max(0, gross - Number(row.taxAmount || row.tax_amount || 0)) : 0;
+
+  const totalAmt = Number(row.totalAmount ?? row.total_amount ?? 0);
+  if (totalAmt > 0) return totalAmt;
+
+  const items = row.items || row.orderItems || [];
+  if (items.length > 0) {
+    const defaultTaxRate = Number(row.tax_rate ?? row.taxRate ?? 19);
+    const shipping = Number(row.shipping_cost ?? row.shippingCost ?? 0);
+    const itemsNet = items.reduce((sum: number, it: any) => {
+      const qty = Number(it.quantity ?? it.qty ?? 1);
+      const price = Number(it.price ?? it.unitPrice ?? 0);
+      return sum + qty * price;
+    }, 0);
+    const netSum = itemsNet + shipping;
+    return netSum * (1 + defaultTaxRate / 100);
+  }
+
+  return 0;
 };
+
+const valueNetCalc = (row: any) => getRkGrossTotal(row);
 
 export function buildRkColumns({
   expandedDocIds,
