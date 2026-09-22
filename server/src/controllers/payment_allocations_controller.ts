@@ -8,11 +8,76 @@ import {
 import { CustomerOrder } from "../models/customer_orders";
 import { Rechnung } from "../models/rechnung";
 import { Rechnung_k } from "../models/rechnung_k";
+import { In } from "typeorm/find-options/operator/In";
 
 const round2 = (n: number): number =>
   isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
 
-/** Sum of everything already allocated out of one Payment Inbound. */
+/**
+ * Batched: every PaymentAllocation targeting one of these Aufträge,
+ * grouped by auftrag_id, with each allocation's linked PaymentInbound
+ * attached — so a linked-documents panel can show "paid via: <payer>,
+ * <amount>, <date>" without a second round trip.
+ */
+export async function getPaymentsForAuftragIds(
+  auftragIds: number[],
+): Promise<Map<number, { allocations: any[]; paid_amount: number }>> {
+  const result = new Map<number, { allocations: any[]; paid_amount: number }>();
+  if (auftragIds.length === 0) return result;
+
+  const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
+  const allocations = await allocationRepo.find({
+    where: {
+      target_type: PaymentAllocationTargetType.AUFTRAG,
+      auftrag_id: In(auftragIds),
+    },
+    relations: ["paymentInbound"],
+    order: { created_at: "DESC" },
+  });
+
+  for (const a of allocations) {
+    if (!a.auftrag_id) continue;
+    if (!result.has(a.auftrag_id)) {
+      result.set(a.auftrag_id, { allocations: [], paid_amount: 0 });
+    }
+    const bucket = result.get(a.auftrag_id)!;
+    bucket.allocations.push(a);
+    bucket.paid_amount = round2(bucket.paid_amount + Number(a.amount));
+  }
+
+  return result;
+}
+
+/** Same as above, keyed by rechnung_id (uuid) instead of auftrag_id. */
+export async function getPaymentsForRechnungIds(
+  rechnungIds: string[],
+): Promise<Map<string, { allocations: any[]; paid_amount: number }>> {
+  const result = new Map<string, { allocations: any[]; paid_amount: number }>();
+  if (rechnungIds.length === 0) return result;
+
+  const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
+  const allocations = await allocationRepo.find({
+    where: {
+      target_type: PaymentAllocationTargetType.RECHNUNG,
+      rechnung_id: In(rechnungIds),
+    },
+    relations: ["paymentInbound"],
+    order: { created_at: "DESC" },
+  });
+
+  for (const a of allocations) {
+    if (!a.rechnung_id) continue;
+    if (!result.has(a.rechnung_id)) {
+      result.set(a.rechnung_id, { allocations: [], paid_amount: 0 });
+    }
+    const bucket = result.get(a.rechnung_id)!;
+    bucket.allocations.push(a);
+    bucket.paid_amount = round2(bucket.paid_amount + Number(a.amount));
+  }
+
+  return result;
+}
+
 export async function getAllocatedAmountForInbound(
   inboundId: string,
 ): Promise<number> {
@@ -324,25 +389,12 @@ export const getAllocationsForTarget = async (
   }
 };
 
-// ============================================================
-// Rechnung payment status — derived, never stored. Computed fresh
-// from PaymentAllocation sums + due-date logic every time a Rechnung
-// is read, so it can't go stale the way a persisted field could.
-// ============================================================
-
 export type RechnungPaymentStatus =
   | "paid"
   | "partially_paid"
   | "unpaid"
   | "overdue";
 
-/**
- * The date payment is considered due: the Rechnung's own due_date if
- * set, otherwise invoice_date (falling back to delivery_date) plus
- * payment_terms days (or 30 days if payment_terms isn't a usable
- * number) — the same default window used elsewhere in this codebase
- * (see the CCI invoice due_date fallback in createRechnungFromAuftrag).
- */
 function getEffectiveDueDate(rechnung: {
   due_date?: any;
   invoice_date?: any;
@@ -367,15 +419,6 @@ function getEffectiveDueDate(rechnung: {
   return due;
 }
 
-/**
- * paid: fully covered by allocations.
- * overdue: not fully paid AND the effective due date has passed —
- *   checked before partially_paid/unpaid so a late partial payment
- *   still shows as overdue rather than hiding behind "partially paid".
- * partially_paid: some but not all of the total has been allocated,
- *   due date not yet passed.
- * unpaid: nothing allocated yet, due date not yet passed.
- */
 export function computeRechnungPaymentStatus(
   rechnung: {
     due_date?: any;

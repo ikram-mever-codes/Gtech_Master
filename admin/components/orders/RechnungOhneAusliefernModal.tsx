@@ -37,6 +37,7 @@ export default function RechnungOhneAusliefernModal({
   const [value, setValue] = useState<string>("30");
   const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [lineItemText, setLineItemText] = useState<string>("");
 
   useEffect(() => {
     if (auftrag) {
@@ -44,6 +45,11 @@ export default function RechnungOhneAusliefernModal({
       setCalculationType("percentage");
       setValue("30");
       setNotes("");
+      setLineItemText(
+        `Rechnung zu Auftrag ${auftrag.order_no || ""}${
+          auftrag.title ? ` ${auftrag.title}` : ""
+        }`.trim(),
+      );
     }
   }, [auftrag, isOpen]);
 
@@ -108,6 +114,7 @@ export default function RechnungOhneAusliefernModal({
         calculationType: amountType === "partial" ? calculationType : undefined,
         value: amountType === "partial" ? parseFloat(value) : undefined,
         notes,
+        lineItemText,
       });
 
       if (res?.success) {
@@ -172,8 +179,19 @@ export default function RechnungOhneAusliefernModal({
               <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5">
                 Tax profile: {taxProfileLabel}
               </span>
+            </div>{" "}
+            <div>
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                Rechnungsposition (Line Item Text)
+              </label>
+              <input
+                type="text"
+                value={lineItemText}
+                onChange={(e) => setLineItemText(e.target.value)}
+                placeholder="Rechnung zu Auftrag ..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent font-medium"
+              />
             </div>
-
             <div className="grid grid-cols-1 gap-3">
               <label
                 className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${

@@ -32,6 +32,7 @@ import {
 import { Order } from "../models/orders";
 import { CargoOrder } from "../models/cargo_orders";
 import { TransferOrder } from "../models/transfer_order";
+import { getPaymentsForRechnungIds } from "./payment_allocations_controller";
 
 async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
@@ -209,6 +210,7 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
     auftrag: [] as any[],
     rechnungenK: [] as any[],
     cargos: [] as any[],
+    payments: { allocations: [] as any[], paid_amount: 0 },
   });
   const result = new Map<string, ReturnType<typeof empty>>();
   rechnungen.forEach((r) => result.set(r.id, empty()));
@@ -227,10 +229,12 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   );
   const rechnungIds = rechnungen.map((r) => r.id);
 
-  const [auftraege, rechnungenK] = await Promise.all([
+  const [auftraege, rechnungenK, paymentsByRechnungId] = await Promise.all([
     auftragIds.length
       ? customerOrderRepo.find({
           where: { id: In(auftragIds) },
+          // total_amount added — the frontend compares this against
+          // each Rechnung's own total_amount to flag a differing amount.
           select: [
             "id",
             "order_no",
@@ -238,14 +242,23 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
             "created_at",
             "payment_terms",
             "payment_method",
+            "total_amount",
           ],
         })
       : Promise.resolve([]),
     rechnungKRepo.find({
       where: { original_rechnung_id: In(rechnungIds) },
-      select: ["id", "invoice_number", "created_at", "original_rechnung_id"],
+      select: [
+        "id",
+        "invoice_number",
+        "created_at",
+        "original_rechnung_id",
+        "total_amount",
+      ],
       order: { created_at: "DESC" },
     }),
+    // Payments assigned to each Rechnung, in one batched query.
+    getPaymentsForRechnungIds(rechnungIds),
   ]);
 
   const auftragById = new Map(auftraege.map((a: any) => [a.id, a]));
@@ -254,14 +267,20 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   const cargosByAuftragId = await getCargosByAuftragIds(auftragIds);
 
   for (const r of rechnungen) {
-    if (!r.auftrag_id) continue;
     const bucket = result.get(r.id);
-    const auftrag = auftragById.get(r.auftrag_id);
-    if (bucket && auftrag) {
-      bucket.auftrag.push(auftrag);
-      const cargos = cargosByAuftragId.get(r.auftrag_id);
-      if (cargos) bucket.cargos.push(...cargos);
+    if (!bucket) continue;
+
+    if (r.auftrag_id) {
+      const auftrag = auftragById.get(r.auftrag_id);
+      if (auftrag) {
+        bucket.auftrag.push(auftrag);
+        const cargos = cargosByAuftragId.get(r.auftrag_id);
+        if (cargos) bucket.cargos.push(...cargos);
+      }
     }
+
+    const payments = paymentsByRechnungId.get(r.id);
+    if (payments) bucket.payments = payments;
   }
 
   for (const rk of rechnungenK) {
@@ -819,6 +838,7 @@ export const createRechnungFromAuftrag = async (
     next(error);
   }
 };
+
 export const createRechnungOhneAusliefern = async (
   req: Request,
   res: Response,
@@ -826,7 +846,8 @@ export const createRechnungOhneAusliefern = async (
 ) => {
   try {
     const { auftragId } = req.params;
-    const { amountType, calculationType, value, notes } = req.body;
+    const { amountType, calculationType, value, notes, lineItemText } =
+      req.body;
 
     const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
     const auftrag = await customerOrderRepo.findOne({
@@ -840,13 +861,20 @@ export const createRechnungOhneAusliefern = async (
     }
 
     const orderItems = auftrag.orderItems || [];
-    const auftragSubtotal = orderItems.reduce(
+    const itemsSubtotal = orderItems.reduce(
       (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
       0,
     );
+    // Shipping is part of the Auftrag's real total, so it must be part of
+    // the base this Rechnung is calculated from too — otherwise
+    // "Gesamtbetrag (100%)" silently undercounts by the shipping cost.
+    const shippingCost = Number(auftrag.shipping_cost) || 0;
+    const shippingQuantity = Number(auftrag.shipping_quantity) || 1;
+    const shippingTotal = shippingCost * shippingQuantity;
+    const auftragSubtotal = itemsSubtotal + shippingTotal;
 
     let invoiceSubtotal = auftragSubtotal;
-    let descriptionText = `Rechnung ohne Ausliefern zu Auftrag ${auftrag.order_no}`;
+    let descriptionText = `Rechnung zu Auftrag ${auftrag.order_no}${auftrag.title ? ` ${auftrag.title}` : ""}`;
 
     const parsedValue = Number(value) || 0;
 
@@ -854,11 +882,13 @@ export const createRechnungOhneAusliefern = async (
       if (calculationType === "percentage") {
         const pct = Math.min(100, Math.max(0.01, parsedValue));
         invoiceSubtotal = (auftragSubtotal * pct) / 100;
-        descriptionText = `${pct}% Teilrechnung zu Auftrag ${auftrag.order_no}`;
       } else if (calculationType === "fixed") {
         invoiceSubtotal = parsedValue > 0 ? parsedValue : auftragSubtotal;
-        descriptionText = `Teilrechnung zu Auftrag ${auftrag.order_no}`;
       }
+    }
+
+    if (typeof lineItemText === "string" && lineItemText.trim()) {
+      descriptionText = lineItemText.trim();
     }
 
     const taxRate = Number(auftrag.tax_rate ?? 19);
@@ -887,6 +917,25 @@ export const createRechnungOhneAusliefern = async (
         relations: ["businessDetails"],
       });
     }
+
+    // Fälligkeit / due date: Auftrag's own payment_terms (if it holds a
+    // usable number of days) -> Customer's defaultPaymentDueDays -> 7
+    // days, in that order. Computed once here and stored on the Rechnung
+    // itself so the frontend never has to re-derive it from a
+    // payment_terms string that may not contain a number (e.g. "Vorkasse").
+    const auftragTermsMatch = String(auftrag.payment_terms || "").match(/\d+/);
+    const auftragDueDays = auftragTermsMatch
+      ? parseInt(auftragTermsMatch[0], 10)
+      : NaN;
+    const customerDueDays = Number(originalCust?.defaultPaymentDueDays) || 0;
+    const dueDays =
+      !isNaN(auftragDueDays) && auftragDueDays > 0
+        ? auftragDueDays
+        : customerDueDays > 0
+          ? customerDueDays
+          : 7;
+    const dueDate = new Date(now);
+    dueDate.setDate(dueDate.getDate() + dueDays);
 
     const dispName =
       auftrag.customerSnapshot?.displayName ||
@@ -950,6 +999,7 @@ export const createRechnungOhneAusliefern = async (
       auftrag_id: auftrag.id,
       auftrag_no: auftrag.order_no,
       invoice_date: now,
+      due_date: dueDate,
       subtotal: invoiceSubtotal,
       tax_rate: taxRate,
       tax_amount: taxAmount,
@@ -980,50 +1030,39 @@ export const createRechnungOhneAusliefern = async (
       payment_method: auftrag.payment_method || undefined,
       payment_terms: auftrag.payment_terms || undefined,
       delivery_terms: auftrag.delivery_terms || undefined,
-      shipping_method:
-        auftrag.shipping_text || auftrag.shipping_method || undefined,
+      // Settings-defined shipping method only — NOT auftrag.shipping_text,
+      // which is a freely user-edited string and may not match the
+      // canonical method name from Settings anymore.
+      shipping_method: auftrag.shipping_method || undefined,
+      // Shipping is already folded into invoiceSubtotal above (as part of
+      // the single line item's total) rather than being its own line —
+      // explicitly zeroed so the Rechnung view never renders a separate
+      // (phantom) shipping row. shipping_quantity defaults to 1 at the
+      // entity level, so this must be passed explicitly, not omitted.
+      shipping_cost: 0,
+      shipping_quantity: 0,
     });
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
-
     const rechnungItemRepo = AppDataSource.getRepository(RechnungItem);
 
-    if (amountType === "full" && orderItems.length > 0) {
-      const itemsToCreate = orderItems.map((item, index) => {
-        const qty = Number(item.quantity) || 1;
-        const price = Number(item.price || 0);
-        const lineTotal = qty * price;
-        return rechnungItemRepo.create({
-          rechnungId: savedRechnung.id,
-          item_name: item.itemName || "Item",
-          itemNo: item.itemNo || item.material || undefined,
-          material: item.material || undefined,
-          photo: item.photo || undefined,
-          specification: item.specification || undefined,
-          description: item.description || undefined,
-          quantity: qty,
-          price: price,
-          unit_price_eur: price,
-          total_price: lineTotal,
-          order_no: auftrag.order_no,
-          position: index + 1,
-          lineTotal: lineTotal,
-        });
-      });
-      await rechnungItemRepo.save(itemsToCreate);
-    } else {
-      const itemEntity = rechnungItemRepo.create({
-        rechnungId: savedRechnung.id,
-        item_name: descriptionText,
-        quantity: 1,
-        price: invoiceSubtotal,
-        unit_price_eur: invoiceSubtotal,
-        total_price: invoiceSubtotal,
-        order_no: auftrag.order_no,
-        position: 1,
-        lineTotal: invoiceSubtotal,
-      });
-      await rechnungItemRepo.save(itemEntity);
-    }
+    // A Vorkasse/prepayment Rechnung never carries the Auftrag's real
+    // line items or a separate shipping line — exactly one adjustable
+    // line, at the full invoiced amount (items + shipping already
+    // merged into invoiceSubtotal above), taxed at the Auftrag's own
+    // tax profile rate.
+    const itemEntity = rechnungItemRepo.create({
+      rechnungId: savedRechnung.id,
+      item_name: descriptionText,
+      quantity: 1,
+      price: invoiceSubtotal,
+      unit_price_eur: invoiceSubtotal,
+      total_price: invoiceSubtotal,
+      taxRate: taxRate,
+      order_no: auftrag.order_no,
+      position: 1,
+      lineTotal: invoiceSubtotal,
+    });
+    await rechnungItemRepo.save(itemEntity);
 
     const fullRechnung = await rechnungRepo.findOne({
       where: { id: savedRechnung.id },
