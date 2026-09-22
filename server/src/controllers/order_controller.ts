@@ -2348,10 +2348,23 @@ export const generateCommercialInvoicePDF = async (
       .strokeColor("black")
       .lineWidth(1)
       .stroke();
-    itemY += 12;
+    itemY += 10;
+
+    doc
+      .fontSize(9)
+      .font("Helvetica-Bold")
+      .fillColor("#000000")
+      .text(
+        "* Unit price is calculated and can have errors from rounding",
+        40,
+        itemY + 2,
+        { width: 310 },
+      );
+
     doc
       .font("Helvetica-Bold")
       .fontSize(11)
+      .fillColor("#000000")
       .text("Total :", 360, itemY, { underline: true });
     doc.text(`${totalQty} pcs`, 415, itemY, { underline: true });
     doc.text(`${grandTotal} €`, 485, itemY, {
@@ -2361,20 +2374,10 @@ export const generateCommercialInvoicePDF = async (
     });
 
     itemY += 20;
-    if (itemY + 110 > pageH - footerReserve) {
+    if (itemY + 80 > pageH - footerReserve) {
       doc.addPage();
       itemY = 50;
     }
-    doc
-      .fontSize(10)
-      .font("Helvetica-Bold")
-      .fillColor("#000000")
-      .text(
-        "* Unit price is calculated and can have errors from rounding",
-        40,
-        itemY,
-      );
-    itemY += 16;
     doc
       .fontSize(9)
       .font("Helvetica")
@@ -2393,7 +2396,7 @@ export const generateCommercialInvoicePDF = async (
       { lineBreak: false },
     );
 
-    itemY += 22;
+    itemY += 20;
     if (itemY + 40 > pageH - footerReserve) {
       doc.addPage();
       itemY = 50;
