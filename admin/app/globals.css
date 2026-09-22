@@ -19,7 +19,7 @@
   font-family: Roboto, sans-serif;
 }
 body {
-  font-family: "Roboto", sans-serif;
+  font-family: "Poppins", "Roboto", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   background-color: #f4f4f4;
   overflow-x: hidden;
 }

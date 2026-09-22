@@ -165,7 +165,8 @@ interface BestellungColumnsArgs {
   gtechHkDisplayName?: string;
 }
 
-const valueNetCalc = (row: any) => {
+export const getBestellungGrossTotal = (row: any): number => {
+  if (!row) return 0;
   const shipping = Number(row.shipping_cost ?? row.shippingCost ?? 0);
   const items = row.items || row.orderItems || [];
   if (items.length > 0) {
@@ -173,6 +174,7 @@ const valueNetCalc = (row: any) => {
       const qty = Number(it.qty ?? it.quantity ?? 1);
       const price = Number(
         it.eur_special_price ??
+          it.purchasePrice ??
           it.price ??
           it.unitPrice ??
           it.transferPrice ??
@@ -184,11 +186,15 @@ const valueNetCalc = (row: any) => {
     }, 0);
     return itemsTotal + shipping;
   }
+  const totalAmt = Number(row.total_amount ?? row.totalAmount ?? 0);
+  if (totalAmt > 0) return totalAmt;
   if (row.subtotal !== undefined && row.subtotal !== null) {
-    return Number(row.subtotal);
+    return Number(row.subtotal) + shipping;
   }
-  return Number(row.total_amount ?? 0);
+  return 0;
 };
+
+const valueNetCalc = (row: any) => getBestellungGrossTotal(row);
 
 const getZweckBadgeStyle = (zweck: string) => {
   switch (zweck) {

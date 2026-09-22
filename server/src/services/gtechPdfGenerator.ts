@@ -27,7 +27,18 @@ async function drawCustomerSvgBackground(doc: InstanceType<typeof PDFDocument>):
       rawSvg = rawSvg
         .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
         .replace(/x_Document_Title/gi, "")
-        .replace(/Document_Title/gi, "");
+        .replace(/Document_Title/gi, "")
+        .replace(/<g[^>]*id="g10"[\s\S]*?<\/g>/gi, "");
+
+      // Round high precision floating point numbers in d="..." path attributes to 2 decimals
+      rawSvg = rawSvg.replace(/d="([^"]+)"/g, (_match: string, pathData: string) => {
+        const roundedData = pathData.replace(/-?\d+\.\d+/g, (numStr: string) => {
+          const n = parseFloat(numStr);
+          return Number(n.toFixed(2)).toString();
+        });
+        return `d="${roundedData}"`;
+      });
+
       cachedCustomerSvg = rawSvg;
       cachedTemplatePath = activePath;
     }
@@ -62,27 +73,30 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
+    const embeddedTemplatePages = await mergedPdf.embedPdf(
+      templatePdf,
+      templatePdf.getPageIndices(),
+    );
+    const embeddedContentPages = await mergedPdf.embedPdf(
+      contentPdf,
+      contentPdf.getPageIndices(),
+    );
+
     for (let i = 0; i < contentPageCount; i++) {
       const templatePageIdx = Math.min(i, templatePageCount - 1);
-
-      const [embeddedTemplate] = await mergedPdf.embedPdf(templateBytes, [
-        templatePageIdx,
-      ]);
-      const [embeddedContent] = await mergedPdf.embedPdf(contentBytes, [i]);
-
       const contentPage = contentPdf.getPage(i);
       const { width, height } = contentPage.getSize();
 
       const newPage = mergedPdf.addPage([width, height]);
 
-      newPage.drawPage(embeddedTemplate, {
+      newPage.drawPage(embeddedTemplatePages[templatePageIdx], {
         x: 0,
         y: 0,
         width,
         height,
       });
 
-      newPage.drawPage(embeddedContent, {
+      newPage.drawPage(embeddedContentPages[i], {
         x: 0,
         y: 0,
         width,
@@ -90,7 +104,7 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
       });
     }
 
-    const mergedBytes = await mergedPdf.save();
+    const mergedBytes = await mergedPdf.save({ useObjectStreams: true });
     fs.writeFileSync(contentPdfPath, mergedBytes);
   } catch (err) {
     console.error("Error in mergePdfTemplate:", err);

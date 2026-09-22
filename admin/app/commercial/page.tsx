@@ -103,16 +103,19 @@ import {
   buildAuftragColumns,
   getStatusBackgroundColor,
   sortAuftraegeByStatus,
+  getAuftragGrossTotal,
 } from "./auftragColumns";
-import { buildBestellungColumns } from "./bestellungColumns";
+import { buildBestellungColumns, getBestellungGrossTotal } from "./bestellungColumns";
 import {
   buildRechnungColumns,
   getRechnungStatusBackgroundColor,
+  getRechnungGrossTotal,
 } from "./rechnungColumns";
-import { buildRkColumns } from "./rkColumns";
+import { buildRkColumns, getRkGrossTotal } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
 import { buildPaymentInboundColumns } from "./paymentInboundColumns";
 import PaymentInboundAssignModal from "./PaymentInboundAssignModal";
+import { getOfferGrossTotal } from "../offers/page";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -2062,77 +2065,23 @@ const InvoiceListPage: React.FC = () => {
               summaryCount={displayItems.length}
               summaryTotal={displayItems.reduce((sum: number, item: any) => {
                 let amt = 0;
-                const shipping = Number(
-                  item.shippingCost ||
-                  item.shipping_cost ||
-                  item.freightCost ||
-                  item.freight_cost ||
-                  0,
-                );
-
-                if (
+                if (activeInvTab === "auftrag") {
+                  amt = getAuftragGrossTotal(item);
+                } else if (activeInvTab === "bestellung") {
+                  amt = getBestellungGrossTotal(item);
+                } else if (activeInvTab === "rechnung") {
+                  amt = getRechnungGrossTotal(item);
+                } else if (activeInvTab === "rk") {
+                  amt = getRkGrossTotal(item);
+                } else if (
                   (activeInvTab as string) === "payment_inbound" ||
                   (activeInvTab as string) === "payments"
                 ) {
                   amt = Number(item.amount || item.total || 0);
-                } else if (
-                  item.subtotal !== undefined &&
-                  item.subtotal !== null
-                ) {
-                  amt = Number(item.subtotal) + shipping;
-                } else if (
-                  item.sub_total !== undefined &&
-                  item.sub_total !== null
-                ) {
-                  amt = Number(item.sub_total) + shipping;
-                } else if (
-                  item.netTotal !== undefined &&
-                  item.netTotal !== null &&
-                  Number(item.netTotal) > 0
-                ) {
-                  amt = Number(item.netTotal);
-                } else if (
-                  item.net_total !== undefined &&
-                  item.net_total !== null &&
-                  Number(item.net_total) > 0
-                ) {
-                  amt = Number(item.net_total);
-                } else if (
-                  item.netAmount !== undefined &&
-                  item.netAmount !== null &&
-                  Number(item.netAmount) > 0
-                ) {
-                  amt = Number(item.netAmount);
-                } else if (
-                  Array.isArray(
-                    item.items || item.orderItems || item.lineItems,
-                  ) &&
-                  (item.items || item.orderItems || item.lineItems).length > 0
-                ) {
-                  const lineItems =
-                    item.items || item.orderItems || item.lineItems;
-                  amt =
-                    lineItems.reduce((acc: number, it: any) => {
-                      const p = Number(
-                        it.price ||
-                        it.sales_price ||
-                        it.unit_price ||
-                        it.net_price ||
-                        0,
-                      );
-                      const q = Number(it.quantity || it.qty || 1);
-                      return acc + p * q;
-                    }, 0) + shipping;
+                } else if (activeInvTab === "lieferschein") {
+                  amt = getAuftragGrossTotal(item);
                 } else {
-                  const gross = Number(
-                    item.total_amount ||
-                    item.totalAmount ||
-                    item.total ||
-                    item.grossTotal ||
-                    0,
-                  );
-                  const taxRate = Number(item.tax_rate || item.taxRate || 19);
-                  amt = gross > 0 ? gross / (1 + taxRate / 100) : 0;
+                  amt = getOfferGrossTotal(item);
                 }
                 return sum + (isNaN(amt) ? 0 : amt);
               }, 0)}

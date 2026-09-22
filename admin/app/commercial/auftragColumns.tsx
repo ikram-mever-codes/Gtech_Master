@@ -46,22 +46,76 @@ interface AuftragColumnsArgs {
   invoices: any[];
 }
 
-const valueNetCalc = (row: any) => {
-  const shipping = Number(row.shipping_cost || 0);
-  if (row.subtotal !== undefined && row.subtotal !== null) {
-    return Number(row.subtotal);
+export const getAuftragGrossTotal = (row: any): number => {
+  if (!row) return 0;
+
+  const visibleItems = row.orderItems || row.items || [];
+  const discountPct = Number(row.discount_percentage || row.discountPercentage || 0);
+  const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
+  const shippingCost = Number(row.shipping_cost || row.shippingCost || 0);
+  const shippingQty = Number(row.shipping_quantity || row.shippingQuantity || 1);
+  const shippingTotal = shippingCost * shippingQty;
+
+  if (visibleItems.length > 0) {
+    const defaultTaxRate = Number(row.tax_rate ?? row.taxRate ?? 19);
+    const byRate = new Map<number, number>();
+
+    visibleItems.forEach((li: any) => {
+      const qty = Number(li.quantity ?? li.qty ?? 1);
+      const price = Number(li.price ?? li.unitPrice ?? 0);
+      const lineTotal = qty * price;
+
+      const isFreetext = !li.sourceItemId && !li.itemNo;
+      let rate = defaultTaxRate;
+      if (isFreetext && li.taxRate !== undefined && li.taxRate !== null && li.taxRate !== "") {
+        rate = Number(li.taxRate);
+      }
+      byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
+    });
+
+    if (shippingTotal > 0) {
+      const shipRate = defaultTaxRate;
+      byRate.set(shipRate, (byRate.get(shipRate) || 0) + shippingTotal);
+    }
+
+    let grossSum = 0;
+    byRate.forEach((base, rate) => {
+      const adjustedBase = base * discountFactor;
+      const tax = adjustedBase * (rate / 100);
+      grossSum += adjustedBase + tax;
+    });
+
+    const discountAmount = Number(row.discount_amount || 0);
+    const finalGross = grossSum - discountAmount;
+    if (finalGross > 0) return finalGross;
   }
-  if (row.total_amount !== undefined && row.total_amount !== null) {
-    return Number(row.total_amount);
+
+  const gross = Number(row.gross_total ?? row.grossTotal ?? 0);
+  if (gross > 0) return gross;
+
+  const subtotal = Number(row.subtotal ?? row.sub_total ?? 0);
+  const taxAmount = Number(row.tax_amount ?? row.taxAmount ?? 0);
+  if (subtotal > 0 && taxAmount > 0) {
+    return subtotal + taxAmount + shippingTotal;
   }
-  return (
-    (row.items || row.orderItems || []).reduce(
-      (sum: number, it: any) =>
-        sum + Number(it.price || it.unitPrice || 0) * Number(it.qty || it.quantity || 0),
-      0,
-    ) + shipping
-  );
+
+  const totalAmt = Number(row.totalAmount ?? row.total_amount ?? 0);
+  const defaultTaxRate = Number(row.tax_rate ?? row.taxRate ?? 19);
+
+  if (totalAmt > 0 && Math.abs(totalAmt - subtotal) > 0.01) {
+    return totalAmt;
+  }
+
+  const baseNet = subtotal > 0 ? subtotal : totalAmt;
+  if (baseNet > 0) {
+    const net = baseNet + shippingTotal;
+    return net * (1 + defaultTaxRate / 100);
+  }
+
+  return 0;
 };
+
+const valueNetCalc = (row: any) => getAuftragGrossTotal(row);
 
 const itemCountCalc = (row: any) => row.items?.length || 0;
 
