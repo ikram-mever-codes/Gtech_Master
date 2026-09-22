@@ -648,6 +648,10 @@ export const createBusiness = async (
       defaultPaymentMethod,
       defaultShippingMethod,
       defaultPaymentDueDays,
+      emailRechnungen,
+      email_rechnungen,
+      emailEinkauf,
+      email_einkauf,
     } = req.body;
 
     const user = (req as any).user;
@@ -838,6 +842,8 @@ export const createBusiness = async (
           defaultPaymentDueDays !== undefined && defaultPaymentDueDays !== null
             ? parseInt(defaultPaymentDueDays)
             : 7;
+        customer.email_rechnungen = (emailRechnungen || email_rechnungen || "").trim() || undefined;
+        customer.email_einkauf = (emailEinkauf || email_einkauf || "").trim() || undefined;
 
         if (isStarCustomer) {
           customer.stage = "star_customer";
@@ -1212,6 +1218,10 @@ export const updateBusiness = async (
       defaultPaymentMethod,
       defaultShippingMethod,
       defaultPaymentDueDays,
+      emailRechnungen,
+      email_rechnungen,
+      emailEinkauf,
+      email_einkauf,
     } = updateData;
 
     const user = (req as any).user;
@@ -1415,6 +1425,12 @@ export const updateBusiness = async (
           customer.defaultPaymentMethod = defaultPaymentMethod
             ? defaultPaymentMethod.trim()
             : undefined;
+        }
+        if (updateData.emailRechnungen !== undefined || updateData.email_rechnungen !== undefined) {
+          customer.email_rechnungen = (updateData.emailRechnungen || updateData.email_rechnungen || "").trim() || undefined;
+        }
+        if (updateData.emailEinkauf !== undefined || updateData.email_einkauf !== undefined) {
+          customer.email_einkauf = (updateData.emailEinkauf || updateData.email_einkauf || "").trim() || undefined;
         }
         if (defaultShippingMethod !== undefined) {
           customer.defaultShippingMethod = defaultShippingMethod

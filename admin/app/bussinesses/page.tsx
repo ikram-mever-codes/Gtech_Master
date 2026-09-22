@@ -32,6 +32,7 @@ import {
   AdjustmentsHorizontalIcon,
   ExclamationTriangleIcon,
   TrashIcon,
+  TagIcon,
 } from "@heroicons/react/24/outline";
 import FilterResetIcon from "@/components/UI/FilterResetIcon";
 import { CheckIcon } from "@heroicons/react/24/solid";
@@ -207,10 +208,10 @@ const slugFromWebsite = (website?: string) => {
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
   return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
     }`;
 };
 
@@ -316,6 +317,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     city: "",
     country: "DE",
     email: "",
+    emailRechnungen: "",
+    emailEinkauf: "",
     phone: "",
     website: "",
     vatTaxId: "",
@@ -644,7 +647,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     let decodedBId = bId;
     try {
       decodedBId = decodeURIComponent(bId).trim();
-    } catch (e) {}
+    } catch (e) { }
 
     if (lastHandledBIdRef.current === bId || lastHandledBIdRef.current === decodedBId) return;
 
@@ -1196,6 +1199,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
       city: business.city || "",
       country: toCountryCode(business.country) || "DE",
       email: business.email || "",
+      emailRechnungen: business.emailRechnungen || business.email_rechnungen || "",
+      emailEinkauf: business.emailEinkauf || business.email_einkauf || "",
       phone: business.phone || "",
       website: business.website || "",
       asanaLink: business.asanaLink || "",
@@ -1244,6 +1249,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
         city: businessForm.city,
         country: businessForm.country,
         email: businessForm.email,
+        emailRechnungen: businessForm.emailRechnungen,
+        emailEinkauf: businessForm.emailEinkauf,
         phone: businessForm.phone,
         website: businessForm.website,
         asanaLink: businessForm.asanaLink,
@@ -1255,8 +1262,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
         defaultShippingMethod: businessForm.defaultShippingMethod || null,
         defaultPaymentDueDays:
           businessForm.defaultPaymentDueDays !== undefined &&
-            businessForm.defaultPaymentDueDays !== null
-            ? parseInt(businessForm.defaultPaymentDueDays)
+            businessForm.defaultPaymentDueDays !== null &&
+            businessForm.defaultPaymentDueDays !== ""
+            ? parseInt(String(businessForm.defaultPaymentDueDays).slice(0, 3))
             : 7,
       };
 
@@ -1731,7 +1739,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-3 align-top max-w-[300px]">
+                          <td className="px-3 py-3 align-top min-w-[280px] max-w-[500px]">
                             {" "}
                             {business.note ? (
                               <button
@@ -1741,11 +1749,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   handleOpenBusinessNote(business);
                                 }}
                                 title="Click to view note"
-                                className="block w-full text-left text-sm text-gray-600 break-words line-clamp-4 hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-snug"
+                                className="block w-full text-left text-sm text-gray-700 whitespace-pre-wrap break-words hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-relaxed"
                               >
-                                {business.note.length > 160
-                                  ? `${business.note.slice(0, 160)}...`
-                                  : business.note}
+                                {business.note}
                               </button>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
@@ -2048,7 +2054,38 @@ const CombinedBusinessContactsContent: React.FC = () => {
             ) : null
           }
           extraHeaderElements={
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {(() => {
+                const currentTp =
+                  taxProfiles.find(
+                    (tp: any) =>
+                      tp.id ===
+                      (businessForm.default_tax_profile_id ||
+                        taxProfiles.find(
+                          (t: any) =>
+                            (t.tax_case || "").trim().toUpperCase() ===
+                            "DE-VAT",
+                        )?.id ||
+                        taxProfiles[0]?.id),
+                  ) || taxProfiles[0];
+
+                const taxCase = (
+                  currentTp?.tax_case ||
+                  currentTp?.name ||
+                  "DE-VAT"
+                ).trim();
+                const upperCase = taxCase.toUpperCase();
+
+                return (
+                  <div
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border bg-orange-100 text-orange-800 border-orange-300 shadow-2xs"
+                    title={`Tax Profile: ${taxCase}`}
+                  >
+                    <TagIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{taxCase}</span>
+                  </div>
+                );
+              })()}
               <button
                 type="button"
                 onClick={() => {
@@ -2274,116 +2311,378 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       ))}
                   </select>
                 </div>
-                {/* Row 3: Email | Phone | Web URL | Company Label Print Logo | Note (wider, spans rows 3-4) */}
-                <div className="col-span-12 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={businessForm.email}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        email: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="info@muster.de"
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={businessForm.phone}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        phone: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="+49 89 1234567"
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Web URL
-                  </label>
-                  <input
-                    type="url"
-                    value={businessForm.website}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        website: e.target.value,
-                      })
-                    }
-                    onBlur={handleWebsiteBlur}
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="https://www.muster.de"
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-2">
-                  <label
-                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
-                    title="Company Label Print Logo"
-                  >
-                    Company Label Print Logo
-                  </label>
-                  <div className="flex items-center gap-2 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
-                    {businessForm.companyLabelPrintLogo ? (
-                      <img
-                        src={businessForm.companyLabelPrintLogo}
-                        alt="Label logo"
-                        className="h-6 w-6 object-contain rounded border border-gray-200 bg-white shrink-0"
+                <div className="col-span-12 md:col-span-8 space-y-3">
+                  <div className="grid grid-cols-12 gap-3">
+                    <div className="col-span-12 sm:col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={businessForm.phone}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            phone: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="+49 89 1234567"
                       />
-                    ) : (
-                      <div className="h-6 w-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 shrink-0">
-                        No
-                      </div>
-                    )}
-                    <input
-                      id="labelLogoInput"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={businessFieldDisabled}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="labelLogoInput"
-                      className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
-                          ? "opacity-50 cursor-not-allowed"
-                          : "cursor-pointer hover:bg-white"
-                        }`}
-                    >
-                      Upload
-                    </label>
-                    {businessForm.companyLabelPrintLogo &&
-                      !businessFieldDisabled && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBusinessForm({
-                              ...businessForm,
-                              companyLabelPrintLogo: "",
-                            })
-                          }
-                          className="text-xs text-red-600 hover:text-red-800 shrink-0"
+                    </div>
+                    <div className="col-span-12 sm:col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Web URL
+                      </label>
+                      <input
+                        type="url"
+                        value={businessForm.website}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            website: e.target.value,
+                          })
+                        }
+                        onBlur={handleWebsiteBlur}
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="https://www.muster.de"
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-4">
+                      <label
+                        className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                        title="Company Label Print Logo"
+                      >
+                        Company Label Print Logo
+                      </label>
+                      <div className="flex items-center gap-2 p-1.5 bg-gray-50/80 border border-gray-200/80 rounded-lg h-[38px]">
+                        {businessForm.companyLabelPrintLogo ? (
+                          <img
+                            src={businessForm.companyLabelPrintLogo}
+                            alt="Label logo"
+                            className="h-6 w-6 object-contain rounded border border-gray-200 bg-white shrink-0"
+                          />
+                        ) : (
+                          <div className="h-6 w-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 shrink-0">
+                            No
+                          </div>
+                        )}
+                        <input
+                          id="labelLogoInput"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          disabled={businessFieldDisabled}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="labelLogoInput"
+                          className={`px-2 py-0.5 text-xs rounded border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
+                            ? "opacity-50 cursor-not-allowed"
+                            : "cursor-pointer hover:bg-white"
+                            }`}
                         >
-                          Remove
-                        </button>
-                      )}
+                          Upload
+                        </label>
+                        {businessForm.companyLabelPrintLogo &&
+                          !businessFieldDisabled && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setBusinessForm({
+                                  ...businessForm,
+                                  companyLabelPrintLogo: "",
+                                })
+                              }
+                              className="text-xs text-red-600 hover:text-red-800 shrink-0"
+                            >
+                              Remove
+                            </button>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-3">
+                    <div className="col-span-12 sm:col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={businessForm.email}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            email: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="info@muster.de"
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Email Rechnungen">
+                        Email Rechnungen
+                      </label>
+                      <input
+                        type="email"
+                        value={businessForm.emailRechnungen || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            emailRechnungen: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="rechnung@muster.de"
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Email Einkauf">
+                        Email Einkauf
+                      </label>
+                      <input
+                        type="email"
+                        value={businessForm.emailEinkauf || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            emailEinkauf: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="einkauf@muster.de"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-3">
+                    <div className="col-span-12 sm:col-span-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Debitor No
+                      </label>
+                      <input
+                        type="text"
+                        value={businessForm.debtor_no || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            debtor_no: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
+                        placeholder="D-99000"
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        VAT / Tax ID
+                      </label>
+                      <input
+                        type="text"
+                        value={businessForm.vatTaxId || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            vatTaxId: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
+                        placeholder="DE123456789"
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-3">
+                      <label
+                        className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                        title="VATID check"
+                      >
+                        VATID check
+                      </label>
+                      <select
+                        value={businessForm.vat_id_status || "unchecked"}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            vat_id_status: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-2 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                      >
+                        <option value="unchecked">Unchecked</option>
+                        <option value="vies_valid">VIES Valid</option>
+                        <option value="vies_invalid">VIES Invalid</option>
+                        <option value="bzst_qualified_valid">
+                          BZSt Qualified Valid
+                        </option>
+                        <option value="bzst_qualified_invalid">
+                          BZSt Qualified Invalid
+                        </option>
+                      </select>
+                    </div>
+                    <div className="col-span-12 sm:col-span-3">
+                      <label
+                        className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                        title="Default Tax Profile"
+                      >
+                        Default Tax Profile
+                      </label>
+                      <div className="w-full px-2 py-2 text-sm border border-gray-200 bg-gray-100 rounded-lg text-gray-700 font-medium truncate h-[38px] flex items-center">
+                        {taxProfiles.find(
+                          (tp: any) =>
+                            tp.id ===
+                            (businessForm.default_tax_profile_id ||
+                              taxProfiles.find(
+                                (t: any) =>
+                                  (t.tax_case || "").trim().toUpperCase() ===
+                                  "DE-VAT",
+                              )?.id ||
+                              taxProfiles[0]?.id),
+                        )?.tax_case ||
+                          taxProfiles.find(
+                            (tp: any) =>
+                              (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
+                          )?.tax_case ||
+                          taxProfiles[0]?.tax_case ||
+                          "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-3">
+                    <div className="col-span-12 sm:col-span-5">
+                      <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Default Shipping Method">
+                        Default Shipping Method
+                      </label>
+                      <select
+                        value={businessForm.defaultShippingMethod || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            defaultShippingMethod: e.target.value || "",
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                      >
+                        <option value="">None / Not Assigned</option>
+                        {(dbShippingMethods.length > 0
+                          ? dbShippingMethods.map((sm: any) => sm.name)
+                          : [
+                            "Standard shipping",
+                            "Express shipping",
+                            "Freight",
+                            "Courier",
+                            "Pickup",
+                          ]
+                        ).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-12 sm:col-span-5">
+                      <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Default Payment Method">
+                        Default Payment Method
+                      </label>
+                      <select
+                        value={businessForm.defaultPaymentMethod || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            defaultPaymentMethod: e.target.value || "",
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                      >
+                        <option value="">None / Not Assigned</option>
+                        {(dbPaymentMethods.length > 0
+                          ? dbPaymentMethods.map((pm: any) => pm.name)
+                          : [
+                            "Prepayment",
+                            "Bank transfer",
+                            "Cash on delivery",
+                            "Invoice",
+                            "Credit card",
+                            "PayPal",
+                          ]
+                        ).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-12 sm:col-span-2">
+                      <label
+                        className="block text-xs font-medium text-gray-700 mb-1 truncate"
+                        title="Due Days"
+                      >
+                        Due Days
+                      </label>
+                      {(() => {
+                        const pmLower = (
+                          businessForm.defaultPaymentMethod || ""
+                        ).toLowerCase();
+                        const isKaufAufRechnung =
+                          pmLower.includes("rechnung") ||
+                          pmLower.includes("invoice") ||
+                          pmLower.includes("account");
+                        return (
+                          <input
+                            type="number"
+                            min="0"
+                            max="999"
+                            maxLength={3}
+                            value={
+                              businessForm.defaultPaymentDueDays !== undefined
+                                ? businessForm.defaultPaymentDueDays
+                                : 7
+                            }
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === "") {
+                                setBusinessForm({
+                                  ...businessForm,
+                                  defaultPaymentDueDays: "",
+                                });
+                              } else {
+                                const clamped = Math.min(999, Math.max(0, parseInt(raw.slice(0, 3)) || 0));
+                                setBusinessForm({
+                                  ...businessForm,
+                                  defaultPaymentDueDays: clamped,
+                                });
+                              }
+                            }}
+                            disabled={businessFieldDisabled || !isKaufAufRechnung}
+                            className={`w-full px-3 py-2 text-sm border rounded-lg transition-all font-medium ${businessFieldDisabled || !isKaufAufRechnung
+                              ? "bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed"
+                              : "bg-white/70 text-gray-900 border-gray-300/80 focus:ring-2 focus:ring-gray-500/50 focus:border-transparent"
+                              }`}
+                            placeholder="7"
+                            title={
+                              !isKaufAufRechnung
+                                ? "Due Days is only editable when Default Payment Method is Kauf auf Rechnung"
+                                : "Max 3 digits"
+                            }
+                          />
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
-                <div className="col-span-12 md:col-span-4 md:row-span-3">
+
+                <div className="col-span-12 md:col-span-4 flex flex-col h-full">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Note
                   </label>
@@ -2396,218 +2695,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       })
                     }
                     disabled={businessFieldDisabled}
-                    rows={4}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed resize-none h-[calc(100%-24px)] min-h-[92px]"
+                    className="w-full flex-1 p-3 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed resize-none min-h-[220px]"
                     placeholder="Internal note…"
                   />
-                </div>
-                {/* Row 4: Debitor No | VAT/Tax ID | VAT Check Status | Tax Profile (read-only, small) */}
-                <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Debitor No
-                  </label>
-                  <input
-                    type="text"
-                    value={businessForm.debtor_no || ""}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        debtor_no: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-                    placeholder="D-99000"
-                  />
-                </div>
-                <div className="col-span-6 md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    VAT / Tax ID
-                  </label>
-                  <input
-                    type="text"
-                    value={businessForm.vatTaxId || ""}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        vatTaxId: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-                    placeholder="DE123456789"
-                  />
-                </div>
-                <div className="col-span-6 md:col-span-2">
-                  <label
-                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
-                    title="VAT Check Status"
-                  >
-                    VAT Check Status
-                  </label>
-                  <select
-                    value={businessForm.vat_id_status || "unchecked"}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        vat_id_status: e.target.value,
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-2 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                  >
-                    <option value="unchecked">Unchecked</option>
-                    <option value="vies_valid">VIES Valid</option>
-                    <option value="vies_invalid">VIES Invalid</option>
-                    <option value="bzst_qualified_valid">
-                      BZSt Qualified Valid
-                    </option>
-                    <option value="bzst_qualified_invalid">
-                      BZSt Qualified Invalid
-                    </option>
-                  </select>
-                </div>
-                {/* Tax Profile — read-only plain text, small field */}
-                <div className="col-span-6 md:col-span-2">
-                  <label
-                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
-                    title="Default Tax Profile"
-                  >
-                    Default Tax Profile
-                  </label>
-                  <div className="w-full px-3 py-2 text-sm border border-gray-200 bg-gray-100 rounded-lg text-gray-700 font-medium truncate h-[38px] flex items-center">
-                    {taxProfiles.find(
-                      (tp: any) =>
-                        tp.id ===
-                        (businessForm.default_tax_profile_id ||
-                          taxProfiles.find(
-                            (t: any) =>
-                              (t.tax_case || "").trim().toUpperCase() ===
-                              "DE-VAT",
-                          )?.id ||
-                          taxProfiles[0]?.id),
-                    )?.tax_case ||
-                      taxProfiles.find(
-                        (tp: any) =>
-                          (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
-                      )?.tax_case ||
-                      taxProfiles[0]?.tax_case ||
-                      "—"}
-                  </div>
-                </div>
-                {/* Row 5: Shipping Method | Payment Method | Due Days */}
-                <div className="col-span-12 md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Default Shipping Method
-                  </label>
-                  <select
-                    value={businessForm.defaultShippingMethod || ""}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        defaultShippingMethod: e.target.value || "",
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                  >
-                    <option value="">None / Not Assigned</option>
-                    {(dbShippingMethods.length > 0
-                      ? dbShippingMethods.map((sm: any) => sm.name)
-                      : [
-                        "Standard shipping",
-                        "Express shipping",
-                        "Freight",
-                        "Courier",
-                        "Pickup",
-                      ]
-                    ).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-12 md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Default Payment Method
-                  </label>
-                  <select
-                    value={businessForm.defaultPaymentMethod || ""}
-                    onChange={(e) =>
-                      setBusinessForm({
-                        ...businessForm,
-                        defaultPaymentMethod: e.target.value || "",
-                      })
-                    }
-                    disabled={businessFieldDisabled}
-                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
-                  >
-                    <option value="">None / Not Assigned</option>
-                    {(dbPaymentMethods.length > 0
-                      ? dbPaymentMethods.map((pm: any) => pm.name)
-                      : [
-                        "Prepayment",
-                        "Bank transfer",
-                        "Cash on delivery",
-                        "Invoice",
-                        "Credit card",
-                        "PayPal",
-                      ]
-                    ).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-6 md:col-span-2">
-                  <label
-                    className="block text-xs font-medium text-gray-700 mb-1 truncate"
-                    title="Due Days"
-                  >
-                    Due Days
-                  </label>
-                  {(() => {
-                    const pmLower = (
-                      businessForm.defaultPaymentMethod || ""
-                    ).toLowerCase();
-                    const isKaufAufRechnung =
-                      pmLower.includes("rechnung") ||
-                      pmLower.includes("invoice") ||
-                      pmLower.includes("account");
-                    return (
-                      <input
-                        type="number"
-                        min="0"
-                        value={
-                          businessForm.defaultPaymentDueDays !== undefined
-                            ? businessForm.defaultPaymentDueDays
-                            : 7
-                        }
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            defaultPaymentDueDays:
-                              e.target.value !== ""
-                                ? parseInt(e.target.value)
-                                : "",
-                          })
-                        }
-                        disabled={businessFieldDisabled || !isKaufAufRechnung}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg transition-all font-medium ${businessFieldDisabled || !isKaufAufRechnung
-                            ? "bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed"
-                            : "bg-white/70 text-gray-900 border-gray-300/80 focus:ring-2 focus:ring-gray-500/50 focus:border-transparent"
-                          }`}
-                        placeholder="7"
-                        title={
-                          !isKaufAufRechnung
-                            ? "Due Days is only editable when Default Payment Method is Kauf auf Rechnung"
-                            : undefined
-                        }
-                      />
-                    );
-                  })()}
                 </div>{" "}
               </div>
             </div>
