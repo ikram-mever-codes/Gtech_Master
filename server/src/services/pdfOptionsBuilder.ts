@@ -5,6 +5,7 @@ import { CustomerOrder } from "../models/customer_orders";
 import { Customer } from "../models/customers";
 import { Offer } from "../models/offer";
 import { Rechnung_k as RechnungK } from "../models/rechnung_k";
+import { User } from "../models/users";
 import { PdfDocumentOptions } from "./gtechPdfGenerator";
 import { parseFlexibleNumber } from "../utils/decimal";
 
@@ -16,6 +17,33 @@ export interface BuildPdfContextOptions {
     email?: string;
   };
   outputFilePath?: string;
+}
+
+async function resolveContactDetails(
+  ansprechpartnerRaw?: string | null,
+  customerContactName?: string | null,
+  ctxUser?: { name?: string; username?: string; email?: string }
+): Promise<{ contactName: string; contactEmail?: string }> {
+  const targetName = (ansprechpartnerRaw || customerContactName || ctxUser?.name || ctxUser?.username || "").trim();
+  let contactName = targetName;
+  let contactEmail = ctxUser?.email;
+
+  if (targetName) {
+    try {
+      const userRepo = AppDataSource.getRepository(User);
+      const matchedUser = await userRepo.findOne({
+        where: [{ name: targetName }, { email: targetName }] as any,
+      });
+      if (matchedUser) {
+        contactName = matchedUser.name || matchedUser.email;
+        if (matchedUser.email) {
+          contactEmail = matchedUser.email;
+        }
+      }
+    } catch (_) {}
+  }
+
+  return { contactName, contactEmail };
 }
 
 function formatDateStr(dateVal: any): string {
@@ -123,12 +151,11 @@ export async function buildRechnungPdfOptions(
   else if (customerCompName) kundeCombined = customerCompName;
   else if (customerNum) kundeCombined = customerNum;
 
-  const contactName =
-    rechnung.ansprechpartner ||
-    customerSnap.contactName ||
-    ctx?.user?.name ||
-    ctx?.user?.username ||
-    "";
+  const { contactName, contactEmail } = await resolveContactDetails(
+    rechnung.ansprechpartner || (auftrag as any)?.ansprechpartner,
+    customerSnap.contactName,
+    ctx?.user,
+  );
 
   const resolvedInvoiceDate = formatDateStr(
     rechnung.invoice_date || rechnung.date_created || rechnung.created_at,
@@ -203,7 +230,7 @@ export async function buildRechnungPdfOptions(
     deliveryAddress: rechnung.deliveryAddress,
     metadataItems,
     kontaktName: contactName,
-    kontaktEmail: ctx?.user?.email,
+    kontaktEmail: contactEmail,
     isDelivered: isLieferscheinConfirmed,
     lineItems: items,
     showPrices: true,
@@ -309,12 +336,11 @@ export async function buildLieferscheinPdfOptions(
   else if (customerCompName) kundeCombined = customerCompName;
   else if (customerNum) kundeCombined = customerNum;
 
-  const contactName =
-    rechnung.ansprechpartner ||
-    customerSnap.contactName ||
-    ctx?.user?.name ||
-    ctx?.user?.username ||
-    "";
+  const { contactName, contactEmail } = await resolveContactDetails(
+    rechnung.ansprechpartner || (auftrag as any)?.ansprechpartner,
+    customerSnap.contactName,
+    ctx?.user,
+  );
 
   const lieferscheinNo =
     lieferschein?.delivery_note_number ||
@@ -400,7 +426,7 @@ export async function buildLieferscheinPdfOptions(
     deliveryAddress: rechnung.deliveryAddress,
     metadataItems,
     kontaktName: contactName,
-    kontaktEmail: ctx?.user?.email,
+    kontaktEmail: contactEmail,
     isDelivered,
     lineItems: items,
     showPrices: false,
@@ -471,11 +497,11 @@ export async function buildAuftragPdfOptions(
   else if (customerCompName) kundeCombined = customerCompName;
   else if (customerNum) kundeCombined = customerNum;
 
-  const contactName =
-    ctx?.user?.name ||
-    ctx?.user?.username ||
-    customerSnap.contactName ||
-    "";
+  const { contactName, contactEmail } = await resolveContactDetails(
+    (auftrag as any).ansprechpartner,
+    customerSnap.contactName,
+    ctx?.user,
+  );
 
   const rawItems = (auftrag.orderItems || [])
     .slice()
@@ -540,7 +566,7 @@ export async function buildAuftragPdfOptions(
   const metadataItems: [string, string][] = [
     ["Kontakt", contactName],
     ["Kunde", kundeCombined],
-    ["Datum", auftrag.date_created || auftrag.created_at || ""],
+    ["Datum", formatDateStr(auftrag.date_created || auftrag.created_at)],
   ];
 
   const subtotal = Number(auftrag.subtotal || 0);
@@ -566,7 +592,7 @@ export async function buildAuftragPdfOptions(
     deliveryAddress: auftrag.deliveryAddress,
     metadataItems,
     kontaktName: contactName,
-    kontaktEmail: ctx?.user?.email,
+    kontaktEmail: contactEmail,
     isDelivered,
     lineItems: items,
     showPrices: true,
@@ -645,11 +671,11 @@ export async function buildOfferPdfOptions(
   else if (customerCompName) kundeCombined = customerCompName;
   else if (customerNum) kundeCombined = customerNum;
 
-  const contactName =
-    ctx?.user?.name ||
-    ctx?.user?.username ||
-    (customerSnap as any).contactName ||
-    "";
+  const { contactName, contactEmail } = await resolveContactDetails(
+    (offer as any).ansprechpartner,
+    (customerSnap as any).contactName,
+    ctx?.user,
+  );
 
   const rawItems = (offer.lineItems || [])
     .slice()
@@ -707,7 +733,7 @@ export async function buildOfferPdfOptions(
     deliveryAddress: offer.deliveryAddress,
     metadataItems,
     kontaktName: contactName,
-    kontaktEmail: ctx?.user?.email,
+    kontaktEmail: contactEmail,
     lineItems: items,
     showPrices: true,
     shippingMethod: offer.shippingMethod,
@@ -782,12 +808,11 @@ export async function buildRechnungKPdfOptions(
   else if (customerCompName) kundeCombined = customerCompName;
   else if (customerNum) kundeCombined = customerNum;
 
-  const contactName =
-    (rechnungK as any).ansprechpartner ||
-    ctx?.user?.name ||
-    ctx?.user?.username ||
-    customerSnap.contactName ||
-    "";
+  const { contactName, contactEmail } = await resolveContactDetails(
+    (rechnungK as any).ansprechpartner,
+    customerSnap.contactName,
+    ctx?.user,
+  );
 
   const formatDateStr = (dateVal: any): string => {
     if (!dateVal) return "";
@@ -860,7 +885,7 @@ export async function buildRechnungKPdfOptions(
     deliveryAddress: rechnungK.deliveryAddress,
     metadataItems,
     kontaktName: contactName,
-    kontaktEmail: ctx?.user?.email,
+    kontaktEmail: contactEmail,
     isDelivered: true,
     lineItems: items,
     showPrices: true,

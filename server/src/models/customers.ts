@@ -114,6 +114,12 @@ export class Customer {
   @Column({ unique: true, nullable: true })
   email?: string;
 
+  @Column({ name: "email_rechnungen", nullable: true })
+  email_rechnungen?: string;
+
+  @Column({ name: "email_einkauf", nullable: true })
+  email_einkauf?: string;
+
   @Column({ nullable: true })
   contactEmail?: string;
 

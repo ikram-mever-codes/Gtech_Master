@@ -140,7 +140,15 @@ interface RkColumnsArgs {
   onView: (row: any) => void;
 }
 
-const valueNetCalc = (row: any) => Number(row.netTotal || row.grossTotal || 0);
+const valueNetCalc = (row: any) => {
+  const itemsNet = Number(row.subtotal ?? row.netTotal ?? 0);
+  const shipping = Number(row.shipping_cost ?? row.shippingCost ?? 0);
+  if (itemsNet > 0) {
+    return itemsNet + shipping;
+  }
+  const gross = Number(row.grossTotal || row.total_amount || 0);
+  return gross > 0 ? Math.max(0, gross - Number(row.taxAmount || row.tax_amount || 0)) : 0;
+};
 
 export function buildRkColumns({
   expandedDocIds,

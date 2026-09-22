@@ -729,8 +729,6 @@ const OffersPage: React.FC<any> = ({
     const shipping = Number(
       off.shippingCost ||
         off.shipping_cost ||
-        off.freightCost ||
-        off.freight_cost ||
         0,
     );
 

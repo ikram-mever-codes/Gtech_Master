@@ -48,20 +48,16 @@ interface AuftragColumnsArgs {
 
 const valueNetCalc = (row: any) => {
   const shipping = Number(row.shipping_cost || 0);
-  if (row.isCustomerOrder || row.subtotal !== undefined) {
-    if (row.subtotal !== undefined && row.subtotal !== null) {
-      // subtotal is line-items-only — shipping_cost is a separate column
-      // and wasn't being added in here before.
-      return Number(row.subtotal) + shipping;
-    }
-    // No subtotal on this row — total_amount is the only value available,
-    // and it already has shipping folded in, so don't add it a second time.
-    return Number(row.total_amount ?? 0);
+  if (row.subtotal !== undefined && row.subtotal !== null) {
+    return Number(row.subtotal);
+  }
+  if (row.total_amount !== undefined && row.total_amount !== null) {
+    return Number(row.total_amount);
   }
   return (
-    (row.items || []).reduce(
+    (row.items || row.orderItems || []).reduce(
       (sum: number, it: any) =>
-        sum + Number(it.price || 0) * Number(it.qty || 0),
+        sum + Number(it.price || it.unitPrice || 0) * Number(it.qty || it.quantity || 0),
       0,
     ) + shipping
   );

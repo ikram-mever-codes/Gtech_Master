@@ -2,6 +2,8 @@ export interface CommercialFilters {
   documentNo: string;
   customerNo: string;
   customerName: string;
+  itemNo: string;
+  itemName: string;
   valueOperator: "=" | ">" | "<";
   valueAmount: string;
   status: string;
@@ -15,6 +17,8 @@ export const initialCommercialFilters: CommercialFilters = {
   documentNo: "",
   customerNo: "",
   customerName: "",
+  itemNo: "",
+  itemName: "",
   valueOperator: "=",
   valueAmount: "",
   status: "partially_delivered_and_open",

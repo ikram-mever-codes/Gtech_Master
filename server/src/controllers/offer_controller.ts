@@ -2319,6 +2319,10 @@ export class OfferController {
             // has no isDraft of its own, only whatever Item it currently
             // points to does.
             isDraft: !!src?.isDraft,
+            weight:
+              src && src.weight !== undefined && src.weight !== null
+                ? Number(src.weight)
+                : item.weight,
             activePrice: this.getActiveMatrixEntry(item),
           };
         });
@@ -2420,7 +2424,7 @@ export class OfferController {
         const itemRepository = AppDataSource.getRepository(Item);
         const sourceItems = await itemRepository.find({
           where: { id: In(sourceItemIds) },
-          select: ["id", "item_no_de", "isDraft", "photo"],
+          select: ["id", "item_no_de", "isDraft", "photo", "weight"],
         });
         itemById = new Map(sourceItems.map((it: any) => [String(it.id), it]));
       }
@@ -2496,13 +2500,13 @@ export class OfferController {
               : undefined;
             return {
               ...item,
-              // Always the source Item's real item_no_de — never
-              // item.material.
               itemNo: src?.item_no_de || null,
-              // Always resolved live from the source Item, linked via
-              // sourceItemId on this line item.
               isDraft: !!src?.isDraft,
               photo: item.photo || src?.photo || undefined,
+              weight:
+                src && src.weight !== undefined && src.weight !== null
+                  ? Number(src.weight)
+                  : item.weight,
             };
           }),
           linkedDocuments: linkedOrdersByOfferId.get(offer.id) || [],

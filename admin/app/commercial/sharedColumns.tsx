@@ -8,20 +8,51 @@ import { formatCountryCode } from "@/utils/address";
 
 export function hasContactPersonEmail(row: any): boolean {
   if (!row) return false;
-  const email =
-    row.customerSnapshot?.contactEmail ||
-    row.customerSnapshot?.contact_email ||
-    row.customerSnapshot?.email ||
-    row.customerSnapshot?.contactPersonEmail ||
-    row.customer?.contactPersonEmail ||
-    row.customer?.contact_email ||
-    row.customer?.email ||
-    row.customer?.contactPerson?.email ||
-    row.contactPersonEmail ||
-    row.contact_email ||
-    row.contactEmail ||
-    row.email;
-  return typeof email === "string" && email.trim().length > 0 && email.includes("@");
+
+  const directEmails = [
+    row.customerSnapshot?.contactEmail,
+    row.customerSnapshot?.contact_email,
+    row.customerSnapshot?.email,
+    row.customerSnapshot?.contactPersonEmail,
+    row.customer?.contactPersonEmail,
+    row.customer?.contact_email,
+    row.customer?.email,
+    row.customer?.contactPerson?.email,
+    row.contactPersonEmail,
+    row.contact_email,
+    row.contactEmail,
+    row.email,
+  ];
+
+  for (const email of directEmails) {
+    if (typeof email === "string" && email.trim().length > 0 && email.includes("@")) {
+      return true;
+    }
+  }
+
+  const contactArrays = [
+    row.contacts,
+    row.contactPersons,
+    row.customer?.contacts,
+    row.customer?.contactPersons,
+    row.customerSnapshot?.contacts,
+    row.customerSnapshot?.contactPersons,
+    row.customer?.starBusinessDetails?.contacts,
+  ];
+
+  for (const arr of contactArrays) {
+    if (Array.isArray(arr)) {
+      for (const item of arr) {
+        if (!item) continue;
+        const itemEmail = item.email || item.contactEmail || item.contact_email;
+        if (typeof itemEmail === "string" && itemEmail.trim().length > 0 && itemEmail.includes("@")) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 export function buildExpandColumn(
@@ -247,17 +278,6 @@ export const kundeColumn: ColumnDef<any> = {
       row.is_weiterversand === "Yes" ||
       row.isWeiterversand === true;
 
-    if (!isWV || rawText === "—") {
-      return (
-        <div
-          className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
-          title={rawText}
-        >
-          {rawText}
-        </div>
-      );
-    }
-
     const providerName =
       row.weiterversandServiceProvider?.name ||
       row.weiterversand_service_provider_name ||
@@ -265,15 +285,25 @@ export const kundeColumn: ColumnDef<any> = {
       "";
 
     const displayText = providerName
-      ? `${rawText}-WV-${providerName}`
-      : `${rawText}-Weiterversand`;
+      ? `WV-${providerName}`
+      : `Weiterversand`;
 
     return (
-      <div
-        className="truncate max-w-[160px] text-sm font-bold text-gray-900"
-        title={displayText}
-      >
-        {displayText}
+      <div className="flex flex-col leading-snug">
+        <div
+          className="truncate max-w-[140px] text-sm font-semibold text-gray-900"
+          title={rawText}
+        >
+          {rawText}
+        </div>
+        {isWV && (
+          <div
+            className="inline-block mt-0.5 px-1 py-0.2 text-[11px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate"
+            title={displayText}
+          >
+            {displayText}
+          </div>
+        )}
       </div>
     );
   },

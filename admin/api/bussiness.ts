@@ -20,6 +20,10 @@ export interface Business {
   stage: string;
   phoneNumber?: string;
   email?: string;
+  emailRechnungen?: string;
+  email_rechnungen?: string;
+  emailEinkauf?: string;
+  email_einkauf?: string;
   socialMedia?: {
     facebook?: string;
     instagram?: string;

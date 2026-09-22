@@ -295,13 +295,18 @@ export default function OrdersTable({
           order?.weiterversand_service_provider ||
           "";
 
-        const displayText = providerName
-          ? `${rawName}-WV-${providerName}`
-          : `${rawName}-Weiterversand`;
+        const badgeText = providerName ? `WV-${providerName}` : "Weiterversand";
 
         return (
-          <div className="truncate max-w-[130px] font-bold text-xs text-gray-900" title={displayText}>
-            {displayText}
+          <div className="flex flex-col leading-snug">
+            <span className="truncate max-w-[130px] font-bold text-xs text-gray-900" title={rawName}>
+              {rawName}
+            </span>
+            {isWV && (
+              <span className="inline-block mt-0.5 px-1 py-0.2 text-[10px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate">
+                {badgeText}
+              </span>
+            )}
           </div>
         );
       },
@@ -309,28 +314,94 @@ export default function OrdersTable({
     { header: "Order No.", width: "65px", render: (row) => row.order_no },
     {
       header: "Purpose / Zweck",
-      width: "110px",
+      width: "80px",
       render: (row) => {
         const zweck = row.bestellung_zweck || row.order?.bestellung_zweck || row.parentOrder?.bestellung_zweck;
-        const comment = row.bestellung_notes || row.comment || row.order?.comment || row.parentOrder?.comment || row.remarks_cn || row.remark_de;
-        const fullTooltip = [
-          zweck ? `Zweck: ${zweck}` : null,
-          comment ? `Comment: ${comment}` : null,
-        ].filter(Boolean).join(" | ") || "-";
-
         return (
-          <div className="flex flex-col text-xs leading-tight max-w-[110px]" title={fullTooltip}>
-            {zweck && (
-              <span className="font-semibold text-blue-700 bg-blue-50 px-1 rounded w-fit text-[10px] truncate max-w-full mb-0.5">
+          <div className="flex flex-col text-xs leading-tight max-w-[80px]" title={zweck ? `Zweck: ${zweck}` : "-"}>
+            {zweck ? (
+              <span className="font-semibold text-blue-700 bg-blue-50 px-1 py-0.5 rounded w-fit text-[10px] truncate max-w-full">
                 {zweck}
               </span>
-            )}
-            {comment ? (
-              <span className="text-gray-600 text-[11px] line-clamp-2">
-                {comment}
-              </span>
-            ) : !zweck ? (
+            ) : (
               <span className="text-gray-400">-</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Remark 3Lv",
+      width: "160px",
+      render: (row) => {
+        const itemDetails = itemById.get(String(row.item_id));
+
+        let orderItemRemark = (
+          row.order_item_remark ||
+          row.remark_de ||
+          row.item_remark ||
+          ""
+        ).trim();
+
+        const itemName = (row.item_name || row.itemName || row.item?.item_name || row.item?.name || "").trim();
+        const fallbackComment = (row.comment || row.bestellung_notes || "").trim();
+
+        if (!orderItemRemark && fallbackComment) {
+          const lowerComment = fallbackComment.toLowerCase();
+          const isTitle = lowerComment.startsWith("bestellung de") || (itemName && lowerComment === itemName.toLowerCase());
+          if (!isTitle) {
+            orderItemRemark = fallbackComment;
+          }
+        } else if (orderItemRemark) {
+          const lowerRemark = orderItemRemark.toLowerCase();
+          if (lowerRemark.startsWith("bestellung de") || (itemName && lowerRemark === itemName.toLowerCase())) {
+            orderItemRemark = "";
+          }
+        }
+
+        const remarkENDE = (
+          itemDetails?.remark_de ||
+          itemDetails?.remark ||
+          itemDetails?.remark_ex ||
+          row.item?.remark_de ||
+          row.item?.remark ||
+          ""
+        ).trim();
+
+        const remarkCN = (
+          itemDetails?.remark_cn ||
+          row.item?.remark_cn ||
+          ""
+        ).trim();
+
+        const hasAnyRemark = orderItemRemark || remarkENDE || remarkCN;
+
+        if (!hasAnyRemark) {
+          return <span className="text-gray-400 text-xs">-</span>;
+        }
+
+        const tooltipStr = [
+          orderItemRemark ? `OrderItem Remark: ${orderItemRemark}` : null,
+          remarkENDE ? `Item EN/DE Remark: ${remarkENDE}` : null,
+          remarkCN ? `Item CN Remark: ${remarkCN}` : null,
+        ].filter(Boolean).join("\n");
+
+        return (
+          <div className="flex flex-col gap-0.5 text-[11px] leading-tight max-w-[160px]" title={tooltipStr}>
+            {orderItemRemark ? (
+              <div className="text-gray-900 font-semibold truncate" title={orderItemRemark}>
+                {orderItemRemark}
+              </div>
+            ) : null}
+            {remarkENDE ? (
+              <div className="text-gray-600 font-normal truncate" title={remarkENDE}>
+                {remarkENDE}
+              </div>
+            ) : null}
+            {remarkCN ? (
+              <div className="text-emerald-700 font-normal truncate" title={remarkCN}>
+                {remarkCN}
+              </div>
             ) : null}
           </div>
         );
@@ -533,13 +604,18 @@ export default function OrdersTable({
           row.weiterversand_service_provider ||
           "";
 
-        const displayText = providerName
-          ? `${rawName}-WV-${providerName}`
-          : `${rawName}-Weiterversand`;
+        const badgeText = providerName ? `WV-${providerName}` : "Weiterversand";
 
         return (
-          <div className="truncate max-w-[140px] font-bold text-xs text-gray-900" title={displayText}>
-            {displayText}
+          <div className="flex flex-col leading-snug">
+            <span className="truncate max-w-[140px] font-bold text-xs text-gray-900" title={rawName}>
+              {rawName}
+            </span>
+            {isWV && (
+              <span className="inline-block mt-0.5 px-1 py-0.2 text-[10px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate">
+                {badgeText}
+              </span>
+            )}
           </div>
         );
       },

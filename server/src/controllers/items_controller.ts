@@ -376,8 +376,8 @@ export const getItems = async (
             .where("vv.item_id = item.id")
             .andWhere(
               "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
-                "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
-                "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
+              "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+              "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
             );
           return `EXISTS ${subQuery.getQuery()}`;
         });
@@ -594,8 +594,8 @@ export const getItems = async (
         ItemID_DE: item.ItemID_DE || null,
         is_active:
           item.isActive === "N" ||
-          item.isActive === "0" ||
-          item.isActive === "No"
+            item.isActive === "0" ||
+            item.isActive === "No"
             ? "N"
             : warehouseData
               ? warehouseData.is_active
@@ -918,8 +918,8 @@ export const getItemById = async (
           primaryWarehouseItem?.item_name_en || item.parent?.name_en || "",
         isActive:
           item.isActive === "N" ||
-          item.isActive === "0" ||
-          item.isActive === "No"
+            item.isActive === "0" ||
+            item.isActive === "No"
             ? false
             : primaryWarehouseItem
               ? primaryWarehouseItem.is_active === "Y"
@@ -994,31 +994,31 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-              id: defaultSi.id,
-              supplierId: defaultSi.supplier_id,
-              supplierName:
-                defaultSi.supplier?.company_name ||
-                defaultSi.supplier?.name ||
-                "Unknown",
-              priceRMB: defaultSi.price_rmb?.toString() || "0",
-              currency: defaultSi.currency || "RMB",
-              isPO: defaultSi.is_po || "No",
-              moq: defaultSi.moq?.toString() || "0",
-              interval: defaultSi.oi?.toString() || "0",
-              leadTime: defaultSi.lead_time || "",
-              noteCN: defaultSi.note_cn || "",
-              url: defaultSi.url || "",
-            }
+            id: defaultSi.id,
+            supplierId: defaultSi.supplier_id,
+            supplierName:
+              defaultSi.supplier?.company_name ||
+              defaultSi.supplier?.name ||
+              "Unknown",
+            priceRMB: defaultSi.price_rmb?.toString() || "0",
+            currency: defaultSi.currency || "RMB",
+            isPO: defaultSi.is_po || "No",
+            moq: defaultSi.moq?.toString() || "0",
+            interval: defaultSi.oi?.toString() || "0",
+            leadTime: defaultSi.lead_time || "",
+            noteCN: defaultSi.note_cn || "",
+            url: defaultSi.url || "",
+          }
           : {
-              priceRMB: "0",
-              currency: "RMB",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            };
+            priceRMB: "0",
+            currency: "RMB",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -1311,57 +1311,59 @@ export const updateItem = async (
       }
     }
 
-    // if (!newSupplierId && !item.supplier_id) {
-    //   return next(
-    //     new ErrorHandler(
-    //       "This item needs a supplier assigned before saving changes",
-    //       400,
-    //     ),
-    //   );
-    // }
-
     if (newSupplierId) {
-      const allSIs = await supplierItemRepository.find({
-        where: { item_id: item.id },
+      const supplierRepo = AppDataSource.getRepository(Supplier);
+      const supplierExists = await supplierRepo.findOne({
+        where: { id: Number(newSupplierId) },
       });
 
-      let foundActive = false;
-      for (const si of allSIs) {
-        const shouldBeDefault =
-          Number(si.supplier_id) === Number(newSupplierId);
-        if (shouldBeDefault) {
-          foundActive = true;
-        }
-        const targetIsDefault = shouldBeDefault ? "Y" : "N";
-        if (si.is_default !== targetIsDefault) {
-          si.is_default = targetIsDefault;
-          await supplierItemRepository.save(si);
-        }
-      }
-
-      if (!foundActive) {
-        const supplierItemData = req.body.supplierItem;
-        const newSI = supplierItemRepository.create({
-          item_id: item.id,
-          supplier_id: newSupplierId,
-          is_default: "Y",
-          price_rmb:
-            supplierItemData?.price_rmb !== undefined
-              ? parseFloat(supplierItemData.price_rmb)
-              : 0,
-          is_po: supplierItemData?.is_po || "No",
-          moq:
-            supplierItemData?.moq !== undefined
-              ? parseInt(supplierItemData.moq)
-              : 1,
-          oi:
-            supplierItemData?.oi !== undefined
-              ? parseInt(supplierItemData.oi)
-              : 0,
-          lead_time: supplierItemData?.lead_time || "",
-          url: supplierItemData?.url || "",
+      if (supplierExists) {
+        const allSIs = await supplierItemRepository.find({
+          where: { item_id: item.id },
         });
-        await supplierItemRepository.save(newSI);
+
+        let foundActive = false;
+        for (const si of allSIs) {
+          const shouldBeDefault =
+            Number(si.supplier_id) === Number(newSupplierId);
+          if (shouldBeDefault) {
+            foundActive = true;
+          }
+          const targetIsDefault = shouldBeDefault ? "Y" : "N";
+          if (si.is_default !== targetIsDefault) {
+            si.is_default = targetIsDefault;
+            await supplierItemRepository.save(si);
+          }
+        }
+
+        if (!foundActive) {
+          const supplierItemData = req.body.supplierItem;
+          const newSI = supplierItemRepository.create({
+            item_id: item.id,
+            supplier_id: newSupplierId,
+            is_default: "Y",
+            price_rmb:
+              supplierItemData?.price_rmb !== undefined
+                ? parseFloat(supplierItemData.price_rmb)
+                : 0,
+            is_po: supplierItemData?.is_po || "No",
+            moq:
+              supplierItemData?.moq !== undefined
+                ? parseInt(supplierItemData.moq)
+                : 1,
+            oi:
+              supplierItemData?.oi !== undefined
+                ? parseInt(supplierItemData.oi)
+                : 0,
+            lead_time: supplierItemData?.lead_time || "",
+            url: supplierItemData?.url || "",
+          });
+          await supplierItemRepository.save(newSI);
+        }
+      } else {
+        console.warn(
+          `[updateItem] supplier_id ${newSupplierId} not found in supplier table. Skipping supplier_item update.`,
+        );
       }
     }
 
@@ -1645,8 +1647,8 @@ export const updateItem = async (
       if (req.body.isActive !== undefined) {
         const activeStr =
           req.body.isActive === "Y" ||
-          req.body.isActive === true ||
-          req.body.isActive === "Yes"
+            req.body.isActive === true ||
+            req.body.isActive === "Yes"
             ? "Y"
             : "N";
         warehouseItem.is_active = activeStr;
@@ -2267,9 +2269,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2345,17 +2347,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3915,23 +3917,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         return {
