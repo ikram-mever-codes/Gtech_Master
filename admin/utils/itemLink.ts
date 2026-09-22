@@ -1,33 +1,29 @@
 export const getItemLink = (item: any): string | undefined => {
   if (!item) return undefined;
 
-  const isDraftItem =
-    item.isDraft === true ||
-    item.is_draft === true ||
-    item.isDraft === "Yes" ||
-    item.is_draft === "Yes" ||
-    item.sourceType === "inquiry" ||
-    Boolean(item.inquiryId) ||
-    Boolean(item.requestId);
-
-  const masterId =
+  const catalogItemId =
     item.sourceItemId ||
     item.source_item_id ||
     item.itemId ||
     item.item_id ||
     item.masterItemId ||
-    item.item?.id ||
-    item.requestId ||
-    item.id;
+    item.item?.id;
 
-  if (!masterId) return undefined;
-
-  if (isDraftItem) {
-    return `/inquiry?requestId=${masterId}`;
+  if (catalogItemId) {
+    return `/items?itemId=${catalogItemId}`;
   }
-  return `/items?itemId=${masterId}`;
-};
 
+  const requestId = item.requestId || item.inquiryId;
+  if (requestId) {
+    return `/inquiry?requestId=${requestId}`;
+  }
+
+  if (item.id && !item.isFreetext) {
+    return `/items?itemId=${item.id}`;
+  }
+
+  return undefined;
+};
 export const getCustomerLink = (customerId: string | number | null | undefined): string | undefined => {
   if (!customerId) return undefined;
   return `/bussinesses?businessId=${encodeURIComponent(String(customerId))}`;

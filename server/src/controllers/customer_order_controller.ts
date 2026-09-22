@@ -671,6 +671,35 @@ export const getAllCustomerOrders = async (
       }
     }
 
+    const allSourceIds = Array.from(
+      new Set(
+        orders
+          .flatMap((o: any) => o.orderItems || [])
+          .filter((li: any) => li.sourceItemId)
+          .map((li: any) => Number(li.sourceItemId))
+          .filter((id: number) => !isNaN(id) && id > 0),
+      ),
+    );
+    if (allSourceIds.length > 0) {
+      const sourceItems = await AppDataSource.getRepository(Item).find({
+        where: { id: In(allSourceIds) },
+        select: ["id", "weight"],
+      });
+      const weightById = new Map(
+        sourceItems.map((it: any) => [String(it.id), it.weight]),
+      );
+      orders.forEach((order: any) => {
+        (order.orderItems || []).forEach((li: any) => {
+          if (li.sourceItemId) {
+            const w = weightById.get(String(li.sourceItemId));
+            if (w !== undefined && w !== null) {
+              li.weight = Number(w);
+            }
+          }
+        });
+      });
+    }
+
     const ordersWithLinkedDocuments = orders.map((order: any) => ({
       ...order,
       taxProfile: taxProfileByOrderId.get(order.id) || null,
@@ -1302,33 +1331,34 @@ export const getCustomerOrderById = async (
       }
     }
 
-    const itemsMissingWeight = (order.orderItems || []).filter(
-      (li: any) =>
-        (li.weight === null || li.weight === undefined) && li.sourceItemId,
+    const itemsWithSource = (order.orderItems || []).filter(
+      (li: any) => li.sourceItemId,
     );
-    if (itemsMissingWeight.length > 0) {
-      const missingIds = Array.from(
+    if (itemsWithSource.length > 0) {
+      const sourceIds = Array.from(
         new Set(
-          itemsMissingWeight
+          itemsWithSource
             .map((li: any) => Number(li.sourceItemId))
-            .filter(Boolean),
+            .filter((id: number) => !isNaN(id) && id > 0),
         ),
       );
-      const sourceItems = await AppDataSource.getRepository(Item).find({
-        where: { id: In(missingIds) },
-      });
-      const weightById = new Map(
-        sourceItems.map((it: any) => [String(it.id), it.weight]),
-      );
-      (order.orderItems as any[]).forEach((li: any) => {
-        if (
-          (li.weight === null || li.weight === undefined) &&
-          li.sourceItemId
-        ) {
-          const w = weightById.get(String(li.sourceItemId));
-          if (w !== undefined && w !== null) li.weight = w;
-        }
-      });
+      if (sourceIds.length > 0) {
+        const sourceItems = await AppDataSource.getRepository(Item).find({
+          where: { id: In(sourceIds) },
+          select: ["id", "weight"],
+        });
+        const weightById = new Map(
+          sourceItems.map((it: any) => [String(it.id), it.weight]),
+        );
+        (order.orderItems as any[]).forEach((li: any) => {
+          if (li.sourceItemId) {
+            const w = weightById.get(String(li.sourceItemId));
+            if (w !== undefined && w !== null) {
+              li.weight = Number(w);
+            }
+          }
+        });
+      }
     }
 
     res.json({

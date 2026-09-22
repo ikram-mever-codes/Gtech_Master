@@ -295,13 +295,18 @@ export default function OrdersTable({
           order?.weiterversand_service_provider ||
           "";
 
-        const displayText = providerName
-          ? `${rawName}-WV-${providerName}`
-          : `${rawName}-Weiterversand`;
+        const badgeText = providerName ? `WV-${providerName}` : "Weiterversand";
 
         return (
-          <div className="truncate max-w-[130px] font-bold text-xs text-gray-900" title={displayText}>
-            {displayText}
+          <div className="flex flex-col leading-snug">
+            <span className="truncate max-w-[130px] font-bold text-xs text-gray-900" title={rawName}>
+              {rawName}
+            </span>
+            {isWV && (
+              <span className="inline-block mt-0.5 px-1 py-0.2 text-[10px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate">
+                {badgeText}
+              </span>
+            )}
           </div>
         );
       },
@@ -599,13 +604,18 @@ export default function OrdersTable({
           row.weiterversand_service_provider ||
           "";
 
-        const displayText = providerName
-          ? `${rawName}-WV-${providerName}`
-          : `${rawName}-Weiterversand`;
+        const badgeText = providerName ? `WV-${providerName}` : "Weiterversand";
 
         return (
-          <div className="truncate max-w-[140px] font-bold text-xs text-gray-900" title={displayText}>
-            {displayText}
+          <div className="flex flex-col leading-snug">
+            <span className="truncate max-w-[140px] font-bold text-xs text-gray-900" title={rawName}>
+              {rawName}
+            </span>
+            {isWV && (
+              <span className="inline-block mt-0.5 px-1 py-0.2 text-[10px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate">
+                {badgeText}
+              </span>
+            )}
           </div>
         );
       },

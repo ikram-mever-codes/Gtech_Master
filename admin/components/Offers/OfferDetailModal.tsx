@@ -1555,7 +1555,7 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
       pricingMode === "matrix"
         ? (parseFlexibleNumber(getActiveMatrixEntry(li)?.quantity) ?? 1)
         : (parseFlexibleNumber(li.baseQuantity) ?? 1);
-    const weightGrams = parseFlexibleNumber(li.weight) ?? 0;
+    const weightGrams = parseFlexibleNumber(li.weight ?? li.item?.weight) ?? 0;
     return sum + (weightGrams * qty) / 1000;
   }, 0);
   const extraWeightKg = visibleLineItems.reduce(

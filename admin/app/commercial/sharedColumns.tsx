@@ -285,8 +285,8 @@ export const kundeColumn: ColumnDef<any> = {
       "";
 
     const displayText = providerName
-      ? `${rawText}-WV-${providerName}`
-      : `${rawText}-Weiterversand`;
+      ? `WV-${providerName}`
+      : `Weiterversand`;
 
     return (
       <div className="flex flex-col leading-snug">

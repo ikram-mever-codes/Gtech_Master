@@ -440,8 +440,8 @@ const OrderPage: React.FC = () => {
       "";
 
     const labelText = providerName
-      ? `${customerName ? customerName + "-" : ""}WV-${providerName}`
-      : `${customerName ? customerName + "-" : ""}Weiterversand`;
+      ? `WV-${providerName}`
+      : `Weiterversand`;
 
     return (
       <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm whitespace-nowrap">
@@ -2812,8 +2812,8 @@ const OrderPage: React.FC = () => {
                           "";
 
                         const customerWVText = providerName
-                          ? `${customerName}-WV-${providerName}`
-                          : `${customerName}-Weiterversand`;
+                          ? `WV-${providerName}`
+                          : `Weiterversand`;
 
                         return (
                           <div className="flex flex-col leading-snug">
