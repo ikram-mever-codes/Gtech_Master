@@ -1468,11 +1468,28 @@ export const updateOrderItemStatus = async (
     }
 
     const oldCargoId = orderItem.cargo_id;
-    const newCargoId = body.cargo_id;
+    const rawNewCargoId = body.cargo_id;
+    let targetCargoId: number | null = null;
+
+    if (rawNewCargoId) {
+      if (!isNaN(Number(rawNewCargoId)) && Number(rawNewCargoId) > 0) {
+        targetCargoId = Number(rawNewCargoId);
+      } else {
+        const foundCargo = await AppDataSource.getRepository(Cargo).findOne({
+          where: [
+            { cargo_no: String(rawNewCargoId).trim() },
+            { cargo_no: Like(`%${String(rawNewCargoId).trim()}%`) },
+          ],
+        });
+        if (foundCargo) targetCargoId = foundCargo.id;
+      }
+    }
 
     Object.keys(body).forEach((key) => {
       if (key === "supplier_order_id" && body[key] === null) {
         orderItem.supplier_order_id = undefined;
+      } else if (key === "cargo_id" && targetCargoId) {
+        orderItem.cargo_id = targetCargoId;
       } else if (key !== "id" && key !== "updated_at") {
         (orderItem as any)[key] = body[key];
       }
@@ -1481,9 +1498,27 @@ export const updateOrderItemStatus = async (
     orderItem.updated_at = new Date();
     await orderItemsRepo.save(orderItem);
 
+    if (targetCargoId && orderItem.order_id) {
+      const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+      const existingLink = await cargoOrderRepo.findOne({
+        where: {
+          cargo_id: targetCargoId,
+          order_id: Number(orderItem.order_id),
+        },
+      });
+      if (!existingLink) {
+        await cargoOrderRepo.save(
+          cargoOrderRepo.create({
+            cargo_id: targetCargoId,
+            order_id: Number(orderItem.order_id),
+          }),
+        );
+      }
+    }
+
     const cargoIdsToRefresh: number[] = [];
     if (oldCargoId) cargoIdsToRefresh.push(Number(oldCargoId));
-    if (newCargoId) cargoIdsToRefresh.push(Number(newCargoId));
+    if (targetCargoId) cargoIdsToRefresh.push(Number(targetCargoId));
 
     await generateInvoicesForOrders(
       [Number(orderItem.order_id)],
