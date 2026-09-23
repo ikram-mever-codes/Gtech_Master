@@ -248,8 +248,8 @@ const syncInvoiceRecord = async (
   const manualTaricsList =
     uniqueCodes.length > 0
       ? await AppDataSource.getRepository(Taric).find({
-          where: { code: In(uniqueCodes) },
-        })
+        where: { code: In(uniqueCodes) },
+      })
       : [];
   const manualTaricMap = new Map(manualTaricsList.map((t) => [t.code, t]));
 
