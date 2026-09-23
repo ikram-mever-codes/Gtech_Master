@@ -48,7 +48,7 @@ import {
   type Offer,
   type OfferSearchFilters,
 } from "@/api/offers";
-import { formatDate } from "@/utils/offers";
+import { formatDate, getOfferGrossTotal } from "@/utils/offers";
 import { parseFlexibleNumber } from "@/utils/decimal";
 import { BASE_URL } from "@/utils/constants";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
@@ -73,12 +73,11 @@ import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 // Item Number
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
-  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
+  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
   }`;
 
 const getContrastTextColor = (hex: string): string => {
@@ -155,32 +154,6 @@ const getVatGroups = (
     })
 };
 
-export const getOfferGrossTotal = (off: any): number => {
-  if (!off) return 0;
-  const totalAmt = Number(off.totalAmount ?? off.total_amount ?? off.grossTotal ?? off.gross_total ?? 0);
-
-  const lineItems = off.lineItems || off.items || [];
-  if (lineItems.length > 0) {
-    const vatGroups = getVatGroups(off, lineItems);
-    const netSum = vatGroups.reduce((acc, g) => acc + g.base, 0);
-    const taxSum = vatGroups.reduce((acc, g) => acc + g.tax, 0);
-    const calculatedGross = netSum + taxSum;
-    if (calculatedGross > 0) return calculatedGross;
-  }
-
-  if (totalAmt > 0) return totalAmt;
-
-  const subtotal = Number(off.subtotal ?? off.sub_total ?? 0);
-  const taxAmount = Number(off.taxAmount ?? off.tax_amount ?? 0);
-  const shipping = Number(off.shippingCost ?? off.shipping_cost ?? 0);
-
-  if (subtotal > 0 || taxAmount > 0) {
-    return subtotal + taxAmount;
-  }
-
-  const taxRate = Number(off.taxProfile?.taxRate ?? off.taxRate ?? 19);
-  return (subtotal + shipping) * (1 + taxRate / 100);
-};
 
 const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
   offer,
@@ -257,8 +230,8 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                           alt="thumb"
                           className="w-full h-full object-contain"
                           onError={(e) =>
-                            ((e.target as HTMLImageElement).style.display =
-                              "none")
+                          ((e.target as HTMLImageElement).style.display =
+                            "none")
                           }
                         />
                       ) : (
@@ -358,26 +331,23 @@ const OfferActionMenu: React.FC<{
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
-          isOpen
-            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
-            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
-        }`}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
+          ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+          }`}
         title="Aktionen"
       >
         <ChevronRight
-          className={`w-4 h-4 transition-transform duration-150 ${
-            isOpen ? "rotate-90 text-[#8CC21B]" : ""
-          }`}
+          className={`w-4 h-4 transition-transform duration-150 ${isOpen ? "rotate-90 text-[#8CC21B]" : ""
+            }`}
         />
       </button>
 
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute right-0 ${
-            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+          className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+            } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
         >
           <div className="p-1">
             <button
@@ -415,7 +385,7 @@ const OfferActionMenu: React.FC<{
                 setIsOpen(false);
                 try {
                   await downloadOfferPdf(row.id, row.offerNumber);
-                } catch (_) {}
+                } catch (_) { }
               }}
               className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
             >
@@ -433,7 +403,7 @@ const OfferActionMenu: React.FC<{
                   setIsOpen(false);
                   try {
                     await downloadOfferEml(row.id, row.offerNumber);
-                  } catch (_) {}
+                  } catch (_) { }
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
               >
@@ -613,10 +583,10 @@ const OffersPage: React.FC<any> = ({
         prevOffers.map((o) =>
           o.id === offer.id
             ? {
-                ...o,
-                highlightColor: "#ECEAE6",
-                conversionCount: nextCount,
-              }
+              ...o,
+              highlightColor: "#ECEAE6",
+              conversionCount: nextCount,
+            }
             : o,
         ),
       );
@@ -626,7 +596,7 @@ const OffersPage: React.FC<any> = ({
           highlightColor: "#ECEAE6",
           conversionCount: nextCount,
         } as any);
-      } catch (_) {}
+      } catch (_) { }
 
       fetchOffers();
       onOrderConverted?.();
@@ -715,18 +685,18 @@ const OffersPage: React.FC<any> = ({
       if (customerNo) {
         const cNo = String(
           offer.customerSnapshot?.customerNumber ||
-            (offer as any).customer?.customer_number ||
-            "",
+          (offer as any).customer?.customer_number ||
+          "",
         );
         if (!cNo.toLowerCase().includes(customerNo.toLowerCase())) return false;
       }
       if (customerName) {
         const name = String(
           offer.customerSnapshot?.companyName ||
-            offer.customerSnapshot?.name ||
-            (offer as any).customer?.company_name ||
-            (offer as any).customer?.name ||
-            "",
+          offer.customerSnapshot?.name ||
+          (offer as any).customer?.company_name ||
+          (offer as any).customer?.name ||
+          "",
         );
         if (!name.toLowerCase().includes(customerName.toLowerCase()))
           return false;
@@ -977,11 +947,10 @@ const OffersPage: React.FC<any> = ({
                     setCurrentPage(p);
                     setFilters({ ...filters, page: p });
                   }}
-                  className={`px-2 py-1 text-sm rounded-lg ${
-                    currentPage === p
-                      ? "bg-gray-600 text-white"
-                      : "bg-white border border-gray-300 hover:bg-gray-50"
-                  }`}
+                  className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
+                    ? "bg-gray-600 text-white"
+                    : "bg-white border border-gray-300 hover:bg-gray-50"
+                    }`}
                 >
                   {p}
                 </button>
