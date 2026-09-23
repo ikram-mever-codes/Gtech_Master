@@ -164,24 +164,22 @@ export const generateOfferEmailHTML = (offer: any): string => {
               <td style="text-align: right;">Subtotal:</td>
               <td style="text-align: right;">${formatCurrency(subtotal, offer.currency)}</td>
             </tr>
-            ${
-              discount > 0
-                ? `
+            ${discount > 0
+      ? `
             <tr>
               <td style="text-align: right; color: #e74c3c;">Discount:</td>
               <td style="text-align: right; color: #e74c3c;">-${formatCurrency(discount, offer.currency)}</td>
             </tr>`
-                : ""
-            }
-            ${
-              shipping > 0
-                ? `
+      : ""
+    }
+            ${shipping > 0
+      ? `
             <tr>
               <td style="text-align: right;">Shipping:</td>
               <td style="text-align: right;">${formatCurrency(shipping, offer.currency)}</td>
             </tr>`
-                : ""
-            }
+      : ""
+    }
             <tr>
               <td style="text-align: right;">VAT:</td>
               <td style="text-align: right;">${formatCurrency(tax, offer.currency)}</td>
@@ -194,63 +192,57 @@ export const generateOfferEmailHTML = (offer: any): string => {
         </div>
 
         <!-- Terms & Conditions -->
-        ${
-          offer.termsConditions || offer.paymentTerms || offer.deliveryTerms
-            ? `
+        ${offer.termsConditions || offer.paymentTerms || offer.deliveryTerms
+      ? `
         <div class="section">
           <h2 class="section-title">Terms & Conditions</h2>
           <table style="width: 100%;">
-            ${
-              offer.paymentTerms
-                ? `
+            ${offer.paymentTerms
+        ? `
             <tr>
               <td style="border: none; width: 120px;"><strong>Payment Terms:</strong></td>
               <td style="border: none;">${offer.paymentTerms}</td>
             </tr>`
-                : ""
-            }
-            ${
-              offer.deliveryTerms
-                ? `
+        : ""
+      }
+            ${offer.deliveryTerms
+        ? `
             <tr>
               <td style="border: none;"><strong>Delivery Terms:</strong></td>
               <td style="border: none;">${offer.deliveryTerms}</td>
             </tr>`
-                : ""
-            }
-            ${
-              offer.deliveryTime
-                ? `
+        : ""
+      }
+            ${offer.deliveryTime
+        ? `
             <tr>
               <td style="border: none;"><strong>Delivery Time:</strong></td>
               <td style="border: none;">${offer.deliveryTime}</td>
             </tr>`
-                : ""
-            }
-            ${
-              offer.termsConditions
-                ? `
+        : ""
+      }
+            ${offer.termsConditions
+        ? `
             <tr>
               <td style="border: none;"><strong>Additional Terms:</strong></td>
               <td style="border: none;">${offer.termsConditions}</td>
             </tr>`
-                : ""
-            }
+        : ""
+      }
           </table>
         </div>`
-            : ""
-        }
+      : ""
+    }
 
         <!-- Notes -->
-        ${
-          offer.notes
-            ? `
+        ${offer.notes
+      ? `
         <div class="section">
           <h2 class="section-title">Notes</h2>
           <p style="background-color: #f9f9f9; padding: 10px; border-radius: 5px;">${offer.notes.replace(/\n/g, "<br/>")}</p>
         </div>`
-            : ""
-        }
+      : ""
+    }
 
         <!-- Footer -->
         <div class="footer">
@@ -297,4 +289,60 @@ export const openOutlookWithOffer = (offer: any) => {
     console.error("Error opening email client:", error);
     toast.error("Failed to open email client");
   }
+};
+
+export const getOfferGrossTotal = (off: any): number => {
+  if (!off) return 0;
+  const totalAmt = Number(off.totalAmount ?? off.total_amount ?? off.grossTotal ?? off.gross_total ?? 0);
+
+  const lineItems = off.lineItems || off.items || [];
+  if (lineItems.length > 0) {
+    const byRate = new Map<number, number>();
+    const defaultTaxRate = Number(off.taxProfile?.taxRate ?? off.taxRate ?? 19);
+
+    lineItems.forEach((li: any) => {
+      const qty = Number(li.baseQuantity ?? li.quantity ?? li.qty ?? 1);
+      const price = Number(li.basePrice ?? li.unitPrice ?? li.price ?? 0);
+      const lineTotal = qty * price;
+
+      const isFreetext = !li.sourceItemId && !li.requestedItemId;
+      let rate = defaultTaxRate;
+      if (isFreetext && li.taxRate !== undefined && li.taxRate !== null && li.taxRate !== "") {
+        rate = Number(li.taxRate);
+      }
+      byRate.set(rate, (byRate.get(rate) || 0) + lineTotal);
+    });
+
+    const shipping = Number(off.shippingCost ?? off.shipping_cost ?? 0);
+    if (shipping > 0) {
+      byRate.set(defaultTaxRate, (byRate.get(defaultTaxRate) || 0) + shipping);
+    }
+
+    const discountPct = Number(off.discountPercentage ?? off.discount_percentage ?? 0);
+    const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
+
+    let grossSum = 0;
+    byRate.forEach((base, rate) => {
+      const adjustedBase = base * discountFactor;
+      const tax = adjustedBase * (rate / 100);
+      grossSum += adjustedBase + tax;
+    });
+
+    const discountAmount = Number(off.discountAmount ?? off.discount_amount ?? 0);
+    const finalGross = grossSum - discountAmount;
+    if (finalGross > 0) return finalGross;
+  }
+
+  if (totalAmt > 0) return totalAmt;
+
+  const subtotal = Number(off.subtotal ?? off.sub_total ?? 0);
+  const taxAmount = Number(off.taxAmount ?? off.tax_amount ?? 0);
+  const shipping = Number(off.shippingCost ?? off.shipping_cost ?? 0);
+
+  if (subtotal > 0 || taxAmount > 0) {
+    return subtotal + taxAmount;
+  }
+
+  const taxRate = Number(off.taxProfile?.taxRate ?? off.taxRate ?? 19);
+  return (subtotal + shipping) * (1 + taxRate / 100);
 };

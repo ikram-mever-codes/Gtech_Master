@@ -115,7 +115,7 @@ import { buildRkColumns, getRkGrossTotal } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
 import { buildPaymentInboundColumns } from "./paymentInboundColumns";
 import PaymentInboundAssignModal from "./PaymentInboundAssignModal";
-import { getOfferGrossTotal } from "../offers/page";
+import { getOfferGrossTotal } from "@/utils/offers";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 

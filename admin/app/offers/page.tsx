@@ -48,7 +48,7 @@ import {
   type Offer,
   type OfferSearchFilters,
 } from "@/api/offers";
-import { formatDate } from "@/utils/offers";
+import { formatDate, getOfferGrossTotal } from "@/utils/offers";
 import { parseFlexibleNumber } from "@/utils/decimal";
 import { BASE_URL } from "@/utils/constants";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
@@ -152,39 +152,6 @@ const getVatGroups = (
       tax: adjustedBase * (rate / 100),
     };
   });
-};
-
-export const getOfferGrossTotal = (off: any) => {
-  if (!off) return 0;
-  const totalAmt = Number(
-    off.totalAmount ??
-      off.total_amount ??
-      off.grossTotal ??
-      off.gross_total ??
-      0,
-  );
-
-  const lineItems = off.lineItems || off.items || [];
-  if (lineItems.length > 0) {
-    const vatGroups = getVatGroups(off, lineItems);
-    const netSum = vatGroups.reduce((acc, g) => acc + g.base, 0);
-    const taxSum = vatGroups.reduce((acc, g) => acc + g.tax, 0);
-    const calculatedGross = netSum + taxSum;
-    if (calculatedGross > 0) return calculatedGross;
-  }
-
-  if (totalAmt > 0) return totalAmt;
-
-  const subtotal = Number(off.subtotal ?? off.sub_total ?? 0);
-  const taxAmount = Number(off.taxAmount ?? off.tax_amount ?? 0);
-  const shipping = Number(off.shippingCost ?? off.shipping_cost ?? 0);
-
-  if (subtotal > 0 || taxAmount > 0) {
-    return subtotal + taxAmount;
-  }
-
-  const taxRate = Number(off.taxProfile?.taxRate ?? off.taxRate ?? 19);
-  return (subtotal + shipping) * (1 + taxRate / 100);
 };
 
 const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
