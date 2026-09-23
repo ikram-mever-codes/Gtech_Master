@@ -418,18 +418,36 @@ export const getAllCargos = async (
           const qb = orderItemRepo
             .createQueryBuilder("oi")
             .leftJoin("oi.order", "o")
-            .where("(o.is_deleted = false OR o.is_deleted IS NULL OR oi.order_id IS NULL)");
+            .where(
+              "(o.is_deleted = false OR o.is_deleted IS NULL OR oi.order_id IS NULL)",
+            );
 
           if (linkedOrderIds.length > 0) {
             qb.andWhere(
-              "(oi.cargo_id = :cargoId OR oi.order_id IN (:...linkedOrderIds))",
+              "(oi.cargo_id = :cargoId OR o.cargo_id = :cargoId OR oi.order_id IN (:...linkedOrderIds))",
               { cargoId, linkedOrderIds },
             );
           } else {
-            qb.andWhere("oi.cargo_id = :cargoId", { cargoId });
+            qb.andWhere(
+              "(oi.cargo_id = :cargoId OR o.cargo_id = :cargoId)",
+              { cargoId },
+            );
           }
 
-          const count = await qb.getCount();
+          let count = await qb.getCount();
+          if (count === 0) {
+            const currentCargo = cargos.find((c) => c.id === cargoId);
+            if (currentCargo?.cargo_no) {
+              const invRepo = AppDataSource.getRepository(Invoice);
+              const inv = await invRepo.findOne({
+                where: { orderNumber: currentCargo.cargo_no },
+                relations: ["items"],
+              });
+              if (inv?.items) {
+                count = inv.items.length;
+              }
+            }
+          }
           itemCountsMap[cargoId] = count;
         }),
       );
@@ -945,7 +963,10 @@ export const getCargoOrders = async (
 ) => {
   try {
     const { id } = req.params;
+    const cargoRepo = AppDataSource.getRepository(Cargo);
     const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+
+    const cargo = await cargoRepo.findOne({ where: { id: Number(id) } });
 
     const cargoOrders = await cargoOrderRepo.find({
       where: { cargo_id: Number(id) },
@@ -966,16 +987,53 @@ export const getCargoOrders = async (
 
     if (orderIds.length > 0) {
       qb.where(
-        "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
+        "(oi.cargo_id = :cargoId OR order.cargo_id = :cargoId OR oi.order_id IN (:...orderIds))",
         { cargoId: Number(id), orderIds },
       );
     } else {
-      qb.where("oi.cargo_id = :cargoId", { cargoId: Number(id) });
+      qb.where("(oi.cargo_id = :cargoId OR order.cargo_id = :cargoId)", {
+        cargoId: Number(id),
+      });
     }
     qb.andWhere(
       "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
     );
     orderItems = await qb.getMany();
+
+    console.log(
+      `[getCargoOrders-DEBUG] Cargo ID ${id} (${cargo?.cargo_no}): query returned ${orderItems.length} items from OrderItem table.`,
+    );
+
+    if (orderItems.length === 0 && cargo?.cargo_no) {
+      const invRepo = AppDataSource.getRepository(Invoice);
+      const inv = await invRepo.findOne({
+        where: { orderNumber: cargo.cargo_no },
+        relations: ["items", "items.item", "customer"],
+      });
+      if (inv && inv.items && inv.items.length > 0) {
+        console.log(
+          `[getCargoOrders-DEBUG] Cargo ID ${id} (${cargo.cargo_no}): Found ${inv.items.length} fallback items from Invoice record.`,
+        );
+        orderItems = inv.items.map((invItem) => ({
+          id: invItem.id,
+          qty: invItem.quantity,
+          quantity: invItem.quantity,
+          price: invItem.unitPrice,
+          eur_special_price: invItem.unitPrice,
+          item: invItem.item || {
+            item_name: invItem.description,
+            name: invItem.description,
+            material: invItem.articleNumber,
+            ean: invItem.articleNumber,
+          },
+          itemName: invItem.description,
+          order: {
+            order_no: inv.orderNumber || cargo.cargo_no,
+            customer: inv.customer,
+          },
+        }));
+      }
+    }
 
     res.status(200).json({
       success: true,
