@@ -1543,6 +1543,21 @@ export const updateOrderItemStatus = async (
       }
     }
 
+    if (oldCargoId && orderItem.order_id && oldCargoId !== targetCargoId) {
+      const remainingItemsCount = await orderItemsRepo.count({
+        where: {
+          order_id: Number(orderItem.order_id),
+          cargo_id: Number(oldCargoId),
+        },
+      });
+      if (remainingItemsCount === 0) {
+        await AppDataSource.getRepository(CargoOrder).delete({
+          cargo_id: Number(oldCargoId),
+          order_id: Number(orderItem.order_id),
+        });
+      }
+    }
+
     const cargoIdsToRefresh: number[] = [];
     if (oldCargoId) cargoIdsToRefresh.push(Number(oldCargoId));
     if (targetCargoId) cargoIdsToRefresh.push(Number(targetCargoId));
