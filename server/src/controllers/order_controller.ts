@@ -622,6 +622,35 @@ export const getAllOrders = async (
       });
     }
 
+    const unlinkedOrderIds = orders
+      .filter((o) => !o.cargo || !o.cargo_id)
+      .map((o) => o.id);
+
+    if (unlinkedOrderIds.length > 0) {
+      const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+      const cargoOrders = await cargoOrderRepo.find({
+        where: { order_id: In(unlinkedOrderIds) },
+        relations: ["cargo", "cargo.customer"],
+      });
+
+      const cargoOrderMap = new Map<number, Cargo>();
+      cargoOrders.forEach((co) => {
+        if (co.order_id && co.cargo) {
+          cargoOrderMap.set(co.order_id, co.cargo);
+        }
+      });
+
+      orders.forEach((o) => {
+        if (!o.cargo || !o.cargo_id) {
+          const foundCargo = cargoOrderMap.get(o.id);
+          if (foundCargo) {
+            o.cargo = foundCargo;
+            o.cargo_id = foundCargo.id;
+          }
+        }
+      });
+    }
+
     for (const ord of orders) {
       if (
         ord.order_no &&
