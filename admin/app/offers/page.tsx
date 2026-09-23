@@ -144,20 +144,25 @@ const getVatGroups = (
   const discountFactor =
     offer?.discountPercentage > 0 ? 1 - offer.discountPercentage / 100 : 1;
 
-  return Array.from(byRate.entries())
-    .map(([rate, base]) => {
-      const adjustedBase = base * discountFactor;
-      return {
-        rate,
-        base: adjustedBase,
-        tax: adjustedBase * (rate / 100),
-      };
-    })
+  return Array.from(byRate.entries()).map(([rate, base]) => {
+    const adjustedBase = base * discountFactor;
+    return {
+      rate,
+      base: adjustedBase,
+      tax: adjustedBase * (rate / 100),
+    };
+  });
 };
 
-export const getOfferGrossTotal = (off: any): number => {
+export const getOfferGrossTotal = (off: any): any => {
   if (!off) return 0;
-  const totalAmt = Number(off.totalAmount ?? off.total_amount ?? off.grossTotal ?? off.gross_total ?? 0);
+  const totalAmt = Number(
+    off.totalAmount ??
+      off.total_amount ??
+      off.grossTotal ??
+      off.gross_total ??
+      0,
+  );
 
   const lineItems = off.lineItems || off.items || [];
   if (lineItems.length > 0) {
@@ -499,7 +504,8 @@ const OffersPage: React.FC<any> = ({
   );
   const [draftItemsPreview, setDraftItemsPreview] = useState<any[]>([]);
   const [convertModalOffer, setConvertModalOffer] = useState<any | null>(null);
-  const [convertModalKundenreferenz, setConvertModalKundenreferenz] = useState("");
+  const [convertModalKundenreferenz, setConvertModalKundenreferenz] =
+    useState("");
 
   const [filters, setFilters] = useState<OfferSearchFilters>({
     search: "",
@@ -647,10 +653,7 @@ const OffersPage: React.FC<any> = ({
     }
   };
 
-  const handleConvertOfferToAuftrag = (
-    offer: any,
-    e?: React.MouseEvent,
-  ) => {
+  const handleConvertOfferToAuftrag = (offer: any, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setConvertModalKundenreferenz(offer.kundenreferenz || "");
     setConvertModalOffer(offer);
@@ -750,8 +753,6 @@ const OffersPage: React.FC<any> = ({
       return true;
     });
   }, [offers, docFilters]);
-
-
 
   const offerColumns: ColumnDef<any>[] = useMemo(
     () => [
@@ -1111,12 +1112,15 @@ const OffersPage: React.FC<any> = ({
                   autoFocus
                   maxLength={255}
                   value={convertModalKundenreferenz}
-                  onChange={(e) => setConvertModalKundenreferenz(e.target.value)}
+                  onChange={(e) =>
+                    setConvertModalKundenreferenz(e.target.value)
+                  }
                   placeholder="e.g. EURODIMA BE2650931 vom 20.08.2026"
                   className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 bg-white shadow-sm"
                 />
                 <p className="text-[11px] text-gray-500 mt-1.5">
-                  Der Cursor springt automatisch hierher. Nach dem Ausfüllen einfach OK klicken oder Enter drücken.
+                  Der Cursor springt automatisch hierher. Nach dem Ausfüllen
+                  einfach OK klicken oder Enter drücken.
                 </p>
               </div>
 
