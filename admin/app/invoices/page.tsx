@@ -846,21 +846,42 @@ const InvoiceListPage: React.FC = () => {
 
       setShowREModal(false);
 
-      const invId = Object.keys(expandedStates).find((key) =>
-        expandedStates[key].data?.detailedItems?.some(
-          (it: any) => it.id === selectedItem.id,
-        ),
+      await Promise.all([loadInvoices(), fetchOrders()]);
+
+      const expandedKeys = Object.keys(expandedStates).filter(
+        (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
       );
 
-      if (invId) {
-        setExpandedStates((prev) => {
-          const newState = { ...prev };
-          delete newState[invId];
-          return newState;
-        });
+      if (expandedKeys.length > 0) {
+        await Promise.all(
+          expandedKeys.map(async (invId) => {
+            try {
+              const res = await getExpandedInvoiceDetails(invId);
+              if (res?.success) {
+                setExpandedStates((prev) => ({
+                  ...prev,
+                  [invId]: { ...prev[invId], data: res.data },
+                }));
+              }
+            } catch (e) {
+              console.error(
+                `Failed to refresh expanded details for invoice ${invId}`,
+                e,
+              );
+            }
+          }),
+        );
       }
 
-      await Promise.all([loadInvoices(), fetchOrders()]);
+      setExpandedStates((prev) => {
+        const newState = { ...prev };
+        Object.keys(newState).forEach((key) => {
+          if (!newState[key]?.items && !newState[key]?.taric) {
+            delete newState[key].data;
+          }
+        });
+        return newState;
+      });
     } catch (err) {
       console.error(err);
       toast.error("Failed to assign/reassign cargo");
@@ -879,19 +900,43 @@ const InvoiceListPage: React.FC = () => {
       toast.success("Item split and moved successfully");
       setShowSPModal(false);
       setSplitRemarks("");
-      const invId = Object.keys(expandedStates).find((key) =>
-        expandedStates[key].data?.detailedItems?.some(
-          (it: any) => it.id === selectedItem.id,
-        ),
+
+      await Promise.all([loadInvoices(), fetchOrders()]);
+
+      const expandedKeys = Object.keys(expandedStates).filter(
+        (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
       );
-      if (invId) {
-        setExpandedStates((prev) => {
-          const newState = { ...prev };
-          delete newState[invId];
-          return newState;
-        });
+
+      if (expandedKeys.length > 0) {
+        await Promise.all(
+          expandedKeys.map(async (invId) => {
+            try {
+              const res = await getExpandedInvoiceDetails(invId);
+              if (res?.success) {
+                setExpandedStates((prev) => ({
+                  ...prev,
+                  [invId]: { ...prev[invId], data: res.data },
+                }));
+              }
+            } catch (e) {
+              console.error(
+                `Failed to refresh expanded details for invoice ${invId}`,
+                e,
+              );
+            }
+          }),
+        );
       }
-      await loadInvoices();
+
+      setExpandedStates((prev) => {
+        const newState = { ...prev };
+        Object.keys(newState).forEach((key) => {
+          if (!newState[key]?.items && !newState[key]?.taric) {
+            delete newState[key].data;
+          }
+        });
+        return newState;
+      });
     } catch (err) {
       console.error(err);
     }

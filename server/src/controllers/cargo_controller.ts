@@ -397,22 +397,42 @@ export const getAllCargos = async (
     const cargoIds = cargos.map((c) => c.id);
     const itemCountsMap: { [key: number]: number } = {};
     if (cargoIds.length > 0) {
+      const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
       const orderItemRepo = AppDataSource.getRepository(OrderItem);
-      const counts = await orderItemRepo
-        .createQueryBuilder("oi")
-        .leftJoin("oi.order", "o")
-        .select("oi.cargo_id", "cargoId")
-        .addSelect("COUNT(oi.id)", "count")
-        .where("oi.cargo_id IN (:...cargoIds)", { cargoIds })
-        .andWhere(
-          "(o.is_deleted = false OR o.is_deleted IS NULL OR oi.order_id IS NULL)",
-        )
-        .groupBy("oi.cargo_id")
-        .getRawMany();
 
-      counts.forEach((c) => {
-        itemCountsMap[Number(c.cargoId)] = Number(c.count);
+      const cargoOrders = await cargoOrderRepo.find({
+        where: { cargo_id: In(cargoIds) },
       });
+
+      const cargoToOrderIds = new Map<number, number[]>();
+      cargoOrders.forEach((co) => {
+        if (!cargoToOrderIds.has(co.cargo_id)) {
+          cargoToOrderIds.set(co.cargo_id, []);
+        }
+        cargoToOrderIds.get(co.cargo_id)!.push(co.order_id);
+      });
+
+      await Promise.all(
+        cargoIds.map(async (cargoId) => {
+          const linkedOrderIds = cargoToOrderIds.get(cargoId) || [];
+          const qb = orderItemRepo
+            .createQueryBuilder("oi")
+            .leftJoin("oi.order", "o")
+            .where("(o.is_deleted = false OR o.is_deleted IS NULL OR oi.order_id IS NULL)");
+
+          if (linkedOrderIds.length > 0) {
+            qb.andWhere(
+              "(oi.cargo_id = :cargoId OR oi.order_id IN (:...linkedOrderIds))",
+              { cargoId, linkedOrderIds },
+            );
+          } else {
+            qb.andWhere("oi.cargo_id = :cargoId", { cargoId });
+          }
+
+          const count = await qb.getCount();
+          itemCountsMap[cargoId] = count;
+        }),
+      );
     }
 
     const cargoTypes = await AppDataSource.getRepository(CargoType).find();
