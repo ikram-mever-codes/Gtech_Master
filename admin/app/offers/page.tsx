@@ -154,7 +154,7 @@ const getVatGroups = (
   });
 };
 
-export const getOfferGrossTotal = (off: any): any => {
+export const getOfferGrossTotal = (off: any) => {
   if (!off) return 0;
   const totalAmt = Number(
     off.totalAmount ??
