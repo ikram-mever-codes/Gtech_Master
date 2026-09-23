@@ -127,7 +127,9 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
                     [cargoId]: { orders: [], orderItems: [], loading: true }
                 }));
                 try {
+                    console.log(`[FRONTEND-DEBUG] Expanding Cargo ID ${cargoId}... calling getCargoOrders API`);
                     const res: any = await getCargoOrders(cargoId);
+                    console.log(`[FRONTEND-DEBUG] API response for Cargo ID ${cargoId}:`, res);
                     if (res && res.success) {
                         setCargoDetailsMap(prev => ({
                             ...prev,
