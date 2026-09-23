@@ -1000,10 +1000,6 @@ export const getCargoOrders = async (
     );
     orderItems = await qb.getMany();
 
-    console.log(
-      `[getCargoOrders-DEBUG] Cargo ID ${id} (${cargo?.cargo_no}): query returned ${orderItems.length} items from OrderItem table.`,
-    );
-
     if (orderItems.length === 0 && cargo?.cargo_no) {
       const invRepo = AppDataSource.getRepository(Invoice);
       const inv = await invRepo.findOne({
@@ -1011,9 +1007,6 @@ export const getCargoOrders = async (
         relations: ["items", "items.item", "customer"],
       });
       if (inv && inv.items && inv.items.length > 0) {
-        console.log(
-          `[getCargoOrders-DEBUG] Cargo ID ${id} (${cargo.cargo_no}): Found ${inv.items.length} fallback items from Invoice record.`,
-        );
         orderItems = inv.items.map((invItem) => ({
           id: invItem.id,
           qty: invItem.quantity,
