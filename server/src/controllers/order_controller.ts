@@ -1422,23 +1422,38 @@ export const generateLabelPDF = async (
     );
 
     let remarkCNText = (item.remarks_cn || "").trim();
-    let remarkWText = "";
-
-    if (transferOrderItem) {
+    let remarkWText = (item.remark_de || "").trim();
+    if (!remarkWText && transferOrderItem) {
       remarkWText = (transferOrderItem.remark_order_item || "").trim();
-    } else {
-      remarkWText = (item.remark_de || "").trim();
-      const rawItemName = (resolvedItem?.item_name || "").trim();
-      const rawItemNoDe = (resolvedItem?.item_no_de || "").trim();
-      const rawItemNameDe = ((item.item as any)?.item_name_de || "").trim();
+    }
+
+    if (remarkWText) {
+      const lowerRemark = remarkWText.toLowerCase();
+
+      const itemNamesToCompare = [
+        (resolvedItem?.item_name || "").trim().toLowerCase(),
+        (resolvedItem?.item_no_de || "").trim().toLowerCase(),
+        ((item.item as any)?.item_name_de || "").trim().toLowerCase(),
+        ((item as any)?.item_name || "").trim().toLowerCase(),
+        ((item as any)?.item_name_de || "").trim().toLowerCase(),
+        ((item as any)?.description || "").trim().toLowerCase(),
+        ((transferOrderItem as any)?.item_name || "").trim().toLowerCase(),
+        ((transferOrderItem as any)?.description || "").trim().toLowerCase(),
+      ].filter((val) => val.length > 0);
+
+      const isItemNameMatch = itemNamesToCompare.some(
+        (name) =>
+          lowerRemark === name ||
+          lowerRemark.includes(name) ||
+          (name.length > 5 && lowerRemark.includes(name.slice(0, 15))),
+      );
 
       if (
-        remarkWText &&
-        (remarkWText === rawItemName ||
-          remarkWText === rawItemNoDe ||
-          remarkWText === rawItemNameDe ||
-          remarkWText.startsWith("Dummy Test Item") ||
-          remarkWText.startsWith("Barbeque Sleeves"))
+        isItemNameMatch ||
+        lowerRemark.startsWith("dummy test item") ||
+        lowerRemark.startsWith("barbeque sleeves") ||
+        lowerRemark.startsWith("kreismesser") ||
+        lowerRemark.startsWith("round blade")
       ) {
         remarkWText = "";
       }
@@ -1476,7 +1491,7 @@ export const generateLabelPDF = async (
       doc.text("Lieferhinweis", colA, currentY);
 
       const valY = currentY + 7;
-      const maxAvailableHeight = Math.max(10, 102 - valY);
+      const maxAvailableHeight = Math.max(10, Math.min(26, 96 - valY));
 
       let fontSizeW = 7.5;
       if (fontSource) doc.font(fontSource, 0);
@@ -1489,6 +1504,21 @@ export const generateLabelPDF = async (
         )
           break;
         fontSizeW -= 0.5;
+      }
+
+      if (
+        doc.heightOfString(remarkWText, { width: 125 }) > maxAvailableHeight
+      ) {
+        doc.fontSize(4.5);
+        let trimmed = remarkWText;
+        while (
+          trimmed.length > 5 &&
+          doc.heightOfString(trimmed + "...", { width: 125 }) >
+            maxAvailableHeight
+        ) {
+          trimmed = trimmed.slice(0, -3);
+        }
+        remarkWText = trimmed + "...";
       }
 
       doc.text(remarkWText, valColA, valY, {
