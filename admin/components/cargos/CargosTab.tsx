@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Select from "react-select";
 import {
-    ArrowPathIcon,
-    PlusIcon,
-    TrashIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    MagnifyingGlassIcon,
+  ArrowPathIcon,
+  PlusIcon,
+  TrashIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import { Truck } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
@@ -16,22 +16,26 @@ import ModalHeader from "@/components/UI/ModalHeader";
 import ModalFooter from "@/components/UI/ModalFooter";
 import { toast } from "react-hot-toast";
 import {
-    getAllCargos,
-    getCargoById,
-    createCargo,
-    updateCargo,
-    deleteCargo,
-    assignOrdersToCargo,
-    removeOrderFromCargo,
-    getCargoOrders,
-    CargoType,
-    CARGO_STATUSES,
-    getCargoStatusColor,
+  getAllCargos,
+  getCargoById,
+  createCargo,
+  updateCargo,
+  deleteCargo,
+  assignOrdersToCargo,
+  removeOrderFromCargo,
+  getCargoOrders,
+  CargoType,
+  CARGO_STATUSES,
+  getCargoStatusColor,
 } from "@/api/cargos";
 import { getAllOrders, type Order } from "@/api/orders";
 import { getAllCustomers } from "@/api/customers";
+import { getAllInvoices } from "@/api/invoice";
 import { errorStyles, successStyles } from "@/utils/constants";
-import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "../General/BillToShipToForm";
+import BillToShipToForm, {
+  BillToShipToData,
+  WAREHOUSE_BILL_TO,
+} from "../General/BillToShipToForm";
 import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
 import SegmentedControl from "@/components/UI/SegmentedControl";
 import { formatDate } from "@/utils/date";
@@ -41,127 +45,371 @@ import { getShippingAddresses } from "@/api/shipping_addresses";
 import { formatCountryCode } from "@/utils/address";
 import { ClipboardList } from "lucide-react";
 
-
 type Customer = {
-    id: string | number;
-    companyName: string;
-    legalName?: string;
-    email?: string;
-    contactEmail?: string;
-    contactPhoneNumber?: string;
-    taxNumber?: string;
-    addressLine1?: string;
-    addressLine2?: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    postalCode?: string;
-    deliveryAddressLine1?: string;
-    deliveryAddressLine2?: string;
-    deliveryCity?: string;
-    deliveryCountry?: string;
-    deliveryPostalCode?: string;
+  id: string | number;
+  companyName: string;
+  legalName?: string;
+  email?: string;
+  contactEmail?: string;
+  contactPhoneNumber?: string;
+  taxNumber?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  deliveryAddressLine1?: string;
+  deliveryAddressLine2?: string;
+  deliveryCity?: string;
+  deliveryCountry?: string;
+  deliveryPostalCode?: string;
 };
 
 interface CargosTabProps {
-    customers?: Customer[];
-    searchTerm?: string;
-    statusFilter?: string;
-    setStatusFilter?: (s: string) => void;
+  customers?: Customer[];
+  searchTerm?: string;
+  statusFilter?: string;
+  setStatusFilter?: (s: string) => void;
 }
 
 const formatDateInput = (dateString: string | Date | undefined | null) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "";
-    return date.toISOString().split("T")[0];
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "";
+  return date.toISOString().split("T")[0];
 };
 
 const formatCargoDateShort = (dateString: string | Date | undefined | null) => {
-    return formatDate(dateString, true);
+  return formatDate(dateString, true);
 };
 
-const CargosTab = React.forwardRef<any, CargosTabProps>(({
-    customers: externalCustomers,
-    searchTerm: externalSearchTerm,
-    statusFilter: externalStatusFilter,
-    setStatusFilter: externalSetStatusFilter
-}, ref) => {
+// A CI (Commercial Invoice) counts as "closed" once it's paid, cancelled,
+// or has been frozen into the CCIInvoice snapshot table (which getAllInvoices
+// merges into the same list with status "closed" — see InvoiceListPage /
+// createRechnungOhneAusliefern context elsewhere in this codebase).
+const CLOSED_INVOICE_STATUSES = new Set(["paid", "cancelled", "closed"]);
+
+const CargosTab = React.forwardRef<any, CargosTabProps>(
+  (
+    {
+      customers: externalCustomers,
+      searchTerm: externalSearchTerm,
+      statusFilter: externalStatusFilter,
+      setStatusFilter: externalSetStatusFilter,
+    },
+    ref,
+  ) => {
     const [cargos, setCargos] = useState<CargoType[]>([]);
     const [loading, setLoading] = useState(false);
     const [localSearch, setLocalSearch] = useState("");
-    const search = externalSearchTerm !== undefined ? externalSearchTerm : localSearch;
+    const search =
+      externalSearchTerm !== undefined ? externalSearchTerm : localSearch;
     const [localStatusFilter, setLocalStatusFilter] = useState("Open");
-    const statusFilter = externalStatusFilter !== undefined ? externalStatusFilter : localStatusFilter;
-    const setStatusFilter = externalSetStatusFilter !== undefined ? externalSetStatusFilter : setLocalStatusFilter;
+    const statusFilter =
+      externalStatusFilter !== undefined
+        ? externalStatusFilter
+        : localStatusFilter;
+    const setStatusFilter =
+      externalSetStatusFilter !== undefined
+        ? externalSetStatusFilter
+        : setLocalStatusFilter;
     const [pagination, setPagination] = useState({
-        page: 1,
-        limit: 30,
-        totalRecords: 0,
-        totalPages: 1,
+      page: 1,
+      limit: 30,
+      totalRecords: 0,
+      totalPages: 1,
     });
 
+    // cargo_no -> true when that cargo's linked CI is closed (paid,
+    // cancelled, or frozen into CCIInvoice). Drives whether the "Ship"
+    // action is available for a given cargo row — a cargo cannot be
+    // shipped while its invoice is still open.
+    const [closedInvoiceCargoNos, setClosedInvoiceCargoNos] = useState<
+      Set<string>
+    >(new Set());
+    const [loadingInvoiceStatus, setLoadingInvoiceStatus] = useState(false);
+
+    const fetchInvoiceStatusMap = useCallback(async () => {
+      setLoadingInvoiceStatus(true);
+      try {
+        const response: any = await getAllInvoices();
+        const invoices: any[] = response?.data || [];
+        const closedSet = new Set<string>();
+        invoices.forEach((inv) => {
+          const cargoNo = (
+            inv.cargoNo ||
+            inv.cargo?.cargo_no ||
+            inv.orderNumber ||
+            ""
+          ).trim();
+          if (!cargoNo) return;
+          if (
+            CLOSED_INVOICE_STATUSES.has(String(inv.status || "").toLowerCase())
+          ) {
+            closedSet.add(cargoNo);
+          }
+        });
+        setClosedInvoiceCargoNos(closedSet);
+      } catch (error) {
+        console.error("Error fetching invoice status for cargos:", error);
+      } finally {
+        setLoadingInvoiceStatus(false);
+      }
+    }, []);
+
+    /** True once this cargo's CI is closed — the Ship action is gated on
+     * this. A cargo with no invoice at all yet is also treated as "not
+     * ready to ship", same as one with a still-open invoice. */
+    const isCiClosedForCargo = useCallback(
+      (cargo: any) => {
+        const cargoNo = (cargo?.cargo_no || "").trim();
+        if (!cargoNo) return false;
+        return closedInvoiceCargoNos.has(cargoNo);
+      },
+      [closedInvoiceCargoNos],
+    );
+
     const handleStatusFilterChange = (newStatus: string) => {
-        setStatusFilter(newStatus);
-        setPagination((prev) => ({ ...prev, page: 1 }));
+      setStatusFilter(newStatus);
+      setPagination((prev) => ({ ...prev, page: 1 }));
     };
 
     const [showModal, setShowModal] = useState(false);
-    const [expandedCargoIds, setExpandedCargoIds] = useState<Set<number>>(new Set());
-    const [cargoDetailsMap, setCargoDetailsMap] = useState<Record<number, { orders: any[]; orderItems: any[]; loading: boolean }>>({});
+    const [expandedCargoIds, setExpandedCargoIds] = useState<Set<number>>(
+      new Set(),
+    );
+    const [cargoDetailsMap, setCargoDetailsMap] = useState<
+      Record<number, { orders: any[]; orderItems: any[]; loading: boolean }>
+    >({});
 
     const toggleExpandCargo = async (cargoId: number, e: React.MouseEvent) => {
-        e.stopPropagation();
-        const newExpanded = new Set(expandedCargoIds);
-        if (newExpanded.has(cargoId)) {
-            newExpanded.delete(cargoId);
-            setExpandedCargoIds(newExpanded);
-        } else {
-            newExpanded.add(cargoId);
-            setExpandedCargoIds(newExpanded);
+      e.stopPropagation();
+      const newExpanded = new Set(expandedCargoIds);
+      if (newExpanded.has(cargoId)) {
+        newExpanded.delete(cargoId);
+        setExpandedCargoIds(newExpanded);
+      } else {
+        newExpanded.add(cargoId);
+        setExpandedCargoIds(newExpanded);
 
-            if (!cargoDetailsMap[cargoId]) {
-                setCargoDetailsMap(prev => ({
-                    ...prev,
-                    [cargoId]: { orders: [], orderItems: [], loading: true }
-                }));
-                try {
-                    const res: any = await getCargoOrders(cargoId);
-                    if (res && res.success) {
-                        setCargoDetailsMap(prev => ({
-                            ...prev,
-                            [cargoId]: {
-                                orders: res.data?.orders || [],
-                                orderItems: res.data?.orderItems || [],
-                                loading: false
-                            }
-                        }));
-                    } else {
-                        setCargoDetailsMap(prev => ({
-                            ...prev,
-                            [cargoId]: { orders: [], orderItems: [], loading: false }
-                        }));
-                    }
-                } catch (err) {
-                    console.error("Failed to load cargo orders", err);
-                    setCargoDetailsMap(prev => ({
-                        ...prev,
-                        [cargoId]: { orders: [], orderItems: [], loading: false }
-                    }));
-                }
+        if (!cargoDetailsMap[cargoId]) {
+          setCargoDetailsMap((prev) => ({
+            ...prev,
+            [cargoId]: { orders: [], orderItems: [], loading: true },
+          }));
+          try {
+            const res: any = await getCargoOrders(cargoId);
+            if (res && res.success) {
+              setCargoDetailsMap((prev) => ({
+                ...prev,
+                [cargoId]: {
+                  orders: res.data?.orders || [],
+                  orderItems: res.data?.orderItems || [],
+                  loading: false,
+                },
+              }));
+            } else {
+              setCargoDetailsMap((prev) => ({
+                ...prev,
+                [cargoId]: { orders: [], orderItems: [], loading: false },
+              }));
             }
+          } catch (err) {
+            console.error("Failed to load cargo orders", err);
+            setCargoDetailsMap((prev) => ({
+              ...prev,
+              [cargoId]: { orders: [], orderItems: [], loading: false },
+            }));
+          }
         }
+      }
     };
 
-    const [modalMode, setModalMode] = useState<"create" | "edit" | "view">("create");
+    const [modalMode, setModalMode] = useState<"create" | "edit" | "view">(
+      "create",
+    );
     const [editingId, setEditingId] = useState<number | null>(null);
     const [isEditEnabled, setIsEditEnabled] = useState(false);
 
     const [formData, setFormData] = useState<Partial<CargoType>>({
+      customer_id: undefined,
+      cargo_type_id: undefined,
+      cargo_no: "",
+      pickup_date: "",
+      dep_date: "",
+      eta: "",
+      note: "",
+      online_track: "",
+      remark: "",
+      cargo_status: "Open",
+      shipped_at: "",
+      customer_type: "GT-Warehouse",
+      ...WAREHOUSE_BILL_TO,
+      ship_to_company_name: "",
+      ship_to_display_name: "",
+      ship_to_contact_person: "",
+      ship_to_contact_phone: "",
+      ship_to_country: "",
+      ship_to_city: "",
+      ship_to_postal_code: "",
+      ship_to_full_address: "",
+      ship_to_remarks: "",
+    });
+
+    const [assignedOrderIds, setAssignedOrderIds] = useState<number[]>([]);
+    const [cargoOrderItems, setCargoOrderItems] = useState<any[]>([]);
+    const [cargoOrders, setCargoOrders] = useState<any[]>([]);
+
+    const [allOrders, setAllOrders] = useState<Order[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [cargoTypes, setCargoTypes] = useState<CargoTypeObj[]>([]);
+    const [loadingOrders, setLoadingOrders] = useState(false);
+
+    useEffect(() => {
+      if (externalCustomers && externalCustomers.length > 0) {
+        setCustomers(externalCustomers);
+      }
+    }, [externalCustomers]);
+
+    const fetchCargos = useCallback(async () => {
+      setLoading(true);
+      try {
+        const response: any = await getAllCargos({
+          page: pagination.page,
+          limit: pagination.limit,
+          search,
+          status: statusFilter,
+        });
+        setCargos(response.data || []);
+        if (response.pagination) {
+          setPagination(response.pagination);
+        }
+      } catch (error) {
+        console.error("Error fetching cargos:", error);
+      } finally {
+        setLoading(false);
+      }
+    }, [pagination.page, pagination.limit, search, statusFilter]);
+
+    const fetchOrders = useCallback(async () => {
+      setLoadingOrders(true);
+      try {
+        const response: any = await getAllOrders();
+        if (response?.success) setAllOrders(response.data || []);
+        else if (response?.data) setAllOrders(response.data || []);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      } finally {
+        setLoadingOrders(false);
+      }
+    }, []);
+
+    const fetchCargoTypesData = useCallback(async () => {
+      try {
+        const response: any = await getAllCargoTypes();
+        const data = response?.data?.data || response?.data || response;
+        setCargoTypes(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error("Error fetching cargo types:", e);
+      }
+    }, []);
+
+    const fetchCustomersIfNeeded = useCallback(async () => {
+      if (externalCustomers && externalCustomers.length > 0) return;
+      try {
+        const response = await getAllCustomers({ limit: 1000 });
+        const data = response?.data ?? response;
+        let arr = [];
+        if (Array.isArray(data)) {
+          arr = data;
+        } else if (data?.businesses && Array.isArray(data.businesses)) {
+          arr = data.businesses;
+        } else if (data?.customers && Array.isArray(data.customers)) {
+          arr = data.customers;
+        }
+        setCustomers(arr);
+      } catch (e) {
+        console.error("Error fetching customers:", e);
+      }
+    }, [externalCustomers]);
+
+    useEffect(() => {
+      fetchCargos();
+    }, [fetchCargos]);
+
+    useEffect(() => {
+      fetchOrders();
+      fetchCustomersIfNeeded();
+      fetchCargoTypesData();
+      fetchInvoiceStatusMap();
+    }, [
+      fetchOrders,
+      fetchCustomersIfNeeded,
+      fetchCargoTypesData,
+      fetchInvoiceStatusMap,
+    ]);
+
+    const handlePageChange = (newPage: number) => {
+      if (newPage < 1 || newPage > pagination.totalPages) return;
+      setPagination({ ...pagination, page: newPage });
+    };
+
+    const getCustomerName = useCallback(
+      (customerId: any) =>
+        customers.find((c) => String(c.id) === String(customerId))
+          ?.companyName ?? "-",
+      [customers],
+    );
+
+    const availableOrders = useMemo(() => {
+      return allOrders.filter((o) => !assignedOrderIds.includes(o.id));
+    }, [allOrders, assignedOrderIds]);
+
+    const getCargoTypeName = useCallback(
+      (id: any) =>
+        cargoTypes.find((ct) => String(ct.id) === String(id))?.type ?? "-",
+      [cargoTypes],
+    );
+
+    const orderOptions = useMemo(
+      () =>
+        availableOrders.map((o) => ({
+          value: String(o.id),
+          label: `${o.order_no} (ID: ${o.id})`,
+        })),
+      [availableOrders],
+    );
+
+    const cargoTypeOptions = useMemo(
+      () =>
+        cargoTypes.map((ct) => ({
+          value: String(ct.id),
+          label: `${ct.type} (${ct.duration || 0} days)`,
+        })),
+      [cargoTypes],
+    );
+
+    const customerOptions = useMemo(
+      () =>
+        customers.map((c) => ({
+          value: String(c.id),
+          label: c.companyName || "-",
+        })),
+      [customers],
+    );
+
+    const resetForm = () => {
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const defaultPrefix = `C${yy}${mm}-`;
+
+      setFormData({
         customer_id: undefined,
         cargo_type_id: undefined,
-        cargo_no: "",
+        cargo_no: defaultPrefix,
         pickup_date: "",
         dep_date: "",
         eta: "",
@@ -181,1040 +429,1101 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({
         ship_to_postal_code: "",
         ship_to_full_address: "",
         ship_to_remarks: "",
-    });
-
-    const [assignedOrderIds, setAssignedOrderIds] = useState<number[]>([]);
-    const [cargoOrderItems, setCargoOrderItems] = useState<any[]>([]);
-    const [cargoOrders, setCargoOrders] = useState<any[]>([]);
-
-    const [allOrders, setAllOrders] = useState<Order[]>([]);
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [cargoTypes, setCargoTypes] = useState<CargoTypeObj[]>([]);
-    const [loadingOrders, setLoadingOrders] = useState(false);
-
-    useEffect(() => {
-        if (externalCustomers && externalCustomers.length > 0) {
-            setCustomers(externalCustomers);
-        }
-    }, [externalCustomers]);
-
-    const fetchCargos = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response: any = await getAllCargos({
-                page: pagination.page,
-                limit: pagination.limit,
-                search,
-                status: statusFilter,
-            });
-            setCargos(response.data || []);
-            if (response.pagination) {
-                setPagination(response.pagination);
-            }
-        } catch (error) {
-            console.error("Error fetching cargos:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [pagination.page, pagination.limit, search, statusFilter]);
-
-    const fetchOrders = useCallback(async () => {
-        setLoadingOrders(true);
-        try {
-            const response: any = await getAllOrders();
-            if (response?.success) setAllOrders(response.data || []);
-            else if (response?.data) setAllOrders(response.data || []);
-        } catch (error) {
-            console.error("Error fetching orders:", error);
-        } finally {
-            setLoadingOrders(false);
-        }
-    }, []);
-
-    const fetchCargoTypesData = useCallback(async () => {
-        try {
-            const response: any = await getAllCargoTypes();
-            const data = response?.data?.data || response?.data || response;
-            setCargoTypes(Array.isArray(data) ? data : []);
-        } catch (e) {
-            console.error("Error fetching cargo types:", e);
-        }
-    }, []);
-
-    const fetchCustomersIfNeeded = useCallback(async () => {
-        if (externalCustomers && externalCustomers.length > 0) return;
-        try {
-            const response = await getAllCustomers({ limit: 1000 });
-            const data = response?.data ?? response;
-            let arr = [];
-            if (Array.isArray(data)) {
-                arr = data;
-            } else if (data?.businesses && Array.isArray(data.businesses)) {
-                arr = data.businesses;
-            } else if (data?.customers && Array.isArray(data.customers)) {
-                arr = data.customers;
-            }
-            setCustomers(arr);
-        } catch (e) {
-            console.error("Error fetching customers:", e);
-        }
-    }, [externalCustomers]);
-
-    useEffect(() => {
-        fetchCargos();
-    }, [fetchCargos]);
-
-    useEffect(() => {
-        fetchOrders();
-        fetchCustomersIfNeeded();
-        fetchCargoTypesData();
-    }, [fetchOrders, fetchCustomersIfNeeded, fetchCargoTypesData]);
-
-    const handlePageChange = (newPage: number) => {
-        if (newPage < 1 || newPage > pagination.totalPages) return;
-        setPagination({ ...pagination, page: newPage });
+      });
+      setAssignedOrderIds([]);
+      setCargoOrderItems([]);
+      setCargoOrders([]);
     };
 
-    const getCustomerName = useCallback(
-        (customerId: any) =>
-            customers.find((c) => String(c.id) === String(customerId))?.companyName ?? "-",
-        [customers]
-    );
+    const handleOpenCreate = () => {
+      resetForm();
+      setModalMode("create");
+      setIsEditEnabled(true);
+      setEditingId(null);
+      setShowModal(true);
+    };
 
-    const availableOrders = useMemo(() => {
-        return allOrders.filter((o) => !assignedOrderIds.includes(o.id));
-    }, [allOrders, assignedOrderIds]);
+    const handleOpenEdit = async (id: number) => {
+      try {
+        setLoading(true);
+        const response: any = await getCargoById(id);
+        if (response.success && response.data) {
+          const cargo = response.data;
+          setFormData({
+            customer_id: cargo.customer_id,
+            cargo_type_id: cargo.cargo_type_id,
+            cargo_no: cargo.cargo_no || "",
+            pickup_date: formatDateInput(cargo.pickup_date),
+            dep_date: formatDateInput(cargo.dep_date),
+            eta: formatDateInput(cargo.eta),
+            note: cargo.note || "",
+            online_track: cargo.online_track || "",
+            remark: cargo.remark || "",
+            cargo_status: cargo.cargo_status || "Open",
+            shipped_at: formatDateInput(cargo.shipped_at),
+            customer_type: cargo.customer_type || "Other Customer",
+            bill_to_company_name: cargo.bill_to_company_name || "",
+            bill_to_display_name: cargo.bill_to_display_name || "",
+            bill_to_phone_no: cargo.bill_to_phone_no || "",
+            bill_to_tax_no: cargo.bill_to_tax_no || "",
+            bill_to_email: cargo.bill_to_email || "",
+            bill_to_website: cargo.bill_to_website || "",
+            bill_to_contact_person: cargo.bill_to_contact_person || "",
+            bill_to_contact_phone: cargo.bill_to_contact_phone || "",
+            bill_to_contact_mobile: cargo.bill_to_contact_mobile || "",
+            bill_to_contact_email: cargo.bill_to_contact_email || "",
+            bill_to_country: cargo.bill_to_country || "",
+            bill_to_city: cargo.bill_to_city || "",
+            bill_to_postal_code: cargo.bill_to_postal_code || "",
+            bill_to_full_address: cargo.bill_to_full_address || "",
+            ship_to_company_name: cargo.ship_to_company_name || "",
+            ship_to_display_name: cargo.ship_to_display_name || "",
+            ship_to_contact_person: cargo.ship_to_contact_person || "",
+            ship_to_contact_phone: cargo.ship_to_contact_phone || "",
+            ship_to_country: cargo.ship_to_country || "",
+            ship_to_city: cargo.ship_to_city || "",
+            ship_to_postal_code: cargo.ship_to_postal_code || "",
+            ship_to_full_address: cargo.ship_to_full_address || "",
+            ship_to_remarks: cargo.ship_to_remarks || "",
+          });
+          setAssignedOrderIds((cargo.orders || []).map((o: any) => o.id));
+          setCargoOrders(cargo.orders || []);
+          setCargoOrderItems(cargo.orderItems || []);
+          setModalMode("edit");
+          setEditingId(id);
+          setIsEditEnabled(false);
+          setShowModal(true);
+        }
+      } catch (error) {
+        toast.error("Failed to load cargo", errorStyles);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const getCargoTypeName = useCallback(
-        (id: any) =>
-            cargoTypes.find((ct) => String(ct.id) === String(id))?.type ?? "-",
-        [cargoTypes]
-    );
+    const handleOpenView = async (id: number) => {
+      await handleOpenEdit(id);
+      setModalMode("view");
+    };
 
-    const orderOptions = useMemo(
-        () =>
-            availableOrders.map((o) => ({
-                value: String(o.id),
-                label: `${o.order_no} (ID: ${o.id})`,
-            })),
-        [availableOrders]
-    );
+    const handleSubmit = async () => {
+      try {
+        setLoading(true);
+        const cleanFormData = { ...formData };
+        const dateFields = [
+          "pickup_date",
+          "dep_date",
+          "eta",
+          "shipped_at",
+        ] as const;
 
-    const cargoTypeOptions = useMemo(
-        () =>
-            cargoTypes.map((ct) => ({
-                value: String(ct.id),
-                label: `${ct.type} (${ct.duration || 0} days)`,
-            })),
-        [cargoTypes]
-    );
+        dateFields.forEach((field) => {
+          if (cleanFormData[field] === "") {
+            cleanFormData[field] = null as any;
+          }
+        });
 
-    const customerOptions = useMemo(
-        () =>
-            customers.map((c) => ({
-                value: String(c.id),
-                label: c.companyName || "-",
-            })),
-        [customers]
-    );
-
-    const resetForm = () => {
+        const rawCargoNo = (cleanFormData.cargo_no || "").trim();
         const now = new Date();
         const yy = String(now.getFullYear()).slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, "0");
         const defaultPrefix = `C${yy}${mm}-`;
 
-        setFormData({
-            customer_id: undefined,
-            cargo_type_id: undefined,
-            cargo_no: defaultPrefix,
-            pickup_date: "",
-            dep_date: "",
-            eta: "",
-            note: "",
-            online_track: "",
-            remark: "",
-            cargo_status: "Open",
-            shipped_at: "",
-            customer_type: "GT-Warehouse",
-            ...WAREHOUSE_BILL_TO,
-            ship_to_company_name: "",
-            ship_to_display_name: "",
-            ship_to_contact_person: "",
-            ship_to_contact_phone: "",
-            ship_to_country: "",
-            ship_to_city: "",
-            ship_to_postal_code: "",
-            ship_to_full_address: "",
-            ship_to_remarks: "",
-        });
-        setAssignedOrderIds([]);
-        setCargoOrderItems([]);
-        setCargoOrders([]);
-    };
+        const isCustomText =
+          rawCargoNo &&
+          rawCargoNo !== defaultPrefix &&
+          !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
 
-    const handleOpenCreate = () => {
-        resetForm();
-        setModalMode("create");
-        setIsEditEnabled(true);
-        setEditingId(null);
-        setShowModal(true);
-    };
-
-    const handleOpenEdit = async (id: number) => {
-        try {
-            setLoading(true);
-            const response: any = await getCargoById(id);
-            if (response.success && response.data) {
-                const cargo = response.data;
-                setFormData({
-                    customer_id: cargo.customer_id,
-                    cargo_type_id: cargo.cargo_type_id,
-                    cargo_no: cargo.cargo_no || "",
-                    pickup_date: formatDateInput(cargo.pickup_date),
-                    dep_date: formatDateInput(cargo.dep_date),
-                    eta: formatDateInput(cargo.eta),
-                    note: cargo.note || "",
-                    online_track: cargo.online_track || "",
-                    remark: cargo.remark || "",
-                    cargo_status: cargo.cargo_status || "Open",
-                    shipped_at: formatDateInput(cargo.shipped_at),
-                    customer_type: cargo.customer_type || "Other Customer",
-                    bill_to_company_name: cargo.bill_to_company_name || "",
-                    bill_to_display_name: cargo.bill_to_display_name || "",
-                    bill_to_phone_no: cargo.bill_to_phone_no || "",
-                    bill_to_tax_no: cargo.bill_to_tax_no || "",
-                    bill_to_email: cargo.bill_to_email || "",
-                    bill_to_website: cargo.bill_to_website || "",
-                    bill_to_contact_person: cargo.bill_to_contact_person || "",
-                    bill_to_contact_phone: cargo.bill_to_contact_phone || "",
-                    bill_to_contact_mobile: cargo.bill_to_contact_mobile || "",
-                    bill_to_contact_email: cargo.bill_to_contact_email || "",
-                    bill_to_country: cargo.bill_to_country || "",
-                    bill_to_city: cargo.bill_to_city || "",
-                    bill_to_postal_code: cargo.bill_to_postal_code || "",
-                    bill_to_full_address: cargo.bill_to_full_address || "",
-                    ship_to_company_name: cargo.ship_to_company_name || "",
-                    ship_to_display_name: cargo.ship_to_display_name || "",
-                    ship_to_contact_person: cargo.ship_to_contact_person || "",
-                    ship_to_contact_phone: cargo.ship_to_contact_phone || "",
-                    ship_to_country: cargo.ship_to_country || "",
-                    ship_to_city: cargo.ship_to_city || "",
-                    ship_to_postal_code: cargo.ship_to_postal_code || "",
-                    ship_to_full_address: cargo.ship_to_full_address || "",
-                    ship_to_remarks: cargo.ship_to_remarks || "",
-                });
-                setAssignedOrderIds((cargo.orders || []).map((o: any) => o.id));
-                setCargoOrders(cargo.orders || []);
-                setCargoOrderItems(cargo.orderItems || []);
-                setModalMode("edit");
-                setEditingId(id);
-                setIsEditEnabled(false);
-                setShowModal(true);
+        if (isCustomText) {
+          const existingRemark = (
+            cleanFormData.remark ||
+            cleanFormData.note ||
+            ""
+          ).trim();
+          if (existingRemark) {
+            if (!existingRemark.includes(rawCargoNo)) {
+              cleanFormData.remark = `${existingRemark} - ${rawCargoNo}`;
             }
-        } catch (error) {
-            toast.error("Failed to load cargo", errorStyles);
-        } finally {
-            setLoading(false);
+          } else {
+            cleanFormData.remark = rawCargoNo;
+          }
+          cleanFormData.note = cleanFormData.remark;
         }
-    };
 
-    const handleOpenView = async (id: number) => {
-        await handleOpenEdit(id);
-        setModalMode("view");
-    };
+        const payload: any = {
+          ...cleanFormData,
+          orders: assignedOrderIds,
+        };
 
-    const handleSubmit = async () => {
-        try {
-            setLoading(true);
-            const cleanFormData = { ...formData };
-            const dateFields = ["pickup_date", "dep_date", "eta", "shipped_at"] as const;
-
-            dateFields.forEach(field => {
-                if (cleanFormData[field] === "") {
-                    cleanFormData[field] = null as any;
-                }
-            });
-
-            const rawCargoNo = (cleanFormData.cargo_no || "").trim();
-            const now = new Date();
-            const yy = String(now.getFullYear()).slice(-2);
-            const mm = String(now.getMonth() + 1).padStart(2, "0");
-            const defaultPrefix = `C${yy}${mm}-`;
-
-            const isCustomText =
-                rawCargoNo &&
-                rawCargoNo !== defaultPrefix &&
-                !/^C\d{4,6}-\d+$/i.test(rawCargoNo);
-
-            if (isCustomText) {
-                const existingRemark = (cleanFormData.remark || cleanFormData.note || "").trim();
-                if (existingRemark) {
-                    if (!existingRemark.includes(rawCargoNo)) {
-                        cleanFormData.remark = `${existingRemark} - ${rawCargoNo}`;
-                    }
-                } else {
-                    cleanFormData.remark = rawCargoNo;
-                }
-                cleanFormData.note = cleanFormData.remark;
-            }
-
-            const payload: any = {
-                ...cleanFormData,
-                orders: assignedOrderIds,
-            };
-
-            if (modalMode === "create") {
-                await createCargo(payload);
-            } else if (modalMode === "edit" && editingId) {
-                await updateCargo(editingId, payload);
-                toast.success("Cargo updated successfully", successStyles);
-            }
-            setShowModal(false);
-            fetchCargos();
-        } catch (error: any) {
-        } finally {
-            setLoading(false);
+        if (modalMode === "create") {
+          await createCargo(payload);
+        } else if (modalMode === "edit" && editingId) {
+          await updateCargo(editingId, payload);
+          toast.success("Cargo updated successfully", successStyles);
         }
+        setShowModal(false);
+        fetchCargos();
+      } catch (error: any) {
+      } finally {
+        setLoading(false);
+      }
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm("Are you sure you want to delete this cargo? This action cannot be undone.")) return;
-        try {
-            setLoading(true);
-            await deleteCargo(id);
-            fetchCargos();
-        } catch (error) {
-        } finally {
-            setLoading(false);
-        }
+      if (
+        !confirm(
+          "Are you sure you want to delete this cargo? This action cannot be undone.",
+        )
+      )
+        return;
+      try {
+        setLoading(true);
+        await deleteCargo(id);
+        fetchCargos();
+      } catch (error) {
+      } finally {
+        setLoading(false);
+      }
     };
 
     const handleAddOrder = (orderId: string) => {
-        if (!orderId) return;
-        const id = Number(orderId);
-        if (assignedOrderIds.includes(id)) return;
+      if (!orderId) return;
+      const id = Number(orderId);
+      if (assignedOrderIds.includes(id)) return;
 
-        setAssignedOrderIds([...assignedOrderIds, id]);
-        const order = allOrders.find((o) => o.id === id);
-        if (order) {
-            setCargoOrders([...cargoOrders, order]);
-        }
+      setAssignedOrderIds([...assignedOrderIds, id]);
+      const order = allOrders.find((o) => o.id === id);
+      if (order) {
+        setCargoOrders([...cargoOrders, order]);
+      }
     };
 
     const handleRemoveOrder = (orderId: number) => {
-        setAssignedOrderIds(assignedOrderIds.filter((id) => id !== orderId));
-        setCargoOrders(cargoOrders.filter((o: any) => o.id !== orderId));
+      setAssignedOrderIds(assignedOrderIds.filter((id) => id !== orderId));
+      setCargoOrders(cargoOrders.filter((o: any) => o.id !== orderId));
     };
 
     const updateField = (field: string, value: any) => {
-        setFormData({ ...formData, [field]: value });
+      setFormData({ ...formData, [field]: value });
     };
 
     const handleMarkAsShippedClick = () => {
-        if (confirm("Are you sure you want to mark this cargo as Shipped? This will change status to 'Shipped' and auto-fill the shipped date with today's date.")) {
-            const today = new Date().toISOString().split('T')[0];
-            setFormData(prev => ({
-                ...prev,
-                cargo_status: "Shipped",
-                shipped_at: today
-            }));
-        }
+      if (!isCiClosedForCargo(formData)) {
+        toast.error(
+          "The linked CI (invoice) must be closed before this cargo can be marked as Shipped.",
+          errorStyles,
+        );
+        return;
+      }
+      if (
+        confirm(
+          "Are you sure you want to mark this cargo as Shipped? This will change status to 'Shipped' and auto-fill the shipped date with today's date.",
+        )
+      ) {
+        const today = new Date().toISOString().split("T")[0];
+        setFormData((prev) => ({
+          ...prev,
+          cargo_status: "Shipped",
+          shipped_at: today,
+        }));
+      }
     };
 
     const handleMarkAsDeliveredClick = () => {
-        const cargoTypeStr = formData.cargo_type_id ? getCargoTypeName(formData.cargo_type_id) : "Cargo";
-        const cargoNoStr = formData.cargo_no || "this cargo";
-        const etaStr = formData.eta ? formatDateInput(formData.eta) : "N/A";
-        const confirmMsg = `Has ${cargoTypeStr} ${cargoNoStr} with Expected Delivery Date ${etaStr} arrived?`;
+      const cargoTypeStr = formData.cargo_type_id
+        ? getCargoTypeName(formData.cargo_type_id)
+        : "Cargo";
+      const cargoNoStr = formData.cargo_no || "this cargo";
+      const etaStr = formData.eta ? formatDateInput(formData.eta) : "N/A";
+      const confirmMsg = `Has ${cargoTypeStr} ${cargoNoStr} with Expected Delivery Date ${etaStr} arrived?`;
 
-        if (confirm(confirmMsg)) {
-            setFormData(prev => ({
-                ...prev,
-                cargo_status: "Delivered"
-            }));
-        }
+      if (confirm(confirmMsg)) {
+        setFormData((prev) => ({
+          ...prev,
+          cargo_status: "Delivered",
+        }));
+      }
     };
 
     const handleMarkAsShippedDirect = async (cargo: any) => {
-        const cargoNoStr = cargo.cargo_no || `ID #${cargo.id}`;
-        if (confirm(`Are you sure you want to mark cargo "${cargoNoStr}" as Shipped?`)) {
-            try {
-                const today = new Date().toISOString().split('T')[0];
-                await updateCargo(cargo.id, {
-                    cargo_status: "Shipped",
-                    shipped_at: today,
-                });
-                toast.success(`Cargo ${cargoNoStr} marked as Shipped`, successStyles);
-                fetchCargos();
-            } catch (err: any) {
-                toast.error(err?.message || "Failed to update cargo status", errorStyles);
-            }
+      if (!isCiClosedForCargo(cargo)) {
+        toast.error(
+          "The linked CI (invoice) must be closed before this cargo can be shipped.",
+          errorStyles,
+        );
+        return;
+      }
+      const cargoNoStr = cargo.cargo_no || `ID #${cargo.id}`;
+      if (
+        confirm(
+          `Are you sure you want to mark cargo "${cargoNoStr}" as Shipped?`,
+        )
+      ) {
+        try {
+          const today = new Date().toISOString().split("T")[0];
+          await updateCargo(cargo.id, {
+            cargo_status: "Shipped",
+            shipped_at: today,
+          });
+          toast.success(`Cargo ${cargoNoStr} marked as Shipped`, successStyles);
+          fetchCargos();
+        } catch (err: any) {
+          toast.error(
+            err?.message || "Failed to update cargo status",
+            errorStyles,
+          );
         }
+      }
     };
 
     const handleMarkAsArrivedDirect = async (cargo: any) => {
-        const cargoTypeStr = cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "Cargo";
-        const cargoNoStr = cargo.cargo_no || `ID #${cargo.id}`;
-        const etaStr = cargo.eta ? formatCargoDateShort(cargo.eta) : "N/A";
-        const confirmMsg = `Has ${cargoTypeStr} ${cargoNoStr} with Expected Delivery Date ${etaStr} arrived?`;
+      const cargoTypeStr = cargo.cargo_type_id
+        ? getCargoTypeName(cargo.cargo_type_id)
+        : "Cargo";
+      const cargoNoStr = cargo.cargo_no || `ID #${cargo.id}`;
+      const etaStr = cargo.eta ? formatCargoDateShort(cargo.eta) : "N/A";
+      const confirmMsg = `Has ${cargoTypeStr} ${cargoNoStr} with Expected Delivery Date ${etaStr} arrived?`;
 
-        if (confirm(confirmMsg)) {
-            try {
-                await updateCargo(cargo.id, {
-                    cargo_status: "Delivered",
-                });
-                toast.success(`Cargo ${cargoNoStr} marked as Delivered`, successStyles);
-                fetchCargos();
-            } catch (err: any) {
-                toast.error(err?.message || "Failed to update cargo status", errorStyles);
-            }
+      if (confirm(confirmMsg)) {
+        try {
+          await updateCargo(cargo.id, {
+            cargo_status: "Delivered",
+          });
+          toast.success(
+            `Cargo ${cargoNoStr} marked as Delivered`,
+            successStyles,
+          );
+          fetchCargos();
+        } catch (err: any) {
+          toast.error(
+            err?.message || "Failed to update cargo status",
+            errorStyles,
+          );
         }
+      }
     };
 
     const handleCustomerChange = async (customerId: string | undefined) => {
-        if (!customerId) {
-            setFormData(prev => ({
-                ...prev,
-                customer_id: undefined,
-                customer_type: "GT-Warehouse",
-                ...WAREHOUSE_BILL_TO,
-                ship_to_company_name: "",
-                ship_to_display_name: "",
-                ship_to_contact_person: "",
-                ship_to_contact_phone: "",
-                ship_to_country: "",
-                ship_to_city: "",
-                ship_to_postal_code: "",
-                ship_to_full_address: "",
-                ship_to_remarks: "",
-            }));
-            return;
-        }
-
-        const customer = customers.find(c => String(c.id) === String(customerId));
-        if (!customer) {
-            setFormData(prev => ({ ...prev, customer_id: customerId }));
-            return;
-        }
-
-        const billTo = {
-            customer_type: "Other Customer",
-            bill_to_company_name: customer.companyName || "",
-            bill_to_display_name: customer.companyName || "",
-            bill_to_phone_no: customer.contactPhoneNumber || customer.email || "",
-            bill_to_tax_no: customer.taxNumber || "",
-            bill_to_email: customer.email || "",
-            bill_to_website: "",
-            bill_to_contact_person: customer.legalName || "",
-            bill_to_contact_phone: customer.contactPhoneNumber || "",
-            bill_to_contact_mobile: "",
-            bill_to_contact_email: customer.contactEmail || "",
-            bill_to_country: customer.country || "",
-            bill_to_city: customer.city || "",
-            bill_to_postal_code: customer.postalCode || "",
-            bill_to_full_address: [customer.addressLine1 || customer.address || "", customer.addressLine2 || ""].filter(Boolean).join(" "),
-        };
-
-        let shipTo = {
-            ship_to_company_name: customer.companyName || "",
-            ship_to_display_name: customer.companyName || "",
-            ship_to_contact_person: customer.legalName || "",
-            ship_to_contact_phone: customer.contactPhoneNumber || "",
-            ship_to_country: "",
-            ship_to_city: "",
-            ship_to_postal_code: "",
-            ship_to_full_address: "",
-            ship_to_remarks: "",
-        };
-        try {
-            const res: any = await getShippingAddresses(String(customer.id));
-            const dbAddresses = res && res.success ? (res.data || []) : [];
-            const defaultAddress = dbAddresses.find((a: any) => a.is_default);
-
-            if (defaultAddress) {
-                const fullAddressStr = [
-                    defaultAddress.street,
-                    defaultAddress.address_additional_line || ""
-                ].filter(Boolean).join(" ");
-                shipTo.ship_to_country = defaultAddress.country?.name || "";
-                shipTo.ship_to_city = defaultAddress.city || "";
-                shipTo.ship_to_postal_code = defaultAddress.postal_code || "";
-                shipTo.ship_to_full_address = fullAddressStr;
-            } else {
-                const hasDelivery = !!(customer.deliveryAddressLine1 || customer.deliveryCity || customer.deliveryCountry);
-                if (hasDelivery) {
-                    shipTo.ship_to_country = customer.deliveryCountry || "";
-                    shipTo.ship_to_city = customer.deliveryCity || "";
-                    shipTo.ship_to_postal_code = customer.deliveryPostalCode || "";
-                    shipTo.ship_to_full_address = [customer.deliveryAddressLine1 || "", customer.deliveryAddressLine2 || ""].filter(Boolean).join(" ");
-                } else {
-                    shipTo.ship_to_country = customer.country || "";
-                    shipTo.ship_to_city = customer.city || "";
-                    shipTo.ship_to_postal_code = customer.postalCode || "";
-                    shipTo.ship_to_full_address = [customer.addressLine1 || customer.address || "", customer.addressLine2 || ""].filter(Boolean).join(" ");
-                }
-            }
-        } catch (err) {
-            console.error("Failed to load customer shipping addresses", err);
-            const hasDelivery = !!(customer.deliveryAddressLine1 || customer.deliveryCity || customer.deliveryCountry);
-            if (hasDelivery) {
-                shipTo.ship_to_country = customer.deliveryCountry || "";
-                shipTo.ship_to_city = customer.deliveryCity || "";
-                shipTo.ship_to_postal_code = customer.deliveryPostalCode || "";
-                shipTo.ship_to_full_address = [customer.deliveryAddressLine1 || "", customer.deliveryAddressLine2 || ""].filter(Boolean).join(" ");
-            } else {
-                shipTo.ship_to_country = customer.country || "";
-                shipTo.ship_to_city = customer.city || "";
-                shipTo.ship_to_postal_code = customer.postalCode || "";
-                shipTo.ship_to_full_address = [customer.addressLine1 || customer.address || "", customer.addressLine2 || ""].filter(Boolean).join(" ");
-            }
-        }
-
-        setFormData(prev => ({
-            ...prev,
-            customer_id: customerId,
-            ...billTo,
-            ...shipTo,
+      if (!customerId) {
+        setFormData((prev) => ({
+          ...prev,
+          customer_id: undefined,
+          customer_type: "GT-Warehouse",
+          ...WAREHOUSE_BILL_TO,
+          ship_to_company_name: "",
+          ship_to_display_name: "",
+          ship_to_contact_person: "",
+          ship_to_contact_phone: "",
+          ship_to_country: "",
+          ship_to_city: "",
+          ship_to_postal_code: "",
+          ship_to_full_address: "",
+          ship_to_remarks: "",
         }));
+        return;
+      }
+
+      const customer = customers.find(
+        (c) => String(c.id) === String(customerId),
+      );
+      if (!customer) {
+        setFormData((prev) => ({ ...prev, customer_id: customerId }));
+        return;
+      }
+
+      const billTo = {
+        customer_type: "Other Customer",
+        bill_to_company_name: customer.companyName || "",
+        bill_to_display_name: customer.companyName || "",
+        bill_to_phone_no: customer.contactPhoneNumber || customer.email || "",
+        bill_to_tax_no: customer.taxNumber || "",
+        bill_to_email: customer.email || "",
+        bill_to_website: "",
+        bill_to_contact_person: customer.legalName || "",
+        bill_to_contact_phone: customer.contactPhoneNumber || "",
+        bill_to_contact_mobile: "",
+        bill_to_contact_email: customer.contactEmail || "",
+        bill_to_country: customer.country || "",
+        bill_to_city: customer.city || "",
+        bill_to_postal_code: customer.postalCode || "",
+        bill_to_full_address: [
+          customer.addressLine1 || customer.address || "",
+          customer.addressLine2 || "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      };
+
+      let shipTo = {
+        ship_to_company_name: customer.companyName || "",
+        ship_to_display_name: customer.companyName || "",
+        ship_to_contact_person: customer.legalName || "",
+        ship_to_contact_phone: customer.contactPhoneNumber || "",
+        ship_to_country: "",
+        ship_to_city: "",
+        ship_to_postal_code: "",
+        ship_to_full_address: "",
+        ship_to_remarks: "",
+      };
+      try {
+        const res: any = await getShippingAddresses(String(customer.id));
+        const dbAddresses = res && res.success ? res.data || [] : [];
+        const defaultAddress = dbAddresses.find((a: any) => a.is_default);
+
+        if (defaultAddress) {
+          const fullAddressStr = [
+            defaultAddress.street,
+            defaultAddress.address_additional_line || "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          shipTo.ship_to_country = defaultAddress.country?.name || "";
+          shipTo.ship_to_city = defaultAddress.city || "";
+          shipTo.ship_to_postal_code = defaultAddress.postal_code || "";
+          shipTo.ship_to_full_address = fullAddressStr;
+        } else {
+          const hasDelivery = !!(
+            customer.deliveryAddressLine1 ||
+            customer.deliveryCity ||
+            customer.deliveryCountry
+          );
+          if (hasDelivery) {
+            shipTo.ship_to_country = customer.deliveryCountry || "";
+            shipTo.ship_to_city = customer.deliveryCity || "";
+            shipTo.ship_to_postal_code = customer.deliveryPostalCode || "";
+            shipTo.ship_to_full_address = [
+              customer.deliveryAddressLine1 || "",
+              customer.deliveryAddressLine2 || "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+          } else {
+            shipTo.ship_to_country = customer.country || "";
+            shipTo.ship_to_city = customer.city || "";
+            shipTo.ship_to_postal_code = customer.postalCode || "";
+            shipTo.ship_to_full_address = [
+              customer.addressLine1 || customer.address || "",
+              customer.addressLine2 || "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load customer shipping addresses", err);
+        const hasDelivery = !!(
+          customer.deliveryAddressLine1 ||
+          customer.deliveryCity ||
+          customer.deliveryCountry
+        );
+        if (hasDelivery) {
+          shipTo.ship_to_country = customer.deliveryCountry || "";
+          shipTo.ship_to_city = customer.deliveryCity || "";
+          shipTo.ship_to_postal_code = customer.deliveryPostalCode || "";
+          shipTo.ship_to_full_address = [
+            customer.deliveryAddressLine1 || "",
+            customer.deliveryAddressLine2 || "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+        } else {
+          shipTo.ship_to_country = customer.country || "";
+          shipTo.ship_to_city = customer.city || "";
+          shipTo.ship_to_postal_code = customer.postalCode || "";
+          shipTo.ship_to_full_address = [
+            customer.addressLine1 || customer.address || "",
+            customer.addressLine2 || "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+        }
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        customer_id: customerId,
+        ...billTo,
+        ...shipTo,
+      }));
     };
 
     const selectedCustomer = useMemo(() => {
-        if (!formData.customer_id) return null;
-        return (customers as any[]).find((c) => String(c.id) === String(formData.customer_id)) || null;
+      if (!formData.customer_id) return null;
+      return (
+        (customers as any[]).find(
+          (c) => String(c.id) === String(formData.customer_id),
+        ) || null
+      );
     }, [formData.customer_id, customers]);
 
     React.useImperativeHandle(ref, () => ({
-        handleOpenCreate,
-        fetchCargos,
+      handleOpenCreate,
+      fetchCargos,
     }));
 
     return (
-        <div>
-            {externalSearchTerm === undefined && (
-                <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="flex flex-row items-center gap-3 w-full">
-                        {externalSearchTerm === undefined && (
-                            <div className="flex-1 w-full relative">
-                                <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search cargos..."
-                                    value={localSearch}
-                                    onChange={(e) => setLocalSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
-                                />
-                            </div>
-                        )}
-                        <div className="shrink-0">
-                            <SegmentedControl
-                                options={[
-                                    { value: "Open", label: "Open" },
-                                    { value: "Shipped", label: "Shipped" },
-                                    { value: "Delivered", label: "Delivered" },
-                                ]}
-                                value={statusFilter}
-                                onChange={handleStatusFilterChange}
-                            />
-                        </div>
-                        <FilterResetIcon
-                            isActive={Boolean(search || statusFilter !== "Open")}
-                            onReset={() => {
-                                setLocalSearch("");
-                                handleStatusFilterChange("Open");
-                            }}
-                        />
-                    </div>
+      <div>
+        {externalSearchTerm === undefined && (
+          <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <div className="flex flex-row items-center gap-3 w-full">
+              {externalSearchTerm === undefined && (
+                <div className="flex-1 w-full relative">
+                  <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search cargos..."
+                    value={localSearch}
+                    onChange={(e) => setLocalSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
+                  />
                 </div>
-            )}
-            <div className="overflow-x-auto px-6 pb-6">
-                {loading && cargos.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">
-                        <div className="inline-flex items-center gap-3">
-                            <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-                            <span className="text-gray-600">Loading Cargos...</span>
-                        </div>
-                    </div>
-                ) : cargos.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500 overflow-hidden">
-                        <Truck className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-600">No Cargos Found</p>
-                        <p className="text-sm text-gray-400 mt-1">Click &quot;New Cargo&quot; to create one.</p>
-                    </div>
-                ) : (
-                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="w-8 px-2 py-2.5"></th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        ID
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        CARGO NO
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        STATUS
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        CARGO TYPE
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        SHIP TO
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        EST. DEPARTURE
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        SHIPPED
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        EST. ARRIVAL
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        ARRIVED (DAYS)
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        ONLINE TRACK
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
-                                        REMARKS
-                                    </th>
-                                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase text-right">
-                                        ACTION
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {cargos.map((cargo) => (
-                                    <React.Fragment key={cargo.id}>
-                                        <tr
-                                            className="hover:bg-gray-50 cursor-pointer transition-colors"
-                                            onClick={() => handleOpenEdit(cargo.id)}
-                                        >
-                                            <td className="px-2 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    onClick={(e) => toggleExpandCargo(cargo.id, e)}
-                                                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+              )}
+              <div className="shrink-0">
+                <SegmentedControl
+                  options={[
+                    { value: "Open", label: "Open" },
+                    { value: "Shipped", label: "Shipped" },
+                    { value: "Delivered", label: "Delivered" },
+                  ]}
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                />
+              </div>
+              <FilterResetIcon
+                isActive={Boolean(search || statusFilter !== "Open")}
+                onReset={() => {
+                  setLocalSearch("");
+                  handleStatusFilterChange("Open");
+                }}
+              />
+            </div>
+          </div>
+        )}
+        <div className="overflow-x-auto px-6 pb-6">
+          {loading && cargos.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <div className="inline-flex items-center gap-3">
+                <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
+                <span className="text-gray-600">Loading Cargos...</span>
+              </div>
+            </div>
+          ) : cargos.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 overflow-hidden">
+              <Truck className="h-10 w-10 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No Cargos Found</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Click &quot;New Cargo&quot; to create one.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="w-8 px-2 py-2.5"></th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      ID
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      CARGO NO
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      STATUS
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      CARGO TYPE
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      SHIP TO
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      EST. DEPARTURE
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      SHIPPED
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      EST. ARRIVAL
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      ARRIVED (DAYS)
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      ONLINE TRACK
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase">
+                      REMARKS
+                    </th>
+                    <th className="px-2.5 py-2.5 text-xs font-semibold text-gray-600 uppercase text-right">
+                      ACTION
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {cargos.map((cargo) => (
+                    <React.Fragment key={cargo.id}>
+                      <tr
+                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                        onClick={() => handleOpenEdit(cargo.id)}
+                      >
+                        <td
+                          className="px-2 py-2.5 text-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={(e) => toggleExpandCargo(cargo.id, e)}
+                            className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                          >
+                            <ChevronRightIcon
+                              className={`h-4.5 w-4.5 transition-transform duration-200 ${
+                                expandedCargoIds.has(cargo.id)
+                                  ? "rotate-90"
+                                  : ""
+                              } ${
+                                (cargo.assignedItemsCount ?? 0) === 0
+                                  ? "text-red-500 font-bold stroke-[3px]"
+                                  : "text-gray-400"
+                              }`}
+                            />
+                          </button>
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800 font-bold">
+                          {cargo.id}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800 font-semibold">
+                          {cargo.cargo_no || "-"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm">
+                          <span className="text-[10px] font-bold text-[#495057]">
+                            {cargo.cargo_status || "Open"}
+                          </span>
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800">
+                          {cargo.cargo_type_id
+                            ? getCargoTypeName(cargo.cargo_type_id)
+                            : "-"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800">
+                          {cargo.ship_to_company_name ||
+                            (cargo.customer_id
+                              ? getCustomerName(cargo.customer_id)
+                              : "-")}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800">
+                          {formatCargoDateShort(cargo.dep_date)}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800">
+                          {formatCargoDateShort(cargo.shipped_at)}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800">
+                          {formatCargoDateShort(cargo.eta)}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800">
+                          -
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm max-w-[120px] truncate">
+                          {cargo.online_track ? (
+                            <a
+                              href={cargo.online_track}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {cargo.online_track}
+                            </a>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-sm text-gray-800 max-w-[150px] truncate">
+                          {cargo.remark || cargo.note || cargo.cargo_no || "-"}
+                        </td>
+                        <td
+                          className="px-2.5 py-2.5 text-sm text-right whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {(cargo.cargo_status === "Open" ||
+                            !cargo.cargo_status) &&
+                            (loadingInvoiceStatus ? (
+                              <span className="text-[11px] text-gray-400 italic">
+                                Checking CI…
+                              </span>
+                            ) : isCiClosedForCargo(cargo) ? (
+                              <button
+                                onClick={() => handleMarkAsShippedDirect(cargo)}
+                                className="px-2 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 rounded-md transition-all shadow-sm inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                🚢 Ship
+                              </button>
+                            ) : (
+                              <span
+                                className="text-[11px] text-gray-400 italic"
+                                title="Ship becomes available once the linked CI (invoice) is closed"
+                              >
+                                CI open
+                              </span>
+                            ))}
+
+                          {cargo.cargo_status === "Shipped" && (
+                            <button
+                              onClick={() => handleMarkAsArrivedDirect(cargo)}
+                              className="px-2 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-200 rounded-md transition-all shadow-sm inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              📦 Arrived
+                            </button>
+                          )}
+
+                          {cargo.cargo_status === "Delivered" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 rounded-md">
+                              ✅ Delivered
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                      {expandedCargoIds.has(cargo.id) && (
+                        <tr className="bg-gray-50/50 border-t border-b border-gray-100">
+                          <td colSpan={13} className="px-6 py-4">
+                            <div>
+                              {(() => {
+                                const details = cargoDetailsMap[cargo.id] || {
+                                  orders: [],
+                                  orderItems: [],
+                                  loading: false,
+                                };
+                                if (details.loading) {
+                                  return (
+                                    <div className="flex items-center gap-2 py-2 text-sm text-gray-500">
+                                      <ArrowPathIcon className="h-4 w-4 animate-spin text-gray-500 animate-infinite" />
+                                      <span>Loading orders and items...</span>
+                                    </div>
+                                  );
+                                }
+                                if (details.orderItems.length === 0) {
+                                  return (
+                                    <div className="text-sm text-gray-400 py-2">
+                                      No assigned order items.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                                      <table className="w-full text-left text-xs text-gray-600">
+                                        <thead className="bg-gray-100 border-b border-gray-200">
+                                          <tr>
+                                            <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">
+                                              OrderItem
+                                            </th>
+                                            <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">
+                                              Item No
+                                            </th>
+                                            <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">
+                                              EAN
+                                            </th>
+                                            <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">
+                                              Customer
+                                            </th>
+                                            <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">
+                                              Order No
+                                            </th>
+                                            <th className="px-3 py-2.5 font-semibold uppercase text-gray-500 text-center">
+                                              QTY
+                                            </th>
+                                            <th className="px-3 py-2.5 font-semibold uppercase text-gray-500 text-right">
+                                              Price
+                                            </th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                          {details.orderItems
+                                            .filter((oi: any) => oi != null)
+                                            .map((oi: any) => {
+                                              const itemName =
+                                                oi.item?.item_name ||
+                                                oi.itemName ||
+                                                "—";
+                                              const itemNo =
+                                                oi.item?.item_no_de ||
+                                                oi.item?.material ||
+                                                oi.master_id ||
+                                                "—";
+                                              const ean =
+                                                oi.item?.ean ||
+                                                oi.item?.model ||
+                                                "—";
+                                              const customerName =
+                                                oi.order?.customer
+                                                  ?.companyName ||
+                                                oi.order?.customer
+                                                  ?.displayName ||
+                                                "—";
+                                              const orderNo =
+                                                oi.order?.order_no ||
+                                                (oi.order_id
+                                                  ? `#${oi.order_id}`
+                                                  : "—");
+                                              const qty =
+                                                oi.qty ?? oi.quantity ?? 1;
+                                              const rawPrice =
+                                                oi.eur_special_price ??
+                                                oi.price ??
+                                                oi.unitPrice;
+                                              const priceStr =
+                                                rawPrice !== undefined &&
+                                                rawPrice !== null &&
+                                                !isNaN(Number(rawPrice))
+                                                  ? `€${Number(rawPrice).toFixed(2)}`
+                                                  : "—";
+
+                                              return (
+                                                <tr
+                                                  key={oi.id}
+                                                  className="hover:bg-gray-50 transition-colors"
                                                 >
-                                                    <ChevronRightIcon
-                                                        className={`h-4.5 w-4.5 transition-transform duration-200 ${expandedCargoIds.has(cargo.id) ? "rotate-90" : ""
-                                                            } ${(cargo.assignedItemsCount ?? 0) === 0
-                                                                ? "text-red-500 font-bold stroke-[3px]"
-                                                                : "text-gray-400"
-                                                            }`}
-                                                    />
-                                                </button>
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800 font-bold">
-                                                {cargo.id}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800 font-semibold">
-                                                {cargo.cargo_no || "-"}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm">
-                                                <span className="text-[10px] font-bold text-[#495057]">
-                                                    {cargo.cargo_status || "Open"}
-                                                </span>
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
-                                                {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
-                                                {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
-                                                {formatCargoDateShort(cargo.dep_date)}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
-                                                {formatCargoDateShort(cargo.shipped_at)}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
-                                                {formatCargoDateShort(cargo.eta)}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800">
-                                                -
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm max-w-[120px] truncate">
-                                                {cargo.online_track ? (
-                                                    <a
-                                                        href={cargo.online_track}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 hover:underline"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        {cargo.online_track}
-                                                    </a>
-                                                ) : "-"}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-gray-800 max-w-[150px] truncate">
-                                                {cargo.remark || cargo.note || cargo.cargo_no || "-"}
-                                            </td>
-                                            <td className="px-2.5 py-2.5 text-sm text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                                {(cargo.cargo_status === "Open" || !cargo.cargo_status) && (
-                                                    <button
-                                                        onClick={() => handleMarkAsShippedDirect(cargo)}
-                                                        className="px-2 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 rounded-md transition-all shadow-sm inline-flex items-center gap-1 cursor-pointer"
-                                                    >
-                                                        🚢 Ship
-                                                    </button>
-                                                )}
+                                                  <td
+                                                    className="px-3 py-2 font-medium text-gray-800 max-w-[200px] truncate"
+                                                    title={itemName}
+                                                  >
+                                                    {itemName}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-gray-700 font-mono">
+                                                    {itemNo}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-gray-500 font-mono">
+                                                    {ean}
+                                                  </td>
+                                                  <td
+                                                    className="px-3 py-2 text-gray-700 max-w-[160px] truncate"
+                                                    title={customerName}
+                                                  >
+                                                    {customerName}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-blue-700 font-semibold">
+                                                    {orderNo}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-center text-gray-800 font-semibold">
+                                                    {qty}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-gray-800 font-semibold">
+                                                    {priceStr}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
-                                                {cargo.cargo_status === "Shipped" && (
-                                                    <button
-                                                        onClick={() => handleMarkAsArrivedDirect(cargo)}
-                                                        className="px-2 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-200 rounded-md transition-all shadow-sm inline-flex items-center gap-1 cursor-pointer"
-                                                    >
-                                                        📦 Arrived
-                                                    </button>
-                                                )}
+        {pagination.totalPages > 1 && (
+          <div className="mx-6 mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 flex items-center justify-between shadow-sm">
+            <p className="text-sm text-gray-600">
+              Showing{" "}
+              {Math.min(
+                (pagination.page - 1) * pagination.limit + 1,
+                pagination.totalRecords,
+              )}{" "}
+              to{" "}
+              {Math.min(
+                pagination.page * pagination.limit,
+                pagination.totalRecords,
+              )}{" "}
+              of {pagination.totalRecords} cargos
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1 text-black font-semibold bg-white"
+              >
+                <ChevronLeftIcon className="w-4 h-4" />
+                Previous
+              </button>
+              <span className="text-sm text-gray-600 px-3">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1 text-black font-semibold bg-white"
+              >
+                Next
+                <ChevronRightIcon className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
-                                                {cargo.cargo_status === "Delivered" && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 rounded-md">
-                                                        ✅ Delivered
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                        {expandedCargoIds.has(cargo.id) && (
-                                            <tr className="bg-gray-50/50 border-t border-b border-gray-100">
-                                                <td colSpan={13} className="px-6 py-4">
-                                                    <div>
-                                                        {(() => {
-                                                            const details = cargoDetailsMap[cargo.id] || { orders: [], orderItems: [], loading: false };
-                                                            if (details.loading) {
-                                                                return (
-                                                                    <div className="flex items-center gap-2 py-2 text-sm text-gray-500">
-                                                                        <ArrowPathIcon className="h-4 w-4 animate-spin text-gray-500 animate-infinite" />
-                                                                        <span>Loading orders and items...</span>
-                                                                    </div>
-                                                                );
-                                                            }
-                                                            if (details.orderItems.length === 0) {
-                                                                return (
-                                                                    <div className="text-sm text-gray-400 py-2">
-                                                                        No assigned order items.
-                                                                    </div>
-                                                                );
-                                                            }
-                                                            return (
-                                                                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+        <CustomModal
+          title=""
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          width="max-w-4xl"
+          showHeader={false}
+          noPadding={true}
+        >
+          <div className="flex flex-col">
+            <ModalHeader
+              entityName="Cargo"
+              entityNo={
+                modalMode !== "create" ? (
+                  <span className="flex items-center gap-2.5 font-semibold text-base sm:text-lg">
+                    <span className="text-[#8CC21B] font-mono font-bold">
+                      {formData.cargo_no || "N/A"}
+                    </span>
+                    <span className="text-gray-300 font-normal">|</span>
+                    <span className="text-gray-600 font-medium">
+                      {selectedCustomer
+                        ? selectedCustomer.displayName || "GTech"
+                        : "GTech"}
+                    </span>
+                    <span className="text-gray-300 font-normal">|</span>
+                    <span
+                      className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-bold select-none ${
+                        formData.cargo_status === "Delivered"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : formData.cargo_status === "Shipped"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {formData.cargo_status || "Open"}
+                    </span>
+                  </span>
+                ) : undefined
+              }
+              icon={Truck}
+              isEditMode={modalMode !== "create"}
+              isEditEnabled={isEditEnabled}
+              onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
+              onClose={() => setShowModal(false)}
+            />
 
-                                                                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
-                                                                        <table className="w-full text-left text-xs text-gray-600">
-                                                                            <thead className="bg-gray-100 border-b border-gray-200">
-                                                                                <tr>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">OrderItem</th>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Item No</th>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">EAN</th>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Customer</th>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500">Order No</th>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500 text-center">QTY</th>
-                                                                                    <th className="px-3 py-2.5 font-semibold uppercase text-gray-500 text-right">Price</th>
-                                                                                </tr>
-                                                                            </thead>
-                                                                            <tbody className="divide-y divide-gray-100">
-                                                                                {details.orderItems.filter((oi: any) => oi != null).map((oi: any) => {
-                                                                                    const itemName = oi.item?.item_name || oi.itemName || "—";
-                                                                                    const itemNo = oi.item?.item_no_de || oi.item?.material || oi.master_id || "—";
-                                                                                    const ean = oi.item?.ean || oi.item?.model || "—";
-                                                                                    const customerName = oi.order?.customer?.companyName || oi.order?.customer?.displayName || "—";
-                                                                                    const orderNo = oi.order?.order_no || (oi.order_id ? `#${oi.order_id}` : "—");
-                                                                                    const qty = oi.qty ?? oi.quantity ?? 1;
-                                                                                    const rawPrice = oi.eur_special_price ?? oi.price ?? oi.unitPrice;
-                                                                                    const priceStr = rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) ? `€${Number(rawPrice).toFixed(2)}` : "—";
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Cargo Type
+                  </label>
+                  <Select
+                    className="text-sm"
+                    classNames={{
+                      control: () =>
+                        "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
+                    }}
+                    options={cargoTypeOptions}
+                    value={
+                      cargoTypeOptions.find(
+                        (opt) => opt.value === String(formData.cargo_type_id),
+                      ) || null
+                    }
+                    onChange={(newValue) =>
+                      updateField(
+                        "cargo_type_id",
+                        newValue?.value ? Number(newValue.value) : undefined,
+                      )
+                    }
+                    placeholder="Select cargo type..."
+                    isSearchable
+                    isClearable
+                    isDisabled={!isEditEnabled}
+                  />
+                </div>
 
-                                                                                    return (
-                                                                                        <tr key={oi.id} className="hover:bg-gray-50 transition-colors">
-                                                                                            <td className="px-3 py-2 font-medium text-gray-800 max-w-[200px] truncate" title={itemName}>
-                                                                                                {itemName}
-                                                                                            </td>
-                                                                                            <td className="px-3 py-2 text-gray-700 font-mono">
-                                                                                                {itemNo}
-                                                                                            </td>
-                                                                                            <td className="px-3 py-2 text-gray-500 font-mono">
-                                                                                                {ean}
-                                                                                            </td>
-                                                                                            <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate" title={customerName}>
-                                                                                                {customerName}
-                                                                                            </td>
-                                                                                            <td className="px-3 py-2 text-blue-700 font-semibold">
-                                                                                                {orderNo}
-                                                                                            </td>
-                                                                                            <td className="px-3 py-2 text-center text-gray-800 font-semibold">
-                                                                                                {qty}
-                                                                                            </td>
-                                                                                            <td className="px-3 py-2 text-right text-gray-800 font-semibold">
-                                                                                                {priceStr}
-                                                                                            </td>
-                                                                                        </tr>
-                                                                                    );
-                                                                                })}
-                                                                            </tbody>
-                                                                        </table>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Cargo No (Leave blank auto-generate)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.cargo_no || ""}
+                    onChange={(e) => updateField("cargo_no", e.target.value)}
+                    disabled={!isEditEnabled}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    placeholder="Auto-generated if left blank"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Customer
+                  </label>
+                  <CustomerSearchInput
+                    value={formData.customer_id || ""}
+                    onChange={(id) => handleCustomerChange(id || undefined)}
+                    disabled={!isEditEnabled}
+                    placeholder="Search or select customer..."
+                    mode="customers"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Pickup Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formatDateInput(formData.pickup_date)}
+                    onChange={(e) =>
+                      updateField("pickup_date", e.target.value || null)
+                    }
+                    disabled={!isEditEnabled}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    ETD (Estimated Departure)
+                  </label>
+                  <input
+                    type="date"
+                    value={formatDateInput(formData.dep_date)}
+                    onChange={(e) =>
+                      updateField("dep_date", e.target.value || null)
+                    }
+                    disabled={!isEditEnabled}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    ETA (Estimated Arrival)
+                  </label>
+                  <input
+                    type="date"
+                    value={formatDateInput(formData.eta)}
+                    onChange={(e) => updateField("eta", e.target.value || null)}
+                    disabled={!isEditEnabled}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Shipped At
+                    </label>
+                    {isEditEnabled &&
+                      formData.cargo_status !== "Shipped" &&
+                      formData.cargo_status !== "Delivered" &&
+                      isCiClosedForCargo(formData) && (
+                        <button
+                          type="button"
+                          onClick={handleMarkAsShippedClick}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-all cursor-pointer"
+                        >
+                          🚢 Ship Cargo
+                        </button>
+                      )}
+                    {isEditEnabled &&
+                      formData.cargo_status !== "Shipped" &&
+                      formData.cargo_status !== "Delivered" &&
+                      !isCiClosedForCargo(formData) && (
+                        <span
+                          className="text-xs text-gray-400 italic"
+                          title="Ship becomes available once the linked CI (invoice) is closed"
+                        >
+                          CI open — cannot ship yet
+                        </span>
+                      )}
+                    {isEditEnabled && formData.cargo_status === "Shipped" && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAsDeliveredClick}
+                        className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-all cursor-pointer"
+                      >
+                        📦 Deliver Cargo
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={formatDateInput(formData.shipped_at)}
+                    onChange={(e) =>
+                      updateField("shipped_at", e.target.value || null)
+                    }
+                    disabled={!isEditEnabled}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Remark
+                  </label>
+                  <textarea
+                    value={formData.remark || formData.note || ""}
+                    onChange={(e) => {
+                      updateField("remark", e.target.value);
+                      updateField("note", e.target.value);
+                    }}
+                    disabled={!isEditEnabled}
+                    rows={3}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-none"
+                    placeholder="Enter remark"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Online Tracking URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.online_track || ""}
+                    onChange={(e) =>
+                      updateField("online_track", e.target.value)
+                    }
+                    disabled={!isEditEnabled}
+                    placeholder="Paste tracking link here (e.g. https://www.fedex.com/track?...)"
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
+                  {formData.online_track && (
+                    <a
+                      href={formData.online_track}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-500 hover:underline"
+                    >
+                      🔗 Open tracking link
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {pagination.totalPages > 1 && (
-                <div className="mx-6 mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 flex items-center justify-between shadow-sm">
-                    <p className="text-sm text-gray-600">
-                        Showing{" "}
-                        {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.totalRecords)} to{" "}
-                        {Math.min(pagination.page * pagination.limit, pagination.totalRecords)} of{" "}
-                        {pagination.totalRecords} cargos
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => handlePageChange(pagination.page - 1)}
-                            disabled={pagination.page === 1}
-                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1 text-black font-semibold bg-white"
-                        >
-                            <ChevronLeftIcon className="w-4 h-4" />
-                            Previous
-                        </button>
-                        <span className="text-sm text-gray-600 px-3">
-                            Page {pagination.page} of {pagination.totalPages}
-                        </span>
-                        <button
-                            onClick={() => handlePageChange(pagination.page + 1)}
-                            disabled={pagination.page === pagination.totalPages}
-                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1 text-black font-semibold bg-white"
-                        >
-                            Next
-                            <ChevronRightIcon className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <CustomModal
-                title=""
-                isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                width="max-w-4xl"
-                showHeader={false}
-                noPadding={true}
-            >
-                <div className="flex flex-col">
-                    <ModalHeader
-                        entityName="Cargo"
-                        entityNo={modalMode !== "create" ? (
-                            <span className="flex items-center gap-2.5 font-semibold text-base sm:text-lg">
-                                <span className="text-[#8CC21B] font-mono font-bold">
-                                    {formData.cargo_no || "N/A"}
-                                </span>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <span className="text-gray-600 font-medium">
-                                    {selectedCustomer ? selectedCustomer.displayName || "GTech" : "GTech"}
-                                </span>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <span className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-bold select-none ${formData.cargo_status === "Delivered"
-                                    ? "bg-emerald-100 text-emerald-800"
-                                    : formData.cargo_status === "Shipped"
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-blue-100 text-blue-800"
-                                    }`}>
-                                    {formData.cargo_status || "Open"}
-                                </span>
-                            </span>
-                        ) : undefined}
-
-                        icon={Truck}
-                        isEditMode={modalMode !== "create"}
-                        isEditEnabled={isEditEnabled}
-                        onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
-                        onClose={() => setShowModal(false)}
-                    />
-
-                    <div className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Cargo Type
-                                </label>
-                                <Select
-                                    className="text-sm"
-                                    classNames={{
-                                        control: () =>
-                                            "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
-                                    }}
-                                    options={cargoTypeOptions}
-                                    value={cargoTypeOptions.find((opt) => opt.value === String(formData.cargo_type_id)) || null}
-                                    onChange={(newValue) => updateField("cargo_type_id", newValue?.value ? Number(newValue.value) : undefined)}
-                                    placeholder="Select cargo type..."
-                                    isSearchable
-                                    isClearable
-                                    isDisabled={!isEditEnabled}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Cargo No (Leave blank auto-generate)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.cargo_no || ""}
-                                    onChange={(e) => updateField("cargo_no", e.target.value)}
-                                    disabled={!isEditEnabled}
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                    placeholder="Auto-generated if left blank"
-                                />
-                            </div>
-
-
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Customer
-                                </label>
-                                <CustomerSearchInput
-                                    value={formData.customer_id || ""}
-                                    onChange={(id) => handleCustomerChange(id || undefined)}
-                                    disabled={!isEditEnabled}
-                                    placeholder="Search or select customer..."
-                                    mode="customers"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Pickup Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={formatDateInput(formData.pickup_date)}
-                                    onChange={(e) => updateField("pickup_date", e.target.value || null)}
-                                    disabled={!isEditEnabled}
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    ETD (Estimated Departure)
-                                </label>
-                                <input
-                                    type="date"
-                                    value={formatDateInput(formData.dep_date)}
-                                    onChange={(e) => updateField("dep_date", e.target.value || null)}
-                                    disabled={!isEditEnabled}
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    ETA (Estimated Arrival)
-                                </label>
-                                <input
-                                    type="date"
-                                    value={formatDateInput(formData.eta)}
-                                    onChange={(e) => updateField("eta", e.target.value || null)}
-                                    disabled={!isEditEnabled}
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                />
-                            </div>
-
-                            <div>
-                                <div className="flex justify-between items-center mb-1.5">
-                                    <label className="block text-sm font-medium text-gray-700">
-                                        Shipped At
-                                    </label>
-                                    {isEditEnabled && formData.cargo_status !== "Shipped" && formData.cargo_status !== "Delivered" && (
-                                        <button
-                                            type="button"
-                                            onClick={handleMarkAsShippedClick}
-                                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-all cursor-pointer"
-                                        >
-                                            🚢 Ship Cargo
-                                        </button>
-                                    )}
-                                    {isEditEnabled && formData.cargo_status === "Shipped" && (
-                                        <button
-                                            type="button"
-                                            onClick={handleMarkAsDeliveredClick}
-                                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-all cursor-pointer"
-                                        >
-                                            📦 Deliver Cargo
-                                        </button>
-                                    )}
-
-                                </div>
-                                <input
-                                    type="date"
-                                    value={formatDateInput(formData.shipped_at)}
-                                    onChange={(e) => updateField("shipped_at", e.target.value || null)}
-                                    disabled={!isEditEnabled}
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Remark</label>
-                                <textarea
-                                    value={formData.remark || formData.note || ""}
-                                    onChange={(e) => {
-                                        updateField("remark", e.target.value);
-                                        updateField("note", e.target.value);
-                                    }}
-                                    disabled={!isEditEnabled}
-                                    rows={3}
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-none"
-                                    placeholder="Enter remark"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Online Tracking URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={formData.online_track || ""}
-                                    onChange={(e) => updateField("online_track", e.target.value)}
-                                    disabled={!isEditEnabled}
-                                    placeholder="Paste tracking link here (e.g. https://www.fedex.com/track?...)"
-                                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                />
-                                {formData.online_track && (
-                                    <a
-                                        href={formData.online_track}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-500 hover:underline"
-                                    >
-                                        🔗 Open tracking link
-                                    </a>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <ModalFooter
-                        isEditMode={modalMode !== "create"}
-                        isEditEnabled={isEditEnabled}
-                        onDelete={modalMode === "edit" ? () => handleDelete(editingId!) : undefined}
-                        onCancel={() => setShowModal(false)}
-                        onSave={handleSubmit}
-                        saveLabel={modalMode === "edit" ? "Update Cargo" : "Create Cargo"}
-                        loading={loading}
-                    />
-                </div>
-            </CustomModal>
-        </div>
+            <ModalFooter
+              isEditMode={modalMode !== "create"}
+              isEditEnabled={isEditEnabled}
+              onDelete={
+                modalMode === "edit"
+                  ? () => handleDelete(editingId!)
+                  : undefined
+              }
+              onCancel={() => setShowModal(false)}
+              onSave={handleSubmit}
+              saveLabel={modalMode === "edit" ? "Update Cargo" : "Create Cargo"}
+              loading={loading}
+            />
+          </div>
+        </CustomModal>
+      </div>
     );
-});
+  },
+);
 
 export default CargosTab;

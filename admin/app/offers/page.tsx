@@ -73,11 +73,12 @@ import { isValueMatching, isDateInPreset } from "@/utils/commercialFilters";
 // Item Number
 
 const getInputClass = (hasValue: boolean, isEmptySelect = false) =>
-  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
+  `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
   }`;
 
 const getContrastTextColor = (hex: string): string => {
@@ -143,17 +144,15 @@ const getVatGroups = (
   const discountFactor =
     offer?.discountPercentage > 0 ? 1 - offer.discountPercentage / 100 : 1;
 
-  return Array.from(byRate.entries())
-    .map(([rate, base]) => {
-      const adjustedBase = base * discountFactor;
-      return {
-        rate,
-        base: adjustedBase,
-        tax: adjustedBase * (rate / 100),
-      };
-    })
+  return Array.from(byRate.entries()).map(([rate, base]) => {
+    const adjustedBase = base * discountFactor;
+    return {
+      rate,
+      base: adjustedBase,
+      tax: adjustedBase * (rate / 100),
+    };
+  });
 };
-
 
 const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
   offer,
@@ -230,8 +229,8 @@ const OfferLineItemsTable: React.FC<{ offer: any; lineItems: any[] }> = ({
                           alt="thumb"
                           className="w-full h-full object-contain"
                           onError={(e) =>
-                          ((e.target as HTMLImageElement).style.display =
-                            "none")
+                            ((e.target as HTMLImageElement).style.display =
+                              "none")
                           }
                         />
                       ) : (
@@ -331,23 +330,26 @@ const OfferActionMenu: React.FC<{
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
-          ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
-          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
-          }`}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
+          isOpen
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+        }`}
         title="Aktionen"
       >
         <ChevronRight
-          className={`w-4 h-4 transition-transform duration-150 ${isOpen ? "rotate-90 text-[#8CC21B]" : ""
-            }`}
+          className={`w-4 h-4 transition-transform duration-150 ${
+            isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          }`}
         />
       </button>
 
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
-            } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+          className={`absolute right-0 ${
+            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
         >
           <div className="p-1">
             <button
@@ -385,7 +387,7 @@ const OfferActionMenu: React.FC<{
                 setIsOpen(false);
                 try {
                   await downloadOfferPdf(row.id, row.offerNumber);
-                } catch (_) { }
+                } catch (_) {}
               }}
               className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
             >
@@ -403,7 +405,7 @@ const OfferActionMenu: React.FC<{
                   setIsOpen(false);
                   try {
                     await downloadOfferEml(row.id, row.offerNumber);
-                  } catch (_) { }
+                  } catch (_) {}
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
               >
@@ -469,7 +471,8 @@ const OffersPage: React.FC<any> = ({
   );
   const [draftItemsPreview, setDraftItemsPreview] = useState<any[]>([]);
   const [convertModalOffer, setConvertModalOffer] = useState<any | null>(null);
-  const [convertModalKundenreferenz, setConvertModalKundenreferenz] = useState("");
+  const [convertModalKundenreferenz, setConvertModalKundenreferenz] =
+    useState("");
 
   const [filters, setFilters] = useState<OfferSearchFilters>({
     search: "",
@@ -583,10 +586,10 @@ const OffersPage: React.FC<any> = ({
         prevOffers.map((o) =>
           o.id === offer.id
             ? {
-              ...o,
-              highlightColor: "#ECEAE6",
-              conversionCount: nextCount,
-            }
+                ...o,
+                highlightColor: "#ECEAE6",
+                conversionCount: nextCount,
+              }
             : o,
         ),
       );
@@ -596,7 +599,7 @@ const OffersPage: React.FC<any> = ({
           highlightColor: "#ECEAE6",
           conversionCount: nextCount,
         } as any);
-      } catch (_) { }
+      } catch (_) {}
 
       fetchOffers();
       onOrderConverted?.();
@@ -617,10 +620,7 @@ const OffersPage: React.FC<any> = ({
     }
   };
 
-  const handleConvertOfferToAuftrag = (
-    offer: any,
-    e?: React.MouseEvent,
-  ) => {
+  const handleConvertOfferToAuftrag = (offer: any, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setConvertModalKundenreferenz(offer.kundenreferenz || "");
     setConvertModalOffer(offer);
@@ -685,18 +685,18 @@ const OffersPage: React.FC<any> = ({
       if (customerNo) {
         const cNo = String(
           offer.customerSnapshot?.customerNumber ||
-          (offer as any).customer?.customer_number ||
-          "",
+            (offer as any).customer?.customer_number ||
+            "",
         );
         if (!cNo.toLowerCase().includes(customerNo.toLowerCase())) return false;
       }
       if (customerName) {
         const name = String(
           offer.customerSnapshot?.companyName ||
-          offer.customerSnapshot?.name ||
-          (offer as any).customer?.company_name ||
-          (offer as any).customer?.name ||
-          "",
+            offer.customerSnapshot?.name ||
+            (offer as any).customer?.company_name ||
+            (offer as any).customer?.name ||
+            "",
         );
         if (!name.toLowerCase().includes(customerName.toLowerCase()))
           return false;
@@ -720,8 +720,6 @@ const OffersPage: React.FC<any> = ({
       return true;
     });
   }, [offers, docFilters]);
-
-
 
   const offerColumns: ColumnDef<any>[] = useMemo(
     () => [
@@ -947,10 +945,11 @@ const OffersPage: React.FC<any> = ({
                     setCurrentPage(p);
                     setFilters({ ...filters, page: p });
                   }}
-                  className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
-                    ? "bg-gray-600 text-white"
-                    : "bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
+                  className={`px-2 py-1 text-sm rounded-lg ${
+                    currentPage === p
+                      ? "bg-gray-600 text-white"
+                      : "bg-white border border-gray-300 hover:bg-gray-50"
+                  }`}
                 >
                   {p}
                 </button>
@@ -1080,12 +1079,15 @@ const OffersPage: React.FC<any> = ({
                   autoFocus
                   maxLength={255}
                   value={convertModalKundenreferenz}
-                  onChange={(e) => setConvertModalKundenreferenz(e.target.value)}
+                  onChange={(e) =>
+                    setConvertModalKundenreferenz(e.target.value)
+                  }
                   placeholder="e.g. EURODIMA BE2650931 vom 20.08.2026"
                   className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 bg-white shadow-sm"
                 />
                 <p className="text-[11px] text-gray-500 mt-1.5">
-                  Der Cursor springt automatisch hierher. Nach dem Ausfüllen einfach OK klicken oder Enter drücken.
+                  Der Cursor springt automatisch hierher. Nach dem Ausfüllen
+                  einfach OK klicken oder Enter drücken.
                 </p>
               </div>
 

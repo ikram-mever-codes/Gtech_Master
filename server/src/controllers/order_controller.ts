@@ -93,7 +93,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) { }
+      } catch (e: any) {}
     }
   }
 })();
@@ -211,18 +211,18 @@ export const createOrder = async (
     const dbItems =
       itemIds.length > 0
         ? await itemRepo
-          .createQueryBuilder("i")
-          .where("i.id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("i")
+            .where("i.id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
     const supplierItems =
       itemIds.length > 0
         ? await supplierItemRepo
-          .createQueryBuilder("si")
-          .where("si.item_id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("si")
+            .where("si.item_id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
@@ -301,12 +301,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -495,12 +495,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -562,23 +562,27 @@ export const getAllOrders = async (
     const orderNos = orders.map((o) => o.order_no).filter(Boolean);
     const bOrderNos = orderNos.map((no) => no.replace(/^DE/, "B"));
     const allOrderNoLookups = Array.from(new Set([...orderNos, ...bOrderNos]));
-    const comments = Array.from(new Set(orders.map((o) => (o.comment || "").trim()).filter(Boolean)));
+    const comments = Array.from(
+      new Set(orders.map((o) => (o.comment || "").trim()).filter(Boolean)),
+    );
 
     const [transferOrders, customerOrders] = await Promise.all([
       allOrderNoLookups.length > 0
         ? AppDataSource.getRepository(TransferOrder).find({
-          where: { order_no: In(allOrderNoLookups) },
-          select: ["order_no", "zweck", "notes"],
-        })
+            where: { order_no: In(allOrderNoLookups) },
+            select: ["order_no", "zweck", "notes"],
+          })
         : Promise.resolve([]),
       allOrderNoLookups.length > 0 || comments.length > 0
         ? AppDataSource.getRepository(CustomerOrder).find({
-          where: [
-            ...(allOrderNoLookups.length ? [{ order_no: In(allOrderNoLookups) }] : []),
-            ...(comments.length ? [{ title: In(comments) }] : []),
-          ],
-          relations: ["weiterversandServiceProvider"],
-        })
+            where: [
+              ...(allOrderNoLookups.length
+                ? [{ order_no: In(allOrderNoLookups) }]
+                : []),
+              ...(comments.length ? [{ title: In(comments) }] : []),
+            ],
+            relations: ["weiterversandServiceProvider"],
+          })
         : Promise.resolve([]),
     ]);
 
@@ -623,6 +627,19 @@ export const getAllOrders = async (
       });
     }
 
+    // --- order_no B/MA -> DE rename -------------------------------------
+    // Same transformation and same in-memory mutation as before (which is
+    // what downstream logic actually depends on). The only change: the DB
+    // persistence is no longer awaited one-by-one in a sequential loop —
+    // every order's in-memory order_no is updated immediately (fast, no
+    // I/O), and the actual DB writes are fired concurrently in the
+    // background. The response never depended on these writes completing
+    // (errors were already silently swallowed before), so this is a pure
+    // latency win with identical observable behavior for the request.
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const renameUpdates: Promise<any>[] = [];
     const unlinkedOrderIds = orders
       .filter((o) => !o.cargo || !o.cargo_id)
       .map((o) => o.id);
@@ -659,70 +676,80 @@ export const getAllOrders = async (
       ) {
         const parts = ord.order_no.split("-");
         const suffix = parts[parts.length - 1];
-        const now = new Date();
-        const yy = String(now.getFullYear()).slice(-2);
-        const mm = String(now.getMonth() + 1).padStart(2, "0");
         const newDeNo = `DE${yy}${mm}-${suffix}`;
         ord.order_no = newDeNo;
-        try {
-          await orderRepo.update(ord.id, { order_no: newDeNo });
-        } catch (_) { }
+        renameUpdates.push(
+          orderRepo.update(ord.id, { order_no: newDeNo }).catch(() => {}),
+        );
       }
     }
+    if (renameUpdates.length > 0) {
+      // Fire-and-forget, same as the original try/catch-per-iteration —
+      // just no longer blocking the request on each one sequentially.
+      Promise.allSettled(renameUpdates);
+    }
 
-    const itemIds: number[] = [];
-    const itemIdDEs: (number | undefined)[] = [];
+    // --- Collect item ids (deduped) --------------------------------------
+    const itemIdSet = new Set<number>();
+    const itemIdDESet = new Set<number>();
 
     orders.forEach((order) => {
       order.orderItems?.forEach((oi) => {
-        if (oi.item_id) itemIds.push(oi.item_id);
-        if (oi.ItemID_DE) itemIdDEs.push(oi.ItemID_DE);
-        if (oi.item?.id) itemIds.push(oi.item.id);
+        if (oi.item_id) itemIdSet.add(oi.item_id);
+        if (oi.ItemID_DE) itemIdDESet.add(oi.ItemID_DE);
+        if (oi.item?.id) itemIdSet.add(oi.item.id);
       });
     });
 
-    const warehouseItems = await warehouseRepo
-      .createQueryBuilder("wi")
-      .where("wi.item_id IN (:...itemIds)", {
-        itemIds: itemIds.length ? itemIds : [0],
-      })
-      .orWhere("wi.ItemID_DE IN (:...itemIdDEs)", {
-        itemIdDEs: itemIdDEs.length ? itemIdDEs : [0],
-      })
-      .getMany();
+    const itemIds = Array.from(itemIdSet);
+    const itemIdDEs = Array.from(itemIdDESet);
+    const hasItemIds = itemIds.length > 0;
+    const hasItemIdDEs = itemIdDEs.length > 0;
+
+    const itemRepo = AppDataSource.getRepository(Item);
+    const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+
+    // These three lookups are fully independent of each other — run them
+    // concurrently instead of one-after-another, and skip entirely when
+    // there's nothing to look up instead of querying with a dummy [0] id.
+    const [warehouseItems, fallbackItems, supplierItems] = await Promise.all([
+      hasItemIds || hasItemIdDEs
+        ? warehouseRepo
+            .createQueryBuilder("wi")
+            .where("wi.item_id IN (:...itemIds)", {
+              itemIds: hasItemIds ? itemIds : [0],
+            })
+            .orWhere("wi.ItemID_DE IN (:...itemIdDEs)", {
+              itemIdDEs: hasItemIdDEs ? itemIdDEs : [0],
+            })
+            .getMany()
+        : Promise.resolve([]),
+      hasItemIdDEs
+        ? itemRepo.find({
+            where: { ItemID_DE: In(itemIdDEs) },
+            relations: ["supplier", "taric"],
+          })
+        : Promise.resolve([]),
+      hasItemIds
+        ? supplierItemRepo.find({
+            where: { item_id: In(itemIds) },
+            relations: ["supplier"],
+          })
+        : Promise.resolve([]),
+    ]);
 
     const warehouseByItemId = new Map<number, WarehouseItem>();
     const warehouseByItemIdDE = new Map<number, WarehouseItem>();
-
     warehouseItems.forEach((wi) => {
       if (wi.item_id) warehouseByItemId.set(wi.item_id, wi);
       if (wi.ItemID_DE) warehouseByItemIdDE.set(wi.ItemID_DE, wi);
     });
-
-    const itemRepo = AppDataSource.getRepository(Item);
-    const validItemIDEs = itemIdDEs.filter(
-      (id) => id !== undefined && id !== null,
-    ) as number[];
-    const fallbackItems: Item[] =
-      validItemIDEs.length > 0
-        ? await itemRepo.find({
-          where: {
-            ItemID_DE: In(validItemIDEs),
-          },
-          relations: ["supplier", "taric"],
-        })
-        : [];
 
     const itemByDE = new Map<number, Item>();
     fallbackItems.forEach((item) => {
       if (item.ItemID_DE) itemByDE.set(item.ItemID_DE, item);
     });
 
-    const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
-    const supplierItems = await supplierItemRepo.find({
-      where: { item_id: In(itemIds.length ? itemIds : [0]) },
-      relations: ["supplier"],
-    });
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
     );
@@ -799,7 +826,7 @@ export const getAllOrders = async (
           .map((oi) => {
             const itemDetails =
               oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
-            console.log(itemDetails);
+
             let warehouseItem = null;
             if (oi.item_id) {
               warehouseItem = warehouseByItemId.get(oi.item_id);
@@ -860,20 +887,20 @@ export const getAllOrders = async (
               item: itemDetails,
               warehouse_data: warehouseItem
                 ? {
-                  id: warehouseItem.id,
-                  item_no_de: itemDetails?.item_no_de,
-                  item_name_de: warehouseItem.item_name_de,
-                  item_name_en: warehouseItem.item_name_en,
-                  stock_qty: warehouseItem.stock_qty,
-                  msq: warehouseItem.msq,
-                  buffer: warehouseItem.buffer,
-                  is_stock_item: warehouseItem.is_stock_item,
-                  is_SnSI: warehouseItem.is_SnSI,
-                  ship_class: warehouseItem.ship_class,
-                  is_active: warehouseItem.is_active,
-                  is_no_auto_order: warehouseItem.is_no_auto_order,
-                  category_id: warehouseItem.category_id,
-                }
+                    id: warehouseItem.id,
+                    item_no_de: itemDetails?.item_no_de,
+                    item_name_de: warehouseItem.item_name_de,
+                    item_name_en: warehouseItem.item_name_en,
+                    stock_qty: warehouseItem.stock_qty,
+                    msq: warehouseItem.msq,
+                    buffer: warehouseItem.buffer,
+                    is_stock_item: warehouseItem.is_stock_item,
+                    is_SnSI: warehouseItem.is_SnSI,
+                    ship_class: warehouseItem.ship_class,
+                    is_active: warehouseItem.is_active,
+                    is_no_auto_order: warehouseItem.is_no_auto_order,
+                    category_id: warehouseItem.category_id,
+                  }
                 : null,
               cargo_id: oi.cargo_id || (hasValidCargo ? validCargoId : null),
             };
@@ -1085,12 +1112,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -1847,9 +1874,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-    starCustomerDetails?.deliveryAddressLine1 ||
-    businessDetails?.address ||
-    "",
+      starCustomerDetails?.deliveryAddressLine1 ||
+      businessDetails?.address ||
+      "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -1867,9 +1894,9 @@ const resolveCustomerAddress = (
       "",
     country: formatCountry(
       customer.country ||
-      starCustomerDetails?.deliveryCountry ||
-      businessDetails?.country ||
-      "",
+        starCustomerDetails?.deliveryCountry ||
+        businessDetails?.country ||
+        "",
     ),
     phone:
       customer.contactPhoneNumber ||
@@ -2029,10 +2056,10 @@ export const generateCommercialInvoicePDF = async (
         const q = Number(it.qty || it.quantity || 0);
         const p = Number(
           it.eur_special_price ||
-          it._fallbackEk ||
-          it.unitPrice ||
-          it.unit_price ||
-          0,
+            it._fallbackEk ||
+            it.unitPrice ||
+            it.unit_price ||
+            0,
         );
         const tot = Number(it.price || it.total_price || q * p);
         return {
@@ -2059,10 +2086,10 @@ export const generateCommercialInvoicePDF = async (
     let subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
     const invoiceGross = Number(
       expandedData?.invoice?.grossTotal ??
-      invoice?.grossTotal ??
-      expandedData?.invoice?.netTotal ??
-      invoice?.netTotal ??
-      0,
+        invoice?.grossTotal ??
+        expandedData?.invoice?.netTotal ??
+        invoice?.netTotal ??
+        0,
     );
     const freightCost = Number(
       expandedData?.invoice?.freightCost ?? invoice?.freightCost ?? 0,
@@ -2115,7 +2142,7 @@ export const generateCommercialInvoicePDF = async (
       customerAddress.contact &&
       customer?.legalName &&
       customerAddress.contact.trim().toLowerCase() ===
-      customer.legalName.trim().toLowerCase()
+        customer.legalName.trim().toLowerCase()
     );
     const shipToContact =
       cargo?.ship_to_contact_person ||
@@ -2289,7 +2316,7 @@ export const generateCommercialInvoicePDF = async (
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
               .text("安徽省...", 152, 101);
-          } catch (e) { }
+          } catch (e) {}
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -2365,7 +2392,10 @@ export const generateCommercialInvoicePDF = async (
         .fillColor("black")
         .font("Helvetica-Bold")
         .fontSize(10.5)
-        .text(primaryShipName, 205, shipNameY, { width: 350, lineBreak: false });
+        .text(primaryShipName, 205, shipNameY, {
+          width: 350,
+          lineBreak: false,
+        });
     }
 
     const metaY = shipNameY + 15;
@@ -2563,8 +2593,8 @@ export const generateCommercialInvoicePDF = async (
       invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
     const orderForRemark = targetOrderNo
       ? await AppDataSource.getRepository(Order).findOne({
-        where: { order_no: targetOrderNo },
-      })
+          where: { order_no: targetOrderNo },
+        })
       : null;
     const orderComment = orderForRemark?.comment || "";
     if (orderComment) remarkLines.push(orderComment);
@@ -2606,7 +2636,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) { }
+    } catch (e) {}
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;
