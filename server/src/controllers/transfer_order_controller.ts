@@ -872,7 +872,7 @@ async function createOrderFromBestellung(
         qty: Math.max(1, Math.round(Number(li.qty) || 1)),
         remark_de: li.remark_order_item?.trim()
           ? li.remark_order_item.trim()
-          : (li.itemName?.trim() || li.description?.trim() || undefined),
+          : undefined,
         price:
           li.transferPrice !== undefined && li.transferPrice !== null
             ? li.transferPrice
@@ -992,8 +992,7 @@ export async function syncBestellungToLinkedOrder(
         ? Number(li.sourceItemId)
         : catalogItem?.id;
 
-      const remarkForChina =
-        li.remark_order_item?.trim() || li.itemName?.trim() || li.description?.trim() || null;
+      const remarkForChina = li.remark_order_item?.trim() || null;
 
       let targetItem = existingOrderItems[i];
       if (!targetItem) {

@@ -2741,24 +2741,37 @@ const OrderPage: React.FC = () => {
                     {
                       header: "Remark",
                       width: "100px",
-                      render: (row) => (
-                        <div className="text-gray-500 italic text-xs space-y-0.5">
-                          {row.remark_de && (
-                            <div className=""> {row.remark_de} /</div>
-                          )}
-                          {row.remarks_cn && (
-                            <div className=""> {row.remarks_cn} /</div>
-                          )}
-                          {row.remark_en && (
-                            <div className=""> {row.remark_en}</div>
-                          )}
-                          {!row.remark_de &&
-                            !row.remarks_cn &&
-                            !row.remark_en && (
-                              <span className="text-gray-300">-</span>
+                      render: (row) => {
+                        const rDe = (row.remark_de || "").trim();
+                        const isItemName =
+                          rDe &&
+                          (rDe === (row.item?.item_name || "").trim() ||
+                           rDe === (row.item?.name || "").trim() ||
+                           rDe === (row.item?.item_name_de || "").trim() ||
+                           rDe === ((row as any).item_name || "").trim() ||
+                           rDe === ((row as any).itemName || "").trim() ||
+                           rDe === ((row as any).description || "").trim());
+                        const cleanRemarkDe = isItemName ? null : row.remark_de;
+
+                        return (
+                          <div className="text-gray-500 italic text-xs space-y-0.5">
+                            {cleanRemarkDe && (
+                              <div className=""> {cleanRemarkDe} /</div>
                             )}
-                        </div>
-                      ),
+                            {row.remarks_cn && (
+                              <div className=""> {row.remarks_cn} /</div>
+                            )}
+                            {row.remark_en && (
+                              <div className=""> {row.remark_en}</div>
+                            )}
+                            {!cleanRemarkDe &&
+                              !row.remarks_cn &&
+                              !row.remark_en && (
+                                <span className="text-gray-300">-</span>
+                              )}
+                          </div>
+                        );
+                      },
                     },
                     {
                       header: "Order_no",

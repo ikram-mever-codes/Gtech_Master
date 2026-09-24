@@ -21,6 +21,7 @@ import { generateInvoicesForOrders } from "./cargo_controller";
 import { NumberSequenceService } from "../services/number_sequence_service";
 import { InvoiceController } from "./invoice_controller";
 import { TransferOrder } from "../models/transfer_order";
+import { TransferOrderItem } from "../models/transfer_order_items";
 import { CustomerOrder } from "../models/customer_orders";
 import { ensureAllToBeProcessedBestellungenAreSynced } from "./transfer_order_controller";
 
@@ -241,7 +242,7 @@ export const createOrder = async (
         item_id: validItemId || undefined,
         ItemID_DE: dbItem?.ItemID_DE || undefined,
         qty,
-        remark_de: it.remark_de || it.itemName || undefined,
+        remark_de: it.remark_de ? it.remark_de.trim() : undefined,
         rmb_special_price: rmbPrice || undefined,
         price: Number(it.price) || dbItem?.price || 0,
         currency: dbItem?.currency || "EUR",
@@ -1139,6 +1140,25 @@ export const generateLabelPDF = async (
       relations: ["customer"],
     });
 
+    let transferOrderItem: TransferOrderItem | null = null;
+    if (order?.order_no) {
+      const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
+      const transferOrder = await transferOrderRepo.findOne({
+        where: { order_no: order.order_no },
+        relations: ["orderItems"],
+      });
+      if (transferOrder && transferOrder.orderItems?.length) {
+        const sortedTOItems = [...transferOrder.orderItems].sort(
+          (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0),
+        );
+        const itemPos = item.position || 1;
+        transferOrderItem =
+          sortedTOItems.find((to) => Number(to.position) === Number(itemPos)) ||
+          sortedTOItems[Number(itemPos) - 1] ||
+          null;
+      }
+    }
+
     const doc = new PDFDocument({ size: [252, 110], margin: 0 });
     const logoPath = path.join(__dirname, "../../public/logo.png");
 
@@ -1369,78 +1389,131 @@ export const generateLabelPDF = async (
       lineBreak: true,
     });
 
-    const bottomSectionY = Math.max(
-      56,
-      Math.min(descriptionY + descriptionHeight + 4, 65),
+    let currentY = Math.max(
+      54,
+      Math.min(descriptionY + descriptionHeight + 2, 60),
     );
 
-    let remarkCNText = item.remarks_cn || "";
-    doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
-    doc.text("Hinweis", colA, bottomSectionY);
+    let remarkCNText = (item.remarks_cn || "").trim();
+    let remarkWText = "";
 
-    let fontSizeCN = 10;
-    if (fontSource) {
-      doc.font(fontSource, 0);
+    if (transferOrderItem) {
+      remarkWText = (transferOrderItem.remark_order_item || "").trim();
     } else {
-      doc.font("Helvetica");
-    }
-    while (fontSizeCN > 4.5) {
-      doc.fontSize(fontSizeCN);
-      if (doc.widthOfString(remarkCNText) <= 125) {
-        break;
+      remarkWText = (item.remark_de || "").trim();
+      const rawItemName = (resolvedItem?.item_name || "").trim();
+      const rawItemNoDe = (resolvedItem?.item_no_de || "").trim();
+      const rawItemNameDe = ((item.item as any)?.item_name_de || "").trim();
+
+      if (
+        remarkWText &&
+        (remarkWText === rawItemName ||
+          remarkWText === rawItemNoDe ||
+          remarkWText === rawItemNameDe ||
+          remarkWText.startsWith("Dummy Test Item") ||
+          remarkWText.startsWith("Barbeque Sleeves"))
+      ) {
+        remarkWText = "";
       }
-      fontSizeCN -= 0.5;
     }
-    doc.text(remarkCNText, valColA, bottomSectionY + 8, {
-      width: 125,
-      lineBreak: false,
-    });
 
-    let remarkWText = item.remark_de || "";
-    const remarkWLabelY = bottomSectionY + 8 + Math.max(fontSizeCN, 8) + 7;
-    doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
-    doc.text("Lieferhinweis", colA, remarkWLabelY);
+    if (remarkCNText) {
+      doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
+      doc.text("Hinweis", colA, currentY);
 
-    let fontSizeW = 8;
-    if (fontSource) {
-      doc.font(fontSource, 0);
-    } else {
-      doc.font("Helvetica");
-    }
-    while (fontSizeW > 4.5) {
-      doc.fontSize(fontSizeW);
-      if (doc.widthOfString(remarkWText) <= 125) {
-        break;
+      let fontSizeCN = 8;
+      if (fontSource) doc.font(fontSource, 0);
+      else doc.font("Helvetica");
+
+      while (fontSizeCN > 4.5) {
+        doc.fontSize(fontSizeCN);
+        if (doc.widthOfString(remarkCNText) <= 125) break;
+        fontSizeCN -= 0.5;
       }
-      fontSizeW -= 0.5;
+      const cnValY = currentY + 7;
+      doc.text(remarkCNText, valColA, cnValY, {
+        width: 125,
+        height: 12,
+        lineBreak: true,
+        ellipsis: true,
+      });
+      const renderedHeight = Math.min(
+        doc.heightOfString(remarkCNText, { width: 125 }),
+        12,
+      );
+      currentY = cnValY + renderedHeight + 3;
     }
-    doc.text(remarkWText, valColA, remarkWLabelY + 8, {
-      width: 125,
-      lineBreak: false,
-    });
 
-    const barcodeValue = (
+    if (remarkWText) {
+      doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
+      doc.text("Lieferhinweis", colA, currentY);
+
+      const valY = currentY + 7;
+      const maxAvailableHeight = Math.max(10, 102 - valY);
+
+      let fontSizeW = 7.5;
+      if (fontSource) doc.font(fontSource, 0);
+      else doc.font("Helvetica");
+
+      while (fontSizeW > 4.5) {
+        doc.fontSize(fontSizeW);
+        if (
+          doc.heightOfString(remarkWText, { width: 125 }) <= maxAvailableHeight
+        )
+          break;
+        fontSizeW -= 0.5;
+      }
+
+      doc.text(remarkWText, valColA, valY, {
+        width: 125,
+        height: maxAvailableHeight,
+        lineBreak: true,
+        ellipsis: true,
+      });
+    }
+
+    const generateEAN13 = (seed: number): string => {
+      const prefix = "428";
+      const body = String(Math.abs(seed) % 1000000000).padStart(9, "0");
+      const twelve = prefix + body;
+      let sum = 0;
+      for (let i = 0; i < 12; i++) {
+        const digit = parseInt(twelve[i], 10);
+        sum += i % 2 === 0 ? digit : digit * 3;
+      }
+      const checksum = (10 - (sum % 10)) % 10;
+      return twelve + checksum;
+    };
+
+    let rawEan = (
       resolvedItem?.ean?.toString() ||
       warehouseItem?.ean?.toString() ||
       ""
     ).trim();
-    if (barcodeValue && barcodeValue !== "-") {
-      try {
-        const barcodeBuffer = await bwipjs.toBuffer({
-          bcid: "code128",
-          text: barcodeValue,
-          scale: 2,
-          height: 10,
-          includetext: true,
-          textsize: 10,
-          textgaps: 4,
-          textxalign: "center",
-        });
 
-        doc.image(barcodeBuffer, 145, 68, { width: 100 });
-      } catch (barcodeErr) {
-        console.error("Barcode generation failed:", barcodeErr);
-      }
+    let barcodeValue = "";
+    if (rawEan && /^\d{12,13}$/.test(rawEan)) {
+      barcodeValue = rawEan.length === 12 ? generateEAN13(Number(rawEan) || item.id) : rawEan;
+    } else {
+      const seed = item.id || item.ItemID_DE || item.item_id || 1;
+      barcodeValue = generateEAN13(seed);
+    }
+
+    try {
+      const barcodeBuffer = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: barcodeValue,
+        scale: 3,
+        height: 10,
+        includetext: true,
+        textsize: 9,
+        textgaps: 2,
+        textxalign: "center",
+      });
+
+      doc.image(barcodeBuffer, 145, 68, { width: 100 });
+    } catch (barcodeErr) {
+      console.error("Barcode generation failed:", barcodeErr);
     }
 
     doc.end();
