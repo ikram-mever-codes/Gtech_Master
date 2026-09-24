@@ -144,6 +144,15 @@ async function drawCustomerSvgBackground(doc: any): Promise<void> {
             .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
             .replace(/x_Document_Title/gi, "")
             .replace(/Document_Title/gi, "");
+
+          rawSvg = rawSvg.replace(/d="([\s\S]*?)"/g, (_match: string, pathData: string) => {
+            const roundedData = pathData.replace(/-?\d+\.\d+/g, (numStr: string) => {
+              const n = parseFloat(numStr);
+              return Number(n.toFixed(2)).toString();
+            });
+            return `d="${roundedData}"`;
+          });
+
           cachedCustomerSvg = rawSvg;
         } catch (err) {
           console.error("Failed to load Customer Document SVG template:", err);
@@ -3841,7 +3850,7 @@ export class OfferController {
       const M = fontMedium(gtechFonts);
       const SB = fontSemiBold(gtechFonts);
 
-      drawCustomerSvgBackground(doc);
+      await drawCustomerSvgBackground(doc);
 
       let customer: any = {};
       if (offer.customerSnapshot) {
@@ -4310,7 +4319,8 @@ export class OfferController {
             return orderA - orderB;
           });
 
-        customerItems.forEach((item: any, rowIndex: number) => {
+        for (let rowIndex = 0; rowIndex < customerItems.length; rowIndex++) {
+          const item = customerItems[rowIndex];
           let qtyStr = "1";
           let unitPriceNum = 0;
           let netTotalNum = 0;
@@ -4385,7 +4395,7 @@ export class OfferController {
               .stroke();
 
             doc.addPage();
-            drawCustomerSvgBackground(doc);
+            await drawCustomerSvgBackground(doc);
             doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
 
             const newTableY = MM(25);
@@ -4482,7 +4492,7 @@ export class OfferController {
           }
 
           currentY += computedRowHeight;
-        });
+        }
       }
 
       const shippingMethod = ((offer.shippingText || offer.shippingMethod) || "").trim();
@@ -4509,7 +4519,7 @@ export class OfferController {
 
         if (currentY + shipRowH > MM(270)) {
           doc.addPage();
-          drawCustomerSvgBackground(doc);
+          await drawCustomerSvgBackground(doc);
           doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
           currentY = MM(25);
         }
@@ -4551,7 +4561,7 @@ export class OfferController {
       yPos = currentY + 12;
       if (yPos + 80 > MM(272)) {
         doc.addPage();
-        drawCustomerSvgBackground(doc);
+        await drawCustomerSvgBackground(doc);
         doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
         yPos = MM(25);
       }
@@ -4788,7 +4798,7 @@ export class OfferController {
 
       if (yPos + notesHeight > MM(272)) {
         doc.addPage();
-        drawCustomerSvgBackground(doc);
+        await drawCustomerSvgBackground(doc);
         doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
         yPos = MM(25);
       }

@@ -31,7 +31,7 @@ async function drawCustomerSvgBackground(doc: InstanceType<typeof PDFDocument>):
         .replace(/<g[^>]*id="g10"[\s\S]*?<\/g>/gi, "");
 
       // Round high precision floating point numbers in d="..." path attributes to 2 decimals
-      rawSvg = rawSvg.replace(/d="([^"]+)"/g, (_match: string, pathData: string) => {
+      rawSvg = rawSvg.replace(/d="([\s\S]*?)"/g, (_match: string, pathData: string) => {
         const roundedData = pathData.replace(/-?\d+\.\d+/g, (numStr: string) => {
           const n = parseFloat(numStr);
           return Number(n.toFixed(2)).toString();
