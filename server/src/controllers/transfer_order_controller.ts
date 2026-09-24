@@ -348,7 +348,7 @@ export const getAllTransferOrders = async (
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const orders = await transferOrderRepo.find({
       order: { created_at: "DESC" },
-      relations: ["orderItems", "customer", "supplier"],
+      relations: ["orderItems", "customer", "supplier", "customer.starBusinessDetails", "customer.starBusinessDetails.contactPersons"],
     });
 
     const linkedDocumentsByBestellungId =

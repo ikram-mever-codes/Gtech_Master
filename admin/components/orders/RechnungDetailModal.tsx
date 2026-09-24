@@ -550,10 +550,10 @@ export default function RechnungDetailModal({
     );
     setEditShippingMethod(
       rechnung?.shipping_method ||
-        rechnung?.auftrag?.shipping_method ||
-        (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
-        (rechnung?.customerSnapshot as any)?.shipping_method ||
-        "",
+      rechnung?.auftrag?.shipping_method ||
+      (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
+      (rechnung?.customerSnapshot as any)?.shipping_method ||
+      "",
     );
     setRkNotesExtern(rechnung?.notes || "");
     setRkNotesIntern(rechnung?.internal_notes || "");
@@ -631,26 +631,26 @@ export default function RechnungDetailModal({
 
   const correctionsSubtotal = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-        if (!selectedCorrectionIds.has(item.id)) return sum;
-        const openQty = openQuantities[item.id] || 0;
-        const corr = corrections[item.id];
-        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-          return sum + corr.quantity * corr.price;
-        }
-        return sum;
-      }, 0)
+      if (!selectedCorrectionIds.has(item.id)) return sum;
+      const openQty = openQuantities[item.id] || 0;
+      const corr = corrections[item.id];
+      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+        return sum + corr.quantity * corr.price;
+      }
+      return sum;
+    }, 0)
     : 0;
   const correctionsTax = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-        if (!selectedCorrectionIds.has(item.id)) return sum;
-        const openQty = openQuantities[item.id] || 0;
-        const corr = corrections[item.id];
-        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-          const lineTaxRate = Number(item.taxRate ?? taxRate);
-          return sum + corr.quantity * corr.price * (lineTaxRate / 100);
-        }
-        return sum;
-      }, 0)
+      if (!selectedCorrectionIds.has(item.id)) return sum;
+      const openQty = openQuantities[item.id] || 0;
+      const corr = corrections[item.id];
+      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+        const lineTaxRate = Number(item.taxRate ?? taxRate);
+        return sum + corr.quantity * corr.price * (lineTaxRate / 100);
+      }
+      return sum;
+    }, 0)
     : 0;
 
   const netTotal = showCorrectionUI
@@ -1406,8 +1406,8 @@ export default function RechnungDetailModal({
                 value={
                   data.date_delivery_confirmed || data.real_delivery_date
                     ? formatDate(
-                        data.date_delivery_confirmed || data.real_delivery_date,
-                      )
+                      data.date_delivery_confirmed || data.real_delivery_date,
+                    )
                     : "—"
                 }
               />
@@ -1672,11 +1672,10 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${
-                                  isFullyCorrected
-                                    ? "text-green-600"
-                                    : "text-amber-600"
-                                }`}
+                                className={`font-semibold ${isFullyCorrected
+                                  ? "text-green-600"
+                                  : "text-amber-600"
+                                  }`}
                               >
                                 {openQty}
                               </span>
@@ -1697,11 +1696,10 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${
-                                    selected
-                                      ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
-                                      : "border-gray-200 bg-gray-100 text-gray-400"
-                                  }`}
+                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${selected
+                                    ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
+                                    : "border-gray-200 bg-gray-100 text-gray-400"
+                                    }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1723,11 +1721,10 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${
-                                    selected
-                                      ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
-                                      : "border-gray-200 bg-gray-100 text-gray-400"
-                                  }`}
+                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${selected
+                                    ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
+                                    : "border-gray-200 bg-gray-100 text-gray-400"
+                                    }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1794,11 +1791,10 @@ export default function RechnungDetailModal({
                   {(editShippingMethod || data.shipping_method) &&
                     (editShippingCost > 0 || editShippingQuantity > 0) && (
                       <tr
-                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${
-                          showCorrectionUI && !shippingSelected
-                            ? "opacity-60"
-                            : ""
-                        }`}
+                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${showCorrectionUI && !shippingSelected
+                          ? "opacity-60"
+                          : ""
+                          }`}
                       >
                         {showCorrectionUI && (
                           <td className="px-2 py-2 text-center">
@@ -2003,11 +1999,10 @@ export default function RechnungDetailModal({
                         ⚠ Not uploaded yet
                       </span>
                       <label
-                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                          uploadingDoc
-                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                            : "bg-amber-600 text-white hover:bg-amber-700"
-                        }`}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          : "bg-amber-600 text-white hover:bg-amber-700"
+                          }`}
                       >
                         {uploadingDoc ? (
                           <>
@@ -2044,10 +2039,10 @@ export default function RechnungDetailModal({
                 </h3>
               </div>
               {auftragDocs.length === 0 &&
-              rechnungenKDocs.length === 0 &&
-              rechnungDocs.length === 0 &&
-              cargoDocs.length === 0 &&
-              paymentsData.allocations.length === 0 ? (
+                rechnungenKDocs.length === 0 &&
+                rechnungDocs.length === 0 &&
+                cargoDocs.length === 0 &&
+                paymentsData.allocations.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No linked documents yet.
                 </p>
@@ -2239,18 +2234,17 @@ export default function RechnungDetailModal({
                               </span>
                               <div className="flex items-center gap-2">
                                 <span
-                                  className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${
-                                    differs
-                                      ? "text-amber-700 bg-amber-50 border-amber-200"
-                                      : "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                  }`}
+                                  className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${differs
+                                    ? "text-amber-700 bg-amber-50 border-amber-200"
+                                    : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                    }`}
                                 >
                                   {formatDeCurrency(Number(alloc.amount) || 0)}
                                 </span>
                                 <span className="text-gray-400 text-xs">
                                   {formatDate(
                                     alloc.paymentInbound?.received_date ||
-                                      alloc.created_at,
+                                    alloc.created_at,
                                   )}
                                 </span>
                               </div>
@@ -2327,8 +2321,8 @@ export default function RechnungDetailModal({
                           : addressEdit
                             ? editNotesExtern
                             : data.notes ||
-                              data.comment ||
-                              data.notes_external) || "",
+                            data.comment ||
+                            data.notes_external) || "",
                       );
                       toast.success("External comment copied to clipboard!");
                     }}
@@ -2382,11 +2376,10 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-                  hasCorrections && !isCreating
-                    ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
+                  ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  }`}
               >
                 {isCreating ? (
                   <>

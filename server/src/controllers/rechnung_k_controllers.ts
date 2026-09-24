@@ -13,7 +13,6 @@ import { generateRechnungKEml } from "../services/emlGenerator";
 import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
-import { Customer } from "../models/customers";
 import { TaxProfile } from "../models/tax_profile";
 import { getCargosByAuftragIds } from "./rechnung_controller";
 
@@ -27,19 +26,19 @@ async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
   return match
     ? {
-        id: match.id,
-        name: match.name,
-        taxCase: match.tax_case || undefined,
-        taxRate: Number(match.tax_rate),
-        taxCode: match.tax_code || undefined,
-      }
+      id: match.id,
+      name: match.name,
+      taxCase: match.tax_case || undefined,
+      taxRate: Number(match.tax_rate),
+      taxCode: match.tax_code || undefined,
+    }
     : {
-        id: null,
-        name: "Frozen",
-        taxCase: undefined,
-        taxRate: Number(taxRate) || 19,
-        taxCode: undefined,
-      };
+      id: null,
+      name: "Frozen",
+      taxCase: undefined,
+      taxRate: Number(taxRate) || 19,
+      taxCode: undefined,
+    };
 }
 
 async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
@@ -84,15 +83,15 @@ async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
   const [rechnungen, auftraege] = await Promise.all([
     originalRechnungIds.length
       ? rechnungRepo.find({
-          where: { id: In(originalRechnungIds) },
-          select: ["id", "invoice_number", "title", "created_at"],
-        })
+        where: { id: In(originalRechnungIds) },
+        select: ["id", "invoice_number", "title", "created_at"],
+      })
       : Promise.resolve([]),
     auftragIds.length
       ? customerOrderRepo.find({
-          where: { id: In(auftragIds) },
-          select: ["id", "order_no", "title", "created_at"],
-        })
+        where: { id: In(auftragIds) },
+        select: ["id", "order_no", "title", "created_at"],
+      })
       : Promise.resolve([]),
   ]);
 
@@ -525,35 +524,11 @@ export const getAllRechnungenK = async (
     const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
     const rechnungenK = await rechnungKRepo.find({
       order: { created_at: "DESC" },
-      relations: ["items", "customer"],
+      relations: ["items", "customer", "customer.starBusinessDetails", "customer.starBusinessDetails.contactPersons"],
     });
 
     const linkedDocumentsByRechnungKId =
       await getLinkedDocumentsForRechnungenK(rechnungenK);
-
-    const originalCustIds = Array.from(
-      new Set(
-        rechnungenK
-          .map(
-            (rk: any) =>
-              rk.customer?.original_customer_id ||
-              rk.customerSnapshot?.id ||
-              linkedDocumentsByRechnungKId.get(rk.id)?.auftrag?.[0]?.customer_id,
-          )
-          .filter((id): id is string => !!id),
-      ),
-    );
-
-    let fullCustomersById = new Map<string, any>();
-    if (originalCustIds.length > 0) {
-      const custRepo = AppDataSource.getRepository(Customer);
-      const fullCustomers = await custRepo.find({
-        where: { id: In(originalCustIds) },
-        relations: ["starBusinessDetails", "starBusinessDetails.contactPersons"],
-      });
-      fullCustomersById = new Map(fullCustomers.map((c) => [c.id, c]));
-    }
-
     const distinctRates = Array.from(
       new Set(rechnungenK.map((rk) => Number(rk.tax_rate) || 19)),
     );
@@ -572,24 +547,8 @@ export const getAllRechnungenK = async (
         linkedDocs.rechnung[0]?.title ||
         linkedDocs.auftrag[0]?.title ||
         undefined;
-
-      const origId =
-        rk.customer?.original_customer_id ||
-        rk.customerSnapshot?.id ||
-        linkedDocs.auftrag[0]?.customer_id;
-      const fullCust = origId ? fullCustomersById.get(origId) : null;
-      const custObject = rk.customer
-        ? {
-            ...rk.customer,
-            starBusinessDetails: fullCust?.starBusinessDetails || undefined,
-            contactPersons:
-              fullCust?.starBusinessDetails?.contactPersons || [],
-          }
-        : fullCust || undefined;
-
       return {
         ...rk,
-        customer: custObject,
         title,
         linkedDocuments: linkedDocs,
         taxProfile: taxProfileByRate.get(Number(rk.tax_rate) || 19),
@@ -892,9 +851,9 @@ export const downloadRechnungKPdf = async (
           "Datum",
           String(
             rechnungK.date_created ||
-              rechnungK.created_at ||
-              rechnungK.invoice_date ||
-              "",
+            rechnungK.created_at ||
+            rechnungK.invoice_date ||
+            "",
           ),
         ],
       ] as [string, string][],
@@ -920,11 +879,11 @@ export const downloadRechnungKPdf = async (
       deliveryTerms: rechnungK.delivery_terms,
       paymentTerms: rechnungK.payment_terms
         ? (() => {
-            const m = String(rechnungK.payment_terms).match(/(\d+)/);
-            return m
-              ? `Zahlungsziel: ${m[1]} Tage`
-              : `Zahlungsziel: ${rechnungK.payment_terms}`;
-          })()
+          const m = String(rechnungK.payment_terms).match(/(\d+)/);
+          return m
+            ? `Zahlungsziel: ${m[1]} Tage`
+            : `Zahlungsziel: ${rechnungK.payment_terms}`;
+        })()
         : undefined,
       paymentMethod: rechnungK.payment_method,
       taxProfile:

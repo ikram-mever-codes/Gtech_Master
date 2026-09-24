@@ -183,9 +183,9 @@ async function getLinkedDocumentsForAuftrag(
   ] = await Promise.all([
     safeOfferId
       ? offerRepo.findOne({
-          where: { id: safeOfferId },
-          select: ["id", "offerNumber", "createdAt"],
-        })
+        where: { id: safeOfferId },
+        select: ["id", "offerNumber", "createdAt"],
+      })
       : Promise.resolve(null),
     rechnungRepo.find({
       where: { auftrag_id: auftragId },
@@ -268,9 +268,9 @@ async function getLinkedDocumentsForAuftraege(
   ] = await Promise.all([
     offerIds.length
       ? offerRepo.find({
-          where: { id: In(offerIds) },
-          select: ["id", "offerNumber", "createdAt"],
-        })
+        where: { id: In(offerIds) },
+        select: ["id", "offerNumber", "createdAt"],
+      })
       : Promise.resolve([]),
     rechnungRepo.find({
       where: { auftrag_id: In(auftragIds) },
@@ -588,12 +588,12 @@ async function resolveAuftragTaxProfile(
       profile: frozenMatch
         ? mapTaxProfile(frozenMatch)
         : {
-            id: null,
-            name: "Frozen",
-            taxCase: undefined,
-            taxRate: Number(order.tax_rate) || 19,
-            taxCode: undefined,
-          },
+          id: null,
+          name: "Frozen",
+          taxCase: undefined,
+          taxRate: Number(order.tax_rate) || 19,
+          taxCode: undefined,
+        },
       changed: false,
     };
   }
@@ -647,11 +647,7 @@ export const getAllCustomerOrders = async (
     if (customerIds.length > 0) {
       const customersOnPage = await customerRepo.find({
         where: { id: In(customerIds) },
-        relations: [
-          "defaultTaxProfile",
-          "starBusinessDetails",
-          "starBusinessDetails.contactPersons",
-        ],
+        relations: ["defaultTaxProfile", "starBusinessDetails", "starBusinessDetails.contactPersons"],
       });
       customersById = new Map(customersOnPage.map((c: any) => [c.id, c]));
     }
@@ -675,12 +671,12 @@ export const getAllCustomerOrders = async (
           frozenMatch
             ? mapTaxProfile(frozenMatch)
             : {
-                id: null,
-                name: "Frozen",
-                taxCase: undefined,
-                taxRate: Number(order.tax_rate) || 19,
-                taxCode: undefined,
-              },
+              id: null,
+              name: "Frozen",
+              taxCase: undefined,
+              taxRate: Number(order.tax_rate) || 19,
+              taxCode: undefined,
+            },
         );
         continue;
       }
@@ -750,22 +746,16 @@ export const getAllCustomerOrders = async (
       });
     }
 
-    const ordersWithLinkedDocuments = orders.map((order: any) => {
-      const custObj = order.customer_id
-        ? customersById.get(order.customer_id)
-        : null;
-      return {
-        ...order,
-        customer: custObj || order.customer,
-        taxProfile: taxProfileByOrderId.get(order.id) || null,
-        linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
-          offers: [],
-          rechnungen: [],
-          rechnungenK: [],
-          bestellungen: [],
-        },
-      };
-    });
+    const ordersWithLinkedDocuments = orders.map((order: any) => ({
+      ...order,
+      taxProfile: taxProfileByOrderId.get(order.id) || null,
+      linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
+        offers: [],
+        rechnungen: [],
+        rechnungenK: [],
+        bestellungen: [],
+      },
+    }));
 
     res.json({ success: true, data: ordersWithLinkedDocuments });
   } catch (error) {
