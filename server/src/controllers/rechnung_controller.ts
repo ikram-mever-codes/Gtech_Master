@@ -1156,8 +1156,6 @@ export const getAllRechnungen = async (
       .createQueryBuilder("r")
       .leftJoinAndSelect("r.items", "items")
       .leftJoinAndSelect("r.customer", "c")
-      .leftJoinAndSelect("c.starBusinessDetails", "sbd")
-      .leftJoinAndSelect("sbd.contactPersons", "cp")
       .orderBy("r.created_at", "DESC");
 
     if (filter === "missing_gelangenheitsbestaetigung") {
