@@ -1154,6 +1154,12 @@ const CombinedInquiriesPageContent = () => {
       const requestsData = inquiryRequests.map((req) => ({
         ...req,
         qty: req.qty.toString(),
+        targetPrice:
+          req.targetPrice !== "" &&
+          req.targetPrice !== undefined &&
+          req.targetPrice !== null
+            ? parseFloat(req.targetPrice.toString()) || 0
+            : 0,
       }));
       const inquiryPayload = {
         ...inquiryFormData,
@@ -3493,24 +3499,25 @@ const CombinedInquiriesPageContent = () => {
                                   Target Price (EUR)
                                 </label>
                                 <input
-                                  type="number"
-                                  value={request.targetPrice || ""}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "targetPrice",
-                                      e.target.value === ""
-                                        ? ""
-                                        : parseFloat(e.target.value) || 0,
-                                    )
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={
+                                    request.targetPrice !== undefined &&
+                                    request.targetPrice !== null
+                                      ? request.targetPrice
+                                      : ""
                                   }
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(",", ".");
+                                    if (val === "" || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                      updateRequest(index, "targetPrice", val);
+                                    }
+                                  }}
                                   disabled={
                                     inquiryModalMode === "edit" &&
                                     !editModeEnabled
                                   }
                                   className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                  step="0.01"
-                                  min="0"
                                   placeholder="0.00"
                                 />
                               </div>
