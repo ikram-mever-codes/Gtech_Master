@@ -1,7 +1,3 @@
-import path from "path";
-import fs from "fs";
-
-const mm = (millimeters: number): number => millimeters * 2.8346;
 
 export interface GtechFonts {
   regular: string;
@@ -11,23 +7,13 @@ export interface GtechFonts {
 }
 
 export function resolveGtechFonts(): GtechFonts {
-  const interBase = path.join(
-    __dirname,
-    "../../node_modules/inter-font/ttf"
-  );
-
-  const resolve = (filename: string): string | null => {
-    const p = path.join(interBase, filename);
-    return fs.existsSync(p) ? p : null;
+  // Use PDFKit built-in fonts (Helvetica) — these are NOT embedded in the PDF
+  // output and add 0 bytes. Previously Inter-Regular.ttf (~310KB) was being
+  // fully embedded in every generated document, inflating file size 5x.
+  return {
+    regular: "Helvetica",
+    medium: "Helvetica",
+    semiBold: "Helvetica-Bold",
+    serif: "Times-Roman",
   };
-
-  const regular =
-    resolve("Inter-Regular.ttf") ||
-    "Helvetica";
-
-  const medium = regular;
-  const semiBold = regular;
-  const serif = "Times-Roman";
-
-  return { regular, medium, semiBold, serif };
 }

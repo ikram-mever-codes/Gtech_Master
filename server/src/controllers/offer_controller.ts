@@ -189,28 +189,34 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const contentPdf = await pdfLib.PDFDocument.load(contentBytes);
 
     const mergedPdf = await pdfLib.PDFDocument.create();
+    mergedPdf.setTitle(path.basename(contentPdfPath, ".pdf"));
+
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
+    // Embed both PDFs ONCE outside the loop — re-using the same embedded
+    // XObjects for every page avoids the duplicate stream bloat that was
+    // inflating file size when embedPdf() was called inside the loop.
+    const embeddedTemplatePages = await mergedPdf.embedPdf(
+      templatePdf,
+      templatePdf.getPageIndices(),
+    );
+    const embeddedContentPages = await mergedPdf.embedPdf(
+      contentPdf,
+      contentPdf.getPageIndices(),
+    );
+
     for (let i = 0; i < contentPageCount; i++) {
       const templatePageIdx = Math.min(i, templatePageCount - 1);
-
-      const [embeddedTemplate] = await mergedPdf.embedPdf(templateBytes, [
-        templatePageIdx,
-      ]);
-      const [embeddedContent] = await mergedPdf.embedPdf(contentBytes, [i]);
-
       const contentPage = contentPdf.getPage(i);
       const { width, height } = contentPage.getSize();
 
       const newPage = mergedPdf.addPage([width, height]);
-
-      newPage.drawPage(embeddedTemplate, { x: 0, y: 0, width, height });
-
-      newPage.drawPage(embeddedContent, { x: 0, y: 0, width, height });
+      newPage.drawPage(embeddedTemplatePages[templatePageIdx], { x: 0, y: 0, width, height });
+      newPage.drawPage(embeddedContentPages[i], { x: 0, y: 0, width, height });
     }
 
-    const mergedBytes = await mergedPdf.save();
+    const mergedBytes = await mergedPdf.save({ useObjectStreams: true });
     fs.writeFileSync(contentPdfPath, mergedBytes);
   } catch (err) {
     console.error("Error in mergePdfTemplate:", err);

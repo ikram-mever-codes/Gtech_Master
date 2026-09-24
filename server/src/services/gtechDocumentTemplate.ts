@@ -33,27 +33,34 @@ export function registerGtechFonts(
   doc: InstanceType<typeof PDFDocument>,
   fonts: GtechFonts
 ): void {
-  if (fonts.regular !== "Helvetica") {
+  // Built-in PDFKit fonts (Helvetica, Times-Roman) do NOT need registration.
+  // Only register if a custom TTF path was provided.
+  if (fonts.regular && fonts.regular !== "Helvetica" && fonts.regular !== "Helvetica-Bold") {
     try { doc.registerFont("Inter-Regular", fonts.regular); } catch (_) { }
   }
-  if (fonts.medium !== "Helvetica" && fonts.medium !== fonts.regular) {
+  if (fonts.medium && fonts.medium !== fonts.regular && fonts.medium !== "Helvetica" && fonts.medium !== "Helvetica-Bold") {
     try { doc.registerFont("Inter-Medium", fonts.medium); } catch (_) { }
   }
-  if (fonts.semiBold !== "Helvetica-Bold" && fonts.semiBold !== fonts.regular) {
+  if (fonts.semiBold && fonts.semiBold !== fonts.regular && fonts.semiBold !== "Helvetica" && fonts.semiBold !== "Helvetica-Bold") {
     try { doc.registerFont("Inter-SemiBold", fonts.semiBold); } catch (_) { }
   }
 }
 
 export function fontRegular(fonts: GtechFonts): string {
-  return fonts.regular !== "Helvetica" ? "Inter-Regular" : "Helvetica";
+  if (!fonts.regular || fonts.regular === "Helvetica") return "Helvetica";
+  return "Inter-Regular";
 }
 export function fontMedium(fonts: GtechFonts): string {
-  if (fonts.medium === fonts.regular && fonts.regular !== "Helvetica") return "Inter-Regular";
-  return fonts.medium !== "Helvetica" ? "Inter-Medium" : "Helvetica";
+  if (!fonts.medium || fonts.medium === "Helvetica") return "Helvetica";
+  if (fonts.medium === "Helvetica-Bold") return "Helvetica-Bold";
+  if (fonts.medium === fonts.regular) return fontRegular(fonts);
+  return "Inter-Medium";
 }
 export function fontSemiBold(fonts: GtechFonts): string {
-  if (fonts.semiBold === fonts.regular && fonts.regular !== "Helvetica") return "Inter-Regular";
-  return fonts.semiBold !== "Helvetica-Bold" ? "Inter-SemiBold" : "Helvetica-Bold";
+  if (!fonts.semiBold || fonts.semiBold === "Helvetica-Bold") return "Helvetica-Bold";
+  if (fonts.semiBold === "Helvetica") return "Helvetica";
+  if (fonts.semiBold === fonts.regular) return fontRegular(fonts);
+  return "Inter-SemiBold";
 }
 
 export function drawGtechBrandLayer(
