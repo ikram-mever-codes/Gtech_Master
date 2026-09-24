@@ -37,6 +37,7 @@ export function hasContactPersonEmail(row: any): boolean {
     row.customer?.contactPersons,
     row.customerSnapshot?.contacts,
     row.customerSnapshot?.contactPersons,
+    row.customer?.starBusinessDetails?.contactPersons,
     row.customer?.starBusinessDetails?.contacts,
   ];
 

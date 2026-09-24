@@ -746,16 +746,21 @@ export const getAllCustomerOrders = async (
       });
     }
 
-    const ordersWithLinkedDocuments = orders.map((order: any) => ({
-      ...order,
-      taxProfile: taxProfileByOrderId.get(order.id) || null,
-      linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
-        offers: [],
-        rechnungen: [],
-        rechnungenK: [],
-        bestellungen: [],
-      },
-    }));
+    const ordersWithLinkedDocuments = orders.map((order: any) => {
+      const cust = order.customer_id ? customersById.get(order.customer_id) : undefined;
+      const contactPersons = cust?.starBusinessDetails?.contactPersons || [];
+      return {
+        ...order,
+        contactPersons,
+        taxProfile: taxProfileByOrderId.get(order.id) || null,
+        linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
+          offers: [],
+          rechnungen: [],
+          rechnungenK: [],
+          bestellungen: [],
+        },
+      };
+    });
 
     res.json({ success: true, data: ordersWithLinkedDocuments });
   } catch (error) {

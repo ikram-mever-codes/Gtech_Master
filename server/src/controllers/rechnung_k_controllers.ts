@@ -15,6 +15,7 @@ import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
 import { TaxProfile } from "../models/tax_profile";
 import { getCargosByAuftragIds } from "./rechnung_controller";
+import { Customer } from "../models/customers";
 
 /** Fetches documents linked to a correction invoice (Rechnung_k): the
  * original Rechnung it was created from, and the originating Auftrag
@@ -524,8 +525,24 @@ export const getAllRechnungenK = async (
     const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
     const rechnungenK = await rechnungKRepo.find({
       order: { created_at: "DESC" },
-      relations: ["items", "customer", "customer.starBusinessDetails", "customer.starBusinessDetails.contactPersons"],
+      relations: ["items", "customer"],
     });
+
+    const origCustIds = Array.from(
+      new Set(
+        (rechnungenK as any[])
+          .map((rk) => rk.customer?.original_customer_id)
+          .filter((id): id is string => !!id),
+      ),
+    );
+    const custRepo = AppDataSource.getRepository(Customer);
+    const origCustomers = origCustIds.length
+      ? await custRepo.find({
+        where: { id: In(origCustIds) },
+        relations: ["starBusinessDetails", "starBusinessDetails.contactPersons"],
+      })
+      : [];
+    const origCustById = new Map(origCustomers.map((c) => [c.id, c]));
 
     const linkedDocumentsByRechnungKId =
       await getLinkedDocumentsForRechnungenK(rechnungenK);
@@ -547,11 +564,17 @@ export const getAllRechnungenK = async (
         linkedDocs.rechnung[0]?.title ||
         linkedDocs.auftrag[0]?.title ||
         undefined;
+
+      const origCustId = rk.customer?.original_customer_id;
+      const origCust = origCustId ? origCustById.get(origCustId) : undefined;
+      const contactPersons = (origCust as any)?.starBusinessDetails?.contactPersons || [];
+
       return {
         ...rk,
         title,
         linkedDocuments: linkedDocs,
         taxProfile: taxProfileByRate.get(Number(rk.tax_rate) || 19),
+        contactPersons,
       };
     });
 

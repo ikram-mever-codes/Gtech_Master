@@ -419,9 +419,19 @@ export const createRechnungFromAuftrag = async (
     if (auftrag.customer_id) {
       originalCust = await custRepo.findOne({
         where: { id: auftrag.customer_id },
-        relations: ["businessDetails"],
+        relations: ["businessDetails", "starBusinessDetails", "starBusinessDetails.contactPersons"],
       });
     }
+
+    const contactPersonEmails = (originalCust as any)?.starBusinessDetails?.contactPersons || [];
+    const firstContactEmail = contactPersonEmails.find(
+      (cp: any) => typeof cp.email === "string" && cp.email.includes("@")
+    )?.email;
+    const resolvedEmail =
+      auftrag.customerSnapshot?.email ||
+      originalCust?.email ||
+      firstContactEmail ||
+      undefined;
 
     const dispName =
       auftrag.customerSnapshot?.displayName ||
@@ -448,8 +458,7 @@ export const createRechnungFromAuftrag = async (
       company_name: dispName,
       display_name: dispName,
       legal_name: legName,
-      email:
-        auftrag.customerSnapshot?.email || originalCust?.email || undefined,
+      email: resolvedEmail,
       tax_number:
         auftrag.customerSnapshot?.vatId ||
         originalCust?.vatTaxId ||
@@ -1161,6 +1170,26 @@ export const getAllRechnungen = async (
 
     const rechnungen = await qb.getMany();
 
+    // Batch-load original customer contact persons for email check.
+    // RechnungCustomer is a snapshot (no contactPersons relation), so we
+    // look up the live Customer record by original_customer_id and attach
+    // contactPersons to each row for the frontend hasContactPersonEmail check.
+    const origCustIds = Array.from(
+      new Set(
+        (rechnungen as any[])
+          .map((r) => r.customer?.original_customer_id)
+          .filter((id): id is string => !!id),
+      ),
+    );
+    const custRepo = AppDataSource.getRepository(Customer);
+    const origCustomers = origCustIds.length
+      ? await custRepo.find({
+        where: { id: In(origCustIds) },
+        relations: ["starBusinessDetails", "starBusinessDetails.contactPersons"],
+      })
+      : [];
+    const origCustById = new Map(origCustomers.map((c) => [c.id, c]));
+
     const linkedDocumentsByRechnungId =
       await getLinkedDocumentsForRechnungen(rechnungen);
 
@@ -1190,6 +1219,11 @@ export const getAllRechnungen = async (
         linkedAuftrag?.deliveryTime ||
         linkedAuftrag?.delivery_time ||
         linkedAuftrag?.real_delivery_date;
+
+      const origCustId = r.customer?.original_customer_id;
+      const origCust = origCustId ? origCustById.get(origCustId) : undefined;
+      const contactPersons = (origCust as any)?.starBusinessDetails?.contactPersons || [];
+
       return {
         ...r,
         title,
@@ -1197,6 +1231,7 @@ export const getAllRechnungen = async (
         delivery_date: resolvedDeliveryDate,
         linkedDocuments: linkedDocs,
         taxProfile: taxProfileByRate.get(Number(r.tax_rate) || 19),
+        contactPersons,
       };
     });
     res.json({

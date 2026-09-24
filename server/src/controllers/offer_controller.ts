@@ -2493,10 +2493,17 @@ export class OfferController {
         }, new Map<string, any[]>());
       }
 
-      // Transform offers with linked documents attached inline
       const offersWithItemNo = offers.map((offer: any) => {
+        const customer = offer.customerId
+          ? customersById.get(offer.customerId)
+          : undefined;
+        const contactPersons =
+          customer?.starBusinessDetails?.contactPersons || [];
+
         return {
           ...offer,
+          customer: customer || offer.customer || undefined,
+          contactPersons,
           taxProfile: offer.customerId
             ? taxProfileByCustomerId.get(offer.customerId) || defaultTaxProfile
             : defaultTaxProfile,
