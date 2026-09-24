@@ -751,6 +751,7 @@ export const getAllCustomerOrders = async (
       const contactPersons = cust?.starBusinessDetails?.contactPersons || [];
       return {
         ...order,
+        customer: cust || order.customer || undefined,
         contactPersons,
         taxProfile: taxProfileByOrderId.get(order.id) || null,
         linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {

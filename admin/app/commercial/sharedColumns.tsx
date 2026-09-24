@@ -9,47 +9,89 @@ import { formatCountryCode } from "@/utils/address";
 export function hasContactPersonEmail(row: any): boolean {
   if (!row) return false;
 
-  const directEmails = [
-    row.customerSnapshot?.contactEmail,
-    row.customerSnapshot?.contact_email,
-    row.customerSnapshot?.email,
-    row.customerSnapshot?.contactPersonEmail,
-    row.customer?.contactPersonEmail,
-    row.customer?.contact_email,
-    row.customer?.email,
-    row.customer?.contactPerson?.email,
-    row.contactPersonEmail,
-    row.contact_email,
-    row.contactEmail,
+  const isEmail = (val: any): boolean =>
+    typeof val === "string" && val.trim().length > 3 && val.includes("@");
+
+  const snap =
+    typeof row.customerSnapshot === "string"
+      ? (() => {
+          try {
+            return JSON.parse(row.customerSnapshot);
+          } catch (_) {
+            return null;
+          }
+        })()
+      : row.customerSnapshot;
+
+  const cust =
+    typeof row.customer === "string"
+      ? (() => {
+          try {
+            return JSON.parse(row.customer);
+          } catch (_) {
+            return null;
+          }
+        })()
+      : row.customer;
+
+  const supp =
+    typeof row.supplier === "string"
+      ? (() => {
+          try {
+            return JSON.parse(row.supplier);
+          } catch (_) {
+            return null;
+          }
+        })()
+      : row.supplier;
+
+  // 1. Direct Email fields on Document, Customer, Snapshot, or Supplier
+  const direct = [
     row.email,
+    row.contactEmail,
+    row.contact_email,
+    row.kontaktEmail,
+    cust?.email,
+    cust?.email_rechnungen,
+    cust?.email_einkauf,
+    cust?.contactEmail,
+    snap?.email,
+    snap?.email_rechnungen,
+    snap?.email_einkauf,
+    snap?.contactEmail,
+    supp?.email,
+    supp?.email_einkauf,
+    supp?.email_rechnungen,
   ];
 
-  for (const email of directEmails) {
-    if (typeof email === "string" && email.trim().length > 0 && email.includes("@")) {
-      return true;
-    }
-  }
+  if (direct.some(isEmail)) return true;
 
-  const contactArrays = [
-    row.contacts,
+  // 2. Contact Person Arrays on Document, Customer, Snapshot, or Supplier
+  const arrays = [
     row.contactPersons,
-    row.customer?.contacts,
-    row.customer?.contactPersons,
-    row.customerSnapshot?.contacts,
-    row.customerSnapshot?.contactPersons,
-    row.customer?.starBusinessDetails?.contactPersons,
-    row.customer?.starBusinessDetails?.contacts,
+    row.contacts,
+    cust?.contactPersons,
+    cust?.starBusinessDetails?.contactPersons,
+    snap?.contactPersons,
+    supp?.contactPersons,
   ];
 
-  for (const arr of contactArrays) {
-    if (Array.isArray(arr)) {
-      for (const item of arr) {
-        if (!item) continue;
-        const itemEmail = item.email || item.contactEmail || item.contact_email;
-        if (typeof itemEmail === "string" && itemEmail.trim().length > 0 && itemEmail.includes("@")) {
-          return true;
-        }
-      }
+  for (const arr of arrays) {
+    const list =
+      typeof arr === "string"
+        ? (() => {
+            try {
+              return JSON.parse(arr);
+            } catch (_) {
+              return [];
+            }
+          })()
+        : arr;
+    if (
+      Array.isArray(list) &&
+      list.some((item) => isEmail(item?.email || item?.contactEmail))
+    ) {
+      return true;
     }
   }
 

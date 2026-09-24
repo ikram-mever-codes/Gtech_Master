@@ -1224,6 +1224,7 @@ export const getAllRechnungen = async (
 
       return {
         ...r,
+        customer: origCust || r.customer || undefined,
         title,
         date_delivery: resolvedDeliveryDate,
         delivery_date: resolvedDeliveryDate,

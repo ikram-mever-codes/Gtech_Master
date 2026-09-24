@@ -571,6 +571,7 @@ export const getAllRechnungenK = async (
 
       return {
         ...rk,
+        customer: origCust || rk.customer || undefined,
         title,
         linkedDocuments: linkedDocs,
         taxProfile: taxProfileByRate.get(Number(rk.tax_rate) || 19),
