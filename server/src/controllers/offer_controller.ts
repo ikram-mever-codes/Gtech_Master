@@ -2451,7 +2451,11 @@ export class OfferController {
       if (customerIds.length > 0) {
         const customersOnPage = await this.customerRepository.find({
           where: { id: In(customerIds) },
-          relations: ["defaultTaxProfile"],
+          relations: [
+            "defaultTaxProfile",
+            "starBusinessDetails",
+            "starBusinessDetails.contactPersons",
+          ],
         });
         customersById = new Map(customersOnPage.map((c: any) => [c.id, c]));
       }
@@ -2493,10 +2497,11 @@ export class OfferController {
         }, new Map<string, any[]>());
       }
 
-      // Transform offers with linked documents attached inline
       const offersWithItemNo = offers.map((offer: any) => {
+        const cust = offer.customerId ? customersById.get(offer.customerId) : null;
         return {
           ...offer,
+          customer: cust || offer.customer,
           taxProfile: offer.customerId
             ? taxProfileByCustomerId.get(offer.customerId) || defaultTaxProfile
             : defaultTaxProfile,

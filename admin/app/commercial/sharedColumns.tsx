@@ -17,11 +17,15 @@ export function hasContactPersonEmail(row: any): boolean {
     row.customer?.contactPersonEmail,
     row.customer?.contact_email,
     row.customer?.email,
+    row.customer?.email_rechnungen,
+    row.customer?.email_einkauf,
     row.customer?.contactPerson?.email,
     row.contactPersonEmail,
     row.contact_email,
     row.contactEmail,
     row.email,
+    row.supplier?.email,
+    row.supplier?.contact_email,
   ];
 
   for (const email of directEmails) {
@@ -38,13 +42,16 @@ export function hasContactPersonEmail(row: any): boolean {
     row.customerSnapshot?.contacts,
     row.customerSnapshot?.contactPersons,
     row.customer?.starBusinessDetails?.contacts,
+    row.customer?.starBusinessDetails?.contactPersons,
+    row.supplier?.contacts,
+    row.supplier?.contactPersons,
   ];
 
   for (const arr of contactArrays) {
     if (Array.isArray(arr)) {
       for (const item of arr) {
         if (!item) continue;
-        const itemEmail = item.email || item.contactEmail || item.contact_email;
+        const itemEmail = typeof item === "string" ? item : (item.email || item.contactEmail || item.contact_email);
         if (typeof itemEmail === "string" && itemEmail.trim().length > 0 && itemEmail.includes("@")) {
           return true;
         }

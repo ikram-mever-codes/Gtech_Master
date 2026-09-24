@@ -647,7 +647,11 @@ export const getAllCustomerOrders = async (
     if (customerIds.length > 0) {
       const customersOnPage = await customerRepo.find({
         where: { id: In(customerIds) },
-        relations: ["defaultTaxProfile"],
+        relations: [
+          "defaultTaxProfile",
+          "starBusinessDetails",
+          "starBusinessDetails.contactPersons",
+        ],
       });
       customersById = new Map(customersOnPage.map((c: any) => [c.id, c]));
     }
@@ -746,16 +750,22 @@ export const getAllCustomerOrders = async (
       });
     }
 
-    const ordersWithLinkedDocuments = orders.map((order: any) => ({
-      ...order,
-      taxProfile: taxProfileByOrderId.get(order.id) || null,
-      linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
-        offers: [],
-        rechnungen: [],
-        rechnungenK: [],
-        bestellungen: [],
-      },
-    }));
+    const ordersWithLinkedDocuments = orders.map((order: any) => {
+      const custObj = order.customer_id
+        ? customersById.get(order.customer_id)
+        : null;
+      return {
+        ...order,
+        customer: custObj || order.customer,
+        taxProfile: taxProfileByOrderId.get(order.id) || null,
+        linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {
+          offers: [],
+          rechnungen: [],
+          rechnungenK: [],
+          bestellungen: [],
+        },
+      };
+    });
 
     res.json({ success: true, data: ordersWithLinkedDocuments });
   } catch (error) {

@@ -1165,6 +1165,28 @@ export const getAllRechnungen = async (
     await attachPaymentStatusToRechnungen(rechnungen);
     await attachPaymentsAndRksToRechnungen(rechnungen);
 
+    const originalCustIds = Array.from(
+      new Set(
+        rechnungen
+          .map(
+            (r: any) =>
+              r.customer?.original_customer_id ||
+              linkedDocumentsByRechnungId.get(r.id)?.auftrag?.[0]?.customer_id,
+          )
+          .filter((id): id is string => !!id),
+      ),
+    );
+
+    let fullCustomersById = new Map<string, any>();
+    if (originalCustIds.length > 0) {
+      const custRepo = AppDataSource.getRepository(Customer);
+      const fullCustomers = await custRepo.find({
+        where: { id: In(originalCustIds) },
+        relations: ["starBusinessDetails", "starBusinessDetails.contactPersons"],
+      });
+      fullCustomersById = new Map(fullCustomers.map((c) => [c.id, c]));
+    }
+
     const distinctRates = Array.from(
       new Set(rechnungen.map((r) => Number(r.tax_rate) || 19)),
     );
@@ -1188,8 +1210,22 @@ export const getAllRechnungen = async (
         linkedAuftrag?.deliveryTime ||
         linkedAuftrag?.delivery_time ||
         linkedAuftrag?.real_delivery_date;
+
+      const origId =
+        r.customer?.original_customer_id || linkedAuftrag?.customer_id;
+      const fullCust = origId ? fullCustomersById.get(origId) : null;
+      const custObject = r.customer
+        ? {
+            ...r.customer,
+            starBusinessDetails: fullCust?.starBusinessDetails || undefined,
+            contactPersons:
+              fullCust?.starBusinessDetails?.contactPersons || [],
+          }
+        : fullCust || undefined;
+
       return {
         ...r,
+        customer: custObject,
         title,
         date_delivery: resolvedDeliveryDate,
         delivery_date: resolvedDeliveryDate,

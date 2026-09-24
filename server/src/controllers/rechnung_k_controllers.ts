@@ -13,6 +13,7 @@ import { generateRechnungKEml } from "../services/emlGenerator";
 import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
+import { Customer } from "../models/customers";
 import { TaxProfile } from "../models/tax_profile";
 import { getCargosByAuftragIds } from "./rechnung_controller";
 
@@ -529,6 +530,30 @@ export const getAllRechnungenK = async (
 
     const linkedDocumentsByRechnungKId =
       await getLinkedDocumentsForRechnungenK(rechnungenK);
+
+    const originalCustIds = Array.from(
+      new Set(
+        rechnungenK
+          .map(
+            (rk: any) =>
+              rk.customer?.original_customer_id ||
+              rk.customerSnapshot?.id ||
+              linkedDocumentsByRechnungKId.get(rk.id)?.auftrag?.[0]?.customer_id,
+          )
+          .filter((id): id is string => !!id),
+      ),
+    );
+
+    let fullCustomersById = new Map<string, any>();
+    if (originalCustIds.length > 0) {
+      const custRepo = AppDataSource.getRepository(Customer);
+      const fullCustomers = await custRepo.find({
+        where: { id: In(originalCustIds) },
+        relations: ["starBusinessDetails", "starBusinessDetails.contactPersons"],
+      });
+      fullCustomersById = new Map(fullCustomers.map((c) => [c.id, c]));
+    }
+
     const distinctRates = Array.from(
       new Set(rechnungenK.map((rk) => Number(rk.tax_rate) || 19)),
     );
@@ -547,8 +572,24 @@ export const getAllRechnungenK = async (
         linkedDocs.rechnung[0]?.title ||
         linkedDocs.auftrag[0]?.title ||
         undefined;
+
+      const origId =
+        rk.customer?.original_customer_id ||
+        rk.customerSnapshot?.id ||
+        linkedDocs.auftrag[0]?.customer_id;
+      const fullCust = origId ? fullCustomersById.get(origId) : null;
+      const custObject = rk.customer
+        ? {
+            ...rk.customer,
+            starBusinessDetails: fullCust?.starBusinessDetails || undefined,
+            contactPersons:
+              fullCust?.starBusinessDetails?.contactPersons || [],
+          }
+        : fullCust || undefined;
+
       return {
         ...rk,
+        customer: custObject,
         title,
         linkedDocuments: linkedDocs,
         taxProfile: taxProfileByRate.get(Number(rk.tax_rate) || 19),
