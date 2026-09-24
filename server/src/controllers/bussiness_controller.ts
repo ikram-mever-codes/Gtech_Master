@@ -239,8 +239,8 @@ export const bulkImportBusinesses = async (
         customer.email = businessData.email
           ? businessData.email.trim().toLowerCase()
           : `${companyNameFirstWord
-              .toLowerCase()
-              .replace(/[^a-z0-9]/g, ".")}@imported.business`;
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, ".")}@imported.business`;
         customer.stage = "business";
         customer.contactEmail = businessData.contactEmail
           ? businessData.contactEmail.trim().toLowerCase()
@@ -363,8 +363,7 @@ export const bulkImportBusinesses = async (
         for (let i = 0; i < customersToSave.length; i += CHUNK_SIZE) {
           const chunk = customersToSave.slice(i, i + CHUNK_SIZE);
           console.log(
-            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${
-              chunk.length
+            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${chunk.length
             } businesses`,
           );
 
@@ -1056,10 +1055,9 @@ export const createBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features.</p>
-        ${
-          defaultList
-            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-            : ""
+        ${defaultList
+          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+          : ""
         }
       `;
 
@@ -1118,26 +1116,26 @@ export const createBusiness = async (
       note: finalCustomer.businessDetails?.description,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-            inSeries: finalCustomer.starBusinessDetails.inSeries,
-            madeIn: finalCustomer.starBusinessDetails.madeIn,
-            device: finalCustomer.starBusinessDetails.device,
-            industry: finalCustomer.starBusinessDetails.industry,
-            converted_timestamp:
-              finalCustomer.starBusinessDetails.converted_timestamp,
-            convertedBy: finalCustomer.starBusinessDetails.convertedBy
-              ? {
-                  id: finalCustomer.starBusinessDetails.convertedBy.id,
-                  name: finalCustomer.starBusinessDetails.convertedBy.name,
-                  email: finalCustomer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-          }
+          inSeries: finalCustomer.starBusinessDetails.inSeries,
+          madeIn: finalCustomer.starBusinessDetails.madeIn,
+          device: finalCustomer.starBusinessDetails.device,
+          industry: finalCustomer.starBusinessDetails.industry,
+          converted_timestamp:
+            finalCustomer.starBusinessDetails.converted_timestamp,
+          convertedBy: finalCustomer.starBusinessDetails.convertedBy
+            ? {
+              id: finalCustomer.starBusinessDetails.convertedBy.id,
+              name: finalCustomer.starBusinessDetails.convertedBy.name,
+              email: finalCustomer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+        }
         : undefined,
       defaultList: defaultList
         ? {
-            id: defaultList.id,
-            name: defaultList.name,
-          }
+          id: defaultList.id,
+          name: defaultList.name,
+        }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -1400,23 +1398,24 @@ export const updateBusiness = async (
               : null;
         }
         if (contactEmail !== undefined) {
-          customer.contactEmail = contactEmail.trim()
-            ? contactEmail.trim().toLowerCase()
-            : undefined;
+          customer.contactEmail =
+            contactEmail && contactEmail.trim()
+              ? contactEmail.trim().toLowerCase()
+              : null;
         }
         if (contactPhoneNumber !== undefined) {
-          customer.contactPhoneNumber = contactPhoneNumber.trim();
+          customer.contactPhoneNumber = contactPhoneNumber.trim() || null;
         } else if (phone !== undefined) {
-          customer.contactPhoneNumber = phone ? phone.trim() : undefined;
+          customer.contactPhoneNumber = phone ? phone.trim() : null;
         }
         if (vatTaxId !== undefined) {
-          customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+          customer.vatTaxId = vatTaxId ? vatTaxId.trim() : null;
         }
         if (debtor_no !== undefined) {
-          customer.debtor_no = debtor_no ? debtor_no.trim() : undefined;
+          customer.debtor_no = debtor_no ? debtor_no.trim() : null;
         }
         if (default_tax_profile_id !== undefined) {
-          customer.default_tax_profile_id = default_tax_profile_id || undefined;
+          customer.default_tax_profile_id = default_tax_profile_id || null;
         }
         if (vat_id_status !== undefined) {
           customer.vat_id_status = vat_id_status || "unchecked";
@@ -1424,13 +1423,29 @@ export const updateBusiness = async (
         if (defaultPaymentMethod !== undefined) {
           customer.defaultPaymentMethod = defaultPaymentMethod
             ? defaultPaymentMethod.trim()
-            : undefined;
+            : null;
         }
-        if (updateData.emailRechnungen !== undefined || updateData.email_rechnungen !== undefined) {
-          customer.email_rechnungen = (updateData.emailRechnungen || updateData.email_rechnungen || "").trim() || undefined;
+        if (
+          updateData.emailRechnungen !== undefined ||
+          updateData.email_rechnungen !== undefined
+        ) {
+          const raw =
+            updateData.emailRechnungen !== undefined
+              ? updateData.emailRechnungen
+              : updateData.email_rechnungen;
+          const trimmed = (raw || "").trim();
+          customer.email_rechnungen = trimmed ? trimmed : null;
         }
-        if (updateData.emailEinkauf !== undefined || updateData.email_einkauf !== undefined) {
-          customer.email_einkauf = (updateData.emailEinkauf || updateData.email_einkauf || "").trim() || undefined;
+        if (
+          updateData.emailEinkauf !== undefined ||
+          updateData.email_einkauf !== undefined
+        ) {
+          const raw =
+            updateData.emailEinkauf !== undefined
+              ? updateData.emailEinkauf
+              : updateData.email_einkauf;
+          const trimmed = (raw || "").trim();
+          customer.email_einkauf = trimmed ? trimmed : null;
         }
         if (defaultShippingMethod !== undefined) {
           customer.defaultShippingMethod = defaultShippingMethod
@@ -1524,11 +1539,12 @@ export const updateBusiness = async (
             businessDetails.contactPhone = updateData.phoneNumber.trim();
           }
           if (updateData.email !== undefined) {
-            const trimmedEmail = updateData.email.trim()
-              ? updateData.email.trim().toLowerCase()
-              : undefined;
-            businessDetails.email = trimmedEmail;
-            customer.email = trimmedEmail;
+            const trimmedEmail =
+              updateData.email && updateData.email.trim()
+                ? updateData.email.trim().toLowerCase()
+                : null;
+            businessDetails.email = trimmedEmail as any;
+            customer.email = trimmedEmail as any;
           }
           if (updateData.googleMapsUrl !== undefined)
             businessDetails.googleMapsUrl = updateData.googleMapsUrl.trim();
@@ -1678,10 +1694,9 @@ export const updateBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features and change your password.</p>
-        ${
-          defaultList
-            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-            : ""
+        ${defaultList
+          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+          : ""
         }
       `;
 
@@ -1749,35 +1764,35 @@ export const updateBusiness = async (
       vat_id_check_response_json: finalCustomer.vat_id_check_response_json,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
-            id: finalCustomer.businessDetails.check_by.id,
-            name: finalCustomer.businessDetails.check_by.name,
-            email: finalCustomer.businessDetails.check_by.email,
-          }
+          id: finalCustomer.businessDetails.check_by.id,
+          name: finalCustomer.businessDetails.check_by.name,
+          email: finalCustomer.businessDetails.check_by.email,
+        }
         : undefined,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-            inSeries: finalCustomer.starBusinessDetails.inSeries,
-            madeIn: finalCustomer.starBusinessDetails.madeIn,
-            lastChecked: finalCustomer.starBusinessDetails.lastChecked,
-            checkedBy: finalCustomer.starBusinessDetails.checkedBy,
-            device: finalCustomer.starBusinessDetails.device,
-            industry: finalCustomer.starBusinessDetails.industry,
-            converted_timestamp:
-              finalCustomer.starBusinessDetails.converted_timestamp,
-            convertedBy: finalCustomer.starBusinessDetails.convertedBy
-              ? {
-                  id: finalCustomer.starBusinessDetails.convertedBy.id,
-                  name: finalCustomer.starBusinessDetails.convertedBy.name,
-                  email: finalCustomer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-          }
+          inSeries: finalCustomer.starBusinessDetails.inSeries,
+          madeIn: finalCustomer.starBusinessDetails.madeIn,
+          lastChecked: finalCustomer.starBusinessDetails.lastChecked,
+          checkedBy: finalCustomer.starBusinessDetails.checkedBy,
+          device: finalCustomer.starBusinessDetails.device,
+          industry: finalCustomer.starBusinessDetails.industry,
+          converted_timestamp:
+            finalCustomer.starBusinessDetails.converted_timestamp,
+          convertedBy: finalCustomer.starBusinessDetails.convertedBy
+            ? {
+              id: finalCustomer.starBusinessDetails.convertedBy.id,
+              name: finalCustomer.starBusinessDetails.convertedBy.name,
+              email: finalCustomer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+        }
         : undefined,
       defaultList: defaultList
         ? {
-            id: defaultList.id,
-            name: defaultList.name,
-          }
+          id: defaultList.id,
+          name: defaultList.name,
+        }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -1871,54 +1886,54 @@ export const getBusinessById = async (
       vat_id_check_response_json: customer.vat_id_check_response_json,
       businessDetails: customer.businessDetails
         ? {
-            ...customer.businessDetails,
-            check_by: customer.businessDetails.check_by
-              ? {
-                  id: customer.businessDetails.check_by.id,
-                  name: customer.businessDetails.check_by.name,
-                  email: customer.businessDetails.check_by.email,
-                }
-              : undefined,
-          }
+          ...customer.businessDetails,
+          check_by: customer.businessDetails.check_by
+            ? {
+              id: customer.businessDetails.check_by.id,
+              name: customer.businessDetails.check_by.name,
+              email: customer.businessDetails.check_by.email,
+            }
+            : undefined,
+        }
         : undefined,
       starBusinessDetails: customer.starBusinessDetails
         ? {
-            id: customer.starBusinessDetails.id,
-            inSeries: customer.starBusinessDetails.inSeries,
-            madeIn: customer.starBusinessDetails.madeIn,
-            lastChecked: customer.starBusinessDetails.lastChecked,
-            checkedBy: customer.starBusinessDetails.checkedBy,
-            device: customer.starBusinessDetails.device,
-            industry: customer.starBusinessDetails.industry,
-            converted_timestamp:
-              customer.starBusinessDetails.converted_timestamp,
-            convertedBy: customer.starBusinessDetails.convertedBy
-              ? {
-                  id: customer.starBusinessDetails.convertedBy.id,
-                  name: customer.starBusinessDetails.convertedBy.name,
-                  email: customer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-            comment: customer.starBusinessDetails.comment,
-            createdAt: customer.starBusinessDetails.createdAt,
-            updatedAt: customer.starBusinessDetails.updatedAt,
-          }
+          id: customer.starBusinessDetails.id,
+          inSeries: customer.starBusinessDetails.inSeries,
+          madeIn: customer.starBusinessDetails.madeIn,
+          lastChecked: customer.starBusinessDetails.lastChecked,
+          checkedBy: customer.starBusinessDetails.checkedBy,
+          device: customer.starBusinessDetails.device,
+          industry: customer.starBusinessDetails.industry,
+          converted_timestamp:
+            customer.starBusinessDetails.converted_timestamp,
+          convertedBy: customer.starBusinessDetails.convertedBy
+            ? {
+              id: customer.starBusinessDetails.convertedBy.id,
+              name: customer.starBusinessDetails.convertedBy.name,
+              email: customer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+          comment: customer.starBusinessDetails.comment,
+          createdAt: customer.starBusinessDetails.createdAt,
+          updatedAt: customer.starBusinessDetails.updatedAt,
+        }
         : undefined,
       starCustomerDetails: customer.starCustomerDetails
         ? {
-            id: customer.starCustomerDetails.id,
-            taxNumber: customer.starCustomerDetails.taxNumber,
-            accountVerificationStatus:
-              customer.starCustomerDetails.accountVerificationStatus,
-            isEmailVerified: customer.starCustomerDetails.isEmailVerified,
-            deliveryAddressLine1:
-              customer.starCustomerDetails.deliveryAddressLine1,
-            deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
-            deliveryCity: customer.starCustomerDetails.deliveryCity,
-            deliveryCountry: customer.starCustomerDetails.deliveryCountry,
-            createdAt: customer.starCustomerDetails.createdAt,
-            updatedAt: customer.starCustomerDetails.updatedAt,
-          }
+          id: customer.starCustomerDetails.id,
+          taxNumber: customer.starCustomerDetails.taxNumber,
+          accountVerificationStatus:
+            customer.starCustomerDetails.accountVerificationStatus,
+          isEmailVerified: customer.starCustomerDetails.isEmailVerified,
+          deliveryAddressLine1:
+            customer.starCustomerDetails.deliveryAddressLine1,
+          deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
+          deliveryCity: customer.starCustomerDetails.deliveryCity,
+          deliveryCountry: customer.starCustomerDetails.deliveryCountry,
+          createdAt: customer.starCustomerDetails.createdAt,
+          updatedAt: customer.starCustomerDetails.updatedAt,
+        }
         : undefined,
       website: customer.businessDetails?.website,
       hasWebsite: !!customer.businessDetails?.website,

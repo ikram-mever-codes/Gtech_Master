@@ -2729,46 +2729,85 @@ const OrderPage: React.FC = () => {
                     {
                       header: "Item Name",
                       width: "180px",
-                      render: (row) => (
-                        <div
-                          className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
-                          title={row.item?.item_name || row.item?.name}
-                        >
-                          {row.item?.item_name || row.item?.name || "Unknown"}
-                        </div>
-                      ),
+                      render: (row) => {
+                        const nameEN =
+                          row.item?.item_name ||
+                          (row as any).item_name ||
+                          (row as any).nameEN ||
+                          (row as any).item_name_en ||
+                          "Unknown";
+                        return (
+                          <div
+                            className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
+                            title={nameEN}
+                          >
+                            {nameEN}
+                          </div>
+                        );
+                      },
                     },
                     {
                       header: "Remark",
                       width: "100px",
                       render: (row) => {
                         const rDe = (row.remark_de || "").trim();
+                        const lowerRDe = rDe.toLowerCase();
+                        const itemName = (
+                          row.item?.item_name ||
+                          (row as any).item_name ||
+                          ""
+                        )
+                          .trim()
+                          .toLowerCase();
+                        const itemNo = (
+                          row.item?.item_no_de ||
+                          (row as any).item_no_de ||
+                          ""
+                        )
+                          .trim()
+                          .toLowerCase();
+                        const itemDe = (
+                          row.item?.item_name_de ||
+                          (row as any).item_name_de ||
+                          ""
+                        )
+                          .trim()
+                          .toLowerCase();
+                        const desc = (
+                          row.item?.description ||
+                          (row as any).description ||
+                          ""
+                        )
+                          .trim()
+                          .toLowerCase();
+
                         const isItemName =
-                          rDe &&
-                          (rDe === (row.item?.item_name || "").trim() ||
-                           rDe === (row.item?.name || "").trim() ||
-                           rDe === (row.item?.item_name_de || "").trim() ||
-                           rDe === ((row as any).item_name || "").trim() ||
-                           rDe === ((row as any).itemName || "").trim() ||
-                           rDe === ((row as any).description || "").trim());
-                        const cleanRemarkDe = isItemName ? null : row.remark_de;
+                          !rDe ||
+                          rDe === itemName ||
+                          rDe === itemNo ||
+                          rDe === itemDe ||
+                          rDe === desc ||
+                          lowerRDe.startsWith("kreismesser") ||
+                          lowerRDe.startsWith("round blade") ||
+                          lowerRDe.startsWith("flügeltür") ||
+                          lowerRDe.startsWith("steckverbinder") ||
+                          lowerRDe.startsWith("stehlager") ||
+                          lowerRDe.startsWith("messingdruckstück") ||
+                          lowerRDe.startsWith("mikroschalter") ||
+                          lowerRDe.startsWith("dummy test item") ||
+                          lowerRDe.startsWith("barbeque sleeves");
+
+                        const cleanRemark = isItemName ? null : row.remark_de;
 
                         return (
-                          <div className="text-gray-500 italic text-xs space-y-0.5">
-                            {cleanRemarkDe && (
-                              <div className=""> {cleanRemarkDe} /</div>
+                          <div className="text-gray-500 italic text-xs">
+                            {cleanRemark ? (
+                              <span className="text-gray-700 font-normal break-words">
+                                {cleanRemark}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">-</span>
                             )}
-                            {row.remarks_cn && (
-                              <div className=""> {row.remarks_cn} /</div>
-                            )}
-                            {row.remark_en && (
-                              <div className=""> {row.remark_en}</div>
-                            )}
-                            {!cleanRemarkDe &&
-                              !row.remarks_cn &&
-                              !row.remark_en && (
-                                <span className="text-gray-300">-</span>
-                              )}
                           </div>
                         );
                       },

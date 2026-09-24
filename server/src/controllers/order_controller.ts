@@ -1445,7 +1445,8 @@ export const generateLabelPDF = async (
         (name) =>
           lowerRemark === name ||
           lowerRemark.includes(name) ||
-          (name.length > 5 && lowerRemark.includes(name.slice(0, 15))),
+          name.includes(lowerRemark) ||
+          (name.length > 5 && lowerRemark.includes(name.slice(0, 12))),
       );
 
       if (
@@ -1453,7 +1454,12 @@ export const generateLabelPDF = async (
         lowerRemark.startsWith("dummy test item") ||
         lowerRemark.startsWith("barbeque sleeves") ||
         lowerRemark.startsWith("kreismesser") ||
-        lowerRemark.startsWith("round blade")
+        lowerRemark.startsWith("round blade") ||
+        lowerRemark.startsWith("flügeltür") ||
+        lowerRemark.startsWith("steckverbinder") ||
+        lowerRemark.startsWith("stehlager") ||
+        lowerRemark.startsWith("messingdruckstück") ||
+        lowerRemark.startsWith("mikroschalter")
       ) {
         remarkWText = "";
       }
@@ -1476,7 +1482,7 @@ export const generateLabelPDF = async (
       doc.text(remarkCNText, valColA, cnValY, {
         width: 125,
         height: 12,
-        lineBreak: true,
+        lineBreak: false,
         ellipsis: true,
       });
       const renderedHeight = Math.min(
@@ -1491,7 +1497,7 @@ export const generateLabelPDF = async (
       doc.text("Lieferhinweis", colA, currentY);
 
       const valY = currentY + 7;
-      const maxAvailableHeight = Math.max(10, Math.min(26, 96 - valY));
+      const maxAvailableHeight = Math.max(8, Math.min(22, 92 - valY));
 
       let fontSizeW = 7.5;
       if (fontSource) doc.font(fontSource, 0);
@@ -1512,11 +1518,11 @@ export const generateLabelPDF = async (
         doc.fontSize(4.5);
         let trimmed = remarkWText;
         while (
-          trimmed.length > 5 &&
+          trimmed.length > 3 &&
           doc.heightOfString(trimmed + "...", { width: 125 }) >
             maxAvailableHeight
         ) {
-          trimmed = trimmed.slice(0, -3);
+          trimmed = trimmed.slice(0, -2);
         }
         remarkWText = trimmed + "...";
       }
@@ -1524,7 +1530,7 @@ export const generateLabelPDF = async (
       doc.text(remarkWText, valColA, valY, {
         width: 125,
         height: maxAvailableHeight,
-        lineBreak: true,
+        lineBreak: false,
         ellipsis: true,
       });
     }

@@ -639,7 +639,16 @@ export const getAllCustomerOrders = async (
 
     const customerIds = Array.from(
       new Set(
-        orders.map((o) => o.customer_id).filter((id): id is string => !!id),
+        orders
+          .map(
+            (o: any) =>
+              o.customer_id ||
+              o.customerId ||
+              o.customerSnapshot?.id ||
+              o.customerSnapshot?.customerId ||
+              o.customer?.id,
+          )
+          .filter((id): id is string => !!id),
       ),
     );
 
@@ -747,11 +756,21 @@ export const getAllCustomerOrders = async (
     }
 
     const ordersWithLinkedDocuments = orders.map((order: any) => {
-      const cust = order.customer_id ? customersById.get(order.customer_id) : undefined;
-      const contactPersons = cust?.starBusinessDetails?.contactPersons || [];
+      const cid =
+        order.customer_id ||
+        order.customerId ||
+        order.customerSnapshot?.id ||
+        order.customerSnapshot?.customerId ||
+        order.customer?.id;
+      const cust = cid ? customersById.get(cid) : undefined;
+      const contactPersons =
+        cust?.starBusinessDetails?.contactPersons ||
+        cust?.contactPersons ||
+        order.contactPersons ||
+        [];
       return {
         ...order,
-        customer: cust || order.customer || undefined,
+        customer: cust || order.customerSnapshot || order.customer || undefined,
         contactPersons,
         taxProfile: taxProfileByOrderId.get(order.id) || null,
         linkedDocuments: linkedDocumentsByAuftragId.get(order.id) || {

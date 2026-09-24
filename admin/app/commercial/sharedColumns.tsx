@@ -55,10 +55,12 @@ export function hasContactPersonEmail(row: any): boolean {
     cust?.email_rechnungen,
     cust?.email_einkauf,
     cust?.contactEmail,
+    cust?.contact_email,
     snap?.email,
     snap?.email_rechnungen,
     snap?.email_einkauf,
     snap?.contactEmail,
+    snap?.contact_email,
     supp?.email,
     supp?.email_einkauf,
     supp?.email_rechnungen,
@@ -71,9 +73,14 @@ export function hasContactPersonEmail(row: any): boolean {
     row.contactPersons,
     row.contacts,
     cust?.contactPersons,
+    cust?.contacts,
     cust?.starBusinessDetails?.contactPersons,
+    cust?.businessDetails?.contactPersons,
     snap?.contactPersons,
+    snap?.contacts,
+    snap?.starBusinessDetails?.contactPersons,
     supp?.contactPersons,
+    supp?.contacts,
   ];
 
   for (const arr of arrays) {
@@ -89,7 +96,15 @@ export function hasContactPersonEmail(row: any): boolean {
         : arr;
     if (
       Array.isArray(list) &&
-      list.some((item) => isEmail(item?.email || item?.contactEmail))
+      list.some((item) =>
+        isEmail(
+          item?.email ||
+            item?.contactEmail ||
+            item?.kontaktEmail ||
+            item?.emailAddress ||
+            item?.contact_email,
+        ),
+      )
     ) {
       return true;
     }

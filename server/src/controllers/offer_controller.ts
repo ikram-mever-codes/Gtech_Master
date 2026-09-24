@@ -2347,7 +2347,20 @@ export class OfferController {
       // and VAT ID status against tax_profiles, same logic as the
       // Relationships/Business page. Angebot always shows the customer's
       // CURRENT profile, recomputed on every load.
-      const taxProfile = await this.getCustomerTaxProfile(offer.customerId);
+      const cid = offer.customerId || (offer as any).customer_id || offer.customerSnapshot?.id || offer.customerSnapshot?.customerId || offer.customer?.id;
+      const taxProfile = await this.getCustomerTaxProfile(cid);
+
+      let customer: any = undefined;
+      if (cid) {
+        customer = await this.customerRepository.findOne({
+          where: { id: cid },
+          relations: ["starBusinessDetails", "starBusinessDetails.contactPersons", "defaultTaxProfile"],
+        });
+      }
+      const contactPersons =
+        customer?.starBusinessDetails?.contactPersons ||
+        customer?.contactPersons ||
+        [];
 
       const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
       const linkedOrders = await customerOrderRepo.find({
@@ -2360,6 +2373,8 @@ export class OfferController {
         success: true,
         data: {
           ...offer,
+          customer: customer || offer.customerSnapshot || offer.customer || undefined,
+          contactPersons,
           taxProfile,
           linkedDocuments: linkedOrders,
         },
@@ -2451,7 +2466,14 @@ export class OfferController {
       const customerIds: any = Array.from(
         new Set(
           offers
-            .map((o: any) => o.customerId)
+            .map(
+              (o: any) =>
+                o.customerId ||
+                o.customer_id ||
+                o.customerSnapshot?.id ||
+                o.customerSnapshot?.customerId ||
+                o.customer?.id,
+            )
             .filter((id: any): id is string => !!id),
         ),
       );
@@ -2503,18 +2525,25 @@ export class OfferController {
       }
 
       const offersWithItemNo = offers.map((offer: any) => {
-        const customer = offer.customerId
-          ? customersById.get(offer.customerId)
-          : undefined;
+        const cid =
+          offer.customerId ||
+          offer.customer_id ||
+          offer.customerSnapshot?.id ||
+          offer.customerSnapshot?.customerId ||
+          offer.customer?.id;
+        const customer = cid ? customersById.get(cid) : (offer.customer || undefined);
         const contactPersons =
-          customer?.starBusinessDetails?.contactPersons || [];
+          customer?.starBusinessDetails?.contactPersons ||
+          customer?.contactPersons ||
+          offer.contactPersons ||
+          [];
 
         return {
           ...offer,
-          customer: customer || offer.customer || undefined,
+          customer: customer || offer.customerSnapshot || offer.customer || undefined,
           contactPersons,
-          taxProfile: offer.customerId
-            ? taxProfileByCustomerId.get(offer.customerId) || defaultTaxProfile
+          taxProfile: cid
+            ? taxProfileByCustomerId.get(cid) || defaultTaxProfile
             : defaultTaxProfile,
           lineItems: (offer.lineItems || []).map((item: any) => {
             const src = item.sourceItemId

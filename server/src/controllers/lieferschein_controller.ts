@@ -3,6 +3,7 @@ import { AppDataSource } from "../config/database";
 import { Lieferschein } from "../models/lieferscheine";
 import { Rechnung } from "../models/rechnung";
 import { CustomerOrder } from "../models/customer_orders";
+import { Customer } from "../models/customers";
 import { Cargo } from "../models/cargos";
 import { In } from "typeorm";
 import path from "path";
@@ -72,10 +73,30 @@ export const getAllLieferscheine = async (
       auftraege.map((a: any) => [a.id, a.title]),
     );
 
+    const origCustIds = Array.from(
+      new Set(
+        lieferscheine
+          .map((ls) => ls.rechnung?.customer?.original_customer_id)
+          .filter((id): id is string => !!id),
+      ),
+    );
+    const custRepo = AppDataSource.getRepository(Customer);
+    const origCustomers = origCustIds.length
+      ? await custRepo.find({
+          where: { id: In(origCustIds) },
+          relations: ["starBusinessDetails", "starBusinessDetails.contactPersons"],
+        })
+      : [];
+    const origCustById = new Map(origCustomers.map((c) => [c.id, c]));
+
     const formattedLieferscheine = lieferscheine.map((ls) => {
       const rechnung = ls.rechnung;
       const customer = rechnung?.customer;
       const customerSnapshot = rechnung?.customerSnapshot;
+      const origCustId = customer?.original_customer_id;
+      const origCust = origCustId ? origCustById.get(origCustId) : undefined;
+      const contactPersons = (origCust as any)?.starBusinessDetails?.contactPersons || [];
+
       const items = rechnung?.items || [];
       const custName =
         customerSnapshot?.displayName ||
@@ -117,7 +138,8 @@ export const getAllLieferscheine = async (
         status: calcStatus,
         confirmedAt: ls.confirmed_at,
         customerName: custName,
-        customer: customer || customerSnapshot,
+        customer: origCust || customer || customerSnapshot,
+        contactPersons,
         customerSnapshot: customerSnapshot,
         city: customer?.city || customerSnapshot?.city || "",
         country: customer?.country || customerSnapshot?.country || "",
