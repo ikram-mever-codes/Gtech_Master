@@ -1453,7 +1453,7 @@ export const generateLabelPDF = async (
       doc.font("Helvetica");
     }
     doc.fontSize(8).fillColor("#222222");
-    const description = resolvedItem?.item_name || "No description available";
+    const description = resolvedItem?.item_name || "";
     const descriptionY = row1ValueY + itemNoWHeight + 1.5;
     const descriptionHeight = Math.min(
       doc.heightOfString(description, { width: 180 }),
@@ -1473,9 +1473,6 @@ export const generateLabelPDF = async (
     const remarkCNText = (item.remarks_cn || "").trim();
 
     let remarkWText = (transferOrderItem?.remark_order_item || "").trim();
-    if (!remarkWText) {
-      remarkWText = (item.remark_de || "").trim();
-    }
 
     if (remarkCNText) {
       doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
