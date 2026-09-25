@@ -570,8 +570,6 @@ export const getAllOrders = async (
       allOrderNoLookups.length > 0
         ? AppDataSource.getRepository(TransferOrder).find({
           where: { order_no: In(allOrderNoLookups) },
-          // No `select` restriction — let eager orderItems load so we can
-          // read remark_order_item per position for the label print tab.
         })
         : Promise.resolve([]),
       allOrderNoLookups.length > 0 || comments.length > 0
@@ -597,7 +595,6 @@ export const getAllOrders = async (
       ]),
     );
 
-    // Build a map: order_no → (position/index → remark_order_item)
     const transferItemRemarkMap = new Map<string, Map<number, string>>();
     for (const to of transferOrders) {
       if (!to.orderItems?.length) continue;
@@ -878,8 +875,6 @@ export const getAllOrders = async (
             const finalPrice =
               rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
 
-            // Look up the remark the user typed in the Bestellung modal
-            // (transfer_order_items.remark_order_item) by matching position or 1-based index.
             const toRemarkPosMap = order.order_no
               ? transferItemRemarkMap.get(order.order_no)
               : undefined;
@@ -1477,8 +1472,6 @@ export const generateLabelPDF = async (
 
     const remarkCNText = (item.remarks_cn || "").trim();
 
-    // Primary source: what the user typed in the Bestellung modal
-    // (transfer_order_items.remark_order_item).
     let remarkWText = (transferOrderItem?.remark_order_item || "").trim();
     if (!remarkWText) {
       remarkWText = (item.remark_de || "").trim();
