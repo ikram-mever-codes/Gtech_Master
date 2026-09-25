@@ -875,7 +875,7 @@ const OrderPage: React.FC = () => {
     fetchCargos();
     getWeiterversandServiceProviders()
       .then((res: any) => setWvProviders(Array.isArray(res) ? res : res?.data || []))
-      .catch(() => {});
+      .catch(() => { });
   }, [fetchCustomers, fetchCategories, fetchSuppliers, fetchAllItems]);
 
   useEffect(() => {
@@ -2732,9 +2732,7 @@ const OrderPage: React.FC = () => {
                       render: (row) => {
                         const nameEN =
                           row.item?.item_name ||
-                          (row as any).item_name ||
-                          (row as any).nameEN ||
-                          (row as any).item_name_en ||
+                          itemById.get(String(row.item_id))?.item_name ||
                           "Unknown";
                         return (
                           <div
@@ -2750,60 +2748,13 @@ const OrderPage: React.FC = () => {
                       header: "Remark",
                       width: "100px",
                       render: (row) => {
-                        const rDe = (row.remark_de || "").trim();
-                        const lowerRDe = rDe.toLowerCase();
-                        const itemName = (
-                          row.item?.item_name ||
-                          (row as any).item_name ||
-                          ""
-                        )
-                          .trim()
-                          .toLowerCase();
-                        const itemNo = (
-                          row.item?.item_no_de ||
-                          (row as any).item_no_de ||
-                          ""
-                        )
-                          .trim()
-                          .toLowerCase();
-                        const itemDe = (
-                          row.item?.item_name_de ||
-                          (row as any).item_name_de ||
-                          ""
-                        )
-                          .trim()
-                          .toLowerCase();
-                        const desc = (
-                          row.item?.description ||
-                          (row as any).description ||
-                          ""
-                        )
-                          .trim()
-                          .toLowerCase();
-
-                        const isItemName =
-                          !rDe ||
-                          rDe === itemName ||
-                          rDe === itemNo ||
-                          rDe === itemDe ||
-                          rDe === desc ||
-                          lowerRDe.startsWith("kreismesser") ||
-                          lowerRDe.startsWith("round blade") ||
-                          lowerRDe.startsWith("flügeltür") ||
-                          lowerRDe.startsWith("steckverbinder") ||
-                          lowerRDe.startsWith("stehlager") ||
-                          lowerRDe.startsWith("messingdruckstück") ||
-                          lowerRDe.startsWith("mikroschalter") ||
-                          lowerRDe.startsWith("dummy test item") ||
-                          lowerRDe.startsWith("barbeque sleeves");
-
-                        const cleanRemark = isItemName ? null : row.remark_de;
-
+                        // Show bestellung (order) comment/remark directly — no filtering
+                        const remark = (row.parentOrder?.comment || "").trim();
                         return (
                           <div className="text-gray-500 italic text-xs">
-                            {cleanRemark ? (
+                            {remark ? (
                               <span className="text-gray-700 font-normal break-words">
-                                {cleanRemark}
+                                {remark}
                               </span>
                             ) : (
                               <span className="text-gray-300">-</span>
@@ -2856,8 +2807,8 @@ const OrderPage: React.FC = () => {
                           wvProviderMap.get(
                             String(
                               order?.weiterversand_service_provider_id ||
-                                order?.weiterversandServiceProviderId ||
-                                "",
+                              order?.weiterversandServiceProviderId ||
+                              "",
                             ),
                           ) ||
                           order?.weiterversand_service_provider ||
