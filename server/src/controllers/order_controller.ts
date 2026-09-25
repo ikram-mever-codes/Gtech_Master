@@ -570,7 +570,8 @@ export const getAllOrders = async (
       allOrderNoLookups.length > 0
         ? AppDataSource.getRepository(TransferOrder).find({
           where: { order_no: In(allOrderNoLookups) },
-          select: ["order_no", "zweck", "notes"],
+          // No `select` restriction — let eager orderItems load so we can
+          // read remark_order_item per position for the label print tab.
         })
         : Promise.resolve([]),
       allOrderNoLookups.length > 0 || comments.length > 0
@@ -595,6 +596,27 @@ export const getAllOrders = async (
         { zweck: to.zweck, notes: to.notes },
       ]),
     );
+
+    // Build a map: order_no → (position/index → remark_order_item)
+    const transferItemRemarkMap = new Map<string, Map<number, string>>();
+    for (const to of transferOrders) {
+      if (!to.orderItems?.length) continue;
+      const posMap = new Map<number, string>();
+      const sortedTOItems = [...to.orderItems].sort(
+        (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0),
+      );
+      sortedTOItems.forEach((ti, idx) => {
+        const remark = ti.remark_order_item != null ? ti.remark_order_item : "";
+        const pos = Number(ti.position);
+        if (pos > 0) {
+          posMap.set(pos, remark);
+        }
+        posMap.set(idx + 1, remark);
+      });
+      if (posMap.size > 0) {
+        transferItemRemarkMap.set(to.order_no, posMap);
+      }
+    }
 
     const customerOrderMap = new Map<string, CustomerOrder>();
     customerOrders.forEach((co) => {
@@ -823,7 +845,7 @@ export const getAllOrders = async (
             if (posB !== 0) return 1;
             return (Number(a.id) || 0) - (Number(b.id) || 0);
           })
-          .map((oi) => {
+          .map((oi, index) => {
             const itemDetails =
               oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
 
@@ -856,6 +878,17 @@ export const getAllOrders = async (
             const finalPrice =
               rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
 
+            // Look up the remark the user typed in the Bestellung modal
+            // (transfer_order_items.remark_order_item) by matching position or 1-based index.
+            const toRemarkPosMap = order.order_no
+              ? transferItemRemarkMap.get(order.order_no)
+              : undefined;
+            const itemPos = Number(oi.position || 0);
+            const remarkOrderItem =
+              (itemPos > 0 ? toRemarkPosMap?.get(itemPos) : undefined) ??
+              toRemarkPosMap?.get(index + 1) ??
+              null;
+
             return {
               ...oi,
               de_no: itemDetails?.item_no_de || "-",
@@ -863,6 +896,7 @@ export const getAllOrders = async (
               item_id: oi.item_id || itemDetails?.id,
               ean: itemDetails?.ean || warehouseItem?.ean || "-",
               remark_de: oi.remark_de || "",
+              remark_order_item: remarkOrderItem ?? "",
               remark_cn: oi.remarks_cn,
               remark_en: itemDetails?.remark || "",
               item_name:
@@ -1178,11 +1212,31 @@ export const generateLabelPDF = async (
         const sortedTOItems = [...transferOrder.orderItems].sort(
           (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0),
         );
-        const itemPos = item.position || 1;
-        transferOrderItem =
-          sortedTOItems.find((to) => Number(to.position) === Number(itemPos)) ||
-          sortedTOItems[Number(itemPos) - 1] ||
-          null;
+        const allOrderItems = await orderItemRepo.find({
+          where: { order_id: item.order_id },
+        });
+        const sortedOrderItems = [...allOrderItems].sort((a: any, b: any) => {
+          const posA = Number(a.position || 0);
+          const posB = Number(b.position || 0);
+          if (posA !== 0 && posB !== 0) return posA - posB;
+          if (posA !== 0) return -1;
+          if (posB !== 0) return 1;
+          return (Number(a.id) || 0) - (Number(b.id) || 0);
+        });
+        const itemIdx = sortedOrderItems.findIndex(
+          (it) => Number(it.id) === Number(item.id),
+        );
+        const itemPos = Number(item.position || 0);
+        if (itemPos > 0) {
+          transferOrderItem =
+            sortedTOItems.find((to) => Number(to.position) === itemPos) || null;
+        }
+        if (!transferOrderItem && itemIdx !== -1) {
+          transferOrderItem = sortedTOItems[itemIdx] || null;
+        }
+        if (!transferOrderItem) {
+          transferOrderItem = sortedTOItems[0] || null;
+        }
       }
     }
 
@@ -1421,82 +1475,13 @@ export const generateLabelPDF = async (
       Math.min(descriptionY + descriptionHeight + 2, 60),
     );
 
-    let remarkCNText = (item.remarks_cn || "").trim();
-    let remarkWText = (item.remark_de || "").trim();
-    if (!remarkWText && transferOrderItem) {
-      remarkWText = (transferOrderItem.remark_order_item || "").trim();
-    }
+    const remarkCNText = (item.remarks_cn || "").trim();
 
-    if (remarkWText) {
-      const normalize = (str: string) =>
-        (str || "")
-          .toLowerCase()
-          .replace(/[^a-z0-9äöüß]/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-
-      const normRemark = normalize(remarkWText);
-
-      const candidateTexts = [
-        resolvedItem?.item_name,
-        resolvedItem?.item_name_de,
-        resolvedItem?.item_no_de,
-        (item.item as any)?.item_name_de,
-        (item as any)?.item_name,
-        (item as any)?.item_name_de,
-        (item as any)?.description,
-        (transferOrderItem as any)?.item_name,
-        (transferOrderItem as any)?.description,
-      ]
-        .filter(Boolean)
-        .map((s) => String(s).trim());
-
-      let isItemNameMatch = false;
-
-      for (const cand of candidateTexts) {
-        const normCand = normalize(cand);
-        if (!normCand) continue;
-        if (
-          normRemark === normCand ||
-          normRemark.includes(normCand) ||
-          normCand.includes(normRemark)
-        ) {
-          isItemNameMatch = true;
-          break;
-        }
-      }
-
-      if (!isItemNameMatch && candidateTexts.length > 0) {
-        const candidateWords = new Set<string>();
-        for (const cand of candidateTexts) {
-          normalize(cand)
-            .split(" ")
-            .forEach((w) => {
-              if (w.length > 2) candidateWords.add(w);
-            });
-        }
-
-        if (candidateWords.size > 0) {
-          const remarkWords = normRemark
-            .split(" ")
-            .filter((w) => w.length > 2);
-          if (remarkWords.length > 0) {
-            const matchCount = remarkWords.filter((w) =>
-              candidateWords.has(w),
-            ).length;
-            if (
-              matchCount >= 2 ||
-              (matchCount > 0 && matchCount / remarkWords.length >= 0.5)
-            ) {
-              isItemNameMatch = true;
-            }
-          }
-        }
-      }
-
-      if (isItemNameMatch) {
-        remarkWText = "";
-      }
+    // Primary source: what the user typed in the Bestellung modal
+    // (transfer_order_items.remark_order_item).
+    let remarkWText = (transferOrderItem?.remark_order_item || "").trim();
+    if (!remarkWText) {
+      remarkWText = (item.remark_de || "").trim();
     }
 
     if (remarkCNText) {

@@ -2748,8 +2748,7 @@ const OrderPage: React.FC = () => {
                       header: "Remark",
                       width: "100px",
                       render: (row) => {
-                        // Show bestellung (order) comment/remark directly — no filtering
-                        const remark = (row.parentOrder?.comment || "").trim();
+                        const remark = (row.remark_order_item || "").trim();
                         return (
                           <div className="text-gray-500 italic text-xs">
                             {remark ? (
