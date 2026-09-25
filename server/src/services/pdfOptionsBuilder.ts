@@ -236,8 +236,13 @@ export async function buildRechnungPdfOptions(
     showPrices: true,
     shippingMethod: rechnung.shipping_method || undefined,
     shippingCost,
-    shippingQuantity: Number(rechnung.shipping_quantity ?? 0),
-    shippingTaxRate: defaultTaxRate,
+    shippingQuantity: Number(rechnung.shipping_quantity || 1),
+    shippingTaxRate: Number(
+      (rechnung as any).shipping_tax_rate ??
+      (customerSnap as any).taxRate ??
+      (rechnung.customer as any)?.taxRate ??
+      19,
+    ),
     discountPercentage: Number(rechnung.discount_percentage || 0),
     discountAmount,
     subtotal,
@@ -599,7 +604,12 @@ export async function buildAuftragPdfOptions(
     shippingMethod: auftrag.shipping_text || auftrag.shipping_method,
     shippingCost,
     shippingQuantity: Number(auftrag.shipping_quantity || 1),
-    shippingTaxRate: defaultTaxRate,
+    shippingTaxRate: Number(
+      (auftrag as any).shipping_tax_rate ??
+      (customerSnap as any).taxRate ??
+      (auftrag.customer as any)?.taxRate ??
+      19,
+    ),
     discountPercentage: Number(auftrag.discount_percentage || 0),
     discountAmount,
     subtotal,

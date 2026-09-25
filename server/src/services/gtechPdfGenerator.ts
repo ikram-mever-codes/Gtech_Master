@@ -611,7 +611,7 @@ export async function generateGtechDocumentPdf(
       const body = `Hallo guten Tag ${contactName},\n\nich habe eine Rückfrage zur ${docType} ${docNum}${titlePart}:\n\n`;
 
       const mailtoUrl = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      const valDisplay = `${contactEmail} \u2197`;
+      const valDisplay = contactEmail;
 
       const hLbl = doc.font(R).fontSize(8.5).heightOfString(lblStr, { width: LABEL_W });
       const hVal = doc.font(M).fontSize(8.5).heightOfString(valDisplay, { width: VALUE_W });
@@ -833,7 +833,7 @@ export async function generateGtechDocumentPdf(
 
   const shippingMethod = (opts.shippingMethod || "").trim();
   const shippingCostNum = Number(opts.shippingCost || 0);
-  const shippingQtyNum = Number(opts.shippingQuantity ?? 0);
+  const shippingQtyNum = Number(opts.shippingQuantity || 1);
   const shippingLineTotal = shippingCostNum * shippingQtyNum;
   const shippingTaxRateForRow =
     opts.shippingTaxRate !== undefined && opts.shippingTaxRate !== null
@@ -842,7 +842,7 @@ export async function generateGtechDocumentPdf(
         ? Number(opts.taxRate)
         : 0;
 
-  if (shippingMethod && (shippingCostNum > 0 || shippingQtyNum > 0)) {
+  if (shippingMethod) {
     const totalItemCount = opts.lineItems ? opts.lineItems.length : 0;
     const shipRowNum = totalItemCount + 1;
     const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";

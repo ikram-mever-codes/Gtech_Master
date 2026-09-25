@@ -4194,7 +4194,7 @@ export class OfferController {
       }
 
       const infoItems: [string, string, string | null][] = [
-        ["Kontakt", `${contactEmailVal} \u2197`, offerMailtoUrl],
+        ["Kontakt", contactEmailVal, offerMailtoUrl],
         ["Kunde", kundeCombined, null],
         ["Datum", formatDate(offer.createdAt), null],
       ];
@@ -4533,7 +4533,7 @@ export class OfferController {
           ? getSafeNumber(offer.shippingTaxRate)
           : resolvedDefaultTaxRate;
 
-      if (shippingMethod && shippingCostNum > 0 && shippingQtyNum > 0) {
+      if (shippingMethod) {
         const totalItemCount = offer.lineItems
           ? offer.lineItems.filter((item: any) => !item.isComponent).length
           : 0;
