@@ -180,8 +180,8 @@ export const PaymentInboundModal: React.FC<PaymentInboundModalProps> = ({
               Amount *
             </label>
             <input
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={form.amount}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, amount: e.target.value }))

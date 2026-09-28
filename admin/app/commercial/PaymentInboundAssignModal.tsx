@@ -43,25 +43,35 @@ const getDocCustomerName = (doc: any): string =>
   "—";
 
 const getDocTotal = (doc: any): number => {
-  const directTotal = Number(
-    doc.total_amount ?? doc.totalAmount ?? doc.grossTotal ?? 0,
-  );
-  if (directTotal > 0) return directTotal;
+  if (!doc) return 0;
 
-  const subtotal = Number(doc.subtotal ?? 0);
+  const gross = Number(doc.grossTotal ?? doc.gross_total ?? 0);
+  if (gross > 0) return gross;
+
+  const subtotal = Number(doc.subtotal ?? doc.netTotal ?? doc.sub_total ?? 0);
+  const taxAmount = Number(doc.tax_amount ?? doc.taxAmount ?? 0);
+  if (subtotal > 0 || taxAmount > 0) {
+    return subtotal + taxAmount;
+  }
+
+  const totalAmt = Number(doc.total_amount ?? doc.totalAmount ?? 0);
+  if (totalAmt > 0) return totalAmt;
+
+  const items = doc.items || doc.orderItems || doc.lineItems || [];
+  const defaultTaxRate = Number(doc.tax_rate ?? doc.taxRate ?? doc.taxProfile?.taxRate ?? 19);
   const shippingCost = Number(doc.shipping_cost ?? doc.shippingCost ?? 0);
-  const shippingQty = Number(
-    doc.shipping_quantity ?? doc.shippingQuantity ?? 1,
-  );
+  const shippingQty = Number(doc.shipping_quantity ?? doc.shippingQuantity ?? 1);
   const shippingTotal = shippingCost * shippingQty;
-  const discountAmount = Number(doc.discount_amount ?? doc.discountAmount ?? 0);
-  const taxRate = Number(
-    doc.tax_rate ?? doc.taxRate ?? doc.taxProfile?.taxRate ?? 19,
-  );
 
-  const net = Math.max(0, subtotal - discountAmount + shippingTotal);
-  const tax = net * (taxRate / 100);
-  return net + tax;
+  const itemsNet = items.reduce((sum: number, it: any) => {
+    const qty = Number(it.quantity ?? it.qty ?? 1);
+    const price = Number(it.price ?? it.unitPrice ?? it.unit_price_eur ?? 0);
+    return sum + qty * price;
+  }, 0);
+
+  const discountAmount = Number(doc.discount_amount ?? doc.discountAmount ?? 0);
+  const netSum = Math.max(0, itemsNet - discountAmount + shippingTotal);
+  return netSum * (1 + defaultTaxRate / 100);
 };
 export const PaymentInboundAssignModal: React.FC<
   PaymentInboundAssignModalProps
