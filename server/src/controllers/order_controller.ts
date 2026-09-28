@@ -11,7 +11,7 @@ import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
 import fs, { existsSync } from "fs";
 import { WarehouseItem } from "../models/warehouse_items";
-import { Invoice } from "../models/invoice";
+import { Invoice, InvoiceItem } from "../models/invoice";
 import { Cargo } from "../models/cargos";
 import { CargoOrder } from "../models/cargo_orders";
 import { Taric } from "../models/tarics";
@@ -520,6 +520,7 @@ export const getAllOrders = async (
       .createQueryBuilder("o")
       .leftJoinAndSelect("o.orderItems", "oi")
       .leftJoinAndSelect("oi.item", "item")
+      .leftJoinAndSelect("oi.cargo", "oi_cargo")
       .leftJoinAndSelect("item.taric", "taric")
       .leftJoinAndSelect("o.supplier", "s")
       .leftJoinAndSelect("item.supplier", "item_supplier")
@@ -646,15 +647,6 @@ export const getAllOrders = async (
       });
     }
 
-    // --- order_no B/MA -> DE rename -------------------------------------
-    // Same transformation and same in-memory mutation as before (which is
-    // what downstream logic actually depends on). The only change: the DB
-    // persistence is no longer awaited one-by-one in a sequential loop —
-    // every order's in-memory order_no is updated immediately (fast, no
-    // I/O), and the actual DB writes are fired concurrently in the
-    // background. The response never depended on these writes completing
-    // (errors were already silently swallowed before), so this is a pure
-    // latency win with identical observable behavior for the request.
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -703,12 +695,9 @@ export const getAllOrders = async (
       }
     }
     if (renameUpdates.length > 0) {
-      // Fire-and-forget, same as the original try/catch-per-iteration —
-      // just no longer blocking the request on each one sequentially.
       Promise.allSettled(renameUpdates);
     }
 
-    // --- Collect item ids (deduped) --------------------------------------
     const itemIdSet = new Set<number>();
     const itemIdDESet = new Set<number>();
 
@@ -931,7 +920,7 @@ export const getAllOrders = async (
                   category_id: warehouseItem.category_id,
                 }
                 : null,
-              cargo_id: oi.cargo_id || (hasValidCargo ? validCargoId : null),
+              cargo_id: oi.cargo_id || null,
             };
           }),
         orderItems: undefined,
@@ -1603,10 +1592,27 @@ export const updateOrderItemStatus = async (
     const body = req.body;
 
     const orderItemsRepo = AppDataSource.getRepository(OrderItem);
-    const orderItem = await orderItemsRepo.findOne({
-      where: { id: Number(id) },
-      relations: ["order"],
-    });
+    let orderItem: OrderItem | null = null;
+    const numId = Number(id);
+    if (!isNaN(numId) && numId > 0) {
+      orderItem = await orderItemsRepo.findOne({
+        where: { id: numId },
+        relations: ["order"],
+      });
+    }
+
+    if (!orderItem && typeof id === "string") {
+      const invItem = await AppDataSource.getRepository(InvoiceItem).findOne({
+        where: { id },
+        relations: ["invoice"],
+      });
+      if (invItem && invItem.item_id) {
+        orderItem = await orderItemsRepo.findOne({
+          where: { item_id: Number(invItem.item_id) },
+          relations: ["order"],
+        });
+      }
+    }
 
     if (!orderItem) {
       return next(new ErrorHandler("Order Item not found", 404));
@@ -1741,7 +1747,7 @@ export const splitOrderItem = async (
 
   try {
     const { id } = req.params;
-    const { splitQty, targetCargoId, remarks_cn } = req.body;
+    const { splitQty, targetCargoId, remarks_cn, currentCargoId } = req.body;
 
     if (!splitQty || splitQty <= 0) {
       return next(
@@ -1753,10 +1759,27 @@ export const splitOrderItem = async (
     await queryRunner.startTransaction();
 
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
-    const orderItem = await orderItemsRepo.findOne({
-      where: { id: Number(id) },
-      relations: ["order"],
-    });
+    let orderItem: OrderItem | null = null;
+    const numId = Number(id);
+    if (!isNaN(numId) && numId > 0) {
+      orderItem = await orderItemsRepo.findOne({
+        where: { id: numId },
+        relations: ["order"],
+      });
+    }
+
+    if (!orderItem && typeof id === "string") {
+      const invItem = await queryRunner.manager.getRepository(InvoiceItem).findOne({
+        where: { id },
+        relations: ["invoice"],
+      });
+      if (invItem && invItem.item_id) {
+        orderItem = await orderItemsRepo.findOne({
+          where: { item_id: Number(invItem.item_id) },
+          relations: ["order"],
+        });
+      }
+    }
 
     if (!orderItem) {
       throw new ErrorHandler("Order item not found", 404);
@@ -1769,34 +1792,74 @@ export const splitOrderItem = async (
       );
     }
 
+    let targetCargoIdNum: number | null = null;
+    if (targetCargoId) {
+      if (!isNaN(Number(targetCargoId)) && Number(targetCargoId) > 0) {
+        targetCargoIdNum = Number(targetCargoId);
+      } else {
+        const foundCargo = await queryRunner.manager.getRepository(Cargo).findOne({
+          where: [
+            { cargo_no: String(targetCargoId).trim() },
+            { cargo_no: Like(`%${String(targetCargoId).trim()}%`) },
+          ],
+        });
+        if (foundCargo) targetCargoIdNum = foundCargo.id;
+      }
+    }
+
+    const sourceCargoId =
+      orderItem.cargo_id ||
+      (currentCargoId && !isNaN(Number(currentCargoId))
+        ? Number(currentCargoId)
+        : null) ||
+      (orderItem.order?.cargo_id ? Number(orderItem.order.cargo_id) : null);
+
+    const finalTargetCargoId =
+      targetCargoIdNum || sourceCargoId || orderItem.cargo_id;
+
+    const remainingQty = (orderItem.qty || 0) - splitQty;
+    const rawOi = orderItem as any;
     const newItem = orderItemsRepo.create({
-      ...orderItem,
-      id: undefined,
+      order_id: rawOi.order_id,
+      item_id: rawOi.item_id,
+      ItemID_DE: rawOi.ItemID_DE,
+      cargo_id: finalTargetCargoId || undefined,
       qty: splitQty,
-      cargo_id: targetCargoId || orderItem.cargo_id,
-      remarks_cn: remarks_cn || orderItem.remarks_cn,
+      qty_label: splitQty,
+      qty_split: splitQty,
+      price: rawOi.price,
+      eur_special_price: rawOi.eur_special_price,
+      rmb_special_price: rawOi.rmb_special_price,
+      remark_de: rawOi.remark_de,
+      remarks_cn: remarks_cn || rawOi.remarks_cn,
+      status: rawOi.status,
+      category_id: rawOi.category_id,
+      set_taric_code: rawOi.set_taric_code,
       created_at: new Date(),
       updated_at: new Date(),
-    });
+    } as any);
 
-    orderItem.qty = (orderItem.qty || 0) - splitQty;
+    orderItem.qty = remainingQty;
+    orderItem.qty_label = remainingQty;
+    orderItem.qty_split = splitQty;
+    orderItem.cargo_id = sourceCargoId || undefined;
     orderItem.updated_at = new Date();
 
     await orderItemsRepo.save(orderItem);
     await orderItemsRepo.save(newItem);
 
-    if (targetCargoId) {
+    if (targetCargoIdNum && orderItem.order_id) {
       const cargoOrderRepo = queryRunner.manager.getRepository(CargoOrder);
       const existingLink = await cargoOrderRepo.findOne({
         where: {
-          cargo_id: Number(targetCargoId),
+          cargo_id: targetCargoIdNum,
           order_id: Number(orderItem.order_id),
         },
       });
       if (!existingLink) {
         await cargoOrderRepo.save(
           cargoOrderRepo.create({
-            cargo_id: Number(targetCargoId),
+            cargo_id: targetCargoIdNum,
             order_id: Number(orderItem.order_id),
           }),
         );
@@ -1806,11 +1869,13 @@ export const splitOrderItem = async (
     await queryRunner.commitTransaction();
 
     const cargoIdsToRefresh: number[] = [];
-    if (orderItem.cargo_id) cargoIdsToRefresh.push(Number(orderItem.cargo_id));
-    if (targetCargoId) cargoIdsToRefresh.push(Number(targetCargoId));
+    if (sourceCargoId) cargoIdsToRefresh.push(Number(sourceCargoId));
+    if (targetCargoIdNum && targetCargoIdNum !== sourceCargoId) {
+      cargoIdsToRefresh.push(Number(targetCargoIdNum));
+    }
 
     await generateInvoicesForOrders(
-      [Number(orderItem.order_id)],
+      [Number(orderItem.order_id)].filter(Boolean),
       cargoIdsToRefresh,
     );
 

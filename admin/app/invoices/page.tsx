@@ -846,7 +846,7 @@ const InvoiceListPage: React.FC = () => {
 
       setShowREModal(false);
 
-      await Promise.all([loadInvoices(), fetchOrders()]);
+      await Promise.all([loadInvoices(), fetchOrders(), cargosTabRef.current?.fetchCargos?.()]);
 
       const expandedKeys = Object.keys(expandedStates).filter(
         (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
@@ -896,12 +896,13 @@ const InvoiceListPage: React.FC = () => {
         splitQty,
         targetCargoId,
         splitRemarks,
+        selectedItem.cargo_id,
       );
       toast.success("Item split and moved successfully");
       setShowSPModal(false);
       setSplitRemarks("");
 
-      await Promise.all([loadInvoices(), fetchOrders()]);
+      await Promise.all([loadInvoices(), fetchOrders(), cargosTabRef.current?.fetchCargos?.()]);
 
       const expandedKeys = Object.keys(expandedStates).filter(
         (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
@@ -2332,7 +2333,7 @@ const InvoiceListPage: React.FC = () => {
                                                             <td className="py-2 px-3">
                                                               <div className="flex items-center justify-center gap-1">
                                                                 <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setNewQty(it.qty_label || it.qty); setQtyRemarks(it.remarks_cn || ""); setShowQTYModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition" title="QtyLabel">Qty</button>
-                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setSplitQty(Math.floor(it.qty * 0.5)); setTargetCargoId(""); setSplitRemarks(it.remarks_cn || ""); setShowSPModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition" title="Split">Split</button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem({ ...it, cargo_id: it.cargo_id || invoice.cargo?.id || (expandedStates[invoice.id]?.data?.cargo?.id) }); setSplitQty(Math.floor(it.qty * 0.5)); setTargetCargoId(""); setSplitRemarks(it.remarks_cn || ""); setShowSPModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition" title="Split">Split</button>
                                                                 <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setTargetCargoId(it.cargo_id || ""); setShowREModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition" title="ReAssign">ReAssign</button>
                                                               </div>
                                                             </td>
