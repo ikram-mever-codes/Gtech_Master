@@ -2565,7 +2565,8 @@ const InvoiceListPage: React.FC = () => {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (!inboundForm.amount || Number(inboundForm.amount) <= 0) {
+                const parsedInboundAmount = parseFloat(String(inboundForm.amount || "").replace(",", "."));
+                if (!inboundForm.amount || isNaN(parsedInboundAmount) || parsedInboundAmount <= 0) {
                   toast.error("Please enter a valid amount > 0");
                   return;
                 }
@@ -2575,7 +2576,7 @@ const InvoiceListPage: React.FC = () => {
                     payment_account_id:
                       inboundForm.paymentAccountId || undefined,
                     received_date: inboundForm.receivedDate,
-                    amount: Number(inboundForm.amount),
+                    amount: parsedInboundAmount,
                     currency_code: inboundForm.currencyCode || "EUR",
                     payer_name: inboundForm.payerName,
                     reference: inboundForm.reference,
@@ -2639,8 +2640,8 @@ const InvoiceListPage: React.FC = () => {
                     Amount *
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={inboundForm.amount}
                     onChange={(e) =>
                       setInboundForm((prev) => ({
