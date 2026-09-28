@@ -249,7 +249,7 @@ export async function buildRechnungPdfOptions(
       (rechnung as any).shipping_tax_rate ??
       (customerSnap as any).taxRate ??
       (rechnung.customer as any)?.taxRate ??
-      19,
+      defaultTaxRate,
     ),
     discountPercentage: Number(rechnung.discount_percentage || 0),
     discountAmount,
