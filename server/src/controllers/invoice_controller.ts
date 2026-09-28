@@ -1668,6 +1668,14 @@ export class InvoiceController {
             .leftJoinAndSelect("item.purchasePrices", "purchasePrices")
             .leftJoinAndSelect("oi.order", "order")
             .where("oi.order_id IN (:...allOrderIds)", { allOrderIds })
+            .andWhere("(oi.cargo_id IS NULL OR oi.cargo_id = 0)")
+            .andWhere(
+              `NOT EXISTS (
+        SELECT 1 FROM order_item sib
+        WHERE sib.order_id = oi.order_id
+          AND sib.cargo_id IS NOT NULL AND sib.cargo_id <> 0
+      )`,
+            )
             .andWhere(
               "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
             )
