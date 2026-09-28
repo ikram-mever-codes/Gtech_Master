@@ -1607,9 +1607,7 @@ export class InvoiceController {
       const ordersInCargo = await orderRepository.find({
         where: [{ cargo_id: cargo.id, is_deleted: false }],
       });
-      const orderIdsFromOrders = ordersInCargo
-        .map((o) => o.id)
-        .filter(Boolean);
+      const orderIdsFromOrders = ordersInCargo.map((o) => o.id).filter(Boolean);
 
       const allOrderIds = [
         ...new Set([...orderIdsFromCargoOrders, ...orderIdsFromOrders]),
@@ -1665,53 +1663,53 @@ export class InvoiceController {
       });
     }
 
-      if (orderItems.length === 0 && orderNumber) {
-        const tokens = [
-          orderNumber,
-          ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2),
-        ];
-        const uniqueTokens = [...new Set(tokens)];
+    if (orderItems.length === 0 && orderNumber) {
+      const tokens = [
+        orderNumber,
+        ...orderNumber.split(/[\s\-\/]+/).filter((t: string) => t.length > 2),
+      ];
+      const uniqueTokens = [...new Set(tokens)];
 
-        const matchingOrders = await orderRepository.find({
-          where: uniqueTokens.map((t) => ({
-            order_no: Like(`%${t}%`),
-            is_deleted: false,
-          })),
+      const matchingOrders = await orderRepository.find({
+        where: uniqueTokens.map((t) => ({
+          order_no: Like(`%${t}%`),
+          is_deleted: false,
+        })),
+      });
+
+      if (matchingOrders.length > 0) {
+        const matchingOrderIds = matchingOrders.map((o) => o.id);
+        const foundCargoOrder = await AppDataSource.getRepository(
+          CargoOrder,
+        ).findOne({
+          where: { order_id: In(matchingOrderIds) },
+          relations: ["cargo"],
         });
-
-        if (matchingOrders.length > 0) {
-          const matchingOrderIds = matchingOrders.map((o) => o.id);
-          const foundCargoOrder = await AppDataSource.getRepository(
-            CargoOrder,
-          ).findOne({
-            where: { order_id: In(matchingOrderIds) },
-            relations: ["cargo"],
-          });
-          if (foundCargoOrder?.cargo) {
-            cargo = foundCargoOrder.cargo;
-          }
-
-          orderItems = await orderItemRepository
-            .createQueryBuilder("oi")
-            .leftJoinAndSelect("oi.item", "item")
-            .leftJoinAndSelect("item.taric", "taric")
-            .leftJoinAndSelect("item.purchasePrices", "purchasePrices")
-            .leftJoinAndSelect("oi.order", "order")
-            .where("oi.order_id IN (:...matchingOrderIds)", {
-              matchingOrderIds,
-            })
-            .andWhere(
-              "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
-            )
-            .getMany();
+        if (foundCargoOrder?.cargo) {
+          cargo = foundCargoOrder.cargo;
         }
-      }
 
-      if (orderItems.length > 0) {
-        const itemMap = new Map();
-        orderItems.forEach((oi) => itemMap.set(oi.id, oi));
-        orderItems = Array.from(itemMap.values());
+        orderItems = await orderItemRepository
+          .createQueryBuilder("oi")
+          .leftJoinAndSelect("oi.item", "item")
+          .leftJoinAndSelect("item.taric", "taric")
+          .leftJoinAndSelect("item.purchasePrices", "purchasePrices")
+          .leftJoinAndSelect("oi.order", "order")
+          .where("oi.order_id IN (:...matchingOrderIds)", {
+            matchingOrderIds,
+          })
+          .andWhere(
+            "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+          )
+          .getMany();
       }
+    }
+
+    if (orderItems.length > 0) {
+      const itemMap = new Map();
+      orderItems.forEach((oi) => itemMap.set(oi.id, oi));
+      orderItems = Array.from(itemMap.values());
+    }
 
     const getEffectiveTaricCode = (oi: any): string => {
       const itemTaricCode = oi.item?.taric?.code || "";

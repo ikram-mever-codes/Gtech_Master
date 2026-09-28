@@ -348,7 +348,13 @@ export const getAllTransferOrders = async (
     const transferOrderRepo = AppDataSource.getRepository(TransferOrder);
     const orders = await transferOrderRepo.find({
       order: { created_at: "DESC" },
-      relations: ["orderItems", "customer", "supplier", "customer.starBusinessDetails", "customer.starBusinessDetails.contactPersons"],
+      relations: [
+        "orderItems",
+        "customer",
+        "supplier",
+        "customer.starBusinessDetails",
+        "customer.starBusinessDetails.contactPersons",
+      ],
     });
 
     const linkedDocumentsByBestellungId =
@@ -802,7 +808,8 @@ async function createOrderFromBestellung(
     itemByDeNo = new Map(foundItems.map((it) => [it.item_no_de as string, it]));
   }
 
-  const resolved: { line: TransferOrderItem; itemId: number | undefined }[] = [];
+  const resolved: { line: TransferOrderItem; itemId: number | undefined }[] =
+    [];
 
   for (const li of allItems) {
     let itemId: number | undefined;
@@ -1032,21 +1039,41 @@ export async function ensureAllToBeProcessedBestellungenAreSynced(): Promise<voi
     const toBeProcessedOrders = await transferOrderRepo
       .createQueryBuilder("to")
       .leftJoinAndSelect("to.orderItems", "orderItems")
-      .where("LOWER(to.status) != :draftStatus AND LOWER(to.status) != :emptyStatus", {
-        draftStatus: "draft",
-        emptyStatus: "",
-      })
+      .where(
+        "LOWER(to.status) != :draftStatus AND LOWER(to.status) != :emptyStatus",
+        {
+          draftStatus: "draft",
+          emptyStatus: "",
+        },
+      )
       .getMany();
 
-    for (const b of toBeProcessedOrders) {
-      const linked = await orderRepo.findOne({
-        where: { order_no: b.order_no },
-        relations: ["orderItems"],
-      });
-      const bItemsCount = b.orderItems?.length || 0;
-      const linkedItemsCount = linked?.orderItems?.length || 0;
+    if (toBeProcessedOrders.length === 0) return;
 
-      if (!linked || bItemsCount !== linkedItemsCount) {
+    const orderNos = toBeProcessedOrders.map((b) => b.order_no).filter(Boolean);
+    const linkedOrders = await orderRepo.find({
+      where: { order_no: In(orderNos) },
+      relations: ["orderItems"],
+    });
+    const linkedByNo = new Map(linkedOrders.map((o) => [o.order_no, o]));
+
+    for (const b of toBeProcessedOrders) {
+      const linked = linkedByNo.get(b.order_no);
+
+      if (!linked) {
+        await syncBestellungToLinkedOrder(b.id);
+        continue;
+      }
+
+      const linkedItemIds = new Set(
+        (linked.orderItems || []).map((oi) => Number(oi.item_id)),
+      );
+      const bItemIds = (b.orderItems || [])
+        .map((bi: any) => Number(bi.source_item_id ?? bi.sourceItemId))
+        .filter((id) => !isNaN(id) && id > 0);
+
+      const missing = bItemIds.some((id) => !linkedItemIds.has(id));
+      if (missing) {
         await syncBestellungToLinkedOrder(b.id);
       }
     }
