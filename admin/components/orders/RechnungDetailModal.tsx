@@ -9,6 +9,8 @@ import {
   ClipboardDocumentIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/Redux/store";
 import { errorStyles, successStyles } from "@/utils/constants";
 import {
   Loader2,
@@ -468,6 +470,7 @@ export default function RechnungDetailModal({
   onSwitchToRechnungK,
   onSwitchToCargo,
 }: RechnungDetailModalProps) {
+  const { user: currentUser } = useSelector((state: RootState) => state.user);
   const [data, setData] = useState<any>(rechnung);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -939,7 +942,7 @@ export default function RechnungDetailModal({
     setAddressForm({
       customerSnapshot: { ...(data.customerSnapshot || {}) },
       deliveryAddress: { ...(data.deliveryAddress || {}) },
-      ansprechpartner: data.ansprechpartner || "",
+      ansprechpartner: data.ansprechpartner || currentUser?.name || currentUser?.email || "",
       kundenreferenz: data.kundenreferenz || "",
     });
     setEditNotesExtern(data.notes || data.comment || data.notes_external || "");
