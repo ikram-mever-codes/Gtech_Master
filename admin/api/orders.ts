@@ -192,6 +192,7 @@ export const splitOrderItem = async (
   splitQty: number,
   targetCargoId?: string | number,
   remarks_cn?: string,
+  currentCargoId?: string | number,
 ) => {
   try {
     toast.loading("Splitting item...", loadingStyles);
@@ -199,6 +200,7 @@ export const splitOrderItem = async (
       splitQty,
       targetCargoId,
       remarks_cn,
+      currentCargoId,
     });
     toast.dismiss();
     toast.success("Item split successfully", successStyles);

@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { XMarkIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/Redux/store";
 import {
   createRechnungFromAuftrag,
   downloadRechnungEml,
@@ -154,6 +156,7 @@ export default function AuftragToRechnungModal({
   onSuccess,
   onEditAuftrag,
 }: AuftragToRechnungModalProps) {
+  const { user: currentUser } = useSelector((state: RootState) => state.user);
   const [items, setItems] = useState<SelectedItemState[]>([]);
   const [notes, setNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
@@ -290,7 +293,9 @@ export default function AuftragToRechnungModal({
     setNotes(auftrag.notes || auftrag.comment || "");
     setInternalNotes(auftrag.internalNotes || auftrag.internal_notes || "");
     setEditTitle(auftrag.title || auftrag.comment || "");
-    setEditAnsprechpartner(auftrag.ansprechpartner || "");
+    setEditAnsprechpartner(
+      auftrag.ansprechpartner || currentUser?.name || currentUser?.email || "",
+    );
     // Populate Customer Address & Defaults State
     const cust = auftrag.customerSnapshot || auftrag.customer || {};
     setEditCompanyName(

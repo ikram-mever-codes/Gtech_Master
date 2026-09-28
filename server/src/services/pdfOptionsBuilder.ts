@@ -23,24 +23,32 @@ async function resolveContactDetails(
   ansprechpartnerRaw?: string | null,
   customerContactName?: string | null,
   ctxUser?: { name?: string; username?: string; email?: string }
-): Promise<{ contactName: string; contactEmail?: string }> {
-  const targetName = (ansprechpartnerRaw || customerContactName || ctxUser?.name || ctxUser?.username || "").trim();
-  let contactName = targetName;
-  let contactEmail = ctxUser?.email;
+): Promise<{ contactName: string; contactEmail: string }> {
+  const rawTarget = (ansprechpartnerRaw || "").trim();
+  const fallbackEmail = (ctxUser?.email || "").trim();
 
-  if (targetName) {
-    try {
-      const userRepo = AppDataSource.getRepository(User);
-      const matchedUser = await userRepo.findOne({
-        where: [{ name: targetName }, { email: targetName }] as any,
-      });
-      if (matchedUser) {
-        contactName = matchedUser.name || matchedUser.email;
-        if (matchedUser.email) {
+  let contactName = rawTarget || (customerContactName || "").trim() || ctxUser?.name || ctxUser?.username || "GTech Admin";
+  let contactEmail = "";
+
+  if (rawTarget) {
+    if (rawTarget.includes("@")) {
+      contactEmail = rawTarget;
+    } else {
+      try {
+        const userRepo = AppDataSource.getRepository(User);
+        const matchedUser = await userRepo.findOne({
+          where: [{ name: rawTarget }, { email: rawTarget }] as any,
+        });
+        if (matchedUser && matchedUser.email) {
+          contactName = matchedUser.name || matchedUser.email;
           contactEmail = matchedUser.email;
         }
-      }
-    } catch (_) { }
+      } catch (_) { }
+    }
+  }
+
+  if (!contactEmail) {
+    contactEmail = fallbackEmail || "admin@gtech.de";
   }
 
   return { contactName, contactEmail };

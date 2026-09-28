@@ -127,8 +127,9 @@ export default function OrdersTable({
       width: "80px",
       render: (row) => {
         const cargoId = row.cargo_id;
-        const cargoObj = row.cargo || cargos?.find((c: any) => String(c.id) === String(cargoId));
-        const cNo = cargoObj?.cargo_no || (cargoId && cargoId !== 0 && cargoId !== "0" && cargoId !== "-" && cargoId !== "null" ? String(cargoId) : null);
+        if (!cargoId || cargoId === 0 || cargoId === "0" || cargoId === "null" || cargoId === "-") return "-";
+        const cargoObj = (row.cargo && String(row.cargo.id) === String(cargoId) ? row.cargo : null) || cargos?.find((c: any) => String(c.id) === String(cargoId));
+        const cNo = cargoObj?.cargo_no || String(cargoId);
         if (!cNo) return "-";
         const cType = cargoObj?.cargo_type?.cargo_type || cargoObj?.cargo_type || "";
         return (

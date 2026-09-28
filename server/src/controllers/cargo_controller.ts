@@ -86,33 +86,16 @@ export const generateInvoicesForOrders = async (
         .map((co) => co.order_id)
         .filter(Boolean);
 
-      let rawItems: OrderItem[] = [];
-      if (orderIdsFromCargo.length > 0) {
-        rawItems = await orderItemRepo
-          .createQueryBuilder("oi")
-          .leftJoinAndSelect("oi.item", "item")
-          .leftJoinAndSelect("item.taric", "taric")
-          .leftJoinAndSelect("oi.order", "order")
-          .where(
-            "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIdsFromCargo)))",
-            { cargoId: cargo.id, orderIdsFromCargo },
-          )
-          .andWhere(
-            "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
-          )
-          .getMany();
-      } else {
-        rawItems = await orderItemRepo
-          .createQueryBuilder("oi")
-          .leftJoinAndSelect("oi.item", "item")
-          .leftJoinAndSelect("item.taric", "taric")
-          .leftJoinAndSelect("oi.order", "order")
-          .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
-          .andWhere(
-            "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
-          )
-          .getMany();
-      }
+      let rawItems: OrderItem[] = await orderItemRepo
+        .createQueryBuilder("oi")
+        .leftJoinAndSelect("oi.item", "item")
+        .leftJoinAndSelect("item.taric", "taric")
+        .leftJoinAndSelect("oi.order", "order")
+        .where("oi.cargo_id = :cargoId", { cargoId: cargo.id })
+        .andWhere(
+          "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
+        )
+        .getMany();
 
       const itemMap = new Map();
       rawItems.forEach((oi) => itemMap.set(oi.id, oi));
@@ -136,7 +119,14 @@ export const generateInvoicesForOrders = async (
         where: { orderNumber: orderNo },
       });
       if (existingInvoice) {
-        await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+        await invoiceItemRepo
+          .createQueryBuilder()
+          .delete()
+          .from(InvoiceItem)
+          .where("invoiceId = :invId OR invoice_id = :invId", {
+            invId: existingInvoice.id,
+          })
+          .execute();
         await invoiceRepo.delete(existingInvoice.id);
         console.log(
           `[InvoiceSync] Cleaned up standalone order invoice for orderNo: ${orderNo}`,
@@ -157,7 +147,14 @@ export const generateInvoicesForOrders = async (
         !linkedCargo ||
         !linkedCargo.cargo_no?.toUpperCase().startsWith("C")
       ) {
-        await invoiceItemRepo.delete({ invoice: { id: inv.id } });
+        await invoiceItemRepo
+          .createQueryBuilder()
+          .delete()
+          .from(InvoiceItem)
+          .where("invoiceId = :invId", {
+            invId: inv.id,
+          })
+          .execute();
         await invoiceRepo.delete(inv.id);
         console.log(
           `[InvoiceSync] Cleaned up non-Cargo dummy invoice: ${inv.orderNumber}`,
@@ -191,7 +188,14 @@ const syncInvoiceRecord = async (
         where: { orderNumber },
       });
       if (existingInvoice) {
-        await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+        await invoiceItemRepo
+          .createQueryBuilder()
+          .delete()
+          .from(InvoiceItem)
+          .where("invoiceId = :invId", {
+            invId: existingInvoice.id,
+          })
+          .execute();
         await invoiceRepo.delete(existingInvoice.id);
         console.log(`[InvoiceSync] Removed non-Cargo invoice ${orderNumber}`);
       }
@@ -212,7 +216,14 @@ const syncInvoiceRecord = async (
   }
 
   if (invoice) {
-    await invoiceItemRepo.delete({ invoice: { id: invoice.id } });
+    await invoiceItemRepo
+      .createQueryBuilder()
+      .delete()
+      .from(InvoiceItem)
+      .where("invoiceId = :invId", {
+        invId: invoice.id,
+      })
+      .execute();
   } else {
     invoice = invoiceRepo.create({
       invoiceNumber: `INV-${orderNumber.startsWith("MA") ? orderNumber : "C-" + orderNumber}-${Date.now().toString().slice(-4)}`,
@@ -422,17 +433,7 @@ export const getAllCargos = async (
               "(o.is_deleted = false OR o.is_deleted IS NULL OR oi.order_id IS NULL)",
             );
 
-          if (linkedOrderIds.length > 0) {
-            qb.andWhere(
-              "(oi.cargo_id = :cargoId OR o.cargo_id = :cargoId OR oi.order_id IN (:...linkedOrderIds))",
-              { cargoId, linkedOrderIds },
-            );
-          } else {
-            qb.andWhere(
-              "(oi.cargo_id = :cargoId OR o.cargo_id = :cargoId)",
-              { cargoId },
-            );
-          }
+          qb.andWhere("oi.cargo_id = :cargoId", { cargoId });
 
           let count = await qb.getCount();
           if (count === 0) {
@@ -521,18 +522,15 @@ export const getCargoById = async (
       .leftJoinAndSelect("oi.order", "order")
       .leftJoinAndSelect("order.customer", "customer");
 
-    if (orderIds.length > 0) {
-      qb.where(
-        "(oi.cargo_id = :cargoId OR ((oi.cargo_id IS NULL OR oi.cargo_id = 0) AND oi.order_id IN (:...orderIds)))",
-        { cargoId: cargo.id, orderIds },
-      );
-    } else {
-      qb.where("oi.cargo_id = :cargoId", { cargoId: cargo.id });
-    }
+    qb.where("oi.cargo_id = :cargoId", { cargoId: cargo.id });
     qb.andWhere(
       "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
     );
-    orderItems = await qb.getMany();
+    const rawOrderItems = await qb.getMany();
+
+    const itemMap = new Map();
+    rawOrderItems.forEach((oi) => itemMap.set(oi.id, oi));
+    orderItems = Array.from(itemMap.values());
 
     res.status(200).json({
       success: true,
@@ -985,16 +983,7 @@ export const getCargoOrders = async (
       .leftJoinAndSelect("oi.order", "order")
       .leftJoinAndSelect("order.customer", "customer");
 
-    if (orderIds.length > 0) {
-      qb.where(
-        "(oi.cargo_id = :cargoId OR order.cargo_id = :cargoId OR oi.order_id IN (:...orderIds))",
-        { cargoId: Number(id), orderIds },
-      );
-    } else {
-      qb.where("(oi.cargo_id = :cargoId OR order.cargo_id = :cargoId)", {
-        cargoId: Number(id),
-      });
-    }
+    qb.where("oi.cargo_id = :cargoId", { cargoId: Number(id) });
     qb.andWhere(
       "(order.is_deleted = false OR order.is_deleted IS NULL OR oi.order_id IS NULL)",
     );
