@@ -2643,8 +2643,8 @@ export const generateCommercialInvoicePDF = async (
     itemY += 10;
 
     doc
-      .fontSize(9)
-      .font("Helvetica-Bold")
+      .fontSize(8)
+      .font("Helvetica")
       .fillColor("#000000")
       .text(
         "* Unit price is calculated and can have errors from rounding",
@@ -2671,22 +2671,15 @@ export const generateCommercialInvoicePDF = async (
       itemY = 50;
     }
     doc
-      .fontSize(9)
-      .font("Helvetica")
+      .fontSize(8.5)
+      .font("Helvetica-Bold")
       .fillColor("#000000")
       .text(
-        "We hereby confirm that no raw material from Russia were used",
+        "We hereby confirm that no raw material from Russia were used in the production of the goods mentioned in this invoice.",
         40,
         itemY,
-        { lineBreak: false },
+        { width: 515 },
       );
-    itemY += 13;
-    doc.text(
-      "in the production of the goods mentioned in this invoice.",
-      40,
-      itemY,
-      { lineBreak: false },
-    );
 
     itemY += 20;
     if (itemY + 40 > pageH - footerReserve) {
