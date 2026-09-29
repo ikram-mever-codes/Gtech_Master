@@ -274,6 +274,11 @@ export interface OfferSearchFilters {
   status?: string;
   page?: number;
   limit?: number;
+  datePreset?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface LinkedDocumentRef {
