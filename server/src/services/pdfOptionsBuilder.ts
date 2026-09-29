@@ -515,10 +515,15 @@ export async function buildAuftragPdfOptions(
     .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
 
   const items = rawItems.map((it: any, idx: number) => {
-    const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
-    const unitPrice = Number(it.price || 0);
+    const qty =
+      it.quantity !== undefined && it.quantity !== null
+        ? Number(it.quantity)
+        : it.qty !== undefined && it.qty !== null
+          ? Number(it.qty)
+          : 1;
+    const unitPrice = Number(it.price || it.unitPrice || 0);
     const lineTotal =
-      it.lineTotal !== undefined && it.lineTotal !== null
+      it.lineTotal !== undefined && it.lineTotal !== null && Number(it.lineTotal) > 0
         ? Number(it.lineTotal)
         : qty * unitPrice;
     return {
@@ -576,9 +581,14 @@ export async function buildAuftragPdfOptions(
     ["Datum", formatDateStr(auftrag.date_created || auftrag.created_at)],
   ];
 
-  const subtotal = Number(auftrag.subtotal || 0);
+  const calculatedItemsSubtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
   const discountAmount = Number(auftrag.discount_amount || 0);
   const shippingCost = Number(auftrag.shipping_cost || 0);
+
+  const subtotal =
+    Number(auftrag.subtotal || 0) > 0
+      ? Number(auftrag.subtotal)
+      : calculatedItemsSubtotal;
 
   let taxAmount = Number(auftrag.tax_amount || 0);
   if (taxAmount <= 0 && subtotal > 0 && defaultTaxRate > 0) {
@@ -586,7 +596,10 @@ export async function buildAuftragPdfOptions(
   }
 
   let totalAmount = Number(auftrag.total_amount || 0);
-  if (totalAmount <= 0 && subtotal > 0) {
+  if (
+    totalAmount <= 0 ||
+    (subtotal > 0 && Math.abs(totalAmount - (subtotal - discountAmount + taxAmount + shippingCost)) > 1)
+  ) {
     totalAmount = Math.round((subtotal - discountAmount + taxAmount + shippingCost) * 100) / 100;
   }
 
