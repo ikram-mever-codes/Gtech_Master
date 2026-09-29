@@ -2,8 +2,11 @@ import { formatCurrency } from "@/api/offers";
 import toast from "react-hot-toast";
 import { formatDate as centralFormatDate } from "./date";
 
-export const formatDate = (dateString: string | Date | null | undefined) => {
-  return centralFormatDate(dateString);
+export const formatDate = (
+  dateString: string | Date | null | undefined,
+  hideCurrentYear: boolean = false,
+) => {
+  return centralFormatDate(dateString, hideCurrentYear);
 };
 export const generateOfferEmailHTML = (offer: any): string => {
   const formatDate = (dateString: string | Date) => {
