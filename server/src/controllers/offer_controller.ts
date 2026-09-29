@@ -2418,8 +2418,21 @@ export class OfferController {
           customerId,
         });
       }
-      if (status) {
-        queryBuilder.andWhere("offer.status = :status", { status });
+      const validOfferStatuses = [
+        "draft",
+        "submitted",
+        "negotiation",
+        "accepted",
+        "rejected",
+        "expired",
+        "cancelled",
+      ];
+      if (
+        status &&
+        status !== "all" &&
+        validOfferStatuses.includes(String(status).toLowerCase())
+      ) {
+        queryBuilder.andWhere("LOWER(offer.status) = LOWER(:status)", { status });
       }
       if (search) {
         queryBuilder.andWhere(

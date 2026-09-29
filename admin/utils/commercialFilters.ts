@@ -23,7 +23,7 @@ export const initialCommercialFilters: CommercialFilters = {
   valueAmount: "",
   status: "partially_delivered_and_open",
   rechnungFilter: "all",
-  datePreset: "all",
+  datePreset: "last_30_days",
   dateFrom: "",
   dateTo: "",
 };

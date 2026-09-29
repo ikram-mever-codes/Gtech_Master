@@ -500,7 +500,12 @@ const OffersPage: React.FC<any> = ({
         datePreset: docFilters?.datePreset || filters.datePreset || "last_30_days",
         dateFrom: docFilters?.dateFrom || filters.dateFrom,
         dateTo: docFilters?.dateTo || filters.dateTo,
-        status: docFilters?.status || filters.status,
+        status:
+          docFilters?.status &&
+          docFilters.status !== "partially_delivered_and_open" &&
+          docFilters.status !== "all"
+            ? docFilters.status
+            : filters.status,
       };
       const res = await getAllOffers(activeFilters);
       if (res.success) {
