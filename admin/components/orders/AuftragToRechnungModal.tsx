@@ -317,10 +317,7 @@ export default function AuftragToRechnungModal({
     );
 
     const sMethod =
-      +auftrag.shipping_text ||
-      -auftrag.shippingMethod ||
-      +auftrag.shippingMethod ||
-      auftrag.shipping_method ||
+      auftrag.shipping_text ||
       cust.defaultShippingMethod ||
       cust.shippingMethod ||
       cust.shipping_method ||
@@ -348,14 +345,9 @@ export default function AuftragToRechnungModal({
     setEditPaymentMethod(pMethod);
     setEditPaymentTerms(pTerms);
 
-    // Seed the per-delivery shipping override from the Auftrag's own
-    // shipping cost/quantity — included by default whenever a shipping
-    // method exists on the Auftrag.
     setShippingCostInput(Number(auftrag.shipping_cost) || 0);
     setShippingQuantityInput(Number(auftrag.shipping_quantity) || 1);
-    setShippingIncluded(
-      !!(auftrag.shipping_text || auftrag.shipping_method || sMethod),
-    );
+    setShippingIncluded(!!sMethod);
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
@@ -406,11 +398,7 @@ export default function AuftragToRechnungModal({
 
   if (!isOpen || !auftrag) return null;
   const hasStockItems = items.some((it) => it.is_stock_item === "Y");
-  const hasShippingMethod = !!(
-    editShippingMethod ||
-    auftrag.shipping_text ||
-    auftrag.shipping_method
-  );
+  const hasShippingMethod = !!(editShippingMethod || auftrag.shipping_text);
 
   /** The actual on-hand quantity for a stock item at the currently
    * selected warehouse — null for non-stock lines. */
@@ -1321,7 +1309,6 @@ export default function AuftragToRechnungModal({
                       <td className="px-2 py-2 font-bold text-gray-700">
                         {editShippingMethod ||
                           auftrag.shipping_text ||
-                          auftrag.shipping_method ||
                           "Shipping"}
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
