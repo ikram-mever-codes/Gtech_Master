@@ -766,15 +766,17 @@ const OffersPage: React.FC<any> = ({
           const raw = row.date_delivery || row.validUntil;
           if (!raw)
             return <span className="text-gray-400 font-normal text-sm">—</span>;
-          if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw)) {
-            const [d, m] = raw.split(".");
+          if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw.trim())) {
+            const [d, m, y] = raw.trim().split(".");
+            const currentYear = String(new Date().getFullYear());
+            const displayStr = y === currentYear ? `${d}.${m}.` : `${d}.${m}.${y}`;
             return (
-              <span className="text-sm text-gray-600 font-normal">{`${d}.${m}.`}</span>
+              <span className="text-sm text-gray-600 font-normal">{displayStr}</span>
             );
           }
           return (
             <span className="text-sm text-gray-600 font-normal">
-              {formatDate(raw)}
+              {formatDate(raw, true)}
             </span>
           );
         },

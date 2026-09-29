@@ -249,14 +249,16 @@ export function buildBestellungColumns({
           row.date_created || row.createdAt || row.created_at;
         if (
           typeof rawDate === "string" &&
-          /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)
+          /^\d{2}\.\d{2}\.\d{4}$/.test(rawDate.trim())
         ) {
-          const [d, m] = rawDate.split(".");
-          return <span className="text-xs text-gray-800 font-normal">{`${d}.${m}.`}</span>;
+          const [d, m, y] = rawDate.trim().split(".");
+          const currentYear = String(new Date().getFullYear());
+          const displayStr = y === currentYear ? `${d}.${m}.` : `${d}.${m}.${y}`;
+          return <span className="text-xs text-gray-800 font-normal">{displayStr}</span>;
         }
         return (
           <span className="text-xs text-gray-800 font-normal">
-            {rawDate ? formatDate(rawDate) : "—"}
+            {rawDate ? formatDate(rawDate, true) : "—"}
           </span>
         );
       },
@@ -405,11 +407,13 @@ export function buildBestellungColumns({
       render: (row) => {
         const raw = row.date_delivery || row.deliveryDate;
         if (!raw) return <span className="text-gray-400 font-normal text-xs">—</span>;
-        if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw)) {
-          const [d, m] = raw.split(".");
-          return <span className="text-xs text-gray-600 font-normal">{`${d}.${m}.`}</span>;
+        if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw.trim())) {
+          const [d, m, y] = raw.trim().split(".");
+          const currentYear = String(new Date().getFullYear());
+          const displayStr = y === currentYear ? `${d}.${m}.` : `${d}.${m}.${y}`;
+          return <span className="text-xs text-gray-600 font-normal">{displayStr}</span>;
         }
-        return <span className="text-xs text-gray-600 font-normal">{formatDate(raw)}</span>;
+        return <span className="text-xs text-gray-600 font-normal">{formatDate(raw, true)}</span>;
       },
     },
     {

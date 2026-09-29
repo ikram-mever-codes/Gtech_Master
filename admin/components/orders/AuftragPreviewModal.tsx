@@ -1108,14 +1108,14 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
               </p>
               <span
                 className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.auftrag_status === "delivered" ||
-                    order.status === "Completed"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : order.auftrag_status === "partially_delivered" ||
-                      order.status === "In Progress"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : order.auftrag_status === "closed"
-                        ? "bg-gray-200 text-gray-700 border-gray-300"
-                        : "bg-blue-50 text-blue-700 border-blue-200"
+                  order.status === "Completed"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : order.auftrag_status === "partially_delivered" ||
+                    order.status === "In Progress"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : order.auftrag_status === "closed"
+                      ? "bg-gray-200 text-gray-700 border-gray-300"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
                   }`}
               >
                 {order.auftrag_status === "closed"
@@ -2378,7 +2378,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 )}
               </div>
               {linkedDocsCount > 0 ||
-              (order?.linkedDocuments?.payments?.allocations?.length || 0) >
+                (order?.linkedDocuments?.payments?.allocations?.length || 0) >
                 0 ? (
                 <div className="space-y-3">
                   {(
@@ -2482,58 +2482,57 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
                   {(order?.linkedDocuments?.payments?.allocations?.length ||
                     0) > 0 && (
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                        Zahlung
-                      </p>
-                      <div className="space-y-1.5 text-sm">
-                        {order.linkedDocuments.payments.allocations.map(
-                          (alloc: any) => {
-                            const allocAmount = Number(alloc.amount) || 0;
-                            const auftragTotal = order?.total_amount;
-                            const differs =
-                              auftragTotal !== undefined &&
-                              amountsDiffer(
-                                order.linkedDocuments.payments.paid_amount,
-                                auftragTotal,
-                              );
-                            return (
-                              <div
-                                key={alloc.id}
-                                className="flex justify-between items-center text-gray-700"
-                              >
-                                <span className="text-sm">
-                                  {alloc.paymentInbound?.payer_name ||
-                                    alloc.paymentInbound?.source ||
-                                    "Zahlung"}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${
-                                      differs
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                          Zahlung
+                        </p>
+                        <div className="space-y-1.5 text-sm">
+                          {order.linkedDocuments.payments.allocations.map(
+                            (alloc: any) => {
+                              const allocAmount = Number(alloc.amount) || 0;
+                              const auftragTotal = order?.total_amount;
+                              const differs =
+                                auftragTotal !== undefined &&
+                                amountsDiffer(
+                                  order.linkedDocuments.payments.paid_amount,
+                                  auftragTotal,
+                                );
+                              return (
+                                <div
+                                  key={alloc.id}
+                                  className="flex justify-between items-center text-gray-700"
+                                >
+                                  <span className="text-sm">
+                                    {alloc.paymentInbound?.payer_name ||
+                                      alloc.paymentInbound?.source ||
+                                      "Zahlung"}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${differs
                                         ? "text-amber-700 bg-amber-50 border-amber-200"
                                         : "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                    }`}
-                                  >
-                                    {formatCurrency(
-                                      allocAmount,
-                                      order?.currency || "EUR",
-                                    )}
-                                  </span>
-                                  <span className="text-gray-400 text-xs">
-                                    {formatDate(
-                                      alloc.paymentInbound?.received_date ||
+                                        }`}
+                                    >
+                                      {formatCurrency(
+                                        allocAmount,
+                                        order?.currency || "EUR",
+                                      )}
+                                    </span>
+                                    <span className="text-gray-400 text-xs">
+                                      {formatDate(
+                                        alloc.paymentInbound?.received_date ||
                                         alloc.created_at,
-                                    )}
-                                  </span>
+                                      )}
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          },
-                        )}
+                              );
+                            },
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">
@@ -2657,4 +2656,5 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     </div>
   );
 };
+
 export default AuftragPreviewModal;

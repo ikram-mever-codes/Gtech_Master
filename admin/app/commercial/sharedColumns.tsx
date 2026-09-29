@@ -15,34 +15,34 @@ export function hasContactPersonEmail(row: any): boolean {
   const snap =
     typeof row.customerSnapshot === "string"
       ? (() => {
-          try {
-            return JSON.parse(row.customerSnapshot);
-          } catch (_) {
-            return null;
-          }
-        })()
+        try {
+          return JSON.parse(row.customerSnapshot);
+        } catch (_) {
+          return null;
+        }
+      })()
       : row.customerSnapshot;
 
   const cust =
     typeof row.customer === "string"
       ? (() => {
-          try {
-            return JSON.parse(row.customer);
-          } catch (_) {
-            return null;
-          }
-        })()
+        try {
+          return JSON.parse(row.customer);
+        } catch (_) {
+          return null;
+        }
+      })()
       : row.customer;
 
   const supp =
     typeof row.supplier === "string"
       ? (() => {
-          try {
-            return JSON.parse(row.supplier);
-          } catch (_) {
-            return null;
-          }
-        })()
+        try {
+          return JSON.parse(row.supplier);
+        } catch (_) {
+          return null;
+        }
+      })()
       : row.supplier;
 
   // 1. Direct Email fields on Document, Customer, Snapshot, or Supplier
@@ -87,22 +87,22 @@ export function hasContactPersonEmail(row: any): boolean {
     const list =
       typeof arr === "string"
         ? (() => {
-            try {
-              return JSON.parse(arr);
-            } catch (_) {
-              return [];
-            }
-          })()
+          try {
+            return JSON.parse(arr);
+          } catch (_) {
+            return [];
+          }
+        })()
         : arr;
     if (
       Array.isArray(list) &&
       list.some((item) =>
         isEmail(
           item?.email ||
-            item?.contactEmail ||
-            item?.kontaktEmail ||
-            item?.emailAddress ||
-            item?.contact_email,
+          item?.contactEmail ||
+          item?.kontaktEmail ||
+          item?.emailAddress ||
+          item?.contact_email,
         ),
       )
     ) {

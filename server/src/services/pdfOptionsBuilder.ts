@@ -244,12 +244,7 @@ export async function buildRechnungPdfOptions(
     shippingMethod: rechnung.shipping_method || undefined,
     shippingCost,
     shippingQuantity: Number(rechnung.shipping_quantity || 1),
-    shippingTaxRate: Number(
-      (rechnung as any).shipping_tax_rate ??
-      (customerSnap as any).taxRate ??
-      (rechnung.customer as any)?.taxRate ??
-      defaultTaxRate,
-    ),
+    shippingTaxRate: defaultTaxRate,
     discountPercentage: Number(rechnung.discount_percentage || 0),
     discountAmount,
     subtotal,
@@ -520,10 +515,15 @@ export async function buildAuftragPdfOptions(
     .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0));
 
   const items = rawItems.map((it: any, idx: number) => {
-    const qty = it.quantity !== undefined && it.quantity !== null ? Number(it.quantity) : 1;
-    const unitPrice = Number(it.price || 0);
+    const qty =
+      it.quantity !== undefined && it.quantity !== null
+        ? Number(it.quantity)
+        : it.qty !== undefined && it.qty !== null
+          ? Number(it.qty)
+          : 1;
+    const unitPrice = Number(it.price || it.unitPrice || 0);
     const lineTotal =
-      it.lineTotal !== undefined && it.lineTotal !== null
+      it.lineTotal !== undefined && it.lineTotal !== null && Number(it.lineTotal) > 0
         ? Number(it.lineTotal)
         : qty * unitPrice;
     return {
@@ -581,9 +581,14 @@ export async function buildAuftragPdfOptions(
     ["Datum", formatDateStr(auftrag.date_created || auftrag.created_at)],
   ];
 
-  const subtotal = Number(auftrag.subtotal || 0);
+  const calculatedItemsSubtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
   const discountAmount = Number(auftrag.discount_amount || 0);
   const shippingCost = Number(auftrag.shipping_cost || 0);
+
+  const subtotal =
+    Number(auftrag.subtotal || 0) > 0
+      ? Number(auftrag.subtotal)
+      : calculatedItemsSubtotal;
 
   let taxAmount = Number(auftrag.tax_amount || 0);
   if (taxAmount <= 0 && subtotal > 0 && defaultTaxRate > 0) {
@@ -591,7 +596,10 @@ export async function buildAuftragPdfOptions(
   }
 
   let totalAmount = Number(auftrag.total_amount || 0);
-  if (totalAmount <= 0 && subtotal > 0) {
+  if (
+    totalAmount <= 0 ||
+    (subtotal > 0 && Math.abs(totalAmount - (subtotal - discountAmount + taxAmount + shippingCost)) > 1)
+  ) {
     totalAmount = Math.round((subtotal - discountAmount + taxAmount + shippingCost) * 100) / 100;
   }
 
@@ -611,12 +619,7 @@ export async function buildAuftragPdfOptions(
     shippingMethod: auftrag.shipping_text || auftrag.shipping_method,
     shippingCost,
     shippingQuantity: Number(auftrag.shipping_quantity || 1),
-    shippingTaxRate: Number(
-      (auftrag as any).shipping_tax_rate ??
-      (customerSnap as any).taxRate ??
-      (auftrag.customer as any)?.taxRate ??
-      defaultTaxRate,
-    ),
+    shippingTaxRate: defaultTaxRate,
     discountPercentage: Number(auftrag.discount_percentage || 0),
     discountAmount,
     subtotal,
@@ -727,7 +730,7 @@ export async function buildOfferPdfOptions(
     ["Datum", formatDateStr(offer.createdAt)],
   ];
 
-  const defaultTaxRate = Number(offer.taxRate || 19);
+  const defaultTaxRate = Number((offer as any).tax_rate ?? offer.taxRate ?? 19);
   const subtotal = Number(offer.subtotal || 0);
   const discountAmount = Number(offer.discountAmount || 0);
   const shippingCost = Number(offer.shippingCost || 0);
@@ -756,13 +759,7 @@ export async function buildOfferPdfOptions(
     shippingMethod: offer.shippingMethod,
     shippingCost,
     shippingQuantity: Number(offer.shippingQuantity || 1),
-    shippingTaxRate: Number(
-      (offer as any).shippingTaxRate ??
-      (offer as any).shipping_tax_rate ??
-      (customerSnap as any).taxRate ??
-      (offer as any).customer?.taxRate ??
-      defaultTaxRate,
-    ),
+    shippingTaxRate: defaultTaxRate,
     discountPercentage: Number(offer.discountPercentage || 0),
     discountAmount,
     subtotal,
@@ -915,12 +912,7 @@ export async function buildRechnungKPdfOptions(
     shippingMethod: rechnungK.shipping_method || undefined,
     shippingCost,
     shippingQuantity: Number(rechnungK.shipping_quantity ?? 0),
-    shippingTaxRate: Number(
-      (rechnungK as any).shipping_tax_rate ??
-      (customerSnap as any).taxRate ??
-      (rechnungK.customer as any)?.taxRate ??
-      defaultTaxRate,
-    ),
+    shippingTaxRate: defaultTaxRate,
     discountPercentage: Number(rechnungK.discount_percentage || 0),
     discountAmount,
     subtotal,
