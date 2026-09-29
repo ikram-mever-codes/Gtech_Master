@@ -717,7 +717,7 @@ export async function buildOfferPdfOptions(
     ["Datum", formatDateStr(offer.createdAt)],
   ];
 
-  const defaultTaxRate = Number(offer.taxRate || 19);
+  const defaultTaxRate = Number((offer as any).tax_rate ?? offer.taxRate ?? 19);
   const subtotal = Number(offer.subtotal || 0);
   const discountAmount = Number(offer.discountAmount || 0);
   const shippingCost = Number(offer.shippingCost || 0);
@@ -746,13 +746,7 @@ export async function buildOfferPdfOptions(
     shippingMethod: offer.shippingMethod,
     shippingCost,
     shippingQuantity: Number(offer.shippingQuantity || 1),
-    shippingTaxRate: Number(
-      (offer as any).shippingTaxRate ??
-      (offer as any).shipping_tax_rate ??
-      (customerSnap as any).taxRate ??
-      (offer as any).customer?.taxRate ??
-      defaultTaxRate,
-    ),
+    shippingTaxRate: defaultTaxRate,
     discountPercentage: Number(offer.discountPercentage || 0),
     discountAmount,
     subtotal,
