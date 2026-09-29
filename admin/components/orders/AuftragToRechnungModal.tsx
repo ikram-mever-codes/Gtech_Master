@@ -317,8 +317,8 @@ export default function AuftragToRechnungModal({
     );
 
     const sMethod =
-      -auftrag.shippingMethod ||
       +auftrag.shipping_text ||
+      -auftrag.shippingMethod ||
       +auftrag.shippingMethod ||
       auftrag.shipping_method ||
       cust.defaultShippingMethod ||
