@@ -86,6 +86,36 @@ async function resolveCustomerTaxProfileForRechnung(
   return 19;
 }
 
+export async function resolveEffectiveRechnungTaxRate(
+  rechnung: Rechnung,
+): Promise<number> {
+  if (
+    rechnung.tax_profile_case === "EU_IGL" ||
+    rechnung.tax_profile_case === "third_country"
+  ) {
+    return 0;
+  }
+  if (
+    (rechnung as any).taxProfile?.taxRate !== undefined &&
+    (rechnung as any).taxProfile?.taxRate !== null
+  ) {
+    return Number((rechnung as any).taxProfile.taxRate);
+  }
+  if (
+    rechnung.tax_rate !== undefined &&
+    rechnung.tax_rate !== null &&
+    Number(rechnung.tax_rate) > 0
+  ) {
+    return Number(rechnung.tax_rate);
+  }
+  const custId =
+    (rechnung as any).customerSnapshot?.original_customer_id ||
+    rechnung.customer?.original_customer_id ||
+    rechnung.rechnung_customer_id;
+
+  return await resolveCustomerTaxProfileForRechnung(custId);
+}
+
 async function getLinkedDocumentsForRechnung(rechnung: Rechnung) {
   const customerOrderRepo = AppDataSource.getRepository(CustomerOrder);
   const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
@@ -1380,7 +1410,8 @@ export const getRechnungById = async (
       (linkedAuftrag as any)?.deliveryTime ||
       (linkedAuftrag as any)?.delivery_time ||
       linkedAuftrag?.real_delivery_date;
-    const taxProfile = await resolveFrozenTaxProfile(rechnung.tax_rate);
+    const liveTaxRate = await resolveEffectiveRechnungTaxRate(rechnung);
+    const taxProfile = await resolveFrozenTaxProfile(liveTaxRate);
 
     res.json({
       success: true,
@@ -1630,13 +1661,8 @@ export const downloadRechnungPdf = async (
       });
     }
 
-    const defaultTaxRate =
-      rechnung.tax_profile_case === "EU_IGL" ||
-        rechnung.tax_profile_case === "third_country"
-        ? 0
-        : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
-          ? Number(rechnung.tax_rate)
-          : 19;
+    const defaultTaxRate = await resolveEffectiveRechnungTaxRate(rechnung);
+    (rechnung as any).taxProfile = await resolveFrozenTaxProfile(defaultTaxRate);
 
     const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
     const contactName =
