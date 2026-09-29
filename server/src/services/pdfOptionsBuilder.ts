@@ -9,7 +9,6 @@ import { User } from "../models/users";
 import { PdfDocumentOptions } from "./gtechPdfGenerator";
 import { parseFlexibleNumber } from "../utils/decimal";
 
-
 export interface BuildPdfContextOptions {
   user?: {
     name?: string;
@@ -939,4 +938,5 @@ export async function buildRechnungKPdfOptions(
   };
 
   return { options, rechnungK };
+
 }

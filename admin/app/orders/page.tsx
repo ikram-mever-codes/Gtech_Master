@@ -58,6 +58,7 @@ import {
 
 import { getAllCustomers } from "@/api/customers";
 import { getWeiterversandServiceProviders } from "@/api/weiterversand_service_providers";
+import { getItemLink } from "@/utils/itemLink";
 import {
   getAllSuppliers,
   getSupplierItems,
@@ -2685,27 +2686,46 @@ const OrderPage: React.FC = () => {
                   data={labelPrintItems}
                   columns={[
                     {
-                      header: "ID",
-                      width: "50px",
-                      render: (row) => row.id,
+                      header: "Pic",
+                      width: "60px",
                       align: "center",
+                      render: (row) => {
+                        const photo =
+                          row.item?.photo ||
+                          row.photo ||
+                          (itemById.get(String(row.item_id)) as any)?.photo;
+                        return (
+                          <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 mx-auto shrink-0">
+                            {photo ? (
+                              <img
+                                src={photo}
+                                alt="item"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
+                          </div>
+                        );
+                      },
                     },
                     {
-                      header: "EAN",
+                      header: "ItemNo",
                       width: "120px",
+                      align: "center",
                       render: (row) => {
-                        const ean =
-                          row.item?.ean ||
-                          row.warehouse_data?.ean ||
-                          row.ean ||
-                          row.item?.warehouse_data?.ean ||
-                          itemById.get(String(row.item_id))?.ean ||
+                        const itemNo =
+                          row.item?.de_no ||
+                          row.item?.itemNo ||
+                          (itemById.get(String(row.item_id)) as any)?.de_no ||
+                          (itemById.get(String(row.item_id)) as any)?.ItemID_DE ||
+                          row.de_no ||
                           "-";
 
                         const isHighlighted =
                           reprintSearch &&
-                          ean !== "-" &&
-                          ean
+                          itemNo !== "-" &&
+                          itemNo
                             .toString()
                             .toLowerCase()
                             .includes(reprintSearch.toLowerCase());
@@ -2715,16 +2735,15 @@ const OrderPage: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              const itemId = row.item_id || row.item?.id || (row as any).id;
-                              if (itemId) router.push(`/items/${itemId}`);
+                              const link = getItemLink(row) || (row.item_id ? `/items?itemId=${row.item_id}` : row.item?.id ? `/items?itemId=${row.item.id}` : undefined);
+                              if (link) router.push(link);
                             }}
-                            className={`font-medium hover:underline ${isHighlighted ? "text-[#059669] font-bold" : "text-blue-600"}`}
+                            className={`font-medium hover:underline cursor-pointer ${isHighlighted ? "text-[#059669] font-bold" : "text-blue-600"}`}
                           >
-                            {ean}
+                            {itemNo}
                           </button>
                         );
                       },
-                      align: "center",
                     },
                     {
                       header: "Item Name",
@@ -2735,12 +2754,18 @@ const OrderPage: React.FC = () => {
                           itemById.get(String(row.item_id))?.item_name ||
                           "Unknown";
                         return (
-                          <div
-                            className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const link = getItemLink(row) || (row.item_id ? `/items?itemId=${row.item_id}` : row.item?.id ? `/items?itemId=${row.item.id}` : undefined);
+                              if (link) router.push(link);
+                            }}
+                            className="font-semibold text-gray-800 hover:text-blue-600 hover:underline text-left line-clamp-3 leading-tight break-words cursor-pointer"
                             title={nameEN}
                           >
                             {nameEN}
-                          </div>
+                          </button>
                         );
                       },
                     },
@@ -2835,25 +2860,6 @@ const OrderPage: React.FC = () => {
                       },
                     },
                     {
-                      header: "Purpose",
-                      width: "110px",
-                      render: (row) => {
-                        const purpose =
-                          row.parentOrder?.comment ||
-                          null;
-                        return purpose ? (
-                          <span
-                            className="text-gray-600 text-xs line-clamp-2 leading-tight"
-                            title={purpose}
-                          >
-                            {purpose}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        );
-                      },
-                    },
-                    {
                       header: "QTY",
                       width: "80px",
                       align: "center",
@@ -2872,12 +2878,6 @@ const OrderPage: React.FC = () => {
                           )}
                         </div>
                       ),
-                    },
-                    {
-                      header: "SOID",
-                      width: "55px",
-                      render: (row) => row.supplier_order_id || "-",
-                      align: "center",
                     },
                     {
                       header: "Status",
