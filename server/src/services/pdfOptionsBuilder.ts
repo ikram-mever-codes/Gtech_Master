@@ -8,6 +8,7 @@ import { Rechnung_k as RechnungK } from "../models/rechnung_k";
 import { User } from "../models/users";
 import { PdfDocumentOptions } from "./gtechPdfGenerator";
 import { parseFlexibleNumber } from "../utils/decimal";
+import { resolveEffectiveRechnungTaxRate } from "../controllers/rechnung_controller";
 
 export interface BuildPdfContextOptions {
   user?: {
@@ -180,7 +181,7 @@ export async function buildRechnungPdfOptions(
 
   const resolvedDeliveryDateConfirmed = rawConfirmedDate ? formatDateStr(rawConfirmedDate) : undefined;
 
-  const defaultTaxRate = Number(rechnung.tax_rate ?? 19);
+  const defaultTaxRate = await resolveEffectiveRechnungTaxRate(rechnung);
   const subtotal = Number(rechnung.subtotal || 0);
   const discountAmount = Number(rechnung.discount_amount || 0);
   const shippingCost = Number(rechnung.shipping_cost || 0);

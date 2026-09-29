@@ -936,6 +936,9 @@ export class OfferController {
     for (const [key, value] of Object.entries(projected)) {
       if (value !== undefined && value !== null) merged[key] = value;
     }
+    if (item?.item_name_de) {
+      merged.itemName = item.item_name_de;
+    }
     return merged;
   }
 
@@ -1307,7 +1310,7 @@ export class OfferController {
         if (inquiry.requests && inquiry.requests.length > 0) {
           for (const request of inquiry.requests) {
             const componentItemData = this.itemFieldsOrFallback(request.item, {
-              itemName: request.itemName,
+              itemName: request.item_name_de || request.itemName,
               material: request.material,
               specification: request.specification,
               weight: request.weight,
@@ -1356,7 +1359,7 @@ export class OfferController {
         if (inquiry.requests && inquiry.requests.length > 0) {
           for (const request of inquiry.requests) {
             const itemData = this.itemFieldsOrFallback(request.item, {
-              itemName: request.itemName,
+              itemName: request.item_name_de || request.itemName,
               material: request.material,
               specification: request.specification,
               weight: request.weight,
