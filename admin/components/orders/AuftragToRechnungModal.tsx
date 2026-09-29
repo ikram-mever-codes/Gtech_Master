@@ -109,10 +109,11 @@ const Field: React.FC<{
         children
       ) : (
         <div
-          className={`${highlightOrange
+          className={`${
+            highlightOrange
               ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
               : ""
-            }`}
+          }`}
         >
           {value || "—"}
         </div>
@@ -303,10 +304,10 @@ export default function AuftragToRechnungModal({
     );
     setEditStreet(
       cust.address ||
-      cust.street ||
-      cust.addressLine1 ||
-      cust.bill_to_address ||
-      "",
+        cust.street ||
+        cust.addressLine1 ||
+        cust.bill_to_address ||
+        "",
     );
     setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
     setEditCity(cust.city || "Göttingen");
@@ -316,7 +317,9 @@ export default function AuftragToRechnungModal({
     );
 
     const sMethod =
-      auftrag.shippingMethod ||
+      -auftrag.shippingMethod ||
+      +auftrag.shipping_text ||
+      +auftrag.shippingMethod ||
       auftrag.shipping_method ||
       cust.defaultShippingMethod ||
       cust.shippingMethod ||
@@ -663,7 +666,7 @@ export default function AuftragToRechnungModal({
       if (res?.success) {
         toast.success(
           res.message ||
-          `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
+            `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
           successStyles,
         );
         const newRechnungId = res?.data?.id;
@@ -880,7 +883,7 @@ export default function AuftragToRechnungModal({
                   })}
                   {editAnsprechpartner &&
                     !systemUsers.some(
-                      (u: any) => (u.name || u.email) === editAnsprechpartner
+                      (u: any) => (u.name || u.email) === editAnsprechpartner,
                     ) && (
                       <option value={editAnsprechpartner}>
                         {editAnsprechpartner}
@@ -902,10 +905,11 @@ export default function AuftragToRechnungModal({
                     setDeliveryDate(e.target.value);
                     setIsDatePastOrEmpty(false);
                   }}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
+                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${
+                    isDatePastOrEmpty || !deliveryDate
                       ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
                       : "bg-white border-gray-300 text-gray-900"
-                    }`}
+                  }`}
                 />
               </div>
 
@@ -949,8 +953,8 @@ export default function AuftragToRechnungModal({
                   ? !selectedPmObj.is_prepayment
                   : editPaymentMethod
                     ? !/vorkasse|prepayment|paypal|cash|credit/i.test(
-                      editPaymentMethod,
-                    )
+                        editPaymentMethod,
+                      )
                     : false;
 
                 return (
@@ -1140,9 +1144,9 @@ export default function AuftragToRechnungModal({
                                 Math.min(
                                   6,
                                   (item.itemName || "").split("\n").length ||
-                                  Math.ceil(
-                                    (item.itemName || "").length / 22,
-                                  ),
+                                    Math.ceil(
+                                      (item.itemName || "").length / 22,
+                                    ),
                                 ),
                               )}
                               value={item.itemName}
@@ -1169,7 +1173,7 @@ export default function AuftragToRechnungModal({
                                 Math.min(
                                   6,
                                   (item.hinweis || "").split("\n").length ||
-                                  Math.ceil((item.hinweis || "").length / 22),
+                                    Math.ceil((item.hinweis || "").length / 22),
                                 ),
                               )}
                               value={item.hinweis}
@@ -1242,10 +1246,11 @@ export default function AuftragToRechnungModal({
                             onChange={(e) =>
                               updateQty(item.lineItemId, e.target.value)
                             }
-                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${invalid
+                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${
+                              invalid
                                 ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
                                 : "border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500"
-                              }`}
+                            }`}
                           />
                         </td>
 
