@@ -616,7 +616,7 @@ export async function buildAuftragPdfOptions(
       (auftrag as any).shipping_tax_rate ??
       (customerSnap as any).taxRate ??
       (auftrag.customer as any)?.taxRate ??
-      19,
+      defaultTaxRate,
     ),
     discountPercentage: Number(auftrag.discount_percentage || 0),
     discountAmount,
@@ -757,7 +757,13 @@ export async function buildOfferPdfOptions(
     shippingMethod: offer.shippingMethod,
     shippingCost,
     shippingQuantity: Number(offer.shippingQuantity || 1),
-    shippingTaxRate: Number(offer.shippingTaxRate ?? offer.taxRate ?? 19),
+    shippingTaxRate: Number(
+      (offer as any).shippingTaxRate ??
+      (offer as any).shipping_tax_rate ??
+      (customerSnap as any).taxRate ??
+      (offer as any).customer?.taxRate ??
+      defaultTaxRate,
+    ),
     discountPercentage: Number(offer.discountPercentage || 0),
     discountAmount,
     subtotal,
@@ -910,7 +916,12 @@ export async function buildRechnungKPdfOptions(
     shippingMethod: rechnungK.shipping_method || undefined,
     shippingCost,
     shippingQuantity: Number(rechnungK.shipping_quantity ?? 0),
-    shippingTaxRate: defaultTaxRate,
+    shippingTaxRate: Number(
+      (rechnungK as any).shipping_tax_rate ??
+      (customerSnap as any).taxRate ??
+      (rechnungK.customer as any)?.taxRate ??
+      defaultTaxRate,
+    ),
     discountPercentage: Number(rechnungK.discount_percentage || 0),
     discountAmount,
     subtotal,
