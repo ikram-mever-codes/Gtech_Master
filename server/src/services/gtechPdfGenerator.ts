@@ -15,6 +15,7 @@ const SVGtoPDF = require("svg-to-pdfkit");
 
 let cachedCustomerSvg: string | null = null;
 let cachedTemplatePath: string | null = null;
+let cachedTemplateMtime: number = 0;
 
 async function drawCustomerSvgBackground(doc: InstanceType<typeof PDFDocument>): Promise<void> {
   try {
@@ -22,25 +23,33 @@ async function drawCustomerSvgBackground(doc: InstanceType<typeof PDFDocument>):
     const isSvg = activePath && activePath.toLowerCase().endsWith(".svg");
     if (!isSvg || !fs.existsSync(activePath)) return;
 
-    if (!cachedCustomerSvg || cachedTemplatePath !== activePath) {
+    const fileStats = fs.statSync(activePath);
+
+    if (
+      !cachedCustomerSvg ||
+      cachedTemplatePath !== activePath ||
+      cachedTemplateMtime !== fileStats.mtimeMs
+    ) {
       let rawSvg = fs.readFileSync(activePath, "utf8");
       rawSvg = rawSvg
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<sodipodi:namedview[\s\S]*?<\/sodipodi:namedview>/gi, "")
         .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
         .replace(/x_Document_Title/gi, "")
         .replace(/Document_Title/gi, "")
         .replace(/<g[^>]*id="g10"[\s\S]*?<\/g>/gi, "");
 
-      // Round high precision floating point numbers in d="..." path attributes to 2 decimals
-      rawSvg = rawSvg.replace(/d="([\s\S]*?)"/g, (_match: string, pathData: string) => {
+      rawSvg = rawSvg.replace(/d="([^"]+)"/g, (_match: string, pathData: string) => {
         const roundedData = pathData.replace(/-?\d+\.\d+/g, (numStr: string) => {
           const n = parseFloat(numStr);
-          return Number(n.toFixed(2)).toString();
+          return Number(n.toFixed(1)).toString();
         });
         return `d="${roundedData}"`;
       });
 
       cachedCustomerSvg = rawSvg;
       cachedTemplatePath = activePath;
+      cachedTemplateMtime = fileStats.mtimeMs;
     }
 
     if (cachedCustomerSvg) {
@@ -68,35 +77,29 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const templatePdf = await pdfLib.PDFDocument.load(templateBytes);
     const contentPdf = await pdfLib.PDFDocument.load(contentBytes);
 
-    const mergedPdf = await pdfLib.PDFDocument.create();
-    mergedPdf.setTitle(path.basename(contentPdfPath, ".pdf"));
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
-    const embeddedTemplatePages = await mergedPdf.embedPdf(
-      templatePdf,
-      templatePdf.getPageIndices(),
-    );
-    const embeddedContentPages = await mergedPdf.embedPdf(
+    const embeddedContentPages = await templatePdf.embedPdf(
       contentPdf,
       contentPdf.getPageIndices(),
     );
 
     for (let i = 0; i < contentPageCount; i++) {
-      const templatePageIdx = Math.min(i, templatePageCount - 1);
-      const contentPage = contentPdf.getPage(i);
-      const { width, height } = contentPage.getSize();
+      let page: pdfLib.PDFPage;
+      if (i < templatePageCount) {
+        page = templatePdf.getPage(i);
+      } else {
+        const { width, height } = contentPdf.getPage(i).getSize();
+        page = templatePdf.addPage([width, height]);
+        if (templatePageCount > 0) {
+          const [embeddedBg] = await templatePdf.embedPdf(templatePdf, [0]);
+          page.drawPage(embeddedBg, { x: 0, y: 0, width, height });
+        }
+      }
 
-      const newPage = mergedPdf.addPage([width, height]);
-
-      newPage.drawPage(embeddedTemplatePages[templatePageIdx], {
-        x: 0,
-        y: 0,
-        width,
-        height,
-      });
-
-      newPage.drawPage(embeddedContentPages[i], {
+      const { width, height } = page.getSize();
+      page.drawPage(embeddedContentPages[i], {
         x: 0,
         y: 0,
         width,
@@ -104,7 +107,7 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
       });
     }
 
-    const mergedBytes = await mergedPdf.save({ useObjectStreams: true });
+    const mergedBytes = await templatePdf.save({ useObjectStreams: true });
     fs.writeFileSync(contentPdfPath, mergedBytes);
   } catch (err) {
     console.error("Error in mergePdfTemplate:", err);

@@ -122,43 +122,46 @@ import { Country } from "../models/country";
 
 let cachedCustomerSvg: string | null = null;
 let cachedTemplatePath: string | null = null;
+let cachedTemplateMtime: number = 0;
 
 async function drawCustomerSvgBackground(doc: any): Promise<void> {
   try {
     const activePath = await getActiveTemplateFilePath("customer_doc_template");
 
     // Only handle SVG files in this step
-    const isSvg = activePath.toLowerCase().endsWith(".svg");
-    if (!isSvg) return;
+    const isSvg = activePath && activePath.toLowerCase().endsWith(".svg");
+    if (!isSvg || !fs.existsSync(activePath)) return;
 
-    if (cachedTemplatePath !== activePath) {
-      cachedCustomerSvg = null;
+    const fileStats = fs.statSync(activePath);
+
+    if (
+      cachedCustomerSvg === null ||
+      cachedTemplatePath !== activePath ||
+      cachedTemplateMtime !== fileStats.mtimeMs
+    ) {
       cachedTemplatePath = activePath;
-    }
+      cachedTemplateMtime = fileStats.mtimeMs;
+      try {
+        let rawSvg = fs.readFileSync(activePath, "utf8");
+        rawSvg = rawSvg
+          .replace(/<!--[\s\S]*?-->/g, "")
+          .replace(/<sodipodi:namedview[\s\S]*?<\/sodipodi:namedview>/gi, "")
+          .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
+          .replace(/x_Document_Title/gi, "")
+          .replace(/Document_Title/gi, "")
+          .replace(/<g[^>]*id="g10"[\s\S]*?<\/g>/gi, "");
 
-    if (cachedCustomerSvg === null) {
-      if (fs.existsSync(activePath)) {
-        try {
-          let rawSvg = fs.readFileSync(activePath, "utf8");
-          rawSvg = rawSvg
-            .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
-            .replace(/x_Document_Title/gi, "")
-            .replace(/Document_Title/gi, "");
-
-          rawSvg = rawSvg.replace(/d="([\s\S]*?)"/g, (_match: string, pathData: string) => {
-            const roundedData = pathData.replace(/-?\d+\.\d+/g, (numStr: string) => {
-              const n = parseFloat(numStr);
-              return Number(n.toFixed(2)).toString();
-            });
-            return `d="${roundedData}"`;
+        rawSvg = rawSvg.replace(/d="([^"]+)"/g, (_match: string, pathData: string) => {
+          const roundedData = pathData.replace(/-?\d+\.\d+/g, (numStr: string) => {
+            const n = parseFloat(numStr);
+            return Number(n.toFixed(1)).toString();
           });
+          return `d="${roundedData}"`;
+        });
 
-          cachedCustomerSvg = rawSvg;
-        } catch (err) {
-          console.error("Failed to load Customer Document SVG template:", err);
-          cachedCustomerSvg = "";
-        }
-      } else {
+        cachedCustomerSvg = rawSvg;
+      } catch (err) {
+        console.error("Failed to load Customer Document SVG template:", err);
         cachedCustomerSvg = "";
       }
     }
@@ -187,7 +190,7 @@ async function drawCustomerSvgBackground(doc: any): Promise<void> {
 async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
   try {
     const activePath = await getActiveTemplateFilePath("customer_doc_template");
-    const isPdf = activePath.toLowerCase().endsWith(".pdf");
+    const isPdf = activePath && activePath.toLowerCase().endsWith(".pdf");
     if (!isPdf || !fs.existsSync(activePath) || !fs.existsSync(contentPdfPath))
       return;
 
@@ -197,35 +200,37 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const templatePdf = await pdfLib.PDFDocument.load(templateBytes);
     const contentPdf = await pdfLib.PDFDocument.load(contentBytes);
 
-    const mergedPdf = await pdfLib.PDFDocument.create();
-    mergedPdf.setTitle(path.basename(contentPdfPath, ".pdf"));
-
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
-    // Embed both PDFs ONCE outside the loop — re-using the same embedded
-    // XObjects for every page avoids the duplicate stream bloat that was
-    // inflating file size when embedPdf() was called inside the loop.
-    const embeddedTemplatePages = await mergedPdf.embedPdf(
-      templatePdf,
-      templatePdf.getPageIndices(),
-    );
-    const embeddedContentPages = await mergedPdf.embedPdf(
+    const embeddedContentPages = await templatePdf.embedPdf(
       contentPdf,
       contentPdf.getPageIndices(),
     );
 
     for (let i = 0; i < contentPageCount; i++) {
-      const templatePageIdx = Math.min(i, templatePageCount - 1);
-      const contentPage = contentPdf.getPage(i);
-      const { width, height } = contentPage.getSize();
+      let page: pdfLib.PDFPage;
+      if (i < templatePageCount) {
+        page = templatePdf.getPage(i);
+      } else {
+        const { width, height } = contentPdf.getPage(i).getSize();
+        page = templatePdf.addPage([width, height]);
+        if (templatePageCount > 0) {
+          const [embeddedBg] = await templatePdf.embedPdf(templatePdf, [0]);
+          page.drawPage(embeddedBg, { x: 0, y: 0, width, height });
+        }
+      }
 
-      const newPage = mergedPdf.addPage([width, height]);
-      newPage.drawPage(embeddedTemplatePages[templatePageIdx], { x: 0, y: 0, width, height });
-      newPage.drawPage(embeddedContentPages[i], { x: 0, y: 0, width, height });
+      const { width, height } = page.getSize();
+      page.drawPage(embeddedContentPages[i], {
+        x: 0,
+        y: 0,
+        width,
+        height,
+      });
     }
 
-    const mergedBytes = await mergedPdf.save({ useObjectStreams: true });
+    const mergedBytes = await templatePdf.save({ useObjectStreams: true });
     fs.writeFileSync(contentPdfPath, mergedBytes);
   } catch (err) {
     console.error("Error in mergePdfTemplate:", err);
