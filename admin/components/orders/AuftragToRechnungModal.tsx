@@ -164,30 +164,17 @@ export default function AuftragToRechnungModal({
   const [submitting, setSubmitting] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [isDatePastOrEmpty, setIsDatePastOrEmpty] = useState(false);
-  // Single source of truth for the selected warehouse — used both by the
-  // header selector and by the per-line stock validation. Previously this
-  // was split across two states ("warehouse" and "stockWhere"), which let
-  // the selector and the validation drift out of sync.
+  const [qtyInputs, setQtyInputs] = useState<Record<string, string>>({});
   const [stockWhere, setStockWhere] = useState<"CN" | "EU">("CN");
-
-  // --- Shipping line (this delivery only) ---------------------------------
-  // Editable per-delivery override for shipping cost/quantity/inclusion —
-  // seeded from the Auftrag's own shipping values but NOT written back to
-  // the Auftrag on submit; only sent along with this specific Rechnung.
   const [shippingIncluded, setShippingIncluded] = useState(true);
   const [shippingCostInput, setShippingCostInput] = useState<number>(0);
   const [shippingQuantityInput, setShippingQuantityInput] = useState<number>(1);
 
-  // Prepayment credit ("Rechnung ohne Ausliefern") outstanding on this
-  // Auftrag — fetched fresh every time the modal opens for it. Purely
-  // informational on the client: the server recomputes and applies the
-  // deduction independently when the Rechnung is generated.
   const [prepaymentInfo, setPrepaymentInfo] = useState<PrepaymentInfo | null>(
     null,
   );
   const [loadingPrepayments, setLoadingPrepayments] = useState(false);
 
-  // Inline Edit Mode state (matching OfferDetailModal)
   const [isEditingAuftrag, setIsEditingAuftrag] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editAnsprechpartner, setEditAnsprechpartner] = useState("");
@@ -242,12 +229,6 @@ export default function AuftragToRechnungModal({
 
     const mapped: SelectedItemState[] = sourceItems.map(
       (it: any, index: number) => {
-        // it.openQuantity is computed backend-side (quantity minus
-        // everything already delivered via past Rechnungen — see
-        // attachDeliveredQuantityToOrders). Fall back to computing it
-        // locally from deliveredQuantity in case an older cached response
-        // only has that field, and finally to quantity itself for a
-        // response that predates both (nothing delivered yet).
         const orderedQty = Number(it.quantity || it.qty) || 1;
         const openQty =
           it.openQuantity !== undefined
@@ -400,8 +381,32 @@ export default function AuftragToRechnungModal({
   const hasStockItems = items.some((it) => it.is_stock_item === "Y");
   const hasShippingMethod = !!(editShippingMethod || auftrag.shipping_text);
 
-  /** The actual on-hand quantity for a stock item at the currently
-   * selected warehouse — null for non-stock lines. */
+  const handleQtyInputChange = (lineItemId: string, val: string) => {
+    setQtyInputs((prev) => ({ ...prev, [lineItemId]: val }));
+    const parsed = parseFloat(val);
+    setItems((prev) =>
+      prev.map((it) =>
+        it.lineItemId === lineItemId
+          ? { ...it, qty: isNaN(parsed) ? 0 : Math.max(0, parsed) }
+          : it,
+      ),
+    );
+  };
+
+  const commitQty = (lineItemId: string) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.lineItemId !== lineItemId) return it;
+        return { ...it, qty: Math.min(Math.max(0, it.qty), it.max_qty) };
+      }),
+    );
+    setQtyInputs((prev) => {
+      const next = { ...prev };
+      delete next[lineItemId];
+      return next;
+    });
+  };
+
   const getAvailableStock = (item: SelectedItemState): number | null => {
     if (item.is_stock_item !== "Y") return null;
     const val = stockWhere === "CN" ? item.stock_cn : item.stock_eu;
@@ -462,29 +467,19 @@ export default function AuftragToRechnungModal({
   const shippingLineTotal = shippingIncluded
     ? (shippingCostInput || 0) * (shippingQuantityInput || 0)
     : 0;
-  const subtotal = itemsSubtotal + shippingLineTotal;
+  const subtotal = itemsSubtotal + shippingLineTotal; // Zwischensumme Netto
   const taxRate = Number(auftrag.tax_rate ?? 19);
-  const taxAmount = (subtotal * taxRate) / 100;
-  const totalAmount = subtotal + taxAmount;
 
-  // Tax profile display — the Auftrag's taxProfile is resolved
-  // server-side: live from the customer while status is OPEN, frozen
-  // (matched only by rate, never re-derived) once Partially
-  // Delivered/Delivered/Closed. This is purely a display label; taxRate
-  // above always drives the actual calculation.
+  // Prepayments reduce the NET subtotal first (partial draw supported);
+  // tax is calculated only on what remains net.
+  const prepaymentAmount = Math.min(prepaymentInfo?.available || 0, subtotal);
+  const remainingNet = Math.max(0, subtotal - prepaymentAmount);
+  const taxAmount = (remainingNet * taxRate) / 100;
+  const totalAmount = remainingNet + taxAmount; // Gesamt Brutto
   const taxProfileLabel = auftrag.taxProfile?.name
     ? `${auftrag.taxProfile.name} (${formatTaxRate(taxRate)})`
     : formatTaxRate(taxRate);
 
-  // Prepayment credit applied to THIS delivery — capped at what's
-  // actually available and at the invoice total itself (never negative,
-  // never more than what's owed). Purely a client-side preview; the
-  // server recomputes and applies this independently from auftrag.id
-  // when the Rechnung is generated.
-  const prepaymentAmount = Math.min(
-    prepaymentInfo?.available || 0,
-    totalAmount,
-  );
   const restbetrag = Math.max(0, totalAmount - prepaymentAmount);
 
   const netWeightKg = selectedItems.reduce((sum, it) => {
@@ -1222,7 +1217,6 @@ export default function AuftragToRechnungModal({
                           )}
                         </td>
 
-                        {/* Qty Delivered */}
                         <td className="px-2 py-2 text-right">
                           <input
                             type="number"
@@ -1230,10 +1224,16 @@ export default function AuftragToRechnungModal({
                             max={item.max_qty}
                             step="any"
                             disabled={!item.selected}
-                            value={item.qty}
-                            onChange={(e) =>
-                              updateQty(item.lineItemId, e.target.value)
+                            value={
+                              qtyInputs[item.lineItemId] ?? String(item.qty)
                             }
+                            onChange={(e) =>
+                              handleQtyInputChange(
+                                item.lineItemId,
+                                e.target.value,
+                              )
+                            }
+                            onBlur={() => commitQty(item.lineItemId)}
                             className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${
                               invalid
                                 ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
@@ -1241,7 +1241,6 @@ export default function AuftragToRechnungModal({
                             }`}
                           />
                         </td>
-
                         {/* Netto-Preis */}
                         <td className="px-2 py-2 text-right">
                           {isEditingAuftrag ? (
@@ -1381,11 +1380,9 @@ export default function AuftragToRechnungModal({
                   </span>
                 </div>
               )}
-              <div className="flex justify-between text-gray-600">
-                <span>MwSt. ({formatTaxRate(taxRate)})</span>
-                <span className="font-medium text-gray-900">
-                  {formatDeCurrency(taxAmount)}
-                </span>
+              <div className="flex justify-between text-gray-800 font-semibold border-t border-gray-200 pt-1.5">
+                <span>Zwischensumme Netto</span>
+                <span>{formatDeCurrency(subtotal)}</span>
               </div>
 
               {loadingPrepayments && (
@@ -1397,22 +1394,35 @@ export default function AuftragToRechnungModal({
               {!loadingPrepayments && prepaymentAmount > 0 && (
                 <div className="flex justify-between text-amber-700">
                   <span>
-                    Rechnung
+                    Vorauszahlungsrechnung
                     {prepaymentInfo!.prepayments.length === 1
                       ? ` ${prepaymentInfo!.prepayments[0].invoice_number}`
                       : prepaymentInfo!.prepayments.length > 1
                         ? ` (${prepaymentInfo!.prepayments.length}x)`
-                        : ""}
+                        : ""}{" "}
+                    netto
                   </span>
                   <span className="font-medium">
-                    - {formatDeCurrency(prepaymentAmount)}
+                    − {formatDeCurrency(prepaymentAmount)}
                   </span>
                 </div>
               )}
 
+              <div className="flex justify-between text-gray-800 font-semibold">
+                <span>Restbetrag netto</span>
+                <span>{formatDeCurrency(remainingNet)}</span>
+              </div>
+
+              <div className="flex justify-between text-gray-600">
+                <span>MwSt. ({formatTaxRate(taxRate)})</span>
+                <span className="font-medium text-gray-900">
+                  {formatDeCurrency(taxAmount)}
+                </span>
+              </div>
+
               <div className="border-t border-gray-900 pt-2 flex justify-between font-bold text-lg text-gray-900">
-                <span>{prepaymentAmount > 0 ? "Restbetrag" : "Total"}</span>
-                <span>{formatDeCurrency(restbetrag)}</span>
+                <span>Gesamt Brutto</span>
+                <span>{formatDeCurrency(totalAmount)}</span>
               </div>
             </div>
           </div>

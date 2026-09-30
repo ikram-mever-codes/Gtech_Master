@@ -678,18 +678,18 @@ export const createRechnungFromAuftrag = async (
       : 0;
     const shippingTotal = shippingCost * shippingQuantity;
 
-    // Add shipping to subtotal if included
-    const totalSubtotal = subtotal + shippingTotal;
-    const taxAmount = (totalSubtotal * taxRate) / 100;
-    const totalAmount = totalSubtotal + taxAmount;
+const totalSubtotal = subtotal + shippingTotal; 
 
-    const discountPercentage = Number(auftrag.discount_percentage ?? 0);
-    const discountAmount = Number(auftrag.discount_amount ?? 0);
+const discountPercentage = Number(auftrag.discount_percentage ?? 0);
+const discountAmount = Number(auftrag.discount_amount ?? 0);
 
-    const { available: prepaymentCredit, prepayments } =
-      await getAvailablePrepaymentCredit(auftrag.id);
-    const appliedPrepayment = Math.min(prepaymentCredit, totalAmount);
-    const amountDueNow = Math.max(0, totalAmount - appliedPrepayment);
+const { available: prepaymentCredit, prepayments } =
+  await getAvailablePrepaymentCredit(auftrag.id);
+const appliedPrepayment = Math.min(prepaymentCredit, totalSubtotal);
+const remainingNet = Math.max(0, totalSubtotal - appliedPrepayment);
+const taxAmount = (remainingNet * taxRate) / 100;
+const totalAmount = remainingNet + taxAmount;
+const amountDueNow = totalAmount;
 
     let remainingToApply = appliedPrepayment;
     const prepaymentsToSave: Rechnung[] = [];
