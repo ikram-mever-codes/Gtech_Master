@@ -3841,13 +3841,10 @@ export class OfferController {
         return qty * getSafeNumber(item.basePrice);
       };
 
-      const resolvedDefaultTaxRate: number =
-        customerTaxProfile?.taxRate !== undefined &&
-          customerTaxProfile?.taxRate !== null
-          ? getSafeNumber(customerTaxProfile.taxRate)
-          : offer.taxRate !== undefined && offer.taxRate !== null
-            ? getSafeNumber(offer.taxRate)
-            : 19;
+      const rawDbTaxRate = getSafeNumber(
+        customerEntity?.defaultTaxProfile?.tax_rate ?? offer.taxRate ?? 0,
+      );
+      const resolvedDefaultTaxRate: number = rawDbTaxRate > 0 ? rawDbTaxRate : 19;
 
       const isFreetextLine = (item: any): boolean =>
         !item?.sourceItemId &&
