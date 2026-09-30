@@ -109,10 +109,11 @@ const Field: React.FC<{
         children
       ) : (
         <div
-          className={`${highlightOrange
+          className={`${
+            highlightOrange
               ? "bg-amber-100/90 border border-amber-400 text-amber-900 font-bold p-1 rounded inline-block min-w-[120px]"
               : ""
-            }`}
+          }`}
         >
           {value || "—"}
         </div>
@@ -303,10 +304,10 @@ export default function AuftragToRechnungModal({
     );
     setEditStreet(
       cust.address ||
-      cust.street ||
-      cust.addressLine1 ||
-      cust.bill_to_address ||
-      "",
+        cust.street ||
+        cust.addressLine1 ||
+        cust.bill_to_address ||
+        "",
     );
     setEditPostalCode(cust.postalCode || cust.postal_code || "37079");
     setEditCity(cust.city || "Göttingen");
@@ -316,8 +317,7 @@ export default function AuftragToRechnungModal({
     );
 
     const sMethod =
-      auftrag.shippingMethod ||
-      auftrag.shipping_method ||
+      auftrag.shipping_text ||
       cust.defaultShippingMethod ||
       cust.shippingMethod ||
       cust.shipping_method ||
@@ -345,14 +345,9 @@ export default function AuftragToRechnungModal({
     setEditPaymentMethod(pMethod);
     setEditPaymentTerms(pTerms);
 
-    // Seed the per-delivery shipping override from the Auftrag's own
-    // shipping cost/quantity — included by default whenever a shipping
-    // method exists on the Auftrag.
     setShippingCostInput(Number(auftrag.shipping_cost) || 0);
     setShippingQuantityInput(Number(auftrag.shipping_quantity) || 1);
-    setShippingIncluded(
-      !!(auftrag.shipping_text || auftrag.shipping_method || sMethod),
-    );
+    setShippingIncluded(!!sMethod);
 
     // Delivery date evaluation logic
     const todayStr = new Date().toISOString().split("T")[0];
@@ -403,11 +398,7 @@ export default function AuftragToRechnungModal({
 
   if (!isOpen || !auftrag) return null;
   const hasStockItems = items.some((it) => it.is_stock_item === "Y");
-  const hasShippingMethod = !!(
-    editShippingMethod ||
-    auftrag.shipping_text ||
-    auftrag.shipping_method
-  );
+  const hasShippingMethod = !!(editShippingMethod || auftrag.shipping_text);
 
   /** The actual on-hand quantity for a stock item at the currently
    * selected warehouse — null for non-stock lines. */
@@ -663,7 +654,7 @@ export default function AuftragToRechnungModal({
       if (res?.success) {
         toast.success(
           res.message ||
-          `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
+            `Rechnung & Lieferschein created from ${auftrag.order_no}!`,
           successStyles,
         );
         const newRechnungId = res?.data?.id;
@@ -880,7 +871,7 @@ export default function AuftragToRechnungModal({
                   })}
                   {editAnsprechpartner &&
                     !systemUsers.some(
-                      (u: any) => (u.name || u.email) === editAnsprechpartner
+                      (u: any) => (u.name || u.email) === editAnsprechpartner,
                     ) && (
                       <option value={editAnsprechpartner}>
                         {editAnsprechpartner}
@@ -902,10 +893,11 @@ export default function AuftragToRechnungModal({
                     setDeliveryDate(e.target.value);
                     setIsDatePastOrEmpty(false);
                   }}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${isDatePastOrEmpty || !deliveryDate
+                  className={`w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-emerald-500 font-bold transition-all ${
+                    isDatePastOrEmpty || !deliveryDate
                       ? "bg-amber-100/90 border-orange-400 text-amber-900 shadow-sm"
                       : "bg-white border-gray-300 text-gray-900"
-                    }`}
+                  }`}
                 />
               </div>
 
@@ -949,8 +941,8 @@ export default function AuftragToRechnungModal({
                   ? !selectedPmObj.is_prepayment
                   : editPaymentMethod
                     ? !/vorkasse|prepayment|paypal|cash|credit/i.test(
-                      editPaymentMethod,
-                    )
+                        editPaymentMethod,
+                      )
                     : false;
 
                 return (
@@ -1140,9 +1132,9 @@ export default function AuftragToRechnungModal({
                                 Math.min(
                                   6,
                                   (item.itemName || "").split("\n").length ||
-                                  Math.ceil(
-                                    (item.itemName || "").length / 22,
-                                  ),
+                                    Math.ceil(
+                                      (item.itemName || "").length / 22,
+                                    ),
                                 ),
                               )}
                               value={item.itemName}
@@ -1169,7 +1161,7 @@ export default function AuftragToRechnungModal({
                                 Math.min(
                                   6,
                                   (item.hinweis || "").split("\n").length ||
-                                  Math.ceil((item.hinweis || "").length / 22),
+                                    Math.ceil((item.hinweis || "").length / 22),
                                 ),
                               )}
                               value={item.hinweis}
@@ -1242,10 +1234,11 @@ export default function AuftragToRechnungModal({
                             onChange={(e) =>
                               updateQty(item.lineItemId, e.target.value)
                             }
-                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${invalid
+                            className={`w-20 px-1.5 py-1 text-right border font-bold rounded focus:ring-2 shadow-sm ${
+                              invalid
                                 ? "border-rose-400 bg-rose-100 text-rose-900 focus:ring-rose-500"
                                 : "border-orange-400 bg-amber-100 text-gray-900 focus:ring-orange-500"
-                              }`}
+                            }`}
                           />
                         </td>
 
@@ -1316,7 +1309,6 @@ export default function AuftragToRechnungModal({
                       <td className="px-2 py-2 font-bold text-gray-700">
                         {editShippingMethod ||
                           auftrag.shipping_text ||
-                          auftrag.shipping_method ||
                           "Shipping"}
                       </td>
                       <td className="px-2 py-2 text-gray-400"></td>
