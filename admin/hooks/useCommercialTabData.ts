@@ -117,15 +117,15 @@ export function useCommercialTabData() {
     }
   }, []);
 
-  const fetchRechnungen = useCallback(async () => {
+  const fetchRechnungen = useCallback(async (filter?: string) => {
     setLoadingRechnungen(true);
     try {
-      const res: any = await getAllRechnungen();
+      const res: any = await getAllRechnungen(filter ? { filter } : undefined);
       if (res?.success) setRechnungen(res.data || []);
       else if (Array.isArray(res?.data)) setRechnungen(res.data);
     } finally {
       setLoadingRechnungen(false);
-      loadedRef.current.add("rechnungen");
+      loadedRef.current.add(filter ? `rechnungen_${filter}` : "rechnungen");
     }
   }, []);
 
@@ -211,7 +211,7 @@ export function useCommercialTabData() {
   /** Call on mount and whenever activeInvTab changes. Only fetches what
    * that tab needs and only once per session unless force=true. */
   const ensureLoaded = useCallback(
-    (tab: InvoiceTab, force = false) => {
+    (tab: InvoiceTab, force = false, filter?: string) => {
       const has = (key: string) => !force && loadedRef.current.has(key);
 
       if (tab === "angebot") {
@@ -232,7 +232,8 @@ export function useCommercialTabData() {
       }
 
       if (tab === "rechnung") {
-        if (!has("rechnungen")) fetchRechnungen();
+        const cacheKey = filter ? `rechnungen_${filter}` : "rechnungen";
+        if (!has(cacheKey)) fetchRechnungen(filter);
       }
 
       if (tab === "rk") {

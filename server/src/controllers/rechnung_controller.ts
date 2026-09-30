@@ -1161,7 +1161,7 @@ export const getAllRechnungen = async (
 
     if (filter === "missing_gelangenheitsbestaetigung") {
       qb.andWhere(
-        "(r.tax_profile_case IN ('EU_IGL', 'third_country') OR (c.country IS NOT NULL AND c.country != '' AND c.country NOT IN ('DE', 'Deutschland', 'DEU')))",
+        "(r.tax_profile_case IN ('EU_IGL', 'third_country', 'THIRD_COUNTRY') OR (c.country IS NOT NULL AND c.country != '' AND c.country NOT IN ('DE', 'Deutschland', 'DEU')))",
       ).andWhere(
         "(r.gelangenheitsbestaetigung_doc IS NULL OR r.gelangenheitsbestaetigung_doc = '' OR r.gelangenheitsbestaetigung_doc = 'null')",
       );
@@ -1225,7 +1225,9 @@ export const getAllRechnungen = async (
 
       return {
         ...r,
-        customer: origCust || r.customer || undefined,
+        customerSnapshot: r.customer,
+        customer: r.customer || origCust || undefined,
+        liveCustomer: origCust,
         title,
         date_delivery: resolvedDeliveryDate,
         delivery_date: resolvedDeliveryDate,
@@ -1385,10 +1387,10 @@ export const getRechnungById = async (
     const effectiveTaxRate = rawTaxRate > 0
       ? rawTaxRate
       : await resolveCustomerTaxProfileForRechnung(
-          (rechnung as any).customerSnapshot?.original_customer_id ||
-          rechnung.customer?.original_customer_id ||
-          rechnung.rechnung_customer_id
-        );
+        (rechnung as any).customerSnapshot?.original_customer_id ||
+        rechnung.customer?.original_customer_id ||
+        rechnung.rechnung_customer_id
+      );
     const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
 
     res.json({

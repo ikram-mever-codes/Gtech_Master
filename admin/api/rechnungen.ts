@@ -48,9 +48,9 @@ export const createRechnungOhneAusliefern = async (
   }
 };
 
-export const getAllRechnungen = async () => {
+export const getAllRechnungen = async (params?: { filter?: string }) => {
   try {
-    const response: any = await api.get("/rechnungen");
+    const response: any = await api.get("/rechnungen", { params });
     return response;
   } catch (error: any) {
     handleApiError(error, "Failed to fetch Rechnungen");

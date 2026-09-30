@@ -175,11 +175,12 @@ const InvoiceListPage: React.FC = () => {
     () => (searchParams.get("tab") as InvoiceTab) || "auftrag",
   );
 
-  useEffect(() => {
-    tabData.ensureLoaded(activeInvTab);
-  }, [activeInvTab, tabData]);
+  const filterParam = searchParams.get("filter") || undefined;
 
-  // Fetch open quantities for all Rechnungen when Rechnung tab is active
+  useEffect(() => {
+    tabData.ensureLoaded(activeInvTab, false, filterParam);
+  }, [activeInvTab, tabData, filterParam]);
+
   const fetchAllOpenQuantities = useCallback(async () => {
     if (activeInvTab !== "rechnung") return;
 
@@ -1243,7 +1244,6 @@ const InvoiceListPage: React.FC = () => {
     setViewItems([]);
   };
 
-  // --- URL <-> tab/filter sync ---
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", activeInvTab);
@@ -1254,6 +1254,11 @@ const InvoiceListPage: React.FC = () => {
   }, [activeInvTab, docFilters.documentNo, router, searchParams]);
 
   useEffect(() => {
+    const filterParam = searchParams.get("filter");
+    if (filterParam === "missing_gelangenheitsbestaetigung") {
+      setActiveInvTab("rechnung");
+      setDocFilters((prev: any) => ({ ...prev, datePreset: "all", status: "" }));
+    }
     const tabParam = searchParams.get("tab");
     if (tabParam) {
       let mappedTab = tabParam;
@@ -1418,15 +1423,22 @@ const InvoiceListPage: React.FC = () => {
       const auditFilter = searchParams.get("filter");
       if (auditFilter === "missing_gelangenheitsbestaetigung") {
         list = list.filter((r: any) => {
-          const country = (
+          const country = String(
             r.customerSnapshot?.country ||
             r.customer?.country ||
             ""
-          ).trim();
+          ).trim().toUpperCase();
+          const rawCase = String(
+            r.tax_profile_case ||
+            r.taxProfile?.case ||
+            r.customerSnapshot?.tax_profile_case ||
+            r.customer?.defaultTaxProfile?.case ||
+            ""
+          ).toUpperCase();
           const isAbroad =
-            r.tax_profile_case === "EU_IGL" ||
-            r.tax_profile_case === "third_country" ||
-            (country !== "" && !["DE", "Deutschland", "DEU"].includes(country));
+            rawCase.includes("EU_IGL") ||
+            rawCase.includes("THIRD_COUNTRY") ||
+            (country !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(country));
           const missingDoc =
             !r.gelangenheitsbestaetigung_doc ||
             r.gelangenheitsbestaetigung_doc === "" ||
@@ -1726,7 +1738,8 @@ const InvoiceListPage: React.FC = () => {
           return false;
         }
       }
-      if (datePreset && datePreset !== "all") {
+      const auditFilterParam = searchParams.get("filter");
+      if (!auditFilterParam && datePreset && datePreset !== "all") {
         const docDate =
           item.createdAt ||
           item.created_at ||
@@ -1748,6 +1761,7 @@ const InvoiceListPage: React.FC = () => {
     tabData.lieferscheine,
     searchTerm,
     docFilters,
+    searchParams,
   ]);
 
   // Auftrag rows must be ordered by status (partially_delivered -> open ->
@@ -1916,6 +1930,8 @@ const InvoiceListPage: React.FC = () => {
                         return "EUR Special SET with no value";
                       case "dimension_special_no_value":
                         return "Dimension Special SET with no value";
+                      case "missing_gelangenheitsbestaetigung":
+                        return "Auslandslieferungen OHNE Gelangenheitsbestätigung/Ausfuhrnachweis";
                       default:
                         return searchParams.get("filter");
                     }
@@ -1924,9 +1940,7 @@ const InvoiceListPage: React.FC = () => {
               </div>
               <button
                 onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete("filter");
-                  window.location.href = `/invoices?${params.toString()}`;
+                  router.replace(`/commercial?tab=${activeInvTab}`);
                 }}
                 className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
               >
