@@ -140,14 +140,10 @@ const formatUnitPrice = (
 ): string => {
   if (price === null || price === undefined) return "—";
   const num = Number(price) || 0;
-  const rounded3 = Math.round(num * 1000) / 1000;
-  const rounded2 = Math.round(num * 100) / 100;
-  const has3rdDec = Math.abs(rounded3 - rounded2) > 0.0001;
-  const decimals = has3rdDec ? 3 : 2;
   const symbol = currencySymbol(currency);
   return `${symbol}${num.toLocaleString("de-DE", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
   })}`;
 };
 
