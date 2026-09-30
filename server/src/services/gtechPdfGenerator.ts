@@ -1054,9 +1054,15 @@ export async function generateGtechDocumentPdf(
       opts.payments.forEach((p) => {
         const pAmt = Number(p.amount || 0);
         totalPaidInPdf += pAmt;
-        const pMethod = p.paymentMethod || "Überweisung";
+        const rawMethod = (p.paymentMethod || "").trim();
+        let cleanMethod = rawMethod
+          .replace(/\s*\(\s*manual\s*\)/gi, "")
+          .replace(/^manual$/gi, "")
+          .trim();
         const pDate = formatDate(p.receivedDate);
-        const pText = `Zahlung (${pMethod}) vom ${pDate}`;
+        const pText = cleanMethod
+          ? `Zahlung (${cleanMethod}) vom ${pDate}`
+          : `Zahlung vom ${pDate}`;
 
         doc.text(pText, TOTALS_LABEL_X - 60, yPos, { width: TOTALS_LABEL_W + 60 });
         doc.text(
