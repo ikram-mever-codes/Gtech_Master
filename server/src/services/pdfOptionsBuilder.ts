@@ -109,11 +109,15 @@ export async function buildRechnungPdfOptions(
   } else {
     rechnung = rechnungInput;
     if (!rechnung.items || !rechnung.customer) {
+      const existingTaxProfile = (rechnung as any).taxProfile;
       const reloaded = await rechnungRepo.findOne({
         where: { id: String(rechnung.id) } as any,
         relations: ["customer", "items"],
       });
-      if (reloaded) rechnung = reloaded;
+      if (reloaded) {
+        rechnung = reloaded;
+        if (existingTaxProfile) (rechnung as any).taxProfile = existingTaxProfile;
+      }
     }
   }
 

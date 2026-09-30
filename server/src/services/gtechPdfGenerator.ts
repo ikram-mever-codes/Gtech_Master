@@ -1007,9 +1007,7 @@ export async function generateGtechDocumentPdf(
     const entriesToDisplay =
       positiveVatEntries.length > 0
         ? positiveVatEntries
-        : vatEntries.length > 0
-          ? vatEntries
-          : [{ rate: Number(opts.taxRate || 0), amount: 0 }];
+        : [{ rate: Number(opts.taxRate || opts.shippingTaxRate || 0), amount: 0 }];
 
     let calcVatTotal = 0;
     for (const entry of entriesToDisplay) {

@@ -34,7 +34,7 @@ import { CargoOrder } from "../models/cargo_orders";
 import { TransferOrder } from "../models/transfer_order";
 import { getPaymentsForRechnungIds } from "./payment_allocations_controller";
 
-async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
+export async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
   const profiles = await taxProfileRepo.find({ where: { is_active: true } });
   const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
@@ -1381,7 +1381,15 @@ export const getRechnungById = async (
       (linkedAuftrag as any)?.deliveryTime ||
       (linkedAuftrag as any)?.delivery_time ||
       linkedAuftrag?.real_delivery_date;
-    const taxProfile = await resolveFrozenTaxProfile(rechnung.tax_rate ?? 19);
+    const rawTaxRate = Number(rechnung.tax_rate ?? 0);
+    const effectiveTaxRate = rawTaxRate > 0
+      ? rawTaxRate
+      : await resolveCustomerTaxProfileForRechnung(
+          (rechnung as any).customerSnapshot?.original_customer_id ||
+          rechnung.customer?.original_customer_id ||
+          rechnung.rechnung_customer_id
+        );
+    const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
 
     res.json({
       success: true,
@@ -1631,7 +1639,15 @@ export const downloadRechnungPdf = async (
       });
     }
 
-    const taxProfile = await resolveFrozenTaxProfile(rechnung.tax_rate ?? 19);
+    const rawTaxRate = Number(rechnung.tax_rate ?? 0);
+    const effectiveTaxRate = rawTaxRate > 0
+      ? rawTaxRate
+      : await resolveCustomerTaxProfileForRechnung(
+        (rechnung as any).customerSnapshot?.original_customer_id ||
+        rechnung.customer?.original_customer_id ||
+        rechnung.rechnung_customer_id
+      );
+    const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
     (rechnung as any).taxProfile = taxProfile;
     const defaultTaxRate = Number(taxProfile?.taxRate ?? rechnung.tax_rate ?? 19);
 
