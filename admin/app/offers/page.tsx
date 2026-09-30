@@ -474,7 +474,7 @@ const OffersPage: React.FC<any> = ({
     search: "",
     status: "",
     page: 1,
-    limit: 20,
+    limit: 10000,
     datePreset: "last_30_days",
   });
 
@@ -928,57 +928,6 @@ const OffersPage: React.FC<any> = ({
         />
       </div>
 
-      {totalPages > 1 && (
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-700">
-            Showing {(currentPage - 1) * itemsPerPage + 1}–
-            {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
-            {totalRecords}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                const p = Math.max(1, currentPage - 1);
-                setCurrentPage(p);
-                setFilters({ ...filters, page: p });
-              }}
-              disabled={currentPage === 1}
-              className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-            >
-              Previous
-            </button>
-            {[...Array(Math.min(5, totalPages))].map((_, i) => {
-              const p = i + 1;
-              return (
-                <button
-                  key={p}
-                  onClick={() => {
-                    setCurrentPage(p);
-                    setFilters({ ...filters, page: p });
-                  }}
-                  className={`px-2 py-1 text-sm rounded-lg ${currentPage === p
-                      ? "bg-gray-600 text-white"
-                      : "bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
-                >
-                  {p}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => {
-                const p = Math.min(totalPages, currentPage + 1);
-                setCurrentPage(p);
-                setFilters({ ...filters, page: p });
-              }}
-              disabled={currentPage === totalPages}
-              className="px-2 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </>
   );
 

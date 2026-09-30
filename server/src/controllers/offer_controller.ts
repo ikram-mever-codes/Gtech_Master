@@ -2493,11 +2493,13 @@ export class OfferController {
         queryBuilder.andWhere("offer.createdAt <= :filterEndDate", { filterEndDate });
       }
 
-      const skip = (Number(page) - 1) * Number(limit);
-      const [offers, total] = await queryBuilder
-        .skip(skip)
-        .take(Number(limit))
-        .getManyAndCount();
+      const limitNum = Number(limit) || 10000;
+      const pageNum = Number(page) || 1;
+      const skip = (pageNum - 1) * limitNum;
+
+      const [offers, total] = limit
+        ? await queryBuilder.skip(skip).take(limitNum).getManyAndCount()
+        : await queryBuilder.getManyAndCount();
 
       for (const offer of offers) {
         if (offer.subtotal === 0 && offer.totalAmount === 0) {

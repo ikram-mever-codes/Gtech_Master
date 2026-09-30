@@ -236,19 +236,13 @@ const CommercialFilterBar: React.FC<CommercialFilterBarProps> = ({
                 datePreset: e.target.value as any,
               }))
             }
-            className={getInputClass(
-              docFilters.datePreset !== "all",
-              docFilters.datePreset === "all",
-            )}
+            className={getInputClass(true)}
           >
-            <option value="all" className="text-gray-400">
-              All Dates...
+            <option value="last_30_days" className="text-gray-900 font-normal">
+              Last 30 Days
             </option>
             <option value="today" className="text-gray-900 font-normal">
               Today
-            </option>
-            <option value="last_30_days" className="text-gray-900 font-normal">
-              Last 30 Days
             </option>
             <option value="this_month" className="text-gray-900 font-normal">
               This Month
