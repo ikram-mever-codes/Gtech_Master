@@ -168,14 +168,6 @@ export default function Dashboard() {
               <span className="text-gray-500 font-semibold">Calendar Week {calendarWeek}</span>
             </div>
           </div>
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-[#212529] border border-[#E9ECEF] rounded-[4px] shadow-sm font-semibold transition-all duration-200 active:scale-95 text-xs sm:text-sm"
-            style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
-          >
-            <ArrowLeft className="w-3.5 h-3.5 text-gray-600" />
-            Back
-          </button>
         </div>
 
         <div

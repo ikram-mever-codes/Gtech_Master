@@ -1013,10 +1013,25 @@ export default function RechnungDetailModal({
     }
   };
 
-  // --- Gelangenheitsbestätigung upload/remove ----------------------------------
+  const rawCase = String(
+    data?.tax_profile_case ||
+    data?.taxProfile?.case ||
+    (data?.customerSnapshot as any)?.tax_profile_case ||
+    (data?.customerSnapshot as any)?.taxProfile?.case ||
+    (data?.customer as any)?.defaultTaxProfile?.case ||
+    ""
+  ).toUpperCase();
+
+  const customerCountry = String(
+    data?.customerSnapshot?.country ||
+    (data?.customer as any)?.country ||
+    ""
+  ).trim().toUpperCase();
+
   const isExportInvoice =
-    data?.tax_profile_case === "EU_IGL" ||
-    data?.tax_profile_case === "third_country";
+    rawCase.includes("EU_IGL") ||
+    rawCase.includes("THIRD_COUNTRY") ||
+    (customerCountry !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(customerCountry));
 
   const handleUploadGelangenheits = async (
     e: React.ChangeEvent<HTMLInputElement>,
