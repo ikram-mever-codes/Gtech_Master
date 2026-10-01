@@ -95,6 +95,14 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
         if (templatePageCount > 0) {
           const [embeddedBg] = await templatePdf.embedPdf(templatePdf, [0]);
           page.drawPage(embeddedBg, { x: 0, y: 0, width, height });
+          const footerHeight = 100;
+          page.drawRectangle({
+            x: 0,
+            y: footerHeight,
+            width,
+            height: height - footerHeight,
+            color: pdfLib.rgb(1, 1, 1),
+          });
         }
       }
 
