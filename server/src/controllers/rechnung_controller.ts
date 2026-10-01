@@ -35,10 +35,25 @@ import { TransferOrder } from "../models/transfer_order";
 import { getPaymentsForRechnungIds } from "./payment_allocations_controller";
 import { Item } from "../models/items";
 
-export async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
+export async function resolveFrozenTaxProfile(
+  taxRate: number,
+  taxCase?: string | null,
+): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
   const profiles = await taxProfileRepo.find({ where: { is_active: true } });
-  const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
+
+  let match = taxCase
+    ? profiles.find(
+        (tp) =>
+          (tp.tax_case || "").trim().toUpperCase() ===
+          taxCase.trim().toUpperCase(),
+      )
+    : undefined;
+
+  if (!match) {
+    match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
+  }
+
   return match
     ? {
         id: match.id,
@@ -678,18 +693,18 @@ export const createRechnungFromAuftrag = async (
       : 0;
     const shippingTotal = shippingCost * shippingQuantity;
 
-const totalSubtotal = subtotal + shippingTotal; 
+    const totalSubtotal = subtotal + shippingTotal;
 
-const discountPercentage = Number(auftrag.discount_percentage ?? 0);
-const discountAmount = Number(auftrag.discount_amount ?? 0);
+    const discountPercentage = Number(auftrag.discount_percentage ?? 0);
+    const discountAmount = Number(auftrag.discount_amount ?? 0);
 
-const { available: prepaymentCredit, prepayments } =
-  await getAvailablePrepaymentCredit(auftrag.id);
-const appliedPrepayment = Math.min(prepaymentCredit, totalSubtotal);
-const remainingNet = Math.max(0, totalSubtotal - appliedPrepayment);
-const taxAmount = (remainingNet * taxRate) / 100;
-const totalAmount = remainingNet + taxAmount;
-const amountDueNow = totalAmount;
+    const { available: prepaymentCredit, prepayments } =
+      await getAvailablePrepaymentCredit(auftrag.id);
+    const appliedPrepayment = Math.min(prepaymentCredit, totalSubtotal);
+    const remainingNet = Math.max(0, totalSubtotal - appliedPrepayment);
+    const taxAmount = (remainingNet * taxRate) / 100;
+    const totalAmount = remainingNet + taxAmount;
+    const amountDueNow = totalAmount;
 
     let remainingToApply = appliedPrepayment;
     const prepaymentsToSave: Rechnung[] = [];
@@ -1216,10 +1231,6 @@ export const getAllRechnungen = async (
 
     const rechnungen = await qb.getMany();
 
-    // Batch-load original customer contact persons for email check.
-    // RechnungCustomer is a snapshot (no contactPersons relation), so we
-    // look up the live Customer record by original_customer_id and attach
-    // contactPersons to each row for the frontend hasContactPersonEmail check.
     const origCustIds = Array.from(
       new Set(
         (rechnungen as any[])
@@ -1248,9 +1259,20 @@ export const getAllRechnungen = async (
     const distinctRates = Array.from(
       new Set(rechnungen.map((r) => Number(r.tax_rate) || 19)),
     );
-    const taxProfileByRate = new Map<number, any>();
-    for (const rate of distinctRates) {
-      taxProfileByRate.set(rate, await resolveFrozenTaxProfile(rate));
+    const distinctKeys = Array.from(
+      new Set(
+        rechnungen.map(
+          (r) => `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}`,
+        ),
+      ),
+    );
+    const taxProfileByKey = new Map<string, any>();
+    for (const key of distinctKeys) {
+      const [rateStr, taxCase] = key.split("::");
+      taxProfileByKey.set(
+        key,
+        await resolveFrozenTaxProfile(Number(rateStr), taxCase || undefined),
+      );
     }
 
     const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => {
@@ -1283,7 +1305,9 @@ export const getAllRechnungen = async (
         date_delivery: resolvedDeliveryDate,
         delivery_date: resolvedDeliveryDate,
         linkedDocuments: linkedDocs,
-        taxProfile: taxProfileByRate.get(Number(r.tax_rate) || 19),
+        taxProfile: taxProfileByKey.get(
+          `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}`,
+        ),
         contactPersons,
       };
     });
@@ -1435,13 +1459,14 @@ export const getRechnungById = async (
       (linkedAuftrag as any)?.delivery_time ||
       linkedAuftrag?.real_delivery_date;
     const rawTaxRate = Number(rechnung.tax_rate ?? 0);
-    const effectiveTaxRate = rawTaxRate > 0
-      ? rawTaxRate
-      : await resolveCustomerTaxProfileForRechnung(
-        (rechnung as any).customerSnapshot?.original_customer_id ||
-        rechnung.customer?.original_customer_id ||
-        rechnung.rechnung_customer_id
-      );
+    const effectiveTaxRate =
+      rawTaxRate > 0
+        ? rawTaxRate
+        : await resolveCustomerTaxProfileForRechnung(
+            (rechnung as any).customerSnapshot?.original_customer_id ||
+              rechnung.customer?.original_customer_id ||
+              rechnung.rechnung_customer_id,
+          );
     const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
 
     res.json({
@@ -1693,13 +1718,14 @@ export const downloadRechnungPdf = async (
     }
 
     const rawTaxRate = Number(rechnung.tax_rate ?? 0);
-    const effectiveTaxRate = rawTaxRate > 0
-      ? rawTaxRate
-      : await resolveCustomerTaxProfileForRechnung(
-        (rechnung as any).customerSnapshot?.original_customer_id ||
-        rechnung.customer?.original_customer_id ||
-        rechnung.rechnung_customer_id
-      );
+    const effectiveTaxRate =
+      rawTaxRate > 0
+        ? rawTaxRate
+        : await resolveCustomerTaxProfileForRechnung(
+            (rechnung as any).customerSnapshot?.original_customer_id ||
+              rechnung.customer?.original_customer_id ||
+              rechnung.rechnung_customer_id,
+          );
     const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
     (rechnung as any).taxProfile = taxProfile;
     const defaultTaxRate = Number(
