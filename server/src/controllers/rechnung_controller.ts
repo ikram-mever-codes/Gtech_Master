@@ -1718,19 +1718,16 @@ export const downloadRechnungPdf = async (
     }
 
     const rawTaxRate = Number(rechnung.tax_rate ?? 0);
-    const effectiveTaxRate =
-      rawTaxRate > 0
-        ? rawTaxRate
-        : await resolveCustomerTaxProfileForRechnung(
-            (rechnung as any).customerSnapshot?.original_customer_id ||
-              rechnung.customer?.original_customer_id ||
-              rechnung.rechnung_customer_id,
-          );
-    const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
-    (rechnung as any).taxProfile = taxProfile;
-    const defaultTaxRate = Number(
-      taxProfile?.taxRate ?? rechnung.tax_rate ?? 19,
+    const custTaxRate = await resolveCustomerTaxProfileForRechnung(
+      (rechnung as any).customerSnapshot?.original_customer_id ||
+        rechnung.customer?.original_customer_id ||
+        rechnung.rechnung_customer_id,
     );
+    const resolvedRate =
+      rawTaxRate > 0 ? rawTaxRate : custTaxRate > 0 ? custTaxRate : 19;
+    const taxProfile = await resolveFrozenTaxProfile(resolvedRate);
+    (rechnung as any).taxProfile = taxProfile;
+    const defaultTaxRate = resolvedRate;
 
     const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
     const contactName =

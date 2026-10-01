@@ -166,6 +166,36 @@ export const uploadDocumentTemplate = async (
     }
 
     const key = req.body.key || "customer_doc_template";
+
+    if (
+      file.path &&
+      fs.existsSync(file.path) &&
+      (file.mimetype === "image/svg+xml" || file.originalname.toLowerCase().endsWith(".svg"))
+    ) {
+      try {
+        let svgContent = fs.readFileSync(file.path, "utf8");
+        svgContent = svgContent
+          .replace(/<!--[\s\S]*?-->/g, "")
+          .replace(/<sodipodi:namedview[\s\S]*?<\/sodipodi:namedview>/gi, "")
+          .replace(/<path[^>]*id="path25"[^>]*\/>/gi, "")
+          .replace(/x_Document_Title/gi, "")
+          .replace(/Document_Title/gi, "")
+          .replace(/<g[^>]*id="g10"[\s\S]*?<\/g>/gi, "");
+
+        svgContent = svgContent.replace(/d="([^"]+)"/g, (_match: string, pathData: string) => {
+          const roundedData = pathData.replace(/-?\d+\.\d+/g, (numStr: string) => {
+            const n = parseFloat(numStr);
+            return Number(n.toFixed(1)).toString();
+          });
+          return `d="${roundedData}"`;
+        });
+
+        fs.writeFileSync(file.path, svgContent, "utf8");
+      } catch (err) {
+        console.warn("Failed to optimize uploaded SVG template:", err);
+      }
+    }
+
     const repository = AppDataSource.getRepository(SystemParameter);
     let param = await repository.findOne({ where: { key } });
     const file_url = `/uploads/${file.filename}`;
