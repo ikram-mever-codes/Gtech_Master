@@ -880,7 +880,7 @@ export const assignOrdersToCargo = async (
           .createQueryBuilder()
           .update(OrderItem)
           .set({ cargo_id: cargo.id })
-          .where("order_id = :orderId AND (cargo_id IS NULL OR cargo_id = 0)", {
+          .where("order_id = :orderId", {
             orderId: order.id,
           })
           .execute();
