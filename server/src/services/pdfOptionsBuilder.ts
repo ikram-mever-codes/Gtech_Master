@@ -184,9 +184,13 @@ export async function buildRechnungPdfOptions(
 
   const resolvedDeliveryDateConfirmed = rawConfirmedDate ? formatDateStr(rawConfirmedDate) : undefined;
 
-  const rawTaxProfileRate = Number((rechnung as any).taxProfile?.taxRate);
-  const rawRechnungTaxRate = Number(rechnung.tax_rate);
-  const defaultTaxRate = rawTaxProfileRate > 0 ? rawTaxProfileRate : (rawRechnungTaxRate > 0 ? rawRechnungTaxRate : 19);
+  const taxProfileObj = (rechnung as any).taxProfile;
+  const defaultTaxRate =
+    taxProfileObj?.taxRate !== undefined && taxProfileObj?.taxRate !== null
+      ? Number(taxProfileObj.taxRate)
+      : rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
+        ? Number(rechnung.tax_rate)
+        : 19;
   const subtotal = Number(rechnung.subtotal || 0);
   const discountAmount = Number(rechnung.discount_amount || 0);
   const shippingCost = Number(rechnung.shipping_cost || 0);
@@ -205,8 +209,10 @@ export async function buildRechnungPdfOptions(
     const qty = Number(it.quantity || 1);
     const unitPrice = Number(it.unit_price_eur || it.price || 0);
     const lineTot = Number(it.total_price || it.lineTotal || qty * unitPrice);
-    const rawItTaxRate = (it.taxRate !== undefined && it.taxRate !== null) ? Number(it.taxRate) : 0;
-    const vatRate = rawItTaxRate > 0 ? rawItTaxRate : defaultTaxRate;
+    const vatRate =
+      it.taxRate !== undefined && it.taxRate !== null
+        ? Number(it.taxRate)
+        : defaultTaxRate;
 
     return {
       position: it.position || idx + 1,
