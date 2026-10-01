@@ -35,6 +35,20 @@ import { TransferOrder } from "../models/transfer_order";
 import { getPaymentsForRechnungIds } from "./payment_allocations_controller";
 import { Item } from "../models/items";
 
+function mapTaxProfile(tp: any): any {
+  if (!tp) return null;
+  return {
+    id: tp.id,
+    name: tp.name,
+    taxCase: tp.tax_case || undefined,
+    taxRate: Number(tp.tax_rate) || 0,
+    taxCode: tp.tax_code || undefined,
+    requiresVatId: !!tp.requires_vat_id,
+    requiresConfirmedVatId: !!tp.requires_confirmed_vat_id,
+    description: tp.description || undefined,
+  };
+}
+
 export async function resolveFrozenTaxProfile(
   taxRate: number,
   taxCase?: string | null,
@@ -42,32 +56,25 @@ export async function resolveFrozenTaxProfile(
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
   const profiles = await taxProfileRepo.find({ where: { is_active: true } });
 
-  let match = taxCase
+  const match = taxCase
     ? profiles.find(
         (tp) =>
           (tp.tax_case || "").trim().toUpperCase() ===
           taxCase.trim().toUpperCase(),
       )
-    : undefined;
-
-  if (!match) {
-    match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
-  }
+    : profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
 
   return match
-    ? {
-        id: match.id,
-        name: match.name,
-        taxCase: match.tax_case || undefined,
-        taxRate: Number(match.tax_rate),
-        taxCode: match.tax_code || undefined,
-      }
+    ? mapTaxProfile(match)
     : {
         id: null,
         name: "Frozen",
         taxCase: undefined,
         taxRate: Number(taxRate),
         taxCode: undefined,
+        requiresVatId: false,
+        requiresConfirmedVatId: false,
+        description: undefined,
       };
 }
 
@@ -1467,8 +1474,10 @@ export const getRechnungById = async (
               rechnung.customer?.original_customer_id ||
               rechnung.rechnung_customer_id,
           );
-    const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
-
+    const taxProfile = await resolveFrozenTaxProfile(
+      effectiveTaxRate,
+      (rechnung as any).tax_profile_case || undefined,
+    );
     res.json({
       success: true,
       data: {
