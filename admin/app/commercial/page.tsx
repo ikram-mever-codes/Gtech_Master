@@ -15,7 +15,7 @@ import {
   updateRechnungK,
 } from "@/api/rechnungen_k";
 import Link from "next/link";
-import { Plus, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
+import { Plus, DollarSign } from "lucide-react";
 
 import { getExpandedInvoiceDetails, updateInvoice } from "@/api/invoice";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -298,8 +298,6 @@ const InvoiceListPage: React.FC = () => {
   };
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>(
     {},
   );
@@ -1777,15 +1775,6 @@ const InvoiceListPage: React.FC = () => {
     return sortAuftraegeByStatus(filteredItems);
   }, [filteredItems, activeInvTab]);
 
-  const totalPages = Math.ceil(displayItems.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = displayItems.slice(startIndex, endIndex);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, docFilters, activeInvTab]);
-
   const legacyInvoices = useMemo(() => [], []);
 
   const handleDuplicateAuftrag = async (row: any) => {
@@ -2007,12 +1996,8 @@ const InvoiceListPage: React.FC = () => {
               href={`?tab=${tab.id}`}
               scroll={false}
               onClick={(e) => {
-                // Keep this a real, bookmarkable/right-clickable link, but let
-                // the existing state logic (tab switch, filter reset, page reset)
-                // run instead of a full page navigation.
                 e.preventDefault();
                 setActiveInvTab(tab.id);
-                setCurrentPage(1);
                 if (tab.id === "auftrag" && !docFilters.status) {
                   setDocFilters((prev) => ({
                     ...prev,
@@ -2073,7 +2058,7 @@ const InvoiceListPage: React.FC = () => {
         {activeInvTab !== "angebot" && (
           <div className="mb-6">
             <DataTable
-              data={currentItems}
+              data={displayItems}
               columns={commercialColumns}
               loading={dataTableLoading}
               summaryCount={displayItems.length}
@@ -2228,46 +2213,6 @@ const InvoiceListPage: React.FC = () => {
                 );
               }}
             />
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA] rounded-b-[4px] mt-4">
-                <div className="text-[11px] font-medium text-[#6C757D]">
-                  Showing {startIndex + 1} to{" "}
-                  {Math.min(endIndex, displayItems.length)} of{" "}
-                  {displayItems.length} documents
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                  </button>
-                  {[...Array(totalPages)].map((_, i) => (
-                    <button
-                      key={i + 1}
-                      onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                        ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                        : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                        }`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() =>
-                      setCurrentPage(Math.min(totalPages, currentPage + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
         <InvoiceDetailsModal
