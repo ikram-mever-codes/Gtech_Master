@@ -35,6 +35,26 @@ import { TransferOrder } from "../models/transfer_order";
 import { getPaymentsForRechnungIds } from "./payment_allocations_controller";
 import { Item } from "../models/items";
 
+async function resolveRechnungCustomerTaxProfile(
+  customerId?: string | null,
+): Promise<any> {
+  if (customerId) {
+    const custRepo = AppDataSource.getRepository(Customer);
+    const customer = await custRepo.findOne({
+      where: { id: customerId },
+      relations: ["defaultTaxProfile"],
+    });
+    if (customer?.defaultTaxProfile) return customer.defaultTaxProfile;
+  }
+  const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
+  const profiles = await taxProfileRepo.find({ where: { is_active: true } });
+  if (!profiles.length) return null;
+  return (
+    profiles.find(
+      (tp) => (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
+    ) || profiles[0]
+  );
+}
 function mapTaxProfile(tp: any): any {
   if (!tp) return null;
   return {
@@ -52,20 +72,30 @@ function mapTaxProfile(tp: any): any {
 export async function resolveFrozenTaxProfile(
   taxRate: number,
   taxCase?: string | null,
+  customerId?: string | null,
 ): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
   const profiles = await taxProfileRepo.find({ where: { is_active: true } });
 
-  const match = taxCase
+  const caseMatch = taxCase
     ? profiles.find(
         (tp) =>
           (tp.tax_case || "").trim().toUpperCase() ===
           taxCase.trim().toUpperCase(),
       )
-    : profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
+    : undefined;
+  if (caseMatch) return mapTaxProfile(caseMatch);
 
-  return match
-    ? mapTaxProfile(match)
+  if (customerId) {
+    const resolved = await resolveRechnungCustomerTaxProfile(customerId);
+    if (resolved) return mapTaxProfile(resolved);
+  }
+
+  const rateMatch = profiles.find(
+    (tp) => Number(tp.tax_rate) === Number(taxRate),
+  );
+  return rateMatch
+    ? mapTaxProfile(rateMatch)
     : {
         id: null,
         name: "Frozen",
@@ -1263,22 +1293,24 @@ export const getAllRechnungen = async (
     await attachPaymentStatusToRechnungen(rechnungen);
     await attachPaymentsAndRksToRechnungen(rechnungen);
 
-    const distinctRates = Array.from(
-      new Set(rechnungen.map((r) => Number(r.tax_rate) || 19)),
-    );
     const distinctKeys = Array.from(
       new Set(
-        rechnungen.map(
-          (r) => `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}`,
-        ),
+        rechnungen.map((r: any) => {
+          const origCustId = r.customer?.original_customer_id || "";
+          return `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}::${origCustId}`;
+        }),
       ),
     );
     const taxProfileByKey = new Map<string, any>();
     for (const key of distinctKeys) {
-      const [rateStr, taxCase] = key.split("::");
+      const [rateStr, taxCase, customerId] = key.split("::");
       taxProfileByKey.set(
         key,
-        await resolveFrozenTaxProfile(Number(rateStr), taxCase || undefined),
+        await resolveFrozenTaxProfile(
+          Number(rateStr),
+          taxCase || undefined,
+          customerId || undefined,
+        ),
       );
     }
 
@@ -1313,7 +1345,7 @@ export const getAllRechnungen = async (
         delivery_date: resolvedDeliveryDate,
         linkedDocuments: linkedDocs,
         taxProfile: taxProfileByKey.get(
-          `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}`,
+          `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}::${r.customer?.original_customer_id || ""}`,
         ),
         contactPersons,
       };
@@ -1474,9 +1506,15 @@ export const getRechnungById = async (
               rechnung.customer?.original_customer_id ||
               rechnung.rechnung_customer_id,
           );
+    const customerIdForTaxLookup =
+      (rechnung as any).customerSnapshot?.original_customer_id ||
+      rechnung.customer?.original_customer_id ||
+      undefined;
+
     const taxProfile = await resolveFrozenTaxProfile(
       effectiveTaxRate,
       (rechnung as any).tax_profile_case || undefined,
+      customerIdForTaxLookup,
     );
     res.json({
       success: true,
