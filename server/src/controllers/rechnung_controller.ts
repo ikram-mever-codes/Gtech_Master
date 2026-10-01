@@ -35,24 +35,76 @@ import { TransferOrder } from "../models/transfer_order";
 import { getPaymentsForRechnungIds } from "./payment_allocations_controller";
 import { Item } from "../models/items";
 
-export async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
+async function resolveRechnungCustomerTaxProfile(
+  customerId?: string | null,
+): Promise<any> {
+  if (customerId) {
+    const custRepo = AppDataSource.getRepository(Customer);
+    const customer = await custRepo.findOne({
+      where: { id: customerId },
+      relations: ["defaultTaxProfile"],
+    });
+    if (customer?.defaultTaxProfile) return customer.defaultTaxProfile;
+  }
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
   const profiles = await taxProfileRepo.find({ where: { is_active: true } });
-  const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
-  return match
-    ? {
-        id: match.id,
-        name: match.name,
-        taxCase: match.tax_case || undefined,
-        taxRate: Number(match.tax_rate),
-        taxCode: match.tax_code || undefined,
-      }
+  if (!profiles.length) return null;
+  return (
+    profiles.find(
+      (tp) => (tp.tax_case || "").trim().toUpperCase() === "DE-VAT",
+    ) || profiles[0]
+  );
+}
+function mapTaxProfile(tp: any): any {
+  if (!tp) return null;
+  return {
+    id: tp.id,
+    name: tp.name,
+    taxCase: tp.tax_case || undefined,
+    taxRate: Number(tp.tax_rate) || 0,
+    taxCode: tp.tax_code || undefined,
+    requiresVatId: !!tp.requires_vat_id,
+    requiresConfirmedVatId: !!tp.requires_confirmed_vat_id,
+    description: tp.description || undefined,
+  };
+}
+
+export async function resolveFrozenTaxProfile(
+  taxRate: number,
+  taxCase?: string | null,
+  customerId?: string | null,
+): Promise<any> {
+  const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
+  const profiles = await taxProfileRepo.find({ where: { is_active: true } });
+
+  const caseMatch = taxCase
+    ? profiles.find(
+        (tp) =>
+          (tp.tax_case || "").trim().toUpperCase() ===
+          taxCase.trim().toUpperCase(),
+      )
+    : undefined;
+  if (caseMatch) return mapTaxProfile(caseMatch);
+
+  if (customerId) {
+    const resolved = await resolveRechnungCustomerTaxProfile(customerId);
+    if (resolved) return mapTaxProfile(resolved);
+  }
+
+  const rateMatch = profiles.find(
+    (tp) => Number(tp.tax_rate) === Number(taxRate),
+  );
+  return rateMatch
+    ? mapTaxProfile(rateMatch)
     : {
         id: null,
         name: "Frozen",
         taxCase: undefined,
         taxRate: Number(taxRate),
         taxCode: undefined,
+        requiresVatId: false,
+        requiresConfirmedVatId: false,
+        description: undefined,
       };
 }
 
@@ -678,18 +730,18 @@ export const createRechnungFromAuftrag = async (
       : 0;
     const shippingTotal = shippingCost * shippingQuantity;
 
-    // Add shipping to subtotal if included
     const totalSubtotal = subtotal + shippingTotal;
-    const taxAmount = (totalSubtotal * taxRate) / 100;
-    const totalAmount = totalSubtotal + taxAmount;
 
     const discountPercentage = Number(auftrag.discount_percentage ?? 0);
     const discountAmount = Number(auftrag.discount_amount ?? 0);
 
     const { available: prepaymentCredit, prepayments } =
       await getAvailablePrepaymentCredit(auftrag.id);
-    const appliedPrepayment = Math.min(prepaymentCredit, totalAmount);
-    const amountDueNow = Math.max(0, totalAmount - appliedPrepayment);
+    const appliedPrepayment = Math.min(prepaymentCredit, totalSubtotal);
+    const remainingNet = Math.max(0, totalSubtotal - appliedPrepayment);
+    const taxAmount = (remainingNet * taxRate) / 100;
+    const totalAmount = remainingNet + taxAmount;
+    const amountDueNow = totalAmount;
 
     let remainingToApply = appliedPrepayment;
     const prepaymentsToSave: Rechnung[] = [];
@@ -1216,10 +1268,6 @@ export const getAllRechnungen = async (
 
     const rechnungen = await qb.getMany();
 
-    // Batch-load original customer contact persons for email check.
-    // RechnungCustomer is a snapshot (no contactPersons relation), so we
-    // look up the live Customer record by original_customer_id and attach
-    // contactPersons to each row for the frontend hasContactPersonEmail check.
     const origCustIds = Array.from(
       new Set(
         (rechnungen as any[])
@@ -1245,12 +1293,25 @@ export const getAllRechnungen = async (
     await attachPaymentStatusToRechnungen(rechnungen);
     await attachPaymentsAndRksToRechnungen(rechnungen);
 
-    const distinctRates = Array.from(
-      new Set(rechnungen.map((r) => Number(r.tax_rate) || 19)),
+    const distinctKeys = Array.from(
+      new Set(
+        rechnungen.map((r: any) => {
+          const origCustId = r.customer?.original_customer_id || "";
+          return `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}::${origCustId}`;
+        }),
+      ),
     );
-    const taxProfileByRate = new Map<number, any>();
-    for (const rate of distinctRates) {
-      taxProfileByRate.set(rate, await resolveFrozenTaxProfile(rate));
+    const taxProfileByKey = new Map<string, any>();
+    for (const key of distinctKeys) {
+      const [rateStr, taxCase, customerId] = key.split("::");
+      taxProfileByKey.set(
+        key,
+        await resolveFrozenTaxProfile(
+          Number(rateStr),
+          taxCase || undefined,
+          customerId || undefined,
+        ),
+      );
     }
 
     const rechnungenWithLinkedDocuments = rechnungen.map((r: any) => {
@@ -1283,7 +1344,9 @@ export const getAllRechnungen = async (
         date_delivery: resolvedDeliveryDate,
         delivery_date: resolvedDeliveryDate,
         linkedDocuments: linkedDocs,
-        taxProfile: taxProfileByRate.get(Number(r.tax_rate) || 19),
+        taxProfile: taxProfileByKey.get(
+          `${Number(r.tax_rate) || 19}::${r.tax_profile_case || ""}::${r.customer?.original_customer_id || ""}`,
+        ),
         contactPersons,
       };
     });
@@ -1435,15 +1498,24 @@ export const getRechnungById = async (
       (linkedAuftrag as any)?.delivery_time ||
       linkedAuftrag?.real_delivery_date;
     const rawTaxRate = Number(rechnung.tax_rate ?? 0);
-    const effectiveTaxRate = rawTaxRate > 0
-      ? rawTaxRate
-      : await resolveCustomerTaxProfileForRechnung(
-        (rechnung as any).customerSnapshot?.original_customer_id ||
-        rechnung.customer?.original_customer_id ||
-        rechnung.rechnung_customer_id
-      );
-    const taxProfile = await resolveFrozenTaxProfile(effectiveTaxRate);
+    const effectiveTaxRate =
+      rawTaxRate > 0
+        ? rawTaxRate
+        : await resolveCustomerTaxProfileForRechnung(
+            (rechnung as any).customerSnapshot?.original_customer_id ||
+              rechnung.customer?.original_customer_id ||
+              rechnung.rechnung_customer_id,
+          );
+    const customerIdForTaxLookup =
+      (rechnung as any).customerSnapshot?.original_customer_id ||
+      rechnung.customer?.original_customer_id ||
+      undefined;
 
+    const taxProfile = await resolveFrozenTaxProfile(
+      effectiveTaxRate,
+      (rechnung as any).tax_profile_case || undefined,
+      customerIdForTaxLookup,
+    );
     res.json({
       success: true,
       data: {
@@ -1695,10 +1767,11 @@ export const downloadRechnungPdf = async (
     const rawTaxRate = Number(rechnung.tax_rate ?? 0);
     const custTaxRate = await resolveCustomerTaxProfileForRechnung(
       (rechnung as any).customerSnapshot?.original_customer_id ||
-      rechnung.customer?.original_customer_id ||
-      rechnung.rechnung_customer_id
+        rechnung.customer?.original_customer_id ||
+        rechnung.rechnung_customer_id,
     );
-    const resolvedRate = rawTaxRate > 0 ? rawTaxRate : (custTaxRate > 0 ? custTaxRate : 19);
+    const resolvedRate =
+      rawTaxRate > 0 ? rawTaxRate : custTaxRate > 0 ? custTaxRate : 19;
     const taxProfile = await resolveFrozenTaxProfile(resolvedRate);
     (rechnung as any).taxProfile = taxProfile;
     const defaultTaxRate = resolvedRate;
