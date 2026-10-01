@@ -738,8 +738,7 @@ export async function generateGtechDocumentPdf(
           .stroke();
 
         doc.addPage();
-        await drawCustomerSvgBackground(doc);
-        doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+        doc.rect(0, 0, 595.28, MM(262)).fill("#FFFFFF");
 
         const newTableY = MM(25);
         doc.rect(LEFT_X, newTableY, tableWidth, headerHeight).fill("#ECEAE6");
@@ -855,8 +854,7 @@ export async function generateGtechDocumentPdf(
 
     if (currentY + shipRowH > MM(270)) {
       doc.addPage();
-      await drawCustomerSvgBackground(doc);
-      doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+      doc.rect(0, 0, 595.28, MM(262)).fill("#FFFFFF");
       currentY = MM(25);
     }
 
@@ -911,8 +909,7 @@ export async function generateGtechDocumentPdf(
   if (showPrices) {
     if (yPos + 80 > MM(272)) {
       doc.addPage();
-      await drawCustomerSvgBackground(doc);
-      doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+      doc.rect(0, 0, 595.28, MM(262)).fill("#FFFFFF");
       yPos = MM(25);
     }
 
@@ -1198,8 +1195,7 @@ export async function generateGtechDocumentPdf(
 
   if (yPos + notesHeight > MM(272)) {
     doc.addPage();
-    await drawCustomerSvgBackground(doc);
-    doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+    doc.rect(0, 0, 595.28, MM(262)).fill("#FFFFFF");
     yPos = MM(25);
   }
 
@@ -1347,8 +1343,8 @@ export async function generateGtechDocumentPdf(
 
       if (yPos + noteTextHeight + 10 > MM(272)) {
         doc.addPage();
-        await drawCustomerSvgBackground(doc);
-        doc.rect(0, 0, 595.28, MM(24)).fill("#FFFFFF");
+        // Page 2+: white background for header/content area only, leave footer area for template
+        doc.rect(0, 0, 595.28, MM(262)).fill("#FFFFFF");
         yPos = MM(25);
       }
 
