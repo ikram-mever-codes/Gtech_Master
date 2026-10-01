@@ -1,4 +1,3 @@
-// src/controllers/itemManagementController.ts
 import { Request, Response, NextFunction } from "express";
 import { SalesPrice } from "../models/sales_prices";
 import { PurchasePrice } from "../models/purchase_prices";
