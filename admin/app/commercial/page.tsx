@@ -18,6 +18,7 @@ import Link from "next/link";
 import { Plus, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
 
 import { getExpandedInvoiceDetails, updateInvoice } from "@/api/invoice";
+import { getTaricGroupKey } from "@/utils/invoice";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
@@ -909,18 +910,7 @@ const InvoiceListPage: React.FC = () => {
       }
 
       const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter(
-        (oi: any) => {
-          let oiGroupKey = "";
-          if (oi.set_taric_code) {
-            const codes = oi.set_taric_code.split("/");
-            const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-            oiGroupKey = `set_${target}`;
-          } else {
-            const taricId = oi.item?.taric?.id;
-            oiGroupKey = taricId ? `taric_${taricId}` : "unknown";
-          }
-          return oiGroupKey === group.taricId;
-        },
+        (oi: any) => getTaricGroupKey(oi) === group.taricId,
       );
 
       if (itemsInGroup && itemsInGroup.length > 0) {
@@ -931,20 +921,9 @@ const InvoiceListPage: React.FC = () => {
             originalCode !== "0" &&
             originalCode !== "0000000000";
 
-          let newTaricValue = "";
-          if (hasOriginal) {
-            newTaricValue = `${originalCode}/${selectedTaricCode}`;
-          } else {
-            const priorSet = oi.set_taric_code;
-            if (priorSet && priorSet.includes("/")) {
-              const parts = priorSet.split("/");
-              newTaricValue = `${parts[0]}/${selectedTaricCode}`;
-            } else if (priorSet && priorSet !== selectedTaricCode) {
-              newTaricValue = `${priorSet}/${selectedTaricCode}`;
-            } else {
-              newTaricValue = selectedTaricCode;
-            }
-          }
+          const newTaricValue = hasOriginal
+            ? `${originalCode}/${selectedTaricCode}`
+            : selectedTaricCode;
           await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
         }
         toast.success("Taric codes updated successfully");

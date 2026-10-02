@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import SpreadSheet from "@/components/UI/SpreadSheet";
 import { formatDate } from "@/utils/date";
-import { calculateInvoiceTotal } from "@/utils/invoice";
+import { calculateInvoiceTotal, getTaricGroupKey } from "@/utils/invoice";
 
 export interface Invoice {
   id: string;
@@ -597,13 +597,9 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                     expandedRowId={expandedTaricGroupKey}
                     renderRowDetails={(group: any) => {
                       const allDetailedItems = expandedStates[selectedInvoice.id]?.data?.detailedItems || [];
-                      const matchingItems = allDetailedItems.filter((it: any) => {
-                        const code = it.set_taric_code || it.item?.taric?.code || "-";
-                        if (group.taricCode === "-" || !group.taricCode) {
-                          return !code || code === "-";
-                        }
-                        return code === group.taricCode;
-                      });
+                      const matchingItems = allDetailedItems.filter(
+                        (it: any) => getTaricGroupKey(it) === group.taricId,
+                      );
 
                       return (
                         <div className="bg-[#F8F9FA] p-3 rounded-lg border border-gray-200 my-1 space-y-2">

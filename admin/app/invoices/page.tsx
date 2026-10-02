@@ -92,7 +92,7 @@ import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
-import { calculateInvoiceTotal } from "@/utils/invoice";
+import { calculateInvoiceTotal, getTaricGroupKey } from "@/utils/invoice";
 import CommercialLineItemsSubTable from "@/components/UI/CommercialLineItemsSubTable";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
@@ -960,23 +960,7 @@ const InvoiceListPage: React.FC = () => {
       }
 
       const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter(
-        (oi: any) => {
-          const itemTaricCode = oi.item?.taric?.code || "";
-          const isProjectItem =
-            !itemTaricCode ||
-            itemTaricCode === "0" ||
-            itemTaricCode === "0000000000";
-          let oiGroupKey = "";
-          if (oi.set_taric_code) {
-            const codes = oi.set_taric_code.split("/");
-            const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-            oiGroupKey = `set_${target}`;
-          } else {
-            const taricId = oi.item?.taric?.id;
-            oiGroupKey = taricId ? `taric_${taricId}` : "unknown";
-          }
-          return oiGroupKey === group.taricId;
-        },
+        (oi: any) => getTaricGroupKey(oi) === group.taricId,
       );
 
       if (itemsInGroup && itemsInGroup.length > 0) {
@@ -987,20 +971,12 @@ const InvoiceListPage: React.FC = () => {
             originalCode !== "0" &&
             originalCode !== "0000000000";
 
-          let newTaricValue = "";
-          if (hasOriginal) {
-            newTaricValue = `${originalCode}/${selectedTaricCode}`;
-          } else {
-            const priorSet = oi.set_taric_code;
-            if (priorSet && priorSet.includes("/")) {
-              const parts = priorSet.split("/");
-              newTaricValue = `${parts[0]}/${selectedTaricCode}`;
-            } else if (priorSet && priorSet !== selectedTaricCode) {
-              newTaricValue = `${priorSet}/${selectedTaricCode}`;
-            } else {
-              newTaricValue = selectedTaricCode;
-            }
-          }
+          // Always re-base on "original/new" rather than chaining through
+          // every prior override — set_taric_code only needs to carry the
+          // original code (for audit) and the current one.
+          const newTaricValue = hasOriginal
+            ? `${originalCode}/${selectedTaricCode}`
+            : selectedTaricCode;
           await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
         }
         toast.success("Taric codes updated successfully");
@@ -2942,13 +2918,9 @@ const InvoiceListPage: React.FC = () => {
                           expandedRowId={expandedTaricGroupKey}
                           renderRowDetails={(group: any) => {
                             const allDetailedItems = expandedStates[selectedInvoice.id]?.data?.detailedItems || [];
-                            const matchingItems = allDetailedItems.filter((it: any) => {
-                              const code = it.set_taric_code || it.item?.taric?.code || "-";
-                              if (group.taricCode === "-" || !group.taricCode) {
-                                return !code || code === "-";
-                              }
-                              return code === group.taricCode;
-                            });
+                            const matchingItems = allDetailedItems.filter(
+                              (it: any) => getTaricGroupKey(it) === group.taricId,
+                            );
 
                             return (
                               <div className="bg-[#F8F9FA] p-3 rounded-lg border border-gray-200 my-1 space-y-2">
