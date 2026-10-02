@@ -821,7 +821,20 @@ export class InvoiceController {
         ].filter(Boolean);
 
         if (cIds.length > 0 || oIds.length > 0) {
-          await generateInvoicesForOrders(oIds, cIds);
+          // generateInvoicesForOrders walks every cargo/order sequentially
+          // (findOne-per-cargo, then a joined query per cargo) — with the
+          // whole dataset passed in here, awaiting it made every single
+          // page load take as long as a full resync (~1 min). Cargo/order
+          // mutations already trigger a scoped sync directly (see
+          // cargo_controller.ts callers), so this sweep is only a safety
+          // net — let it run in the background instead of blocking the
+          // response.
+          generateInvoicesForOrders(oIds, cIds).catch((syncErr) => {
+            console.warn(
+              "[InvoiceSync] Background auto-sync on getAllInvoices encountered warning:",
+              syncErr,
+            );
+          });
         }
       } catch (syncErr) {
         console.warn(
