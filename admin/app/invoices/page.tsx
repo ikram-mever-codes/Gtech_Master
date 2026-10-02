@@ -83,7 +83,10 @@ import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { ShoppingCart, Truck } from "lucide-react";
 
 import { toast } from "react-hot-toast";
-import { ReassignModal, SplitModal } from "@/app/commercial/orderitemactionsmodal";
+import {
+  ReassignModal,
+  SplitModal,
+} from "@/app/commercial/orderitemactionsmodal";
 import CustomModal from "@/components/UI/CustomModal";
 import SegmentedControl from "@/components/UI/SegmentedControl";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
@@ -98,12 +101,13 @@ import CommercialLineItemsSubTable from "@/components/UI/CommercialLineItemsSubT
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 interface Invoice {
@@ -157,7 +161,13 @@ interface Invoice {
   remark?: string;
   customTotalQty?: number;
   cargoId?: number | null;
-  cargo?: { id: number; cargo_no?: string; cargo_type?: any; cargo_type_id?: number; cargo_type_name?: string } | null;
+  cargo?: {
+    id: number;
+    cargo_no?: string;
+    cargo_type?: any;
+    cargo_type_id?: number;
+    cargo_type_name?: string;
+  } | null;
 }
 
 interface FilterOptions {
@@ -248,8 +258,12 @@ const InvoiceListPage: React.FC = () => {
   const [modalActiveTab, setModalActiveTab] = useState<"taric" | "items">(
     "taric",
   );
-  const [expandedTaricGroupKey, setExpandedTaricGroupKey] = useState<string | null>(null);
-  const [expandedInvoiceIds, setExpandedInvoiceIds] = useState<Set<string>>(new Set());
+  const [expandedTaricGroupKey, setExpandedTaricGroupKey] = useState<
+    string | null
+  >(null);
+  const [expandedInvoiceIds, setExpandedInvoiceIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const handleToggleRowExpand = async (invoice: Invoice) => {
     const next = new Set(expandedInvoiceIds);
@@ -734,45 +748,74 @@ const InvoiceListPage: React.FC = () => {
   const getCargoTypeNameFromInvoice = useCallback(
     (invoice: Invoice) => {
       const invCargo: any = invoice.cargo;
-      const cNo = (invCargo?.cargo_no || invoice.cargoNo || "").trim().toLowerCase();
-      const cargoId = invCargo?.id || invoice.cargoId || (invoice as any).cargo_id;
+      const cNo = (invCargo?.cargo_no || invoice.cargoNo || "")
+        .trim()
+        .toLowerCase();
+      const cargoId =
+        invCargo?.id || invoice.cargoId || (invoice as any).cargo_id;
 
-      if (typeof invCargo?.cargo_type === "string" && invCargo.cargo_type.trim()) {
+      if (
+        typeof invCargo?.cargo_type === "string" &&
+        invCargo.cargo_type.trim()
+      ) {
         return invCargo.cargo_type.trim();
       }
-      if (typeof invCargo?.cargo_type_name === "string" && invCargo.cargo_type_name.trim()) {
+      if (
+        typeof invCargo?.cargo_type_name === "string" &&
+        invCargo.cargo_type_name.trim()
+      ) {
         return invCargo.cargo_type_name.trim();
       }
-      if (invCargo?.cargo_type?.type && typeof invCargo.cargo_type.type === "string") {
+      if (
+        invCargo?.cargo_type?.type &&
+        typeof invCargo.cargo_type.type === "string"
+      ) {
         return invCargo.cargo_type.type.trim();
       }
 
       const matchedCargo: any = cargos.find(
         (c: any) =>
-          (cNo && c.cargo_no && String(c.cargo_no).trim().toLowerCase() === cNo) ||
+          (cNo &&
+            c.cargo_no &&
+            String(c.cargo_no).trim().toLowerCase() === cNo) ||
           (cargoId && String(c.id) === String(cargoId)),
       );
 
       if (matchedCargo) {
-        if (typeof matchedCargo.cargo_type === "string" && matchedCargo.cargo_type.trim()) {
+        if (
+          typeof matchedCargo.cargo_type === "string" &&
+          matchedCargo.cargo_type.trim()
+        ) {
           return matchedCargo.cargo_type.trim();
         }
-        if (typeof matchedCargo.cargo_type_name === "string" && matchedCargo.cargo_type_name.trim()) {
+        if (
+          typeof matchedCargo.cargo_type_name === "string" &&
+          matchedCargo.cargo_type_name.trim()
+        ) {
           return matchedCargo.cargo_type_name.trim();
         }
-        if (matchedCargo.cargo_type?.type && typeof matchedCargo.cargo_type.type === "string") {
+        if (
+          matchedCargo.cargo_type?.type &&
+          typeof matchedCargo.cargo_type.type === "string"
+        ) {
           return matchedCargo.cargo_type.type.trim();
         }
-        const typeId = matchedCargo.cargo_type_id || matchedCargo.cargo_type?.id;
+        const typeId =
+          matchedCargo.cargo_type_id || matchedCargo.cargo_type?.id;
         if (typeId !== undefined && typeId !== null) {
-          const ct = cargoTypesList.find((t: any) => String(t.id) === String(typeId));
+          const ct = cargoTypesList.find(
+            (t: any) => String(t.id) === String(typeId),
+          );
           if (ct) return ct.type || (ct as any).cargo_type || "-";
         }
       }
 
-      const directTypeId = invCargo?.cargo_type_id || (invoice as any).cargo_type_id;
+      const directTypeId =
+        invCargo?.cargo_type_id || (invoice as any).cargo_type_id;
       if (directTypeId !== undefined && directTypeId !== null) {
-        const ct = cargoTypesList.find((t: any) => String(t.id) === String(directTypeId));
+        const ct = cargoTypesList.find(
+          (t: any) => String(t.id) === String(directTypeId),
+        );
         if (ct) return ct.type || (ct as any).cargo_type || "-";
       }
 
@@ -783,17 +826,23 @@ const InvoiceListPage: React.FC = () => {
 
   const getBillToDisplayName = useCallback(
     (invoice: Invoice) => {
-      const billTo = (typeof invoice.bill_to === "string" ? invoice.bill_to : "").trim();
+      const billTo = (
+        typeof invoice.bill_to === "string" ? invoice.bill_to : ""
+      ).trim();
       const custName = (invoice.customer?.companyName || "").trim();
       const raw = billTo || custName;
       if (!raw) return "N/A";
 
       const matched = gtechCompanies.find(
         (g) =>
-          (g.legal_name && g.legal_name.trim().toLowerCase() === raw.toLowerCase()) ||
-          (g.display_name && g.display_name.trim().toLowerCase() === raw.toLowerCase()) ||
-          (g.legal_name && raw.toLowerCase().includes(g.legal_name.trim().toLowerCase())) ||
-          (g.display_name && raw.toLowerCase().includes(g.display_name.trim().toLowerCase())),
+          (g.legal_name &&
+            g.legal_name.trim().toLowerCase() === raw.toLowerCase()) ||
+          (g.display_name &&
+            g.display_name.trim().toLowerCase() === raw.toLowerCase()) ||
+          (g.legal_name &&
+            raw.toLowerCase().includes(g.legal_name.trim().toLowerCase())) ||
+          (g.display_name &&
+            raw.toLowerCase().includes(g.display_name.trim().toLowerCase())),
       );
 
       if (matched && matched.display_name) {
@@ -819,7 +868,7 @@ const InvoiceListPage: React.FC = () => {
         const data = res?.data?.data || res?.data || res;
         if (Array.isArray(data)) setGtechCompanies(data);
       })
-      .catch(() => { });
+      .catch(() => {});
     getAllTaricsSimple().then((res) => {
       if (res.success) setTarics(res.data);
     });
@@ -846,7 +895,11 @@ const InvoiceListPage: React.FC = () => {
 
       setShowREModal(false);
 
-      await Promise.all([loadInvoices(), fetchOrders(), cargosTabRef.current?.fetchCargos?.()]);
+      await Promise.all([
+        loadInvoices(),
+        fetchOrders(),
+        cargosTabRef.current?.fetchCargos?.(),
+      ]);
 
       const expandedKeys = Object.keys(expandedStates).filter(
         (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
@@ -902,7 +955,11 @@ const InvoiceListPage: React.FC = () => {
       setShowSPModal(false);
       setSplitRemarks("");
 
-      await Promise.all([loadInvoices(), fetchOrders(), cargosTabRef.current?.fetchCargos?.()]);
+      await Promise.all([
+        loadInvoices(),
+        fetchOrders(),
+        cargosTabRef.current?.fetchCargos?.(),
+      ]);
 
       const expandedKeys = Object.keys(expandedStates).filter(
         (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
@@ -943,6 +1000,34 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const getTaricGroupKey = (opts: {
+    setTaricCode?: string | null;
+    taricCode?: string | null;
+    taricId?: string | number | null;
+    isProjectItem?: boolean;
+  }) => {
+    if (opts.setTaricCode) {
+      const codes = opts.setTaricCode.split("/");
+      const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+      return `set_${target}`;
+    }
+    if (
+      opts.isProjectItem ||
+      !opts.taricCode ||
+      opts.taricCode === "0" ||
+      opts.taricCode === "0000000000"
+    ) {
+      return "unknown";
+    }
+    return opts.taricId ? `taric_${opts.taricId}` : "unknown";
+  };
+  const getEffectiveTaricCode = (oi: any): string => {
+    if (oi.set_taric_code) {
+      const codes = oi.set_taric_code.split("/");
+      return (codes.length > 1 ? codes[1] : codes[0]).trim();
+    }
+    return oi.item?.taric?.code || "-";
+  };
   const handleSetTaric = async (group: any) => {
     if (!selectedTaricCode || !group) return;
     try {
@@ -950,7 +1035,7 @@ const InvoiceListPage: React.FC = () => {
         (key) =>
           expandedStates[key].taric &&
           expandedStates[key].data?.taricGroups?.some(
-            (g: any) => g.taricId === group.taricId,
+            (g: any) => (g.taricCode || "-") === (group.taricCode || "-"),
           ),
       );
 
@@ -960,23 +1045,7 @@ const InvoiceListPage: React.FC = () => {
       }
 
       const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter(
-        (oi: any) => {
-          const itemTaricCode = oi.item?.taric?.code || "";
-          const isProjectItem =
-            !itemTaricCode ||
-            itemTaricCode === "0" ||
-            itemTaricCode === "0000000000";
-          let oiGroupKey = "";
-          if (oi.set_taric_code) {
-            const codes = oi.set_taric_code.split("/");
-            const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-            oiGroupKey = `set_${target}`;
-          } else {
-            const taricId = oi.item?.taric?.id;
-            oiGroupKey = taricId ? `taric_${taricId}` : "unknown";
-          }
-          return oiGroupKey === group.taricId;
-        },
+        (oi: any) => getEffectiveTaricCode(oi) === (group.taricCode || "-"),
       );
 
       if (itemsInGroup && itemsInGroup.length > 0) {
@@ -987,20 +1056,10 @@ const InvoiceListPage: React.FC = () => {
             originalCode !== "0" &&
             originalCode !== "0000000000";
 
-          let newTaricValue = "";
-          if (hasOriginal) {
-            newTaricValue = `${originalCode}/${selectedTaricCode}`;
-          } else {
-            const priorSet = oi.set_taric_code;
-            if (priorSet && priorSet.includes("/")) {
-              const parts = priorSet.split("/");
-              newTaricValue = `${parts[0]}/${selectedTaricCode}`;
-            } else if (priorSet && priorSet !== selectedTaricCode) {
-              newTaricValue = `${priorSet}/${selectedTaricCode}`;
-            } else {
-              newTaricValue = selectedTaricCode;
-            }
-          }
+          const newTaricValue = hasOriginal
+            ? `${originalCode}/${selectedTaricCode}`
+            : selectedTaricCode;
+
           await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
         }
         toast.success("Taric codes updated successfully");
@@ -1206,36 +1265,48 @@ const InvoiceListPage: React.FC = () => {
       }));
 
       if (o.order_no && String(o.order_no).includes("2608-10")) {
-        console.log("🔍 [DEBUG] RAW items from API for order 2608-10:", rawItems.map((x: any) => ({
-          id: x.id,
-          position: x.position,
-          remark_de: x.remark_de,
-          remark_order_item: x.remark_order_item,
-          _originalIndex: x._originalIndex,
-          item_name: x.item?.item_name || x.item_name
-        })));
+        console.log(
+          "🔍 [DEBUG] RAW items from API for order 2608-10:",
+          rawItems.map((x: any) => ({
+            id: x.id,
+            position: x.position,
+            remark_de: x.remark_de,
+            remark_order_item: x.remark_order_item,
+            _originalIndex: x._originalIndex,
+            item_name: x.item?.item_name || x.item_name,
+          })),
+        );
       }
 
       rawItems.sort((a: any, b: any) => {
         const getSortValue = (item: any, fallbackIdx: number) => {
-          if (item.position !== undefined && item.position !== null && item.position !== "") {
+          if (
+            item.position !== undefined &&
+            item.position !== null &&
+            item.position !== ""
+          ) {
             const p = Number(item.position);
             if (!isNaN(p)) return p;
           }
           return fallbackIdx;
         };
-        return getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex);
+        return (
+          getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex)
+        );
       });
 
       if (o.order_no && String(o.order_no).includes("2608-10")) {
-        console.log("🔍 [DEBUG] SORTED items for order 2608-10:", rawItems.map((x: any) => ({
-          id: x.id,
-          position: x.position,
-          remark_de: x.remark_de,
-          remark_order_item: x.remark_order_item,
-          _originalIndex: x._originalIndex,
-          item_name: x.item?.item_name || x.item_name
-        })));
+        console.log(
+          "🔍 [DEBUG] SORTED items for order 2608-10:",
+          rawItems.map((x: any) => ({
+            id: x.id,
+            position: x.position,
+            remark_de: x.remark_de,
+            remark_order_item: x.remark_order_item,
+            _originalIndex: x._originalIndex,
+            item_name: x.item?.item_name || x.item_name,
+          })),
+        );
       }
 
       return rawItems.map((i: any, idx: number) => ({
@@ -1586,7 +1657,10 @@ const InvoiceListPage: React.FC = () => {
       if (bValue == null) return sortDirection === "asc" ? -1 : 1;
 
       if (typeof aValue === "string" && typeof bValue === "string") {
-        const comp = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: "base" });
+        const comp = aValue.localeCompare(bValue, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
         return sortDirection === "asc" ? comp : -comp;
       }
 
@@ -1687,11 +1761,11 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev) =>
         prev
           ? {
-            ...prev,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1847,10 +1921,11 @@ const InvoiceListPage: React.FC = () => {
                 setActiveInvTab(tab.id);
                 setCurrentPage(1);
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </button>
@@ -1861,17 +1936,19 @@ const InvoiceListPage: React.FC = () => {
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
             <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
               <FilterResetIcon
-                isActive={!!(
-                  searchTerm ||
-                  orderNoFilter ||
-                  filters.status ||
-                  filters.dateFrom ||
-                  filters.dateTo ||
-                  filters.customer ||
-                  filters.minAmount ||
-                  filters.maxAmount ||
-                  (cargoStatusFilter && cargoStatusFilter !== "Open")
-                )}
+                isActive={
+                  !!(
+                    searchTerm ||
+                    orderNoFilter ||
+                    filters.status ||
+                    filters.dateFrom ||
+                    filters.dateTo ||
+                    filters.customer ||
+                    filters.minAmount ||
+                    filters.maxAmount ||
+                    (cargoStatusFilter && cargoStatusFilter !== "Open")
+                  )
+                }
                 onReset={() => {
                   setSearchTerm("");
                   setOrderNoFilter("");
@@ -1892,7 +1969,7 @@ const InvoiceListPage: React.FC = () => {
                 type="text"
                 placeholder={
                   activeInvTab === "open_invoices" ||
-                    activeInvTab === "closed_invoices"
+                  activeInvTab === "closed_invoices"
                     ? "Search invoices, customers, or order numbers..."
                     : activeInvTab === "cargos"
                       ? "Search cargos..."
@@ -1904,7 +1981,7 @@ const InvoiceListPage: React.FC = () => {
                 }
                 value={
                   activeInvTab === "open_invoices" ||
-                    activeInvTab === "closed_invoices"
+                  activeInvTab === "closed_invoices"
                     ? searchTerm
                     : orderNoFilter
                 }
@@ -1918,31 +1995,37 @@ const InvoiceListPage: React.FC = () => {
                     setOrderNoFilter(e.target.value);
                   }
                 }}
-                className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${(activeInvTab === "open_invoices" || activeInvTab === "closed_invoices" ? searchTerm : orderNoFilter)
-                  ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                  : "text-gray-900 border-gray-300 bg-white"
-                  }`}
+                className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                  (
+                    activeInvTab === "open_invoices" ||
+                    activeInvTab === "closed_invoices"
+                      ? searchTerm
+                      : orderNoFilter
+                  )
+                    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                    : "text-gray-900 border-gray-300 bg-white"
+                }`}
               />
               {(activeInvTab === "open_invoices" ||
-                activeInvTab === "closed_invoices"
+              activeInvTab === "closed_invoices"
                 ? searchTerm
                 : orderNoFilter) && (
-                  <button
-                    onClick={() => {
-                      if (
-                        activeInvTab === "open_invoices" ||
-                        activeInvTab === "closed_invoices"
-                      ) {
-                        setSearchTerm("");
-                      } else {
-                        setOrderNoFilter("");
-                      }
-                    }}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    if (
+                      activeInvTab === "open_invoices" ||
+                      activeInvTab === "closed_invoices"
+                    ) {
+                      setSearchTerm("");
+                    } else {
+                      setOrderNoFilter("");
+                    }
+                  }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {activeInvTab === "cargos" && (
@@ -2006,483 +2089,707 @@ const InvoiceListPage: React.FC = () => {
 
         {(activeInvTab === "open_invoices" ||
           activeInvTab === "closed_invoices") && (
-            <>
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                      <p className="text-xs text-[#6C757D]">
-                        Loading invoices...
-                      </p>
-                    </div>
+          <>
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
+                    <p className="text-xs text-[#6C757D]">
+                      Loading invoices...
+                    </p>
                   </div>
-                ) : filteredInvoices.length === 0 ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
-                      <h3 className="text-lg font-medium mb-1 text-[#212529]">
-                        No invoices found
-                      </h3>
-                      <p className="text-xs text-[#6C757D]">
-                        Try adjusting your search or filters
-                      </p>
-                    </div>
+                </div>
+              ) : filteredInvoices.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
+                    <h3 className="text-lg font-medium mb-1 text-[#212529]">
+                      No invoices found
+                    </h3>
+                    <p className="text-xs text-[#6C757D]">
+                      Try adjusting your search or filters
+                    </p>
                   </div>
-                ) : (
-                  <>
-                    <div className="hidden lg:block overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
-                          <tr>
-                            <th className="w-10 py-3.5 px-3 text-center"></th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                #
-                              </th>
-                            )}
-                            {activeInvTab === "closed_invoices" && (
-                              <th
-                                onClick={() => handleSort("id")}
-                                className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                </div>
+              ) : (
+                <>
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
+                        <tr>
+                          <th className="w-10 py-3.5 px-3 text-center"></th>
+                          {activeInvTab === "closed_invoices" && (
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              #
+                            </th>
+                          )}
+                          {activeInvTab === "closed_invoices" && (
+                            <th
+                              onClick={() => handleSort("id")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>ID</span>
+                                {sortField === "id" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                          )}
+                          {activeInvTab === "closed_invoices" && (
+                            <th
+                              onClick={() => handleSort("invoiceNumber")}
+                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Invoice No</span>
+                                {sortField === "invoiceNumber" && (
+                                  <span className="text-xs text-emerald-600 font-bold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                          )}
+                          <th
+                            onClick={() => handleSort("createdAt")}
+                            className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>
+                                {activeInvTab === "open_invoices"
+                                  ? "Date "
+                                  : "Closed Date"}
+                              </span>
+                              {sortField === "createdAt" && (
+                                <span className="text-xs text-emerald-600 font-bold">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSort("customer")}
+                            className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Bill To</span>
+                              {sortField === "customer" && (
+                                <span className="text-xs text-emerald-600 font-bold">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Ship To
+                          </th>
+                          <th
+                            onClick={() => handleSort("cargoNo")}
+                            className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Cargo No.</span>
+                              {sortField === "cargoNo" && (
+                                <span className="text-xs text-emerald-600 font-bold">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            CargoType
+                          </th>
+                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                            Remark
+                          </th>
+                          <th
+                            onClick={() => handleSort("customItemCount")}
+                            className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>
+                                {activeInvTab === "open_invoices"
+                                  ? "Count Item"
+                                  : "Item Count"}
+                              </span>
+                              {sortField === "customItemCount" && (
+                                <span className="text-xs text-emerald-600 font-bold">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSort("customTotalQty")}
+                            className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>
+                                {activeInvTab === "open_invoices"
+                                  ? "QTY"
+                                  : "Total Qty"}
+                              </span>
+                              {sortField === "customTotalQty" && (
+                                <span className="text-xs text-emerald-600 font-bold">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSort("grossTotal")}
+                            className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>
+                                {activeInvTab === "open_invoices"
+                                  ? "TotalAmount"
+                                  : "Total Price"}
+                              </span>
+                              {sortField === "grossTotal" && (
+                                <span className="text-xs text-emerald-600 font-bold">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#F1F3F5]">
+                        {currentInvoices.map((invoice, index) => {
+                          const isExpanded = expandedInvoiceIds.has(invoice.id);
+                          const totalCols =
+                            activeInvTab === "closed_invoices" ? 13 : 10;
+                          return (
+                            <React.Fragment key={invoice.id}>
+                              <tr
+                                onClick={() =>
+                                  handleOpenInvoiceDetails(invoice)
+                                }
+                                className={`hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium ${
+                                  isExpanded ? "bg-[#F8F9FA]" : ""
+                                }`}
                               >
-                                <div className="flex items-center gap-1">
-                                  <span>ID</span>
-                                  {sortField === "id" && (
-                                    <span className="text-xs text-emerald-600 font-bold">
-                                      {sortDirection === "asc" ? "↑" : "↓"}
-                                    </span>
-                                  )}
-                                </div>
-                              </th>
-                            )}
-                            {activeInvTab === "closed_invoices" && (
-                              <th
-                                onClick={() => handleSort("invoiceNumber")}
-                                className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span>Invoice No</span>
-                                  {sortField === "invoiceNumber" && (
-                                    <span className="text-xs text-emerald-600 font-bold">
-                                      {sortDirection === "asc" ? "↑" : "↓"}
-                                    </span>
-                                  )}
-                                </div>
-                              </th>
-                            )}
-                            <th
-                              onClick={() => handleSort("createdAt")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>
-                                  {activeInvTab === "open_invoices"
-                                    ? "Date "
-                                    : "Closed Date"}
-                                </span>
-                                {sortField === "createdAt" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              onClick={() => handleSort("customer")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>Bill To</span>
-                                {sortField === "customer" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Ship To
-                            </th>
-                            <th
-                              onClick={() => handleSort("cargoNo")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>Cargo No.</span>
-                                {sortField === "cargoNo" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              CargoType
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Remark
-                            </th>
-                            <th
-                              onClick={() => handleSort("customItemCount")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>
-                                  {activeInvTab === "open_invoices"
-                                    ? "Count Item"
-                                    : "Item Count"}
-                                </span>
-                                {sortField === "customItemCount" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              onClick={() => handleSort("customTotalQty")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>
-                                  {activeInvTab === "open_invoices"
-                                    ? "QTY"
-                                    : "Total Qty"}
-                                </span>
-                                {sortField === "customTotalQty" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              onClick={() => handleSort("grossTotal")}
-                              className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center justify-end gap-1">
-                                <span>{activeInvTab === "open_invoices" ? "TotalAmount" : "Total Price"}</span>
-                                {sortField === "grossTotal" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#F1F3F5]">
-                          {currentInvoices.map((invoice, index) => {
-                            const isExpanded = expandedInvoiceIds.has(invoice.id);
-                            const totalCols = activeInvTab === "closed_invoices" ? 13 : 10;
-                            return (
-                              <React.Fragment key={invoice.id}>
-                                <tr
-                                  onClick={() =>
-                                    handleOpenInvoiceDetails(invoice)
-                                  }
-                                  className={`hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium ${isExpanded ? "bg-[#F8F9FA]" : ""
-                                    }`}
+                                <td
+                                  className="py-4 px-3 text-center"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <td
-                                    className="py-4 px-3 text-center"
-                                    onClick={(e) => e.stopPropagation()}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleRowExpand(invoice);
+                                    }}
+                                    className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-500 hover:text-black focus:outline-none"
+                                    title={
+                                      isExpanded
+                                        ? "Collapse Order Items"
+                                        : "Unfold OrderItemList"
+                                    }
                                   >
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleToggleRowExpand(invoice);
-                                      }}
-                                      className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-500 hover:text-black focus:outline-none"
-                                      title={isExpanded ? "Collapse Order Items" : "Unfold OrderItemList"}
-                                    >
-                                      {isExpanded ? (
-                                        <ChevronDown className="w-4 h-4 text-[#8CC21B] font-bold" />
-                                      ) : (
-                                        <ChevronRight className="w-4 h-4 text-gray-400 hover:text-gray-700" />
-                                      )}
-                                    </button>
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-[#212529]">
-                                      {startIndex + index + 1}
-                                    </td>
-                                  )}
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-[#212529] font-bold">
-                                      {invoice.id.slice(-5).toUpperCase()}
-                                    </td>
-                                  )}
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                                      {invoice.invoiceNumber || "N/A"}
-                                    </td>
-                                  )}
-                                  <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {formatDate(invoice.invoiceDate, true)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {getBillToDisplayName(invoice)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {(() => {
-                                      const v = invoice.ship_to;
-                                      if (!v || typeof v === "object") return "-";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "-";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {(() => {
-                                      const cNo = (invoice.cargo?.cargo_no || invoice.cargoNo || "").trim();
-                                      return cNo.toUpperCase().startsWith("C") ? cNo : "-";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {getCargoTypeNameFromInvoice(invoice)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {invoice.remark || "-"}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.customItemCount ??
-                                      invoice.items?.length ??
-                                      0}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                    {invoice.customTotalQty ??
-                                      invoice.items?.reduce(
-                                        (sum: any, item: any) =>
-                                          sum + item.quantity,
-                                        0,
-                                      ) ??
-                                      0}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                    {calculateInvoiceTotal(invoice).toLocaleString(
-                                      undefined,
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      },
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-4 h-4 text-[#8CC21B] font-bold" />
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4 text-gray-400 hover:text-gray-700" />
                                     )}
+                                  </button>
+                                </td>
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs text-[#212529]">
+                                    {startIndex + index + 1}
                                   </td>
-                                </tr>
-                                {isExpanded && (
-                                  <tr className="bg-gray-50/90 border-b border-gray-200">
-                                    <td colSpan={totalCols} className="p-4">
-                                      {expandedStates[invoice.id]?.loading ? (
-                                        <div className="flex items-center justify-center p-6 gap-2 text-xs text-gray-500 font-medium">
-                                          <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B]" /> Loading order items...
-                                        </div>
-                                      ) : (() => {
-                                        const data = expandedStates[invoice.id]?.data;
-                                        const itemsToRender = data?.detailedItems || data?.items || invoice.items || [];
+                                )}
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs text-[#212529] font-bold">
+                                    {invoice.id.slice(-5).toUpperCase()}
+                                  </td>
+                                )}
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
+                                    {invoice.invoiceNumber || "N/A"}
+                                  </td>
+                                )}
+                                <td className="py-4 px-4 text-xs text-[#495057]">
+                                  {formatDate(invoice.invoiceDate, true)}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {getBillToDisplayName(invoice)}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#6C757D]">
+                                  {(() => {
+                                    const v = invoice.ship_to;
+                                    if (!v || typeof v === "object") return "-";
+                                    const s = String(v).trim();
+                                    return s.length > 1 ? s : "-";
+                                  })()}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {(() => {
+                                    const cNo = (
+                                      invoice.cargo?.cargo_no ||
+                                      invoice.cargoNo ||
+                                      ""
+                                    ).trim();
+                                    return cNo.toUpperCase().startsWith("C")
+                                      ? cNo
+                                      : "-";
+                                  })()}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {getCargoTypeNameFromInvoice(invoice)}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#6C757D]">
+                                  {invoice.remark || "-"}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529]">
+                                  {invoice.customItemCount ??
+                                    invoice.items?.length ??
+                                    0}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529] font-medium">
+                                  {invoice.customTotalQty ??
+                                    invoice.items?.reduce(
+                                      (sum: any, item: any) =>
+                                        sum + item.quantity,
+                                      0,
+                                    ) ??
+                                    0}
+                                </td>
+                                <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                  {calculateInvoiceTotal(
+                                    invoice,
+                                  ).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr className="bg-gray-50/90 border-b border-gray-200">
+                                  <td colSpan={totalCols} className="p-4">
+                                    {expandedStates[invoice.id]?.loading ? (
+                                      <div className="flex items-center justify-center p-6 gap-2 text-xs text-gray-500 font-medium">
+                                        <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B]" />{" "}
+                                        Loading order items...
+                                      </div>
+                                    ) : (
+                                      (() => {
+                                        const data =
+                                          expandedStates[invoice.id]?.data;
+                                        const itemsToRender =
+                                          data?.detailedItems ||
+                                          data?.items ||
+                                          invoice.items ||
+                                          [];
                                         return (
                                           <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm space-y-2">
                                             <div className="flex items-center justify-between">
                                               <h5 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider flex items-center gap-2">
                                                 <Package className="w-3.5 h-3.5 text-[#8CC21B]" />
-                                                Order Items List ({itemsToRender.length} item{itemsToRender.length !== 1 ? 's' : ''})
+                                                Order Items List (
+                                                {itemsToRender.length} item
+                                                {itemsToRender.length !== 1
+                                                  ? "s"
+                                                  : ""}
+                                                )
                                               </h5>
-                                              <span className="text-[10px] text-gray-400 font-normal">Invoice ID: {invoice.id}</span>
+                                              <span className="text-[10px] text-gray-400 font-normal">
+                                                Invoice ID: {invoice.id}
+                                              </span>
                                             </div>
                                             {itemsToRender.length === 0 ? (
-                                              <p className="text-xs text-gray-500 italic py-2 text-center">No order items recorded for this invoice.</p>
+                                              <p className="text-xs text-gray-500 italic py-2 text-center">
+                                                No order items recorded for this
+                                                invoice.
+                                              </p>
                                             ) : (
                                               <div className="overflow-x-auto rounded border border-gray-200 bg-white">
                                                 <table className="w-full text-xs text-left text-gray-700">
                                                   <thead className="bg-[#343A40] text-white text-[10px] font-bold uppercase">
                                                     <tr>
-                                                      <th className="py-2.5 px-3">#</th>
-                                                      <th className="py-2.5 px-3">EAN</th>
-                                                      <th className="py-2.5 px-3">Item Name</th>
-                                                      <th className="py-2.5 px-3">TARIC</th>
-                                                      <th className="py-2.5 px-3">Order No</th>
-                                                      <th className="py-2.5 px-3">Remark</th>
-                                                      <th className="py-2.5 px-3 text-center">QTY</th>
-                                                      <th className="py-2.5 px-3 text-right">Unit Price (€)</th>
-                                                      <th className="py-2.5 px-3 text-right">Total (€)</th>
-                                                      {activeInvTab === "open_invoices" && <th className="py-2.5 px-3 text-center">Actions</th>}
+                                                      <th className="py-2.5 px-3">
+                                                        #
+                                                      </th>
+                                                      <th className="py-2.5 px-3">
+                                                        EAN
+                                                      </th>
+                                                      <th className="py-2.5 px-3">
+                                                        Item Name
+                                                      </th>
+                                                      <th className="py-2.5 px-3">
+                                                        TARIC
+                                                      </th>
+                                                      <th className="py-2.5 px-3">
+                                                        Order No
+                                                      </th>
+                                                      <th className="py-2.5 px-3">
+                                                        Remark
+                                                      </th>
+                                                      <th className="py-2.5 px-3 text-center">
+                                                        QTY
+                                                      </th>
+                                                      <th className="py-2.5 px-3 text-right">
+                                                        Unit Price (€)
+                                                      </th>
+                                                      <th className="py-2.5 px-3 text-right">
+                                                        Total (€)
+                                                      </th>
+                                                      {activeInvTab ===
+                                                        "open_invoices" && (
+                                                        <th className="py-2.5 px-3 text-center">
+                                                          Actions
+                                                        </th>
+                                                      )}
                                                     </tr>
                                                   </thead>
                                                   <tbody className="divide-y divide-gray-100 font-medium">
-                                                    {itemsToRender.map((it: any, idx: number) => {
-                                                      const ean = it._fallbackEan || it.item?.ean || it.ean || "-";
-                                                      const itemName = it.item?.item_name || it.itemName || it.item_name || it.description || "Item";
-                                                      const taricCode = it.set_taric_code || it.item?.taric?.code || it.taricCode || "-";
-                                                      const orderNo = it.order?.order_no || it.orderNo || "-";
-                                                      const remark = it.remark_de || it.remark || "";
-                                                      const qty = Number(it.qty || it.quantity || 0);
-                                                      const unitPrice = Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0);
-                                                      const totalPrice = Number(it.totalPrice || (qty * unitPrice));
+                                                    {itemsToRender.map(
+                                                      (
+                                                        it: any,
+                                                        idx: number,
+                                                      ) => {
+                                                        const ean =
+                                                          it._fallbackEan ||
+                                                          it.item?.ean ||
+                                                          it.ean ||
+                                                          "-";
+                                                        const itemName =
+                                                          it.item?.item_name ||
+                                                          it.itemName ||
+                                                          it.item_name ||
+                                                          it.description ||
+                                                          "Item";
+                                                        const taricCode =
+                                                          it.set_taric_code ||
+                                                          it.item?.taric
+                                                            ?.code ||
+                                                          it.taricCode ||
+                                                          "-";
+                                                        const orderNo =
+                                                          it.order?.order_no ||
+                                                          it.orderNo ||
+                                                          "-";
+                                                        const remark =
+                                                          it.remark_de ||
+                                                          it.remark ||
+                                                          "";
+                                                        const qty = Number(
+                                                          it.qty ||
+                                                            it.quantity ||
+                                                            0,
+                                                        );
+                                                        const unitPrice =
+                                                          Number(
+                                                            it.eur_special_price ||
+                                                              it._fallbackEk ||
+                                                              it.unitPrice ||
+                                                              it.price ||
+                                                              0,
+                                                          );
+                                                        const totalPrice =
+                                                          Number(
+                                                            it.totalPrice ||
+                                                              qty * unitPrice,
+                                                          );
 
-                                                      return (
-                                                        <tr key={it.id || idx} className="hover:bg-gray-50 transition-colors">
-                                                          <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
-                                                          <td className="py-2 px-3 font-mono text-[11px] text-gray-600">{ean}</td>
-                                                          <td className="py-2 px-3 max-w-[240px] truncate font-semibold text-gray-900" title={itemName}>{itemName}</td>
-                                                          <td className="py-2 px-3 font-mono text-[11px] text-amber-700 font-semibold">{taricCode}</td>
-                                                          <td className="py-2 px-3 text-gray-600">{orderNo}</td>
-                                                          <td className="py-2 px-3 text-gray-500 text-[11px] italic">{remark ? `// ${remark}` : "-"}</td>
-                                                          <td className="py-2 px-3 text-center font-bold">{it.qty_label ? `${it.qty_label}/${qty}` : qty}</td>
-                                                          <td className="py-2 px-3 text-right">€{unitPrice.toFixed(2)}</td>
-                                                          <td className="py-2 px-3 text-right font-bold text-[#10B981]">€{totalPrice.toFixed(2)}</td>
-                                                          {activeInvTab === "open_invoices" && (
-                                                            <td className="py-2 px-3">
-                                                              <div className="flex items-center justify-center gap-1">
-                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setNewQty(it.qty_label || it.qty); setQtyRemarks(it.remarks_cn || ""); setShowQTYModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition" title="QtyLabel">Qty</button>
-                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem({ ...it, cargo_id: it.cargo_id || invoice.cargo?.id || (expandedStates[invoice.id]?.data?.cargo?.id) }); setSplitQty(Math.floor(it.qty * 0.5)); setTargetCargoId(""); setSplitRemarks(it.remarks_cn || ""); setShowSPModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition" title="Split">Split</button>
-                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setTargetCargoId(it.cargo_id || ""); setShowREModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition" title="ReAssign">ReAssign</button>
-                                                              </div>
+                                                        return (
+                                                          <tr
+                                                            key={it.id || idx}
+                                                            className="hover:bg-gray-50 transition-colors"
+                                                          >
+                                                            <td className="py-2 px-3 text-gray-500">
+                                                              {idx + 1}
                                                             </td>
-                                                          )}
-                                                        </tr>
-                                                      );
-                                                    })}
+                                                            <td className="py-2 px-3 font-mono text-[11px] text-gray-600">
+                                                              {ean}
+                                                            </td>
+                                                            <td
+                                                              className="py-2 px-3 max-w-[240px] truncate font-semibold text-gray-900"
+                                                              title={itemName}
+                                                            >
+                                                              {itemName}
+                                                            </td>
+                                                            <td className="py-2 px-3 font-mono text-[11px] text-amber-700 font-semibold">
+                                                              {taricCode}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-gray-600">
+                                                              {orderNo}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-gray-500 text-[11px] italic">
+                                                              {remark
+                                                                ? `// ${remark}`
+                                                                : "-"}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-center font-bold">
+                                                              {it.qty_label
+                                                                ? `${it.qty_label}/${qty}`
+                                                                : qty}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-right">
+                                                              €
+                                                              {unitPrice.toFixed(
+                                                                2,
+                                                              )}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-right font-bold text-[#10B981]">
+                                                              €
+                                                              {totalPrice.toFixed(
+                                                                2,
+                                                              )}
+                                                            </td>
+                                                            {activeInvTab ===
+                                                              "open_invoices" && (
+                                                              <td className="py-2 px-3">
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                  <button
+                                                                    onClick={(
+                                                                      e,
+                                                                    ) => {
+                                                                      e.stopPropagation();
+                                                                      setSelectedItem(
+                                                                        it,
+                                                                      );
+                                                                      setNewQty(
+                                                                        it.qty_label ||
+                                                                          it.qty,
+                                                                      );
+                                                                      setQtyRemarks(
+                                                                        it.remarks_cn ||
+                                                                          "",
+                                                                      );
+                                                                      setShowQTYModal(
+                                                                        true,
+                                                                      );
+                                                                    }}
+                                                                    className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition"
+                                                                    title="QtyLabel"
+                                                                  >
+                                                                    Qty
+                                                                  </button>
+                                                                  <button
+                                                                    onClick={(
+                                                                      e,
+                                                                    ) => {
+                                                                      e.stopPropagation();
+                                                                      setSelectedItem(
+                                                                        {
+                                                                          ...it,
+                                                                          cargo_id:
+                                                                            it.cargo_id ||
+                                                                            invoice
+                                                                              .cargo
+                                                                              ?.id ||
+                                                                            expandedStates[
+                                                                              invoice
+                                                                                .id
+                                                                            ]
+                                                                              ?.data
+                                                                              ?.cargo
+                                                                              ?.id,
+                                                                        },
+                                                                      );
+                                                                      setSplitQty(
+                                                                        Math.floor(
+                                                                          it.qty *
+                                                                            0.5,
+                                                                        ),
+                                                                      );
+                                                                      setTargetCargoId(
+                                                                        "",
+                                                                      );
+                                                                      setSplitRemarks(
+                                                                        it.remarks_cn ||
+                                                                          "",
+                                                                      );
+                                                                      setShowSPModal(
+                                                                        true,
+                                                                      );
+                                                                    }}
+                                                                    className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition"
+                                                                    title="Split"
+                                                                  >
+                                                                    Split
+                                                                  </button>
+                                                                  <button
+                                                                    onClick={(
+                                                                      e,
+                                                                    ) => {
+                                                                      e.stopPropagation();
+                                                                      setSelectedItem(
+                                                                        it,
+                                                                      );
+                                                                      setTargetCargoId(
+                                                                        it.cargo_id ||
+                                                                          "",
+                                                                      );
+                                                                      setShowREModal(
+                                                                        true,
+                                                                      );
+                                                                    }}
+                                                                    className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition"
+                                                                    title="ReAssign"
+                                                                  >
+                                                                    ReAssign
+                                                                  </button>
+                                                                </div>
+                                                              </td>
+                                                            )}
+                                                          </tr>
+                                                        );
+                                                      },
+                                                    )}
                                                   </tbody>
                                                 </table>
                                               </div>
                                             )}
                                           </div>
                                         );
-                                      })()}
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                      })()
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
 
-                    <div className="lg:hidden divide-y divide-[#F1F3F5]">
-                      {currentInvoices.map((invoice) => (
-                        <div
-                          key={invoice.id}
-                          onClick={() => handleOpenInvoiceDetails(invoice)}
-                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
-                                {invoice.id.slice(-5).toUpperCase()}
-                              </div>
-                              <div className="font-bold text-sm text-[#212529]">
-                                {activeInvTab === "closed_invoices"
-                                  ? invoice.invoiceNumber
-                                  : `ID: ${invoice.id.slice(-5)}`}
-                              </div>
+                  <div className="lg:hidden divide-y divide-[#F1F3F5]">
+                    {currentInvoices.map((invoice) => (
+                      <div
+                        key={invoice.id}
+                        onClick={() => handleOpenInvoiceDetails(invoice)}
+                        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
+                              {invoice.id.slice(-5).toUpperCase()}
                             </div>
-                            <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
-                              style={getStatusColor(invoice.status)}
-                            >
-                              {invoice.status}
+                            <div className="font-bold text-sm text-[#212529]">
+                              {activeInvTab === "closed_invoices"
+                                ? invoice.invoiceNumber
+                                : `ID: ${invoice.id.slice(-5)}`}
+                            </div>
+                          </div>
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
+                            style={getStatusColor(invoice.status)}
+                          >
+                            {invoice.status}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">Customer</span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.customer?.companyName}
                             </span>
                           </div>
-
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Customer</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customer?.companyName}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">
-                                {activeInvTab === "open_invoices"
-                                  ? "Cargo"
-                                  : "Cargo No."}
-                              </span>
-                              <span className="font-medium text-[#212529]">
-                                {(() => {
-                                  const cNo = (invoice.cargo?.cargo_no || invoice.cargoNo || "").trim();
-                                  return cNo.toUpperCase().startsWith("C") ? cNo : "-";
-                                })()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Items / Qty</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customItemCount ??
-                                  invoice.items?.length ??
-                                  0}{" "}
-                                /{" "}
-                                {invoice.customTotalQty ??
-                                  invoice.items?.reduce(
-                                    (sum, item) => sum + item.quantity,
-                                    0,
-                                  ) ??
-                                  0}
-                              </span>
-                            </div>
-                            {activeInvTab === "closed_invoices" && (
-                              <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
-                                <span className="text-[#6C757D]">
-                                  Total Price
-                                </span>
-                                <span className="text-[#212529]">
-                                  €
-                                  {calculateInvoiceTotal(invoice).toFixed(2)}
-                                </span>
-                              </div>
-                            )}
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">
+                              {activeInvTab === "open_invoices"
+                                ? "Cargo"
+                                : "Cargo No."}
+                            </span>
+                            <span className="font-medium text-[#212529]">
+                              {(() => {
+                                const cNo = (
+                                  invoice.cargo?.cargo_no ||
+                                  invoice.cargoNo ||
+                                  ""
+                                ).trim();
+                                return cNo.toUpperCase().startsWith("C")
+                                  ? cNo
+                                  : "-";
+                              })()}
+                            </span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
-                        <div className="text-[11px] font-medium text-[#6C757D]">
-                          Showing {startIndex + 1} to{" "}
-                          {Math.min(endIndex, filteredInvoices.length)} of{" "}
-                          {filteredInvoices.length} invoices
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() =>
-                              setCurrentPage(Math.max(1, currentPage - 1))
-                            }
-                            disabled={currentPage === 1}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
-                          {[...Array(totalPages)].map((_, i) => (
-                            <button
-                              key={i + 1}
-                              onClick={() => setCurrentPage(i + 1)}
-                              className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                                }`}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() =>
-                              setCurrentPage(
-                                Math.min(totalPages, currentPage + 1),
-                              )
-                            }
-                            disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#6C757D]">Items / Qty</span>
+                            <span className="font-medium text-[#212529]">
+                              {invoice.customItemCount ??
+                                invoice.items?.length ??
+                                0}{" "}
+                              /{" "}
+                              {invoice.customTotalQty ??
+                                invoice.items?.reduce(
+                                  (sum, item) => sum + item.quantity,
+                                  0,
+                                ) ??
+                                0}
+                            </span>
+                          </div>
+                          {activeInvTab === "closed_invoices" && (
+                            <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
+                              <span className="text-[#6C757D]">
+                                Total Price
+                              </span>
+                              <span className="text-[#212529]">
+                                €{calculateInvoiceTotal(invoice).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </>
-          )}
+                    ))}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
+                      <div className="text-[11px] font-medium text-[#6C757D]">
+                        Showing {startIndex + 1} to{" "}
+                        {Math.min(endIndex, filteredInvoices.length)} of{" "}
+                        {filteredInvoices.length} invoices
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
+                        </button>
+                        {[...Array(totalPages)].map((_, i) => (
+                          <button
+                            key={i + 1}
+                            onClick={() => setCurrentPage(i + 1)}
+                            className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
+                              currentPage === i + 1
+                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1),
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
 
         {activeInvTab === "cargos" && (
           <div
@@ -2565,7 +2872,7 @@ const InvoiceListPage: React.FC = () => {
                               selectedInvoice.id,
                               selectedInvoice.invoiceNumber,
                               selectedInvoice.cargo?.cargo_no ||
-                              selectedInvoice.cargoNo,
+                                selectedInvoice.cargoNo,
                             );
                           } catch (error) {
                             console.error("PDF Generation failed", error);
@@ -2636,7 +2943,11 @@ const InvoiceListPage: React.FC = () => {
                     <span className="text-sm font-semibold text-gray-800 block mt-1">
                       Cargo:{" "}
                       {(() => {
-                        const cNo = (selectedInvoice.cargo?.cargo_no || selectedInvoice.cargoNo || "").trim();
+                        const cNo = (
+                          selectedInvoice.cargo?.cargo_no ||
+                          selectedInvoice.cargoNo ||
+                          ""
+                        ).trim();
                         return cNo.toUpperCase().startsWith("C") ? cNo : "N/A";
                       })()}
                     </span>
@@ -2666,25 +2977,32 @@ const InvoiceListPage: React.FC = () => {
                       <span className="text-sm font-bold text-emerald-600 block mt-0.5">
                         Total: €
                         {(() => {
-                          const expData = expandedStates[selectedInvoice.id]?.data;
-                          const taricSum = expData?.taricGroups?.reduce(
-                            (s: number, g: any) => s + (Number(g.totalPrice) || 0),
-                            0,
-                          ) || 0;
-                          const freight = Number(selectedInvoice.freightCost || 0);
-                          if (taricSum > 0) {
-                            return (taricSum + freight).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            });
-                          }
-                          return calculateInvoiceTotal(selectedInvoice).toLocaleString(
-                            undefined,
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            },
+                          const expData =
+                            expandedStates[selectedInvoice.id]?.data;
+                          const taricSum =
+                            expData?.taricGroups?.reduce(
+                              (s: number, g: any) =>
+                                s + (Number(g.totalPrice) || 0),
+                              0,
+                            ) || 0;
+                          const freight = Number(
+                            selectedInvoice.freightCost || 0,
                           );
+                          if (taricSum > 0) {
+                            return (taricSum + freight).toLocaleString(
+                              undefined,
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              },
+                            );
+                          }
+                          return calculateInvoiceTotal(
+                            selectedInvoice,
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          });
                         })()}
                       </span>
                     )}
@@ -2785,181 +3103,220 @@ const InvoiceListPage: React.FC = () => {
                         </h4>
                         <SpreadSheet
                           data={(
-                            expandedStates[selectedInvoice.id]?.data?.taricGroups || []
-                          ).map((g: any) => ({
-                            ...g,
-                            id: g.taricId || g.taricCode || `taric_${g.taricCode}`
-                          }))}
+                            expandedStates[selectedInvoice.id]?.data
+                              ?.taricGroups || []
+                          ).map((g: any) => {
+                            const groupKey = getTaricGroupKey({
+                              taricCode: g.taricCode,
+                              taricId: g.taricId,
+                              isProjectItem: g.isProjectItem,
+                            });
+                            return { ...g, id: groupKey, groupKey };
+                          })}
                           loading={expandedStates[selectedInvoice.id]?.loading}
                           showTotals={true}
                           columns={
                             activeInvTab === "closed_invoices"
                               ? [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => (
-                                    <div className="font-semibold text-gray-900">{it.taricNameEn}</div>
-                                  ),
-                                  width: "230px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      className="font-mono text-xs"
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 700,
-                                          }
-                                          : { fontWeight: 600 }
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate !== null && it.dutyRate !== undefined
-                                      ? `${Number(it.dutyRate).toFixed(2)}%`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => (
-                                    <span className="font-bold text-gray-900">{it.totalQty}</span>
-                                  ),
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => `€${Number(it.unitPrice || 0).toFixed(2)}`,
-                                  width: "90px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    `€${(Number(it.totalPrice) || 0).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}`,
-                                  width: "110px",
-                                },
-
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => (
+                                      <div className="font-semibold text-gray-900">
+                                        {it.taricNameEn}
+                                      </div>
+                                    ),
+                                    width: "230px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        className="font-mono text-xs"
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 700,
+                                              }
+                                            : { fontWeight: 600 }
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate !== null &&
+                                      it.dutyRate !== undefined
+                                        ? `${Number(it.dutyRate).toFixed(2)}%`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => (
+                                      <span className="font-bold text-gray-900">
+                                        {it.totalQty}
+                                      </span>
+                                    ),
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) =>
+                                      `€${Number(it.unitPrice || 0).toFixed(2)}`,
+                                    width: "90px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      `€${(
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}`,
+                                    width: "110px",
+                                  },
+                                ]
                               : [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => (
-                                    <div className="font-semibold text-gray-900">{it.taricNameEn}</div>
-                                  ),
-                                  width: "210px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      className="font-mono text-xs"
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 700,
-                                          }
-                                          : { fontWeight: 600 }
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate !== null && it.dutyRate !== undefined
-                                      ? `${Number(it.dutyRate).toFixed(2)}%`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => (
-                                    <span className="font-bold text-gray-900">{it.totalQty}</span>
-                                  ),
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => `€${Number(it.unitPrice || 0).toFixed(2)}`,
-                                  width: "90px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    `€${(Number(it.totalPrice) || 0).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}`,
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Operation",
-                                  render: (group: any) => (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTaricGroup(group);
-                                        setSelectedTaricCode("");
-                                        setShowTaricModal(true);
-                                      }}
-                                      className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0] transition-colors"
-                                    >
-                                      <RefreshCw className="w-3 h-3" /> Set taric
-                                    </button>
-                                  ),
-                                  width: "100px",
-                                },
-                              ]
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "50px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => (
+                                      <div className="font-semibold text-gray-900">
+                                        {it.taricNameEn}
+                                      </div>
+                                    ),
+                                    width: "210px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span
+                                        className="font-mono text-xs"
+                                        style={
+                                          it.isProjectItem
+                                            ? {
+                                                color: "#F59E0B",
+                                                fontWeight: 700,
+                                              }
+                                            : { fontWeight: 600 }
+                                        }
+                                      >
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) =>
+                                      it.dutyRate !== null &&
+                                      it.dutyRate !== undefined
+                                        ? `${Number(it.dutyRate).toFixed(2)}%`
+                                        : "-",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => (
+                                      <span className="font-bold text-gray-900">
+                                        {it.totalQty}
+                                      </span>
+                                    ),
+                                    align: "center",
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) =>
+                                      `€${Number(it.unitPrice || 0).toFixed(2)}`,
+                                    width: "90px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      `€${(
+                                        Number(it.totalPrice) || 0
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}`,
+                                    width: "110px",
+                                  },
+                                  {
+                                    header: "Operation",
+                                    render: (group: any) => (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedTaricGroup(group);
+                                          setSelectedTaricCode("");
+                                          setShowTaricModal(true);
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0] transition-colors"
+                                      >
+                                        <RefreshCw className="w-3 h-3" /> Set
+                                        taric
+                                      </button>
+                                    ),
+                                    width: "100px",
+                                  },
+                                ]
                           }
                           expandedRowId={expandedTaricGroupKey}
                           renderRowDetails={(group: any) => {
-                            const allDetailedItems = expandedStates[selectedInvoice.id]?.data?.detailedItems || [];
-                            const matchingItems = allDetailedItems.filter((it: any) => {
-                              const code = it.set_taric_code || it.item?.taric?.code || "-";
-                              if (group.taricCode === "-" || !group.taricCode) {
-                                return !code || code === "-";
-                              }
-                              return code === group.taricCode;
-                            });
+                            const allDetailedItems =
+                              expandedStates[selectedInvoice.id]?.data
+                                ?.detailedItems || [];
+                            const matchingItems = allDetailedItems.filter(
+                              (it: any) => {
+                                const code =
+                                  it.set_taric_code ||
+                                  it.item?.taric?.code ||
+                                  "-";
+                                if (
+                                  group.taricCode === "-" ||
+                                  !group.taricCode
+                                ) {
+                                  return !code || code === "-";
+                                }
+                                return code === group.taricCode;
+                              },
+                            );
 
                             return (
                               <div className="bg-[#F8F9FA] p-3 rounded-lg border border-gray-200 my-1 space-y-2">
                                 <div className="flex items-center justify-between">
                                   <h5 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider flex items-center gap-2">
                                     <Package className="w-3.5 h-3.5 text-[#8CC21B]" />
-                                    Order Items under TARIC Code: <span className="font-mono text-xs text-gray-900 font-bold">{group.taricCode}</span> ({matchingItems.length} item{matchingItems.length !== 1 ? 's' : ''})
+                                    Order Items under TARIC Code:{" "}
+                                    <span className="font-mono text-xs text-gray-900 font-bold">
+                                      {group.taricCode}
+                                    </span>{" "}
+                                    ({matchingItems.length} item
+                                    {matchingItems.length !== 1 ? "s" : ""})
                                   </h5>
                                 </div>
                                 {matchingItems.length === 0 ? (
-                                  <p className="text-xs text-gray-500 italic py-1">No detailed order items recorded for this TARIC group.</p>
+                                  <p className="text-xs text-gray-500 italic py-1">
+                                    No detailed order items recorded for this
+                                    TARIC group.
+                                  </p>
                                 ) : (
                                   <div className="overflow-x-auto rounded border border-gray-200 bg-white shadow-sm">
                                     <table className="w-full text-xs text-left text-gray-700">
@@ -2967,41 +3324,139 @@ const InvoiceListPage: React.FC = () => {
                                         <tr>
                                           <th className="py-2 px-3">#</th>
                                           <th className="py-2 px-3">EAN</th>
-                                          <th className="py-2 px-3">Item Name</th>
-                                          <th className="py-2 px-3">Order No</th>
+                                          <th className="py-2 px-3">
+                                            Item Name
+                                          </th>
+                                          <th className="py-2 px-3">
+                                            Order No
+                                          </th>
                                           <th className="py-2 px-3">Remark</th>
-                                          <th className="py-2 px-3 text-center">QTY</th>
-                                          <th className="py-2 px-3 text-right">Unit Price (€)</th>
-                                          <th className="py-2 px-3 text-right">Total (€)</th>
-                                          {activeInvTab !== "closed_invoices" && <th className="py-2 px-3 text-center">Actions</th>}
+                                          <th className="py-2 px-3 text-center">
+                                            QTY
+                                          </th>
+                                          <th className="py-2 px-3 text-right">
+                                            Unit Price (€)
+                                          </th>
+                                          <th className="py-2 px-3 text-right">
+                                            Total (€)
+                                          </th>
+                                          {activeInvTab !==
+                                            "closed_invoices" && (
+                                            <th className="py-2 px-3 text-center">
+                                              Actions
+                                            </th>
+                                          )}
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-gray-100 font-medium">
-                                        {matchingItems.map((it: any, idx: number) => {
-                                          const unitPrice = Number(it.eur_special_price || it._fallbackEk || 0);
-                                          const totalPrice = Number(it.qty || 0) * unitPrice;
-                                          return (
-                                            <tr key={it.id || idx} className="hover:bg-gray-50 transition-colors">
-                                              <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
-                                              <td className="py-2 px-3 font-mono text-[11px] text-gray-600">{it._fallbackEan || it.item?.ean || "-"}</td>
-                                              <td className="py-2 px-3 max-w-[220px] truncate font-semibold text-gray-900" title={it.item?.item_name}>{it.item?.item_name || "Item"}</td>
-                                              <td className="py-2 px-3 text-gray-600">{it.order?.order_no || "-"}</td>
-                                              <td className="py-2 px-3 text-gray-500 text-[11px] italic">// {it.remark_de || ""}</td>
-                                              <td className="py-2 px-3 text-center font-bold">{it.qty_label ? `${it.qty_label}/${it.qty}` : it.qty}</td>
-                                              <td className="py-2 px-3 text-right">€{unitPrice.toFixed(2)}</td>
-                                              <td className="py-2 px-3 text-right font-bold text-[#10B981]">€{totalPrice.toFixed(2)}</td>
-                                              {activeInvTab !== "closed_invoices" && (
-                                                <td className="py-2 px-3">
-                                                  <div className="flex items-center justify-center gap-1">
-                                                    <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setNewQty(it.qty_label || it.qty); setQtyRemarks(it.remarks_cn || ""); setShowQTYModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition" title="QtyLabel">Qty</button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setSplitQty(Math.floor(it.qty * 0.5)); setTargetCargoId(""); setSplitRemarks(it.remarks_cn || ""); setShowSPModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition" title="Split">Split</button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setTargetCargoId(it.cargo_id || ""); setShowREModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition" title="ReAssign">ReAssign</button>
-                                                  </div>
+                                        {matchingItems.map(
+                                          (it: any, idx: number) => {
+                                            const unitPrice = Number(
+                                              it.eur_special_price ||
+                                                it._fallbackEk ||
+                                                0,
+                                            );
+                                            const totalPrice =
+                                              Number(it.qty || 0) * unitPrice;
+                                            return (
+                                              <tr
+                                                key={it.id || idx}
+                                                className="hover:bg-gray-50 transition-colors"
+                                              >
+                                                <td className="py-2 px-3 text-gray-500">
+                                                  {idx + 1}
                                                 </td>
-                                              )}
-                                            </tr>
-                                          );
-                                        })}
+                                                <td className="py-2 px-3 font-mono text-[11px] text-gray-600">
+                                                  {it._fallbackEan ||
+                                                    it.item?.ean ||
+                                                    "-"}
+                                                </td>
+                                                <td
+                                                  className="py-2 px-3 max-w-[220px] truncate font-semibold text-gray-900"
+                                                  title={it.item?.item_name}
+                                                >
+                                                  {it.item?.item_name || "Item"}
+                                                </td>
+                                                <td className="py-2 px-3 text-gray-600">
+                                                  {it.order?.order_no || "-"}
+                                                </td>
+                                                <td className="py-2 px-3 text-gray-500 text-[11px] italic">
+                                                  // {it.remark_de || ""}
+                                                </td>
+                                                <td className="py-2 px-3 text-center font-bold">
+                                                  {it.qty_label
+                                                    ? `${it.qty_label}/${it.qty}`
+                                                    : it.qty}
+                                                </td>
+                                                <td className="py-2 px-3 text-right">
+                                                  €{unitPrice.toFixed(2)}
+                                                </td>
+                                                <td className="py-2 px-3 text-right font-bold text-[#10B981]">
+                                                  €{totalPrice.toFixed(2)}
+                                                </td>
+                                                {activeInvTab !==
+                                                  "closed_invoices" && (
+                                                  <td className="py-2 px-3">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setSelectedItem(it);
+                                                          setNewQty(
+                                                            it.qty_label ||
+                                                              it.qty,
+                                                          );
+                                                          setQtyRemarks(
+                                                            it.remarks_cn || "",
+                                                          );
+                                                          setShowQTYModal(true);
+                                                        }}
+                                                        className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition"
+                                                        title="QtyLabel"
+                                                      >
+                                                        Qty
+                                                      </button>
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setSelectedItem(it);
+                                                          setSplitQty(
+                                                            Math.floor(
+                                                              it.qty * 0.5,
+                                                            ),
+                                                          );
+                                                          setTargetCargoId("");
+                                                          setSplitRemarks(
+                                                            it.remarks_cn || "",
+                                                          );
+                                                          setShowSPModal(true);
+                                                        }}
+                                                        className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition"
+                                                        title="Split"
+                                                      >
+                                                        Split
+                                                      </button>
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setSelectedItem(it);
+                                                          setTargetCargoId(
+                                                            it.cargo_id || "",
+                                                          );
+                                                          setShowREModal(true);
+                                                        }}
+                                                        className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition"
+                                                        title="ReAssign"
+                                                      >
+                                                        ReAssign
+                                                      </button>
+                                                    </div>
+                                                  </td>
+                                                )}
+                                              </tr>
+                                            );
+                                          },
+                                        )}
                                       </tbody>
                                     </table>
                                   </div>
@@ -3012,89 +3467,89 @@ const InvoiceListPage: React.FC = () => {
                           totalCols={
                             activeInvTab === "closed_invoices"
                               ? [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "90px",
-                                },
-                                {
-                                  value: `€${(
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}`,
-                                  width: "110px",
-                                  align: "left",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "90px",
+                                  },
+                                  {
+                                    value: `€${(
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}`,
+                                    width: "110px",
+                                    align: "left",
+                                  },
+                                ]
                               : [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "90px",
-                                },
-                                {
-                                  value: `€${(
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}`,
-                                  width: "110px",
-                                  align: "left",
-                                },
-                                {
-                                  value: "",
-                                  width: "100px",
-                                },
-                              ]
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    colSpan: 4,
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "80px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "90px",
+                                  },
+                                  {
+                                    value: `€${(
+                                      expandedStates[
+                                        selectedInvoice.id
+                                      ]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) =>
+                                          s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}`,
+                                    width: "110px",
+                                    align: "left",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "100px",
+                                  },
+                                ]
                           }
                         />
                       </div>
@@ -3108,256 +3563,263 @@ const InvoiceListPage: React.FC = () => {
                         columns={
                           activeInvTab === "closed_invoices"
                             ? [
-                              {
-                                header: "#",
-                                render: (_: any, idx: number) => idx + 1,
-                                width: "40px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-2 leading-tight py-1 font-semibold text-gray-900"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "350px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) => (
-                                  <span className="font-mono text-xs">
-                                    {it.set_taric_code || it.item?.taric?.code || "-"}
-                                  </span>
-                                ),
-                                width: "100px",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <span className="font-bold">{it.qty}</span>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  `€${Number(it.eur_special_price || it._fallbackEk || 0).toFixed(2)}`,
-                                width: "70px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      €{totalPrice.toFixed(2)}
-                                    </span>
-                                  );
+                                {
+                                  header: "#",
+                                  render: (_: any, idx: number) => idx + 1,
+                                  width: "40px",
                                 },
-                                width: "80px",
-                                align: "center",
-                              },
-                            ]
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-2 leading-tight py-1 font-semibold text-gray-900"
+                                      title={it.item?.item_name}
+                                    >
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "350px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) => (
+                                    <span className="font-mono text-xs">
+                                      {it.set_taric_code ||
+                                        it.item?.taric?.code ||
+                                        "-"}
+                                    </span>
+                                  ),
+                                  width: "100px",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <span className="font-bold">{it.qty}</span>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    `€${Number(it.eur_special_price || it._fallbackEk || 0).toFixed(2)}`,
+                                  width: "70px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        €{totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "80px",
+                                  align: "center",
+                                },
+                              ]
                             : [
-                              {
-                                header: "ID",
-                                render: (it: any) => (
-                                  <div className="px-2 py-0.5 bg-[#495057] text-white text-[10px] font-bold rounded text-center inline-block font-sans">
-                                    {it.id}
-                                  </div>
-                                ),
-                                width: "70px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "100px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-2 leading-tight break-words font-semibold text-gray-900 py-0.5"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "220px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) => (
-                                  <span className="font-mono text-xs">
-                                    {it.set_taric_code || it.item?.taric?.code || "-"}
-                                  </span>
-                                ),
-                                width: "90px",
-                              },
-                              {
-                                header: "Remark",
-                                render: (it: any) => (
-                                  <span className="text-[11px] text-gray-500 italic">
-                                    {it.remark_de ? `// ${it.remark_de}` : "-"}
-                                  </span>
-                                ),
-                                width: "100px",
-                              },
-                              {
-                                header: "Order_no",
-                                render: (it: any) =>
-                                  it.order?.order_no || "-",
-                                width: "80px",
-                              },
-                              {
-                                header: "SOID",
-                                render: (it: any) =>
-                                  it.supplier_order_id || "-",
-                                width: "50px",
-                              },
-                              {
-                                header: "Status",
-                                render: (it: any) => (
-                                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded border">
-                                    {it.status}
-                                  </span>
-                                ),
-                                width: "60px",
-                              },
-                              {
-                                header: "V(dm³)",
-                                render: (it: any) => it.v?.toFixed(2),
-                                width: "50px",
-                                align: "center",
-                              },
-                              {
-                                header: "W(kg)",
-                                render: (it: any) => it.w?.toFixed(2),
-                                width: "50px",
-                                align: "center",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <span className="font-bold">
-                                    {it.qty_label
-                                      ? `${it.qty_label}/${it.qty}`
-                                      : it.qty}
-                                  </span>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  `€${Number(it.eur_special_price || it._fallbackEk || 0).toFixed(2)}`,
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      €{totalPrice.toFixed(2)}
-                                    </span>
-                                  );
+                                {
+                                  header: "ID",
+                                  render: (it: any) => (
+                                    <div className="px-2 py-0.5 bg-[#495057] text-white text-[10px] font-bold rounded text-center inline-block font-sans">
+                                      {it.id}
+                                    </div>
+                                  ),
+                                  width: "70px",
                                 },
-                                width: "70px",
-                                align: "center",
-                              },
-                              {
-                                header: "Actions",
-                                render: (it: any) => (
-                                  <div className="flex flex-wrap items-center gap-1 py-0.5">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedItem(it);
-                                        setNewQty(it.qty_label || it.qty);
-                                        setQtyRemarks(it.remarks_cn || "");
-                                        setShowQTYModal(true);
-                                      }}
-                                      className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition shadow-sm"
-                                      title="QtyLabel"
+                                {
+                                  header: "EAN",
+                                  render: (it: any) =>
+                                    it._fallbackEan || it.item?.ean || "-",
+                                  width: "100px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div
+                                      className="line-clamp-2 leading-tight break-words font-semibold text-gray-900 py-0.5"
+                                      title={it.item?.item_name}
                                     >
-                                      Qty
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedItem(it);
-                                        setSplitQty(Math.floor(it.qty * 0.5));
-                                        setTargetCargoId("");
-                                        setSplitRemarks(it.remarks_cn || "");
-                                        setShowSPModal(true);
-                                      }}
-                                      className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition shadow-sm"
-                                      title="Split"
-                                    >
-                                      Split
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedItem(it);
-                                        setTargetCargoId(it.cargo_id || "");
-                                        setShowREModal(true);
-                                      }}
-                                      className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition shadow-sm"
-                                      title="ReAssign"
-                                    >
-                                      ReAssign
-                                    </button>
-                                    {it.item?.is_eur_special === "Y" &&
-                                      (!it.eur_special_price ||
-                                        Number(it.eur_special_price) === 0) && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setExpandedPriceItemId(
-                                              expandedPriceItemId === it.id
-                                                ? null
-                                                : it.id,
-                                            );
-                                            setEditingPrice(
-                                              it.eur_special_price || 0,
-                                            );
-                                          }}
-                                          className="px-2 py-1 bg-[#EF4444] text-white text-[9px] font-bold rounded hover:bg-red-600 transition shadow-sm whitespace-nowrap"
-                                        >
-                                          SET PRICE
-                                        </button>
-                                      )}
-                                  </div>
-                                ),
-                                width: "160px",
-                              },
-                            ]
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "220px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) => (
+                                    <span className="font-mono text-xs">
+                                      {it.set_taric_code ||
+                                        it.item?.taric?.code ||
+                                        "-"}
+                                    </span>
+                                  ),
+                                  width: "90px",
+                                },
+                                {
+                                  header: "Remark",
+                                  render: (it: any) => (
+                                    <span className="text-[11px] text-gray-500 italic">
+                                      {it.remark_de
+                                        ? `// ${it.remark_de}`
+                                        : "-"}
+                                    </span>
+                                  ),
+                                  width: "100px",
+                                },
+                                {
+                                  header: "Order_no",
+                                  render: (it: any) =>
+                                    it.order?.order_no || "-",
+                                  width: "80px",
+                                },
+                                {
+                                  header: "SOID",
+                                  render: (it: any) =>
+                                    it.supplier_order_id || "-",
+                                  width: "50px",
+                                },
+                                {
+                                  header: "Status",
+                                  render: (it: any) => (
+                                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded border">
+                                      {it.status}
+                                    </span>
+                                  ),
+                                  width: "60px",
+                                },
+                                {
+                                  header: "V(dm³)",
+                                  render: (it: any) => it.v?.toFixed(2),
+                                  width: "50px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "W(kg)",
+                                  render: (it: any) => it.w?.toFixed(2),
+                                  width: "50px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <span className="font-bold">
+                                      {it.qty_label
+                                        ? `${it.qty_label}/${it.qty}`
+                                        : it.qty}
+                                    </span>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) =>
+                                    `€${Number(it.eur_special_price || it._fallbackEk || 0).toFixed(2)}`,
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice =
+                                      Number(
+                                        it.eur_special_price || it._fallbackEk,
+                                      ) || 0;
+                                    const totalPrice =
+                                      (it.qty || 0) * unitPrice;
+                                    return (
+                                      <span className="font-bold text-[#10B981]">
+                                        €{totalPrice.toFixed(2)}
+                                      </span>
+                                    );
+                                  },
+                                  width: "70px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "Actions",
+                                  render: (it: any) => (
+                                    <div className="flex flex-wrap items-center gap-1 py-0.5">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedItem(it);
+                                          setNewQty(it.qty_label || it.qty);
+                                          setQtyRemarks(it.remarks_cn || "");
+                                          setShowQTYModal(true);
+                                        }}
+                                        className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition shadow-sm"
+                                        title="QtyLabel"
+                                      >
+                                        Qty
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedItem(it);
+                                          setSplitQty(Math.floor(it.qty * 0.5));
+                                          setTargetCargoId("");
+                                          setSplitRemarks(it.remarks_cn || "");
+                                          setShowSPModal(true);
+                                        }}
+                                        className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition shadow-sm"
+                                        title="Split"
+                                      >
+                                        Split
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedItem(it);
+                                          setTargetCargoId(it.cargo_id || "");
+                                          setShowREModal(true);
+                                        }}
+                                        className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition shadow-sm"
+                                        title="ReAssign"
+                                      >
+                                        ReAssign
+                                      </button>
+                                      {it.item?.is_eur_special === "Y" &&
+                                        (!it.eur_special_price ||
+                                          Number(it.eur_special_price) ===
+                                            0) && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setExpandedPriceItemId(
+                                                expandedPriceItemId === it.id
+                                                  ? null
+                                                  : it.id,
+                                              );
+                                              setEditingPrice(
+                                                it.eur_special_price || 0,
+                                              );
+                                            }}
+                                            className="px-2 py-1 bg-[#EF4444] text-white text-[9px] font-bold rounded hover:bg-red-600 transition shadow-sm whitespace-nowrap"
+                                          >
+                                            SET PRICE
+                                          </button>
+                                        )}
+                                    </div>
+                                  ),
+                                  width: "160px",
+                                },
+                              ]
                         }
                         expandedRowId={expandedPriceItemId}
                         renderRowDetails={(it: any) => (
