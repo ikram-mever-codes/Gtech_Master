@@ -7,167 +7,63 @@ import React, {
   useRef,
   Suspense,
 } from "react";
-import Select from "react-select";
+import { Plus, FileText, ShoppingCart, Truck } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/Redux/store";
+import PageHeader from "@/components/UI/PageHeader";
+import CargosTab from "@/components/cargos/CargosTab";
+import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 import {
-  Search,
-  Filter,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
-  Plus,
-  Calendar,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  MoreVertical,
-  Check,
-  X,
-  RefreshCw,
-  User,
-  DollarSign,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  PlusCircle,
-  Loader2,
-  ChevronDown,
-  Package,
-  Clock,
-} from "lucide-react";
-import { FunnelIcon } from "@heroicons/react/24/outline";
-import FilterResetIcon from "@/components/UI/FilterResetIcon";
-
-import {
-  getAllInvoices,
-  generateInvoicePdf,
-  deleteInvoice,
   markInvoiceAsPaid,
-  cancelInvoice,
   getExpandedInvoiceDetails,
   updateInvoice,
 } from "@/api/invoice";
-import SpreadSheet from "@/components/UI/SpreadSheet";
-import { useRouter, useSearchParams } from "next/navigation";
-import PageHeader from "@/components/UI/PageHeader";
-import Link from "next/link";
-import CargosTab from "@/components/cargos/CargosTab";
-import CargoTypesTab from "@/components/cargos/CargoTypesTab";
-import PackingListTab from "./PackingListTab";
-import {
-  getAllCustomers,
-  CustomerData as APICustomerData,
-} from "@/api/customers";
 import {
   updateOrderItemStatus,
   splitOrderItem,
   updateOrderItemPrice,
-  downloadCommercialInvoice,
-  getAllOrders,
-  getOrderStatusColor,
   getOrderById,
-  createOrder,
   updateOrder,
   deleteOrder,
 } from "@/api/orders";
-import { getAllCargos, CargoType, assignOrdersToCargo } from "@/api/cargos";
-import CargoCreateModal from "@/components/cargos/CargoCreateModal";
-import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
-import { getAllGtechCompanies, GtechCompany } from "@/api/gtech_companies";
-import { getAllTaricsSimple, getItems, updateItem } from "@/api/items";
-import { getAllSuppliers, getSupplierItems } from "@/api/suppliers";
-import { getCategories } from "@/api/categories";
-import { useSelector } from "react-redux";
-import { RootState } from "@/app/Redux/store";
-import { DataTable, ColumnDef } from "@/components/UI/DataTable";
-import { ShoppingCart, Truck } from "lucide-react";
+import { assignOrdersToCargo } from "@/api/cargos";
+import { getItems, updateItem } from "@/api/items";
+import { getSupplierItems } from "@/api/suppliers";
+import { getTaricGroupKey } from "@/utils/invoice";
 
-import { toast } from "react-hot-toast";
-import { ReassignModal, SplitModal } from "@/app/commercial/orderitemactionsmodal";
-import CustomModal from "@/components/UI/CustomModal";
-import SegmentedControl from "@/components/UI/SegmentedControl";
-import { Pencil, Scissors, MoveRight } from "lucide-react";
-import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
-import OrdersTable from "@/components/orders/OrdersTable";
-import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
-import { formatDate } from "@/utils/date";
-import { formatCountryCode } from "@/utils/address";
-import { calculateInvoiceTotal, getTaricGroupKey } from "@/utils/invoice";
-import CommercialLineItemsSubTable from "@/components/UI/CommercialLineItemsSubTable";
-
-const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
-
-const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
-};
-
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  orderNumber?: string;
-  cargoNo?: string;
-  invoiceDate: string;
-  deliveryDate: string;
-  netTotal: number;
-  taxAmount: number;
-  dueDate?: string;
-
-  pdfUrl: string;
-  grossTotal: number;
-  paidAmount: number;
-  outstandingAmount: number;
-  paymentMethod: string;
-  shippingMethod: string;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
-  notes?: string;
-  customer: {
-    id: string;
-    companyName: string;
-    email: string;
-    contactPhoneNumber: string;
-    contactEmail?: string;
-    taxNumber?: string;
-    addressLine1?: string;
-    city?: string;
-    country?: string;
-  };
-  items?: Array<{
-    id: string;
-    quantity: number;
-    articleNumber?: string;
-    description: string;
-    unitPrice: number;
-    netPrice: number;
-    taxRate: number;
-    taxAmount: number;
-    grossPrice: number;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-  bill_to?: string;
-  ship_to?: string;
-  customItemCount?: number;
-  description?: string;
-  freightCost?: number | string;
-  remark?: string;
-  customTotalQty?: number;
-  cargoId?: number | null;
-  cargo?: { id: number; cargo_no?: string; cargo_type?: any; cargo_type_id?: number; cargo_type_name?: string } | null;
-}
-
-interface FilterOptions {
-  status: string;
-  dateFrom: string;
-  dateTo: string;
-  customer: string;
-  minAmount: string;
-  maxAmount: string;
-}
+import { useInvoicesTabData, InvoicesTab } from "../../hooks/useInvoicesTabData";
+import PackingListTab from "./PackingListTab";
+import InvoicesFilterBar from "./InvoicesFilterBar";
+import InvoicesTable from "./InvoicesTable";
+import OrdersTabPanel from "./OrdersTabPanel";
+import {
+  InvoiceDetailsModal,
+  OrderFormModal,
+  OrderDetailsModal,
+  ReassignModal,
+  SplitModal,
+  TaricModal,
+  QtyModal,
+} from "./LazyModals";
+import {
+  Invoice,
+  FilterOptions,
+  InvoiceSortField,
+  InvoiceEditForm,
+  ExpandedStates,
+  initialFilterOptions,
+  filterAndSortInvoices,
+  getBillToDisplayName as getBillToDisplayNameFrom,
+  getCargoTypeNameFromInvoice as getCargoTypeNameFrom,
+} from "./invoiceHelpers";
+import {
+  buildOrderItemsFlat,
+  filterOrders,
+  getCategoryNameFrom,
+  getSupplierNameFrom,
+} from "./orderHelpers";
 
 const invoiceTabs = [
   { id: "orders", label: "Orders" },
@@ -177,29 +73,11 @@ const invoiceTabs = [
   { id: "cargos", label: "Cargos" },
   { id: "cargo_type", label: "Cargo Type" },
   { id: "packing_list", label: "Packing List" },
-] as const;
+] as const satisfies readonly { id: InvoicesTab; label: string }[];
 
-type Item = {
-  id: string | number;
-  item_name?: string;
-  name?: string;
-  ean?: number | string;
-  RMB_Price?: number;
-  supplier_id?: string | number;
-  length?: number;
-  width?: number;
-  height?: number;
-  weight?: number;
-  item: any;
-  taric?: any;
-  price?: number;
-  currency?: string;
-  supplier_name?: string;
-};
+type InvoiceTab = InvoicesTab;
 
-type Option = { value: string; label: string };
-
-type InvoiceTab = (typeof invoiceTabs)[number]["id"];
+const validTabs: string[] = invoiceTabs.map((t) => t.id);
 
 const InvoiceListPage: React.FC = () => {
   const router = useRouter();
@@ -208,48 +86,149 @@ const InvoiceListPage: React.FC = () => {
   const cargosTabRef = useRef<any>(null);
   const cargoTypesTabRef = useRef<any>(null);
 
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
-  const [customers, setCustomers] = useState<APICustomerData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const tabData = useInvoicesTabData();
+
   const [activeInvTab, setActiveInvTab] = useState<InvoiceTab>(
     () => (searchParams.get("tab") as InvoiceTab) || "orders",
   );
+
+  // Lazy, cached per-tab data loading (see useInvoicesTabData).
+  const { ensureLoaded } = tabData;
+  useEffect(() => {
+    ensureLoaded(activeInvTab);
+  }, [activeInvTab, ensureLoaded]);
+
+  // ---------------------------------------------------------------------
+  // Filters / search / sort / pagination
+  // ---------------------------------------------------------------------
   const [searchTerm, setSearchTerm] = useState("");
+  const [orderNoFilter, setOrderNoFilter] = useState<string>(
+    () => searchParams.get("order_no") || "",
+  );
   const [cargoStatusFilter, setCargoStatusFilter] = useState("Open");
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortField, setSortField] = useState<keyof Invoice>("createdAt");
+  const [filters, setFilters] = useState<FilterOptions>(initialFilterOptions);
+  const [sortField, setSortField] = useState<InvoiceSortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+
+  const filteredInvoices = useMemo(
+    () =>
+      filterAndSortInvoices(
+        tabData.invoices,
+        activeInvTab,
+        searchTerm,
+        filters,
+        sortField,
+        sortDirection,
+      ),
+    [tabData.invoices, activeInvTab, searchTerm, filters, sortField, sortDirection],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filters, tabData.invoices, sortField, sortDirection, activeInvTab]);
+
+  const handleSort = (field: InvoiceSortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const filterParam = searchParams.get("filter");
+
+  const orderItemsFlat = useMemo(
+    () => buildOrderItemsFlat(tabData.orders, filterParam, orderNoFilter),
+    [tabData.orders, orderNoFilter, filterParam],
+  );
+
+  const filteredOrders = useMemo(
+    () => filterOrders(tabData.orders, filterParam, orderNoFilter),
+    [tabData.orders, orderNoFilter, filterParam],
+  );
+
+  // ---------------------------------------------------------------------
+  // URL <-> state sync
+  // ---------------------------------------------------------------------
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", activeInvTab);
+    if (orderNoFilter) params.set("order_no", orderNoFilter);
+    else params.delete("order_no");
+    const qs = params.toString();
+    router.replace(qs ? `/invoices?${qs}` : "/invoices", { scroll: false });
+  }, [activeInvTab, orderNoFilter, router, searchParams]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && validTabs.includes(tabParam)) {
+      setActiveInvTab(tabParam as InvoiceTab);
+    }
+    const orderNo = searchParams.get("order_no");
+    if (orderNo !== null) {
+      setOrderNoFilter(orderNo);
+    }
+  }, [searchParams]);
+
+  // ---------------------------------------------------------------------
+  // Invoice rows: expansion + details modal
+  // ---------------------------------------------------------------------
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>(
     {},
   );
-
-  const [filters, setFilters] = useState<FilterOptions>({
-    status: "",
-    dateFrom: "",
-    dateTo: "",
-    customer: "",
-    minAmount: "",
-    maxAmount: "",
-  });
-
-  const [expandedStates, setExpandedStates] = useState<
-    Record<
-      string,
-      { taric?: boolean; items?: boolean; data?: any; loading?: boolean }
-    >
-  >({});
-
+  const [expandedStates, setExpandedStates] = useState<ExpandedStates>({});
+  const [expandedInvoiceIds, setExpandedInvoiceIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
   const [modalActiveTab, setModalActiveTab] = useState<"taric" | "items">(
     "taric",
   );
-  const [expandedTaricGroupKey, setExpandedTaricGroupKey] = useState<string | null>(null);
-  const [expandedInvoiceIds, setExpandedInvoiceIds] = useState<Set<string>>(new Set());
+  const [invoiceEditForm, setInvoiceEditForm] = useState<InvoiceEditForm>({
+    description: "",
+    freightCost: "",
+    remark: "",
+  });
+  const [expandedPriceItemId, setExpandedPriceItemId] = useState<string | null>(
+    null,
+  );
+  const [editingPrice, setEditingPrice] = useState<number>(0);
+
+  /** Loads the expanded (taric groups + detailed items) data for an invoice
+   * once; shared by the row expander and the details modal. */
+  const loadExpandedDetails = async (invoice: Invoice, logLabel?: string) => {
+    const currentState = expandedStates[invoice.id] || {};
+    if (currentState.data) return;
+    setExpandedStates((prev) => ({
+      ...prev,
+      [invoice.id]: { ...currentState, loading: true },
+    }));
+    try {
+      const response = await getExpandedInvoiceDetails(invoice.id);
+      if (response.success) {
+        setExpandedStates((prev) => ({
+          ...prev,
+          [invoice.id]: {
+            taric: true,
+            items: true,
+            data: response.data,
+            loading: false,
+          },
+        }));
+      }
+    } catch (error) {
+      if (logLabel) console.error(logLabel, error);
+      else console.error(error);
+      setExpandedStates((prev) => ({
+        ...prev,
+        [invoice.id]: { ...currentState, loading: false },
+      }));
+    }
+  };
 
   const handleToggleRowExpand = async (invoice: Invoice) => {
     const next = new Set(expandedInvoiceIds);
@@ -257,33 +236,7 @@ const InvoiceListPage: React.FC = () => {
       next.delete(invoice.id);
     } else {
       next.add(invoice.id);
-      const currentState = expandedStates[invoice.id] || {};
-      if (!currentState.data) {
-        setExpandedStates((prev) => ({
-          ...prev,
-          [invoice.id]: { ...currentState, loading: true },
-        }));
-        try {
-          const response = await getExpandedInvoiceDetails(invoice.id);
-          if (response.success) {
-            setExpandedStates((prev) => ({
-              ...prev,
-              [invoice.id]: {
-                taric: true,
-                items: true,
-                data: response.data,
-                loading: false,
-              },
-            }));
-          }
-        } catch (error) {
-          console.error("Failed to load invoice items:", error);
-          setExpandedStates((prev) => ({
-            ...prev,
-            [invoice.id]: { ...currentState, loading: false },
-          }));
-        }
-      }
+      await loadExpandedDetails(invoice, "Failed to load invoice items:");
     }
     setExpandedInvoiceIds(next);
   };
@@ -292,94 +245,360 @@ const InvoiceListPage: React.FC = () => {
     setSelectedInvoice(invoice);
     setShowInvoiceDetailsModal(true);
     setModalActiveTab("taric");
-    setExpandedTaricGroupKey(null);
     setInvoiceEditForm({
       description: invoice.description || "",
       freightCost: invoice.freightCost?.toString() || "",
       remark: invoice.remark || "",
     });
+    await loadExpandedDetails(invoice);
+  };
 
-    const currentState = expandedStates[invoice.id] || {};
-    if (!currentState.data) {
-      setExpandedStates((prev) => ({
-        ...prev,
-        [invoice.id]: { ...currentState, loading: true },
-      }));
-      try {
-        const response = await getExpandedInvoiceDetails(invoice.id);
-        if (response.success) {
-          setExpandedStates((prev) => ({
-            ...prev,
-            [invoice.id]: {
-              taric: true,
-              items: true,
-              data: response.data,
-              loading: false,
-            },
-          }));
-        }
-      } catch (error) {
-        console.error(error);
-        setExpandedStates((prev) => ({
-          ...prev,
-          [invoice.id]: { ...currentState, loading: false },
-        }));
+  const getCargoTypeName = useCallback(
+    (invoice: Invoice) =>
+      getCargoTypeNameFrom(invoice, tabData.cargos, tabData.cargoTypesList),
+    [tabData.cargos, tabData.cargoTypesList],
+  );
+
+  const getBillToDisplayName = useCallback(
+    (invoice: Invoice) => getBillToDisplayNameFrom(invoice, tabData.gtechCompanies),
+    [tabData.gtechCompanies],
+  );
+
+  const handleMarkAsPaid = async (invoiceId: string) => {
+    try {
+      const invoice = tabData.invoices.find((inv) => inv.id === invoiceId);
+      if (
+        !invoice ||
+        invoice.freightCost === null ||
+        invoice.freightCost === undefined ||
+        Number(invoice.freightCost) <= 0
+      ) {
+        toast.error(
+          "Please provide a freight cost by editing the invoice before verifying it.",
+        );
+        return;
       }
+      if (!invoice.description || !invoice.description.trim()) {
+        toast.error(
+          "Please provide a description by editing the invoice before verifying it.",
+        );
+        return;
+      }
+
+      setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
+      await markInvoiceAsPaid(invoiceId);
+      await tabData.refetchInvoices();
+      setSelectedInvoice((prev) => (prev ? { ...prev, status: "paid" } : null));
+      toast.success("Invoice verified successfully");
+    } catch (error) {
+      console.error("Failed to mark as paid:", error);
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: false }));
     }
   };
 
+  const handleSaveInvoiceEdit = async (invoiceId: string) => {
+    if (!invoiceEditForm.description?.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+    if (
+      invoiceEditForm.freightCost === "" ||
+      invoiceEditForm.freightCost === null ||
+      invoiceEditForm.freightCost === undefined ||
+      Number(invoiceEditForm.freightCost) <= 0
+    ) {
+      toast.error("Freight Cost must be greater than 0");
+      return;
+    }
+
+    try {
+      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: true }));
+      await updateInvoice({
+        id: invoiceId,
+        description: invoiceEditForm.description,
+        freightCost: invoiceEditForm.freightCost,
+        remark: invoiceEditForm.remark,
+      });
+      await tabData.refetchInvoices();
+      setSelectedInvoice((prev) =>
+        prev
+          ? {
+            ...prev,
+            description: invoiceEditForm.description,
+            freightCost: invoiceEditForm.freightCost,
+            remark: invoiceEditForm.remark,
+          }
+          : null,
+      );
+      toast.success("Invoice changes saved successfully");
+    } catch (error) {
+      console.error("Failed to save invoice edits:", error);
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: false }));
+    }
+  };
+
+  const handleSetPrice = async (itemId: string | number) => {
+    try {
+      const res = await updateOrderItemPrice(itemId, editingPrice);
+      if (res.success) {
+        setExpandedPriceItemId(null);
+        Object.keys(expandedStates).forEach(async (invId) => {
+          if (expandedStates[invId].items) {
+            const response = await getExpandedInvoiceDetails(invId);
+            if (response.success) {
+              setExpandedStates((prev) => ({
+                ...prev,
+                [invId]: { ...prev[invId], data: response.data },
+              }));
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // Order-item action modals (Reassign / Split / Taric / Qty)
+  // ---------------------------------------------------------------------
   const [showREModal, setShowREModal] = useState(false);
   const [showSPModal, setShowSPModal] = useState(false);
   const [showQTYModal, setShowQTYModal] = useState(false);
-  const [showCargoCreateModal, setShowCargoCreateModal] = useState(false);
+  const [showTaricModal, setShowTaricModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [cargos, setCargos] = useState<CargoType[]>([]);
-  const [cargoTypesList, setCargoTypesList] = useState<CargoTypeObj[]>([]);
-  const [gtechCompanies, setGtechCompanies] = useState<GtechCompany[]>([]);
   const [splitQty, setSplitQty] = useState<number>(0);
   const [newQty, setNewQty] = useState<number>(0);
   const [targetCargoId, setTargetCargoId] = useState<string>("");
-
-  const [expandedPriceItemId, setExpandedPriceItemId] = useState<string | null>(
-    null,
-  );
-  const [editingPrice, setEditingPrice] = useState<number>(0);
-
   const [splitRemarks, setSplitRemarks] = useState<string>("");
-  const [tarics, setTarics] = useState<any[]>([]);
-  const [selectedTaricCode, setSelectedTaricCode] = useState<string>("");
-  const [expandedTaricGroupId, setExpandedTaricGroupId] = useState<
-    string | null
-  >(null);
-
-  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
-  const [invoiceEditForm, setInvoiceEditForm] = useState({
-    description: "",
-    freightCost: "",
-    remark: "",
-  });
-
-  const [showTaricModal, setShowTaricModal] = useState(false);
-  const [selectedTaricGroup, setSelectedTaricGroup] = useState<any>(null);
   const [qtyRemarks, setQtyRemarks] = useState("");
+  const [selectedTaricCode, setSelectedTaricCode] = useState<string>("");
+  const [selectedTaricGroup, setSelectedTaricGroup] = useState<any>(null);
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [itemsAll, setItemsAll] = useState<any[]>([]);
-  const [itemsByCategory, setItemsByCategory] = useState<any[]>([]);
-  const [itemsBySupplier, setItemsBySupplier] = useState<any[]>([]);
-  const [loadingItemsAll, setLoadingItemsAll] = useState(false);
-  const [loadingItemsByCategory, setLoadingItemsByCategory] = useState(false);
-  const [loadingItemsBySupplier, setLoadingItemsBySupplier] = useState(false);
-  const [orderNoFilter, setOrderNoFilter] = useState<string>(
-    () => searchParams.get("order_no") || "",
-  );
+  // Openers used by the invoice tables / Invoice Details modal.
+  const openQtyModal = (it: any) => {
+    setSelectedItem(it);
+    setNewQty(it.qty_label || it.qty);
+    setQtyRemarks(it.remarks_cn || "");
+    setShowQTYModal(true);
+  };
+
+  const openInvoiceItemSplitModal = (it: any) => {
+    setSelectedItem(it);
+    setSplitQty(Math.floor(it.qty * 0.5));
+    setTargetCargoId("");
+    setSplitRemarks(it.remarks_cn || "");
+    setShowSPModal(true);
+  };
+
+  const openInvoiceItemReassignModal = (it: any) => {
+    setSelectedItem(it);
+    setTargetCargoId(it.cargo_id || "");
+    setShowREModal(true);
+  };
+
+  const openTaricModal = (group: any) => {
+    setSelectedTaricGroup(group);
+    setSelectedTaricCode("");
+    setShowTaricModal(true);
+  };
+
+  // Openers used by OrdersTable (Orders / Order Items tabs).
+  const handleOpenReassignModal = (item: any) => {
+    setSelectedItem(item);
+    setTargetCargoId(item.cargo_id ? String(item.cargo_id) : "");
+    setShowREModal(true);
+  };
+
+  const handleOpenSplitModal = (item: any) => {
+    setSelectedItem(item);
+    setSplitQty(item.qty_label || item.qty || 0);
+    setShowSPModal(true);
+  };
+
+  /** After a reassign / split: reload invoices, orders and the Cargos tab,
+   * then refresh every currently expanded invoice's details and drop the
+   * cached details of collapsed ones. */
+  const refreshAfterItemMove = async () => {
+    await Promise.all([
+      tabData.refetchInvoices(),
+      tabData.refetchOrders(),
+      cargosTabRef.current?.fetchCargos?.(),
+    ]);
+
+    const expandedKeys = Object.keys(expandedStates).filter(
+      (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
+    );
+
+    if (expandedKeys.length > 0) {
+      await Promise.all(
+        expandedKeys.map(async (invId) => {
+          try {
+            const res = await getExpandedInvoiceDetails(invId);
+            if (res?.success) {
+              setExpandedStates((prev) => ({
+                ...prev,
+                [invId]: { ...prev[invId], data: res.data },
+              }));
+            }
+          } catch (e) {
+            console.error(
+              `Failed to refresh expanded details for invoice ${invId}`,
+              e,
+            );
+          }
+        }),
+      );
+    }
+
+    setExpandedStates((prev) => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach((key) => {
+        if (!newState[key]?.items && !newState[key]?.taric) {
+          delete newState[key].data;
+        }
+      });
+      return newState;
+    });
+  };
+
+  const handleReassignItem = async () => {
+    if (!selectedItem || !targetCargoId) return;
+    try {
+      const cargoIdNum = Number(targetCargoId);
+      const isItem =
+        activeInvTab === "order_items" ||
+        !!selectedItem.item_id ||
+        !!selectedItem.parentOrder;
+
+      if (isItem) {
+        await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
+      } else {
+        const orderId = selectedItem.order_id || selectedItem.id;
+        await assignOrdersToCargo(cargoIdNum, [Number(orderId)], false);
+        toast.success(
+          `Order ${selectedItem.order_no || orderId} assigned to Cargo ${targetCargoId}`,
+        );
+      }
+
+      setShowREModal(false);
+      await refreshAfterItemMove();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to assign/reassign cargo");
+    }
+  };
+
+  const handleSplitItem = async () => {
+    if (!selectedItem || splitQty <= 0) return;
+    try {
+      await splitOrderItem(
+        selectedItem.id,
+        splitQty,
+        targetCargoId,
+        splitRemarks,
+        selectedItem.cargo_id,
+      );
+      toast.success("Item split and moved successfully");
+      setShowSPModal(false);
+      setSplitRemarks("");
+      await refreshAfterItemMove();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSetTaric = async (group: any) => {
+    if (!selectedTaricCode || !group) return;
+    try {
+      const invId = Object.keys(expandedStates).find(
+        (key) =>
+          expandedStates[key].taric &&
+          expandedStates[key].data?.taricGroups?.some(
+            (g: any) => g.taricId === group.taricId,
+          ),
+      );
+
+      if (!invId) {
+        toast.error("Could not find invoice for this taric group");
+        return;
+      }
+
+      const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter(
+        (oi: any) => getTaricGroupKey(oi) === group.taricId,
+      );
+
+      if (itemsInGroup && itemsInGroup.length > 0) {
+        for (const oi of itemsInGroup) {
+          const originalCode = oi.item?.taric?.code;
+          const hasOriginal =
+            originalCode &&
+            originalCode !== "0" &&
+            originalCode !== "0000000000";
+
+          // Always re-base on "original/new" rather than chaining through
+          // every prior override — set_taric_code only needs to carry the
+          // original code (for audit) and the current one.
+          const newTaricValue = hasOriginal
+            ? `${originalCode}/${selectedTaricCode}`
+            : selectedTaricCode;
+          await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
+        }
+        toast.success("Taric codes updated successfully");
+        setShowTaricModal(false);
+        setSelectedTaricCode("");
+
+        const res = await getExpandedInvoiceDetails(invId);
+        if (res.success) {
+          setExpandedStates((prev) => ({
+            ...prev,
+            [invId]: { ...prev[invId], data: res.data },
+          }));
+        }
+      } else {
+        toast.error("No items found in this group to update");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update taric codes");
+    }
+  };
+
+  const handleUpdateQty = async () => {
+    if (!selectedItem || newQty <= 0) return;
+    try {
+      await updateOrderItemStatus(selectedItem.id, {
+        qty_label: newQty,
+        remarks_cn: qtyRemarks,
+      });
+      toast.success("QtyLabel updated successfully");
+      setShowQTYModal(false);
+      setQtyRemarks("");
+      const invId = Object.keys(expandedStates).find((key) =>
+        expandedStates[key].data?.detailedItems?.some(
+          (it: any) => it.id === selectedItem.id,
+        ),
+      );
+      if (invId) {
+        const res = await getExpandedInvoiceDetails(invId);
+        setExpandedStates((prev) => ({
+          ...prev,
+          [invId]: { ...prev[invId], data: res.data },
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // Orders / Order Items: view + edit order
+  // ---------------------------------------------------------------------
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewOrder, setViewOrder] = useState<any>(null);
   const [viewItems, setViewItems] = useState<any[]>([]);
-  const [remarksCN, setRemarksCN] = useState("");
 
   const [showModal, setShowModal] = useState(false);
   const [mode, setMode] = useState<"create" | "edit" | "convert">("create");
@@ -394,46 +613,46 @@ const InvoiceListPage: React.FC = () => {
     status: "",
     ref_no: "",
   });
+  const [itemsByCategory, setItemsByCategory] = useState<any[]>([]);
+  const [itemsBySupplier, setItemsBySupplier] = useState<any[]>([]);
+  const [loadingItemsByCategory, setLoadingItemsByCategory] = useState(false);
+  const [loadingItemsBySupplier, setLoadingItemsBySupplier] = useState(false);
 
   const isTab1 = activeInvTab !== "order_items";
-  const isTab2 = false;
-  const isConvertMode = mode === "convert";
 
   const effectiveItems = useMemo(() => {
     if (form.supplier_id) return itemsBySupplier;
     if (form.category_id) return itemsByCategory;
-    return itemsAll;
+    return tabData.itemsAll;
   }, [
     form.supplier_id,
     itemsBySupplier,
     form.category_id,
     itemsByCategory,
-    itemsAll,
+    tabData.itemsAll,
   ]);
 
   const loadingItems =
-    loadingItemsAll ||
+    tabData.loadingItemsAll ||
     (isTab1 && !!form.supplier_id && loadingItemsBySupplier) ||
     (isTab1 && !!form.category_id && loadingItemsByCategory);
 
-  const canSubmit = useMemo(() => {
-    if (isConvertMode) return orderItems.length > 0;
-    const hasItems = orderItems.length > 0;
-    const hasComment = !!form.comment?.trim();
-    const tabOk =
-      (isTab1 ? !!form.category_id || !!form.supplier_id : true) &&
-      (isTab2 ? !!form.customer_id : true);
-    return hasItems && hasComment && tabOk;
-  }, [
-    isConvertMode,
-    orderItems.length,
-    form.comment,
-    form.category_id,
-    form.supplier_id,
-    form.customer_id,
-    isTab1,
-    isTab2,
-  ]);
+  const itemById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const it of tabData.itemsAll) map.set(String(it.id), it);
+    return map;
+  }, [tabData.itemsAll]);
+
+  const getCategoryName = useCallback(
+    (categoryId: string | number) =>
+      getCategoryNameFrom(tabData.categories, categoryId),
+    [tabData.categories],
+  );
+
+  const getSupplierName = useCallback(
+    (supplierId: any) => getSupplierNameFrom(tabData.suppliers, supplierId),
+    [tabData.suppliers],
+  );
 
   const resetForm = useCallback(() => {
     setForm({
@@ -471,17 +690,10 @@ const InvoiceListPage: React.FC = () => {
     }
   }, []);
 
-  const handleCustomerChange = (customer_id: string) =>
-    setForm((prev) => ({ ...prev, customer_id }));
-
-  const handleCategoryChange = async (
-    category_id: string,
-    resetOrderItemsFlag: boolean = true,
-  ) => {
+  const handleCategoryChange = async (category_id: string) => {
     setForm((prev) => ({ ...prev, category_id }));
     setSelectedItemId("");
-    if (resetOrderItemsFlag) setOrderItems([]);
-
+    setOrderItems([]);
     if (category_id) {
       await fetchItemsByCategory(category_id);
       return;
@@ -611,35 +823,6 @@ const InvoiceListPage: React.FC = () => {
     resetForm();
   };
 
-  const handleCreateOrder = async () => {
-    if (!form.comment?.trim()) return toast.error("Please add a comment");
-    if (orderItems.length === 0)
-      return toast.error("Please add at least one item");
-    if (isTab1 && !form.category_id && !form.supplier_id)
-      return toast.error("Please select a category or supplier for Orders");
-
-    const payload = {
-      customer_id: form.customer_id || null,
-      category_id: form.category_id || null,
-      supplier_id: form.supplier_id || null,
-      comment: form.comment?.slice(0, 200) || null,
-      status: 1,
-      items: orderItems.map((x) => ({
-        item_id: Number(x.item_id),
-        qty: Number(x.qty),
-        remark_de: x.remark_de || null,
-      })),
-    };
-
-    const res = await createOrder(payload as any);
-    if (res?.success) {
-      toast.success("Order created successfully");
-    }
-    setShowModal(false);
-    resetForm();
-    fetchOrders();
-  };
-
   const handleUpdateOrder = async () => {
     if (!selectedOrder?.id) return;
     if (orderItems.length === 0)
@@ -661,674 +844,14 @@ const InvoiceListPage: React.FC = () => {
     await updateOrder(selectedOrder.id, payload);
     setShowModal(false);
     resetForm();
-    fetchOrders();
+    tabData.refetchOrders();
   };
 
   const handleDeleteOrder = async (orderId: string | number) => {
     if (!window.confirm("Are you sure you want to delete this Order?")) return;
     await deleteOrder(orderId);
-    fetchOrders();
+    tabData.refetchOrders();
   };
-
-  const handleSetPrice = async (itemId: string | number) => {
-    try {
-      const res = await updateOrderItemPrice(itemId, editingPrice);
-      if (res.success) {
-        setExpandedPriceItemId(null);
-        Object.keys(expandedStates).forEach(async (invId) => {
-          if (expandedStates[invId].items) {
-            const response = await getExpandedInvoiceDetails(invId);
-            if (response.success) {
-              setExpandedStates((prev) => ({
-                ...prev,
-                [invId]: { ...prev[invId], data: response.data },
-              }));
-            }
-          }
-        });
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const toggleExpansion = async (id: string, type: "taric" | "items") => {
-    const currentState = expandedStates[id] || {};
-    let isCurrentlyOpen =
-      type === "taric" ? currentState.taric : currentState.items;
-
-    let newState: any;
-    if (activeInvTab === "closed_invoices") {
-      const bothActive = currentState.taric && currentState.items;
-      newState = { ...currentState, taric: !bothActive, items: !bothActive };
-      isCurrentlyOpen = bothActive;
-    } else {
-      newState = { ...currentState, [type]: !isCurrentlyOpen };
-    }
-
-    if (!isCurrentlyOpen && !currentState.data) {
-      setExpandedStates((prev) => ({
-        ...prev,
-        [id]: { ...newState, loading: true },
-      }));
-      try {
-        const response = await getExpandedInvoiceDetails(id);
-        if (response.success) {
-          setExpandedStates((prev) => ({
-            ...prev,
-            [id]: { ...newState, data: response.data, loading: false },
-          }));
-        }
-      } catch (error) {
-        console.error(error);
-        setExpandedStates((prev) => ({
-          ...prev,
-          [id]: { ...newState, loading: false },
-        }));
-      }
-    } else {
-      setExpandedStates((prev) => ({ ...prev, [id]: newState }));
-    }
-  };
-
-  const getCargoTypeNameFromInvoice = useCallback(
-    (invoice: Invoice) => {
-      const invCargo: any = invoice.cargo;
-      const cNo = (invCargo?.cargo_no || invoice.cargoNo || "").trim().toLowerCase();
-      const cargoId = invCargo?.id || invoice.cargoId || (invoice as any).cargo_id;
-
-      if (typeof invCargo?.cargo_type === "string" && invCargo.cargo_type.trim()) {
-        return invCargo.cargo_type.trim();
-      }
-      if (typeof invCargo?.cargo_type_name === "string" && invCargo.cargo_type_name.trim()) {
-        return invCargo.cargo_type_name.trim();
-      }
-      if (invCargo?.cargo_type?.type && typeof invCargo.cargo_type.type === "string") {
-        return invCargo.cargo_type.type.trim();
-      }
-
-      const matchedCargo: any = cargos.find(
-        (c: any) =>
-          (cNo && c.cargo_no && String(c.cargo_no).trim().toLowerCase() === cNo) ||
-          (cargoId && String(c.id) === String(cargoId)),
-      );
-
-      if (matchedCargo) {
-        if (typeof matchedCargo.cargo_type === "string" && matchedCargo.cargo_type.trim()) {
-          return matchedCargo.cargo_type.trim();
-        }
-        if (typeof matchedCargo.cargo_type_name === "string" && matchedCargo.cargo_type_name.trim()) {
-          return matchedCargo.cargo_type_name.trim();
-        }
-        if (matchedCargo.cargo_type?.type && typeof matchedCargo.cargo_type.type === "string") {
-          return matchedCargo.cargo_type.type.trim();
-        }
-        const typeId = matchedCargo.cargo_type_id || matchedCargo.cargo_type?.id;
-        if (typeId !== undefined && typeId !== null) {
-          const ct = cargoTypesList.find((t: any) => String(t.id) === String(typeId));
-          if (ct) return ct.type || (ct as any).cargo_type || "-";
-        }
-      }
-
-      const directTypeId = invCargo?.cargo_type_id || (invoice as any).cargo_type_id;
-      if (directTypeId !== undefined && directTypeId !== null) {
-        const ct = cargoTypesList.find((t: any) => String(t.id) === String(directTypeId));
-        if (ct) return ct.type || (ct as any).cargo_type || "-";
-      }
-
-      return "-";
-    },
-    [cargos, cargoTypesList],
-  );
-
-  const getBillToDisplayName = useCallback(
-    (invoice: Invoice) => {
-      const billTo = (typeof invoice.bill_to === "string" ? invoice.bill_to : "").trim();
-      const custName = (invoice.customer?.companyName || "").trim();
-      const raw = billTo || custName;
-      if (!raw) return "N/A";
-
-      const matched = gtechCompanies.find(
-        (g) =>
-          (g.legal_name && g.legal_name.trim().toLowerCase() === raw.toLowerCase()) ||
-          (g.display_name && g.display_name.trim().toLowerCase() === raw.toLowerCase()) ||
-          (g.legal_name && raw.toLowerCase().includes(g.legal_name.trim().toLowerCase())) ||
-          (g.display_name && raw.toLowerCase().includes(g.display_name.trim().toLowerCase())),
-      );
-
-      if (matched && matched.display_name) {
-        return matched.display_name;
-      }
-
-      return raw;
-    },
-    [gtechCompanies],
-  );
-
-  useEffect(() => {
-    getAllCargos({ limit: 1000 }).then((res: any) => {
-      const data = res?.data?.cargos || res?.data?.data || res?.data || res;
-      if (Array.isArray(data)) setCargos(data);
-    });
-    getAllCargoTypes().then((res: any) => {
-      const data = res?.data?.data || res?.data || res;
-      if (Array.isArray(data)) setCargoTypesList(data);
-    });
-    getAllGtechCompanies()
-      .then((res: any) => {
-        const data = res?.data?.data || res?.data || res;
-        if (Array.isArray(data)) setGtechCompanies(data);
-      })
-      .catch(() => { });
-    getAllTaricsSimple().then((res) => {
-      if (res.success) setTarics(res.data);
-    });
-  }, []);
-
-  const handleReassignItem = async () => {
-    if (!selectedItem || !targetCargoId) return;
-    try {
-      const cargoIdNum = Number(targetCargoId);
-      const isItem =
-        activeInvTab === "order_items" ||
-        !!selectedItem.item_id ||
-        !!selectedItem.parentOrder;
-
-      if (isItem) {
-        await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
-      } else {
-        const orderId = selectedItem.order_id || selectedItem.id;
-        await assignOrdersToCargo(cargoIdNum, [Number(orderId)], false);
-        toast.success(
-          `Order ${selectedItem.order_no || orderId} assigned to Cargo ${targetCargoId}`,
-        );
-      }
-
-      setShowREModal(false);
-
-      await Promise.all([loadInvoices(), fetchOrders(), cargosTabRef.current?.fetchCargos?.()]);
-
-      const expandedKeys = Object.keys(expandedStates).filter(
-        (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
-      );
-
-      if (expandedKeys.length > 0) {
-        await Promise.all(
-          expandedKeys.map(async (invId) => {
-            try {
-              const res = await getExpandedInvoiceDetails(invId);
-              if (res?.success) {
-                setExpandedStates((prev) => ({
-                  ...prev,
-                  [invId]: { ...prev[invId], data: res.data },
-                }));
-              }
-            } catch (e) {
-              console.error(
-                `Failed to refresh expanded details for invoice ${invId}`,
-                e,
-              );
-            }
-          }),
-        );
-      }
-
-      setExpandedStates((prev) => {
-        const newState = { ...prev };
-        Object.keys(newState).forEach((key) => {
-          if (!newState[key]?.items && !newState[key]?.taric) {
-            delete newState[key].data;
-          }
-        });
-        return newState;
-      });
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to assign/reassign cargo");
-    }
-  };
-
-  const handleSplitItem = async () => {
-    if (!selectedItem || splitQty <= 0) return;
-    try {
-      await splitOrderItem(
-        selectedItem.id,
-        splitQty,
-        targetCargoId,
-        splitRemarks,
-        selectedItem.cargo_id,
-      );
-      toast.success("Item split and moved successfully");
-      setShowSPModal(false);
-      setSplitRemarks("");
-
-      await Promise.all([loadInvoices(), fetchOrders(), cargosTabRef.current?.fetchCargos?.()]);
-
-      const expandedKeys = Object.keys(expandedStates).filter(
-        (key) => expandedStates[key]?.items || expandedStates[key]?.taric,
-      );
-
-      if (expandedKeys.length > 0) {
-        await Promise.all(
-          expandedKeys.map(async (invId) => {
-            try {
-              const res = await getExpandedInvoiceDetails(invId);
-              if (res?.success) {
-                setExpandedStates((prev) => ({
-                  ...prev,
-                  [invId]: { ...prev[invId], data: res.data },
-                }));
-              }
-            } catch (e) {
-              console.error(
-                `Failed to refresh expanded details for invoice ${invId}`,
-                e,
-              );
-            }
-          }),
-        );
-      }
-
-      setExpandedStates((prev) => {
-        const newState = { ...prev };
-        Object.keys(newState).forEach((key) => {
-          if (!newState[key]?.items && !newState[key]?.taric) {
-            delete newState[key].data;
-          }
-        });
-        return newState;
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSetTaric = async (group: any) => {
-    if (!selectedTaricCode || !group) return;
-    try {
-      const invId = Object.keys(expandedStates).find(
-        (key) =>
-          expandedStates[key].taric &&
-          expandedStates[key].data?.taricGroups?.some(
-            (g: any) => g.taricId === group.taricId,
-          ),
-      );
-
-      if (!invId) {
-        toast.error("Could not find invoice for this taric group");
-        return;
-      }
-
-      const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter(
-        (oi: any) => getTaricGroupKey(oi) === group.taricId,
-      );
-
-      if (itemsInGroup && itemsInGroup.length > 0) {
-        for (const oi of itemsInGroup) {
-          const originalCode = oi.item?.taric?.code;
-          const hasOriginal =
-            originalCode &&
-            originalCode !== "0" &&
-            originalCode !== "0000000000";
-
-          // Always re-base on "original/new" rather than chaining through
-          // every prior override — set_taric_code only needs to carry the
-          // original code (for audit) and the current one.
-          const newTaricValue = hasOriginal
-            ? `${originalCode}/${selectedTaricCode}`
-            : selectedTaricCode;
-          await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
-        }
-        toast.success("Taric codes updated successfully");
-        setShowTaricModal(false);
-        setSelectedTaricCode("");
-
-        const res = await getExpandedInvoiceDetails(invId);
-        if (res.success) {
-          setExpandedStates((prev) => ({
-            ...prev,
-            [invId]: { ...prev[invId], data: res.data },
-          }));
-        }
-      } else {
-        toast.error("No items found in this group to update");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to update taric codes");
-    }
-  };
-
-  const handleUpdateQty = async () => {
-    if (!selectedItem || newQty <= 0) return;
-    try {
-      await updateOrderItemStatus(selectedItem.id, {
-        qty_label: newQty,
-        remarks_cn: qtyRemarks,
-      });
-      toast.success("QtyLabel updated successfully");
-      setShowQTYModal(false);
-      setQtyRemarks("");
-      const invId = Object.keys(expandedStates).find((key) =>
-        expandedStates[key].data?.detailedItems?.some(
-          (it: any) => it.id === selectedItem.id,
-        ),
-      );
-      if (invId) {
-        const res = await getExpandedInvoiceDetails(invId);
-        setExpandedStates((prev) => ({
-          ...prev,
-          [invId]: { ...prev[invId], data: res.data },
-        }));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handlePrintLabel = (item: any) => {
-    const details = item.item;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Label - ${details?.item_name || "Item"}</title>
-          <style>
-            @page { size: 100mm 150mm; margin: 0; }
-            body { 
-              font-family: 'Poppins', sans-serif; 
-              padding: 20px; 
-              border: 1px solid #eee; 
-              width: 100mm; 
-              height: 150mm; 
-              box-sizing: border-box; 
-              position: relative;
-            }
-            .header { border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
-            .item-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; height: 48px; overflow: hidden; }
-            .ean { font-size: 11px; margin-bottom: 5px; color: #555; }
-            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-            .label-field { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-            .value-field { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
-            .barcode { margin-top: 20px; text-align: center; }
-            .qr-placeholder { width: 80px; height: 80px; background: #eee; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; border: 1px dashed #ccc; }
-            .footer { position: absolute; bottom: 20px; left: 20px; right: 20px; font-size: 9px; text-align: center; color: #999; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="header">
-            <div class="item-name">${details?.item_name || "N/A"}</div>
-            <div class="ean">EAN: ${details?.ean || "-"}</div>
-          </div>
-          <div class="details">
-            <div>
-              <div class="label-field">Order / Cargo No.</div>
-              <div class="value-field">${item.order?.order_no || "-"}</div>
-            </div>
-            <div>
-              <div class="label-field">QTY Label</div>
-              <div class="value-field">${item.qty_label || item.qty}</div>
-            </div>
-            <div>
-              <div class="label-field">SOID</div>
-              <div class="value-field">${item.supplier_order_id || "-"}</div>
-            </div>
-            <div>
-              <div class="label-field">Taric</div>
-              <div class="value-field">${details?.taric?.code || "-"}</div>
-            </div>
-          </div>
-          <div class="barcode">
-            <div class="qr-placeholder">G-TECH LABEL</div>
-            <div style="font-size: 9px; margin-top: 5px; font-weight: 500;">Item ID: ${item.id}</div>
-          </div>
-          <div class="footer">
-            Printed on ${new Date().toLocaleString("de-DE")}
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      const response = await getCategories();
-      const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.categories || [];
-      setCategories(arr);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
-  }, []);
-
-  const fetchSuppliers = useCallback(async () => {
-    try {
-      const response = await getAllSuppliers({ limit: 1000 });
-      const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.suppliers || [];
-      setSuppliers(arr);
-    } catch (error) {
-      console.error("Error fetching suppliers:", error);
-    }
-  }, []);
-
-  const fetchAllItems = useCallback(async () => {
-    try {
-      setLoadingItemsAll(true);
-      const response = await getItems({ limit: 10000 });
-      const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.items || [];
-      setItemsAll(arr);
-    } catch (error) {
-      console.error("Error fetching items:", error);
-      setItemsAll([]);
-    } finally {
-      setLoadingItemsAll(false);
-    }
-  }, []);
-
-  const fetchOrders = useCallback(async () => {
-    setLoadingOrders(true);
-    try {
-      const response = await getAllOrders();
-      if (response?.success) setOrders(response.data);
-      else if (response?.data) setOrders(response.data);
-    } catch (error) {
-      console.error("Error fetching Orders:", error);
-      toast.error("Failed to fetch orders");
-    } finally {
-      setLoadingOrders(false);
-    }
-  }, []);
-
-  const itemById = useMemo(() => {
-    const map = new Map<string, any>();
-    for (const it of itemsAll) map.set(String(it.id), it);
-    return map;
-  }, [itemsAll]);
-
-  const getCategoryName = useCallback(
-    (categoryId: string | number) =>
-      categories.find((c) => String(c.id) === String(categoryId))?.name ?? "-",
-    [categories],
-  );
-
-  const getSupplierName = useCallback(
-    (supplierId: any) => {
-      const s = suppliers.find((c) => String(c.id) === String(supplierId));
-      if (!s) return String(supplierId);
-      const englishName =
-        s.name && !hasChinese(s.name)
-          ? s.name
-          : s.company_name && !hasChinese(s.company_name)
-            ? s.company_name
-            : null;
-      if (englishName) return englishName;
-      const chineseName = s.name_cn || s.company_name || s.name;
-      if (chineseName) return chineseName;
-      return s.name_de || String(s.id);
-    },
-    [suppliers],
-  );
-
-  const orderItemsFlat = useMemo(() => {
-    let allItems = orders.flatMap((o: any) => {
-      const rawItems = (o.items || []).map((i: any, idx: number) => ({
-        ...i,
-        _originalIndex: idx,
-      }));
-
-      if (o.order_no && String(o.order_no).includes("2608-10")) {
-        console.log("🔍 [DEBUG] RAW items from API for order 2608-10:", rawItems.map((x: any) => ({
-          id: x.id,
-          position: x.position,
-          remark_de: x.remark_de,
-          remark_order_item: x.remark_order_item,
-          _originalIndex: x._originalIndex,
-          item_name: x.item?.item_name || x.item_name
-        })));
-      }
-
-      rawItems.sort((a: any, b: any) => {
-        const getSortValue = (item: any, fallbackIdx: number) => {
-          if (item.position !== undefined && item.position !== null && item.position !== "") {
-            const p = Number(item.position);
-            if (!isNaN(p)) return p;
-          }
-          return fallbackIdx;
-        };
-        return getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex);
-      });
-
-      if (o.order_no && String(o.order_no).includes("2608-10")) {
-        console.log("🔍 [DEBUG] SORTED items for order 2608-10:", rawItems.map((x: any) => ({
-          id: x.id,
-          position: x.position,
-          remark_de: x.remark_de,
-          remark_order_item: x.remark_order_item,
-          _originalIndex: x._originalIndex,
-          item_name: x.item?.item_name || x.item_name
-        })));
-      }
-
-      return rawItems.map((i: any, idx: number) => ({
-        ...i,
-        position: i.position ?? idx + 1,
-        order_id: o.id,
-        parentOrder: o,
-        order_no: o.order_no,
-        order_status: o.status,
-        item_status: i.status || "NSO",
-        supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
-        customer_id: o.customer_id || o.customer?.id,
-        customer: o.customer,
-        category_id: o.category_id,
-        comment: o.comment,
-      }));
-    });
-
-    const filterParam = searchParams.get("filter");
-    if (filterParam) {
-      if (filterParam === "unassigned_cargo") {
-        allItems = allItems.filter(
-          (i: any) =>
-            !i.cargo_id ||
-            i.cargo_id === 0 ||
-            i.cargo_id === "0" ||
-            i.cargo_id === "-" ||
-            i.cargo_id === "null",
-        );
-      } else if (filterParam === "purchase_problem") {
-        allItems = allItems.filter(
-          (i: any) =>
-            (i.problems &&
-              i.problems !== "" &&
-              (i.problems.toLowerCase().includes("purchase") ||
-                i.problems.toLowerCase().includes("buy"))) ||
-            (i.status && String(i.status).toLowerCase().includes("purchase")),
-        );
-      } else if (filterParam === "check_problem") {
-        allItems = allItems.filter(
-          (i: any) =>
-            i.problems &&
-            i.problems !== "" &&
-            (i.problems.toLowerCase().includes("check") ||
-              i.problems.toLowerCase().includes("verify")),
-        );
-      } else if (filterParam === "rmb_special_no_value") {
-        allItems = allItems.filter((i: any) => {
-          const it = i.item || {};
-          const price = i.rmb_price || it.rmb_price || it.RMB_Price || 0;
-          return (
-            it.is_rmb_special === "Y" &&
-            (!price || parseFloat(String(price)) === 0)
-          );
-        });
-      } else if (filterParam === "eur_special_no_value") {
-        allItems = allItems.filter((i: any) => {
-          const it = i.item || {};
-          const hasEUR =
-            (it.price && parseFloat(String(it.price)) > 0) ||
-            (it.transfer_price_EUR &&
-              parseFloat(String(it.transfer_price_EUR)) > 0);
-          return it.is_eur_special === "Y" && !hasEUR;
-        });
-      } else if (filterParam === "dimension_special_no_value") {
-        allItems = allItems.filter((i: any) => {
-          const it = i.item || {};
-          const hasDim =
-            it.weight &&
-            parseFloat(String(it.weight)) > 0 &&
-            it.length &&
-            parseFloat(String(it.length)) > 0 &&
-            it.width &&
-            parseFloat(String(it.width)) > 0 &&
-            it.height &&
-            parseFloat(String(it.height)) > 0;
-          return it.is_dimension_special === "Y" && !hasDim;
-        });
-      }
-    }
-
-    if (!orderNoFilter) return allItems;
-    const s = orderNoFilter.toLowerCase();
-    return allItems.filter(
-      (i) =>
-        String(i.order_no).toLowerCase().includes(s) ||
-        String(i.ean || i.item?.ean || "")
-          .toLowerCase()
-          .includes(s) ||
-        String(i.item_name || i.itemName || i.item?.item_name || "")
-          .toLowerCase()
-          .includes(s),
-    );
-  }, [orders, orderNoFilter, searchParams]);
-
-  const filteredOrders = useMemo(() => {
-    let list = orders;
-    const filterParam = searchParams.get("filter");
-    if (filterParam === "unassigned_cargo") {
-      list = list.filter(
-        (o: any) =>
-          !o.cargo_id ||
-          o.cargo_id === 0 ||
-          o.cargo_id === "0" ||
-          o.cargo_id === "-" ||
-          o.cargo_id === "null",
-      );
-    }
-    if (!orderNoFilter) return list;
-    const s = orderNoFilter.toLowerCase();
-    return list.filter(
-      (o: any) =>
-        String(o.order_no).toLowerCase().includes(s) ||
-        String(o.id).toLowerCase().includes(s) ||
-        (o.comment || "").toLowerCase().includes(s),
-    );
-  }, [orders, orderNoFilter, searchParams]);
 
   const handleGoToItems = (orderNo: string) => {
     setOrderNoFilter(orderNo);
@@ -1358,19 +881,6 @@ const InvoiceListPage: React.FC = () => {
     setViewItems([]);
   };
 
-  const handleOpenReassignModal = (item: any) => {
-    setSelectedItem(item);
-    setTargetCargoId(item.cargo_id ? String(item.cargo_id) : "");
-    setShowREModal(true);
-  };
-
-  const handleOpenSplitModal = (item: any) => {
-    setSelectedItem(item);
-    setSplitQty(item.qty_label || item.qty || 0);
-    setRemarksCN(item.remarks_cn || "");
-    setShowSPModal(true);
-  };
-
   const handleAssignSupplier = async (
     orderItemId: number | string,
     supplierId: number,
@@ -1381,7 +891,7 @@ const InvoiceListPage: React.FC = () => {
       if (baseItemId) {
         await updateItem(Number(baseItemId), { supplier_id: supplierId });
       }
-      await Promise.all([fetchOrders(), fetchAllItems()]);
+      await Promise.all([tabData.refetchOrders(), tabData.refetchAllItems()]);
       toast.success("Supplier assigned successfully");
     } catch (error) {
       console.error("Failed to assign supplier:", error);
@@ -1389,379 +899,9 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    loadInvoices();
-    if (activeInvTab === "orders" || activeInvTab === "order_items") {
-      fetchOrders();
-      fetchCustomers();
-      fetchCategories();
-      fetchSuppliers();
-      fetchAllItems();
-    }
-  }, [activeInvTab]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", activeInvTab);
-    if (orderNoFilter) params.set("order_no", orderNoFilter);
-    else params.delete("order_no");
-    const qs = params.toString();
-    router.replace(qs ? `/invoices?${qs}` : "/invoices", { scroll: false });
-  }, [activeInvTab, orderNoFilter, router, searchParams]);
-
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam) {
-      const validTabs = [
-        "orders",
-        "order_items",
-        "open_invoices",
-        "closed_invoices",
-        "cargos",
-        "cargo_type",
-        "packing_list",
-      ];
-      if (validTabs.includes(tabParam)) {
-        setActiveInvTab(tabParam as InvoiceTab);
-      }
-    }
-    const orderNo = searchParams.get("order_no");
-    if (orderNo !== null) {
-      setOrderNoFilter(orderNo);
-    }
-  }, [searchParams]);
-
-  const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      const response: any = await getAllCustomers({ limit: 1000 });
-      if (response?.data?.businesses) {
-        setCustomers(response.data.businesses);
-      } else if (Array.isArray(response?.data)) {
-        setCustomers(response.data);
-      } else if (Array.isArray(response)) {
-        setCustomers(response);
-      } else {
-        setCustomers([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch customers:", error);
-    } finally {
-    }
-  };
-
-  useEffect(() => {
-    let filtered = invoices || [];
-
-    if (activeInvTab === "open_invoices") {
-      filtered = filtered.filter((invoice) => {
-        const cNo = (invoice.cargoNo || invoice.cargo?.cargo_no || "").trim();
-        return (
-          invoice.status !== "paid" &&
-          invoice.status !== "cancelled" &&
-          cNo.toUpperCase().startsWith("C")
-        );
-      });
-    } else if (activeInvTab === "closed_invoices") {
-      filtered = filtered.filter((invoice) => {
-        const cNo = (invoice.cargoNo || invoice.cargo?.cargo_no || "").trim();
-        return (
-          (invoice.status === "paid" || invoice.status === "cancelled") &&
-          cNo.toUpperCase().startsWith("C")
-        );
-      });
-    }
-
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.invoiceNumber?.toLowerCase().includes(searchLower) ||
-          invoice.customer?.companyName?.toLowerCase().includes(searchLower) ||
-          invoice.customer?.email?.toLowerCase().includes(searchLower) ||
-          invoice.customer?.contactEmail?.toLowerCase().includes(searchLower) ||
-          (invoice.orderNumber &&
-            invoice.orderNumber.toLowerCase().includes(searchLower)) ||
-          (invoice.cargoNo &&
-            invoice.cargoNo.toLowerCase().includes(searchLower)),
-      );
-    }
-
-    if (filters.status) {
-      filtered = filtered.filter(
-        (invoice) => invoice.status === filters.status,
-      );
-    }
-
-    if (filters.dateFrom) {
-      filtered = filtered.filter(
-        (invoice) =>
-          new Date(invoice.invoiceDate) >= new Date(filters.dateFrom),
-      );
-    }
-    if (filters.dateTo) {
-      filtered = filtered.filter(
-        (invoice) => new Date(invoice.invoiceDate) <= new Date(filters.dateTo),
-      );
-    }
-
-    if (filters.customer) {
-      const customerLower = filters.customer.toLowerCase();
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.customer?.companyName
-            ?.toLowerCase()
-            .includes(customerLower) ||
-          invoice.customer?.email?.toLowerCase().includes(customerLower) ||
-          invoice.customer?.contactEmail?.toLowerCase().includes(customerLower),
-      );
-    }
-
-    if (filters.minAmount) {
-      filtered = filtered.filter(
-        (invoice) => invoice.grossTotal >= parseFloat(filters.minAmount),
-      );
-    }
-    if (filters.maxAmount) {
-      filtered = filtered.filter(
-        (invoice) => invoice.grossTotal <= parseFloat(filters.maxAmount),
-      );
-    }
-
-    filtered.sort((a, b) => {
-      if (sortField === "createdAt" || sortField === "invoiceDate") {
-        const aTime = new Date(a.createdAt || a.invoiceDate || 0).getTime();
-        const bTime = new Date(b.createdAt || b.invoiceDate || 0).getTime();
-        if (aTime !== bTime) {
-          return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
-        }
-        return sortDirection === "asc"
-          ? String(a.id).localeCompare(String(b.id))
-          : String(b.id).localeCompare(String(a.id));
-      }
-
-      let aValue: any = a[sortField];
-      let bValue: any = b[sortField];
-
-      if (sortField === "customer") {
-        aValue = a.customer?.companyName || a.bill_to || "";
-        bValue = b.customer?.companyName || b.bill_to || "";
-      } else if (sortField === "cargoNo") {
-        aValue = a.cargoNo || a.cargo?.cargo_no || "";
-        bValue = b.cargoNo || b.cargo?.cargo_no || "";
-      } else if (sortField === "customItemCount") {
-        aValue = a.customItemCount ?? a.items?.length ?? 0;
-        bValue = b.customItemCount ?? b.items?.length ?? 0;
-      } else if (sortField === "customTotalQty") {
-        aValue = a.customTotalQty ?? 0;
-        bValue = b.customTotalQty ?? 0;
-      }
-
-      if (aValue == null && bValue == null) return 0;
-      if (aValue == null) return sortDirection === "asc" ? 1 : -1;
-      if (bValue == null) return sortDirection === "asc" ? -1 : 1;
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        const comp = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: "base" });
-        return sortDirection === "asc" ? comp : -comp;
-      }
-
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      }
-
-      return 0;
-    });
-
-    setFilteredInvoices(filtered);
-    setCurrentPage(1);
-  }, [searchTerm, filters, invoices, sortField, sortDirection, activeInvTab]);
-
-  const loadInvoices = async () => {
-    try {
-      setLoading(true);
-      const response = await getAllInvoices();
-      setInvoices(response?.data);
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to load invoices:", error);
-      setLoading(false);
-    }
-  };
-
-  const handleSort = (field: keyof Invoice) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const handleDownloadPDF = async (pdfUrl: string) => {
-    router.push(`${pdfUrl}`);
-  };
-
-  const handleMarkAsPaid = async (invoiceId: string) => {
-    try {
-      const invoice = invoices.find((inv) => inv.id === invoiceId);
-      if (
-        !invoice ||
-        invoice.freightCost === null ||
-        invoice.freightCost === undefined ||
-        Number(invoice.freightCost) <= 0
-      ) {
-        toast.error(
-          "Please provide a freight cost by editing the invoice before verifying it.",
-        );
-        return;
-      }
-      if (!invoice.description || !invoice.description.trim()) {
-        toast.error(
-          "Please provide a description by editing the invoice before verifying it.",
-        );
-        return;
-      }
-
-      setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
-      await markInvoiceAsPaid(invoiceId);
-      await loadInvoices();
-      setSelectedInvoice((prev) => (prev ? { ...prev, status: "paid" } : null));
-      toast.success("Invoice verified successfully");
-    } catch (error) {
-      console.error("Failed to mark as paid:", error);
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: false }));
-    }
-  };
-
-  const handleSaveInvoiceEdit = async (invoiceId: string) => {
-    if (!invoiceEditForm.description?.trim()) {
-      toast.error("Description is required");
-      return;
-    }
-    if (
-      invoiceEditForm.freightCost === "" ||
-      invoiceEditForm.freightCost === null ||
-      invoiceEditForm.freightCost === undefined ||
-      Number(invoiceEditForm.freightCost) <= 0
-    ) {
-      toast.error("Freight Cost must be greater than 0");
-      return;
-    }
-
-    try {
-      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: true }));
-      await updateInvoice({
-        id: invoiceId,
-        description: invoiceEditForm.description,
-        freightCost: invoiceEditForm.freightCost,
-        remark: invoiceEditForm.remark,
-      });
-      setEditingInvoiceId(null);
-      await loadInvoices();
-      setSelectedInvoice((prev) =>
-        prev
-          ? {
-            ...prev,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
-          : null,
-      );
-      toast.success("Invoice changes saved successfully");
-    } catch (error) {
-      console.error("Failed to save invoice edits:", error);
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: false }));
-    }
-  };
-
-  const handleCancelInvoice = async (invoiceId: string) => {
-    try {
-      setActionLoading((prev) => ({ ...prev, [`cancel-${invoiceId}`]: true }));
-      await cancelInvoice(invoiceId);
-      await loadInvoices();
-    } catch (error) {
-      console.error("Failed to cancel invoice:", error);
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [`cancel-${invoiceId}`]: false }));
-    }
-  };
-
-  const handleDeleteInvoice = async (invoiceId: string) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this invoice? This action cannot be undone.",
-      )
-    ) {
-      try {
-        setActionLoading((prev) => ({
-          ...prev,
-          [`delete-${invoiceId}`]: true,
-        }));
-        await deleteInvoice(invoiceId);
-        await loadInvoices();
-      } catch (error) {
-        console.error("Failed to delete invoice:", error);
-      } finally {
-        setActionLoading((prev) => ({
-          ...prev,
-          [`delete-${invoiceId}`]: false,
-        }));
-      }
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "paid":
-        return <CheckCircle className="w-4 h-4" />;
-      case "sent":
-        return <Clock className="w-4 h-4" />;
-      case "overdue":
-        return <AlertCircle className="w-4 h-4" />;
-      case "cancelled":
-        return <XCircle className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return { backgroundColor: "#E8F5E8", color: "#2E7D32" };
-      case "sent":
-        return { backgroundColor: "#E3F2FD", color: "#1976D2" };
-      case "overdue":
-        return { backgroundColor: "#FFF3E0", color: "#F57C00" };
-      case "cancelled":
-        return { backgroundColor: "#FFEBEE", color: "#D32F2F" };
-      default:
-        return { backgroundColor: "#F5F5F5", color: "#757575" };
-    }
-  };
-
-  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentInvoices = filteredInvoices.slice(startIndex, endIndex);
-
-  const totalAmount = filteredInvoices.reduce(
-    (sum, inv) => sum + (Number(inv.grossTotal) || 0),
-    0,
-  );
-  const totalPaid = filteredInvoices.reduce(
-    (sum, inv) => sum + (Number(inv.paidAmount) || 0),
-    0,
-  );
-  const outstandingAmount = filteredInvoices.reduce(
-    (sum, inv) => sum + (Number(inv.outstandingAmount) || 0),
-    0,
-  );
-
+  // ---------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------
   return (
     <div className="w-full mx-auto">
       <div
@@ -1833,631 +973,69 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
-        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm flex flex-wrap items-center justify-between gap-2 overflow-visible">
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 flex-1">
-            <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
-              <FilterResetIcon
-                isActive={!!(
-                  searchTerm ||
-                  orderNoFilter ||
-                  filters.status ||
-                  filters.dateFrom ||
-                  filters.dateTo ||
-                  filters.customer ||
-                  filters.minAmount ||
-                  filters.maxAmount ||
-                  (cargoStatusFilter && cargoStatusFilter !== "Open")
-                )}
-                onReset={() => {
-                  setSearchTerm("");
-                  setOrderNoFilter("");
-                  setFilters({
-                    status: "",
-                    dateFrom: "",
-                    dateTo: "",
-                    customer: "",
-                    minAmount: "",
-                    maxAmount: "",
-                  });
-                  setCargoStatusFilter("Open");
-                }}
-              />
-            </div>
-            <div className="relative w-80 shrink-0">
-              <input
-                type="text"
-                placeholder={
-                  activeInvTab === "open_invoices" ||
-                    activeInvTab === "closed_invoices"
-                    ? "Search invoices, customers, or order numbers..."
-                    : activeInvTab === "cargos"
-                      ? "Search cargos..."
-                      : activeInvTab === "cargo_type"
-                        ? "Search cargo types..."
-                        : activeInvTab === "packing_list"
-                          ? "Search packing lists..."
-                          : "Search..."
-                }
-                value={
-                  activeInvTab === "open_invoices" ||
-                    activeInvTab === "closed_invoices"
-                    ? searchTerm
-                    : orderNoFilter
-                }
-                onChange={(e) => {
-                  if (
-                    activeInvTab === "open_invoices" ||
-                    activeInvTab === "closed_invoices"
-                  ) {
-                    setSearchTerm(e.target.value);
-                  } else {
-                    setOrderNoFilter(e.target.value);
-                  }
-                }}
-                className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${(activeInvTab === "open_invoices" || activeInvTab === "closed_invoices" ? searchTerm : orderNoFilter)
-                  ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                  : "text-gray-900 border-gray-300 bg-white"
-                  }`}
-              />
-              {(activeInvTab === "open_invoices" ||
-                activeInvTab === "closed_invoices"
-                ? searchTerm
-                : orderNoFilter) && (
-                  <button
-                    onClick={() => {
-                      if (
-                        activeInvTab === "open_invoices" ||
-                        activeInvTab === "closed_invoices"
-                      ) {
-                        setSearchTerm("");
-                      } else {
-                        setOrderNoFilter("");
-                      }
-                    }}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-            </div>
-
-            {activeInvTab === "cargos" && (
-              <SegmentedControl
-                options={[
-                  { value: "Open", label: "Open" },
-                  { value: "Shipped", label: "Shipped" },
-                  { value: "Delivered", label: "Delivered" },
-                ]}
-                value={cargoStatusFilter}
-                onChange={setCargoStatusFilter}
-              />
-            )}
-          </div>
-        </div>
+        <InvoicesFilterBar
+          activeInvTab={activeInvTab}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          orderNoFilter={orderNoFilter}
+          setOrderNoFilter={setOrderNoFilter}
+          filters={filters}
+          cargoStatusFilter={cargoStatusFilter}
+          setCargoStatusFilter={setCargoStatusFilter}
+          onReset={() => {
+            setSearchTerm("");
+            setOrderNoFilter("");
+            setFilters(initialFilterOptions);
+            setCargoStatusFilter("Open");
+          }}
+        />
 
         {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-          <div className="bg-white rounded-md border border-gray-200 p-4 shadow-sm mb-6">
-            {activeInvTab === "order_items" && orderNoFilter && (
-              <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-100 mb-4 rounded-[4px]">
-                <span className="text-xs text-blue-700 font-medium">
-                  🔍 Showing items for order:&nbsp;
-                  <span className="font-bold bg-blue-100 px-1.5 py-0.5 rounded text-blue-800">
-                    {orderNoFilter}
-                  </span>
-                </span>
-                <button
-                  onClick={() => setOrderNoFilter("")}
-                  className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold ml-1"
-                >
-                  Clear filter (show all)
-                </button>
-              </div>
-            )}
-            <OrdersTable
-              orders={
-                activeInvTab === "orders" ? filteredOrders : orderItemsFlat
-              }
-              loading={loadingOrders}
-              getCategoryName={getCategoryName}
-              getSupplierName={getSupplierName}
-              getOrderStatusColor={getOrderStatusColor}
-              onView={handleViewOrder}
-              onEdit={handleEditOrder}
-              onDelete={handleDeleteOrder}
-              canDelete={user?.role === "ADMIN"}
-              showConvert={false}
-              onConvert={undefined}
-              onReassign={handleOpenReassignModal}
-              onGoToItems={handleGoToItems}
-              activeTab={activeInvTab}
-              itemById={itemById}
-              suppliers={suppliers}
-              onAssignSupplier={handleAssignSupplier}
-              onSplit={handleOpenSplitModal}
-              router={router}
-              cargos={cargos}
-            />
-          </div>
+          <OrdersTabPanel
+            activeInvTab={activeInvTab}
+            orderNoFilter={orderNoFilter}
+            onClearOrderNoFilter={() => setOrderNoFilter("")}
+            orders={activeInvTab === "orders" ? filteredOrders : orderItemsFlat}
+            loading={tabData.loadingOrders}
+            getCategoryName={getCategoryName}
+            getSupplierName={getSupplierName}
+            onView={handleViewOrder}
+            onEdit={handleEditOrder}
+            onDelete={handleDeleteOrder}
+            canDelete={user?.role === "ADMIN"}
+            onReassign={handleOpenReassignModal}
+            onGoToItems={handleGoToItems}
+            itemById={itemById}
+            suppliers={tabData.suppliers}
+            onAssignSupplier={handleAssignSupplier}
+            onSplit={handleOpenSplitModal}
+            router={router}
+            cargos={tabData.cargos}
+          />
         )}
 
         {(activeInvTab === "open_invoices" ||
           activeInvTab === "closed_invoices") && (
-            <>
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                      <p className="text-xs text-[#6C757D]">
-                        Loading invoices...
-                      </p>
-                    </div>
-                  </div>
-                ) : filteredInvoices.length === 0 ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
-                      <h3 className="text-lg font-medium mb-1 text-[#212529]">
-                        No invoices found
-                      </h3>
-                      <p className="text-xs text-[#6C757D]">
-                        Try adjusting your search or filters
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="hidden lg:block overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
-                          <tr>
-                            <th className="w-10 py-3.5 px-3 text-center"></th>
-                            {activeInvTab === "closed_invoices" && (
-                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                                #
-                              </th>
-                            )}
-                            {activeInvTab === "closed_invoices" && (
-                              <th
-                                onClick={() => handleSort("id")}
-                                className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span>ID</span>
-                                  {sortField === "id" && (
-                                    <span className="text-xs text-emerald-600 font-bold">
-                                      {sortDirection === "asc" ? "↑" : "↓"}
-                                    </span>
-                                  )}
-                                </div>
-                              </th>
-                            )}
-                            {activeInvTab === "closed_invoices" && (
-                              <th
-                                onClick={() => handleSort("invoiceNumber")}
-                                className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span>Invoice No</span>
-                                  {sortField === "invoiceNumber" && (
-                                    <span className="text-xs text-emerald-600 font-bold">
-                                      {sortDirection === "asc" ? "↑" : "↓"}
-                                    </span>
-                                  )}
-                                </div>
-                              </th>
-                            )}
-                            <th
-                              onClick={() => handleSort("createdAt")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>
-                                  {activeInvTab === "open_invoices"
-                                    ? "Date "
-                                    : "Closed Date"}
-                                </span>
-                                {sortField === "createdAt" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              onClick={() => handleSort("customer")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>Bill To</span>
-                                {sortField === "customer" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Ship To
-                            </th>
-                            <th
-                              onClick={() => handleSort("cargoNo")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>Cargo No.</span>
-                                {sortField === "cargoNo" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              CargoType
-                            </th>
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Remark
-                            </th>
-                            <th
-                              onClick={() => handleSort("customItemCount")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>
-                                  {activeInvTab === "open_invoices"
-                                    ? "Count Item"
-                                    : "Item Count"}
-                                </span>
-                                {sortField === "customItemCount" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              onClick={() => handleSort("customTotalQty")}
-                              className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span>
-                                  {activeInvTab === "open_invoices"
-                                    ? "QTY"
-                                    : "Total Qty"}
-                                </span>
-                                {sortField === "customTotalQty" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              onClick={() => handleSort("grossTotal")}
-                              className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057] cursor-pointer select-none hover:text-black transition-colors"
-                            >
-                              <div className="flex items-center justify-end gap-1">
-                                <span>{activeInvTab === "open_invoices" ? "TotalAmount" : "Total Price"}</span>
-                                {sortField === "grossTotal" && (
-                                  <span className="text-xs text-emerald-600 font-bold">
-                                    {sortDirection === "asc" ? "↑" : "↓"}
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#F1F3F5]">
-                          {currentInvoices.map((invoice, index) => {
-                            const isExpanded = expandedInvoiceIds.has(invoice.id);
-                            const totalCols = activeInvTab === "closed_invoices" ? 13 : 10;
-                            return (
-                              <React.Fragment key={invoice.id}>
-                                <tr
-                                  onClick={() =>
-                                    handleOpenInvoiceDetails(invoice)
-                                  }
-                                  className={`hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium ${isExpanded ? "bg-[#F8F9FA]" : ""
-                                    }`}
-                                >
-                                  <td
-                                    className="py-4 px-3 text-center"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleToggleRowExpand(invoice);
-                                      }}
-                                      className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-500 hover:text-black focus:outline-none"
-                                      title={isExpanded ? "Collapse Order Items" : "Unfold OrderItemList"}
-                                    >
-                                      {isExpanded ? (
-                                        <ChevronDown className="w-4 h-4 text-[#8CC21B] font-bold" />
-                                      ) : (
-                                        <ChevronRight className="w-4 h-4 text-gray-400 hover:text-gray-700" />
-                                      )}
-                                    </button>
-                                  </td>
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-[#212529]">
-                                      {startIndex + index + 1}
-                                    </td>
-                                  )}
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs text-[#212529] font-bold">
-                                      {invoice.id.slice(-5).toUpperCase()}
-                                    </td>
-                                  )}
-                                  {activeInvTab === "closed_invoices" && (
-                                    <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                                      {invoice.invoiceNumber || "N/A"}
-                                    </td>
-                                  )}
-                                  <td className="py-4 px-4 text-xs text-[#495057]">
-                                    {formatDate(invoice.invoiceDate, true)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {getBillToDisplayName(invoice)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {(() => {
-                                      const v = invoice.ship_to;
-                                      if (!v || typeof v === "object") return "-";
-                                      const s = String(v).trim();
-                                      return s.length > 1 ? s : "-";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {(() => {
-                                      const cNo = (invoice.cargo?.cargo_no || invoice.cargoNo || "").trim();
-                                      return cNo.toUpperCase().startsWith("C") ? cNo : "-";
-                                    })()}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {getCargoTypeNameFromInvoice(invoice)}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {invoice.remark || "-"}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.customItemCount ??
-                                      invoice.items?.length ??
-                                      0}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                    {invoice.customTotalQty ??
-                                      invoice.items?.reduce(
-                                        (sum: any, item: any) =>
-                                          sum + item.quantity,
-                                        0,
-                                      ) ??
-                                      0}
-                                  </td>
-                                  <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                    {calculateInvoiceTotal(invoice).toLocaleString(
-                                      undefined,
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      },
-                                    )}
-                                  </td>
-                                </tr>
-                                {isExpanded && (
-                                  <tr className="bg-gray-50/90 border-b border-gray-200">
-                                    <td colSpan={totalCols} className="p-4">
-                                      {expandedStates[invoice.id]?.loading ? (
-                                        <div className="flex items-center justify-center p-6 gap-2 text-xs text-gray-500 font-medium">
-                                          <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B]" /> Loading order items...
-                                        </div>
-                                      ) : (() => {
-                                        const data = expandedStates[invoice.id]?.data;
-                                        const itemsToRender = data?.detailedItems || data?.items || invoice.items || [];
-                                        return (
-                                          <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm space-y-2">
-                                            <div className="flex items-center justify-between">
-                                              <h5 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider flex items-center gap-2">
-                                                <Package className="w-3.5 h-3.5 text-[#8CC21B]" />
-                                                Order Items List ({itemsToRender.length} item{itemsToRender.length !== 1 ? 's' : ''})
-                                              </h5>
-                                              <span className="text-[10px] text-gray-400 font-normal">Invoice ID: {invoice.id}</span>
-                                            </div>
-                                            {itemsToRender.length === 0 ? (
-                                              <p className="text-xs text-gray-500 italic py-2 text-center">No order items recorded for this invoice.</p>
-                                            ) : (
-                                              <div className="overflow-x-auto rounded border border-gray-200 bg-white">
-                                                <table className="w-full text-xs text-left text-gray-700">
-                                                  <thead className="bg-[#343A40] text-white text-[10px] font-bold uppercase">
-                                                    <tr>
-                                                      <th className="py-2.5 px-3">#</th>
-                                                      <th className="py-2.5 px-3">EAN</th>
-                                                      <th className="py-2.5 px-3">Item Name</th>
-                                                      <th className="py-2.5 px-3">TARIC</th>
-                                                      <th className="py-2.5 px-3">Order No</th>
-                                                      <th className="py-2.5 px-3">Remark</th>
-                                                      <th className="py-2.5 px-3 text-center">QTY</th>
-                                                      <th className="py-2.5 px-3 text-right">Unit Price (€)</th>
-                                                      <th className="py-2.5 px-3 text-right">Total (€)</th>
-                                                      {activeInvTab === "open_invoices" && <th className="py-2.5 px-3 text-center">Actions</th>}
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody className="divide-y divide-gray-100 font-medium">
-                                                    {itemsToRender.map((it: any, idx: number) => {
-                                                      const ean = it._fallbackEan || it.item?.ean || it.ean || "-";
-                                                      const itemName = it.item?.item_name || it.itemName || it.item_name || it.description || "Item";
-                                                      const taricCode = it.set_taric_code || it.item?.taric?.code || it.taricCode || "-";
-                                                      const orderNo = it.order?.order_no || it.orderNo || "-";
-                                                      const remark = it.remark_de || it.remark || "";
-                                                      const qty = Number(it.qty || it.quantity || 0);
-                                                      const unitPrice = Number(it.eur_special_price || it._fallbackEk || it.unitPrice || it.price || 0);
-                                                      const totalPrice = Number(it.totalPrice || (qty * unitPrice));
-
-                                                      return (
-                                                        <tr key={it.id || idx} className="hover:bg-gray-50 transition-colors">
-                                                          <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
-                                                          <td className="py-2 px-3 font-mono text-[11px] text-gray-600">{ean}</td>
-                                                          <td className="py-2 px-3 max-w-[240px] truncate font-semibold text-gray-900" title={itemName}>{itemName}</td>
-                                                          <td className="py-2 px-3 font-mono text-[11px] text-amber-700 font-semibold">{taricCode}</td>
-                                                          <td className="py-2 px-3 text-gray-600">{orderNo}</td>
-                                                          <td className="py-2 px-3 text-gray-500 text-[11px] italic">{remark ? `// ${remark}` : "-"}</td>
-                                                          <td className="py-2 px-3 text-center font-bold">{it.qty_label ? `${it.qty_label}/${qty}` : qty}</td>
-                                                          <td className="py-2 px-3 text-right">€{unitPrice.toFixed(2)}</td>
-                                                          <td className="py-2 px-3 text-right font-bold text-[#10B981]">€{totalPrice.toFixed(2)}</td>
-                                                          {activeInvTab === "open_invoices" && (
-                                                            <td className="py-2 px-3">
-                                                              <div className="flex items-center justify-center gap-1">
-                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setNewQty(it.qty_label || it.qty); setQtyRemarks(it.remarks_cn || ""); setShowQTYModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition" title="QtyLabel">Qty</button>
-                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem({ ...it, cargo_id: it.cargo_id || invoice.cargo?.id || (expandedStates[invoice.id]?.data?.cargo?.id) }); setSplitQty(Math.floor(it.qty * 0.5)); setTargetCargoId(""); setSplitRemarks(it.remarks_cn || ""); setShowSPModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition" title="Split">Split</button>
-                                                                <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setTargetCargoId(it.cargo_id || ""); setShowREModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition" title="ReAssign">ReAssign</button>
-                                                              </div>
-                                                            </td>
-                                                          )}
-                                                        </tr>
-                                                      );
-                                                    })}
-                                                  </tbody>
-                                                </table>
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })()}
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="lg:hidden divide-y divide-[#F1F3F5]">
-                      {currentInvoices.map((invoice) => (
-                        <div
-                          key={invoice.id}
-                          onClick={() => handleOpenInvoiceDetails(invoice)}
-                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
-                                {invoice.id.slice(-5).toUpperCase()}
-                              </div>
-                              <div className="font-bold text-sm text-[#212529]">
-                                {activeInvTab === "closed_invoices"
-                                  ? invoice.invoiceNumber
-                                  : `ID: ${invoice.id.slice(-5)}`}
-                              </div>
-                            </div>
-                            <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
-                              style={getStatusColor(invoice.status)}
-                            >
-                              {invoice.status}
-                            </span>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Customer</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customer?.companyName}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">
-                                {activeInvTab === "open_invoices"
-                                  ? "Cargo"
-                                  : "Cargo No."}
-                              </span>
-                              <span className="font-medium text-[#212529]">
-                                {(() => {
-                                  const cNo = (invoice.cargo?.cargo_no || invoice.cargoNo || "").trim();
-                                  return cNo.toUpperCase().startsWith("C") ? cNo : "-";
-                                })()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#6C757D]">Items / Qty</span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.customItemCount ??
-                                  invoice.items?.length ??
-                                  0}{" "}
-                                /{" "}
-                                {invoice.customTotalQty ??
-                                  invoice.items?.reduce(
-                                    (sum, item) => sum + item.quantity,
-                                    0,
-                                  ) ??
-                                  0}
-                              </span>
-                            </div>
-                            {activeInvTab === "closed_invoices" && (
-                              <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
-                                <span className="text-[#6C757D]">
-                                  Total Price
-                                </span>
-                                <span className="text-[#212529]">
-                                  €
-                                  {calculateInvoiceTotal(invoice).toFixed(2)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
-                        <div className="text-[11px] font-medium text-[#6C757D]">
-                          Showing {startIndex + 1} to{" "}
-                          {Math.min(endIndex, filteredInvoices.length)} of{" "}
-                          {filteredInvoices.length} invoices
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() =>
-                              setCurrentPage(Math.max(1, currentPage - 1))
-                            }
-                            disabled={currentPage === 1}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
-                          {[...Array(totalPages)].map((_, i) => (
-                            <button
-                              key={i + 1}
-                              onClick={() => setCurrentPage(i + 1)}
-                              className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
-                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                                }`}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() =>
-                              setCurrentPage(
-                                Math.min(totalPages, currentPage + 1),
-                              )
-                            }
-                            disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </>
+            <InvoicesTable
+              activeInvTab={activeInvTab}
+              loading={tabData.loadingInvoices}
+              filteredInvoices={filteredInvoices}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              setCurrentPage={setCurrentPage}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              expandedInvoiceIds={expandedInvoiceIds}
+              expandedStates={expandedStates}
+              onToggleRowExpand={handleToggleRowExpand}
+              onOpenInvoiceDetails={handleOpenInvoiceDetails}
+              getBillToDisplayName={getBillToDisplayName}
+              getCargoTypeName={getCargoTypeName}
+              onOpenQtyModal={openQtyModal}
+              onOpenSplitModal={openInvoiceItemSplitModal}
+              onOpenReassignModal={openInvoiceItemReassignModal}
+            />
           )}
 
         {activeInvTab === "cargos" && (
@@ -2488,905 +1066,31 @@ const InvoiceListPage: React.FC = () => {
             <PackingListTab searchTerm={orderNoFilter} />
           </div>
         )}
+
         {showInvoiceDetailsModal && selectedInvoice && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
-              <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-[#8CC21B]" />
-                    Invoice Details
-                  </h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    ID: {selectedInvoice.id}{" "}
-                    {selectedInvoice.invoiceNumber
-                      ? `| Invoice No: ${selectedInvoice.invoiceNumber}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="text-xs font-bold px-2.5 py-1 rounded-[4px] uppercase"
-                    style={getStatusColor(selectedInvoice.status)}
-                  >
-                    {selectedInvoice.status}
-                  </span>
-
-                  {activeInvTab === "open_invoices" ? (
-                    <button
-                      onClick={() => handleMarkAsPaid(selectedInvoice.id)}
-                      disabled={actionLoading[`paid-${selectedInvoice.id}`]}
-                      className="px-4 py-2 bg-[#059669] text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50"
-                    >
-                      {actionLoading[`paid-${selectedInvoice.id}`] ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <CheckCircle className="w-3.5 h-3.5" />
-                      )}
-                      VERIFY
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className="px-4 py-2 border border-[#DC3545] text-[#DC3545] text-xs font-bold rounded-lg flex items-center gap-1.5 hover:bg-[#DC3545]/10 transition-colors disabled:opacity-50"
-                        title="Download PDF"
-                        disabled={actionLoading[`pdf-${selectedInvoice.id}`]}
-                        onClick={async () => {
-                          try {
-                            setActionLoading((prev) => ({
-                              ...prev,
-                              [`pdf-${selectedInvoice.id}`]: true,
-                            }));
-                            await downloadCommercialInvoice(
-                              selectedInvoice.id,
-                              selectedInvoice.invoiceNumber,
-                              selectedInvoice.cargo?.cargo_no ||
-                              selectedInvoice.cargoNo,
-                            );
-                          } catch (error) {
-                            console.error("PDF Generation failed", error);
-                          } finally {
-                            setActionLoading((prev) => ({
-                              ...prev,
-                              [`pdf-${selectedInvoice.id}`]: false,
-                            }));
-                          }
-                        }}
-                      >
-                        {actionLoading[`pdf-${selectedInvoice.id}`] ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <FileText className="w-3.5 h-3.5" />
-                        )}
-                        Download PDF
-                      </button>
-                      <button className="px-4 py-2 bg-[#F15A24] text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
-                        <RefreshCw className="w-3 h-3" /> Ship
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => setShowInvoiceDetailsModal(false)}
-                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors ml-2"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              <div className="p-6 space-y-6 flex-1 text-black">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Customer
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      {selectedInvoice.customer?.companyName || "N/A"}
-                    </span>
-                    {selectedInvoice.customer?.email && (
-                      <span className="text-xs text-gray-500 block mt-0.5">
-                        {selectedInvoice.customer.email}
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Bill To / Ship To
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      Bill To:{" "}
-                      {typeof selectedInvoice.bill_to === "string"
-                        ? selectedInvoice.bill_to
-                        : "N/A"}
-                    </span>
-                    <span className="text-xs text-gray-500 block mt-0.5">
-                      Ship To:{" "}
-                      {typeof selectedInvoice.ship_to === "string"
-                        ? selectedInvoice.ship_to
-                        : "N/A"}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Cargo No / Dates
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      Cargo:{" "}
-                      {(() => {
-                        const cNo = (selectedInvoice.cargo?.cargo_no || selectedInvoice.cargoNo || "").trim();
-                        return cNo.toUpperCase().startsWith("C") ? cNo : "N/A";
-                      })()}
-                    </span>
-                    <span className="text-xs text-gray-500 block mt-0.5">
-                      Date: {formatDate(selectedInvoice.invoiceDate)}
-                    </span>
-                    <span className="text-xs text-gray-500 block mt-0.5">
-                      Delivery: {formatDate(selectedInvoice.deliveryDate)}
-                    </span>
-                    {selectedInvoice.dueDate && (
-                      <span className="text-xs font-semibold text-amber-700 block mt-0.5">
-                        Due: {formatDate(selectedInvoice.dueDate)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                      Items / Totals
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800 block mt-1">
-                      {selectedInvoice.customItemCount ??
-                        selectedInvoice.items?.length ??
-                        0}{" "}
-                      Items | {selectedInvoice.customTotalQty ?? 0} Qty
-                    </span>
-                    {activeInvTab === "closed_invoices" && (
-                      <span className="text-sm font-bold text-emerald-600 block mt-0.5">
-                        Total: €
-                        {(() => {
-                          const expData = expandedStates[selectedInvoice.id]?.data;
-                          const taricSum = expData?.taricGroups?.reduce(
-                            (s: number, g: any) => s + (Number(g.totalPrice) || 0),
-                            0,
-                          ) || 0;
-                          const freight = Number(selectedInvoice.freightCost || 0);
-                          if (taricSum > 0) {
-                            return (taricSum + freight).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            });
-                          }
-                          return calculateInvoiceTotal(selectedInvoice).toLocaleString(
-                            undefined,
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            },
-                          );
-                        })()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {activeInvTab === "open_invoices" && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                      Edit Invoice Details
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                          Description *
-                        </label>
-                        <input
-                          type="text"
-                          value={invoiceEditForm.description}
-                          onChange={(e) =>
-                            setInvoiceEditForm({
-                              ...invoiceEditForm,
-                              description: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
-                          placeholder="Description (e.g. Freight cost)"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                          Freight Cost *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={invoiceEditForm.freightCost}
-                          onChange={(e) =>
-                            setInvoiceEditForm({
-                              ...invoiceEditForm,
-                              freightCost: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
-                          placeholder="Freight Cost"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                        Remark
-                      </label>
-                      <textarea
-                        value={invoiceEditForm.remark}
-                        onChange={(e) =>
-                          setInvoiceEditForm({
-                            ...invoiceEditForm,
-                            remark: e.target.value,
-                          })
-                        }
-                        rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
-                        placeholder="Remark"
-                      />
-                    </div>
-                    <div className="flex justify-end pt-2">
-                      <button
-                        onClick={() =>
-                          handleSaveInvoiceEdit(selectedInvoice.id)
-                        }
-                        disabled={actionLoading[`save-${selectedInvoice.id}`]}
-                        className="px-4 py-2 text-xs font-bold text-white bg-[#059669] rounded-lg hover:bg-green-700 flex items-center gap-1.5 shadow-md disabled:opacity-50"
-                      >
-                        {actionLoading[`save-${selectedInvoice.id}`] ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
-                        )}
-                        Save Changes
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-4">
-                  <div className="min-h-[300px]">
-                    {expandedStates[selectedInvoice.id]?.loading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="text-center">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                          <p className="text-xs text-[#6C757D]">
-                            Loading data details...
-                          </p>
-                        </div>
-                      </div>
-                    ) : modalActiveTab === "taric" ? (
-                      <div className="space-y-2">
-                        <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2 flex items-center justify-between">
-                          <span>Items shown in invoice based on Taric</span>
-                        </h4>
-                        <SpreadSheet
-                          data={(
-                            expandedStates[selectedInvoice.id]?.data?.taricGroups || []
-                          ).map((g: any) => ({
-                            ...g,
-                            id: g.taricId || g.taricCode || `taric_${g.taricCode}`
-                          }))}
-                          loading={expandedStates[selectedInvoice.id]?.loading}
-                          showTotals={true}
-                          columns={
-                            activeInvTab === "closed_invoices"
-                              ? [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => (
-                                    <div className="font-semibold text-gray-900">{it.taricNameEn}</div>
-                                  ),
-                                  width: "230px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      className="font-mono text-xs"
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 700,
-                                          }
-                                          : { fontWeight: 600 }
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate !== null && it.dutyRate !== undefined
-                                      ? `${Number(it.dutyRate).toFixed(2)}%`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => (
-                                    <span className="font-bold text-gray-900">{it.totalQty}</span>
-                                  ),
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => `€${Number(it.unitPrice || 0).toFixed(2)}`,
-                                  width: "90px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    `€${(Number(it.totalPrice) || 0).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}`,
-                                  width: "110px",
-                                },
-
-                              ]
-                              : [
-                                {
-                                  header: "Position",
-                                  render: (_: any, idx: number) => idx + 1,
-                                  width: "50px",
-                                },
-                                {
-                                  header: "Taric Name EN",
-                                  render: (it: any) => (
-                                    <div className="font-semibold text-gray-900">{it.taricNameEn}</div>
-                                  ),
-                                  width: "210px",
-                                },
-                                {
-                                  header: "Taric Code",
-                                  render: (it: any) => (
-                                    <span
-                                      className="font-mono text-xs"
-                                      style={
-                                        it.isProjectItem
-                                          ? {
-                                            color: "#F59E0B",
-                                            fontWeight: 700,
-                                          }
-                                          : { fontWeight: 600 }
-                                      }
-                                    >
-                                      {it.taricCode}
-                                    </span>
-                                  ),
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Duty rate",
-                                  render: (it: any) =>
-                                    it.dutyRate !== null && it.dutyRate !== undefined
-                                      ? `${Number(it.dutyRate).toFixed(2)}%`
-                                      : "-",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Total Qty",
-                                  render: (it: any) => (
-                                    <span className="font-bold text-gray-900">{it.totalQty}</span>
-                                  ),
-                                  align: "center",
-                                  width: "80px",
-                                },
-                                {
-                                  header: "Unit Price",
-                                  render: (it: any) => `€${Number(it.unitPrice || 0).toFixed(2)}`,
-                                  width: "90px",
-                                },
-                                {
-                                  header: "Total Price",
-                                  render: (it: any) =>
-                                    `€${(Number(it.totalPrice) || 0).toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}`,
-                                  width: "110px",
-                                },
-                                {
-                                  header: "Operation",
-                                  render: (group: any) => (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTaricGroup(group);
-                                        setSelectedTaricCode("");
-                                        setShowTaricModal(true);
-                                      }}
-                                      className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0] transition-colors"
-                                    >
-                                      <RefreshCw className="w-3 h-3" /> Set taric
-                                    </button>
-                                  ),
-                                  width: "100px",
-                                },
-                              ]
-                          }
-                          expandedRowId={expandedTaricGroupKey}
-                          renderRowDetails={(group: any) => {
-                            const allDetailedItems = expandedStates[selectedInvoice.id]?.data?.detailedItems || [];
-                            const matchingItems = allDetailedItems.filter(
-                              (it: any) => getTaricGroupKey(it) === group.taricId,
-                            );
-
-                            return (
-                              <div className="bg-[#F8F9FA] p-3 rounded-lg border border-gray-200 my-1 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <h5 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider flex items-center gap-2">
-                                    <Package className="w-3.5 h-3.5 text-[#8CC21B]" />
-                                    Order Items under TARIC Code: <span className="font-mono text-xs text-gray-900 font-bold">{group.taricCode}</span> ({matchingItems.length} item{matchingItems.length !== 1 ? 's' : ''})
-                                  </h5>
-                                </div>
-                                {matchingItems.length === 0 ? (
-                                  <p className="text-xs text-gray-500 italic py-1">No detailed order items recorded for this TARIC group.</p>
-                                ) : (
-                                  <div className="overflow-x-auto rounded border border-gray-200 bg-white shadow-sm">
-                                    <table className="w-full text-xs text-left text-gray-700">
-                                      <thead className="bg-[#343A40] text-white text-[10px] font-bold uppercase">
-                                        <tr>
-                                          <th className="py-2 px-3">#</th>
-                                          <th className="py-2 px-3">EAN</th>
-                                          <th className="py-2 px-3">Item Name</th>
-                                          <th className="py-2 px-3">Order No</th>
-                                          <th className="py-2 px-3">Remark</th>
-                                          <th className="py-2 px-3 text-center">QTY</th>
-                                          <th className="py-2 px-3 text-right">Unit Price (€)</th>
-                                          <th className="py-2 px-3 text-right">Total (€)</th>
-                                          {activeInvTab !== "closed_invoices" && <th className="py-2 px-3 text-center">Actions</th>}
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-100 font-medium">
-                                        {matchingItems.map((it: any, idx: number) => {
-                                          const unitPrice = Number(it.eur_special_price || it._fallbackEk || 0);
-                                          const totalPrice = Number(it.qty || 0) * unitPrice;
-                                          return (
-                                            <tr key={it.id || idx} className="hover:bg-gray-50 transition-colors">
-                                              <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
-                                              <td className="py-2 px-3 font-mono text-[11px] text-gray-600">{it._fallbackEan || it.item?.ean || "-"}</td>
-                                              <td className="py-2 px-3 max-w-[220px] truncate font-semibold text-gray-900" title={it.item?.item_name}>{it.item?.item_name || "Item"}</td>
-                                              <td className="py-2 px-3 text-gray-600">{it.order?.order_no || "-"}</td>
-                                              <td className="py-2 px-3 text-gray-500 text-[11px] italic">// {it.remark_de || ""}</td>
-                                              <td className="py-2 px-3 text-center font-bold">{it.qty_label ? `${it.qty_label}/${it.qty}` : it.qty}</td>
-                                              <td className="py-2 px-3 text-right">€{unitPrice.toFixed(2)}</td>
-                                              <td className="py-2 px-3 text-right font-bold text-[#10B981]">€{totalPrice.toFixed(2)}</td>
-                                              {activeInvTab !== "closed_invoices" && (
-                                                <td className="py-2 px-3">
-                                                  <div className="flex items-center justify-center gap-1">
-                                                    <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setNewQty(it.qty_label || it.qty); setQtyRemarks(it.remarks_cn || ""); setShowQTYModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition" title="QtyLabel">Qty</button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setSplitQty(Math.floor(it.qty * 0.5)); setTargetCargoId(""); setSplitRemarks(it.remarks_cn || ""); setShowSPModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition" title="Split">Split</button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setSelectedItem(it); setTargetCargoId(it.cargo_id || ""); setShowREModal(true); }} className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition" title="ReAssign">ReAssign</button>
-                                                  </div>
-                                                </td>
-                                              )}
-                                            </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }}
-                          totalCols={
-                            activeInvTab === "closed_invoices"
-                              ? [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "90px",
-                                },
-                                {
-                                  value: `€${(
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}`,
-                                  width: "110px",
-                                  align: "left",
-                                },
-                              ]
-                              : [
-                                {
-                                  label: "Grand Total",
-                                  value: "",
-                                  colSpan: 4,
-                                  align: "left",
-                                },
-                                {
-                                  value:
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalQty || 0),
-                                      0,
-                                    ) || 0,
-                                  width: "80px",
-                                  align: "center",
-                                },
-                                {
-                                  value: "",
-                                  width: "90px",
-                                },
-                                {
-                                  value: `€${(
-                                    expandedStates[
-                                      selectedInvoice.id
-                                    ]?.data?.taricGroups?.reduce(
-                                      (s: number, g: any) =>
-                                        s + (g.totalPrice || 0),
-                                      0,
-                                    ) || 0
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}`,
-                                  width: "110px",
-                                  align: "left",
-                                },
-                                {
-                                  value: "",
-                                  width: "100px",
-                                },
-                              ]
-                          }
-                        />
-                      </div>
-                    ) : (
-                      <SpreadSheet
-                        data={
-                          expandedStates[selectedInvoice.id]?.data
-                            ?.detailedItems || []
-                        }
-                        loading={expandedStates[selectedInvoice.id]?.loading}
-                        columns={
-                          activeInvTab === "closed_invoices"
-                            ? [
-                              {
-                                header: "#",
-                                render: (_: any, idx: number) => idx + 1,
-                                width: "40px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "110px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-2 leading-tight py-1 font-semibold text-gray-900"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "350px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) => (
-                                  <span className="font-mono text-xs">
-                                    {it.set_taric_code || it.item?.taric?.code || "-"}
-                                  </span>
-                                ),
-                                width: "100px",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <span className="font-bold">{it.qty}</span>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  `€${Number(it.eur_special_price || it._fallbackEk || 0).toFixed(2)}`,
-                                width: "70px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      €{totalPrice.toFixed(2)}
-                                    </span>
-                                  );
-                                },
-                                width: "80px",
-                                align: "center",
-                              },
-                            ]
-                            : [
-                              {
-                                header: "ID",
-                                render: (it: any) => (
-                                  <div className="px-2 py-0.5 bg-[#495057] text-white text-[10px] font-bold rounded text-center inline-block font-sans">
-                                    {it.id}
-                                  </div>
-                                ),
-                                width: "70px",
-                              },
-                              {
-                                header: "EAN",
-                                render: (it: any) =>
-                                  it._fallbackEan || it.item?.ean || "-",
-                                width: "100px",
-                              },
-                              {
-                                header: "Item Name",
-                                render: (it: any) => (
-                                  <div
-                                    className="line-clamp-2 leading-tight break-words font-semibold text-gray-900 py-0.5"
-                                    title={it.item?.item_name}
-                                  >
-                                    {it.item?.item_name}
-                                  </div>
-                                ),
-                                width: "220px",
-                              },
-                              {
-                                header: "Taric code",
-                                render: (it: any) => (
-                                  <span className="font-mono text-xs">
-                                    {it.set_taric_code || it.item?.taric?.code || "-"}
-                                  </span>
-                                ),
-                                width: "90px",
-                              },
-                              {
-                                header: "Remark",
-                                render: (it: any) => (
-                                  <span className="text-[11px] text-gray-500 italic">
-                                    {it.remark_de ? `// ${it.remark_de}` : "-"}
-                                  </span>
-                                ),
-                                width: "100px",
-                              },
-                              {
-                                header: "Order_no",
-                                render: (it: any) =>
-                                  it.order?.order_no || "-",
-                                width: "80px",
-                              },
-                              {
-                                header: "SOID",
-                                render: (it: any) =>
-                                  it.supplier_order_id || "-",
-                                width: "50px",
-                              },
-                              {
-                                header: "Status",
-                                render: (it: any) => (
-                                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded border">
-                                    {it.status}
-                                  </span>
-                                ),
-                                width: "60px",
-                              },
-                              {
-                                header: "V(dm³)",
-                                render: (it: any) => it.v?.toFixed(2),
-                                width: "50px",
-                                align: "center",
-                              },
-                              {
-                                header: "W(kg)",
-                                render: (it: any) => it.w?.toFixed(2),
-                                width: "50px",
-                                align: "center",
-                              },
-                              {
-                                header: "QTY",
-                                render: (it: any) => (
-                                  <span className="font-bold">
-                                    {it.qty_label
-                                      ? `${it.qty_label}/${it.qty}`
-                                      : it.qty}
-                                  </span>
-                                ),
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EUR",
-                                render: (it: any) =>
-                                  `€${Number(it.eur_special_price || it._fallbackEk || 0).toFixed(2)}`,
-                                width: "60px",
-                                align: "center",
-                              },
-                              {
-                                header: "EK",
-                                render: (it: any) => {
-                                  const unitPrice =
-                                    Number(
-                                      it.eur_special_price || it._fallbackEk,
-                                    ) || 0;
-                                  const totalPrice =
-                                    (it.qty || 0) * unitPrice;
-                                  return (
-                                    <span className="font-bold text-[#10B981]">
-                                      €{totalPrice.toFixed(2)}
-                                    </span>
-                                  );
-                                },
-                                width: "70px",
-                                align: "center",
-                              },
-                              {
-                                header: "Actions",
-                                render: (it: any) => (
-                                  <div className="flex flex-wrap items-center gap-1 py-0.5">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedItem(it);
-                                        setNewQty(it.qty_label || it.qty);
-                                        setQtyRemarks(it.remarks_cn || "");
-                                        setShowQTYModal(true);
-                                      }}
-                                      className="px-2 py-1 text-[9px] font-bold bg-[#495057] text-white rounded hover:bg-[#343A40] transition shadow-sm"
-                                      title="QtyLabel"
-                                    >
-                                      Qty
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedItem(it);
-                                        setSplitQty(Math.floor(it.qty * 0.5));
-                                        setTargetCargoId("");
-                                        setSplitRemarks(it.remarks_cn || "");
-                                        setShowSPModal(true);
-                                      }}
-                                      className="px-2 py-1 text-[9px] font-bold bg-[#F15A24] text-white rounded hover:bg-[#D9481B] transition shadow-sm"
-                                      title="Split"
-                                    >
-                                      Split
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedItem(it);
-                                        setTargetCargoId(it.cargo_id || "");
-                                        setShowREModal(true);
-                                      }}
-                                      className="px-2 py-1 text-[9px] font-bold bg-[#4F46E5] text-white rounded hover:bg-[#4338CA] transition shadow-sm"
-                                      title="ReAssign"
-                                    >
-                                      ReAssign
-                                    </button>
-                                    {it.item?.is_eur_special === "Y" &&
-                                      (!it.eur_special_price ||
-                                        Number(it.eur_special_price) === 0) && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setExpandedPriceItemId(
-                                              expandedPriceItemId === it.id
-                                                ? null
-                                                : it.id,
-                                            );
-                                            setEditingPrice(
-                                              it.eur_special_price || 0,
-                                            );
-                                          }}
-                                          className="px-2 py-1 bg-[#EF4444] text-white text-[9px] font-bold rounded hover:bg-red-600 transition shadow-sm whitespace-nowrap"
-                                        >
-                                          SET PRICE
-                                        </button>
-                                      )}
-                                  </div>
-                                ),
-                                width: "160px",
-                              },
-                            ]
-                        }
-                        expandedRowId={expandedPriceItemId}
-                        renderRowDetails={(it: any) => (
-                          <div className="bg-[#F8F9FA] p-4 rounded-md border border-gray-200 mt-2 shadow-inner">
-                            <h4 className="text-[11px] font-bold text-[#495057] uppercase mb-3 tracking-wider flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-[#EF4444] rounded-full"></div>
-                              Set EUR Price for Item {it.id}
-                            </h4>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">
-                                  EUR Special Price
-                                </label>
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={editingPrice}
-                                    onChange={(e) =>
-                                      setEditingPrice(Number(e.target.value))
-                                    }
-                                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
-                                    placeholder="0.00"
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex gap-2 pt-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedPriceItemId(null);
-                                  }}
-                                  className="px-4 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 transition-all uppercase shadow-sm"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSetPrice(it.id);
-                                  }}
-                                  className="px-5 py-2 text-[11px] font-bold text-white bg-[#10B981] rounded-[4px] hover:bg-[#059669] transition-all uppercase shadow-md flex items-center gap-2"
-                                >
-                                  <Check className="w-3.5 h-3.5" /> Set Price
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        showTotals={false}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <InvoiceDetailsModal
+            isOpen={showInvoiceDetailsModal}
+            onClose={() => setShowInvoiceDetailsModal(false)}
+            selectedInvoice={selectedInvoice}
+            activeInvTab={activeInvTab}
+            actionLoading={actionLoading}
+            setActionLoading={setActionLoading}
+            modalActiveTab={modalActiveTab}
+            expandedStates={expandedStates}
+            invoiceEditForm={invoiceEditForm}
+            setInvoiceEditForm={setInvoiceEditForm}
+            onMarkAsPaid={handleMarkAsPaid}
+            onSaveInvoiceEdit={handleSaveInvoiceEdit}
+            expandedPriceItemId={expandedPriceItemId}
+            setExpandedPriceItemId={setExpandedPriceItemId}
+            editingPrice={editingPrice}
+            setEditingPrice={setEditingPrice}
+            onSetPrice={handleSetPrice}
+            onOpenQtyModal={openQtyModal}
+            onOpenSplitModal={openInvoiceItemSplitModal}
+            onOpenReassignModal={openInvoiceItemReassignModal}
+            onOpenTaricModal={openTaricModal}
+          />
         )}
 
         {showREModal && selectedItem && (
@@ -3394,12 +1098,12 @@ const InvoiceListPage: React.FC = () => {
             isOpen={showREModal}
             onClose={() => setShowREModal(false)}
             selectedItem={selectedItem}
-            cargos={cargos}
+            cargos={tabData.cargos}
             targetCargoId={targetCargoId}
             setTargetCargoId={setTargetCargoId}
             onConfirm={handleReassignItem}
             onCargoCreated={(newCargo) => {
-              setCargos((prev) => [...prev, newCargo]);
+              tabData.setCargos((prev) => [...prev, newCargo]);
             }}
           />
         )}
@@ -3409,7 +1113,7 @@ const InvoiceListPage: React.FC = () => {
             isOpen={showSPModal}
             onClose={() => setShowSPModal(false)}
             selectedItem={selectedItem}
-            cargos={cargos}
+            cargos={tabData.cargos}
             splitQty={splitQty}
             setSplitQty={setSplitQty}
             targetCargoId={targetCargoId}
@@ -3421,287 +1125,65 @@ const InvoiceListPage: React.FC = () => {
         )}
 
         {showTaricModal && selectedTaricGroup && (
-          <CustomModal
+          <TaricModal
             isOpen={showTaricModal}
             onClose={() => setShowTaricModal(false)}
-            title="Set Taric Code"
-          >
-            <div className="p-4 space-y-4">
-              <p className="text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-tight">
-                Current taric code is :{" "}
-                <span className="text-black ml-1">
-                  {selectedTaricGroup.taricCode}
-                </span>
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select new taric code
-                </label>
-                <select
-                  value={selectedTaricCode}
-                  onChange={(e) => setSelectedTaricCode(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#1A73E8] bg-white text-black"
-                >
-                  <option value="">Select Taric Code</option>
-                  {tarics.map((t) => (
-                    <option key={t.id} value={t.code}>
-                      {t.code} -{" "}
-                      {t.description_de ||
-                        t.name_de ||
-                        t.name_en ||
-                        "No description available"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  onClick={() => setShowTaricModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 uppercase font-bold text-[10px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleSetTaric(selectedTaricGroup)}
-                  disabled={!selectedTaricCode}
-                  className="px-6 py-2 text-sm bg-[#1A73E8] text-white rounded-lg hover:bg-[#1557B0] disabled:opacity-50 uppercase font-bold text-[10px]"
-                >
-                  Update Taric
-                </button>
-              </div>
-            </div>
-          </CustomModal>
+            selectedTaricGroup={selectedTaricGroup}
+            tarics={tabData.tarics}
+            selectedTaricCode={selectedTaricCode}
+            setSelectedTaricCode={setSelectedTaricCode}
+            onConfirm={() => handleSetTaric(selectedTaricGroup)}
+          />
         )}
 
         {showQTYModal && selectedItem && (
-          <CustomModal
+          <QtyModal
             isOpen={showQTYModal}
             onClose={() => setShowQTYModal(false)}
-            title={`Update QtyLabel for this item`}
-          >
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New QtyLabel
-                </label>
-                <input
-                  type="number"
-                  value={newQty}
-                  onChange={(e) => setNewQty(Number(e.target.value))}
-                  min={1}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#8CC21B]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Enter Remarks
-                </label>
-                <textarea
-                  value={qtyRemarks}
-                  onChange={(e) => setQtyRemarks(e.target.value)}
-                  rows={3}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#8CC21B]"
-                  placeholder="Enter remarks..."
-                />
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  onClick={() => setShowQTYModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateQty}
-                  disabled={newQty <= 0}
-                  className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  Update QtyLabel
-                </button>
-              </div>
-            </div>
-          </CustomModal>
+            selectedItem={selectedItem}
+            newQty={newQty}
+            setNewQty={setNewQty}
+            qtyRemarks={qtyRemarks}
+            setQtyRemarks={setQtyRemarks}
+            onConfirm={handleUpdateQty}
+          />
         )}
 
-        <OrderDetailsModal
-          isOpen={showViewModal}
-          onClose={closeView}
-          viewOrder={viewOrder}
-          viewItems={viewItems}
-          getCategoryName={getCategoryName}
-          getSupplierName={getSupplierName}
-        />
+        {showViewModal && (
+          <OrderDetailsModal
+            isOpen={showViewModal}
+            onClose={closeView}
+            viewOrder={viewOrder}
+            viewItems={viewItems}
+            getCategoryName={getCategoryName}
+            getSupplierName={getSupplierName}
+          />
+        )}
 
         {showModal && (
-          <CustomModal
+          <OrderFormModal
             isOpen={showModal}
             onClose={closeModal}
-            width="max-w-4xl"
-            title={mode === "edit" ? "Edit Order" : "Create New Order"}
-            footer={
-              <div className="flex gap-3">
-                <button
-                  onClick={closeModal}
-                  className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={
-                    mode === "edit" ? handleUpdateOrder : handleCreateOrder
-                  }
-                  className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all font-bold"
-                >
-                  {mode === "edit" ? "Update Order" : "Create Order"}
-                </button>
-              </div>
+            mode={mode}
+            categories={tabData.categories}
+            suppliers={tabData.suppliers}
+            form={form}
+            onCategoryChange={handleCategoryChange}
+            onSupplierChange={handleSupplierChange}
+            onCommentChange={(comment) =>
+              setForm((prev) => ({ ...prev, comment }))
             }
-          >
-            <div className="space-y-4 text-black">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Category:
-                  </label>
-                  <select
-                    value={form.category_id}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={String(cat.id)}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Supplier:
-                  </label>
-                  <select
-                    value={form.supplier_id}
-                    onChange={(e) => handleSupplierChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
-                  >
-                    <option value="">Select Supplier</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={String(s.id)}>
-                        {s.company_name || s.name || "Unnamed Supplier"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Item then quantity:
-                </label>
-                <ItemSelectorWithQuantity
-                  items={effectiveItems}
-                  selectedItemId={selectedItemId}
-                  onItemChange={setSelectedItemId}
-                  onAdd={handleAddItemToOrder}
-                  disabled={loadingItems}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Comment:
-                </label>
-                <textarea
-                  value={form.comment}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, comment: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
-                  placeholder="Enter order comment..."
-                  rows={3}
-                />
-              </div>
-              {orderItems.length > 0 && (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
-                    <thead className="bg-gray-100 text-gray-800">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          ID
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b w-[120px]">
-                          Item name
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          Qty
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          Item remark
-                        </th>
-                        <th className="px-4 py-2 text-left text-sm font-medium border-b">
-                          Price
-                        </th>
-                        <th className="px-4 py-2 text-center text-sm font-medium border-b">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-700">
-                      {orderItems.map((row) => (
-                        <tr key={row.item_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm border-b">
-                            {row.item_id}
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            <div className="line-clamp-2 leading-tight max-w-[120px]">
-                              {row.itemName}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            <input
-                              type="number"
-                              min={1}
-                              value={row.qty}
-                              onChange={(e) =>
-                                handleUpdateOrderItemQty(
-                                  row.item_id,
-                                  Number(e.target.value),
-                                )
-                              }
-                              className="w-16 px-2 py-1 border border-gray-300 rounded-[4px] text-black"
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            <input
-                              type="text"
-                              value={row.remark_de}
-                              onChange={(e) =>
-                                handleUpdateOrderItemRemark(
-                                  row.item_id,
-                                  e.target.value,
-                                )
-                              }
-                              className="w-full px-2 py-1 border border-gray-300 rounded-[4px] text-black"
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-sm border-b">
-                            {row.price} {row.currency}
-                          </td>
-                          <td className="px-4 py-2 text-center border-b">
-                            <button
-                              onClick={() => handleRemoveOrderItem(row.item_id)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </CustomModal>
+            effectiveItems={effectiveItems}
+            selectedItemId={selectedItemId}
+            setSelectedItemId={setSelectedItemId}
+            onAddItem={handleAddItemToOrder}
+            loadingItems={loadingItems}
+            orderItems={orderItems}
+            onUpdateOrderItemQty={handleUpdateOrderItemQty}
+            onUpdateOrderItemRemark={handleUpdateOrderItemRemark}
+            onRemoveOrderItem={handleRemoveOrderItem}
+            onSubmit={handleUpdateOrder}
+          />
         )}
       </div>
     </div>
