@@ -793,65 +793,96 @@ export class InvoiceController {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
 
     try {
-      try {
-        const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
-        const orderItemRepo = AppDataSource.getRepository(OrderItem);
+      // Fire-and-forget: this safety-net sync (and the two full-table scans
+      // of cargo_order/order_item it needs to compute its IDs) has nothing
+      // to do with answering this request, so none of it belongs on the
+      // request's critical path. Previously only the sync call itself was
+      // detached — the ID-gathering queries above it were still awaited,
+      // so every request still paid for two unfiltered full-table scans
+      // before it could even start fetching invoices. Now the whole thing
+      // runs completely off to the side.
+      (async () => {
+        try {
+          const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+          const orderItemRepo = AppDataSource.getRepository(OrderItem);
 
-        const [cargoOrders, itemsWithCargo] = await Promise.all([
-          cargoOrderRepo.find({ select: ["cargo_id", "order_id"] }),
-          orderItemRepo
-            .createQueryBuilder("oi")
-            .select(["oi.cargo_id", "oi.order_id"])
-            .where("oi.cargo_id IS NOT NULL")
-            .getMany(),
-        ]);
+          const [cargoOrders, itemsWithCargo] = await Promise.all([
+            cargoOrderRepo.find({ select: ["cargo_id", "order_id"] }),
+            orderItemRepo
+              .createQueryBuilder("oi")
+              .select(["oi.cargo_id", "oi.order_id"])
+              .where("oi.cargo_id IS NOT NULL")
+              .getMany(),
+          ]);
 
-        const cIds = [
-          ...new Set([
-            ...cargoOrders.map((co) => co.cargo_id),
-            ...itemsWithCargo.map((oi) => oi.cargo_id!),
-          ]),
-        ].filter(Boolean);
+          const cIds = [
+            ...new Set([
+              ...cargoOrders.map((co) => co.cargo_id),
+              ...itemsWithCargo.map((oi) => oi.cargo_id!),
+            ]),
+          ].filter(Boolean);
 
-        const oIds = [
-          ...new Set([
-            ...cargoOrders.map((co) => co.order_id),
-            ...itemsWithCargo.map((oi) => oi.order_id!),
-          ]),
-        ].filter(Boolean);
+          const oIds = [
+            ...new Set([
+              ...cargoOrders.map((co) => co.order_id),
+              ...itemsWithCargo.map((oi) => oi.order_id!),
+            ]),
+          ].filter(Boolean);
 
-        if (cIds.length > 0 || oIds.length > 0) {
-          // generateInvoicesForOrders walks every cargo/order sequentially
-          // (findOne-per-cargo, then a joined query per cargo) — with the
-          // whole dataset passed in here, awaiting it made every single
-          // page load take as long as a full resync (~1 min). Cargo/order
-          // mutations already trigger a scoped sync directly (see
-          // cargo_controller.ts callers), so this sweep is only a safety
-          // net — let it run in the background instead of blocking the
-          // response.
-          generateInvoicesForOrders(oIds, cIds).catch((syncErr) => {
-            console.warn(
-              "[InvoiceSync] Background auto-sync on getAllInvoices encountered warning:",
-              syncErr,
-            );
-          });
+          if (cIds.length > 0 || oIds.length > 0) {
+            await generateInvoicesForOrders(oIds, cIds);
+          }
+        } catch (syncErr) {
+          console.warn(
+            "[InvoiceSync] Background auto-sync on getAllInvoices encountered warning:",
+            syncErr,
+          );
         }
-      } catch (syncErr) {
-        console.warn(
-          "[InvoiceSync] Auto-syncing cargo invoices on getAllInvoices encountered warning:",
-          syncErr,
-        );
-      }
+      })();
 
+      // "items" used to sit in this same relations array. Invoice->items is
+      // one-to-many, so TypeORM's single joined query returned one full
+      // (invoice + customer + businessDetails + starCustomerDetails) row
+      // PER ITEM — an invoice with 8 items meant that whole wide row
+      // repeated 8 times. Fetching items separately (narrow rows, no
+      // multiplication) and attaching them in memory returns the exact
+      // same inv.items shape below, just without paying for the join
+      // blow-up on every row of this table.
       const invoices = await invoiceRepository.find({
         relations: [
           "customer",
           "customer.businessDetails",
           "customer.starCustomerDetails",
-          "items",
         ],
         order: { createdAt: "DESC", invoiceDate: "DESC" },
       });
+
+      const invoiceIds = invoices.map((i) => i.id);
+      if (invoiceIds.length > 0) {
+        const invoiceItemRepo = AppDataSource.getRepository(InvoiceItem);
+        const allInvoiceItems = await invoiceItemRepo
+          .createQueryBuilder("ii")
+          .innerJoin("ii.invoice", "inv")
+          .addSelect(["inv.id"])
+          .where("inv.id IN (:...ids)", { ids: invoiceIds })
+          .getMany();
+
+        const itemsByInvoiceId = new Map<string, InvoiceItem[]>();
+        allInvoiceItems.forEach((it: any) => {
+          const invId = it.invoice?.id;
+          if (!invId) return;
+          if (!itemsByInvoiceId.has(invId)) itemsByInvoiceId.set(invId, []);
+          itemsByInvoiceId.get(invId)!.push(it);
+        });
+
+        invoices.forEach((inv: any) => {
+          inv.items = itemsByInvoiceId.get(inv.id) || [];
+        });
+      } else {
+        invoices.forEach((inv: any) => {
+          inv.items = [];
+        });
+      }
 
       const orderNumbers = Array.from(
         new Set(invoices.map((i) => i.orderNumber).filter(Boolean)),
@@ -1154,11 +1185,38 @@ export class InvoiceController {
         finalDataMap.set(inv.id, inv);
       });
 
+      // Same join-blow-up fix as above: CCIInvoice->items is one-to-many
+      // too, so it's split off instead of sitting in this relations array.
       const cciInvoiceRepo = AppDataSource.getRepository(CCIInvoice);
       const cciInvoices = await cciInvoiceRepo.find({
-        relations: ["customer", "items"],
+        relations: ["customer"],
         order: { created_at: "DESC", invoice_date: "DESC" },
       });
+
+      const cciInvoiceIds = cciInvoices.map((c) => c.id);
+      if (cciInvoiceIds.length > 0) {
+        const cciItemRepo = AppDataSource.getRepository(CCIItem);
+        // CCIItem has a plain cci_invoice_id column (no join needed).
+        const allCciItems = await cciItemRepo.find({
+          where: { cci_invoice_id: In(cciInvoiceIds) },
+        });
+
+        const cciItemsByInvoiceId = new Map<string, CCIItem[]>();
+        allCciItems.forEach((it) => {
+          if (!cciItemsByInvoiceId.has(it.cci_invoice_id)) {
+            cciItemsByInvoiceId.set(it.cci_invoice_id, []);
+          }
+          cciItemsByInvoiceId.get(it.cci_invoice_id)!.push(it);
+        });
+
+        cciInvoices.forEach((cci: any) => {
+          cci.items = cciItemsByInvoiceId.get(cci.id) || [];
+        });
+      } else {
+        cciInvoices.forEach((cci: any) => {
+          cci.items = [];
+        });
+      }
 
       // No more per-CCI fetchExpandedDetailsData call — each CCIInvoice's
       // own frozen "items" relation (already eagerly loaded above) is the
