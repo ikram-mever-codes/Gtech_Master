@@ -95,7 +95,7 @@ import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import { formatDate } from "@/utils/date";
 import { formatCountryCode } from "@/utils/address";
-import { calculateInvoiceTotal } from "@/utils/invoice";
+import { calculateInvoiceTotal, getTaricGroupKey } from "@/utils/invoice";
 import CommercialLineItemsSubTable from "@/components/UI/CommercialLineItemsSubTable";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
@@ -1045,7 +1045,7 @@ const InvoiceListPage: React.FC = () => {
       }
 
       const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter(
-        (oi: any) => getEffectiveTaricCode(oi) === (group.taricCode || "-"),
+        (oi: any) => getTaricGroupKey(oi) === group.taricId,
       );
 
       if (itemsInGroup && itemsInGroup.length > 0) {
@@ -1059,7 +1059,6 @@ const InvoiceListPage: React.FC = () => {
           const newTaricValue = hasOriginal
             ? `${originalCode}/${selectedTaricCode}`
             : selectedTaricCode;
-
           await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
         }
         toast.success("Taric codes updated successfully");
@@ -3284,19 +3283,8 @@ const InvoiceListPage: React.FC = () => {
                               expandedStates[selectedInvoice.id]?.data
                                 ?.detailedItems || [];
                             const matchingItems = allDetailedItems.filter(
-                              (it: any) => {
-                                const code =
-                                  it.set_taric_code ||
-                                  it.item?.taric?.code ||
-                                  "-";
-                                if (
-                                  group.taricCode === "-" ||
-                                  !group.taricCode
-                                ) {
-                                  return !code || code === "-";
-                                }
-                                return code === group.taricCode;
-                              },
+                              (it: any) =>
+                                getTaricGroupKey(it) === group.taricId,
                             );
 
                             return (
