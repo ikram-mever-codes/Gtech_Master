@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, FileDown, ChevronRight, FileText, Mail } from "lucide-react";
-import { downloadRechnungPdf, downloadRechnungEml } from "@/api/rechnungen";
+import { Loader2, FileDown, ChevronRight, FileText, Mail, Upload } from "lucide-react";
+import { downloadRechnungPdf, downloadRechnungEml, uploadGelangenheitsbestaetigung } from "@/api/rechnungen";
+import { toast } from "react-hot-toast";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -23,6 +24,7 @@ interface RechnungColumnsArgs {
   creatingRkForId: string | null;
   allOpenQuantities?: Record<string, Record<string, number>>;
   rechnungenK?: any[];
+  onRefreshRechnungen?: () => void;
 }
 
 export const getRechnungGrossTotal = (row: any): number => {
@@ -126,6 +128,25 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
           ) === String(row.id),
       ));
 
+  const rawTaxCase = String(
+    row.tax_profile_case ||
+    row.taxProfile?.key ||
+    row.taxProfile ||
+    "",
+  ).toUpperCase();
+
+  const isExportInvoice =
+    rawTaxCase === "EU_IGL" ||
+    rawTaxCase === "THIRD_COUNTRY";
+
+  const hasGlDoc = Boolean(
+    row.gelangenheitsbestaetigung_doc &&
+    row.gelangenheitsbestaetigung_doc !== "null" &&
+    row.gelangenheitsbestaetigung_doc !== ""
+  );
+
+  const isGlMissing = isExportInvoice && !hasGlDoc;
+
   // open_amount already nets out both payments and correction invoices
   // (RK) — see attachPaymentStatusToRechnungen. Only shown when there's
   // actually still something open; "paid" rows have open_amount 0 and
@@ -136,7 +157,7 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
 
   return (
     <div className="flex flex-col items-center justify-center gap-1 whitespace-nowrap">
-      <div className="flex items-center justify-center gap-1.5">
+      <div className="flex items-center justify-center gap-1.5 flex-wrap">
         <span
           className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${classes[status] || classes.unpaid
             }`}
@@ -156,6 +177,14 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
             RK
           </span>
         )}
+        {isGlMissing && (
+          <span
+            className="px-1.5 py-0.5 text-[10px] font-extrabold bg-red-600 text-white rounded-[4px] uppercase tracking-wider shrink-0 shadow-xs"
+            title="Gelangensnachweis fehlt (EU_IGL / Third Country)"
+          >
+            GL
+          </span>
+        )}
       </div>
       {showOpenAmount && (
         <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">
@@ -171,14 +200,17 @@ const RechnungActionMenu: React.FC<{
   onViewRechnung: (row: any) => void;
   onCreateRechnungK: (row: any) => void;
   creatingRkForId: string | null;
+  onRefreshRechnungen?: () => void;
 }> = ({
   row,
   rowIndex,
   onViewRechnung,
   onCreateRechnungK,
   creatingRkForId,
+  onRefreshRechnungen,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isUploadingGl, setIsUploadingGl] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -195,6 +227,17 @@ const RechnungActionMenu: React.FC<{
     const isCreatingRk = creatingRkForId === row.id;
     const isBottom = rowIndex !== undefined && rowIndex >= 5;
 
+    const rawTaxCase = String(
+      row.tax_profile_case ||
+      row.taxProfile?.key ||
+      row.taxProfile ||
+      "",
+    ).toUpperCase();
+
+    const isExportInvoice =
+      rawTaxCase === "EU_IGL" ||
+      rawTaxCase === "THIRD_COUNTRY";
+
     return (
       <div className="relative inline-block text-left" ref={menuRef}>
         <button
@@ -204,8 +247,8 @@ const RechnungActionMenu: React.FC<{
             setIsOpen((prev) => !prev);
           }}
           className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
-              ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
-              : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
+            ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
+            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
             }`}
           title="Aktionen"
         >
@@ -219,7 +262,7 @@ const RechnungActionMenu: React.FC<{
           <div
             onClick={(e) => e.stopPropagation()}
             className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
-              } w-60 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
+              } w-64 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
           >
             {/* Option 1: Rechnungskorrektur erstellen */}
             <div className="p-1">
@@ -247,6 +290,64 @@ const RechnungActionMenu: React.FC<{
                 </div>
               </button>
             </div>
+
+            {/* Option: Gelangensnachweis (Upload / View) for EU_IGL or THIRD_COUNTRY */}
+            {isExportInvoice && (
+              <div className="p-1">
+                {row.gelangenheitsbestaetigung_doc ? (
+                  <a
+                    href={`${process.env.NEXT_PUBLIC_API_URL || ""}${row.gelangenheitsbestaetigung_doc}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                  >
+                    <FileText className="w-4 h-4 text-[#8CC21B] shrink-0" />
+                    <span className="text-xs font-semibold">
+                      Gelangensnachweis öffnen
+                    </span>
+                  </a>
+                ) : (
+                  <label
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                  >
+                    {isUploadingGl ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-orange-500 shrink-0" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-orange-500 shrink-0" />
+                    )}
+                    <span className="text-xs font-semibold">
+                      {isUploadingGl ? "Uploading…" : "Gelangensnachweis hochladen"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      disabled={isUploadingGl}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          setIsUploadingGl(true);
+                          await uploadGelangenheitsbestaetigung(row.id, file);
+                          toast.success("Gelangensnachweis uploaded successfully!");
+                          onRefreshRechnungen?.();
+                        } catch (err) {
+                          console.error("Upload error:", err);
+                        } finally {
+                          setIsUploadingGl(false);
+                          setIsOpen(false);
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
 
             {/* Option 2: PDF öffnen */}
             <div className="p-1">
@@ -330,6 +431,7 @@ export function buildRechnungColumns({
   creatingRkForId,
   allOpenQuantities,
   rechnungenK,
+  onRefreshRechnungen,
 }: RechnungColumnsArgs): ColumnDef<any>[] {
   return [
     buildExpandColumn(expandedDocIds, setExpandedDocIds),
@@ -365,7 +467,7 @@ export function buildRechnungColumns({
     buildNettowertColumn(valueNetCalc),
     {
       header: "Status",
-      width: "130px",
+      width: "140px",
       align: "center",
       sortKey: "status",
       sortValue: (row) => (row.payment_status || "unpaid").toLowerCase(),
@@ -384,6 +486,7 @@ export function buildRechnungColumns({
           onViewRechnung={onViewRechnung}
           onCreateRechnungK={onCreateRechnungK}
           creatingRkForId={creatingRkForId}
+          onRefreshRechnungen={onRefreshRechnungen}
         />
       ),
     },

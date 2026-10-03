@@ -1975,15 +1975,11 @@ export default function RechnungDetailModal({
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <p className="text-sm font-bold text-amber-800">
-                    Gelangenheitsbestätigung / Ausfuhrnachweis
+                  <p className="text-base font-extrabold text-amber-900">
+                    Gelangensnachweis
                   </p>
-                  <p className="text-xs text-amber-600 mt-0.5">
-                    Required for{" "}
-                    {data.tax_profile_case === "EU_IGL"
-                      ? "EU_IGL"
-                      : "third country"}{" "}
-                    invoices
+                  <p className="text-xs text-amber-700 font-medium mt-0.5">
+                    Gelangenheitsbestätigung / Ausfuhrnachweis
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2015,7 +2011,7 @@ export default function RechnungDetailModal({
                       <label
                         className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
                           ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-amber-600 text-white hover:bg-amber-700"
+                          : "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
                           }`}
                       >
                         {uploadingDoc ? (
