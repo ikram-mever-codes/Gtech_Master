@@ -135,15 +135,23 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const resolveUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
     if (url.includes("cloudinary.com")) return url;
-    if (url.includes("/uploads/")) {
-      const fileName = url.split("/uploads/").pop();
-      try {
-        const apiOrigin = new URL(BASE_URL).origin;
+
+    try {
+      const apiOrigin = new URL(BASE_URL).origin;
+
+      if (url.includes("/uploads/")) {
+        const fileName = url.split("/uploads/").pop();
         return `${apiOrigin}/uploads/${fileName}`;
-      } catch {
-        return url;
       }
+
+      if (url.includes("/images/")) {
+        const fileName = url.split("/images/").pop();
+        return `${apiOrigin}/images/${fileName}`;
+      }
+    } catch {
+      return url;
     }
+
     return url;
   };
 
