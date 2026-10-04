@@ -135,24 +135,20 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const resolveUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
     if (url.includes("cloudinary.com")) return url;
-
+    console.log(`This Is Url`, url);
     try {
       const apiOrigin = new URL(BASE_URL).origin;
 
       if (url.includes("/uploads/")) {
         const fileName = url.split("/uploads/").pop();
         return `${apiOrigin}/uploads/${fileName}`;
-      }
-
-      if (url.includes("/images/")) {
+      } else {
         const fileName = url.split("/images/").pop();
         return `${apiOrigin}/images/${fileName}`;
       }
     } catch {
       return url;
     }
-
-    return url;
   };
 
   const getThumb = (item: any) =>
@@ -1754,10 +1750,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                             className="w-full h-full object-contain bg-white cursor-pointer"
                             onClick={() =>
                               window.open(resolveUrl(url)!, "_blank")
-                            }
-                            onError={(e) =>
-                              ((e.target as HTMLImageElement).src =
-                                "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>
