@@ -80,6 +80,10 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
+    if (templatePageCount === 0) return;
+
+    const [cleanBgPage] = await templatePdf.embedPdf(templatePdf, [0]);
+
     const embeddedContentPages = await templatePdf.embedPdf(
       contentPdf,
       contentPdf.getPageIndices(),
@@ -92,9 +96,8 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
       } else {
         const { width, height } = contentPdf.getPage(i).getSize();
         page = templatePdf.addPage([width, height]);
-        if (templatePageCount > 0) {
-          const [embeddedBg] = await templatePdf.embedPdf(templatePdf, [0]);
-          page.drawPage(embeddedBg, { x: 0, y: 0, width, height });
+        if (cleanBgPage) {
+          page.drawPage(cleanBgPage, { x: 0, y: 0, width, height });
           const footerHeight = 100;
           page.drawRectangle({
             x: 0,
@@ -115,7 +118,10 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
       });
     }
 
-    const mergedBytes = await templatePdf.save({ useObjectStreams: true });
+    const mergedBytes = await templatePdf.save({
+      useObjectStreams: true,
+      addDefaultPage: false,
+    });
     fs.writeFileSync(contentPdfPath, mergedBytes);
   } catch (err) {
     console.error("Error in mergePdfTemplate:", err);
@@ -1072,7 +1078,7 @@ export async function generateGtechDocumentPdf(
           ? `Zahlung (${cleanMethod}) vom ${pDate}`
           : `Zahlung vom ${pDate}`;
 
-        doc.text(pText, TOTALS_LABEL_X - 60, yPos, { width: TOTALS_LABEL_W + 60 });
+        doc.text(pText, TOTALS_LABEL_X, yPos, { width: TOTALS_LABEL_W });
         doc.text(
           `${formatGermanNum(pAmt, 2)} ${currency}`,
           TOTALS_VAL_X - TOTALS_RIGHT_PAD,
@@ -1091,7 +1097,7 @@ export async function generateGtechDocumentPdf(
         const rkDate = formatDate(rk.createdDate);
         const rkText = `Rechnungskorrektur vom ${rkDate}`;
 
-        doc.text(rkText, TOTALS_LABEL_X - 60, yPos, { width: TOTALS_LABEL_W + 60 });
+        doc.text(rkText, TOTALS_LABEL_X, yPos, { width: TOTALS_LABEL_W });
         doc.text(
           `-${formatGermanNum(rkAmt, 2)} ${currency}`,
           TOTALS_VAL_X - TOTALS_RIGHT_PAD,
@@ -1351,7 +1357,6 @@ export async function generateGtechDocumentPdf(
 
       if (yPos + noteTextHeight + 10 > MM(272)) {
         doc.addPage();
-        // Page 2+: white background for header/content area only, leave footer area for template
         doc.rect(0, 0, 595.28, MM(262)).fill("#FFFFFF");
         yPos = MM(25);
       }

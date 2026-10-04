@@ -203,6 +203,9 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
+    if (templatePageCount === 0) return;
+    const [cleanBgPage] = await templatePdf.embedPdf(templatePdf, [0]);
+
     const embeddedContentPages = await templatePdf.embedPdf(
       contentPdf,
       contentPdf.getPageIndices(),
@@ -215,9 +218,16 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
       } else {
         const { width, height } = contentPdf.getPage(i).getSize();
         page = templatePdf.addPage([width, height]);
-        if (templatePageCount > 0) {
-          const [embeddedBg] = await templatePdf.embedPdf(templatePdf, [0]);
-          page.drawPage(embeddedBg, { x: 0, y: 0, width, height });
+        if (cleanBgPage) {
+          page.drawPage(cleanBgPage, { x: 0, y: 0, width, height });
+          const footerHeight = 100;
+          page.drawRectangle({
+            x: 0,
+            y: footerHeight,
+            width,
+            height: height - footerHeight,
+            color: pdfLib.rgb(1, 1, 1),
+          });
         }
       }
 
@@ -230,7 +240,10 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
       });
     }
 
-    const mergedBytes = await templatePdf.save({ useObjectStreams: true });
+    const mergedBytes = await templatePdf.save({
+      useObjectStreams: true,
+      addDefaultPage: false,
+    });
     fs.writeFileSync(contentPdfPath, mergedBytes);
   } catch (err) {
     console.error("Error in mergePdfTemplate:", err);

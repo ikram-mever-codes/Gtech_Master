@@ -213,14 +213,12 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [activeInvTab, tabData.rechnungen]);
 
-  // Trigger fetching when Rechnung tab becomes active
   useEffect(() => {
     if (activeInvTab === "rechnung") {
       fetchAllOpenQuantities();
     }
   }, [activeInvTab, fetchAllOpenQuantities]);
 
-  // cargos / tarics / payment accounts
   const [cargos, setCargos] = useState<CargoType[]>([]);
   const [tarics, setTarics] = useState<any[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountData[]>(
@@ -1327,7 +1325,6 @@ const InvoiceListPage: React.FC = () => {
     );
   };
 
-  // --- Tab -> displayed list ---
   const filteredItems = useMemo(() => {
     let list: any[] = [];
     if (activeInvTab === "auftrag") {
@@ -1741,14 +1738,6 @@ const InvoiceListPage: React.FC = () => {
     searchParams,
   ]);
 
-  // Auftrag rows must be ordered by status (partially_delivered -> open ->
-  // delivered -> closed) BEFORE pagination — sorting an already-paginated
-  // page slice (the previous behavior) only reordered the ~10 items on
-  // that page and left which items landed on which page decided by
-  // whatever filteredItems was ordered by before (date), so e.g. a
-  // partially_delivered Auftrag could sit on page 3 while closed ones
-  // showed on page 1. displayItems is the same items, just reordered —
-  // count never changes here, only order.
   const displayItems = useMemo(() => {
     if (activeInvTab !== "auftrag") return filteredItems;
     return sortAuftraegeByStatus(filteredItems);
@@ -1810,9 +1799,9 @@ const InvoiceListPage: React.FC = () => {
           onViewRechnung: handleOpenRechnungView,
           allOpenQuantities,
           rechnungenK: tabData.rechnungenK,
+          onRefreshRechnungen: () => tabData.refetchRechnungen(),
         });
 
-      // 7. In the "rk" case, drop onDelete:
       case "rk":
         return buildRkColumns({
           expandedDocIds,
@@ -2094,9 +2083,6 @@ const InvoiceListPage: React.FC = () => {
                 return "";
               }}
               getRowStyle={(row: any) => {
-                // A manually chosen highlight_color (SystemColourSelect on
-                // the order) always wins over the automatic status colour
-                // below — it's an explicit per-order choice.
                 const customVal = row.highlight_color || row.highlightColor;
                 const hasCustomColor =
                   !!customVal &&
@@ -2113,17 +2099,12 @@ const InvoiceListPage: React.FC = () => {
                     if (matched) hex = matched.hex;
                   }
                 } else if (activeInvTab === "auftrag") {
-                  // No manual override — fall back to the status-driven
-                  // background: partially delivered / open / delivered /
-                  // closed, matching the Auftrag sort order above.
                   const status = row.auftrag_status || row.status || "open";
                   const statusColor = getStatusBackgroundColor(status);
                   if (statusColor && statusColor !== "#FFFFFF") {
                     hex = statusColor;
                   }
                 } else if (activeInvTab === "rechnung") {
-                  // No manual override — fall back to the derived payment
-                  // status: overdue / partially paid / unpaid / paid.
                   const paymentStatus = row.payment_status || "unpaid";
                   const statusColor =
                     getRechnungStatusBackgroundColor(paymentStatus);
@@ -2759,7 +2740,7 @@ const InvoiceListPage: React.FC = () => {
               setTimeout(() => handleOpenAuftragPreview(auftragId), 100);
             }}
             onSwitchToRechnung={(rechnungId: string) => {
-              handleOpenRechnungKDetail; // not used here
+              handleOpenRechnungKDetail;
               const found = (tabData.rechnungen || []).find(
                 (r: any) => r.id === rechnungId,
               );
