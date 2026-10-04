@@ -556,15 +556,11 @@ const InvoiceListPage: React.FC = () => {
             originalCode !== "0" &&
             originalCode !== "0000000000";
 
-          // Always re-base on "original/new" rather than chaining through
-          // every prior override — set_taric_code only needs to carry the
-          // original code (for audit) and the current one.
           const newTaricValue = hasOriginal
             ? `${originalCode}/${selectedTaricCode}`
             : selectedTaricCode;
           await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
         }
-        toast.success("Taric codes updated successfully");
         setShowTaricModal(false);
         setSelectedTaricCode("");
 
