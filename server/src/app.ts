@@ -126,11 +126,9 @@ app.use("/api/v1/lieferscheine", lieferscheinRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));
-app.use(
-  "/images",
-  express.static(path.join(__uploads_dirname, "server/public/images")),
-);
-
+const __current_dir = path.resolve();
+app.use(express.static(path.join(__current_dir, "public")));
+app.use("/images", express.static(path.join(__current_dir, "public/images")));
 app.use(errorMiddleware);
 
 export const initializeCronJobs = () => {
