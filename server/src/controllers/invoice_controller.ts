@@ -1739,7 +1739,10 @@ export class InvoiceController {
       if (taricId && !isProjectItem) {
         return `hs_${itemTaricCode}`;
       }
-      return `item_${oi.item?.id || Math.random()}`;
+      // Deterministic fallback — `Math.random()` here would give the item a
+      // different group key on every request, so "Set Taric" could never
+      // find it again on a second attempt.
+      return `item_${oi.item?.id ?? oi.id ?? "unknown"}`;
     };
 
     const manualTaricCodes: string[] = [];
