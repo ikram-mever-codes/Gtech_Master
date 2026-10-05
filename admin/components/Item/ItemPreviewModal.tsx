@@ -199,6 +199,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           item_name: raw.itemName,
           nameCN: raw.item_name_cn || "",
           item_name_cn: raw.item_name_cn || "",
+          isAutoTransferPrice: false,
           ean: raw.ean || "",
           category_id: raw.cat_id || null,
           category: raw.category?.name || "",
@@ -517,6 +518,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           },
           price: parseFlexibleNumber(previewItem.price) || 0,
           transfer_price_EUR: parseFlexibleNumber(previewItem.price) || 0,
+          is_auto_transfer_price: !!previewItem.isAutoTransferPrice,
           photo: previewItem.pictures?.shopPicture,
           pix_path: previewItem.pictures?.pixPath,
           pix_path_eBay: previewItem.pictures?.ebayPictures,
@@ -1368,16 +1370,36 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
                 <Field label="Transfer Price">
                   {previewEdit ? (
-                    <div className="flex items-center gap-1">
-                      <DecimalInput
-                        className={inputCls}
-                        placeholder="0.00"
-                        value={previewItem.price ?? ""}
-                        onChange={(raw) => patchPreview({ price: raw })}
-                      />
-                      <span className="text-xs font-semibold text-gray-700 shrink-0">
-                        {"EUR"}
-                      </span>
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <DecimalInput
+                          className={inputCls}
+                          placeholder="0.00"
+                          disabled={!!previewItem.isAutoTransferPrice}
+                          value={previewItem.price ?? ""}
+                          onChange={(raw) => patchPreview({ price: raw })}
+                        />
+                        <span className="text-xs font-semibold text-gray-700 shrink-0">
+                          {"EUR"}
+                        </span>
+                      </div>
+                      {!isRequest && (
+                        <label className="mt-1 flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={!!previewItem.isAutoTransferPrice}
+                            onChange={(e) =>
+                              patchPreview({
+                                isAutoTransferPrice: e.target.checked,
+                              })
+                            }
+                            className="w-3.5 h-3.5 text-green-600 border-gray-300 rounded"
+                          />
+                          <span className="text-[11px] text-gray-600">
+                            Auto calculate
+                          </span>
+                        </label>
+                      )}
                     </div>
                   ) : (
                     <span className="font-medium text-gray-900">
