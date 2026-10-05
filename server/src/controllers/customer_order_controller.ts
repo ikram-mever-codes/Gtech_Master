@@ -1581,10 +1581,12 @@ export const updateCustomerOrder = async (
       weiterversand_service_provider_id !== undefined
         ? weiterversand_service_provider_id
         : weiterversandServiceProviderId;
-    if (finalProviderId !== undefined)
+    if (finalProviderId !== undefined) {
       auftrag.weiterversand_service_provider_id = finalProviderId
         ? Number(finalProviderId)
         : (null as any);
+      delete (auftrag as any).weiterversandServiceProvider;
+    }
 
     const finalLabels =
       weiterversand_labels !== undefined

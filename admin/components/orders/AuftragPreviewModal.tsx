@@ -675,9 +675,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         o.is_weiterversand === "1" ||
         o.is_weiterversand === "Yes",
       weiterversandServiceProviderId:
-        o.weiterversand_service_provider_id ||
-        o.weiterversandServiceProvider?.id ||
-        "",
+        o.weiterversand_service_provider_id !== undefined &&
+        o.weiterversand_service_provider_id !== null
+          ? String(o.weiterversand_service_provider_id)
+          : o.weiterversandServiceProvider?.id !== undefined &&
+            o.weiterversandServiceProvider?.id !== null
+            ? String(o.weiterversandServiceProvider.id)
+            : "",
       weiterversandLabels: o.weiterversand_labels || "",
       weiterversandTracking: o.weiterversand_tracking || "",
     };
@@ -688,7 +692,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
   const refreshLocal = async () => {
     if (!order) return;
     const updated = await getCustomerOrderById(order.id);
-    if (updated.success) setOrder(updated.data);
+    if (updated.success) {
+      setOrder(updated.data);
+      setForm(buildForm(updated.data));
+    }
   };
 
   const handleStartEdit = () => {

@@ -82,7 +82,8 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
 
     if (templatePageCount === 0) return;
 
-    const [cleanBgPage] = await templatePdf.embedPdf(templatePdf, [0]);
+    const bgSourcePdf = await pdfLib.PDFDocument.load(templateBytes);
+    const [cleanBgPage] = await templatePdf.embedPdf(bgSourcePdf, [0]);
 
     const embeddedContentPages = await templatePdf.embedPdf(
       contentPdf,
