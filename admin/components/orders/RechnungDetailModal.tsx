@@ -1025,13 +1025,17 @@ export default function RechnungDetailModal({
   const customerCountry = String(
     data?.customerSnapshot?.country ||
     (data?.customer as any)?.country ||
+    (data as any)?.customer_country ||
+    (data as any)?.lieferort ||
     ""
   ).trim().toUpperCase();
+
+  const countryCode = customerCountry.split(/[-,\s]/)[0].trim();
 
   const isExportInvoice =
     rawCase.includes("EU_IGL") ||
     rawCase.includes("THIRD_COUNTRY") ||
-    (customerCountry !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(customerCountry));
+    (countryCode !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(countryCode));
 
   const handleUploadGelangenheits = async (
     e: React.ChangeEvent<HTMLInputElement>,

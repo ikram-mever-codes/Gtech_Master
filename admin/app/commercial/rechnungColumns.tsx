@@ -103,6 +103,35 @@ export const RECHNUNG_PAYMENT_STATUS_FILTER_OPTIONS = [
   "paid",
 ].map((value) => ({ value, label: RECHNUNG_PAYMENT_STATUS_LABELS[value] }));
 
+export function checkIsExportInvoice(row: any): boolean {
+  if (!row) return false;
+  const rawTaxCase = String(
+    row.tax_profile_case ||
+    row.taxProfile?.case ||
+    row.taxProfile?.key ||
+    row.taxProfile ||
+    row.customerSnapshot?.tax_profile_case ||
+    row.customer?.defaultTaxProfile?.case ||
+    "",
+  ).toUpperCase();
+
+  const country = String(
+    row.customerSnapshot?.country ||
+    row.customer?.country ||
+    row.customer_country ||
+    row.lieferort ||
+    ""
+  ).trim().toUpperCase();
+
+  const countryCode = country.split(/[-,\s]/)[0].trim();
+
+  return (
+    rawTaxCase.includes("EU_IGL") ||
+    rawTaxCase.includes("THIRD_COUNTRY") ||
+    (countryCode !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(countryCode))
+  );
+}
+
 const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
   row,
   rechnungenK,
@@ -128,16 +157,7 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
           ) === String(row.id),
       ));
 
-  const rawTaxCase = String(
-    row.tax_profile_case ||
-    row.taxProfile?.key ||
-    row.taxProfile ||
-    "",
-  ).toUpperCase();
-
-  const isExportInvoice =
-    rawTaxCase === "EU_IGL" ||
-    rawTaxCase === "THIRD_COUNTRY";
+  const isExportInvoice = checkIsExportInvoice(row);
 
   const hasGlDoc = Boolean(
     row.gelangenheitsbestaetigung_doc &&
@@ -147,11 +167,6 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
 
   const isGlMissing = isExportInvoice && !hasGlDoc;
 
-  // open_amount already nets out both payments and correction invoices
-  // (RK) — see attachPaymentStatusToRechnungen. Only shown when there's
-  // actually still something open; "paid" rows have open_amount 0 and
-  // show no extra line, matching the examples in the task (RK reduces
-  // open to 0 -> status becomes "paid" with nothing further to display).
   const openAmount = Number(row.open_amount ?? 0);
   const showOpenAmount = status !== "paid" && openAmount > 0.005;
 
@@ -227,16 +242,7 @@ const RechnungActionMenu: React.FC<{
     const isCreatingRk = creatingRkForId === row.id;
     const isBottom = rowIndex !== undefined && rowIndex >= 5;
 
-    const rawTaxCase = String(
-      row.tax_profile_case ||
-      row.taxProfile?.key ||
-      row.taxProfile ||
-      "",
-    ).toUpperCase();
-
-    const isExportInvoice =
-      rawTaxCase === "EU_IGL" ||
-      rawTaxCase === "THIRD_COUNTRY";
+    const isExportInvoice = checkIsExportInvoice(row);
 
     return (
       <div className="relative inline-block text-left" ref={menuRef}>
