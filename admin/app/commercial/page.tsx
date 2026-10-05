@@ -111,6 +111,7 @@ import {
   buildRechnungColumns,
   getRechnungStatusBackgroundColor,
   getRechnungGrossTotal,
+  checkIsExportInvoice,
 } from "./rechnungColumns";
 import { buildRkColumns, getRkGrossTotal } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
@@ -1397,22 +1398,7 @@ const InvoiceListPage: React.FC = () => {
       const auditFilter = searchParams.get("filter");
       if (auditFilter === "missing_gelangenheitsbestaetigung") {
         list = list.filter((r: any) => {
-          const country = String(
-            r.customerSnapshot?.country ||
-            r.customer?.country ||
-            ""
-          ).trim().toUpperCase();
-          const rawCase = String(
-            r.tax_profile_case ||
-            r.taxProfile?.case ||
-            r.customerSnapshot?.tax_profile_case ||
-            r.customer?.defaultTaxProfile?.case ||
-            ""
-          ).toUpperCase();
-          const isAbroad =
-            rawCase.includes("EU_IGL") ||
-            rawCase.includes("THIRD_COUNTRY") ||
-            (country !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(country));
+          const isAbroad = checkIsExportInvoice(r);
           const missingDoc =
             !r.gelangenheitsbestaetigung_doc ||
             r.gelangenheitsbestaetigung_doc === "" ||
