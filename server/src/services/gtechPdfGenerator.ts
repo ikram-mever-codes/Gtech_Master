@@ -80,27 +80,32 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
     const templatePageCount = templatePdf.getPageCount();
     const contentPageCount = contentPdf.getPageCount();
 
-    if (templatePageCount === 0) return;
+    if (templatePageCount === 0 || contentPageCount === 0) return;
 
-    const bgSourcePdf = await pdfLib.PDFDocument.load(templateBytes);
-    const [cleanBgPage] = await templatePdf.embedPdf(bgSourcePdf, [0]);
+    const finalPdf = await pdfLib.PDFDocument.create();
 
-    const embeddedContentPages = await templatePdf.embedPdf(
+    const embeddedTemplatePages = await finalPdf.embedPdf(
+      templatePdf,
+      templatePdf.getPageIndices(),
+    );
+    const embeddedContentPages = await finalPdf.embedPdf(
       contentPdf,
       contentPdf.getPageIndices(),
     );
 
     for (let i = 0; i < contentPageCount; i++) {
-      let page: pdfLib.PDFPage;
-      if (i < templatePageCount) {
-        page = templatePdf.getPage(i);
-      } else {
-        const { width, height } = contentPdf.getPage(i).getSize();
-        page = templatePdf.addPage([width, height]);
-        if (cleanBgPage) {
-          page.drawPage(cleanBgPage, { x: 0, y: 0, width, height });
+      const contentPage = contentPdf.getPage(i);
+      const { width, height } = contentPage.getSize();
+      const newPage = finalPdf.addPage([width, height]);
+
+      const bgPageIndex = i < templatePageCount ? i : 0;
+      const bgPage = embeddedTemplatePages[bgPageIndex];
+
+      if (bgPage) {
+        newPage.drawPage(bgPage, { x: 0, y: 0, width, height });
+        if (i >= templatePageCount) {
           const footerHeight = 100;
-          page.drawRectangle({
+          newPage.drawRectangle({
             x: 0,
             y: footerHeight,
             width,
@@ -110,8 +115,7 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
         }
       }
 
-      const { width, height } = page.getSize();
-      page.drawPage(embeddedContentPages[i], {
+      newPage.drawPage(embeddedContentPages[i], {
         x: 0,
         y: 0,
         width,
@@ -119,7 +123,7 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
       });
     }
 
-    const mergedBytes = await templatePdf.save({
+    const mergedBytes = await finalPdf.save({
       useObjectStreams: true,
       addDefaultPage: false,
     });
