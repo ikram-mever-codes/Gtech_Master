@@ -453,6 +453,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           requestStatus: previewItem.requestStatus,
           qualityCriteria: previewQuality,
           attachments: previewItem.attachments,
+          photo: previewItem.pictures?.shopPicture || "",
+          pix_path_eBay: previewItem.pictures?.ebayPictures || "",
+          pix_path: previewItem.pictures?.pixPath || "",
         });
       } else {
         const payload = {
@@ -1719,11 +1722,19 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                             ...p,
                             pictures: updatedPictures,
                           }));
-                          await updateItem(Number(itemId), {
-                            photo: shopPic,
-                            pix_path_eBay: ebayPic,
-                            pix_path: gallery.join(","),
-                          });
+                          if (isRequest) {
+                            await updateRequestedItem(String(itemId), {
+                              photo: shopPic,
+                              pix_path_eBay: ebayPic,
+                              pix_path: gallery.join(","),
+                            });
+                          } else {
+                            await updateItem(Number(itemId), {
+                              photo: shopPic,
+                              pix_path_eBay: ebayPic,
+                              pix_path: gallery.join(","),
+                            });
+                          }
                           toast.success("Pictures uploaded", {
                             id: tid,
                             ...successStyles,
