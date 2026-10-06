@@ -11,6 +11,7 @@ import {
   ArrowDownTrayIcon,
   PlusIcon,
   PencilIcon,
+  ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/outline";
 import { Package } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -1302,7 +1303,39 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
               </div>
               <div className="mt-5 grid grid-cols-1 md:grid-cols-5 gap-x-6 gap-y-4">
                 <div className="md:col-span-2">
-                  <Field label="Default Supplier">
+                  <Field
+                    label={
+                      <>
+                        <span>Default Supplier</span>
+                        {(() => {
+                          const rawUrl = (
+                            previewItem.supplierItem?.url ||
+                            previewItem.supplier_url ||
+                            ""
+                          )
+                            .toString()
+                            .trim();
+                          if (!rawUrl || rawUrl.toLowerCase() === "null")
+                            return null;
+                          const href = /^https?:\/\//i.test(rawUrl)
+                            ? rawUrl
+                            : `https://${rawUrl}`;
+                          return (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={rawUrl}
+                              className="inline-flex items-center gap-0.5 normal-case tracking-normal font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                              <span>Link</span>
+                            </a>
+                          );
+                        })()}
+                      </>
+                    }
+                  >
                     {previewEdit ? (
                       <select
                         className={inputCls}
