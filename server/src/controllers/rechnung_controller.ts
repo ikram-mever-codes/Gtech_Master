@@ -1256,11 +1256,13 @@ export const getAllRechnungen = async (
       .createQueryBuilder("r")
       .leftJoinAndSelect("r.items", "items")
       .leftJoinAndSelect("r.customer", "c")
+      .leftJoin("customer", "cust", "cust.id::text = c.original_customer_id::text")
+      .leftJoin("tax_profile", "tp", "tp.id::text = cust.default_tax_profile_id::text")
       .orderBy("r.created_at", "DESC");
 
     if (filter === "missing_gelangenheitsbestaetigung") {
       qb.andWhere(
-        "(r.tax_profile_case IN ('EU_IGL', 'third_country', 'THIRD_COUNTRY') OR (c.country IS NOT NULL AND c.country != '' AND c.country NOT IN ('DE', 'Deutschland', 'DEU')))",
+        "UPPER(COALESCE(r.tax_profile_case, tp.tax_case, '')) IN ('EU_IGL', 'THIRD_COUNTRY')",
       ).andWhere(
         "(r.gelangenheitsbestaetigung_doc IS NULL OR r.gelangenheitsbestaetigung_doc = '' OR r.gelangenheitsbestaetigung_doc = 'null')",
       );

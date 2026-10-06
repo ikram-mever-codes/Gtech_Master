@@ -107,28 +107,23 @@ export function checkIsExportInvoice(row: any): boolean {
   if (!row) return false;
   const rawTaxCase = String(
     row.tax_profile_case ||
+    row.taxProfile?.taxCase ||
     row.taxProfile?.case ||
     row.taxProfile?.key ||
-    row.taxProfile ||
+    row.taxProfile?.name ||
+    row.tax_profile?.taxCase ||
+    row.tax_profile?.case ||
+    row.tax_profile?.key ||
     row.customerSnapshot?.tax_profile_case ||
+    row.customer?.defaultTaxProfile?.tax_case ||
     row.customer?.defaultTaxProfile?.case ||
-    "",
-  ).toUpperCase();
-
-  const country = String(
-    row.customerSnapshot?.country ||
-    row.customer?.country ||
-    row.customer_country ||
-    row.lieferort ||
+    row.taxCase ||
     ""
-  ).trim().toUpperCase();
-
-  const countryCode = country.split(/[-,\s]/)[0].trim();
+  ).toUpperCase();
 
   return (
     rawTaxCase.includes("EU_IGL") ||
-    rawTaxCase.includes("THIRD_COUNTRY") ||
-    (countryCode !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(countryCode))
+    rawTaxCase.includes("THIRD_COUNTRY")
   );
 }
 

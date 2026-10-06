@@ -38,6 +38,7 @@ import { formatDate } from "@/utils/date";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import { getItemLink, getCustomerLink } from "@/utils/itemLink";
 import { getAllUsers } from "@/api/user";
+import { checkIsExportInvoice } from "@/app/commercial/rechnungColumns";
 
 const formatDeCurrency = (val: number) => {
   const num = isNaN(val) || !isFinite(val) ? 0 : val;
@@ -1013,29 +1014,7 @@ export default function RechnungDetailModal({
     }
   };
 
-  const rawCase = String(
-    data?.tax_profile_case ||
-    data?.taxProfile?.case ||
-    (data?.customerSnapshot as any)?.tax_profile_case ||
-    (data?.customerSnapshot as any)?.taxProfile?.case ||
-    (data?.customer as any)?.defaultTaxProfile?.case ||
-    ""
-  ).toUpperCase();
-
-  const customerCountry = String(
-    data?.customerSnapshot?.country ||
-    (data?.customer as any)?.country ||
-    (data as any)?.customer_country ||
-    (data as any)?.lieferort ||
-    ""
-  ).trim().toUpperCase();
-
-  const countryCode = customerCountry.split(/[-,\s]/)[0].trim();
-
-  const isExportInvoice =
-    rawCase.includes("EU_IGL") ||
-    rawCase.includes("THIRD_COUNTRY") ||
-    (countryCode !== "" && !["DE", "DEUTSCHLAND", "DEU"].includes(countryCode));
+  const isExportInvoice = checkIsExportInvoice(data);
 
   const handleUploadGelangenheits = async (
     e: React.ChangeEvent<HTMLInputElement>,
