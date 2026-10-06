@@ -1617,7 +1617,19 @@ export const updateItem = async (
     }
     const categoryName = category?.name || item.supp_cat || "STD";
 
-    if (currentRMBPrice !== null && !isNaN(currentRMBPrice)) {
+    // Auto transfer-price calculation only runs when the frontend explicitly
+    // sends `is_auto_transfer_price: true`. Otherwise the plain
+    // `transfer_price_EUR` / `price` values from the payload (already applied
+    // via updatableFields above) are kept as entered.
+    const isAutoTransferPrice =
+      req.body.is_auto_transfer_price === true ||
+      req.body.is_auto_transfer_price === "true";
+
+    if (
+      isAutoTransferPrice &&
+      currentRMBPrice !== null &&
+      !isNaN(currentRMBPrice)
+    ) {
       const calculatedPrice = calculateTransferPrice(
         currentRMBPrice,
         categoryName,

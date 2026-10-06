@@ -70,11 +70,11 @@ const Field = ({
   label,
   children,
 }: {
-  label: string;
+  label: React.ReactNode;
   children: React.ReactNode;
 }) => (
   <div>
-    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5 flex items-center gap-2">
       {label}
     </p>
     <div className="text-sm text-gray-900 break-words">{children}</div>
@@ -199,6 +199,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           item_name: raw.itemName,
           nameCN: raw.item_name_cn || "",
           item_name_cn: raw.item_name_cn || "",
+          isAutoTransferPrice: false,
           ean: raw.ean || "",
           category_id: raw.cat_id || null,
           category: raw.category?.name || "",
@@ -517,6 +518,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           },
           price: parseFlexibleNumber(previewItem.price) || 0,
           transfer_price_EUR: parseFlexibleNumber(previewItem.price) || 0,
+          is_auto_transfer_price: !!previewItem.isAutoTransferPrice,
           photo: previewItem.pictures?.shopPicture,
           pix_path: previewItem.pictures?.pixPath,
           pix_path_eBay: previewItem.pictures?.ebayPictures,
@@ -1366,12 +1368,37 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </span>
                   )}
                 </Field>
-                <Field label="Transfer Price">
+                <Field
+                  label={
+                    <>
+                      <span>Transfer</span>
+                      {previewEdit && !isRequest && (
+                        <label
+                          className="flex items-center gap-1 cursor-pointer select-none normal-case tracking-normal font-medium text-gray-600"
+                          title="Calculate the transfer price automatically from the RMB purchase price on save"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!previewItem.isAutoTransferPrice}
+                            onChange={(e) =>
+                              patchPreview({
+                                isAutoTransferPrice: e.target.checked,
+                              })
+                            }
+                            className="w-3.5 h-3.5 text-green-600 border-gray-300 rounded"
+                          />
+                          <span>Auto</span>
+                        </label>
+                      )}
+                    </>
+                  }
+                >
                   {previewEdit ? (
                     <div className="flex items-center gap-1">
                       <DecimalInput
                         className={inputCls}
                         placeholder="0.00"
+                        disabled={!!previewItem.isAutoTransferPrice}
                         value={previewItem.price ?? ""}
                         onChange={(raw) => patchPreview({ price: raw })}
                       />
@@ -1388,7 +1415,6 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </span>
                   )}
                 </Field>
-
                 <Field label="Sales Price">
                   {previewEdit ? (
                     <div className="flex items-center gap-1">
