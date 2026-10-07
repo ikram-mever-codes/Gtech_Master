@@ -119,6 +119,97 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [uploadingPictures, setUploadingPictures] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen || !previewEdit || uploadingPictures) return;
+
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      ) {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      let imageItem: DataTransferItem | undefined;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          imageItem = items[i];
+          break;
+        }
+      }
+
+      if (!imageItem) return;
+
+      const file = imageItem.getAsFile();
+      if (!file) return;
+
+      e.preventDefault();
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+
+      img.onload = async () => {
+        URL.revokeObjectURL(url);
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+
+        let quality = 0.9;
+        let blob: Blob | null = null;
+        let iter = 0;
+
+        const tryCompress = (q: number): Promise<Blob | null> => {
+          return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", q));
+        };
+
+        blob = await tryCompress(quality);
+        while (blob && blob.size > 800 * 1024 && quality > 0.1 && iter < 10) {
+          quality -= 0.1;
+          blob = await tryCompress(quality);
+          iter++;
+        }
+
+        if (blob) {
+          const dateStr = new Date().toISOString().slice(2, 7).replace("-", ""); // yymm
+          let fileName = "";
+          const itemName =
+            previewItem?.item_name ||
+            previewItem?.name ||
+            previewItem?.itemName ||
+            previewItem?.itemNameDE ||
+            previewItem?.item_name_de;
+
+          if (itemName) {
+            const sanitizedName = String(itemName).replace(/[^a-z0-9]/gi, "_");
+            fileName = `${sanitizedName}_${dateStr}.jpg`;
+          } else {
+            fileName = `${itemId}.jpg`;
+          }
+
+          const newFile = new File([blob], fileName, { type: "image/jpeg" });
+          const dt = new DataTransfer();
+          dt.items.add(newFile);
+
+          if (pictureInputRef.current) {
+            pictureInputRef.current.files = dt.files;
+            const event = new Event("change", { bubbles: true });
+            pictureInputRef.current.dispatchEvent(event);
+          }
+        }
+      };
+      img.src = url;
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [isOpen, previewEdit, uploadingPictures, previewItem, itemId]);
+
   console.log(itemId);
   const toBool = (v: any) =>
     v === "Y" || v === "Yes" || v === true || v === 1 || v === "1";
