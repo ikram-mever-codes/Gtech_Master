@@ -1884,6 +1884,8 @@ export const getBusinessById = async (
       vat_id_checked_at: customer.vat_id_checked_at,
       vat_id_check_source: customer.vat_id_check_source,
       vat_id_check_response_json: customer.vat_id_check_response_json,
+      emailRechnungen: customer.email_rechnungen,
+      emailEinkauf: customer.email_einkauf,
       businessDetails: customer.businessDetails
         ? {
           ...customer.businessDetails,
@@ -2192,6 +2194,8 @@ export const getAllBusinesses = async (
         addressAdditional: customer.addressLine2,
         city: customer.businessDetails?.city,
         state: customer.businessDetails?.state,
+        emailRechnungen: customer.email_rechnungen,
+        emailEinkauf: customer.email_einkauf,
         country: customer.businessDetails?.country || customer.country,
         country_id:
           customer.country_id || customer.businessDetails?.country_id || null,

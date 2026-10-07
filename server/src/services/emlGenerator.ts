@@ -118,6 +118,13 @@ export async function generateRechnungLieferscheinEml(
           email: customer.email.trim(),
         });
       }
+      
+      if (customer?.email_rechnungen) {
+        contactPersons.push({ name: "Rechnungen", email: customer.email_rechnungen.trim() });
+      }
+      if (customer?.email_einkauf) {
+        contactPersons.push({ name: "Einkauf", email: customer.email_einkauf.trim() });
+      }
     } catch (custErr) {
       console.warn("Could not load Customer ContactPersons for EML:", custErr);
     }
@@ -233,8 +240,10 @@ export async function generateRechnungLieferscheinEml(
     : `Rechnung Lieferschein ${rechnungDocNo} GTech`;
 
   let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
-  if (primaryEmail) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
+  const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
+  if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
+  if (allEmlEmails.length > 0) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
   }
   bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
   bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) und den Lieferschein (${lieferscheinNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
@@ -371,6 +380,13 @@ export async function generateRechnungOnlyEml(
           email: customer.email.trim(),
         });
       }
+
+      if (customer?.email_rechnungen) {
+        contactPersons.push({ name: "Rechnungen", email: customer.email_rechnungen.trim() });
+      }
+      if (customer?.email_einkauf) {
+        contactPersons.push({ name: "Einkauf", email: customer.email_einkauf.trim() });
+      }
     } catch (custErr) {
       console.warn("Could not load Customer ContactPersons for Rechnung-only EML:", custErr);
     }
@@ -452,8 +468,10 @@ export async function generateRechnungOnlyEml(
     : `Rechnung ${rechnungDocNo} GTech`;
 
   let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
-  if (primaryEmail) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
+  const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
+  if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
+  if (allEmlEmails.length > 0) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
   }
   bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
   bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
@@ -566,6 +584,13 @@ export async function generateAuftragEml(
           email: customer.email.trim(),
         });
       }
+
+      if (customer?.email_rechnungen) {
+        contactPersons.push({ name: "Rechnungen", email: customer.email_rechnungen.trim() });
+      }
+      if (customer?.email_einkauf) {
+        contactPersons.push({ name: "Einkauf", email: customer.email_einkauf.trim() });
+      }
     } catch (custErr) {
       console.warn("Could not load Customer ContactPersons for Auftrag EML:", custErr);
     }
@@ -671,8 +696,10 @@ export async function generateAuftragEml(
     : `Auftrag ${docNo} GTech`;
 
   let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
-  if (primaryEmail) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
+  const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
+  if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
+  if (allEmlEmails.length > 0) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
   }
   bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
   bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Auftragsbestätigung (${docNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
@@ -779,6 +806,13 @@ export async function generateOfferEml(
           email: customer.email.trim(),
         });
       }
+
+      if (customer?.email_rechnungen) {
+        contactPersons.push({ name: "Rechnungen", email: customer.email_rechnungen.trim() });
+      }
+      if (customer?.email_einkauf) {
+        contactPersons.push({ name: "Einkauf", email: customer.email_einkauf.trim() });
+      }
     } catch (custErr) {
       console.warn("Could not load Customer ContactPersons for Offer EML:", custErr);
     }
@@ -868,8 +902,10 @@ export async function generateOfferEml(
     : `Angebot ${docNo} GTech`;
 
   let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
-  if (primaryEmail) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
+  const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
+  if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
+  if (allEmlEmails.length > 0) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
   }
   bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
   bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie das Angebot (${docNo}) zu Ihrer Anfrage "${offerTitle}".</p>\n`;
@@ -980,6 +1016,13 @@ export async function generateRechnungKEml(
           email: customer.email.trim(),
         });
       }
+
+      if (customer?.email_rechnungen) {
+        contactPersons.push({ name: "Rechnungen", email: customer.email_rechnungen.trim() });
+      }
+      if (customer?.email_einkauf) {
+        contactPersons.push({ name: "Einkauf", email: customer.email_einkauf.trim() });
+      }
     } catch (custErr) {
       console.warn("Could not load Customer ContactPersons for RK EML:", custErr);
     }
@@ -1069,8 +1112,10 @@ export async function generateRechnungKEml(
     : `Rechnungskorrektur ${docNo} GTech`;
 
   let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
-  if (primaryEmail) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${primaryEmail}</p>\n`;
+  const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
+  if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
+  if (allEmlEmails.length > 0) {
+    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
   }
   bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
   bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnungskorrektur (${docNo}) zu Ihrer Bestellung "${rkTitle}".</p>\n`;

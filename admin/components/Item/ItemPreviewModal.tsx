@@ -155,10 +155,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-        item?.pix_path_eBay ||
-        item?.pictures?.shopPicture ||
-        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-        null,
+      item?.pix_path_eBay ||
+      item?.pictures?.shopPicture ||
+      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+      null,
     );
 
   const getCompany = (item: any) =>
@@ -215,10 +215,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           parent_id: raw.parent_id || null,
           parent: raw.parent
             ? {
-                ...raw.parent,
-                de_no: raw.parent.de_no,
-                name_de: raw.parent.name_de,
-              }
+              ...raw.parent,
+              de_no: raw.parent.de_no,
+              name_de: raw.parent.name_de,
+            }
             : null,
           item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
@@ -245,6 +245,15 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
         };
         setPreviewItem(mapped);
         setPreviewQuality(raw.qualityCriteria || []);
+        if (raw.itemId) {
+          const linked: any = await getItemById(Number(raw.itemId));
+          const li = linked?.data || {};
+          setPreviewItem((p: any) => ({
+            ...p,
+            supplierItem: li.supplierItem,
+            sales_price: li.sales_price ?? p.sales_price,
+          }));
+        }
       } else {
         const [detailRes, qualityRes]: any = await Promise.all([
           getItemById(Number(itemId)),
@@ -301,23 +310,23 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             raw.supplierItem ||
             (def
               ? {
-                  priceRMB: def.priceRMB || "0",
-                  isPO: def.isPO || "No",
-                  moq: def.moq || "0",
-                  interval: def.interval || "0",
-                  leadTime: def.leadTime || "",
-                  noteCN: def.noteCN || "",
-                  url: def.url || "",
-                }
+                priceRMB: def.priceRMB || "0",
+                isPO: def.isPO || "No",
+                moq: def.moq || "0",
+                interval: def.interval || "0",
+                leadTime: def.leadTime || "",
+                noteCN: def.noteCN || "",
+                url: def.url || "",
+              }
               : {
-                  priceRMB: "0",
-                  isPO: "No",
-                  moq: "0",
-                  interval: "0",
-                  leadTime: "",
-                  noteCN: "",
-                  url: "",
-                }),
+                priceRMB: "0",
+                isPO: "No",
+                moq: "0",
+                interval: "0",
+                leadTime: "",
+                noteCN: "",
+                url: "",
+              }),
           parent: raw.parent
             ? { ...raw.parent, isActive: toBool(raw.parent?.isActive) }
             : null,
@@ -421,6 +430,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
       if (isRequest) {
         await updateRequestedItem(String(itemId), {
           itemName: previewItem.name || previewItem.item_name,
+          item_name_de: previewItem.item_name_de || "",
           item_name_cn: previewItem.nameCN || previewItem.item_name_cn,
           ean: (previewItem.ean || "").toString(),
           model: previewItem.model,
@@ -445,6 +455,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             ? parseInt(previewItem.taric_id)
             : undefined,
           purchasePrice: parseFlexibleNumber(previewItem.price) || 0,
+          is_stock_item: previewItem.is_stock_item || "N",
+          stockEU: parseFlexibleNumber(previewItem.stockEU) || 0,
+          MSQ_EU: parseFlexibleNumber(previewItem.MSQ_EU) || 0,
+          stockCN: parseFlexibleNumber(previewItem.stockCN) || 0,
+          MSQ_CN: parseFlexibleNumber(previewItem.MSQ_CN) || 0,
           currency: previewItem.currency || "EUR",
           itemNo: previewItem.de_no,
           qty: previewItem.qty,
@@ -454,7 +469,20 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           requestStatus: previewItem.requestStatus,
           qualityCriteria: previewQuality,
           attachments: previewItem.attachments,
+          photo: previewItem.pictures?.shopPicture || "",
+          pix_path_eBay: previewItem.pictures?.ebayPictures || "",
+          pix_path: previewItem.pictures?.pixPath || "",
         });
+
+        if (previewItem.itemId) {
+          await updateItem(Number(previewItem.itemId), {
+            sales_price: parseFlexibleNumber(previewItem.sales_price) || 0,
+            supplierItem: {
+              price_rmb:
+                parseFlexibleNumber(previewItem.supplierItem?.priceRMB) || 0,
+            },
+          } as any);
+        }
       } else {
         const payload = {
           item_name: previewItem.name ?? previewItem.item_name,
@@ -497,8 +525,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           supplierItems: previewItem.supplierItems,
           sales_price:
             previewItem.sales_price === "" ||
-            previewItem.sales_price === undefined ||
-            previewItem.sales_price === null
+              previewItem.sales_price === undefined ||
+              previewItem.sales_price === null
               ? null
               : parseFlexibleNumber(previewItem.sales_price),
           supplierItem: {
@@ -789,11 +817,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       </select>
                     ) : (
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
-                          previewItem.isActive
-                            ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                            : "bg-red-100 text-red-700 border border-red-200"
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${previewItem.isActive
+                          ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                          : "bg-red-100 text-red-700 border border-red-200"
+                          }`}
                       >
                         {previewItem.isActive ? "Active" : "Inactive"}
                       </span>
@@ -808,31 +835,31 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
               <div className="flex items-center gap-4 flex-shrink-0">
                 {(previewEdit ||
                   (previewItem?.tags && previewItem.tags.length > 0)) && (
-                  <div className="flex items-center gap-2">
-                    {previewEdit && (
-                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                        TAGS
-                      </span>
-                    )}
-                    <EntityTagSelector
-                      entityId={previewItem.id}
-                      entityType={isRequest ? "request_item" : "item"}
-                      initialTags={previewItem.tags || []}
-                      tagOrder={previewItem.tagOrder}
-                      disabled={!previewEdit}
-                      onTagsUpdated={(newTags: any[]) =>
-                        setPreviewItem((p: any) =>
-                          p
-                            ? {
+                    <div className="flex items-center gap-2">
+                      {previewEdit && (
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                          TAGS
+                        </span>
+                      )}
+                      <EntityTagSelector
+                        entityId={previewItem.id}
+                        entityType={isRequest ? "request_item" : "item"}
+                        initialTags={previewItem.tags || []}
+                        tagOrder={previewItem.tagOrder}
+                        disabled={!previewEdit}
+                        onTagsUpdated={(newTags: any[]) =>
+                          setPreviewItem((p: any) =>
+                            p
+                              ? {
                                 ...p,
                                 tags: newTags,
                               }
-                            : p,
-                        )
-                      }
-                    />
-                  </div>
-                )}
+                              : p,
+                          )
+                        }
+                      />
+                    </div>
+                  )}
 
                 <ViewEditToggle
                   isEditEnabled={previewEdit}
@@ -952,18 +979,18 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         value={
                           previewItem.taric_id
                             ? (() => {
-                                const t = refTarics?.find(
-                                  (x: any) =>
-                                    String(x.id) ===
-                                    String(previewItem.taric_id),
-                                );
-                                return t
-                                  ? {
-                                      value: t.id,
-                                      label: `${t.code}${t.duty_rate !== null && t.duty_rate !== undefined ? ` (${t.duty_rate}%)` : ""} - ${t.name_de || t.name_en || t.code}`,
-                                    }
-                                  : null;
-                              })()
+                              const t = refTarics?.find(
+                                (x: any) =>
+                                  String(x.id) ===
+                                  String(previewItem.taric_id),
+                              );
+                              return t
+                                ? {
+                                  value: t.id,
+                                  label: `${t.code}${t.duty_rate !== null && t.duty_rate !== undefined ? ` (${t.duty_rate}%)` : ""} - ${t.name_de || t.name_en || t.code}`,
+                                }
+                                : null;
+                            })()
                             : null
                         }
                         onChange={(opt: any) =>
@@ -1200,11 +1227,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </select>
                   ) : (
                     <span
-                      className={`font-bold ${
-                        previewItem.dimensions?.is_dim_weight_estimated
-                          ? "text-[#8CC21B]"
-                          : "text-gray-900"
-                      }`}
+                      className={`font-bold ${previewItem.dimensions?.is_dim_weight_estimated
+                        ? "text-[#8CC21B]"
+                        : "text-gray-900"
+                        }`}
                     >
                       {previewItem.dimensions?.is_dim_weight_estimated
                         ? "YES"
@@ -1355,14 +1381,13 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     ) : (
                       <div className="font-semibold text-gray-900 truncate">
                         {previewItem.supplier_id
-                          ? `[ID: ${previewItem.supplier_id}] ${
-                              previewItem.supplier_name
-                                ? previewItem.supplier_name.replace(
-                                    /^Supplier\s*/i,
-                                    "",
-                                  )
-                                : getSupplierName(previewItem.supplier_id)
-                            }`
+                          ? `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name
+                            ? previewItem.supplier_name.replace(
+                              /^Supplier\s*/i,
+                              "",
+                            )
+                            : getSupplierName(previewItem.supplier_id)
+                          }`
                           : "—"}
                       </div>
                     )}
@@ -1392,8 +1417,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <span className="font-medium text-gray-900">
                       {formatMax3Decimals(
                         previewItem.supplierItem?.priceRMB ||
-                          previewItem.priceRMB ||
-                          0,
+                        previewItem.priceRMB ||
+                        0,
                       )}{" "}
                       <span className="font-semibold text-gray-700">
                         {"RMB"}
@@ -1752,11 +1777,19 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                             ...p,
                             pictures: updatedPictures,
                           }));
-                          await updateItem(Number(itemId), {
-                            photo: shopPic,
-                            pix_path_eBay: ebayPic,
-                            pix_path: gallery.join(","),
-                          });
+                          if (isRequest) {
+                            await updateRequestedItem(String(itemId), {
+                              photo: shopPic,
+                              pix_path_eBay: ebayPic,
+                              pix_path: gallery.join(","),
+                            });
+                          } else {
+                            await updateItem(Number(itemId), {
+                              photo: shopPic,
+                              pix_path_eBay: ebayPic,
+                              pix_path: gallery.join(","),
+                            });
+                          }
                           toast.success("Pictures uploaded", {
                             id: tid,
                             ...successStyles,
