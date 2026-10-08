@@ -645,7 +645,8 @@ export const getItems = async (
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
-        category: item.category?.name || item.supp_cat || null,
+        // Same source as getItemById (what the preview modal shows).
+        category: item.supp_cat || null,
         supplier_id: item.supplier_id || null,
         supplier_url: supplierUrlMap.get(item.id) || null,
         customer_id: item.customer_id || null,
