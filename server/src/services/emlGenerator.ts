@@ -239,7 +239,7 @@ export async function generateRechnungLieferscheinEml(
     ? `Rechnung Lieferschein ${rechnungDocNo} GTech ${subjectTitle}`
     : `Rechnung Lieferschein ${rechnungDocNo} GTech`;
 
-  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">\n`;
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
@@ -467,7 +467,7 @@ export async function generateRechnungOnlyEml(
     ? `Rechnung ${rechnungDocNo} GTech ${subjectTitle}`
     : `Rechnung ${rechnungDocNo} GTech`;
 
-  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">\n`;
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
@@ -695,7 +695,7 @@ export async function generateAuftragEml(
     ? `Auftrag ${docNo} GTech ${subjectTitle}`
     : `Auftrag ${docNo} GTech`;
 
-  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">\n`;
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
@@ -901,7 +901,7 @@ export async function generateOfferEml(
     ? `Angebot ${docNo} GTech ${subjectTitle}`
     : `Angebot ${docNo} GTech`;
 
-  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">\n`;
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
@@ -1111,7 +1111,7 @@ export async function generateRechnungKEml(
     ? `Rechnungskorrektur ${docNo} GTech ${subjectTitle}`
     : `Rechnungskorrektur ${docNo} GTech`;
 
-  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: sans-serif; font-size: 14px; color: #111827;">\n`;
+  let bodyHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"></head>\n<body style="font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">\n`;
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
