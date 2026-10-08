@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   Suspense,
 } from "react";
 import {
@@ -106,7 +107,10 @@ import {
   sortAuftraegeByStatus,
   getAuftragGrossTotal,
 } from "./auftragColumns";
-import { buildBestellungColumns, getBestellungGrossTotal } from "./bestellungColumns";
+import {
+  buildBestellungColumns,
+  getBestellungGrossTotal,
+} from "./bestellungColumns";
 import {
   buildRechnungColumns,
   getRechnungStatusBackgroundColor,
@@ -120,6 +124,19 @@ import PaymentInboundAssignModal from "./PaymentInboundAssignModal";
 import { getOfferGrossTotal } from "@/utils/offers";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
+
+/** Document number as shown in each tab's list. Used for deep links
+ * (?tab=<tab>&doc=<document no>) in both directions. Zahlung is not
+ * linkable (its rows have no stable document number). */
+const getDocNo = (tab: InvoiceTab, row: any): string => {
+  if (!row) return "";
+  if (tab === "auftrag" || tab === "bestellung")
+    return String(row.order_no ?? "");
+  if (tab === "angebot") return String(row.offerNumber ?? "");
+  if (tab === "rechnung" || tab === "rk" || tab === "lieferschein")
+    return String(row.invoiceNumber ?? "");
+  return "";
+};
 
 const invoiceTabs = [
   { id: "angebot", label: "Angebot" },
@@ -178,6 +195,16 @@ const InvoiceListPage: React.FC = () => {
   );
 
   const filterParam = searchParams.get("filter") || undefined;
+
+  // --- Document deep link (?tab=...&doc=<document no>) ---------------------
+  // A pasted link opens the document once its tab's data has loaded.
+  const [pendingDoc, setPendingDoc] = useState<string | null>(
+    () => searchParams.get("doc") || null,
+  );
+  const deepLinkLoadSeenRef = useRef(false);
+  // Unfiltered, mapped rows of the active tab (same objects the table rows
+  // use), so a linked document opens even when list filters hide it.
+  const allItemsRef = useRef<any[]>([]);
 
   useEffect(() => {
     tabData.ensureLoaded(activeInvTab, false, filterParam);
@@ -471,7 +498,7 @@ const InvoiceListPage: React.FC = () => {
     const isStatusActive =
       activeInvTab === "auftrag"
         ? docFilters.status !== "partially_delivered_and_open" &&
-        !!docFilters.status
+          !!docFilters.status
         : !!docFilters.status;
 
     return (
@@ -1220,20 +1247,77 @@ const InvoiceListPage: React.FC = () => {
     setViewItems([]);
   };
 
+  // Number of the document currently open in a modal, but only when it
+  // belongs to the active tab — so the URL (tab + doc) is always a link
+  // that reopens exactly this document.
+  const openDocNo: string | null = (() => {
+    const find = (list: any[] | undefined, id: any) =>
+      (list || []).find((x: any) => String(x?.id) === String(id));
+    let tab: InvoiceTab | null = null;
+    let no = "";
+    if (showRechnungKModal && selectedRechnungKData) {
+      tab = "rk";
+      no = String(
+        selectedRechnungKData.rk_number ||
+          selectedRechnungKData.invoice_number ||
+          "",
+      );
+    } else if (showAuftragPreviewModal && selectedAuftragId != null) {
+      tab = "auftrag";
+      const o =
+        find(tabData.customerOrders, selectedAuftragId) ||
+        find(tabData.orders, selectedAuftragId);
+      no = String(o?.order_no || "");
+    } else if (showBestellungPreviewModal && selectedBestellungId != null) {
+      tab = "bestellung";
+      no = String(
+        find(tabData.bestellungen, selectedBestellungId)?.order_no || "",
+      );
+    } else if (showLieferscheinDetailModal && selectedLieferscheinForDetail) {
+      tab = "lieferschein";
+      no = String(selectedLieferscheinForDetail.invoiceNumber || "");
+    } else if (showRechnungDetailModal && selectedRechnungForDetail) {
+      tab = "rechnung";
+      no = String(
+        selectedRechnungForDetail.invoiceNumber ||
+          selectedRechnungForDetail.invoice_number ||
+          "",
+      );
+    }
+    return tab === activeInvTab && no ? no : null;
+  })();
+
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", activeInvTab);
     if (docFilters.documentNo) params.set("order_no", docFilters.documentNo);
     else params.delete("order_no");
+    // Keep a pasted `doc` until it has been opened; afterwards mirror the
+    // open document.
+    if (!pendingDoc) {
+      if (openDocNo) params.set("doc", openDocNo);
+      else params.delete("doc");
+    }
     const qs = params.toString();
     router.replace(qs ? `/commercial?${qs}` : "/commercial", { scroll: false });
-  }, [activeInvTab, docFilters.documentNo, router, searchParams]);
+  }, [
+    activeInvTab,
+    docFilters.documentNo,
+    router,
+    searchParams,
+    openDocNo,
+    pendingDoc,
+  ]);
 
   useEffect(() => {
     const filterParam = searchParams.get("filter");
     if (filterParam === "missing_gelangenheitsbestaetigung") {
       setActiveInvTab("rechnung");
-      setDocFilters((prev: any) => ({ ...prev, datePreset: "all", status: "" }));
+      setDocFilters((prev: any) => ({
+        ...prev,
+        datePreset: "all",
+        status: "",
+      }));
     }
     const tabParam = searchParams.get("tab");
     if (tabParam) {
@@ -1302,12 +1386,12 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoice((prev: any) =>
         prev
           ? {
-            ...prev,
-            title: invoiceEditForm.title,
-            description: invoiceEditForm.description,
-            freightCost: invoiceEditForm.freightCost,
-            remark: invoiceEditForm.remark,
-          }
+              ...prev,
+              title: invoiceEditForm.title,
+              description: invoiceEditForm.description,
+              freightCost: invoiceEditForm.freightCost,
+              remark: invoiceEditForm.remark,
+            }
           : null,
       );
       toast.success("Invoice changes saved successfully");
@@ -1523,6 +1607,8 @@ const InvoiceListPage: React.FC = () => {
       return timeB - timeA;
     });
 
+    allItemsRef.current = list;
+
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       list = list.filter((item: any) => {
@@ -1575,11 +1661,11 @@ const InvoiceListPage: React.FC = () => {
         const s = customerNo.toLowerCase().trim();
         const cNo = String(
           item.customer?.customerNumber ||
-          item.customer?.id ||
-          item.customer_id ||
-          item.customerSnapshot?.customerNumber ||
-          item.customerSnapshot?.id ||
-          "",
+            item.customer?.id ||
+            item.customer_id ||
+            item.customerSnapshot?.customerNumber ||
+            item.customerSnapshot?.id ||
+            "",
         ).toLowerCase();
         if (!cNo.includes(s)) return false;
       }
@@ -1587,12 +1673,12 @@ const InvoiceListPage: React.FC = () => {
         const s = customerName.toLowerCase().trim();
         const cName = String(
           item.customer?.companyName ||
-          item.customer_name ||
-          item.bill_to ||
-          item.ship_to ||
-          item.customerSnapshot?.companyName ||
-          item.customerSnapshot?.name ||
-          "",
+            item.customer_name ||
+            item.bill_to ||
+            item.ship_to ||
+            item.customerSnapshot?.companyName ||
+            item.customerSnapshot?.name ||
+            "",
         ).toLowerCase();
         if (!cName.includes(s)) return false;
       }
@@ -1611,13 +1697,13 @@ const InvoiceListPage: React.FC = () => {
         const hasMatch = lineItems.some((line: any) => {
           const noStr = String(
             line.itemNo ||
-            line.item_no ||
-            line.material ||
-            line.article_no ||
-            line.ItemNo ||
-            line.item?.item_no ||
-            line.item?.material ||
-            "",
+              line.item_no ||
+              line.material ||
+              line.article_no ||
+              line.ItemNo ||
+              line.item?.item_no ||
+              line.item?.material ||
+              "",
           ).toLowerCase();
           return noStr.includes(s);
         });
@@ -1638,30 +1724,33 @@ const InvoiceListPage: React.FC = () => {
         const hasMatchLine = lineItems.some((line: any) => {
           const nameStr = String(
             line.itemName ||
-            line.item_name ||
-            line.name ||
-            line.title ||
-            line.item?.item_name ||
-            line.item?.name ||
-            "",
+              line.item_name ||
+              line.name ||
+              line.title ||
+              line.item?.item_name ||
+              line.item?.name ||
+              "",
           ).toLowerCase();
           const remarkStr = String(
             line.remark ||
-            line.remarks ||
-            line.remark_de ||
-            line.remark_ex ||
-            line.remarkEX ||
-            line.notes ||
-            line.description ||
-            line.freizeile ||
-            line.text ||
-            "",
+              line.remarks ||
+              line.remark_de ||
+              line.remark_ex ||
+              line.remarkEX ||
+              line.notes ||
+              line.description ||
+              line.freizeile ||
+              line.text ||
+              "",
           ).toLowerCase();
           return nameStr.includes(s) || remarkStr.includes(s);
         });
 
         const shippingStr = String(
-          item.shipping_method || item.shippingMethod || item.shipping_line || "",
+          item.shipping_method ||
+            item.shippingMethod ||
+            item.shipping_line ||
+            "",
         ).toLowerCase();
         const hasMatchShipping = shippingStr.includes(s);
 
@@ -1729,6 +1818,80 @@ const InvoiceListPage: React.FC = () => {
     return sortAuftraegeByStatus(filteredItems);
   }, [filteredItems, activeInvTab]);
 
+  // Opens the document named by a pasted ?doc=<no> link once the tab's data
+  // has loaded; tells the user when no such document exists in that tab.
+  const activeTabLoading =
+    activeInvTab === "auftrag"
+      ? tabData.loadingOrders
+      : activeInvTab === "bestellung"
+        ? tabData.loadingBestellungen
+        : activeInvTab === "rechnung"
+          ? tabData.loadingRechnungen
+          : activeInvTab === "rk"
+            ? tabData.loadingRechnungenK
+            : activeInvTab === "lieferschein"
+              ? tabData.loadingLieferscheine
+              : activeInvTab === "angebot"
+                ? tabData.loadingOffers
+                : false;
+
+  useEffect(() => {
+    if (!pendingDoc) return;
+    if (activeInvTab === "payment_inbound") {
+      toast.error("Document links are not available for Zahlung.", errorStyles);
+      setPendingDoc(null);
+      return;
+    }
+    if (activeTabLoading) {
+      deepLinkLoadSeenRef.current = true;
+      return;
+    }
+    const wanted = pendingDoc.trim().toLowerCase();
+    let opened = false;
+
+    if (activeInvTab === "angebot") {
+      const offer = (tabData.offers || []).find(
+        (o: any) => getDocNo("angebot", o).toLowerCase() === wanted,
+      );
+      if (offer) {
+        handleOpenOfferModal(offer.id);
+        opened = true;
+      }
+    } else {
+      const row = (allItemsRef.current || []).find(
+        (r: any) => getDocNo(activeInvTab, r).toLowerCase() === wanted,
+      );
+      if (row) {
+        if (activeInvTab === "auftrag") handleOpenAuftragPreview(row.id);
+        else if (activeInvTab === "bestellung")
+          handleOpenBestellungPreview(row.id);
+        else if (activeInvTab === "rechnung") handleOpenRechnungView(row);
+        else if (activeInvTab === "rk") handleOpenRechnungKDetail(row);
+        else if (activeInvTab === "lieferschein") {
+          setSelectedLieferscheinForDetail(row);
+          setShowLieferscheinDetailModal(true);
+        }
+        opened = true;
+      }
+    }
+
+    if (opened) {
+      setPendingDoc(null);
+    } else if (deepLinkLoadSeenRef.current) {
+      toast.error(
+        `Document ${pendingDoc} was not found in this tab.`,
+        errorStyles,
+      );
+      setPendingDoc(null);
+    }
+  }, [
+    pendingDoc,
+    activeInvTab,
+    activeTabLoading,
+    filteredItems,
+    tabData.offers,
+  ]);
+
   const legacyInvoices = useMemo(() => [], []);
 
   const handleDuplicateAuftrag = async (row: any) => {
@@ -1737,7 +1900,7 @@ const InvoiceListPage: React.FC = () => {
       if (res?.success) {
         toast.success(
           res.message ||
-          `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
+            `Auftrag duplicated successfully as ${res.data?.order_no || ""}`,
           successStyles,
         );
         await tabData.refetchOrders();
@@ -1964,10 +2127,11 @@ const InvoiceListPage: React.FC = () => {
                   setDocFilters((prev) => ({ ...prev, status: "" }));
                 }
               }}
-              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${activeInvTab === tab.id
-                ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
-                : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
-                }`}
+              className={`px-6 py-3.5 text-sm font-semibold transition-all relative whitespace-nowrap -mb-px ${
+                activeInvTab === tab.id
+                  ? "text-[#8CC21B] border-b-2 border-[#8CC21B]"
+                  : "text-gray-500 hover:text-gray-900 border-b-2 border-transparent"
+              }`}
             >
               {tab.label}
             </Link>
@@ -1982,9 +2146,9 @@ const InvoiceListPage: React.FC = () => {
             setDocFilters(
               activeInvTab === "auftrag"
                 ? {
-                  ...initialCommercialFilters,
-                  status: "partially_delivered_and_open",
-                }
+                    ...initialCommercialFilters,
+                    status: "partially_delivered_and_open",
+                  }
                 : { ...initialCommercialFilters, status: "" },
             );
             setSearchTerm("");
@@ -2470,8 +2634,14 @@ const InvoiceListPage: React.FC = () => {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                const parsedInboundAmount = parseFloat(String(inboundForm.amount || "").replace(",", "."));
-                if (!inboundForm.amount || isNaN(parsedInboundAmount) || parsedInboundAmount <= 0) {
+                const parsedInboundAmount = parseFloat(
+                  String(inboundForm.amount || "").replace(",", "."),
+                );
+                if (
+                  !inboundForm.amount ||
+                  isNaN(parsedInboundAmount) ||
+                  parsedInboundAmount <= 0
+                ) {
                   toast.error("Please enter a valid amount > 0");
                   return;
                 }
