@@ -474,11 +474,16 @@ export default function RechnungDetailModal({
   const [editNotesExtern, setEditNotesExtern] = useState("");
   const [editNotesIntern, setEditNotesIntern] = useState("");
   const [corrections, setCorrections] = useState<{
-    [key: string]: { quantity: number; price: number };
+    [key: string]: { quantity: number; price: number; itemName?: string };
   }>({});
   const [selectedCorrectionIds, setSelectedCorrectionIds] = useState<any>(
     new Set(),
   );
+
+  const [freizeilen, setFreizeilen] = useState<
+    { tempId: string; itemName: string; quantity: number; price: number }[]
+  >([]);
+  const [newFreizeileName, setNewFreizeileName] = useState("");
 
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -550,16 +555,17 @@ export default function RechnungDetailModal({
     );
     setEditShippingMethod(
       rechnung?.shipping_method ||
-      rechnung?.auftrag?.shipping_method ||
-      (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
-      (rechnung?.customerSnapshot as any)?.shipping_method ||
-      "",
+        rechnung?.auftrag?.shipping_method ||
+        (rechnung?.customerSnapshot as any)?.defaultShippingMethod ||
+        (rechnung?.customerSnapshot as any)?.shipping_method ||
+        "",
     );
     setRkNotesExtern(rechnung?.notes || "");
     setRkNotesIntern(rechnung?.internal_notes || "");
     setShowStockBookingModal(false);
     setStockBookingItems([]);
-
+    setFreizeilen([]);
+    setNewFreizeileName("");
     if (rechnung?.items) {
       const initialCorrections: Record<
         string,
@@ -590,7 +596,11 @@ export default function RechnungDetailModal({
       .then((res: any) => {
         const list = res?.data || res || [];
         if (Array.isArray(list)) {
-          setSystemUsers(list.filter((u: any) => (u.role || "").toLowerCase() !== "purchasing"));
+          setSystemUsers(
+            list.filter(
+              (u: any) => (u.role || "").toLowerCase() !== "purchasing",
+            ),
+          );
         }
       })
       .catch((err) => console.error("Error fetching system users:", err));
@@ -629,28 +639,34 @@ export default function RechnungDetailModal({
     );
   };
 
+  const freizeilenSubtotal = showCorrectionUI
+    ? freizeilen.reduce((s, f) => s + f.quantity * f.price, 0)
+    : 0;
+
   const correctionsSubtotal = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-      if (!selectedCorrectionIds.has(item.id)) return sum;
-      const openQty = openQuantities[item.id] || 0;
-      const corr = corrections[item.id];
-      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-        return sum + corr.quantity * corr.price;
-      }
-      return sum;
-    }, 0)
+        if (!selectedCorrectionIds.has(item.id)) return sum;
+        const openQty = openQuantities[item.id] || 0;
+        const corr = corrections[item.id];
+        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+          return sum + corr.quantity * corr.price;
+        }
+        return sum;
+      }, 0) + freizeilenSubtotal
     : 0;
+
   const correctionsTax = showCorrectionUI
     ? items.reduce((sum: number, item: any) => {
-      if (!selectedCorrectionIds.has(item.id)) return sum;
-      const openQty = openQuantities[item.id] || 0;
-      const corr = corrections[item.id];
-      if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
-        const lineTaxRate = Number(item.taxRate ?? taxRate);
-        return sum + corr.quantity * corr.price * (lineTaxRate / 100);
-      }
-      return sum;
-    }, 0)
+        if (!selectedCorrectionIds.has(item.id)) return sum;
+        const openQty = openQuantities[item.id] || 0;
+        const corr = corrections[item.id];
+        if (corr && corr.quantity > 0 && corr.quantity <= openQty) {
+          const lineTaxRate = Number(item.taxRate ?? taxRate);
+          return sum + corr.quantity * corr.price * (lineTaxRate / 100);
+        }
+        return sum;
+      }, 0) +
+      freizeilenSubtotal * (taxRate / 100)
     : 0;
 
   const netTotal = showCorrectionUI
@@ -741,6 +757,48 @@ export default function RechnungDetailModal({
     }));
   };
 
+  const handleItemNameChange = (item: any, name: string) => {
+    setCorrections((prev: any) => ({
+      ...prev,
+      [item.id]: {
+        quantity: prev[item.id]?.quantity ?? (openQuantities[item.id] || 0),
+        price: prev[item.id]?.price ?? (Number(item.price) || 0),
+        ...prev[item.id],
+        itemName: name,
+      },
+    }));
+  };
+
+  const addFreizeile = () => {
+    const name = newFreizeileName.trim();
+    if (!name) {
+      toast.error("Enter a name for the Freizeile first.", errorStyles);
+      return;
+    }
+    setFreizeilen((prev) => [
+      ...prev,
+      {
+        tempId: `fz-${Date.now()}-${prev.length}`,
+        itemName: name,
+        quantity: 1,
+        price: 0,
+      },
+    ]);
+    setNewFreizeileName("");
+  };
+
+  const updateFreizeile = (
+    tempId: string,
+    patch: Partial<{ itemName: string; quantity: number; price: number }>,
+  ) => {
+    setFreizeilen((prev) =>
+      prev.map((f) => (f.tempId === tempId ? { ...f, ...patch } : f)),
+    );
+  };
+
+  const removeFreizeile = (tempId: string) =>
+    setFreizeilen((prev) => prev.filter((f) => f.tempId !== tempId));
+
   const toggleItemSelected = (item: any) => {
     const openQty = openQuantities[item.id] || 0;
     if (openQty <= 0) return;
@@ -773,17 +831,33 @@ export default function RechnungDetailModal({
   };
 
   const handleCreateCorrections = async () => {
-    const correctionsArray = Object.entries(corrections)
+    const itemCorrections = Object.entries(corrections)
       .filter(([itemId, corr]: any) => {
         if (!selectedCorrectionIds.has(itemId)) return false;
         const openQty = openQuantities[itemId] || 0;
         return corr.quantity > 0 && corr.quantity <= openQty;
       })
-      .map(([itemId, corr]: any) => ({
-        itemId,
-        quantity: corr.quantity,
-        price: corr.price,
-      }));
+      .map(([itemId, corr]: any) => {
+        const original = items.find((i: any) => i.id === itemId);
+        const edited = (corr.itemName ?? "").trim();
+        return {
+          itemId,
+          quantity: corr.quantity,
+          price: corr.price,
+          ...(edited && edited !== (original?.item_name ?? "")
+            ? { itemName: edited }
+            : {}),
+        };
+      });
+
+    const freizeileCorrections = freizeilen.map((f) => ({
+      isFreizeile: true as const,
+      itemName: f.itemName.trim(),
+      quantity: f.quantity,
+      price: f.price,
+    }));
+
+    const correctionsArray: any = [...itemCorrections, ...freizeileCorrections];
 
     if (correctionsArray.length === 0) {
       toast.error(
@@ -794,7 +868,7 @@ export default function RechnungDetailModal({
     }
 
     const validationErrors: string[] = [];
-    for (const corr of correctionsArray) {
+    for (const corr of itemCorrections) {
       const openQty = openQuantities[corr.itemId] || 0;
       const item = items.find((i: any) => i.id === corr.itemId);
       const originalUnitPrice = Number(item?.price) || 0;
@@ -813,6 +887,17 @@ export default function RechnungDetailModal({
           `Item "${item?.item_name || corr.itemId}": Price cannot exceed the original line price of ${formatDeUnitPrice(originalUnitPrice)}.`,
         );
       }
+    }
+    for (const f of freizeileCorrections) {
+      if (!f.itemName) validationErrors.push("Freizeile needs a name.");
+      if (!(f.quantity > 0))
+        validationErrors.push(
+          `Freizeile "${f.itemName}": Quantity must be > 0.`,
+        );
+      if (f.price < 0)
+        validationErrors.push(
+          `Freizeile "${f.itemName}": Price cannot be negative.`,
+        );
     }
 
     if (validationErrors.length > 0) {
@@ -939,7 +1024,8 @@ export default function RechnungDetailModal({
     setAddressForm({
       customerSnapshot: { ...(data.customerSnapshot || {}) },
       deliveryAddress: { ...(data.deliveryAddress || {}) },
-      ansprechpartner: data.ansprechpartner || currentUser?.name || currentUser?.email || "",
+      ansprechpartner:
+        data.ansprechpartner || currentUser?.name || currentUser?.email || "",
       kundenreferenz: data.kundenreferenz || "",
     });
     setEditNotesExtern(data.notes || data.comment || data.notes_external || "");
@@ -1071,17 +1157,19 @@ export default function RechnungDetailModal({
     return openQty <= 0;
   });
 
-  const hasCorrections = Array.from(selectedCorrectionIds).some((id: any) => {
-    const corr = corrections[id];
-    return corr && corr.quantity > 0;
-  });
-
-  const totalItemsToCorrect = Array.from(selectedCorrectionIds).filter(
-    (id: any) => {
+  const hasCorrections =
+    freizeilen.length > 0 ||
+    Array.from(selectedCorrectionIds).some((id: any) => {
       const corr = corrections[id];
       return corr && corr.quantity > 0;
-    },
-  ).length;
+    });
+
+  const totalItemsToCorrect =
+    freizeilen.length +
+    Array.from(selectedCorrectionIds).filter((id: any) => {
+      const corr = corrections[id];
+      return corr && corr.quantity > 0;
+    }).length;
 
   const columnCount =
     (showCorrectionUI ? 1 : 0) +
@@ -1347,7 +1435,8 @@ export default function RechnungDetailModal({
                     })}
                     {addressForm.ansprechpartner &&
                       !systemUsers.some(
-                        (u: any) => (u.name || u.email) === addressForm.ansprechpartner
+                        (u: any) =>
+                          (u.name || u.email) === addressForm.ansprechpartner,
                       ) && (
                         <option value={addressForm.ansprechpartner}>
                           {addressForm.ansprechpartner}
@@ -1403,8 +1492,8 @@ export default function RechnungDetailModal({
                 value={
                   data.date_delivery_confirmed || data.real_delivery_date
                     ? formatDate(
-                      data.date_delivery_confirmed || data.real_delivery_date,
-                    )
+                        data.date_delivery_confirmed || data.real_delivery_date,
+                      )
                     : "—"
                 }
               />
@@ -1578,9 +1667,10 @@ export default function RechnungDetailModal({
                     const openQty = openQuantities[item.id] || 0;
                     const isFullyCorrected = openQty <= 0;
                     const selected = selectedCorrectionIds.has(item.id);
-                    const correction = corrections[item.id] || {
+                    const correction: any = corrections[item.id] || {
                       quantity: 0,
                       price: unitPrice,
+                      itemName: item.item_name || item.itemName || "",
                     };
                     const lineTotal =
                       showCorrectionUI && selected && !isFullyCorrected
@@ -1641,21 +1731,39 @@ export default function RechnungDetailModal({
                           {item.itemNo || item.material || "—"}
                         </td>
                         <td className="px-2 py-2">
-                          {(() => {
-                            const href = getItemLink(item);
-                            return href ? (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
-                              >
-                                {item.item_name || item.itemName || "Line Item"}
-                              </a>
-                            ) : (
-                              item.item_name || item.itemName || "Line Item"
-                            );
-                          })()}
+                          {showCorrectionUI && selected && !isFullyCorrected ? (
+                            <input
+                              type="text"
+                              value={
+                                correction.itemName ??
+                                item.item_name ??
+                                item.itemName ??
+                                ""
+                              }
+                              onChange={(e) =>
+                                handleItemNameChange(item, e.target.value)
+                              }
+                              className="w-full min-w-[180px] px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                            />
+                          ) : (
+                            (() => {
+                              const href = getItemLink(item);
+                              return href ? (
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium text-[#8CC21B] hover:underline cursor-pointer"
+                                >
+                                  {item.item_name ||
+                                    item.itemName ||
+                                    "Line Item"}
+                                </a>
+                              ) : (
+                                item.item_name || item.itemName || "Line Item"
+                              );
+                            })()
+                          )}
                         </td>
                         {showViewOnly && (
                           <td className="px-2 py-2 text-gray-600">
@@ -1669,10 +1777,11 @@ export default function RechnungDetailModal({
                           <>
                             <td className="px-2 py-2 text-center">
                               <span
-                                className={`font-semibold ${isFullyCorrected
-                                  ? "text-green-600"
-                                  : "text-amber-600"
-                                  }`}
+                                className={`font-semibold ${
+                                  isFullyCorrected
+                                    ? "text-green-600"
+                                    : "text-amber-600"
+                                }`}
                               >
                                 {openQty}
                               </span>
@@ -1693,10 +1802,11 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${selected
-                                    ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
-                                    : "border-gray-200 bg-gray-100 text-gray-400"
-                                    }`}
+                                  className={`w-20 px-2 py-1 text-sm border rounded-lg text-center ${
+                                    selected
+                                      ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
+                                      : "border-gray-200 bg-gray-100 text-gray-400"
+                                  }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1718,10 +1828,11 @@ export default function RechnungDetailModal({
                                       Number(e.target.value),
                                     )
                                   }
-                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${selected
-                                    ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
-                                    : "border-gray-200 bg-gray-100 text-gray-400"
-                                    }`}
+                                  className={`w-28 px-2 py-1 text-sm border rounded-lg text-right ${
+                                    selected
+                                      ? "border-gray-300 focus:ring-2 focus:ring-amber-500"
+                                      : "border-gray-200 bg-gray-100 text-gray-400"
+                                  }`}
                                 />
                               ) : (
                                 <span className="text-gray-400">—</span>
@@ -1785,13 +1896,113 @@ export default function RechnungDetailModal({
                     );
                   })}
 
+                  {showCorrectionUI &&
+                    freizeilen.map((f, i) => (
+                      <tr key={f.tempId} style={{ backgroundColor: "#D8964A" }}>
+                        <td className="px-2 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeFreizeile(f.tempId)}
+                            title="Remove Freizeile"
+                            className="text-red-700 hover:text-red-900 font-bold"
+                          >
+                            ×
+                          </button>
+                        </td>
+                        <td className="px-2 py-2 text-gray-700">
+                          {items.length + i + 1}
+                        </td>
+                        <td className="px-2 py-2">—</td>
+                        <td className="px-2 py-2">
+                          <input
+                            type="text"
+                            value={f.itemName}
+                            onChange={(e) =>
+                              updateFreizeile(f.tempId, {
+                                itemName: e.target.value,
+                              })
+                            }
+                            className="w-full min-w-[180px] px-2 py-1 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </td>
+                        <td className="px-2 py-2 text-center text-gray-700">
+                          {formatTaxRate(taxRate)}
+                        </td>
+                        <td className="px-2 py-2 text-center text-gray-400">
+                          —
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={f.quantity}
+                            onChange={(e) =>
+                              updateFreizeile(f.tempId, {
+                                quantity: Number(e.target.value),
+                              })
+                            }
+                            className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center"
+                          />
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.001"
+                            value={f.price}
+                            onChange={(e) =>
+                              updateFreizeile(f.tempId, {
+                                price: Number(e.target.value),
+                              })
+                            }
+                            className="w-28 px-2 py-1 text-sm border border-gray-300 rounded-lg text-right"
+                          />
+                        </td>
+                        <td className="px-2 py-2 text-right font-medium">
+                          {formatDeCurrency(f.quantity * f.price)}
+                        </td>
+                      </tr>
+                    ))}
+
+                  {showCorrectionUI && (
+                    <tr>
+                      <td colSpan={columnCount} className="px-2 py-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={newFreizeileName}
+                            onChange={(e) =>
+                              setNewFreizeileName(e.target.value)
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addFreizeile();
+                              }
+                            }}
+                            placeholder="Freizeile — text"
+                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={addFreizeile}
+                            className="px-3 py-1.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg"
+                          >
+                            Add Freizeile
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {(editShippingMethod || data.shipping_method) &&
                     (editShippingCost > 0 || editShippingQuantity > 0) && (
                       <tr
-                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${showCorrectionUI && !shippingSelected
-                          ? "opacity-60"
-                          : ""
-                          }`}
+                        className={`bg-gray-50/80 border-t-2 border-gray-200 ${
+                          showCorrectionUI && !shippingSelected
+                            ? "opacity-60"
+                            : ""
+                        }`}
                       >
                         {showCorrectionUI && (
                           <td className="px-2 py-2 text-center">
@@ -1992,10 +2203,11 @@ export default function RechnungDetailModal({
                         ⚠ Not uploaded yet
                       </span>
                       <label
-                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${uploadingDoc
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
-                          }`}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          uploadingDoc
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                        }`}
                       >
                         {uploadingDoc ? (
                           <>
@@ -2032,10 +2244,10 @@ export default function RechnungDetailModal({
                 </h3>
               </div>
               {auftragDocs.length === 0 &&
-                rechnungenKDocs.length === 0 &&
-                rechnungDocs.length === 0 &&
-                cargoDocs.length === 0 &&
-                paymentsData.allocations.length === 0 ? (
+              rechnungenKDocs.length === 0 &&
+              rechnungDocs.length === 0 &&
+              cargoDocs.length === 0 &&
+              paymentsData.allocations.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No linked documents yet.
                 </p>
@@ -2227,17 +2439,18 @@ export default function RechnungDetailModal({
                               </span>
                               <div className="flex items-center gap-2">
                                 <span
-                                  className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${differs
-                                    ? "text-amber-700 bg-amber-50 border-amber-200"
-                                    : "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                    }`}
+                                  className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${
+                                    differs
+                                      ? "text-amber-700 bg-amber-50 border-amber-200"
+                                      : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                  }`}
                                 >
                                   {formatDeCurrency(Number(alloc.amount) || 0)}
                                 </span>
                                 <span className="text-gray-400 text-xs">
                                   {formatDate(
                                     alloc.paymentInbound?.received_date ||
-                                    alloc.created_at,
+                                      alloc.created_at,
                                   )}
                                 </span>
                               </div>
@@ -2314,8 +2527,8 @@ export default function RechnungDetailModal({
                           : addressEdit
                             ? editNotesExtern
                             : data.notes ||
-                            data.comment ||
-                            data.notes_external) || "",
+                              data.comment ||
+                              data.notes_external) || "",
                       );
                       toast.success("External comment copied to clipboard!");
                     }}
@@ -2369,10 +2582,11 @@ export default function RechnungDetailModal({
               <button
                 onClick={handleCreateCorrections}
                 disabled={isCreating || !hasCorrections}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${hasCorrections && !isCreating
-                  ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+                  hasCorrections && !isCreating
+                    ? "bg-[#8CC21B] text-white hover:bg-[#7ab318]"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
               >
                 {isCreating ? (
                   <>

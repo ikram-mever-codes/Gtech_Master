@@ -27,19 +27,19 @@ async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
   const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
   return match
     ? {
-      id: match.id,
-      name: match.name,
-      taxCase: match.tax_case || undefined,
-      taxRate: Number(match.tax_rate),
-      taxCode: match.tax_code || undefined,
-    }
+        id: match.id,
+        name: match.name,
+        taxCase: match.tax_case || undefined,
+        taxRate: Number(match.tax_rate),
+        taxCode: match.tax_code || undefined,
+      }
     : {
-      id: null,
-      name: "Frozen",
-      taxCase: undefined,
-      taxRate: Number(taxRate) || 19,
-      taxCode: undefined,
-    };
+        id: null,
+        name: "Frozen",
+        taxCase: undefined,
+        taxRate: Number(taxRate) || 19,
+        taxCode: undefined,
+      };
 }
 
 async function getLinkedDocumentsForRechnungK(rechnungK: Rechnung_k) {
@@ -84,15 +84,15 @@ async function getLinkedDocumentsForRechnungenK(rechnungenK: Rechnung_k[]) {
   const [rechnungen, auftraege] = await Promise.all([
     originalRechnungIds.length
       ? rechnungRepo.find({
-        where: { id: In(originalRechnungIds) },
-        select: ["id", "invoice_number", "title", "created_at"],
-      })
+          where: { id: In(originalRechnungIds) },
+          select: ["id", "invoice_number", "title", "created_at"],
+        })
       : Promise.resolve([]),
     auftragIds.length
       ? customerOrderRepo.find({
-        where: { id: In(auftragIds) },
-        select: ["id", "order_no", "title", "created_at"],
-      })
+          where: { id: In(auftragIds) },
+          select: ["id", "order_no", "title", "created_at"],
+        })
       : Promise.resolve([]),
   ]);
 
@@ -324,10 +324,50 @@ export const createRechnungKFromRechnung = async (
       }
     }
 
-    const validationErrors = [];
-    const validatedCorrections = [];
+    const validationErrors: string[] = [];
+    const validatedCorrections: Array<{
+      originalItem: any;
+      quantity: number;
+      price: number;
+      itemName?: string;
+    }> = [];
+    const validatedFreizeilen: Array<{
+      itemName: string;
+      quantity: number;
+      price: number;
+    }> = [];
 
     for (const correction of corrections) {
+      // Freizeile (free-text line): no source line, so no open-qty and no
+      // original-price checks. Needs a name, quantity > 0 and price >= 0.
+      if (correction?.isFreizeile === true) {
+        const freeName = String(correction.itemName ?? "").trim();
+        const freeQty = Number(correction.quantity);
+        const freePrice = Number(correction.price);
+        if (!freeName) {
+          validationErrors.push("Freizeile needs a name.");
+          continue;
+        }
+        if (!isFinite(freeQty) || freeQty <= 0) {
+          validationErrors.push(
+            `Invalid quantity (${correction.quantity}) for Freizeile: ${freeName}`,
+          );
+          continue;
+        }
+        if (!isFinite(freePrice) || freePrice < 0) {
+          validationErrors.push(
+            `Invalid price (${correction.price}) for Freizeile: ${freeName}`,
+          );
+          continue;
+        }
+        validatedFreizeilen.push({
+          itemName: freeName,
+          quantity: freeQty,
+          price: freePrice,
+        });
+        continue;
+      }
+
       const originalItem = original.items.find(
         (item) => item.id === correction.itemId,
       );
@@ -378,10 +418,17 @@ export const createRechnungKFromRechnung = async (
         continue;
       }
 
+      // Optional edited name; empty/blank falls back to the original name.
+      const editedName =
+        typeof correction.itemName === "string"
+          ? correction.itemName.trim()
+          : "";
+
       validatedCorrections.push({
         originalItem,
         quantity: correctionQty,
         price: correctionPrice,
+        itemName: editedName || undefined,
       });
     }
 
@@ -394,7 +441,7 @@ export const createRechnungKFromRechnung = async (
       return;
     }
 
-    if (validatedCorrections.length === 0) {
+    if (validatedCorrections.length + validatedFreizeilen.length === 0) {
       res.status(400).json({
         success: false,
         message: "No valid corrections to create.",
@@ -465,10 +512,10 @@ export const createRechnungKFromRechnung = async (
 
     const itemRepo = AppDataSource.getRepository(RechnungKItem);
     const itemEntities = validatedCorrections.map(
-      ({ originalItem, quantity, price }) =>
+      ({ originalItem, quantity, price, itemName }) =>
         itemRepo.create({
           rechnungId: savedRechnungK.id,
-          item_name: originalItem.item_name,
+          item_name: itemName ?? originalItem.item_name,
           itemNo: originalItem.itemNo,
           material: originalItem.material,
           photo: originalItem.photo,
@@ -496,7 +543,31 @@ export const createRechnungKFromRechnung = async (
           remark_order_item: originalItem.remark_order_item,
         }),
     );
-    await itemRepo.save(itemEntities);
+
+    // Freizeile lines: no itemNo / sourceItemId / sourceLineItemId, so they
+    // are treated as free-text everywhere (colour, no stock booking, no
+    // open-qty accounting). They sit after the corrected lines and use the
+    // RK's header tax rate, which recalculateRechnungKTotals applies.
+    const maxPosition = (original.items || []).reduce(
+      (m, it) => Math.max(m, Number(it.position) || 0),
+      0,
+    );
+    const freizeileEntities = validatedFreizeilen.map(
+      ({ itemName, quantity, price }, idx) =>
+        itemRepo.create({
+          rechnungId: savedRechnungK.id,
+          item_name: itemName,
+          quantity,
+          price,
+          taxRate: original.tax_rate,
+          lineTotal: quantity * price,
+          unit_price_eur: price,
+          total_price: quantity * price,
+          position: maxPosition + idx + 1,
+        }),
+    );
+
+    await itemRepo.save([...itemEntities, ...freizeileEntities]);
 
     await recalculateRechnungKTotals(savedRechnungK.id);
 
@@ -538,9 +609,12 @@ export const getAllRechnungenK = async (
     const custRepo = AppDataSource.getRepository(Customer);
     const origCustomers = origCustIds.length
       ? await custRepo.find({
-        where: { id: In(origCustIds) },
-        relations: ["starBusinessDetails", "starBusinessDetails.contactPersons"],
-      })
+          where: { id: In(origCustIds) },
+          relations: [
+            "starBusinessDetails",
+            "starBusinessDetails.contactPersons",
+          ],
+        })
       : [];
     const origCustById = new Map(origCustomers.map((c) => [c.id, c]));
 
@@ -567,7 +641,8 @@ export const getAllRechnungenK = async (
 
       const origCustId = rk.customer?.original_customer_id;
       const origCust = origCustId ? origCustById.get(origCustId) : undefined;
-      const contactPersons = (origCust as any)?.starBusinessDetails?.contactPersons || [];
+      const contactPersons =
+        (origCust as any)?.starBusinessDetails?.contactPersons || [];
 
       return {
         ...rk,
@@ -875,9 +950,9 @@ export const downloadRechnungKPdf = async (
           "Datum",
           String(
             rechnungK.date_created ||
-            rechnungK.created_at ||
-            rechnungK.invoice_date ||
-            "",
+              rechnungK.created_at ||
+              rechnungK.invoice_date ||
+              "",
           ),
         ],
       ] as [string, string][],
@@ -903,11 +978,11 @@ export const downloadRechnungKPdf = async (
       deliveryTerms: rechnungK.delivery_terms,
       paymentTerms: rechnungK.payment_terms
         ? (() => {
-          const m = String(rechnungK.payment_terms).match(/(\d+)/);
-          return m
-            ? `Zahlungsziel: ${m[1]} Tage`
-            : `Zahlungsziel: ${rechnungK.payment_terms}`;
-        })()
+            const m = String(rechnungK.payment_terms).match(/(\d+)/);
+            return m
+              ? `Zahlungsziel: ${m[1]} Tage`
+              : `Zahlungsziel: ${rechnungK.payment_terms}`;
+          })()
         : undefined,
       paymentMethod: rechnungK.payment_method,
       taxProfile:
