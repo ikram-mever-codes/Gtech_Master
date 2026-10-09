@@ -82,7 +82,12 @@ import ParentModal from "@/components/Item/ParentModal";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { SupplierSearchInput } from "@/components/UI/SupplierSearchInput";
 import FilterResetIcon from "@/components/UI/FilterResetIcon";
-import { EntityTagSelector, TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
+import {
+  EntityTagSelector,
+  TagBadge,
+  sortTags,
+  type Tag,
+} from "@/components/Tags/TagManager";
 import { SuppliersPage } from "@/components/Supplier/SuppliersPage";
 import { formatDate } from "@/utils/date";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
@@ -109,12 +114,13 @@ const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 const ItemsManagementPage: React.FC = () => {
@@ -267,10 +273,10 @@ const ItemsManagementPage: React.FC = () => {
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
+        item?.pix_path_eBay ||
+        item?.pictures?.shopPicture ||
+        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+        null,
     );
 
   const getStatusBadgeColor = (status: string) => {
@@ -336,7 +342,7 @@ const ItemsManagementPage: React.FC = () => {
     for (let i = 0; i < 12; i++) ean12 += Math.floor(Math.random() * 10);
     return `${ean12}${calculateEAN13Checksum(ean12)}`;
   };
-  const refreshCountsRef = useRef<() => Promise<void>>(async () => { });
+  const refreshCountsRef = useRef<() => Promise<void>>(async () => {});
 
   const normalizeItem = (raw: any, fallbackRow: any) => {
     const r = raw || {};
@@ -413,8 +419,10 @@ const ItemsManagementPage: React.FC = () => {
             const params: any = {
               page: page,
               limit: PAGE_LIMIT,
-              isActive: (auditFilter ? undefined : filters.isActive) || undefined,
-              category: (auditFilter ? undefined : filters.category) || undefined,
+              isActive:
+                (auditFilter ? undefined : filters.isActive) || undefined,
+              category:
+                (auditFilter ? undefined : filters.category) || undefined,
               supplier: filters.supplier || undefined,
               tags: filters.tags || undefined,
               isLabel: filters.isLabel || undefined,
@@ -978,7 +986,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(id);
       fetchTab("parents", true);
-    } catch { }
+    } catch {}
   };
 
   const handleBulk = async (action: "activate" | "deactivate" | "delete") => {
@@ -1011,7 +1019,7 @@ const ItemsManagementPage: React.FC = () => {
         await deleteTaric(id);
       setSelectedTarics(new Set());
       fetchTab("tarics", true);
-    } catch { }
+    } catch {}
   };
 
   const isTaricTab = activeTab === "tarics";
@@ -1024,14 +1032,6 @@ const ItemsManagementPage: React.FC = () => {
     const next = new Set(sel);
     next.has(id) ? next.delete(id) : next.add(id);
     setter(next);
-  };
-
-  const handleSelectAll = () => {
-    const ids = pageData.map((d: any) => d.id.toString());
-    const setter = isTaricTab ? setSelectedTarics : setSelectedItems;
-    const sel = isTaricTab ? selectedTarics : selectedItems;
-    if (ids.every((id) => sel.has(id))) setter(new Set());
-    else setter(new Set(ids));
   };
 
   const resetFilters = () =>
@@ -1176,6 +1176,21 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
+  // Same resolution as the item preview: the category is identified by its ID
+  // (the value the CAT dropdown uses); the stored name is only a fallback.
+  const resolveCategoryName = (it: any): string => {
+    const id = it?.category_id ?? it?.cat_id ?? it?.category?.id ?? null;
+    if (id !== null && id !== undefined && id !== "") {
+      const found = categories.find((c: any) => String(c.id) === String(id));
+      if (found?.name) return found.name.toString().trim();
+    }
+    return (
+      (typeof it?.category === "string" ? it.category : it?.category?.name) ||
+      it?.supp_cat ||
+      ""
+    );
+  };
+
   const renderTableRows = () => {
     switch (activeTab) {
       case "items":
@@ -1215,15 +1230,15 @@ const ItemsManagementPage: React.FC = () => {
                   {(item.customer_name ||
                     item.company_name ||
                     item.company) && (
-                      <>
-                        <span>-</span>
-                        <span className="text-blue-600 font-medium">
-                          {item.customer_name ||
-                            item.company_name ||
-                            item.company}
-                        </span>
-                      </>
-                    )}
+                    <>
+                      <span>-</span>
+                      <span className="text-blue-600 font-medium">
+                        {item.customer_name ||
+                          item.company_name ||
+                          item.company}
+                      </span>
+                    </>
+                  )}
                   {item.isLabelPrint && (
                     <>
                       <span>-</span>
@@ -1251,7 +1266,7 @@ const ItemsManagementPage: React.FC = () => {
               </td>
               <td className="px-3 py-3">
                 <div className="text-xs font-semibold text-gray-700">
-                  {item.category || "—"}
+                  {resolveCategoryName(item) || "—"}
                 </div>
               </td>
               <td className="px-4 py-3">
@@ -1286,9 +1301,9 @@ const ItemsManagementPage: React.FC = () => {
               </td>
               <td className="px-3 py-3 whitespace-nowrap text-xs font-medium">
                 {item.is_stock_item === "Y" ||
-                  item.isStockItem === "Y" ||
-                  item.is_stock === "Y" ||
-                  item.isStock ? (
+                item.isStockItem === "Y" ||
+                item.is_stock === "Y" ||
+                item.isStock ? (
                   <div className="flex flex-col text-[11px]">
                     <span className="text-emerald-700 font-bold">
                       EU: {item.stockEU ?? item.stock_qty ?? item.stockQty ?? 0}
@@ -1350,10 +1365,11 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${parent.is_active === "Y"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                  : "bg-gray-50 text-gray-600 border-gray-200"
-                  }`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                  parent.is_active === "Y"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                    : "bg-gray-50 text-gray-600 border-gray-200"
+                }`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
               </span>
@@ -1419,10 +1435,11 @@ const ItemsManagementPage: React.FC = () => {
                       is_stock_item: w.is_stock_item === "Y" ? "N" : "Y",
                     })
                   }
-                  className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${w.is_stock_item === "Y"
-                    ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
-                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
-                    }`}
+                  className={`whitespace-nowrap font-medium text-xs px-2.5 py-1 rounded-lg transition-all border flex items-center gap-1 shadow-sm ${
+                    w.is_stock_item === "Y"
+                      ? "bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 border-rose-200/50"
+                      : "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200/50"
+                  }`}
                 >
                   {w.is_stock_item === "Y" ? "Remove Stock" : "Add Stock"}
                 </button>
@@ -1747,10 +1764,11 @@ const ItemsManagementPage: React.FC = () => {
                           onChange={(e) =>
                             setFilters({ ...filters, search: e.target.value })
                           }
-                          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-900 border-gray-300 bg-white"
-                            }`}
+                          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.search
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
                         />
                         {filters.search && (
                           <button
@@ -1776,10 +1794,11 @@ const ItemsManagementPage: React.FC = () => {
                               eanSearch: e.target.value,
                             })
                           }
-                          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
-                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                            : "text-gray-900 border-gray-300 bg-white"
-                            }`}
+                          className={`w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                            filters.eanSearch
+                              ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                              : "text-gray-900 border-gray-300 bg-white"
+                          }`}
                         />
                         {filters.eanSearch && (
                           <button
@@ -1824,10 +1843,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, isLabel: e.target.value })
                         }
-                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.isLabel
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">isLabel...</option>
                         <option value="Y">Yes</option>
@@ -1841,10 +1861,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, isStock: e.target.value })
                         }
-                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isStock
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.isStock
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">IsStock QTY...</option>
                         <option value="Y">Yes</option>
@@ -1862,12 +1883,12 @@ const ItemsManagementPage: React.FC = () => {
                         initialLabel={
                           filters.supplier
                             ? refSuppliers.find(
-                              (s) => s.id.toString() === filters.supplier,
-                            )?.company_name ||
-                            refSuppliers.find(
-                              (s) => s.id.toString() === filters.supplier,
-                            )?.name ||
-                            ""
+                                (s) => s.id.toString() === filters.supplier,
+                              )?.company_name ||
+                              refSuppliers.find(
+                                (s) => s.id.toString() === filters.supplier,
+                              )?.name ||
+                              ""
                             : ""
                         }
                       />
@@ -1878,10 +1899,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, category: e.target.value })
                         }
-                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-400 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.category
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-400 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="">Category</option>
                         {Array.from(
@@ -1905,10 +1927,11 @@ const ItemsManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, isActive: e.target.value })
                         }
-                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isActive && filters.isActive !== "Y"
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-900 border-gray-300 bg-white"
-                          }`}
+                        className={`w-full px-2 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                          filters.isActive && filters.isActive !== "Y"
+                            ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                            : "text-gray-900 border-gray-300 bg-white"
+                        }`}
                       >
                         <option value="Y">Active</option>
                         <option value="N">Inactive</option>
