@@ -194,8 +194,8 @@ export const getItems = async (
       .createQueryBuilder("item")
       .select("item.id")
       .addSelect("item.created_at")
-      .leftJoin("item.parent", "parent")
-      .leftJoin("item.category", "category");
+      .leftJoin("item.parent", "parent");
+    // .leftJoin("item.category", "category");
     // .andWhere("item.isDraft = true");
 
     // Filter by specific item IDs
@@ -577,7 +577,7 @@ export const getItems = async (
       const parentData = item.parent || null;
       const customerData = item.customer || null;
       const warehouseData = warehouseMap.get(item.id) || null;
-
+      console.log(`This is Item`, item.supp_cat);
       return {
         id: item.id,
         de_no: item.item_no_de || parentData?.de_no || null,
@@ -601,8 +601,6 @@ export const getItems = async (
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
-        // supp_cat holds the correct category name; the category relation
-        // (cat_id) is only a fallback when supp_cat is empty.
         category: item.supp_cat || item.category?.name || null,
         supplier_id: item.supplier_id || null,
         customer_id: item.customer_id || null,
