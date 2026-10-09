@@ -160,7 +160,6 @@ export const getItems = async (
   try {
     const itemRepository = AppDataSource.getRepository(Item);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
-    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
 
     const pageNum = parseInt(req.query.page as string, 10) || 1;
     const limitNum = parseInt(req.query.limit as string, 10) || 50;
@@ -196,8 +195,8 @@ export const getItems = async (
       .select("item.id")
       .addSelect("item.created_at")
       .leftJoin("item.parent", "parent")
-      .leftJoin("item.category", "category")
-      .andWhere("(item.isDraft = false OR item.isDraft IS NULL)");
+      .leftJoin("item.category", "category");
+    // .andWhere("item.isDraft = true");
 
     // Filter by specific item IDs
     if (idsStr) {
@@ -259,7 +258,7 @@ export const getItems = async (
 
     if (category && filterParam !== "null_category") {
       idQb.andWhere(
-        "(category.name = :category OR item.supp_cat = :category)",
+        "COALESCE(NULLIF(item.supp_cat, ''), category.name) = :category",
         { category },
       );
     }
@@ -573,48 +572,6 @@ export const getItems = async (
       warehouseMap.set(wi.item_id, wi);
     });
 
-    const user = (req as any).user;
-
-    // STEP 3b: supplier_item.url per item (one query for the whole page).
-    // Preference: the default supplier item (is_default = 'Y'), then the one
-    // matching item.supplier_id, then any supplier item that has a URL.
-    // Skipped for SALES, which is not allowed to see supplier data.
-    const supplierUrlMap = new Map<number, string>();
-    if ((user?.role || UserRole.STAFF) !== UserRole.SALES) {
-      const supplierItemRows = await supplierItemRepository
-        .createQueryBuilder("si")
-        .select([
-          "si.id",
-          "si.item_id",
-          "si.supplier_id",
-          "si.is_default",
-          "si.url",
-        ])
-        .where("si.item_id IN (:...targetIds)", { targetIds })
-        .andWhere("si.url IS NOT NULL AND si.url <> ''")
-        .orderBy("si.id", "ASC")
-        .getMany();
-
-      const itemSupplierIdMap = new Map<number, number | null>();
-      items.forEach((it: any) => itemSupplierIdMap.set(it.id, it.supplier_id));
-
-      const rank = (si: any) =>
-        si.is_default === "Y"
-          ? 0
-          : Number(si.supplier_id) === Number(itemSupplierIdMap.get(si.item_id))
-            ? 1
-            : 2;
-
-      const bestRank = new Map<number, number>();
-      supplierItemRows.forEach((si: any) => {
-        const r = rank(si);
-        if (!bestRank.has(si.item_id) || r < bestRank.get(si.item_id)!) {
-          bestRank.set(si.item_id, r);
-          supplierUrlMap.set(si.item_id, si.url);
-        }
-      });
-    }
-
     // STEP 4: Format
     const formattedItems = items.map((item: any) => {
       const parentData = item.parent || null;
@@ -644,11 +601,10 @@ export const getItems = async (
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
-        // Name always follows cat_id (the category relation); supp_cat is
-        // only a fallback for items without a linked category.
-        category: item.category?.name || item.supp_cat || null,
+        // supp_cat holds the correct category name; the category relation
+        // (cat_id) is only a fallback when supp_cat is empty.
+        category: item.supp_cat || item.category?.name || null,
         supplier_id: item.supplier_id || null,
-        supplier_url: supplierUrlMap.get(item.id) || null,
         customer_id: item.customer_id || null,
         customer_name: customerData?.companyName || null,
         isLabelPrint: item.isLabelPrint || false,
@@ -683,6 +639,7 @@ export const getItems = async (
       };
     });
 
+    const user = (req as any).user;
     const filteredData = filterDataByRole(
       formattedItems,
       user?.role || "STAFF",
@@ -870,9 +827,9 @@ export const getItemById = async (
       name: item.item_name || "",
       nameCN: item.item_name_cn || "",
       ean: ean?.toString() || "",
-      // Name always follows cat_id (the category relation); supp_cat is
-      // only a fallback for items without a linked category.
-      category: item.category?.name || item.supp_cat || null,
+      // supp_cat holds the correct category name; the category relation
+      // (cat_id) is only a fallback when supp_cat is empty.
+      category: item.supp_cat || item.category?.name || null,
       category_id: item.cat_id,
       taric_id: item.taric_id || null,
       taric: item.taric || null,

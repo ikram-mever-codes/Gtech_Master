@@ -1176,8 +1176,8 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Same resolution as the item preview: the category is identified by its ID
-  // (the value the CAT dropdown uses); the stored name is only a fallback.
+  // Same as the item preview: the name from the API (supp_cat first, then the
+  // category relation); the lookup by cat_id is only a last fallback.
   const resolveCategoryName = (it: any): string => {
     const id = it?.category_id ?? it?.cat_id ?? it?.category?.id ?? null;
     const apiName =
@@ -1189,7 +1189,7 @@ const ItemsManagementPage: React.FC = () => {
       const found = categories.find((c: any) => String(c.id) === String(id));
       if (found?.name) byId = found.name.toString().trim();
     }
-    const resolved = byId || apiName;
+    const resolved = apiName || byId;
     // DEBUG: remove after verifying category resolution
     console.log("[CAT-RESOLVE]", {
       itemId: it?.id,
@@ -1200,7 +1200,7 @@ const ItemsManagementPage: React.FC = () => {
       byId,
       apiName,
       resolved,
-      source: byId ? "categories[id]" : apiName ? "api name" : "none",
+      source: apiName ? "api name" : byId ? "categories[id]" : "none",
       MISMATCH: !!byId && !!apiName && byId !== apiName,
     });
     return resolved;
