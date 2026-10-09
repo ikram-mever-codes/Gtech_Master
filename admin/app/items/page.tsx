@@ -1180,15 +1180,30 @@ const ItemsManagementPage: React.FC = () => {
   // (the value the CAT dropdown uses); the stored name is only a fallback.
   const resolveCategoryName = (it: any): string => {
     const id = it?.category_id ?? it?.cat_id ?? it?.category?.id ?? null;
-    if (id !== null && id !== undefined && id !== "") {
-      const found = categories.find((c: any) => String(c.id) === String(id));
-      if (found?.name) return found.name.toString().trim();
-    }
-    return (
+    const apiName =
       (typeof it?.category === "string" ? it.category : it?.category?.name) ||
       it?.supp_cat ||
-      ""
-    );
+      "";
+    let byId = "";
+    if (id !== null && id !== undefined && id !== "") {
+      const found = categories.find((c: any) => String(c.id) === String(id));
+      if (found?.name) byId = found.name.toString().trim();
+    }
+    const resolved = byId || apiName;
+    // DEBUG: remove after verifying category resolution
+    console.log("[CAT-RESOLVE]", {
+      itemId: it?.id,
+      catId: id,
+      apiCategory: it?.category,
+      suppCat: it?.supp_cat,
+      categoriesLoaded: categories.length,
+      byId,
+      apiName,
+      resolved,
+      source: byId ? "categories[id]" : apiName ? "api name" : "none",
+      MISMATCH: !!byId && !!apiName && byId !== apiName,
+    });
+    return resolved;
   };
 
   const renderTableRows = () => {
