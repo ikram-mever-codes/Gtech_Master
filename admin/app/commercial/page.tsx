@@ -15,7 +15,7 @@ import {
   updateRechnungK,
 } from "@/api/rechnungen_k";
 import Link from "next/link";
-import { Plus, DollarSign } from "lucide-react";
+import { Plus, DollarSign, FileText } from "lucide-react";
 
 import { getExpandedInvoiceDetails, updateInvoice } from "@/api/invoice";
 import { getTaricGroupKey } from "@/utils/invoice";
@@ -1938,6 +1938,16 @@ const InvoiceListPage: React.FC = () => {
                 startIcon={<Plus className="h-4 w-4" />}
               >
                 Zahlungen{" "}
+              </CustomButton>
+            )}
+            {(activeInvTab === "rechnung" || activeInvTab === "rk") && (
+              <CustomButton
+                onClick={() => router.push("/commercial/export")}
+                gradient
+                size="small"
+                startIcon={<FileText className="h-4 w-4" />}
+              >
+                Monthly Export
               </CustomButton>
             )}
           </div>

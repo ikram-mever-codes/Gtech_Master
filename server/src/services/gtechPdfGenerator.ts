@@ -1401,7 +1401,6 @@ export async function generateGtechDocumentPdf(
       }
     );
   }
-
   doc.end();
 
   await pdfWritePromise;
