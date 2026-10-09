@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
+import { Between } from "typeorm";
 import { Rechnung, StockWhere } from "../models/rechnung";
 import { RechnungCustomer } from "../models/rechnung_customer";
 import { RechnungItem } from "../models/rechnung_items";
@@ -2000,6 +2001,106 @@ export const downloadRechnungEmlOnly = async (
     fs.createReadStream(emlData.emlFilePath).pipe(res);
   } catch (err) {
     console.error("Error in downloadRechnungEmlOnly:", err);
+    next(err);
+  }
+};
+
+export const getMonthlyExport = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { month } = req.query;
+    if (!month || typeof month !== "string") {
+      res.status(400).json({ error: "Month parameter (YYYY-MM) is required" });
+      return;
+    }
+
+    const [yearStr, monthStr] = month.split("-");
+    const year = parseInt(yearStr);
+    const m = parseInt(monthStr);
+
+    const startDate = new Date(year, m - 1, 1);
+    const endDate = new Date(year, m, 0, 23, 59, 59, 999);
+
+    const startDateStr = startDate.toISOString().split("T")[0];
+    const endDateStr = endDate.toISOString().split("T")[0];
+
+    const rechnungen = await AppDataSource.getRepository(Rechnung).find({
+      where: {
+        invoice_date: Between(startDateStr, endDateStr) as any,
+      },
+      relations: ["customer"],
+    });
+
+    const rechnungenK = await AppDataSource.getRepository(Rechnung_k).find({
+      where: {
+        invoice_date: Between(startDateStr, endDateStr) as any,
+      },
+      relations: ["customer"],
+    });
+
+    const formatRow = (item: any, isKorrektur: boolean) => {
+      const d = new Date(item.invoice_date);
+      const dateStr = `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}`;
+
+      const customer = item.customerSnapshot || item.customer;
+      const taxProfile = customer?.defaultTaxProfile || item.customerSnapshot?.taxProfile;
+
+      const konto = customer?.debtor_no || customer?.debtorNo || "";
+      const gegenkonto = taxProfile?.revenue_account_no || taxProfile?.revenueAccountNo || "";
+      let totalAmount = Number(item.total_amount || 0);
+
+      if (isKorrektur) {
+        totalAmount = -Math.abs(totalAmount);
+      } else {
+        totalAmount = Math.abs(totalAmount);
+      }
+
+      const rechnungsnummer = `${item.invoice_number} ${customer?.customerNumber || ""}`.trim();
+
+      const gegenpartei = customer?.companyName || customer?.company_name || "Sammel";
+
+      let buchungstyp = "Einzel";
+      let buchungstext = "";
+
+      if (konto === "69999") {
+        buchungstyp = "Sammel";
+        const yyyymm = `${d.getFullYear()}${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        buchungstext = `SAMMEL-${yyyymm}-${gegenkonto}`;
+      }
+
+      return {
+        "Datum (vollständig)": dateStr,
+        Konto: konto,
+        Gegenkonto: gegenkonto,
+        "Betrag in EUR": totalAmount,
+        Rechnungsnummer: rechnungsnummer,
+        Gegenpartei: gegenpartei,
+        Buchungstext: buchungstext,
+        Zahlungsreferenz: "",
+        Kundennummer: customer?.customerNumber || "",
+        Buchungstyp: buchungstyp,
+      };
+    };
+
+    const data = [
+      ...rechnungen.map((r) => formatRow(r, false)),
+      ...rechnungenK.map((rk) => formatRow(rk, true)),
+    ];
+
+    data.sort((a, b) => {
+      const parseDate = (dStr: string) => {
+        const [day, mo, yr] = dStr.split(".");
+        return new Date(`${yr}-${mo}-${day}`).getTime();
+      };
+      return parseDate(a["Datum (vollständig)"]) - parseDate(b["Datum (vollständig)"]);
+    });
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in getMonthlyExport:", err);
     next(err);
   }
 };

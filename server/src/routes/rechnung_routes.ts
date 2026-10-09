@@ -14,6 +14,7 @@ import {
   downloadRechnungEml,
   downloadRechnungEmlOnly,
   getPrepaymentsForAuftrag,
+  getMonthlyExport,
 } from "../controllers/rechnung_controller";
 import { uploadSingleFile } from "../middlewares/multer";
 const router = Router();
@@ -25,6 +26,7 @@ router.post(
 );
 
 router.get("/prepayments/auftrag/:auftragId", getPrepaymentsForAuftrag);
+router.get("/export/monthly", getMonthlyExport);
 router.get("/", getAllRechnungen);
 router.get("/lieferscheine", getLieferscheine);
 router.get("/:id/download-pdf", downloadRechnungPdf);

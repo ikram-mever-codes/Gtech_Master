@@ -1925,7 +1925,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       {picEntries.map(({ url, label }, i) => (
                         <div
                           key={i}
-                          className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
+                          className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative group"
                         >
                           <img
                             src={resolveUrl(url)!}
@@ -1935,6 +1935,56 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                               window.open(resolveUrl(url)!, "_blank")
                             }
                           />
+                          {previewEdit && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const tid = toast.loading("Removing picture...");
+                                try {
+                                  let shopPic = previewItem.pictures?.shopPicture || "";
+                                  let ebayPic = previewItem.pictures?.ebayPictures || "";
+                                  let gallery = (previewItem.pictures?.pixPath || "").split(",").filter(Boolean);
+                                  
+                                  if (shopPic === url) shopPic = "";
+                                  else if (ebayPic === url) ebayPic = "";
+                                  else gallery = gallery.filter((g: string) => g !== url);
+                                  
+                                  const updatedPictures = {
+                                    shopPicture: shopPic,
+                                    ebayPictures: ebayPic,
+                                    pixPath: gallery.join(","),
+                                  };
+                                  
+                                  setPreviewItem((p: any) => ({
+                                    ...p,
+                                    pictures: updatedPictures,
+                                  }));
+                                  
+                                  if (isRequest) {
+                                    await updateRequestedItem(String(itemId), {
+                                      photo: shopPic,
+                                      pix_path_eBay: ebayPic,
+                                      pix_path: gallery.join(","),
+                                    });
+                                  } else {
+                                    await updateItem(Number(itemId), {
+                                      photo: shopPic,
+                                      pix_path_eBay: ebayPic,
+                                      pix_path: gallery.join(","),
+                                    });
+                                  }
+                                  
+                                  toast.success("Picture removed", { id: tid, ...successStyles });
+                                } catch (err) {
+                                  toast.error("Failed to remove picture", { id: tid, ...errorStyles });
+                                }
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-white/80 rounded-full text-gray-500 hover:text-gray-800 hover:bg-white shadow-sm transition-all"
+                              title="Remove picture"
+                            >
+                              <XMarkIcon className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
