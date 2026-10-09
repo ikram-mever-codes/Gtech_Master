@@ -194,8 +194,8 @@ export const getItems = async (
       .createQueryBuilder("item")
       .select("item.id")
       .addSelect("item.created_at")
-      .leftJoin("item.parent", "parent");
-    // .leftJoin("item.category", "category");
+      .leftJoin("item.parent", "parent")
+      .leftJoin("item.category", "category");
     // .andWhere("item.isDraft = true");
 
     // Filter by specific item IDs
