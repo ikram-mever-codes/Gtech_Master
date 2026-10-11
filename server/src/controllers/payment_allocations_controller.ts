@@ -231,6 +231,17 @@ export const createPaymentAllocation = async (
         res.status(404).json({ success: false, message: "Rechnung not found" });
         return;
       }
+      // A Rechnung that is fully covered (payments + Rechnung K) has no open
+      // amount left, so nothing more can be assigned to it.
+      await attachPaymentStatusToRechnungen([rechnung]);
+      const rechnungOpen = Number((rechnung as any).open_amount ?? 0);
+      if (rechnungOpen <= 0.005) {
+        res.status(400).json({
+          success: false,
+          message: `Rechnung ${rechnung.invoice_number} has no open amount left (payments and Rechnung K already cover it).`,
+        });
+        return;
+      }
       targetLabel = rechnung.invoice_number;
     }
 

@@ -42,6 +42,18 @@ const getDocCustomerName = (doc: any): string =>
   doc.customer?.company_name ||
   "—";
 
+// Open amount of a Rechnung (total minus payments minus Rechnung K), as
+// attached by the backend. Undefined for documents that do not carry it.
+const getDocOpenAmount = (
+  doc: any,
+  type: PaymentAllocationTargetType,
+): number | null => {
+  if (type !== "rechnung") return null;
+  if (doc?.open_amount === undefined || doc?.open_amount === null) return null;
+  const v = Number(doc.open_amount);
+  return isNaN(v) ? null : v;
+};
+
 const getDocTotal = (doc: any): number => {
   if (!doc) return 0;
 
@@ -58,9 +70,13 @@ const getDocTotal = (doc: any): number => {
   if (totalAmt > 0) return totalAmt;
 
   const items = doc.items || doc.orderItems || doc.lineItems || [];
-  const defaultTaxRate = Number(doc.tax_rate ?? doc.taxRate ?? doc.taxProfile?.taxRate ?? 19);
+  const defaultTaxRate = Number(
+    doc.tax_rate ?? doc.taxRate ?? doc.taxProfile?.taxRate ?? 19,
+  );
   const shippingCost = Number(doc.shipping_cost ?? doc.shippingCost ?? 0);
-  const shippingQty = Number(doc.shipping_quantity ?? doc.shippingQuantity ?? 1);
+  const shippingQty = Number(
+    doc.shipping_quantity ?? doc.shippingQuantity ?? 1,
+  );
   const shippingTotal = shippingCost * shippingQty;
 
   const itemsNet = items.reduce((sum: number, it: any) => {
@@ -125,7 +141,12 @@ export const PaymentInboundAssignModal: React.FC<
   const candidates = targetType === "auftrag" ? auftraege : rechnungen;
 
   const filteredCandidates = useMemo(() => {
-    const list = candidates || [];
+    // Rechnungen only stay selectable while an open amount is left
+    // (payments and Rechnung K already deducted).
+    const list = (candidates || []).filter((doc: any) => {
+      const open = getDocOpenAmount(doc, targetType);
+      return open === null || open > 0.005;
+    });
     if (!search.trim()) return list.slice(0, 30);
     const q = search.toLowerCase();
     return list
@@ -141,7 +162,7 @@ export const PaymentInboundAssignModal: React.FC<
 
   const handleSelectDoc = (doc: any) => {
     setSelectedDoc(doc);
-    const docTotal = getDocTotal(doc);
+    const docTotal = getDocOpenAmount(doc, targetType) ?? getDocTotal(doc);
     // Best-effort default: the smaller of what's still open on the
     // payment and the target document's own total. This does NOT net
     // out prior payments already covering that target — just a sane
@@ -360,7 +381,11 @@ export const PaymentInboundAssignModal: React.FC<
                           </div>
                         </div>
                         <div className="text-xs font-medium text-gray-600">
-                          {formatMoney(getDocTotal(doc), doc.currency || "EUR")}
+                          {formatMoney(
+                            getDocOpenAmount(doc, targetType) ??
+                              getDocTotal(doc),
+                            doc.currency || "EUR",
+                          )}
                         </div>
                       </button>
                     );
