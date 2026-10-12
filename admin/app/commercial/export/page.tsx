@@ -59,9 +59,9 @@ export default function MonthlyExportPage() {
       if (field === null || field === undefined) return "";
       let str = String(field);
       if (typeof field === "number") {
-        str = field.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        str = field.toFixed(2).replace(".", ",");
       }
-      if (str.includes(",") || str.includes("\"") || str.includes("\n")) {
+      if (str.includes(",") || str.includes("\"") || str.includes("\n") || str.includes(";")) {
         return `"${str.replace(/"/g, '""')}"`;
       }
       return str;
@@ -85,7 +85,7 @@ export default function MonthlyExportPage() {
   };
 
   const columns: ColumnDef<any>[] = [
-    { header: "Datum", render: (row) => row["Datum (vollständig)"] },
+    { header: "Datum (vollständig)", render: (row) => row["Datum (vollständig)"] },
     { header: "Konto", render: (row) => row["Konto"] },
     { header: "Gegenkonto", render: (row) => row["Gegenkonto"] },
     { header: "Betrag in EUR", align: "right", render: (row) => Number(row["Betrag in EUR"]).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },

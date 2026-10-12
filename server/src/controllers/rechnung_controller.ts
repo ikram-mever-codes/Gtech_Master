@@ -2015,56 +2015,209 @@ export const getMonthlyExport = async (
     }
 
     const [yearStr, monthStr] = month.split("-");
-    const year = parseInt(yearStr);
-    const m = parseInt(monthStr);
+    const year = parseInt(yearStr, 10);
+    const m = parseInt(monthStr, 10);
 
-    const startDate = new Date(year, m - 1, 1);
-    const endDate = new Date(year, m, 0, 23, 59, 59, 999);
+    const padMonth = String(m).padStart(2, "0");
+    const startDateStr = `${year}-${padMonth}-01`;
+    const lastDay = new Date(year, m, 0).getDate();
+    const endDateStr = `${year}-${padMonth}-${String(lastDay).padStart(2, "0")}`;
 
-    const startDateStr = startDate.toISOString().split("T")[0];
-    const endDateStr = endDate.toISOString().split("T")[0];
+    const rechnungRepo = AppDataSource.getRepository(Rechnung);
+    const rechnungKRepo = AppDataSource.getRepository(Rechnung_k);
+    const customerRepo = AppDataSource.getRepository(Customer);
+    const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
 
-    const rechnungen = await AppDataSource.getRepository(Rechnung).find({
+    const rechnungen = await rechnungRepo.find({
       where: {
         invoice_date: Between(startDateStr, endDateStr) as any,
       },
       relations: ["customer"],
     });
 
-    const rechnungenK = await AppDataSource.getRepository(Rechnung_k).find({
+    const rechnungenK = await rechnungKRepo.find({
       where: {
         invoice_date: Between(startDateStr, endDateStr) as any,
       },
       relations: ["customer"],
     });
+
+    const origCustomerIds = new Set<string>();
+    for (const r of rechnungen) {
+      const cid =
+        r.customer?.original_customer_id ||
+        (r as any).customerSnapshot?.original_customer_id ||
+        (r as any).customerSnapshot?.id ||
+        r.rechnung_customer_id;
+      if (cid) origCustomerIds.add(String(cid));
+    }
+    for (const rk of rechnungenK) {
+      const cid =
+        rk.customer?.original_customer_id ||
+        (rk as any).customerSnapshot?.original_customer_id ||
+        (rk as any).customerSnapshot?.id ||
+        rk.rechnung_customer_id;
+      if (cid) origCustomerIds.add(String(cid));
+    }
+
+    const customersMap = new Map<string, Customer>();
+    if (origCustomerIds.size > 0) {
+      const customers = await customerRepo.find({
+        where: { id: In(Array.from(origCustomerIds)) },
+        relations: ["defaultTaxProfile"],
+      });
+      customers.forEach((c) => customersMap.set(c.id, c));
+    }
+
+    const taxProfiles = await taxProfileRepo.find({
+      where: { is_active: true },
+    });
+
+    const origRechnungIds = Array.from(
+      new Set(
+        rechnungenK
+          .map((rk) => rk.original_rechnung_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      )
+    );
+    const origRechnungMap = new Map<string, string>();
+    if (origRechnungIds.length > 0) {
+      const origRechnungen = await rechnungRepo.find({
+        where: { id: In(origRechnungIds) },
+        select: ["id", "invoice_number"],
+      });
+      origRechnungen.forEach((r) => origRechnungMap.set(r.id, r.invoice_number));
+    }
+
+    const resolveGegenkonto = (
+      item: any,
+      liveCust: Customer | null | undefined
+    ): string => {
+      const taxCase = (item.tax_profile_case || "").trim();
+      if (taxCase) {
+        const tpCase = taxProfiles.find(
+          (tp) =>
+            (tp.tax_case || "").trim().toUpperCase() === taxCase.toUpperCase()
+        );
+        if (tpCase?.revenue_account_no) return tpCase.revenue_account_no.trim();
+      }
+
+      if (liveCust?.defaultTaxProfile?.revenue_account_no) {
+        return liveCust.defaultTaxProfile.revenue_account_no.trim();
+      }
+
+      const rate = Number(
+        item.tax_rate ?? (liveCust?.defaultTaxProfile?.tax_rate ?? 19)
+      );
+      const tpRate = taxProfiles.find(
+        (tp) => Number(tp.tax_rate) === rate && tp.revenue_account_no
+      );
+      if (tpRate?.revenue_account_no) {
+        return tpRate.revenue_account_no.trim();
+      }
+
+      if (rate === 19) return "8400";
+      if (rate === 7) return "8315";
+      if (rate === 0) {
+        const country = (
+          liveCust?.country ||
+          item.customerSnapshot?.country ||
+          item.customer?.country ||
+          ""
+        )
+          .trim()
+          .toUpperCase();
+        const euCountries = [
+          "AT", "AUSTRIA", "ÖSTERREICH", "BE", "BELGIUM", "BG", "CY", "CZ",
+          "DK", "EE", "FI", "FR", "FRANCE", "GR", "GREECE", "HR", "HU", "IE",
+          "IRELAND", "IT", "ITALY", "LT", "LU", "LV", "MT", "NL", "NETHERLANDS",
+          "PL", "POLAND", "PT", "RO", "SE", "SWEDEN", "SI", "SK"
+        ];
+        if (euCountries.includes(country)) return "8120";
+        return "8125";
+      }
+
+      return "8400";
+    };
 
     const formatRow = (item: any, isKorrektur: boolean) => {
-      const d = new Date(item.invoice_date);
-      const dateStr = `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}`;
+      let dateStr = "";
+      if (item.invoice_date) {
+        const rawDate =
+          item.invoice_date instanceof Date
+            ? item.invoice_date.toISOString().split("T")[0]
+            : String(item.invoice_date).split("T")[0];
+        const [yr, mo, dy] = rawDate.split("-");
+        if (yr && mo && dy) {
+          dateStr = `${dy.padStart(2, "0")}.${mo.padStart(2, "0")}.${yr}`;
+        }
+      }
+      if (!dateStr) {
+        const d = new Date(item.invoice_date);
+        dateStr = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+      }
 
-      const customer = item.customerSnapshot || item.customer;
-      const taxProfile = customer?.defaultTaxProfile || item.customerSnapshot?.taxProfile;
+      const origCustomerId =
+        item.customer?.original_customer_id ||
+        item.customerSnapshot?.original_customer_id ||
+        item.customerSnapshot?.id ||
+        item.rechnung_customer_id;
 
-      const konto = customer?.debtor_no || customer?.debtorNo || "";
-      const gegenkonto = taxProfile?.revenue_account_no || taxProfile?.revenueAccountNo || "";
+      const liveCust = origCustomerId ? customersMap.get(origCustomerId) : null;
+
+      const konto =
+        liveCust?.debtor_no?.trim() ||
+        item.customerSnapshot?.debtor_no?.toString().trim() ||
+        item.customerSnapshot?.debtorNo?.toString().trim() ||
+        "";
+
+      const gegenkonto = resolveGegenkonto(item, liveCust);
+
       let totalAmount = Number(item.total_amount || 0);
-
       if (isKorrektur) {
         totalAmount = -Math.abs(totalAmount);
       } else {
         totalAmount = Math.abs(totalAmount);
       }
 
-      const rechnungsnummer = `${item.invoice_number} ${customer?.customerNumber || ""}`.trim();
+      const customerNumber =
+        liveCust?.customerNumber?.trim() ||
+        item.customerSnapshot?.customerNumber?.toString().trim() ||
+        "";
 
-      const gegenpartei = customer?.companyName || customer?.company_name || "Sammel";
+      let rechnungsnummer = "";
+      if (isKorrektur) {
+        const origInvNum = item.original_rechnung_id
+          ? origRechnungMap.get(item.original_rechnung_id) || ""
+          : "";
+        rechnungsnummer = [item.invoice_number, origInvNum, customerNumber]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+      } else {
+        rechnungsnummer = [item.invoice_number, customerNumber]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+      }
+
+      let gegenpartei =
+        liveCust?.companyName ||
+        liveCust?.legalName ||
+        item.customerSnapshot?.displayName ||
+        item.customerSnapshot?.companyName ||
+        item.customerSnapshot?.company_name ||
+        item.customer?.display_name ||
+        item.customer?.company_name ||
+        "";
 
       let buchungstyp = "Einzel";
       let buchungstext = "";
 
       if (konto === "69999") {
         buchungstyp = "Sammel";
-        const yyyymm = `${d.getFullYear()}${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        gegenpartei = "Sammel";
+        const yyyymm = `${yearStr}${padMonth}`;
         buchungstext = `SAMMEL-${yyyymm}-${gegenkonto}`;
       }
 
@@ -2077,7 +2230,7 @@ export const getMonthlyExport = async (
         Gegenpartei: gegenpartei,
         Buchungstext: buchungstext,
         Zahlungsreferenz: "",
-        Kundennummer: customer?.customerNumber || "",
+        Kundennummer: konto === "69999" ? "" : customerNumber,
         Buchungstyp: buchungstyp,
       };
     };
@@ -2092,7 +2245,9 @@ export const getMonthlyExport = async (
         const [day, mo, yr] = dStr.split(".");
         return new Date(`${yr}-${mo}-${day}`).getTime();
       };
-      return parseDate(a["Datum (vollständig)"]) - parseDate(b["Datum (vollständig)"]);
+      return (
+        parseDate(a["Datum (vollständig)"]) - parseDate(b["Datum (vollständig)"])
+      );
     });
 
     res.json(data);
