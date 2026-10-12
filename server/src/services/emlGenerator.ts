@@ -118,7 +118,7 @@ export async function generateRechnungLieferscheinEml(
           email: customer.email.trim(),
         });
       }
-      
+
       if (customer?.email_rechnungen) {
         contactPersons.push({ name: "Rechnungen", email: customer.email_rechnungen.trim() });
       }
@@ -243,10 +243,10 @@ export async function generateRechnungLieferscheinEml(
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
+    bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${allEmlEmails.join("<br>")}</p>\n`;
   }
-  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
-  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) und den Lieferschein (${lieferscheinNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">anbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) und den Lieferschein (${lieferscheinNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
   bodyHtml += `</body>\n</html>`;
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -471,10 +471,10 @@ export async function generateRechnungOnlyEml(
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
+    bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${allEmlEmails.join("<br>")}</p>\n`;
   }
-  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
-  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">anbei erhalten Sie die Rechnung (${rechnung.invoice_number || rechnung.id}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
   bodyHtml += `</body>\n</html>`;
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -699,10 +699,10 @@ export async function generateAuftragEml(
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
+    bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${allEmlEmails.join("<br>")}</p>\n`;
   }
-  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
-  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Auftragsbestätigung (${docNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">anbei erhalten Sie die Auftragsbestätigung (${docNo}) zu Ihrer Bestellung "${auftragTitle}".</p>\n`;
   bodyHtml += `</body>\n</html>`;
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -905,10 +905,10 @@ export async function generateOfferEml(
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
+    bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${allEmlEmails.join("<br>")}</p>\n`;
   }
-  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
-  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie das Angebot (${docNo}) zu Ihrer Anfrage "${offerTitle}".</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">anbei erhalten Sie das Angebot (${docNo}) zu Ihrer Anfrage "${offerTitle}".</p>\n`;
   bodyHtml += `</body>\n</html>`;
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -1115,10 +1115,10 @@ export async function generateRechnungKEml(
   const allEmlEmails = Array.from(new Set(contactPersons.map(c => c.email).filter(Boolean)));
   if (primaryEmail && !allEmlEmails.includes(primaryEmail)) allEmlEmails.unshift(primaryEmail);
   if (allEmlEmails.length > 0) {
-    bodyHtml += `<p style="margin: 0 0 12px 0;">${allEmlEmails.join("; ")}</p>\n`;
+    bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${allEmlEmails.join("<br>")}</p>\n`;
   }
-  bodyHtml += `<p style="margin: 0 0 12px 0;">${greetingLine}</p>\n`;
-  bodyHtml += `<p style="margin: 0 0 12px 0;">anbei erhalten Sie die Rechnungskorrektur (${docNo}) zu Ihrer Bestellung "${rkTitle}".</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">${greetingLine}</p>\n`;
+  bodyHtml += `<p style="margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 11pt; color: rgb(26, 61, 42);">anbei erhalten Sie die Rechnungskorrektur (${docNo}) zu Ihrer Bestellung "${rkTitle}".</p>\n`;
   bodyHtml += `</body>\n</html>`;
 
   const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

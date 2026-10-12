@@ -241,7 +241,6 @@ export async function getCargosByAuftragIds(
     if (co.order_id && co.cargo) addCargo(co.order_id, co.cargo);
   });
 
-  // Step 3: fold back up to Auftrag id (an Auftrag can have >1 Bestellung)
   for (const [bestellungOrderNo, auftragId] of auftragIdByBestellungOrderNo) {
     const orderId = orderIdByOrderNo.get(bestellungOrderNo);
     if (orderId === undefined) continue;
@@ -287,8 +286,6 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
     auftragIds.length
       ? customerOrderRepo.find({
         where: { id: In(auftragIds) },
-        // total_amount added — the frontend compares this against
-        // each Rechnung's own total_amount to flag a differing amount.
         select: [
           "id",
           "order_no",
