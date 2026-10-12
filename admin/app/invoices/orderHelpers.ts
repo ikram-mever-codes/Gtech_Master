@@ -26,6 +26,66 @@ export const getSupplierNameFrom = (suppliers: any[], supplierId: any) => {
   return s.name_de || String(s.id);
 };
 
+/** Extra Orders / Order Items filters (same behaviour as the "Name..." and
+ * "Company..." filters of the Items Management page). */
+export interface OrderExtraFilters {
+  /** Item name search, case-insensitive substring of the trimmed text. */
+  itemName?: string;
+  /** Selected customer id (exact match); falls back to the name below. */
+  companyId?: string;
+  /** Selected customer name (case-insensitive substring) if no id. */
+  companyName?: string;
+}
+
+const lc = (v: any) => String(v ?? "").toLowerCase();
+
+/** Same fields the Items Management "Name..." search looks at: item name
+ * (EN / DE / CN), model, item no. and the parent's names. */
+const matchesItemName = (row: any, term: string) => {
+  const it = row?.item || {};
+  const haystack = [
+    row?.item_name,
+    row?.itemName,
+    it.item_name,
+    it.name,
+    row?.item_name_de,
+    it.item_name_de,
+    row?.item_name_cn,
+    it.item_name_cn,
+    row?.model,
+    it.model,
+    it.item_no_de,
+    it.parent?.de_no,
+    it.parent?.name_de,
+    it.parent?.name_en,
+  ];
+  return haystack.some((v) => lc(v).includes(term));
+};
+
+const orderCustomerId = (o: any) =>
+  String(o?.customer_id ?? o?.customer?.id ?? "");
+
+const orderCustomerName = (o: any) =>
+  lc(
+    o?.customer?.companyName ||
+      o?.customer?.company_name ||
+      o?.customer?.name ||
+      o?.customer_name ||
+      "",
+  );
+
+const matchesCompany = (o: any, extra: OrderExtraFilters) => {
+  if (extra.companyId) return orderCustomerId(o) === String(extra.companyId);
+  const q = lc(extra.companyName).trim();
+  return !q || orderCustomerName(o).includes(q);
+};
+
+const hasExtra = (extra?: OrderExtraFilters) =>
+  !!(
+    extra &&
+    (extra.itemName?.trim() || extra.companyId || extra.companyName?.trim())
+  );
+
 /** Flattens orders into order-item rows (sorted by `position`, falling back
  * to API order), applies the Reports & Control audit `filter` URL param and
  * the order-no / EAN / item-name search. */
@@ -33,6 +93,7 @@ export const buildOrderItemsFlat = (
   orders: any[],
   filterParam: string | null,
   orderNoFilter: string,
+  extra?: OrderExtraFilters,
 ) => {
   let allItems = orders.flatMap((o: any) => {
     const rawItems = (o.items || []).map((i: any, idx: number) => ({
@@ -42,13 +103,19 @@ export const buildOrderItemsFlat = (
 
     rawItems.sort((a: any, b: any) => {
       const getSortValue = (item: any, fallbackIdx: number) => {
-        if (item.position !== undefined && item.position !== null && item.position !== "") {
+        if (
+          item.position !== undefined &&
+          item.position !== null &&
+          item.position !== ""
+        ) {
           const p = Number(item.position);
           if (!isNaN(p)) return p;
         }
         return fallbackIdx;
       };
-      return getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex);
+      return (
+        getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex)
+      );
     });
 
     return rawItems.map((i: any, idx: number) => ({
@@ -129,6 +196,15 @@ export const buildOrderItemsFlat = (
     }
   }
 
+  if (hasExtra(extra)) {
+    const nameTerm = lc(extra!.itemName).trim();
+    allItems = allItems.filter(
+      (i: any) =>
+        (!nameTerm || matchesItemName(i, nameTerm)) &&
+        matchesCompany(i, extra!),
+    );
+  }
+
   if (!orderNoFilter) return allItems;
   const s = orderNoFilter.toLowerCase();
   return allItems.filter(
@@ -148,6 +224,7 @@ export const filterOrders = (
   orders: any[],
   filterParam: string | null,
   orderNoFilter: string,
+  extra?: OrderExtraFilters,
 ) => {
   let list = orders;
   if (filterParam === "unassigned_cargo") {
@@ -160,6 +237,16 @@ export const filterOrders = (
         o.cargo_id === "null",
     );
   }
+  if (hasExtra(extra)) {
+    const nameTerm = lc(extra!.itemName).trim();
+    list = list.filter(
+      (o: any) =>
+        matchesCompany(o, extra!) &&
+        (!nameTerm ||
+          (o.items || []).some((i: any) => matchesItemName(i, nameTerm))),
+    );
+  }
+
   if (!orderNoFilter) return list;
   const s = orderNoFilter.toLowerCase();
   return list.filter(

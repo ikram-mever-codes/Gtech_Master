@@ -109,6 +109,13 @@ const InvoiceListPage: React.FC = () => {
     () => searchParams.get("order_no") || "",
   );
   const [cargoStatusFilter, setCargoStatusFilter] = useState("Open");
+  // Orders / Order Items: item name + customer filters (same behaviour as
+  // the "Name..." and "Company..." filters of Items Management).
+  const [itemNameFilter, setItemNameFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState<{
+    id: string;
+    name: string;
+  }>({ id: "", name: "" });
   const [filters, setFilters] = useState<FilterOptions>(initialFilterOptions);
   const [sortField, setSortField] = useState<InvoiceSortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -157,14 +164,35 @@ const InvoiceListPage: React.FC = () => {
 
   const filterParam = searchParams.get("filter");
 
+  const orderExtraFilters = useMemo(
+    () => ({
+      itemName: itemNameFilter,
+      companyId: companyFilter.id,
+      companyName: companyFilter.name,
+    }),
+    [itemNameFilter, companyFilter],
+  );
+
   const orderItemsFlat = useMemo(
-    () => buildOrderItemsFlat(tabData.orders, filterParam, orderNoFilter),
-    [tabData.orders, orderNoFilter, filterParam],
+    () =>
+      buildOrderItemsFlat(
+        tabData.orders,
+        filterParam,
+        orderNoFilter,
+        orderExtraFilters,
+      ),
+    [tabData.orders, orderNoFilter, filterParam, orderExtraFilters],
   );
 
   const filteredOrders = useMemo(
-    () => filterOrders(tabData.orders, filterParam, orderNoFilter),
-    [tabData.orders, orderNoFilter, filterParam],
+    () =>
+      filterOrders(
+        tabData.orders,
+        filterParam,
+        orderNoFilter,
+        orderExtraFilters,
+      ),
+    [tabData.orders, orderNoFilter, filterParam, orderExtraFilters],
   );
 
   // ---------------------------------------------------------------------
@@ -997,11 +1025,18 @@ const InvoiceListPage: React.FC = () => {
           filters={filters}
           cargoStatusFilter={cargoStatusFilter}
           setCargoStatusFilter={setCargoStatusFilter}
+          itemNameFilter={itemNameFilter}
+          setItemNameFilter={setItemNameFilter}
+          companyId={companyFilter.id}
+          companyName={companyFilter.name}
+          onCompanyChange={(id, name) => setCompanyFilter({ id, name })}
           onReset={() => {
             setSearchTerm("");
             setOrderNoFilter("");
             setFilters(initialFilterOptions);
             setCargoStatusFilter("Open");
+            setItemNameFilter("");
+            setCompanyFilter({ id: "", name: "" });
           }}
         />
 
