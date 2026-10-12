@@ -115,7 +115,38 @@ export const getAuftragGrossTotal = (row: any): number => {
   return 0;
 };
 
-const valueNetCalc = (row: any) => getAuftragGrossTotal(row);
+export const getAuftragNetTotal = (row: any): number => {
+  if (!row) return 0;
+
+  const visibleItems = row.orderItems || row.items || [];
+  const discountPct = Number(row.discount_percentage || row.discountPercentage || 0);
+  const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
+  const shippingCost = Number(row.shipping_cost || row.shippingCost || 0);
+  const shippingQty = Number(row.shipping_quantity || row.shippingQuantity || 1);
+  const shippingTotal = shippingCost * shippingQty;
+
+  if (visibleItems.length > 0) {
+    const itemsNet = visibleItems.reduce((acc: number, li: any) => {
+      const qty = Number(li.quantity ?? li.qty ?? 1);
+      const price = Number(li.price ?? li.unitPrice ?? 0);
+      return acc + qty * price;
+    }, 0);
+
+    const discountAmount = Number(row.discount_amount || row.discountAmount || 0);
+    const subtotalWithShipping = (itemsNet * discountFactor) + shippingTotal;
+    const finalNet = Math.max(0, subtotalWithShipping - discountAmount);
+    return Math.max(0, finalNet);
+  }
+
+  const subtotal = Number(row.subtotal ?? row.sub_total ?? row.netTotal ?? 0);
+  if (subtotal > 0) {
+    return subtotal + shippingTotal;
+  }
+
+  return 0;
+};
+
+const valueNetCalc = (row: any) => getAuftragNetTotal(row);
 
 const itemCountCalc = (row: any) => row.items?.length || 0;
 

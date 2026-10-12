@@ -106,22 +106,25 @@ import {
   getStatusBackgroundColor,
   sortAuftraegeByStatus,
   getAuftragGrossTotal,
+  getAuftragNetTotal,
 } from "./auftragColumns";
 import {
   buildBestellungColumns,
   getBestellungGrossTotal,
+  getBestellungNetTotal,
 } from "./bestellungColumns";
 import {
   buildRechnungColumns,
   getRechnungStatusBackgroundColor,
   getRechnungGrossTotal,
+  getRechnungNetTotal,
   checkIsExportInvoice,
 } from "./rechnungColumns";
-import { buildRkColumns, getRkGrossTotal } from "./rkColumns";
+import { buildRkColumns, getRkGrossTotal, getRkNetTotal } from "./rkColumns";
 import { buildLieferscheinColumns } from "./lieferscheinColumns";
 import { buildPaymentInboundColumns } from "./paymentInboundColumns";
 import PaymentInboundAssignModal from "./PaymentInboundAssignModal";
-import { getOfferGrossTotal } from "@/utils/offers";
+import { getOfferGrossTotal, getOfferNetTotal } from "@/utils/offers";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -2193,22 +2196,22 @@ const InvoiceListPage: React.FC = () => {
               summaryTotal={displayItems.reduce((sum: number, item: any) => {
                 let amt = 0;
                 if (activeInvTab === "auftrag") {
-                  amt = getAuftragGrossTotal(item);
+                  amt = getAuftragNetTotal(item);
                 } else if (activeInvTab === "bestellung") {
-                  amt = getBestellungGrossTotal(item);
+                  amt = getBestellungNetTotal(item);
                 } else if (activeInvTab === "rechnung") {
-                  amt = getRechnungGrossTotal(item);
+                  amt = getRechnungNetTotal(item);
                 } else if (activeInvTab === "rk") {
-                  amt = getRkGrossTotal(item);
+                  amt = getRkNetTotal(item);
                 } else if (
                   (activeInvTab as string) === "payment_inbound" ||
                   (activeInvTab as string) === "payments"
                 ) {
                   amt = Number(item.amount || item.total || 0);
                 } else if (activeInvTab === "lieferschein") {
-                  amt = getAuftragGrossTotal(item);
+                  amt = getAuftragNetTotal(item);
                 } else {
-                  amt = getOfferGrossTotal(item);
+                  amt = getOfferNetTotal(item);
                 }
                 return sum + (isNaN(amt) ? 0 : amt);
               }, 0)}

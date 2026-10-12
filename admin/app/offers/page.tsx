@@ -48,7 +48,7 @@ import {
   type Offer,
   type OfferSearchFilters,
 } from "@/api/offers";
-import { formatDate, getOfferGrossTotal } from "@/utils/offers";
+import { formatDate, getOfferGrossTotal, getOfferNetTotal } from "@/utils/offers";
 import { parseFlexibleNumber } from "@/utils/decimal";
 import { BASE_URL } from "@/utils/constants";
 import OfferDetailModal from "@/components/Offers/OfferDetailModal";
@@ -781,7 +781,7 @@ const OffersPage: React.FC<any> = ({
           );
         },
       },
-      buildNettowertColumn((row: any) => getOfferGrossTotal(row)),
+      buildNettowertColumn((row: any) => getOfferNetTotal(row)),
       {
         header: "Status",
         width: "90px",
@@ -903,7 +903,7 @@ const OffersPage: React.FC<any> = ({
           expandedRowIds={expandedOfferIds}
           summaryCount={displayOffers.length}
           summaryTotal={displayOffers.reduce((sum: number, off: any) => {
-            const val = getOfferGrossTotal(off);
+            const val = getOfferNetTotal(off);
             return sum + (isNaN(val) ? 0 : val);
           }, 0)}
           renderRowDetails={(row) => (

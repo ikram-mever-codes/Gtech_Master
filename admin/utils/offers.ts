@@ -349,3 +349,30 @@ export const getOfferGrossTotal = (off: any): number => {
   const taxRate = Number(off.taxProfile?.taxRate ?? off.taxRate ?? 19);
   return (subtotal + shipping) * (1 + taxRate / 100);
 };
+
+export const getOfferNetTotal = (off: any): number => {
+  if (!off) return 0;
+
+  const lineItems = off.lineItems || off.items || [];
+  const shipping = Number(off.shippingCost ?? off.shipping_cost ?? 0);
+  const discountPct = Number(off.discountPercentage ?? off.discount_percentage ?? 0);
+  const discountFactor = discountPct > 0 ? 1 - discountPct / 100 : 1;
+  const discountAmount = Number(off.discountAmount ?? off.discount_amount ?? 0);
+
+  if (lineItems.length > 0) {
+    const itemsNet = lineItems.reduce((sum: number, li: any) => {
+      const qty = Number(li.baseQuantity ?? li.quantity ?? li.qty ?? 1);
+      const price = Number(li.basePrice ?? li.unitPrice ?? li.price ?? 0);
+      return sum + qty * price;
+    }, 0);
+    const subtotalWithShipping = (itemsNet * discountFactor) + shipping;
+    return Math.max(0, subtotalWithShipping - discountAmount);
+  }
+
+  const subtotal = Number(off.subtotal ?? off.sub_total ?? off.netTotal ?? 0);
+  if (subtotal > 0) {
+    return Math.max(0, (subtotal * discountFactor) + shipping - discountAmount);
+  }
+
+  return 0;
+};

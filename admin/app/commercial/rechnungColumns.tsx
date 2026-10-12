@@ -58,7 +58,31 @@ export const getRechnungGrossTotal = (row: any): number => {
   return 0;
 };
 
-const valueNetCalc = (row: any) => getRechnungGrossTotal(row);
+export const getRechnungNetTotal = (row: any): number => {
+  if (!row) return 0;
+
+  const subtotal = Number(row.subtotal ?? row.netTotal ?? row.sub_total ?? 0);
+  if (subtotal > 0) return subtotal;
+
+  const items = row.items || row.orderItems || [];
+  const shippingCost = Number(row.shipping_cost ?? row.shippingCost ?? 0);
+  const shippingQty = Number(row.shipping_quantity ?? row.shippingQuantity ?? 1);
+  const shipping = shippingCost * shippingQty;
+
+  if (items.length > 0) {
+    const itemsNet = items.reduce((sum: number, it: any) => {
+      const qty = Number(it.quantity ?? it.qty ?? 1);
+      const price = Number(it.price ?? it.unitPrice ?? 0);
+      return sum + qty * price;
+    }, 0);
+    const discountAmount = Number(row.discount_amount ?? row.discountAmount ?? 0);
+    return Math.max(0, itemsNet + shipping - discountAmount);
+  }
+
+  return 0;
+};
+
+const valueNetCalc = (row: any) => getRechnungNetTotal(row);
 const itemCountCalc = (row: any) =>
   row.customItemCount ?? row.items?.length ?? 0;
 
