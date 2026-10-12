@@ -135,6 +135,12 @@ async function recalculateRechnungKTotals(rechnungKId: string): Promise<void> {
     subtotal += Number(it.total_price) || 0;
   }
 
+  const shippingCost = Number(rechnungK.shipping_cost) || 0;
+  const shippingQuantity = Number(rechnungK.shipping_quantity) || 1;
+  const shippingTotal = shippingCost * shippingQuantity;
+
+  subtotal += shippingTotal;
+
   const round2 = (n: number) =>
     isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
 
@@ -146,6 +152,38 @@ async function recalculateRechnungKTotals(rechnungKId: string): Promise<void> {
   rechnungK.total_amount = round2(subtotal + taxAmount);
 
   await rechnungKRepo.save(rechnungK);
+}
+
+export function computeEffectiveRkTotals(rk: any) {
+  const items = rk.items || [];
+  const itemsSubtotal = items.reduce(
+    (sum: number, it: any) => sum + (Number(it.total_price) || 0),
+    0,
+  );
+  const shippingCost = Number(rk.shipping_cost) || 0;
+  const shippingQuantity = Number(rk.shipping_quantity) || 1;
+  const shippingTotal = shippingCost * shippingQuantity;
+
+  let subtotal = Number(rk.subtotal || 0);
+  let taxAmount = Number(rk.tax_amount || 0);
+  let totalAmount = Number(rk.total_amount || 0);
+
+  const round2 = (n: number) =>
+    isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
+
+  const taxRate = Number(rk.tax_rate) || 0;
+
+  if (shippingTotal > 0 && Math.abs(subtotal - itemsSubtotal) < 0.05) {
+    subtotal = round2(itemsSubtotal + shippingTotal);
+    taxAmount = round2((subtotal * taxRate) / 100);
+    totalAmount = round2(subtotal + taxAmount);
+  } else if (subtotal === 0 && (itemsSubtotal > 0 || shippingTotal > 0)) {
+    subtotal = round2(itemsSubtotal + shippingTotal);
+    taxAmount = round2((subtotal * taxRate) / 100);
+    totalAmount = round2(subtotal + taxAmount);
+  }
+
+  return { subtotal, tax_amount: taxAmount, total_amount: totalAmount };
 }
 
 /**
@@ -644,8 +682,11 @@ export const getAllRechnungenK = async (
       const contactPersons =
         (origCust as any)?.starBusinessDetails?.contactPersons || [];
 
+      const effectiveTotals = computeEffectiveRkTotals(rk);
+
       return {
         ...rk,
+        ...effectiveTotals,
         customer: origCust || rk.customer || undefined,
         title,
         linkedDocuments: linkedDocs,
@@ -687,10 +728,11 @@ export const getRechnungKById = async (
       linkedDocuments.auftrag[0]?.title ||
       undefined;
     const taxProfile = await resolveFrozenTaxProfile(rechnungK.tax_rate);
+    const effectiveTotals = computeEffectiveRkTotals(rechnungK);
 
     res.json({
       success: true,
-      data: { ...rechnungK, title, linkedDocuments, taxProfile },
+      data: { ...rechnungK, ...effectiveTotals, title, linkedDocuments, taxProfile },
     });
   } catch (error) {
     next(error);
@@ -967,9 +1009,9 @@ export const downloadRechnungKPdf = async (
       shippingTaxRate: defaultTaxRate,
       discountPercentage: Number(rechnungK.discount_percentage || 0),
       discountAmount: Number(rechnungK.discount_amount || 0),
-      subtotal: Number(rechnungK.subtotal || 0),
-      taxAmount: Number(rechnungK.tax_amount || 0),
-      totalAmount: Number(rechnungK.total_amount || 0),
+      subtotal: Number(computeEffectiveRkTotals(rechnungK).subtotal),
+      taxAmount: Number(computeEffectiveRkTotals(rechnungK).tax_amount),
+      totalAmount: Number(computeEffectiveRkTotals(rechnungK).total_amount),
       taxRate: defaultTaxRate,
       currency: rechnungK.currency || "EUR",
       notes: rechnungK.notes,
