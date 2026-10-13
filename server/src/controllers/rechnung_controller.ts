@@ -25,6 +25,7 @@ import { createLieferscheinFromRechnung } from "./lieferschein_controller";
 import { Lieferschein } from "../models/lieferscheine";
 import { In } from "typeorm/find-options/operator/In";
 import { Rechnung_k } from "../models/rechnung_k";
+import { computeEffectiveRkTotals } from "./rechnung_k_controllers";
 import { attachPaymentStatusToRechnungen } from "./payment_allocations_controller";
 import { TaxProfile } from "../models/tax_profile";
 import {
@@ -716,18 +717,54 @@ export const createRechnungFromAuftrag = async (
 
     const taxRate = effectiveTaxRate;
 
-    const shippingCost = include_shipping
-      ? shippingCostOverride !== undefined && shippingCostOverride !== null
-        ? Number(shippingCostOverride)
-        : Number(auftrag.shipping_cost ?? 0)
-      : 0;
-    const shippingQuantity = include_shipping
-      ? shippingQuantityOverride !== undefined &&
-        shippingQuantityOverride !== null
-        ? Number(shippingQuantityOverride)
-        : Number(auftrag.shipping_quantity ?? 1)
-      : 0;
-    const shippingTotal = shippingCost * shippingQuantity;
+    const orderShippingCost = Number(
+      auftrag.shipping_cost ?? (auftrag as any).shippingCost ?? 0,
+    );
+    const orderShippingQty =
+      Number(
+        auftrag.shipping_quantity ?? (auftrag as any).shippingQuantity ?? 1,
+      ) || 1;
+    const hasOrderShipping =
+      orderShippingCost > 0 ||
+      !!(auftrag.shipping_method || auftrag.shipping_text);
+
+    const shouldIncludeShipping =
+      include_shipping !== undefined
+        ? Boolean(include_shipping)
+        : hasOrderShipping;
+
+    let shippingCost = 0;
+    let shippingQuantity = 0;
+
+    if (shouldIncludeShipping) {
+      if (
+        shippingCostOverride !== undefined &&
+        shippingCostOverride !== null &&
+        Number(shippingCostOverride) > 0
+      ) {
+        shippingCost = Number(shippingCostOverride);
+      } else if (orderShippingCost > 0) {
+        shippingCost = orderShippingCost;
+      } else if (
+        shippingCostOverride !== undefined &&
+        shippingCostOverride !== null
+      ) {
+        shippingCost = Number(shippingCostOverride);
+      } else {
+        shippingCost = 0;
+      }
+
+      if (
+        shippingQuantityOverride !== undefined &&
+        shippingQuantityOverride !== null &&
+        Number(shippingQuantityOverride) > 0
+      ) {
+        shippingQuantity = Number(shippingQuantityOverride);
+      } else {
+        shippingQuantity = orderShippingQty;
+      }
+    }
+    const shippingTotal = round2(shippingCost * shippingQuantity);
 
     const totalSubtotal = round2(subtotal + shippingTotal);
 
@@ -818,7 +855,7 @@ export const createRechnungFromAuftrag = async (
         (auftrag.customerSnapshot as any)?.taxProfile?.case ||
         undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: include_shipping
+      shipping_method: shouldIncludeShipping
         ? shippingMethodOverride ||
         auftrag.shipping_text ||
         auftrag.shipping_method ||
@@ -829,10 +866,6 @@ export const createRechnungFromAuftrag = async (
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
-
-    // ============================================
-    // SAVE RECHNUNG ITEMS
-    // ============================================
     const itemEntities = itemsToCreate.map((item) =>
       rechnungItemRepo.create({
         ...item,
@@ -2048,7 +2081,7 @@ export const getMonthlyExport = async (
       where: {
         invoice_date: Between(startDateStr, endDateStr) as any,
       },
-      relations: ["customer"],
+      relations: ["customer", "items"],
     });
 
     const origCustomerIds = new Set<string>();
@@ -2184,8 +2217,21 @@ export const getMonthlyExport = async (
 
       let totalAmount = Number(item.total_amount || 0);
       if (isKorrektur) {
+        const effective = computeEffectiveRkTotals(item);
+        if (effective.total_amount) {
+          totalAmount = effective.total_amount;
+        }
         totalAmount = -Math.abs(totalAmount);
       } else {
+        if (totalAmount <= 0) {
+          const subtotal = Number(item.subtotal || 0);
+          const taxAmount = Number(item.tax_amount || 0);
+          const shippingCost = Number(item.shipping_cost || 0);
+          const discountAmount = Number(item.discount_amount || 0);
+          if (subtotal > 0 || shippingCost > 0) {
+            totalAmount = Math.round((subtotal - discountAmount + taxAmount + shippingCost) * 100) / 100;
+          }
+        }
         totalAmount = Math.abs(totalAmount);
       }
 
