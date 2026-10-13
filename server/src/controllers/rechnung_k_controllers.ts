@@ -11,6 +11,7 @@ import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { generateRechnungKEml } from "../services/emlGenerator";
 import { sanitizeFilename } from "../utils/sanitizeFilename";
+import { round2 } from "../utils/decimal";
 import { In } from "typeorm";
 import { CustomerOrder } from "../models/customer_orders";
 import { TaxProfile } from "../models/tax_profile";
@@ -132,20 +133,17 @@ async function recalculateRechnungKTotals(rechnungKId: string): Promise<void> {
   const items = rechnungK.items || [];
   let subtotal = 0;
   for (const it of items) {
-    subtotal += Number(it.total_price) || 0;
+    subtotal += round2(Number(it.total_price) || 0);
   }
 
   const shippingCost = Number(rechnungK.shipping_cost) || 0;
   const shippingQuantity = Number(rechnungK.shipping_quantity) || 1;
   const shippingTotal = shippingCost * shippingQuantity;
 
-  subtotal += shippingTotal;
-
-  const round2 = (n: number) =>
-    isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
+  subtotal = round2(subtotal + shippingTotal);
 
   const taxRate = Number(rechnungK.tax_rate) || 0;
-  const taxAmount = (subtotal * taxRate) / 100;
+  const taxAmount = round2((subtotal * taxRate) / 100);
 
   rechnungK.subtotal = round2(subtotal);
   rechnungK.tax_amount = round2(taxAmount);
@@ -566,9 +564,9 @@ export const createRechnungKFromRechnung = async (
           purchasePrice: originalItem.purchasePrice,
           purchaseCurrency: originalItem.purchaseCurrency,
           taxRate: originalItem.taxRate,
-          lineTotal: quantity * price,
+          lineTotal: round2(quantity * price),
           unit_price_eur: price,
-          total_price: quantity * price,
+          total_price: round2(quantity * price),
           weight: originalItem.weight,
           extraWeight: originalItem.extraWeight,
           position: originalItem.position,
@@ -598,9 +596,9 @@ export const createRechnungKFromRechnung = async (
           quantity,
           price,
           taxRate: original.tax_rate,
-          lineTotal: quantity * price,
+          lineTotal: round2(quantity * price),
           unit_price_eur: price,
-          total_price: quantity * price,
+          total_price: round2(quantity * price),
           position: maxPosition + idx + 1,
         }),
     );

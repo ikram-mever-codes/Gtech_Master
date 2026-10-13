@@ -35,3 +35,10 @@ export function parseFlexibleNumber(value: unknown): number | null {
 export function parseFlexibleNumberOrZero(value: unknown): number {
   return parseFlexibleNumber(value) ?? 0;
 }
+
+/** Rounds a number safely to 2 decimal places using half-up rounding. */
+export function round2(num: number): number {
+  if (isNaN(num) || !isFinite(num)) return 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+

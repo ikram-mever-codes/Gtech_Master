@@ -12,6 +12,7 @@ import fs from "fs";
 import { generateGtechDocumentPdf } from "../services/gtechPdfGenerator";
 import { buildRechnungPdfOptions } from "../services/pdfOptionsBuilder";
 import { sanitizeFilename } from "../utils/sanitizeFilename";
+import { round2 } from "../utils/decimal";
 import {
   generateRechnungLieferscheinEml,
   generateRechnungOnlyEml,
@@ -574,7 +575,7 @@ export const createRechnungFromAuftrag = async (
       const qty =
         Number(selItem.qty || selItem.quantity || sourceLine?.quantity) || 1;
       const price = Number(selItem.price || sourceLine?.price || 0);
-      const lineTotal = qty * price;
+      const lineTotal = round2(qty * price);
       subtotal += lineTotal;
 
       if (sourceLine?.sourceItemId) {
@@ -728,7 +729,7 @@ export const createRechnungFromAuftrag = async (
       : 0;
     const shippingTotal = shippingCost * shippingQuantity;
 
-    const totalSubtotal = subtotal + shippingTotal;
+    const totalSubtotal = round2(subtotal + shippingTotal);
 
     const discountPercentage = Number(auftrag.discount_percentage ?? 0);
     const discountAmount = Number(auftrag.discount_amount ?? 0);
@@ -736,9 +737,9 @@ export const createRechnungFromAuftrag = async (
     const { available: prepaymentCredit, prepayments } =
       await getAvailablePrepaymentCredit(auftrag.id);
     const appliedPrepayment = Math.min(prepaymentCredit, totalSubtotal);
-    const remainingNet = Math.max(0, totalSubtotal - appliedPrepayment);
-    const taxAmount = (remainingNet * taxRate) / 100;
-    const totalAmount = remainingNet + taxAmount;
+    const remainingNet = round2(Math.max(0, totalSubtotal - appliedPrepayment));
+    const taxAmount = round2((remainingNet * taxRate) / 100);
+    const totalAmount = round2(remainingNet + taxAmount);
     const amountDueNow = totalAmount;
 
     let remainingToApply = appliedPrepayment;
@@ -969,7 +970,7 @@ export const createRechnungOhneAusliefern = async (
 
     const orderItems = auftrag.orderItems || [];
     const itemsSubtotal = orderItems.reduce(
-      (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+      (sum, item) => sum + round2(Number(item.price || 0) * Number(item.quantity || 1)),
       0,
     );
     // Shipping is part of the Auftrag's real total, so it must be part of
@@ -978,7 +979,7 @@ export const createRechnungOhneAusliefern = async (
     const shippingCost = Number(auftrag.shipping_cost) || 0;
     const shippingQuantity = Number(auftrag.shipping_quantity) || 1;
     const shippingTotal = shippingCost * shippingQuantity;
-    const auftragSubtotal = itemsSubtotal + shippingTotal;
+    const auftragSubtotal = round2(itemsSubtotal + shippingTotal);
 
     let invoiceSubtotal = auftragSubtotal;
     let descriptionText = `Rechnung zu Auftrag ${auftrag.order_no}${auftrag.title ? ` ${auftrag.title}` : ""}`;
@@ -988,9 +989,9 @@ export const createRechnungOhneAusliefern = async (
     if (amountType === "partial") {
       if (calculationType === "percentage") {
         const pct = Math.min(100, Math.max(0.01, parsedValue));
-        invoiceSubtotal = (auftragSubtotal * pct) / 100;
+        invoiceSubtotal = round2((auftragSubtotal * pct) / 100);
       } else if (calculationType === "fixed") {
-        invoiceSubtotal = parsedValue > 0 ? parsedValue : auftragSubtotal;
+        invoiceSubtotal = parsedValue > 0 ? round2(parsedValue) : auftragSubtotal;
       }
     }
 
@@ -999,8 +1000,8 @@ export const createRechnungOhneAusliefern = async (
     }
 
     const taxRate = Number(auftrag.tax_rate ?? 19);
-    const taxAmount = (invoiceSubtotal * taxRate) / 100;
-    const totalAmount = invoiceSubtotal + taxAmount;
+    const taxAmount = round2((invoiceSubtotal * taxRate) / 100);
+    const totalAmount = round2(invoiceSubtotal + taxAmount);
 
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);

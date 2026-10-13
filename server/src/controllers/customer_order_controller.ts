@@ -17,6 +17,7 @@ import { NumberSequenceService } from "../services/number_sequence_service";
 import {
   parseFlexibleNumber,
   parseFlexibleNumberOrZero,
+  round2,
 } from "../utils/decimal";
 import { WarehouseItem } from "../models/warehouse_items";
 import path from "path";
@@ -352,44 +353,34 @@ async function calculateOrderTotals(orderId: number): Promise<void> {
 
   const items = order.orderItems || [];
   let subtotal = 0;
-  let taxAmount = 0;
 
   for (const it of items) {
     const qty = Number(it.quantity) || 1;
     const price = Number(it.price) || 0;
-    const lineTotal = qty * price;
+    const lineTotal = round2(qty * price);
     subtotal += lineTotal;
-
-    const lineTaxRate = isFreetextLine(it)
-      ? (it.taxRate ?? order.tax_rate ?? 19)
-      : (order.tax_rate ?? 19);
-    taxAmount += lineTotal * (Number(lineTaxRate) / 100);
   }
 
-  let total = subtotal;
+  let netTotal = subtotal;
 
   if (order.discount_percentage && order.discount_percentage > 0) {
-    const discount = subtotal * (order.discount_percentage / 100);
-    total = subtotal - discount;
+    const discount = round2(subtotal * (order.discount_percentage / 100));
+    netTotal = round2(subtotal - discount);
     order.discount_amount = discount;
-    taxAmount *= 1 - order.discount_percentage / 100;
   } else if (order.discount_amount && order.discount_amount > 0) {
-    total = subtotal - order.discount_amount;
+    netTotal = round2(subtotal - order.discount_amount);
   }
 
   const shippingQty = order.shipping_quantity || 1;
   const shippingTotal = (order.shipping_cost || 0) * shippingQty;
-  if (shippingTotal > 0) {
-    total += shippingTotal;
-    taxAmount += shippingTotal * ((order.tax_rate ?? 19) / 100);
-  }
+  const roundedNetWithShipping = round2(netTotal + shippingTotal);
 
-  const round2 = (n: number) =>
-    isNaN(n) || !isFinite(n) ? 0 : Math.round(n * 100) / 100;
+  const taxRate = Number(order.tax_rate ?? 19);
+  const taxAmount = round2(roundedNetWithShipping * (taxRate / 100));
 
   order.subtotal = round2(subtotal + shippingTotal);
-  order.tax_amount = round2(taxAmount);
-  order.total_amount = round2(total + taxAmount);
+  order.tax_amount = taxAmount;
+  order.total_amount = round2(roundedNetWithShipping + taxAmount);
   await customerOrderRepo.save(order);
 }
 
@@ -913,7 +904,7 @@ export const createAuftragFromItems = async (
       if (!selItem.price && matchedItem) {
         price = await getEffectiveUnitPrice(matchedItem, customer.id, qty);
       }
-      const lineTotal = qty * price;
+      const lineTotal = round2(qty * price);
 
       const itemName =
         selItem.itemName ||
@@ -1204,7 +1195,7 @@ export const createAuftragFromOffer = async (
 
       const qty = Number(selItem.quantity) || 1;
       const price = Number(selItem.price) || 0;
-      const lineTotal = qty * price;
+      const lineTotal = round2(qty * price);
 
       const src =
         backingItemByLineItemId.get(lineItem?.id) ||
@@ -1759,7 +1750,7 @@ export const createOrderLineItem = async (
       quantity: quantity,
       price: price,
       taxRate: taxRate,
-      lineTotal: quantity * price,
+      lineTotal: round2(quantity * price),
       position: nextPosition,
       sourceItemId: body.sourceItemId || undefined,
       notes: body.notes,
@@ -1901,7 +1892,7 @@ export const updateOrderLineItem = async (
         parseFlexibleNumber(body.taxRate) ?? order.tax_rate ?? 19;
     }
 
-    lineItem.lineTotal = Number(lineItem.quantity) * Number(lineItem.price);
+    lineItem.lineTotal = round2(Number(lineItem.quantity) * Number(lineItem.price));
 
     const updated = await orderItemRepo.save(lineItem);
     await calculateOrderTotals(order.id);
