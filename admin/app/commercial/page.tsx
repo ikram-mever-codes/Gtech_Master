@@ -116,6 +116,7 @@ import {
 import {
   buildRechnungColumns,
   getRechnungStatusBackgroundColor,
+  getRechnungPaymentStatus,
   getRechnungGrossTotal,
   getRechnungNetTotal,
   checkIsExportInvoice,
@@ -1777,7 +1778,7 @@ const InvoiceListPage: React.FC = () => {
           activeInvTab === "auftrag"
             ? String(item.auftrag_status || item.status || "open").toLowerCase()
             : activeInvTab === "rechnung"
-              ? String(item.payment_status || "unpaid").toLowerCase()
+              ? getRechnungPaymentStatus(item).toLowerCase()
               : String(item.status || "").toLowerCase();
 
         if (status.toLowerCase() === "partially_delivered_and_open") {
@@ -2268,7 +2269,7 @@ const InvoiceListPage: React.FC = () => {
                     hex = statusColor;
                   }
                 } else if (activeInvTab === "rechnung") {
-                  const paymentStatus = row.payment_status || "unpaid";
+                  const paymentStatus = getRechnungPaymentStatus(row);
                   const statusColor =
                     getRechnungStatusBackgroundColor(paymentStatus);
                   if (statusColor && statusColor !== "#FFFFFF") {
