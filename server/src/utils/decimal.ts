@@ -1,13 +1,4 @@
-// src/utils/decimal.ts
 
-/**
- * Accepts "," and "." interchangeably as the decimal separator.
- * Rule: if both appear, the LAST one is the decimal point and the other
- * is treated as a thousands separator and stripped. If only one appears,
- * it is always the decimal point (never assumed to be a thousands
- * separator, since prices/quantities here don't need grouping on input).
- * "." alone (the client's placeholder for "not calculated") returns null.
- */
 export function parseFlexibleNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number") return isNaN(value) ? null : value;
@@ -41,4 +32,3 @@ export function round2(num: number): number {
   if (isNaN(num) || !isFinite(num)) return 0;
   return Math.round((num + Number.EPSILON) * 100) / 100;
 }
-
