@@ -669,12 +669,37 @@ export default function RechnungDetailModal({
       freizeilenSubtotal * (taxRate / 100)
     : 0;
 
+  let viewSubtotal = Number(data.subtotal ?? 0);
+  let viewTax = Number(data.tax_amount ?? 0);
+
+  if (isCorrection) {
+    const itemsSubtotalInDoc = items.reduce((sum: number, it: any) => {
+      const qty = Number(it.quantity) || 1;
+      const price = Number(it.unit_price_eur || it.price || 0);
+      const lineTotal =
+        it.total_price !== undefined && it.total_price !== null
+          ? Number(it.total_price)
+          : it.lineTotal !== undefined && it.lineTotal !== null
+            ? Number(it.lineTotal)
+            : qty * price;
+      return sum + lineTotal;
+    }, 0);
+
+    if (shippingTotal > 0 && Math.abs(viewSubtotal - itemsSubtotalInDoc) < 0.05) {
+      viewSubtotal = itemsSubtotalInDoc + shippingTotal;
+      viewTax = viewSubtotal * (taxRate / 100);
+    } else if (viewSubtotal === 0 && (itemsSubtotalInDoc > 0 || shippingTotal > 0)) {
+      viewSubtotal = itemsSubtotalInDoc + shippingTotal;
+      viewTax = viewSubtotal * (taxRate / 100);
+    }
+  }
+
   const netTotal = showCorrectionUI
     ? correctionsSubtotal + (shippingSelected ? shippingTotal : 0)
-    : Number(data.subtotal ?? 0);
+    : viewSubtotal;
   const taxAmount = showCorrectionUI
     ? correctionsTax + (shippingSelected ? shippingTotal * (taxRate / 100) : 0)
-    : Number(data.tax_amount ?? 0);
+    : viewTax;
   const grossTotal = netTotal + taxAmount;
 
   const invoiceNumber = data.invoice_number || data.rk_number || data.id;

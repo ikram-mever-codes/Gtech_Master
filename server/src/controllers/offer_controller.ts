@@ -17,6 +17,7 @@ import { Customer } from "../models/customers";
 import {
   parseFlexibleNumber,
   parseFlexibleNumberOrZero,
+  round2,
 } from "../utils/decimal";
 
 type ValidatorModule = any;
@@ -1126,7 +1127,7 @@ export class OfferController {
     }
     const qty = parseFlexibleNumberOrZero(item.baseQuantity) || 1;
     const price = parseFlexibleNumberOrZero(item.basePrice);
-    return qty * price;
+    return round2(qty * price);
   }
 
   async createOfferFromInquiry(request: Request, response: Response) {
@@ -3857,7 +3858,7 @@ export class OfferController {
           return active?.total ?? 0;
         }
         const qty = getSafeNumber(item.baseQuantity) || 1;
-        return qty * getSafeNumber(item.basePrice);
+        return round2(qty * getSafeNumber(item.basePrice));
       };
 
       const resolvedDefaultTaxRate: number =
@@ -3890,45 +3891,39 @@ export class OfferController {
 
       const calculateTotals = (offerData: any) => {
         let subtotal = 0;
-        let taxAmount = 0;
         if (offerData.lineItems && Array.isArray(offerData.lineItems)) {
           const customerItems = offerData.lineItems.filter(
             (item: any) => !item.isComponent,
           );
           customerItems.forEach((item: any) => {
-            const lineNet = getLineTotal(item);
-            subtotal += lineNet;
-            const lineRate = getEffectiveLineTaxRate(item);
-            taxAmount += lineNet * (lineRate / 100);
+            subtotal += getLineTotal(item);
           });
         }
 
         const discount = getSafeNumber(
           offerData.discountAmount || offerData.discount,
         );
-        let discountedSubtotal = subtotal - discount;
+        let discountedSubtotal = round2(subtotal - discount);
         if (discountedSubtotal < 0) discountedSubtotal = 0;
-
-        const discountFactor = subtotal > 0 ? discountedSubtotal / subtotal : 1;
-        taxAmount = taxAmount * discountFactor;
 
         const shippingCost = getSafeNumber(offerData.shippingCost);
         const shippingQty = getSafeNumber(offerData.shippingQuantity) || 1;
         const shippingTotal = shippingCost * shippingQty;
-        if (shippingTotal > 0) {
-          subtotal += shippingTotal;
-          const shipRate =
-            offerData.shippingTaxRate !== undefined &&
-              offerData.shippingTaxRate !== null
-              ? getSafeNumber(offerData.shippingTaxRate)
-              : resolvedDefaultTaxRate;
-          taxAmount += shippingTotal * (shipRate / 100);
-        }
 
-        const totalAmount = discountedSubtotal + shippingTotal + taxAmount;
+        const roundedNet = round2(discountedSubtotal + shippingTotal);
+
+        const shipRate =
+          offerData.shippingTaxRate !== undefined &&
+            offerData.shippingTaxRate !== null
+            ? getSafeNumber(offerData.shippingTaxRate)
+            : resolvedDefaultTaxRate;
+
+        const taxAmount = round2(roundedNet * (shipRate / 100));
+
+        const totalAmount = round2(roundedNet + taxAmount);
 
         return {
-          subtotal: subtotal.toFixed(2),
+          subtotal: round2(subtotal + shippingTotal).toFixed(2),
           taxAmount: taxAmount.toFixed(2),
           totalAmount: totalAmount.toFixed(2),
           discountAmount: discount.toFixed(2),

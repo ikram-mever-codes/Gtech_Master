@@ -140,58 +140,43 @@ interface RkColumnsArgs {
   onView: (row: any) => void;
 }
 
-export const getRkGrossTotal = (row: any): number => {
-  if (!row) return 0;
-
-  const gross = Number(row.grossTotal ?? row.gross_total ?? 0);
-  if (gross > 0) return gross;
-
-  const subtotal = Number(row.subtotal ?? row.netTotal ?? row.sub_total ?? 0);
-  const taxAmount = Number(row.taxAmount ?? row.tax_amount ?? 0);
-  if (subtotal > 0 || taxAmount > 0) {
-    return subtotal + taxAmount;
-  }
-
-  const totalAmt = Number(row.totalAmount ?? row.total_amount ?? 0);
-  if (totalAmt > 0) return totalAmt;
-
-  const items = row.items || row.orderItems || [];
-  if (items.length > 0) {
-    const defaultTaxRate = Number(row.tax_rate ?? row.taxRate ?? 19);
-    const shipping = Number(row.shipping_cost ?? row.shippingCost ?? 0);
-    const itemsNet = items.reduce((sum: number, it: any) => {
-      const qty = Number(it.quantity ?? it.qty ?? 1);
-      const price = Number(it.price ?? it.unitPrice ?? 0);
-      return sum + qty * price;
-    }, 0);
-    const netSum = itemsNet + shipping;
-    return netSum * (1 + defaultTaxRate / 100);
-  }
-
-  return 0;
-};
-
 export const getRkNetTotal = (row: any): number => {
   if (!row) return 0;
-
-  const subtotal = Number(row.subtotal ?? row.netTotal ?? row.sub_total ?? 0);
-  if (subtotal > 0) return subtotal;
 
   const items = row.items || row.orderItems || [];
   const shippingCost = Number(row.shipping_cost ?? row.shippingCost ?? 0);
   const shippingQty = Number(row.shipping_quantity ?? row.shippingQuantity ?? 1);
   const shipping = shippingCost * shippingQty;
 
-  if (items.length > 0) {
-    const itemsNet = items.reduce((sum: number, it: any) => {
-      const qty = Number(it.quantity ?? it.qty ?? 1);
-      const price = Number(it.price ?? it.unitPrice ?? 0);
-      return sum + qty * price;
-    }, 0);
-    return itemsNet + shipping;
+  const itemsNet = items.reduce((sum: number, it: any) => {
+    const qty = Number(it.quantity ?? it.qty ?? 1);
+    const price = Number(it.price ?? it.unitPrice ?? 0);
+    const total =
+      it.total_price !== undefined && it.total_price !== null
+        ? Number(it.total_price)
+        : it.lineTotal !== undefined && it.lineTotal !== null
+          ? Number(it.lineTotal)
+          : qty * price;
+    return sum + total;
+  }, 0);
+
+  const subtotal = Number(row.subtotal ?? row.netTotal ?? row.sub_total ?? 0);
+  if (subtotal > 0) {
+    if (shipping > 0 && Math.abs(subtotal - itemsNet) < 0.05) {
+      return itemsNet + shipping;
+    }
+    return subtotal;
   }
 
-  return 0;
+  return itemsNet + shipping;
+};
+
+export const getRkGrossTotal = (row: any): number => {
+  if (!row) return 0;
+
+  const net = getRkNetTotal(row);
+  const taxRate = Number(row.tax_rate ?? row.taxRate ?? 19);
+  return net * (1 + taxRate / 100);
 };
 
 const valueNetCalc = (row: any) => getRkNetTotal(row);
