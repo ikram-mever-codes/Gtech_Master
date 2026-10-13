@@ -2161,7 +2161,13 @@ export class OfferController {
 
     let targetCase = "third_country";
 
-    if (countryCode === "DE" || "GERMANY") {
+    const isGermany =
+      countryCode === "DE" ||
+      countryCode === "DEU" ||
+      countryCode === "GERMANY" ||
+      countryCode === "DEUTSCHLAND";
+
+    if (isGermany) {
       targetCase = "DE-VAT";
     } else {
       const matchedCountry = countries.find(

@@ -473,8 +473,15 @@ function determineTaxCase(
   vatIdStatus: string | null | undefined,
 ): string {
   const iso2 = (countryEntity?.iso2 || "").trim().toUpperCase();
+  const cName = (countryEntity?.name || "").trim().toUpperCase();
 
-  if (!countryEntity || iso2 === "DE") {
+  if (
+    !countryEntity ||
+    iso2 === "DE" ||
+    iso2 === "DEU" ||
+    cName === "GERMANY" ||
+    cName === "DEUTSCHLAND"
+  ) {
     return "DE-VAT";
   }
 

@@ -93,9 +93,9 @@ export async function resolveFrozenTaxProfile(
     if (resolved) return mapTaxProfile(resolved);
   }
 
-  const rateMatch = profiles.find(
-    (tp) => Number(tp.tax_rate) === Number(taxRate),
-  );
+  const rateMatch =
+    profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate)) ||
+    profiles[0];
   return rateMatch
     ? mapTaxProfile(rateMatch)
     : {
@@ -1775,7 +1775,15 @@ export const downloadRechnungPdf = async (
       rechnung.tax_rate !== undefined && rechnung.tax_rate !== null
         ? rawTaxRate
         : custTaxRate;
-    const taxProfile = await resolveFrozenTaxProfile(resolvedRate);
+    const customerIdForTax =
+      (rechnung as any).customerSnapshot?.original_customer_id ||
+      rechnung.customer?.original_customer_id ||
+      undefined;
+    const taxProfile = await resolveFrozenTaxProfile(
+      resolvedRate,
+      (rechnung as any).tax_profile_case || undefined,
+      customerIdForTax,
+    );
     (rechnung as any).taxProfile = taxProfile;
     const defaultTaxRate = resolvedRate;
 
@@ -2111,7 +2119,7 @@ export const getMonthlyExport = async (
         item.tax_rate ?? (liveCust?.defaultTaxProfile?.tax_rate ?? 19)
       );
       const tpRate = taxProfiles.find(
-        (tp) => Number(tp.tax_rate) === rate && tp.revenue_account_no
+        (tp) => Number(tp.tax_rate) === rate && tp.revenue_account_no,
       );
       if (tpRate?.revenue_account_no) {
         return tpRate.revenue_account_no.trim();
