@@ -716,18 +716,54 @@ export const createRechnungFromAuftrag = async (
 
     const taxRate = effectiveTaxRate;
 
-    const shippingCost = include_shipping
-      ? shippingCostOverride !== undefined && shippingCostOverride !== null
-        ? Number(shippingCostOverride)
-        : Number(auftrag.shipping_cost ?? 0)
-      : 0;
-    const shippingQuantity = include_shipping
-      ? shippingQuantityOverride !== undefined &&
-        shippingQuantityOverride !== null
-        ? Number(shippingQuantityOverride)
-        : Number(auftrag.shipping_quantity ?? 1)
-      : 0;
-    const shippingTotal = shippingCost * shippingQuantity;
+    const orderShippingCost = Number(
+      auftrag.shipping_cost ?? (auftrag as any).shippingCost ?? 0,
+    );
+    const orderShippingQty =
+      Number(
+        auftrag.shipping_quantity ?? (auftrag as any).shippingQuantity ?? 1,
+      ) || 1;
+    const hasOrderShipping =
+      orderShippingCost > 0 ||
+      !!(auftrag.shipping_method || auftrag.shipping_text);
+
+    const shouldIncludeShipping =
+      include_shipping !== undefined
+        ? Boolean(include_shipping)
+        : hasOrderShipping;
+
+    let shippingCost = 0;
+    let shippingQuantity = 0;
+
+    if (shouldIncludeShipping) {
+      if (
+        shippingCostOverride !== undefined &&
+        shippingCostOverride !== null &&
+        Number(shippingCostOverride) > 0
+      ) {
+        shippingCost = Number(shippingCostOverride);
+      } else if (orderShippingCost > 0) {
+        shippingCost = orderShippingCost;
+      } else if (
+        shippingCostOverride !== undefined &&
+        shippingCostOverride !== null
+      ) {
+        shippingCost = Number(shippingCostOverride);
+      } else {
+        shippingCost = 0;
+      }
+
+      if (
+        shippingQuantityOverride !== undefined &&
+        shippingQuantityOverride !== null &&
+        Number(shippingQuantityOverride) > 0
+      ) {
+        shippingQuantity = Number(shippingQuantityOverride);
+      } else {
+        shippingQuantity = orderShippingQty;
+      }
+    }
+    const shippingTotal = round2(shippingCost * shippingQuantity);
 
     const totalSubtotal = round2(subtotal + shippingTotal);
 
@@ -818,7 +854,7 @@ export const createRechnungFromAuftrag = async (
         (auftrag.customerSnapshot as any)?.taxProfile?.case ||
         undefined,
       payment_method: auftrag.payment_method || undefined,
-      shipping_method: include_shipping
+      shipping_method: shouldIncludeShipping
         ? shippingMethodOverride ||
         auftrag.shipping_text ||
         auftrag.shipping_method ||
@@ -829,10 +865,6 @@ export const createRechnungFromAuftrag = async (
     });
 
     const savedRechnung: Rechnung = await rechnungRepo.save(rechnung);
-
-    // ============================================
-    // SAVE RECHNUNG ITEMS
-    // ============================================
     const itemEntities = itemsToCreate.map((item) =>
       rechnungItemRepo.create({
         ...item,
