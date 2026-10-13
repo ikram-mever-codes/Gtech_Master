@@ -108,9 +108,6 @@ const itemCountCalc = (row: any) =>
  */
 export const getRechnungPaymentStatus = (row: any): string => {
   if (!row) return "unpaid";
-  // Net total 0 (e.g. free samples): nothing to pay, never overdue.
-  const net = Number(row.subtotal ?? row.netTotal ?? row.total_amount);
-  if (Number.isFinite(net) && net <= 0.005) return "paid";
   const open = row.open_amount;
   if (open !== undefined && open !== null && Number(open) <= 0.005) {
     return "paid";
