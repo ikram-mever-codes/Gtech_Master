@@ -25,6 +25,7 @@ import { createLieferscheinFromRechnung } from "./lieferschein_controller";
 import { Lieferschein } from "../models/lieferscheine";
 import { In } from "typeorm/find-options/operator/In";
 import { Rechnung_k } from "../models/rechnung_k";
+import { computeEffectiveRkTotals } from "./rechnung_k_controllers";
 import { attachPaymentStatusToRechnungen } from "./payment_allocations_controller";
 import { TaxProfile } from "../models/tax_profile";
 import {
@@ -2080,7 +2081,7 @@ export const getMonthlyExport = async (
       where: {
         invoice_date: Between(startDateStr, endDateStr) as any,
       },
-      relations: ["customer"],
+      relations: ["customer", "items"],
     });
 
     const origCustomerIds = new Set<string>();
@@ -2216,8 +2217,21 @@ export const getMonthlyExport = async (
 
       let totalAmount = Number(item.total_amount || 0);
       if (isKorrektur) {
+        const effective = computeEffectiveRkTotals(item);
+        if (effective.total_amount) {
+          totalAmount = effective.total_amount;
+        }
         totalAmount = -Math.abs(totalAmount);
       } else {
+        if (totalAmount <= 0) {
+          const subtotal = Number(item.subtotal || 0);
+          const taxAmount = Number(item.tax_amount || 0);
+          const shippingCost = Number(item.shipping_cost || 0);
+          const discountAmount = Number(item.discount_amount || 0);
+          if (subtotal > 0 || shippingCost > 0) {
+            totalAmount = Math.round((subtotal - discountAmount + taxAmount + shippingCost) * 100) / 100;
+          }
+        }
         totalAmount = Math.abs(totalAmount);
       }
 
