@@ -8,6 +8,10 @@ import { Rechnung_k as RechnungK } from "../models/rechnung_k";
 import { User } from "../models/users";
 import { PdfDocumentOptions } from "./gtechPdfGenerator";
 import { parseFlexibleNumber } from "../utils/decimal";
+import {
+  PaymentAllocation,
+  PaymentAllocationTargetType,
+} from "../models/payment_allocations";
 
 export interface BuildPdfContextOptions {
   user?: {
@@ -241,6 +245,42 @@ export async function buildRechnungPdfOptions(
     ["Datum", String(resolvedInvoiceDate || "")],
   ];
 
+  const allocationRepo = AppDataSource.getRepository(PaymentAllocation);
+  const allocations = await allocationRepo.find({
+    where: {
+      target_type: PaymentAllocationTargetType.RECHNUNG,
+      rechnung_id: rechnung.id,
+    },
+    relations: ["paymentInbound"],
+    order: { created_at: "ASC" },
+  });
+
+  const pdfPayments = allocations.map((a) => ({
+    amount: Number(a.amount || 0),
+    receivedDate: a.paymentInbound?.received_date || a.created_at,
+    paymentMethod: a.paymentInbound?.source || "Überweisung",
+  }));
+
+  const rkRepo = AppDataSource.getRepository(RechnungK);
+  const rks = await rkRepo.find({
+    where: { original_rechnung_id: rechnung.id },
+  });
+
+  const pdfRks = rks.map((rk) => ({
+    amount: Number(rk.total_amount || 0),
+    createdDate: rk.created_at,
+    rkNumber: rk.invoice_number,
+  }));
+
+  const totalPaid = pdfPayments.reduce((s, p) => s + p.amount, 0);
+  const totalRk = pdfRks.reduce((s, r) => s + r.amount, 0);
+  const outstandingAmount = Math.max(0, totalAmount - totalPaid - totalRk);
+
+  const kundenreferenz =
+    (rechnung as any).kundenreferenz ||
+    auftrag?.kundenreferenz ||
+    undefined;
+
   const options: PdfDocumentOptions = {
     documentType: "Rechnung",
     documentNumber: rechnung.invoice_number || String(rechnung.id),
@@ -275,7 +315,13 @@ export async function buildRechnungPdfOptions(
     invoiceDate: resolvedInvoiceDate,
     taxProfile: rechnung.tax_profile_case || (auftrag as any)?.tax_profile_case,
     outputFilePath: ctx?.outputFilePath || "",
-
+    payments: pdfPayments.length > 0 ? pdfPayments : undefined,
+    rks: pdfRks.length > 0 ? pdfRks : undefined,
+    outstandingAmount:
+      pdfPayments.length > 0 || pdfRks.length > 0
+        ? outstandingAmount
+        : undefined,
+    kundenreferenz,
   };
 
   return {
@@ -435,6 +481,7 @@ export async function buildLieferscheinPdfOptions(
   const kundenreferenz =
     (lieferschein as any)?.kundenreferenz ||
     rechnung.kundenreferenz ||
+    auftrag?.kundenreferenz ||
     undefined;
 
   const options: PdfDocumentOptions = {
