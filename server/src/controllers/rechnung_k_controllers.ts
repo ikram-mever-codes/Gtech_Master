@@ -22,10 +22,53 @@ import { Customer } from "../models/customers";
  * original Rechnung it was created from, and the originating Auftrag
  * (CustomerOrder). Full records, not just ids. */
 
-async function resolveFrozenTaxProfile(taxRate: number): Promise<any> {
+async function resolveFrozenTaxProfile(
+  taxRate: number,
+  customerId?: string | null,
+  taxCase?: string | null,
+): Promise<any> {
   const taxProfileRepo = AppDataSource.getRepository(TaxProfile);
   const profiles = await taxProfileRepo.find({ where: { is_active: true } });
-  const match = profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate));
+
+  if (taxCase) {
+    const caseMatch = profiles.find(
+      (tp) =>
+        (tp.tax_case || "").trim().toUpperCase() ===
+        taxCase.trim().toUpperCase(),
+    );
+    if (caseMatch) {
+      return {
+        id: caseMatch.id,
+        name: caseMatch.name,
+        taxCase: caseMatch.tax_case || undefined,
+        taxRate: Number(caseMatch.tax_rate),
+        taxCode: caseMatch.tax_code || undefined,
+      };
+    }
+  }
+
+  if (customerId) {
+    const customerRepo = AppDataSource.getRepository(Customer);
+    const customer = await customerRepo.findOne({
+      where: { id: customerId },
+      relations: ["defaultTaxProfile"],
+    });
+    if (customer?.defaultTaxProfile) {
+      const tp = customer.defaultTaxProfile;
+      return {
+        id: tp.id,
+        name: tp.name,
+        taxCase: tp.tax_case || undefined,
+        taxRate: Number(tp.tax_rate),
+        taxCode: tp.tax_code || undefined,
+      };
+    }
+  }
+
+  const match =
+    profiles.find((tp) => Number(tp.tax_rate) === Number(taxRate)) ||
+    profiles[0];
+
   return match
     ? {
         id: match.id,
@@ -688,7 +731,9 @@ export const getAllRechnungenK = async (
         customer: origCust || rk.customer || undefined,
         title,
         linkedDocuments: linkedDocs,
-        taxProfile: taxProfileByRate.get(Number(rk.tax_rate) || 19),
+        taxProfile:
+          (origCust as any)?.defaultTaxProfile ||
+          taxProfileByRate.get(Number(rk.tax_rate) || 19),
         contactPersons,
       };
     });
@@ -725,7 +770,18 @@ export const getRechnungKById = async (
       linkedDocuments.rechnung[0]?.title ||
       linkedDocuments.auftrag[0]?.title ||
       undefined;
-    const taxProfile = await resolveFrozenTaxProfile(rechnungK.tax_rate);
+    const origCustId =
+      rechnungK.customer?.original_customer_id ||
+      (rechnungK as any).customerSnapshot?.original_customer_id ||
+      linkedDocuments.auftrag[0]?.customer_id ||
+      linkedDocuments.rechnung[0]?.customer?.original_customer_id ||
+      undefined;
+    const taxCase = (rechnungK as any).tax_profile_case || undefined;
+    const taxProfile = await resolveFrozenTaxProfile(
+      rechnungK.tax_rate,
+      origCustId,
+      taxCase,
+    );
     const effectiveTotals = computeEffectiveRkTotals(rechnungK);
 
     res.json({

@@ -518,7 +518,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
     let targetCase = "third_country";
 
-    if (countryCode === "DE") {
+    const isGermany =
+      countryCode === "DE" ||
+      countryCode === "DEU" ||
+      countryCode === "GERMANY" ||
+      countryCode === "DEUTSCHLAND";
+
+    if (isGermany) {
       targetCase = "DE-VAT";
     } else {
       const matchedCountry = dbCountries.find(

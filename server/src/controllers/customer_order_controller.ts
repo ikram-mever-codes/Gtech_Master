@@ -566,15 +566,25 @@ async function resolveAuftragTaxProfile(
   const status = order.auftrag_status || AuftragStatus.OPEN;
 
   if (status !== AuftragStatus.OPEN) {
-    // Frozen: never re-read from the customer. Only match the stored
-    // tax_rate against tax_profiles to get a display name — tax_rate
-    // itself is never touched here.
+    if (order.customer_id) {
+      const cust = await customerRepo.findOne({
+        where: { id: order.customer_id },
+        relations: ["defaultTaxProfile"],
+      });
+      if (cust?.defaultTaxProfile) {
+        return {
+          profile: mapTaxProfile(cust.defaultTaxProfile),
+          changed: false,
+        };
+      }
+    }
     const taxProfiles = await taxProfileRepo.find({
       where: { is_active: true },
     });
-    const frozenMatch = taxProfiles.find(
-      (tp: any) => Number(tp.tax_rate) === Number(order.tax_rate ?? 19),
-    );
+    const frozenMatch =
+      taxProfiles.find(
+        (tp: any) => Number(tp.tax_rate) === Number(order.tax_rate ?? 19),
+      ) || taxProfiles[0];
     return {
       profile: frozenMatch
         ? mapTaxProfile(frozenMatch)
@@ -663,9 +673,22 @@ export const getAllCustomerOrders = async (
       const status = order.auftrag_status || AuftragStatus.OPEN;
 
       if (status !== AuftragStatus.OPEN) {
-        const frozenMatch = allTaxProfiles.find(
-          (tp: any) => Number(tp.tax_rate) === Number(order.tax_rate ?? 19),
-        );
+        const customer = order.customer_id
+          ? customersById.get(order.customer_id)
+          : null;
+        if (customer?.defaultTaxProfile) {
+          taxProfileByOrderId.set(
+            order.id,
+            mapTaxProfile(customer.defaultTaxProfile),
+          );
+          continue;
+        }
+
+        const frozenMatch =
+          allTaxProfiles.find(
+            (tp: any) => Number(tp.tax_rate) === Number(order.tax_rate ?? 19),
+          ) || allTaxProfiles[0];
+
         taxProfileByOrderId.set(
           order.id,
           frozenMatch
