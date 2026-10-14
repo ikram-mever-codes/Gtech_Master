@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Loader2, FileDown, ChevronRight, FileText, Mail, Upload } from "lucide-react";
 import { downloadRechnungPdf, downloadRechnungEml, uploadGelangenheitsbestaetigung } from "@/api/rechnungen";
 import { toast } from "react-hot-toast";
+import { getGelangenheitsUrl } from "@/utils/constants";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,
@@ -316,12 +317,11 @@ const RechnungActionMenu: React.FC<{
               </button>
             </div>
 
-            {/* Option: Gelangensnachweis (Upload / View) for EU_IGL or THIRD_COUNTRY */}
             {isExportInvoice && (
               <div className="p-1">
                 {row.gelangenheitsbestaetigung_doc ? (
                   <a
-                    href={`${process.env.NEXT_PUBLIC_API_URL || ""}${row.gelangenheitsbestaetigung_doc}`}
+                    href={getGelangenheitsUrl(row.gelangenheitsbestaetigung_doc)}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => {

@@ -11,7 +11,11 @@ import {
 import { toast } from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
-import { errorStyles, successStyles } from "@/utils/constants";
+import {
+  errorStyles,
+  successStyles,
+  getGelangenheitsUrl,
+} from "@/utils/constants";
 import {
   Loader2,
   FileText,
@@ -2205,7 +2209,7 @@ export default function RechnungDetailModal({
                   {data.gelangenheitsbestaetigung_doc ? (
                     <div className="flex gap-2">
                       <a
-                        href={`${process.env.NEXT_PUBLIC_API_URL || ""}${data.gelangenheitsbestaetigung_doc}`}
+                        href={getGelangenheitsUrl(data.gelangenheitsbestaetigung_doc)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center gap-1.5 transition-all"
