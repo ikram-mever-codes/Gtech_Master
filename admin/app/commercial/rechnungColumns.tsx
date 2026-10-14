@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Loader2, FileDown, ChevronRight, FileText, Mail, Upload } from "lucide-react";
 import { downloadRechnungPdf, downloadRechnungEml, uploadGelangenheitsbestaetigung } from "@/api/rechnungen";
 import { toast } from "react-hot-toast";
-import { getGelangenheitsUrl } from "@/utils/constants";
+import { getGelangenheitsUrl } from "@/utils/fileUrl";
 import { ColumnDef } from "@/components/UI/DataTable";
 import {
   buildExpandColumn,

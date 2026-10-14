@@ -11,11 +11,8 @@ import {
 import { toast } from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
-import {
-  errorStyles,
-  successStyles,
-  getGelangenheitsUrl,
-} from "@/utils/constants";
+import { errorStyles, successStyles } from "@/utils/constants";
+import { getGelangenheitsUrl } from "@/utils/fileUrl";
 import {
   Loader2,
   FileText,
