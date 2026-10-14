@@ -276,18 +276,6 @@ export default function MonthlyExportPage() {
           </div>
         </div>
 
-        {data.length > 0 && (
-          <div className="mb-3 text-xs text-gray-400 flex items-center gap-1">
-            <DownloadIcon sx={{ fontSize: 14 }} />
-            <span>
-              File will be saved as{" "}
-              <span className="font-mono font-medium text-gray-600">
-                RA{month.replace("-", "")}.csv
-              </span>
-            </span>
-          </div>
-        )}
-
         <div className="mt-2">
           <DataTable
             data={data}
