@@ -59,7 +59,7 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
       if (!showAllCargos) {
         return status === "open" || !status || status === "";
       }
-      return status !== "delivered" && status !== "cancelled";
+      return status !== "cancelled";
     })
     .map((c) => ({
       value: String(c.id),
@@ -71,7 +71,9 @@ export const ReassignModal: React.FC<ReassignModalProps> = ({
     label: formatCargoOptionLabel(c),
   }));
 
-  const selectedValue = allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) || null;
+  const selectedValue =
+    allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) ||
+    null;
 
   return (
     <>
@@ -196,7 +198,7 @@ export const SplitModal: React.FC<SplitModalProps> = ({
       if (!showAllCargos) {
         return status === "open" || !status || status === "";
       }
-      return status !== "delivered" && status !== "cancelled";
+      return status !== "cancelled";
     })
     .map((c) => ({
       value: String(c.id),
@@ -208,7 +210,9 @@ export const SplitModal: React.FC<SplitModalProps> = ({
     label: formatCargoOptionLabel(c),
   }));
 
-  const selectedValue = allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) || null;
+  const selectedValue =
+    allFormattedOptions.find((opt) => opt.value === String(targetCargoId)) ||
+    null;
 
   return (
     <CustomModal

@@ -1,8 +1,19 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, FileDown, ChevronRight, FileText, Mail, Upload } from "lucide-react";
-import { downloadRechnungPdf, downloadRechnungEml, uploadGelangenheitsbestaetigung } from "@/api/rechnungen";
+import {
+  Loader2,
+  FileDown,
+  ChevronRight,
+  FileText,
+  Mail,
+  Upload,
+} from "lucide-react";
+import {
+  downloadRechnungPdf,
+  downloadRechnungEml,
+  uploadGelangenheitsbestaetigung,
+} from "@/api/rechnungen";
 import { toast } from "react-hot-toast";
 import { getGelangenheitsUrl } from "@/utils/fileUrl";
 import { ColumnDef } from "@/components/UI/DataTable";
@@ -67,7 +78,9 @@ export const getRechnungNetTotal = (row: any): number => {
 
   const items = row.items || row.orderItems || [];
   const shippingCost = Number(row.shipping_cost ?? row.shippingCost ?? 0);
-  const shippingQty = Number(row.shipping_quantity ?? row.shippingQuantity ?? 1);
+  const shippingQty = Number(
+    row.shipping_quantity ?? row.shippingQuantity ?? 1,
+  );
   const shipping = shippingCost * shippingQty;
 
   if (items.length > 0) {
@@ -76,7 +89,9 @@ export const getRechnungNetTotal = (row: any): number => {
       const price = Number(it.price ?? it.unitPrice ?? 0);
       return sum + qty * price;
     }, 0);
-    const discountAmount = Number(row.discount_amount ?? row.discountAmount ?? 0);
+    const discountAmount = Number(
+      row.discount_amount ?? row.discountAmount ?? 0,
+    );
     return Math.max(0, itemsNet + shipping - discountAmount);
   }
 
@@ -86,6 +101,20 @@ export const getRechnungNetTotal = (row: any): number => {
 const valueNetCalc = (row: any) => getRechnungNetTotal(row);
 const itemCountCalc = (row: any) =>
   row.customItemCount ?? row.items?.length ?? 0;
+
+/**
+ * Effective payment status of a Rechnung. An open amount of 0 (or less)
+ * means nothing is due: the Rechnung is paid, never overdue — regardless
+ * of the due date or what the stored status says.
+ */
+export const getRechnungPaymentStatus = (row: any): string => {
+  if (!row) return "unpaid";
+  const open = row.open_amount;
+  if (open !== undefined && open !== null && Number(open) <= 0.005) {
+    return "paid";
+  }
+  return row.payment_status || "unpaid";
+};
 
 /**
  * Row-background color per Rechnung payment status, mirroring
@@ -132,31 +161,28 @@ export function checkIsExportInvoice(row: any): boolean {
   if (!row) return false;
   const rawTaxCase = String(
     row.tax_profile_case ||
-    row.taxProfile?.taxCase ||
-    row.taxProfile?.case ||
-    row.taxProfile?.key ||
-    row.taxProfile?.name ||
-    row.tax_profile?.taxCase ||
-    row.tax_profile?.case ||
-    row.tax_profile?.key ||
-    row.customerSnapshot?.tax_profile_case ||
-    row.customer?.defaultTaxProfile?.tax_case ||
-    row.customer?.defaultTaxProfile?.case ||
-    row.taxCase ||
-    ""
+      row.taxProfile?.taxCase ||
+      row.taxProfile?.case ||
+      row.taxProfile?.key ||
+      row.taxProfile?.name ||
+      row.tax_profile?.taxCase ||
+      row.tax_profile?.case ||
+      row.tax_profile?.key ||
+      row.customerSnapshot?.tax_profile_case ||
+      row.customer?.defaultTaxProfile?.tax_case ||
+      row.customer?.defaultTaxProfile?.case ||
+      row.taxCase ||
+      "",
   ).toUpperCase();
 
-  return (
-    rawTaxCase.includes("EU_IGL") ||
-    rawTaxCase.includes("THIRD_COUNTRY")
-  );
+  return rawTaxCase.includes("EU_IGL") || rawTaxCase.includes("THIRD_COUNTRY");
 }
 
 const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
   row,
   rechnungenK,
 }) => {
-  const status = row.payment_status || "unpaid";
+  const status = getRechnungPaymentStatus(row);
   const label = RECHNUNG_PAYMENT_STATUS_LABELS[status] || status;
   const classes: Record<string, string> = {
     paid: "bg-emerald-100 text-emerald-800 border-emerald-300",
@@ -182,7 +208,7 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
   const hasGlDoc = Boolean(
     row.gelangenheitsbestaetigung_doc &&
     row.gelangenheitsbestaetigung_doc !== "null" &&
-    row.gelangenheitsbestaetigung_doc !== ""
+    row.gelangenheitsbestaetigung_doc !== "",
   );
 
   const isGlMissing = isExportInvoice && !hasGlDoc;
@@ -194,8 +220,9 @@ const PaymentStatusBadge: React.FC<{ row: any; rechnungenK?: any[] }> = ({
     <div className="flex flex-col items-center justify-center gap-1 whitespace-nowrap">
       <div className="flex items-center justify-center gap-1.5 flex-wrap">
         <span
-          className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${classes[status] || classes.unpaid
-            }`}
+          className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase whitespace-nowrap ${
+            classes[status] || classes.unpaid
+          }`}
           title={
             row.paid_amount !== undefined
               ? `Paid: ${Number(row.paid_amount).toFixed(2)} / Corrected: ${Number(row.corrected_amount ?? 0).toFixed(2)} / Open: ${openAmount.toFixed(2)}`
@@ -244,209 +271,213 @@ const RechnungActionMenu: React.FC<{
   creatingRkForId,
   onRefreshRechnungen,
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [isUploadingGl, setIsUploadingGl] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isUploadingGl, setIsUploadingGl] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-      if (!isOpen) return;
-      const handleClickOutside = (e: MouseEvent) => {
-        if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-          setIsOpen(false);
-        }
-      };
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
-    const isCreatingRk = creatingRkForId === row.id;
-    const isBottom = rowIndex !== undefined && rowIndex >= 5;
+  const isCreatingRk = creatingRkForId === row.id;
+  const isBottom = rowIndex !== undefined && rowIndex >= 5;
 
-    const isExportInvoice = checkIsExportInvoice(row);
+  const isExportInvoice = checkIsExportInvoice(row);
 
-    return (
-      <div className="relative inline-block text-left" ref={menuRef}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen((prev) => !prev);
-          }}
-          className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${isOpen
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-xs cursor-pointer ${
+          isOpen
             ? "border-[#8CC21B] bg-lime-50 text-[#8CC21B] ring-2 ring-[#8CC21B]/20"
             : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900"
-            }`}
-          title="Aktionen"
+        }`}
+        title="Aktionen"
+      >
+        <ChevronRight
+          className={`w-4 h-4 transition-transform duration-150 ${
+            isOpen ? "rotate-90 text-[#8CC21B]" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute right-0 ${
+            isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } w-64 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
         >
-          <ChevronRight
-            className={`w-4 h-4 transition-transform duration-150 ${isOpen ? "rotate-90 text-[#8CC21B]" : ""
-              }`}
-          />
-        </button>
-
-        {isOpen && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className={`absolute right-0 ${isBottom ? "bottom-full mb-1.5" : "top-full mt-1.5"
-              } w-64 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 text-left divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 font-poppins`}
-          >
-            {/* Option 1: Rechnungskorrektur erstellen */}
-            <div className="p-1">
-              <button
-                type="button"
-                disabled={isCreatingRk}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsOpen(false);
-                  onCreateRechnungK(row);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-              >
-                {isCreatingRk ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B] shrink-0" />
-                ) : (
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] shrink-0">
-                    +RK
-                  </span>
-                )}
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-semibold">
-                    Rechnungskorrektur (+RK)
-                  </span>
-                </div>
-              </button>
-            </div>
-
-            {isExportInvoice && (
-              <div className="p-1">
-                {row.gelangenheitsbestaetigung_doc ? (
-                  <a
-                    href={getGelangenheitsUrl(row.gelangenheitsbestaetigung_doc)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsOpen(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-                  >
-                    <FileText className="w-4 h-4 text-[#8CC21B] shrink-0" />
-                    <span className="text-xs font-semibold">
-                      Gelangensnachweis öffnen
-                    </span>
-                  </a>
-                ) : (
-                  <label
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-                  >
-                    {isUploadingGl ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-orange-500 shrink-0" />
-                    ) : (
-                      <Upload className="w-4 h-4 text-orange-500 shrink-0" />
-                    )}
-                    <span className="text-xs font-semibold">
-                      {isUploadingGl ? "Uploading…" : "Gelangensnachweis hochladen"}
-                    </span>
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="hidden"
-                      disabled={isUploadingGl}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        try {
-                          setIsUploadingGl(true);
-                          await uploadGelangenheitsbestaetigung(row.id, file);
-                          toast.success("Gelangensnachweis uploaded successfully!");
-                          onRefreshRechnungen?.();
-                        } catch (err) {
-                          console.error("Upload error:", err);
-                        } finally {
-                          setIsUploadingGl(false);
-                          setIsOpen(false);
-                        }
-                      }}
-                    />
-                  </label>
-                )}
+          {/* Option 1: Rechnungskorrektur erstellen */}
+          <div className="p-1">
+            <button
+              type="button"
+              disabled={isCreatingRk}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onCreateRechnungK(row);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              {isCreatingRk ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#8CC21B] shrink-0" />
+              ) : (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] shrink-0">
+                  +RK
+                </span>
+              )}
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-semibold">
+                  Rechnungskorrektur (+RK)
+                </span>
               </div>
-            )}
+            </button>
+          </div>
 
-            {/* Option 2: PDF öffnen */}
+          {/* Option: Gelangensnachweis (Upload / View) for EU_IGL or THIRD_COUNTRY */}
+          {isExportInvoice && (
             <div className="p-1">
+              {row.gelangenheitsbestaetigung_doc ? (
+                <a
+                  href={getGelangenheitsUrl(row.gelangenheitsbestaetigung_doc)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-[#8CC21B] shrink-0" />
+                  <span className="text-xs font-semibold">
+                    Gelangensnachweis öffnen
+                  </span>
+                </a>
+              ) : (
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                >
+                  {isUploadingGl ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-orange-500 shrink-0" />
+                  ) : (
+                    <Upload className="w-4 h-4 text-orange-500 shrink-0" />
+                  )}
+                  <span className="text-xs font-semibold">
+                    {isUploadingGl ? "Uploading…" : "Gelangensnachweis hochladen"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    disabled={isUploadingGl}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        setIsUploadingGl(true);
+                        await uploadGelangenheitsbestaetigung(row.id, file);
+                        toast.success("Gelangensnachweis uploaded successfully!");
+                        onRefreshRechnungen?.();
+                      } catch (err) {
+                        console.error("Upload error:", err);
+                      } finally {
+                        setIsUploadingGl(false);
+                        setIsOpen(false);
+                      }
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          )}
+
+          {/* Option 2: PDF öffnen */}
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                try {
+                  await downloadRechnungPdf(
+                    row.id,
+                    row.invoiceNumber || row.invoice_number,
+                  );
+                } catch (_) {}
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <FileDown className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="text-xs font-semibold">PDF öffnen</span>
+            </button>
+          </div>
+
+          <div className="p-1">
+            {hasContactPersonEmail(row) ? (
               <button
                 type="button"
                 onClick={async (e) => {
                   e.stopPropagation();
                   setIsOpen(false);
                   try {
-                    await downloadRechnungPdf(
+                    await downloadRechnungEml(
                       row.id,
                       row.invoiceNumber || row.invoice_number,
                     );
-                  } catch (_) { }
+                  } catch (_) {}
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
               >
-                <FileDown className="w-4 h-4 text-blue-600 shrink-0" />
-                <span className="text-xs font-semibold">PDF öffnen</span>
+                <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
+                <span className="text-xs font-semibold">PDF in Email</span>
               </button>
-            </div>
-
-            <div className="p-1">
-              {hasContactPersonEmail(row) ? (
-                <button
-                  type="button"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    setIsOpen(false);
-                    try {
-                      await downloadRechnungEml(
-                        row.id,
-                        row.invoiceNumber || row.invoice_number,
-                      );
-                    } catch (_) { }
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
-                >
-                  <Mail className="w-4 h-4 text-[#8CC21B] shrink-0" />
-                  <span className="text-xs font-semibold">PDF in Email</span>
-                </button>
-              ) : (
-                <div
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg bg-orange-50/60 cursor-not-allowed select-none"
-                  title="No contact person email address set"
-                >
-                  <Mail className="w-4 h-4 text-orange-500 shrink-0" />
-                  <span className="text-xs font-semibold text-orange-500">
-                    keine Emailadresse
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Option 3: Rechnung öffnen */}
-            <div className="p-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsOpen(false);
-                  onViewRechnung(row);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            ) : (
+              <div
+                className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg bg-orange-50/60 cursor-not-allowed select-none"
+                title="No contact person email address set"
               >
-                <FileText className="w-4 h-4 text-gray-500 shrink-0" />
-                <span className="text-xs font-semibold">Rechnung öffnen</span>
-              </button>
-            </div>
+                <Mail className="w-4 h-4 text-orange-500 shrink-0" />
+                <span className="text-xs font-semibold text-orange-500">
+                  keine Emailadresse
+                </span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    );
-  };
+
+          {/* Option 3: Rechnung öffnen */}
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onViewRechnung(row);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <FileText className="w-4 h-4 text-gray-500 shrink-0" />
+              <span className="text-xs font-semibold">Rechnung öffnen</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function buildRechnungColumns({
   expandedDocIds,
@@ -495,7 +526,7 @@ export function buildRechnungColumns({
       width: "140px",
       align: "center",
       sortKey: "status",
-      sortValue: (row) => (row.payment_status || "unpaid").toLowerCase(),
+      sortValue: (row) => getRechnungPaymentStatus(row).toLowerCase(),
       render: (row) => (
         <PaymentStatusBadge row={row} rechnungenK={rechnungenK} />
       ),

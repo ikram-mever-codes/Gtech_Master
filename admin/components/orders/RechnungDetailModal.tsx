@@ -686,10 +686,16 @@ export default function RechnungDetailModal({
       return sum + lineTotal;
     }, 0);
 
-    if (shippingTotal > 0 && Math.abs(viewSubtotal - itemsSubtotalInDoc) < 0.05) {
+    if (
+      shippingTotal > 0 &&
+      Math.abs(viewSubtotal - itemsSubtotalInDoc) < 0.05
+    ) {
       viewSubtotal = itemsSubtotalInDoc + shippingTotal;
       viewTax = viewSubtotal * (taxRate / 100);
-    } else if (viewSubtotal === 0 && (itemsSubtotalInDoc > 0 || shippingTotal > 0)) {
+    } else if (
+      viewSubtotal === 0 &&
+      (itemsSubtotalInDoc > 0 || shippingTotal > 0)
+    ) {
       viewSubtotal = itemsSubtotalInDoc + shippingTotal;
       viewTax = viewSubtotal * (taxRate / 100);
     }
@@ -2129,8 +2135,9 @@ export default function RechnungDetailModal({
               {(() => {
                 const paymentsList = data?.payments || [];
                 const rksList = data?.rks || [];
-                if (paymentsList.length === 0 && rksList.length === 0)
-                  return null;
+                // Always show the open amount for a Rechnung (also when
+                // nothing is paid yet); RK documents have none.
+                if (isCorrection) return null;
 
                 const totalPaid = paymentsList.reduce(
                   (sum: number, p: any) => sum + Number(p.amount || 0),
@@ -2141,9 +2148,14 @@ export default function RechnungDetailModal({
                     sum + Number(r.totalAmount || r.total || 0),
                   0,
                 );
+                // Server value is the single source of truth (same figure as
+                // the Rechnung list); local calculation only as fallback.
+                const serverOpen = Number(data?.open_amount);
                 const openAmount = Math.max(
                   0,
-                  grossTotal - totalPaid - totalRk,
+                  Number.isFinite(serverOpen) && data?.open_amount != null
+                    ? serverOpen
+                    : grossTotal - totalPaid - totalRk,
                 );
 
                 return (
