@@ -12,7 +12,11 @@ import {
   ClipboardDocumentIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  ArrowDownTrayIcon,
+  ArrowTopRightOnSquareIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
+import { getGelangenheitsUrl } from "@/utils/fileUrl";
 import { toast } from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
@@ -676,7 +680,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         o.is_weiterversand === "Yes",
       weiterversandServiceProviderId:
         o.weiterversand_service_provider_id !== undefined &&
-        o.weiterversand_service_provider_id !== null
+          o.weiterversand_service_provider_id !== null
           ? String(o.weiterversand_service_provider_id)
           : o.weiterversandServiceProvider?.id !== undefined &&
             o.weiterversandServiceProvider?.id !== null
@@ -706,6 +710,87 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     setForm(buildForm(order));
     setEdit(false);
     setShowItemPicker(false);
+  };
+
+  const openLabel = (label: { name: string; url: string }) => {
+    if (!label?.url) return;
+    if (label.url.startsWith("data:")) {
+      try {
+        const arr = label.url.split(",");
+        const mime = arr[0].match(/:(.*?);/)?.[1] || "application/pdf";
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = window.URL.createObjectURL(blob);
+        window.open(blobUrl, "_blank");
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
+        return;
+      } catch (e) {
+        console.error("Failed to open data URL as blob", e);
+      }
+    }
+    const targetUrl =
+      label.url.startsWith("/") || label.url.startsWith("uploads/")
+        ? getGelangenheitsUrl(label.url)
+        : label.url;
+    window.open(targetUrl, "_blank");
+  };
+
+  const downloadLabel = (label: { name: string; url: string }) => {
+    if (!label?.url) return;
+    const filename = label.name || "shipping_label.pdf";
+    if (label.url.startsWith("data:")) {
+      try {
+        const arr = label.url.split(",");
+        const mime = arr[0].match(/:(.*?);/)?.[1] || "application/pdf";
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          link.remove();
+          window.URL.revokeObjectURL(blobUrl);
+        }, 1000);
+        return;
+      } catch (e) {
+        console.error("Failed to download data URL", e);
+      }
+    }
+    const targetUrl =
+      label.url.startsWith("/") || label.url.startsWith("uploads/")
+        ? getGelangenheitsUrl(label.url)
+        : label.url;
+    const link = document.createElement("a");
+    link.href = targetUrl;
+    link.download = filename;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => link.remove(), 1000);
+  };
+
+  const removeLabel = (indexToRemove: number) => {
+    const currentList = parseLabels(
+      form.weiterversandLabels || order?.weiterversand_labels,
+    );
+    const updated = currentList.filter((_, idx) => idx !== indexToRemove);
+    patch({
+      weiterversandLabels: updated.length > 0 ? JSON.stringify(updated) : "",
+    });
+    toast.success("Label removed");
   };
 
   const handleSave = async () => {
@@ -1750,6 +1835,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                                   };
                                   reader.readAsDataURL(file);
                                 });
+                                e.target.value = "";
                               }}
                             />
                           </div>
@@ -1757,6 +1843,82 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       </>
                     )}
                 </div>
+                {(effectiveEdit && canEditCommercial
+                  ? form.isWeiterversand
+                  : order.is_weiterversand === true ||
+                  order.is_weiterversand === 1 ||
+                  order.is_weiterversand === "true" ||
+                  order.is_weiterversand === "1" ||
+                  order.is_weiterversand === "Yes") && (
+                    (() => {
+                      const currentLabels = parseLabels(
+                        effectiveEdit && canEditCommercial
+                          ? form.weiterversandLabels
+                          : order?.weiterversand_labels || form.weiterversandLabels
+                      );
+                      if (currentLabels.length === 0) {
+                        return !effectiveEdit ? (
+                          <div className="w-full text-xs text-gray-400 italic pt-2">
+                            No label(s) uploaded
+                          </div>
+                        ) : null;
+                      }
+                      return (
+                        <div className="w-full flex flex-wrap items-center gap-2 pt-2.5 border-t border-dashed border-gray-200 mt-2.5">
+                          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                            <DocumentTextIcon className="w-3.5 h-3.5 text-gray-400" />
+                            Attached Label(s):
+                          </span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {currentLabels.map((lbl, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-amber-50 hover:bg-amber-100/90 border border-amber-200 text-amber-900 rounded-lg transition-colors shadow-2xs"
+                              >
+                                <DocumentTextIcon className="w-4 h-4 text-amber-700 shrink-0" />
+                                <button
+                                  type="button"
+                                  onClick={() => openLabel(lbl)}
+                                  className="font-semibold hover:underline max-w-[200px] truncate text-left cursor-pointer"
+                                  title={`Click to view ${lbl.name}`}
+                                >
+                                  {lbl.name}
+                                </button>
+                                <div className="flex items-center gap-0.5 ml-1 border-l border-amber-300 pl-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openLabel(lbl)}
+                                    className="p-1 hover:bg-amber-200 rounded text-amber-800 transition-colors cursor-pointer"
+                                    title="Open / View PDF"
+                                  >
+                                    <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadLabel(lbl)}
+                                    className="p-1 hover:bg-amber-200 rounded text-amber-800 transition-colors cursor-pointer"
+                                    title="Download PDF"
+                                  >
+                                    <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                  {effectiveEdit && canEditCommercial && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeLabel(idx)}
+                                      className="p-1 hover:bg-red-100 rounded text-red-600 hover:text-red-800 transition-colors cursor-pointer ml-0.5"
+                                      title="Remove label"
+                                    >
+                                      <TrashIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
               </div>
             </div>
           </div>
