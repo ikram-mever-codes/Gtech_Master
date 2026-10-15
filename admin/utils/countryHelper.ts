@@ -22,7 +22,6 @@ export const fetchCountries = async (forceRefresh = false): Promise<Country[]> =
   return fetchPromise;
 };
 
-// Eagerly trigger fetch in browser environment so countries are ready
 if (typeof window !== "undefined") {
   fetchCountries();
 }
@@ -34,7 +33,6 @@ export const getCountryCode = (country?: string): string => {
 
   const lower = trimmed.toLowerCase();
 
-  // Check dynamically fetched countries from Settings > Countries
   const found = cachedCountries.find(
     (c) =>
       (c.iso2 && c.iso2.toLowerCase() === lower) ||
@@ -52,7 +50,6 @@ export const getCountryName = (country?: string): string => {
 
   const lower = trimmed.toLowerCase();
 
-  // Check dynamically fetched countries from Settings > Countries
   const found = cachedCountries.find(
     (c) =>
       (c.iso2 && c.iso2.toLowerCase() === lower) ||
