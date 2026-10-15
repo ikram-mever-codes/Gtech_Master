@@ -402,17 +402,12 @@ export async function generateGtechDocumentPdf(
         .replace(/,\s*$/, "");
     }
 
-    let cityLineVal = `${pStr} ${cStr}`.trim();
-    if (!isGer && rawC) {
-      const cCode =
-        rawC.length <= 3
-          ? rawC.toUpperCase()
-          : dispC.substring(0, 2).toUpperCase();
-      cityLineVal = `${cCode} - ${pStr} ${cStr}`.trim();
-    }
+    const cityLineVal = `${pStr} ${cStr}`.trim();
 
     const lines: string[] = [];
     if (cName && cName.trim()) lines.push(cName.trim());
+
+    if (cleanStreet) lines.push(cleanStreet);
 
     if (
       addLine &&
@@ -423,8 +418,10 @@ export async function generateGtechDocumentPdf(
       lines.push(addLine.trim());
     }
 
-    if (cleanStreet) lines.push(cleanStreet);
     if (cityLineVal) lines.push(cityLineVal);
+
+    // For non-German addresses, append the country name as the last line
+    if (!isGer && dispC) lines.push(dispC);
 
     return lines;
   };
