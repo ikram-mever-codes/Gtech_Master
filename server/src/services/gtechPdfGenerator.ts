@@ -1,4 +1,6 @@
+import * as isoCountries from "i18n-iso-countries";
 import path from "path";
+
 import fs from "fs";
 import PDFDocument from "pdfkit";
 import * as pdfLib from "pdf-lib";
@@ -207,19 +209,25 @@ function formatGermanPrice(val: number | string | undefined | null): string {
 
 function formatCountry(code?: string | null): string {
   if (!code) return "";
-  const upper = code.trim().toUpperCase();
-  if (upper === "DE" || upper === "GERMANY" || upper === "DEUTSCHLAND")
-    return "Deutschland";
-  if (upper === "AT" || upper === "AUSTRIA" || upper === "ÖSTERREICH")
-    return "Österreich";
-  if (upper === "CH" || upper === "SWITZERLAND" || upper === "SCHWEIZ")
-    return "Schweiz";
-  if (upper === "CN" || upper === "CHINA") return "China";
-  if (upper === "HK" || upper === "HONG KONG") return "Hong Kong";
-  if (upper === "US" || upper === "USA" || upper === "UNITED STATES")
-    return "USA";
-  return code;
+
+  // Try as ISO alpha-2 code first (e.g. "CN", "DE", "FR")
+  const byCode = isoCountries.getName(code.trim(), "de") ||
+                 isoCountries.getName(code.trim(), "en");
+  if (byCode) return byCode;
+
+  // Try as full country name (e.g. "China", "Germany") — get alpha-2 then resolve
+  const alpha2 = isoCountries.getAlpha2Code(code.trim(), "de") ||
+                 isoCountries.getAlpha2Code(code.trim(), "en");
+  if (alpha2) {
+    const resolved = isoCountries.getName(alpha2, "de") ||
+                     isoCountries.getName(alpha2, "en");
+    if (resolved) return resolved;
+  }
+
+  // Fallback: return as-is (e.g. already correctly formatted)
+  return code.trim();
 }
+
 
 export interface PdfLineItem {
   position: number;

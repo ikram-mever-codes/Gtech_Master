@@ -18,6 +18,7 @@
     "csv-parse": "^6.1.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "i18n-iso-countries": "^7.14.0",
     "inter-font": "^3.19.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.2",

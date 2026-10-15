@@ -1,3 +1,4 @@
+import * as isoCountries from "i18n-iso-countries";
 import { IsNull } from "typeorm";
 import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { SalesPrice } from "../models/sales_prices";
@@ -259,12 +260,21 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
 
 const formatCountry = (country?: string | null): string => {
   if (!country) return "";
-  const code = country.trim().toUpperCase();
-  if (code === "DE") return "Germany";
-  if (code === "AT") return "Austria";
-  if (code === "CH") return "Switzerland";
+
+  const byCode = isoCountries.getName(country.trim(), "en") ||
+    isoCountries.getName(country.trim(), "de");
+  if (byCode) return byCode;
+  const alpha2 = isoCountries.getAlpha2Code(country.trim(), "en") ||
+    isoCountries.getAlpha2Code(country.trim(), "de");
+  if (alpha2) {
+    const resolved = isoCountries.getName(alpha2, "en") ||
+      isoCountries.getName(alpha2, "de");
+    if (resolved) return resolved;
+  }
+
   return country.trim();
 };
+
 
 const coerceDate = (value: any): Date | undefined => {
   if (value === undefined || value === null || value === "") return undefined;
