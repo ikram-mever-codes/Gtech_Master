@@ -1,4 +1,7 @@
 import * as isoCountries from "i18n-iso-countries";
+// Register locales so getName() returns clean names (e.g. "China" not "People's Republic of China")
+isoCountries.registerLocale(require("i18n-iso-countries/langs/de.json"));
+isoCountries.registerLocale(require("i18n-iso-countries/langs/en.json"));
 import path from "path";
 
 import fs from "fs";

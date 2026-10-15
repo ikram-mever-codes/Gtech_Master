@@ -1,4 +1,6 @@
 import * as isoCountries from "i18n-iso-countries";
+isoCountries.registerLocale(require("i18n-iso-countries/langs/de.json"));
+isoCountries.registerLocale(require("i18n-iso-countries/langs/en.json"));
 import { Request, Response, NextFunction } from "express";
 import { In, Like } from "typeorm";
 import PDFDocument from "pdfkit";
