@@ -1,6 +1,9 @@
-import * as isoCountries from "i18n-iso-countries";
-isoCountries.registerLocale(require("i18n-iso-countries/langs/de.json"));
-isoCountries.registerLocale(require("i18n-iso-countries/langs/en.json"));
+import {
+  preloadCountries,
+  formatCountryName,
+  formatCountryCode,
+  isGermanAddress,
+} from "../utils/countryHelper";
 import { Request, Response, NextFunction } from "express";
 import { In, Like } from "typeorm";
 import PDFDocument from "pdfkit";
@@ -1967,21 +1970,7 @@ const formatPostalCity = (
 };
 
 const formatCountry = (country?: string | null): string => {
-  if (!country) return "";
-
-  const byCode = isoCountries.getName(country.trim(), "en") ||
-    isoCountries.getName(country.trim(), "de");
-  if (byCode) return byCode;
-
-  const alpha2 = isoCountries.getAlpha2Code(country.trim(), "en") ||
-    isoCountries.getAlpha2Code(country.trim(), "de");
-  if (alpha2) {
-    const resolved = isoCountries.getName(alpha2, "en") ||
-      isoCountries.getName(alpha2, "de");
-    if (resolved) return resolved;
-  }
-
-  return country.trim();
+  return formatCountryName(country);
 };
 
 
@@ -2044,6 +2033,7 @@ export const generateCommercialInvoicePDF = async (
   next: NextFunction,
 ) => {
   try {
+    await preloadCountries();
     const { invoiceId } = req.params;
 
     if (!invoiceId || typeof invoiceId !== "string") {

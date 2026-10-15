@@ -18,6 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { formatTaxRate } from "@/utils/decimal";
+import { getCountryCode } from "@/utils/countryHelper";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
@@ -375,38 +376,7 @@ const PickerRow: React.FC<{
   </div>
 );
 
-const COUNTRY_CODES: Record<string, string> = {
-  germany: "DE",
-  deutschland: "DE",
-  austria: "AT",
-  österreich: "AT",
-  switzerland: "CH",
-  schweiz: "CH",
-  france: "FR",
-  frankreich: "FR",
-  italy: "IT",
-  italien: "IT",
-  spain: "ES",
-  spanien: "ES",
-  netherlands: "NL",
-  niederlande: "NL",
-  belgium: "BE",
-  belgien: "BE",
-  poland: "PL",
-  polen: "PL",
-  "united kingdom": "GB",
-  uk: "GB",
-  "united states": "US",
-  usa: "US",
-  china: "CN",
-};
 
-const getCountryCode = (country?: string): string => {
-  if (!country) return "";
-  const trimmed = country.trim();
-  if (trimmed.length === 2) return trimmed.toUpperCase();
-  return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
-};
 
 const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   addr,

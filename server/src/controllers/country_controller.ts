@@ -4,6 +4,7 @@ import { Country } from "../models/country";
 import { BusinessDetails } from "../models/business_details";
 import { CompanyShippingAddress } from "../models/company_shipping_address";
 import { Customer } from "../models/customers";
+import { invalidateCountryCache } from "../utils/countryHelper";
 
 export const getAllCountries = async (
   req: Request,
@@ -84,6 +85,7 @@ export const createCountry = async (
     });
 
     const saved = await countryRepository.save(country);
+    invalidateCountryCache();
     return res.status(201).json({ success: true, data: saved });
   } catch (error) {
     console.error(error);
@@ -133,6 +135,7 @@ export const updateCountry = async (
     if (is_igl_country !== undefined) country.is_igl_country = !!is_igl_country;
     if (is_active !== undefined) country.is_active = !!is_active;
     const updated = await countryRepository.save(country);
+    invalidateCountryCache();
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
     console.error(error);
@@ -158,6 +161,7 @@ export const deactivateCountry = async (
 
     country.is_active = false;
     await countryRepository.save(country);
+    invalidateCountryCache();
     return res
       .status(200)
       .json({ success: true, message: "Country deactivated successfully." });
@@ -200,6 +204,7 @@ export const deleteCountry = async (
     }
 
     await countryRepository.remove(country);
+    invalidateCountryCache();
     return res.status(200).json({ success: true, message: "Country deleted successfully." });
   } catch (error) {
     console.error(error);

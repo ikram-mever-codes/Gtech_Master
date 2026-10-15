@@ -1,6 +1,9 @@
-import * as isoCountries from "i18n-iso-countries";
-isoCountries.registerLocale(require("i18n-iso-countries/langs/de.json"));
-isoCountries.registerLocale(require("i18n-iso-countries/langs/en.json"));
+import {
+  preloadCountries,
+  formatCountryName,
+  formatCountryCode,
+  isGermanAddress,
+} from "../utils/countryHelper";
 import { IsNull } from "typeorm";
 import { sanitizeFilename } from "../utils/sanitizeFilename";
 import { SalesPrice } from "../models/sales_prices";
@@ -261,22 +264,8 @@ async function mergePdfTemplate(contentPdfPath: string): Promise<void> {
 }
 
 const formatCountry = (country?: string | null): string => {
-  if (!country) return "";
-
-  const byCode = isoCountries.getName(country.trim(), "en") ||
-    isoCountries.getName(country.trim(), "de");
-  if (byCode) return byCode;
-  const alpha2 = isoCountries.getAlpha2Code(country.trim(), "en") ||
-    isoCountries.getAlpha2Code(country.trim(), "de");
-  if (alpha2) {
-    const resolved = isoCountries.getName(alpha2, "en") ||
-      isoCountries.getName(alpha2, "de");
-    if (resolved) return resolved;
-  }
-
-  return country.trim();
+  return formatCountryName(country);
 };
-
 
 const coerceDate = (value: any): Date | undefined => {
   if (value === undefined || value === null || value === "") return undefined;
@@ -3988,6 +3977,7 @@ export class OfferController {
       const M = fontMedium(gtechFonts);
       const SB = fontSemiBold(gtechFonts);
 
+      await preloadCountries();
       await drawCustomerSvgBackground(doc);
 
       let customer: any = {};
@@ -4047,12 +4037,8 @@ export class OfferController {
           typeof countryVal === "string"
             ? countryVal.trim()
             : (countryVal?.code || countryVal?.name || "").trim();
-        const dispC = formatCountry(rawC);
-        const isGer =
-          !rawC ||
-          ["DE", "GERMANY", "DEUTSCHLAND", "DE - GERMANY"].some((s) =>
-            rawC.toUpperCase().includes(s),
-          );
+        const dispC = formatCountryName(rawC);
+        const isGer = isGermanAddress(rawC);
 
         let cleanStreet = (street || "").trim();
         const pStr = (pCode || "").trim();

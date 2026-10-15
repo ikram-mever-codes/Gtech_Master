@@ -17,6 +17,7 @@ import {
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { getGelangenheitsUrl } from "@/utils/fileUrl";
+import { getCountryCode } from "@/utils/countryHelper";
 import { toast } from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
@@ -132,24 +133,6 @@ const toDateInputValue = (value: any): string => {
   return d.toISOString().split("T")[0];
 };
 
-const COUNTRY_CODES: Record<string, string> = {
-  germany: "DE",
-  deutschland: "DE",
-  austria: "AT",
-  österreich: "AT",
-  switzerland: "CH",
-  schweiz: "CH",
-};
-
-const getCountryCode = (country?: string): string => {
-  if (!country) return "";
-  const trimmed = country.trim();
-  if (trimmed.length === 2) return trimmed.toUpperCase();
-  return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
-};
-
-/** True if the "same as billing" delivery address should be shown as
- * identical to the customer snapshot — same rule as the Offer modal. */
 const normalizeAddrValue = (v: any): string =>
   (v || "").toString().trim().toLowerCase();
 

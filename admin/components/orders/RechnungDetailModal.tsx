@@ -13,6 +13,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { getGelangenheitsUrl } from "@/utils/fileUrl";
+import { getCountryCode, isGermanyCountry } from "@/utils/countryHelper";
 import {
   Loader2,
   FileText,
@@ -71,31 +72,7 @@ const isWithin3Months = (dateVal: any): boolean => {
   return Date.now() - d.getTime() <= THREE_MONTHS_MS;
 };
 
-const COUNTRY_CODES: Record<string, string> = {
-  germany: "DE",
-  deutschland: "DE",
-  austria: "AT",
-  österreich: "AT",
-  switzerland: "CH",
-  schweiz: "CH",
-};
 
-const getCountryCode = (country?: string): string => {
-  if (!country) return "";
-  const trimmed = country.trim();
-  if (trimmed.length === 2) return trimmed.toUpperCase();
-  return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
-};
-
-const isGermanCountry = (country?: string): boolean => {
-  if (!country) return false;
-  const normalized = country.trim().toLowerCase();
-  return (
-    normalized === "germany" ||
-    normalized === "de" ||
-    normalized === "deutschland"
-  );
-};
 
 const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
   addr,
@@ -103,7 +80,7 @@ const AddressBlock: React.FC<{ addr: any; emptyText: string }> = ({
 }) => {
   if (!addr) return <div className="text-sm text-gray-400">{emptyText}</div>;
   const countryCode = getCountryCode(addr.country);
-  const isGermany = isGermanCountry(addr.country);
+  const isGermany = isGermanyCountry(addr.country);
 
   let street = (addr.street || addr.address || "").trim();
   const postalCode = (addr.postalCode || addr.postal_code || "").trim();

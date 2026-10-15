@@ -1,7 +1,9 @@
-import * as isoCountries from "i18n-iso-countries";
-// Register locales so getName() returns clean names (e.g. "China" not "People's Republic of China")
-isoCountries.registerLocale(require("i18n-iso-countries/langs/de.json"));
-isoCountries.registerLocale(require("i18n-iso-countries/langs/en.json"));
+import {
+  preloadCountries,
+  formatCountryName,
+  formatCountryCode,
+  isGermanAddress,
+} from "../utils/countryHelper";
 import path from "path";
 
 import fs from "fs";
@@ -210,28 +212,6 @@ function formatGermanPrice(val: number | string | undefined | null): string {
   });
 }
 
-function formatCountry(code?: string | null): string {
-  if (!code) return "";
-
-  // Try as ISO alpha-2 code first (e.g. "CN", "DE", "FR")
-  const byCode = isoCountries.getName(code.trim(), "de") ||
-                 isoCountries.getName(code.trim(), "en");
-  if (byCode) return byCode;
-
-  // Try as full country name (e.g. "China", "Germany") — get alpha-2 then resolve
-  const alpha2 = isoCountries.getAlpha2Code(code.trim(), "de") ||
-                 isoCountries.getAlpha2Code(code.trim(), "en");
-  if (alpha2) {
-    const resolved = isoCountries.getName(alpha2, "de") ||
-                     isoCountries.getName(alpha2, "en");
-    if (resolved) return resolved;
-  }
-
-  // Fallback: return as-is (e.g. already correctly formatted)
-  return code.trim();
-}
-
-
 export interface PdfLineItem {
   position: number;
   artNr?: string;
@@ -297,6 +277,7 @@ export interface PdfDocumentOptions {
 export async function generateGtechDocumentPdf(
   opts: PdfDocumentOptions,
 ): Promise<string> {
+  await preloadCountries();
   const gtechFonts = resolveGtechFonts();
   const showPrices = opts.showPrices !== false;
 
@@ -394,12 +375,8 @@ export async function generateGtechDocumentPdf(
       typeof countryVal === "string"
         ? countryVal.trim()
         : (countryVal?.code || countryVal?.name || "").trim();
-    const dispC = formatCountry(rawC);
-    const isGer =
-      !rawC ||
-      ["DE", "GERMANY", "DEUTSCHLAND", "DE - GERMANY"].some((s) =>
-        rawC.toUpperCase().includes(s),
-      );
+    const dispC = formatCountryName(rawC);
+    const isGer = isGermanAddress(rawC);
 
     let cleanStreet = (street || "").trim();
     const pStr = (pCode || "").trim();
