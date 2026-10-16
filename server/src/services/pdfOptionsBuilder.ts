@@ -198,15 +198,76 @@ export async function buildRechnungPdfOptions(
   const subtotal = Number(rechnung.subtotal || 0);
   const discountAmount = Number(rechnung.discount_amount || 0);
   const shippingCost = Number(rechnung.shipping_cost || 0);
+  let prepaymentLines:
+    | Array<{ invoiceNumber: string; amount: number }>
+    | undefined = undefined;
+
+  if (
+    rechnung.applied_prepayments &&
+    Array.isArray(rechnung.applied_prepayments) &&
+    rechnung.applied_prepayments.length > 0
+  ) {
+    prepaymentLines = rechnung.applied_prepayments.map((p: any) => ({
+      invoiceNumber: p.invoice_number,
+      amount: Number(p.amount || 0),
+    }));
+  } else if (!rechnung.is_prepayment && rechnung.auftrag_id) {
+    try {
+      const rechnungRepo = AppDataSource.getRepository(Rechnung);
+      const existingPrepayments = await rechnungRepo.find({
+        where: { auftrag_id: rechnung.auftrag_id, is_prepayment: true },
+        order: { invoice_date: "ASC" },
+      });
+      if (existingPrepayments.length > 0) {
+        const fullGross =
+          Math.round(
+            (subtotal - discountAmount + shippingCost) *
+            (1 + defaultTaxRate / 100) *
+            100,
+          ) / 100;
+        if (
+          Number(rechnung.total_amount) < fullGross ||
+          Number(rechnung.total_amount) === 0
+        ) {
+          let neededNet = subtotal + shippingCost - discountAmount;
+          const lines: Array<{ invoiceNumber: string; amount: number }> = [];
+          for (const ep of existingPrepayments) {
+            if (neededNet <= 0) break;
+            const epNet = Number(ep.subtotal || 0);
+            const take = Math.min(epNet, neededNet);
+            if (take > 0) {
+              lines.push({
+                invoiceNumber: ep.invoice_number,
+                amount: take,
+              });
+              neededNet -= take;
+            }
+          }
+          if (lines.length > 0) {
+            prepaymentLines = lines;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Could not load fallback prepayments in PDF options:", err);
+    }
+  }
+
+  const hasPrepayments = Boolean(prepaymentLines && prepaymentLines.length > 0);
 
   let taxAmount = Number(rechnung.tax_amount || 0);
-  if (taxAmount <= 0 && subtotal > 0 && defaultTaxRate > 0) {
-    taxAmount = Math.round((subtotal - discountAmount) * (defaultTaxRate / 100) * 100) / 100;
+  if (!hasPrepayments && taxAmount <= 0 && subtotal > 0 && defaultTaxRate > 0) {
+    taxAmount =
+      Math.round((subtotal - discountAmount) * (defaultTaxRate / 100) * 100) /
+      100;
   }
 
   let totalAmount = Number(rechnung.total_amount || 0);
-  if (totalAmount <= 0 && subtotal > 0) {
-    totalAmount = Math.round((subtotal - discountAmount + taxAmount + shippingCost) * 100) / 100;
+  if (!hasPrepayments && totalAmount <= 0 && subtotal > 0) {
+    totalAmount =
+      Math.round(
+        (subtotal - discountAmount + taxAmount + shippingCost) * 100,
+      ) / 100;
   }
 
   const items = (rechnung.items || []).map((it: any, idx: number) => {
@@ -322,6 +383,7 @@ export async function buildRechnungPdfOptions(
         ? outstandingAmount
         : undefined,
     kundenreferenz,
+    prepaymentLines,
   };
 
   return {

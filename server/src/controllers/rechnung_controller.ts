@@ -344,22 +344,77 @@ async function getLinkedDocumentsForRechnungen(rechnungen: Rechnung[]) {
   return result;
 }
 
-async function getAvailablePrepaymentCredit(auftragId: number): Promise<{
+interface PrepaymentCreditItem {
+  id: string;
+  invoice_number: string;
+  invoice_date?: Date;
+  originalNet: number;
+  usedNet: number;
+  availableNet: number;
+  total_amount?: number;
+  rechnung: Rechnung;
+}
+
+async function getAvailablePrepaymentCredit(
+  auftragId: number,
+  excludeDeliveryRechnungId?: string,
+): Promise<{
   available: number;
-  prepayments: Rechnung[];
+  prepayments: PrepaymentCreditItem[];
 }> {
   const rechnungRepo = AppDataSource.getRepository(Rechnung);
   const prepayments = await rechnungRepo.find({
     where: { auftrag_id: auftragId, is_prepayment: true },
-    order: { invoice_date: "ASC" },
+    order: { invoice_date: "ASC", created_at: "ASC" },
   });
 
-  const available = prepayments.reduce(
-    (sum, r) => sum + Number(r.total_amount || 0),
-    0,
-  );
+  if (prepayments.length === 0) {
+    return { available: 0, prepayments: [] };
+  }
 
-  return { available, prepayments };
+  const deliveryInvoices = await rechnungRepo.find({
+    where: { auftrag_id: auftragId, is_prepayment: false },
+  });
+
+  const usedByInvoiceNo = new Map<string, number>();
+  for (const inv of deliveryInvoices) {
+    if (excludeDeliveryRechnungId && inv.id === excludeDeliveryRechnungId) {
+      continue;
+    }
+    if (inv.applied_prepayments && Array.isArray(inv.applied_prepayments)) {
+      for (const ap of inv.applied_prepayments) {
+        if (ap.invoice_number) {
+          const prev = usedByInvoiceNo.get(ap.invoice_number) || 0;
+          usedByInvoiceNo.set(ap.invoice_number, prev + Number(ap.amount || 0));
+        }
+      }
+    }
+  }
+
+  let totalAvailableNet = 0;
+  const items: PrepaymentCreditItem[] = [];
+
+  for (const p of prepayments) {
+    const originalNet = Number(p.subtotal || 0);
+    const usedNet = usedByInvoiceNo.get(p.invoice_number) || 0;
+    const availableNet = Math.max(0, originalNet - usedNet);
+    totalAvailableNet += availableNet;
+    items.push({
+      id: p.id,
+      invoice_number: p.invoice_number,
+      invoice_date: p.invoice_date,
+      originalNet,
+      usedNet,
+      availableNet,
+      total_amount: p.total_amount,
+      rechnung: p,
+    });
+  }
+
+  return {
+    available: totalAvailableNet,
+    prepayments: items,
+  };
 }
 
 export const getPrepaymentsForAuftrag = async (
@@ -378,10 +433,12 @@ export const getPrepaymentsForAuftrag = async (
       data: {
         available,
         prepayments: prepayments
-          .filter((r) => Number(r.total_amount) > 0)
+          .filter((r) => r.availableNet > 0)
           .map((r) => ({
             id: r.id,
             invoice_number: r.invoice_number,
+            available_net: r.availableNet,
+            original_net: r.originalNet,
             total_amount: r.total_amount,
             invoice_date: r.invoice_date,
           })),
@@ -773,25 +830,36 @@ export const createRechnungFromAuftrag = async (
 
     const { available: prepaymentCredit, prepayments } =
       await getAvailablePrepaymentCredit(auftrag.id);
-    const appliedPrepayment = Math.min(prepaymentCredit, totalSubtotal);
+
+    let appliedPrepayment = 0;
+    const appliedPrepaymentsData: Array<{
+      invoice_number: string;
+      amount: number;
+      rechnung_id: string;
+    }> = [];
+
+    if (prepaymentCredit > 0) {
+      let neededNet = totalSubtotal;
+      for (const p of prepayments) {
+        if (neededNet <= 0) break;
+        if (p.availableNet <= 0) continue;
+        const take = round2(Math.min(p.availableNet, neededNet));
+        if (take > 0) {
+          appliedPrepaymentsData.push({
+            invoice_number: p.invoice_number,
+            amount: take,
+            rechnung_id: p.id,
+          });
+          appliedPrepayment = round2(appliedPrepayment + take);
+          neededNet = round2(neededNet - take);
+        }
+      }
+    }
+
     const remainingNet = round2(Math.max(0, totalSubtotal - appliedPrepayment));
     const taxAmount = round2((remainingNet * taxRate) / 100);
     const totalAmount = round2(remainingNet + taxAmount);
     const amountDueNow = totalAmount;
-
-    let remainingToApply = appliedPrepayment;
-    const prepaymentsToSave: Rechnung[] = [];
-    for (const p of prepayments) {
-      if (remainingToApply <= 0) break;
-      const take = Math.min(Number(p.total_amount || 0), remainingToApply);
-      if (take <= 0) continue;
-      p.total_amount = Number(p.total_amount) - take;
-      remainingToApply -= take;
-      prepaymentsToSave.push(p);
-    }
-    if (prepaymentsToSave.length > 0) {
-      await AppDataSource.getRepository(Rechnung).save(prepaymentsToSave);
-    }
 
     const rechnungRepo = AppDataSource.getRepository(Rechnung);
     const rechnung = rechnungRepo.create({
@@ -815,6 +883,8 @@ export const createRechnungFromAuftrag = async (
       tax_rate: taxRate,
       tax_amount: taxAmount,
       total_amount: amountDueNow,
+      applied_prepayments:
+        appliedPrepaymentsData.length > 0 ? appliedPrepaymentsData : undefined,
       currency: auftrag.currency || "EUR",
       notes: notes || auftrag.notes || "",
       status: "open",

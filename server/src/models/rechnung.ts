@@ -175,6 +175,13 @@ export class Rechnung {
   @Column({ type: "boolean", default: false })
   is_prepayment: boolean;
 
+  @Column({ type: "json", nullable: true })
+  applied_prepayments?: Array<{
+    invoice_number: string;
+    amount: number;
+    rechnung_id?: string;
+  }>;
+
   @Column({ type: "text", nullable: true })
   delivery_terms?: string;
 

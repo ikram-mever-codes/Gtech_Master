@@ -269,6 +269,8 @@ export interface PdfDocumentOptions {
   taxProfile?: string;
   payments?: Array<{ amount: number; receivedDate?: string | Date; paymentMethod?: string }>;
   rks?: Array<{ amount: number; createdDate?: string | Date; rkNumber?: string }>;
+  prepaymentLines?: Array<{ invoiceNumber: string; amount: number }>;
+  netRemaining?: number;
   outstandingAmount?: number;
   invoiceDate?: string | Date;
   kundenreferenz?: string;
@@ -848,7 +850,10 @@ export async function generateGtechDocumentPdf(
         ? Number(opts.taxRate)
         : 0;
 
-  if (shippingMethod) {
+  const shouldRenderShippingRow =
+    Boolean(shippingMethod) && (shippingCostNum > 0 || !showPrices);
+
+  if (shouldRenderShippingRow) {
     const totalItemCount = opts.lineItems ? opts.lineItems.length : 0;
     const shipRowNum = totalItemCount + 1;
     const shipRowBg = totalItemCount % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
@@ -920,12 +925,12 @@ export async function generateGtechDocumentPdf(
     const TOTALS_RIGHT_PAD = 6;
     const TOTALS_VAL_W = MM(42);
     const TOTALS_VAL_X = TABLE_END_X - TOTALS_VAL_W;
-    const TOTALS_LABEL_W = MM(55);
+    const TOTALS_LABEL_W = MM(72);
     const TOTALS_LABEL_X = TOTALS_VAL_X - TOTALS_LABEL_W;
     const rawCurrency = opts.currency || "EUR";
     const currency = (rawCurrency.toUpperCase() === "EUR" || rawCurrency === "€") ? "€" : rawCurrency;
 
-    const shippingTotalNet = shippingLineTotal;
+    const shippingTotalNet = shippingCostNum * shippingQtyNum;
     const lineItemsSubtotal = (opts.lineItems || []).reduce((acc, it) => {
       const lineNet =
         it.lineTotal !== undefined && it.lineTotal !== null
@@ -963,9 +968,58 @@ export async function generateGtechDocumentPdf(
       );
     }
 
+    const hasPrepaymentLines =
+      Boolean(opts.prepaymentLines && opts.prepaymentLines.length > 0);
+    const baseNet = effectiveSubtotal - Number(opts.discountAmount || 0);
+    let netForTax = baseNet;
+
+    if (hasPrepaymentLines) {
+      let totalPrepaymentDeducted = 0;
+      for (const prepay of opts.prepaymentLines!) {
+        const prepayAmt = Number(prepay.amount || 0);
+        totalPrepaymentDeducted += prepayAmt;
+        yPos += 16;
+        doc
+          .font(R)
+          .text(
+            `Vorauszahlungsrechnung ${prepay.invoiceNumber} netto`,
+            TOTALS_LABEL_X,
+            yPos,
+            { width: TOTALS_LABEL_W, lineBreak: false },
+          );
+        doc.font(R).text(
+          `-${formatGermanNum(prepayAmt, 2)} ${currency}`,
+          TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+          yPos,
+          { align: "right", width: TOTALS_VAL_W },
+        );
+      }
+
+      netForTax = Math.max(0, baseNet - totalPrepaymentDeducted);
+
+      yPos += 16;
+      doc.font(R).text("Restbetrag netto", TOTALS_LABEL_X, yPos);
+      doc.font(R).text(
+        `${formatGermanNum(netForTax, 2)} ${currency}`,
+        TOTALS_VAL_X - TOTALS_RIGHT_PAD,
+        yPos,
+        { align: "right", width: TOTALS_VAL_W },
+      );
+    }
+
     let vatEntries: Array<{ rate: number; amount: number }> = [];
 
-    if (opts.vatBreakdown && opts.vatBreakdown.length > 0) {
+    if (hasPrepaymentLines) {
+      const primaryRate = Number(
+        opts.taxRate !== undefined && opts.taxRate !== null ? opts.taxRate : 19,
+      );
+      if (netForTax <= 0.001) {
+        vatEntries = [{ rate: primaryRate, amount: 0 }];
+      } else {
+        const taxAmt = Math.round(netForTax * (primaryRate / 100) * 100) / 100;
+        vatEntries = [{ rate: primaryRate, amount: taxAmt }];
+      }
+    } else if (opts.vatBreakdown && opts.vatBreakdown.length > 0) {
       vatEntries = opts.vatBreakdown;
     } else {
       const rateOrder: number[] = [];
@@ -1032,7 +1086,9 @@ export async function generateGtechDocumentPdf(
       );
     }
 
-    const finalBrutto = (effectiveSubtotal - Number(opts.discountAmount || 0)) + calcVatTotal;
+    const finalBrutto = hasPrepaymentLines
+      ? netForTax + calcVatTotal
+      : (effectiveSubtotal - Number(opts.discountAmount || 0)) + calcVatTotal;
 
     yPos += 22;
     const bruttoBoxX = TOTALS_LABEL_X - 6;
@@ -1040,7 +1096,8 @@ export async function generateGtechDocumentPdf(
     doc.rect(bruttoBoxX, yPos - 4, bruttoBoxW, 20).fill("#ECEAE6");
 
     doc.font(SB).fontSize(10).fillColor("#1A202C");
-    doc.text("Gesamtpreis Brutto", TOTALS_LABEL_X, yPos);
+    const bruttoLabel = hasPrepaymentLines ? "Gesamt Brutto" : "Gesamtpreis Brutto";
+    doc.text(bruttoLabel, TOTALS_LABEL_X, yPos);
     doc.text(
       `${formatGermanNum(finalBrutto, 2)} ${currency}`,
       TOTALS_VAL_X - TOTALS_RIGHT_PAD,
