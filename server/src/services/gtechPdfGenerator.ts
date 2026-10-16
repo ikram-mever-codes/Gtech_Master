@@ -332,20 +332,17 @@ export async function generateGtechDocumentPdf(
   let addrY = MM(53);
   doc.fillColor("#3F4446");
 
-  const legalName = (
-    customer.legalName ||
-    customer.legal_name ||
-    customer.legalCompany ||
-    opts.customerEntity?.legalName ||
-    ""
-  ).trim();
-  const companyName = (
+  const displayName = (
+    customer.displayName ||
+    customer.display_name ||
+    opts.customerEntity?.displayName ||
     customer.companyName ||
     customer.company_name ||
     opts.customerEntity?.companyName ||
+    customer.name ||
     ""
   ).trim();
-  const primaryName = legalName || companyName;
+  const primaryName = displayName;
   const mainCityStr = (customer.city || opts.customerEntity?.city || "").trim();
   const mainPostalStr = (
     customer.postalCode ||
@@ -359,8 +356,14 @@ export async function generateGtechDocumentPdf(
     ""
   ).trim();
   const mainAddInfo = (
+    customer.addressAdditional ||
+    customer.address_additional ||
     customer.addressAdditionalLine ||
+    customer.address_additional_line ||
+    customer.additionalInfo ||
     customer.addressLine2 ||
+    opts.customerEntity?.addressAdditional ||
+    opts.customerEntity?.address_additional ||
     opts.customerEntity?.addressLine2 ||
     ""
   ).trim();
@@ -392,25 +395,26 @@ export async function generateGtechDocumentPdf(
         .replace(/,\s*$/, "");
     }
 
-    const cityLineVal = `${pStr} ${cStr}`.trim();
+    const cleanPostal = pStr.replace(/^[A-Za-z]{2}-/i, "").trim();
+    const cityLineVal = `${cleanPostal} ${cStr}`.trim();
 
     const lines: string[] = [];
     if (cName && cName.trim()) lines.push(cName.trim());
-
-    if (cleanStreet) lines.push(cleanStreet);
 
     if (
       addLine &&
       addLine.trim() &&
       addLine.trim() !== "Additional Info" &&
+      addLine.trim().toLowerCase() !== "additional line (c/o, floor)" &&
       addLine.trim() !== cName.trim()
     ) {
       lines.push(addLine.trim());
     }
 
+    if (cleanStreet) lines.push(cleanStreet);
+
     if (cityLineVal) lines.push(cityLineVal);
 
-    // For non-German addresses, append the country name as the last line
     if (!isGer && dispC) lines.push(dispC);
 
     return lines;
@@ -493,13 +497,34 @@ export async function generateGtechDocumentPdf(
             .toLowerCase()
             .replace(/[^a-z0-9]/gi, "");
 
-          const sAddLine =
+          const sAddLine = (
+            offerDelivery.addressAdditional ||
+            offerDelivery.address_additional ||
             offerDelivery.additionalInfo ||
             offerDelivery.addressAdditionalLine ||
+            offerDelivery.address_additional_line ||
             offerDelivery.addressLine2 ||
-            "";
+            ""
+          ).trim();
+
+          const sDeliveryTitle = (
+            offerDelivery.addressName ||
+            offerDelivery.name ||
+            offerDelivery.companyName ||
+            ""
+          ).trim();
+
+          const sContactName = (offerDelivery.contactName || "").trim();
+          const isGenericContact =
+            !sContactName ||
+            sContactName === primaryName ||
+            sContactName === displayName;
+
           const sContact =
-            offerDelivery.contactName || offerDelivery.name || primaryName;
+            sDeliveryTitle ||
+            (!isGenericContact ? sContactName : "") ||
+            primaryName;
+
           shipLinesToRender = formatAddressBlockLines(
             sContact,
             sAddLine,

@@ -1669,7 +1669,7 @@ export class OfferController {
           defaultAddress.address_additional_line ||
           defaultAddress.additionalInfo ||
           undefined,
-        contactName: customer.legalName || customer.companyName,
+        contactName: defaultAddress.name || customer.legalName || customer.companyName,
         contactPhone: customer.contactPhoneNumber,
       };
     }
@@ -1765,13 +1765,6 @@ export class OfferController {
           ? (parseFlexibleNumber(body.taxRate) ?? offer.taxRate ?? 19)
           : (offer.taxRate ?? 19);
 
-      // NEW: whenever this line is tied to a catalog item (sourceItemId,
-      // e.g. "Add existing item"), the price always comes from the
-      // sales_prices resolution — customer-specific tier, then general
-      // tier, then the item's own plain price — never from the caller's
-      // basePrice, since the frontend can't know these tiers itself.
-      // Freetext ("Freizeile") lines with no sourceItemId keep using
-      // whatever basePrice was supplied (defaults to 0, edited afterwards).
       let basePrice = parseFlexibleNumber(body.basePrice) ?? 0;
       if (body.sourceItemId) {
         const itemRepository = AppDataSource.getRepository(Item);
@@ -3995,17 +3988,17 @@ export class OfferController {
       let addrY = MM(53);
       doc.fillColor("#3F4446");
 
-      const legalName = (
-        customer.legalName ||
-        customerEntity?.legalName ||
-        ""
-      ).trim();
-      const companyName = (
+      const displayName = (
+        customer.displayName ||
+        customer.display_name ||
+        customerEntity?.displayName ||
         customer.companyName ||
+        customer.company_name ||
         customerEntity?.companyName ||
+        customer.name ||
         ""
       ).trim();
-      const primaryName = legalName || companyName;
+      const primaryName = displayName;
       const mainCityStr = (customer.city || customerEntity?.city || "").trim();
       const mainPostalStr = (
         customer.postalCode ||
@@ -4019,8 +4012,14 @@ export class OfferController {
         ""
       ).trim();
       const mainAddInfo = (
+        customer.addressAdditional ||
+        customer.address_additional ||
         customer.addressAdditionalLine ||
+        customer.address_additional_line ||
+        customer.additionalInfo ||
         customer.addressLine2 ||
+        customerEntity?.addressAdditional ||
+        customerEntity?.address_additional ||
         customerEntity?.addressLine2 ||
         ""
       ).trim();
@@ -4052,27 +4051,25 @@ export class OfferController {
             .replace(/,\s*$/, "");
         }
 
-        const cityLineVal = `${pStr} ${cStr}`.trim();
+        const cleanPostal = pStr.replace(/^[A-Za-z]{2}-/i, "").trim();
+        const cityLineVal = `${cleanPostal} ${cStr}`.trim();
 
         const lines: string[] = [];
         if (cName && cName.trim()) lines.push(cName.trim());
-
-        if (cleanStreet) lines.push(cleanStreet);
 
         if (
           addLine &&
           addLine.trim() &&
           addLine.trim() !== "Additional Info" &&
+          addLine.trim().toLowerCase() !== "additional line (c/o, floor)" &&
           addLine.trim() !== cName.trim()
         ) {
           lines.push(addLine.trim());
         }
 
+        if (cleanStreet) lines.push(cleanStreet);
         if (cityLineVal) lines.push(cityLineVal);
-
-        // For non-German addresses, append the country name as the last line
         if (!isGer && dispC) lines.push(dispC);
-
         return lines;
       };
 
@@ -4172,14 +4169,37 @@ export class OfferController {
                   .toLowerCase()
                   .replace(/[^a-z0-9]/gi, "");
 
-              const sAddLine =
+              const sAddLine = (
+                offerDelivery.addressAdditional ||
+                offerDelivery.address_additional ||
                 offerDelivery.additionalInfo ||
                 offerDelivery.address_additional_line ||
+                offerDelivery.addressAdditionalLine ||
                 offerDelivery.addressLine2 ||
                 offerDelivery.additionalLine ||
-                "";
+                ""
+              ).trim();
+
+              const sDeliveryTitle = (
+                offerDelivery.addressName ||
+                offerDelivery.name ||
+                offerDelivery.companyName ||
+                ""
+              ).trim();
+
+              const sContactName = (offerDelivery.contactName || "").trim();
+              const isGenericContact =
+                !sContactName ||
+                sContactName === primaryName ||
+                sContactName === displayName;
+
+              const sContact =
+                sDeliveryTitle ||
+                (!isGenericContact ? sContactName : "") ||
+                primaryName;
+
               shipLinesToRender = formatAddressBlockLines(
-                offerDelivery.companyName || offerDelivery.name || primaryName,
+                sContact,
                 sAddLine,
                 sStreet,
                 sPostal,

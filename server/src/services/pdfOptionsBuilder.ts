@@ -155,9 +155,10 @@ export async function buildRechnungPdfOptions(
 
   const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
   const customerCompName = String(
-    customerSnap.company_name ||
+    customerSnap.displayName ||
+    customerSnap.display_name ||
     customerSnap.companyName ||
-    customerSnap.legalName ||
+    customerSnap.company_name ||
     "",
   ).trim();
   const customerNum = String(customerSnap.customerNumber || "").trim();
@@ -453,9 +454,10 @@ export async function buildLieferscheinPdfOptions(
 
   const customerSnap = rechnung.customerSnapshot || rechnung.customer || {};
   const customerCompName = String(
-    customerSnap.company_name ||
+    customerSnap.displayName ||
+    customerSnap.display_name ||
     customerSnap.companyName ||
-    customerSnap.legalName ||
+    customerSnap.company_name ||
     "",
   ).trim();
   const customerNum = String(customerSnap.customerNumber || "").trim();
@@ -614,10 +616,10 @@ export async function buildAuftragPdfOptions(
 
   const customerSnap = auftrag.customerSnapshot || auftrag.customer || {};
   const customerCompName = String(
+    customerSnap.displayName ||
+    customerSnap.display_name ||
     customerSnap.companyName ||
     customerSnap.company_name ||
-    customerSnap.legalName ||
-    customerSnap.displayName ||
     "",
   ).trim();
   const customerNum = String(customerSnap.customerNumber || "").trim();
@@ -801,10 +803,10 @@ export async function buildOfferPdfOptions(
 
   const customerSnap = offer.customerSnapshot || {};
   const customerCompName = String(
+    (customerSnap as any).displayName ||
+    (customerSnap as any).display_name ||
     (customerSnap as any).companyName ||
     (customerSnap as any).company_name ||
-    (customerSnap as any).legalName ||
-    (customerSnap as any).displayName ||
     "",
   ).trim();
   const customerNum = String((customerSnap as any).customerNumber || "").trim();

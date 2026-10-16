@@ -876,7 +876,7 @@ const DeliveryHistoryTab = ({ items, isMobile, allLists }: any) => {
                     <TableCell>
                       <IconButton size="small">
                         {expandedPeriod ===
-                        `${delivery.period}_${delivery.cargoNo}` ? (
+                          `${delivery.period}_${delivery.cargoNo}` ? (
                           <ExpandLess />
                         ) : (
                           <ExpandMore />
@@ -2037,21 +2037,21 @@ const MobileItemCard = ({
         borderColor: hasAnyChanges
           ? "#f44336"
           : isSelected
-          ? theme.palette.primary.main
-          : alpha("#E0E7FF", 0.8),
+            ? theme.palette.primary.main
+            : alpha("#E0E7FF", 0.8),
         borderRadius: 2,
         overflow: "hidden",
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         backgroundColor: hasAnyChanges
           ? "#ffebee"
           : isSelected
-          ? alpha(theme.palette.primary.main, 0.02)
-          : "background.paper",
+            ? alpha(theme.palette.primary.main, 0.02)
+            : "background.paper",
         boxShadow: hasAnyChanges
           ? `0 4px 20px ${alpha("#f44336", 0.15)}`
           : isSelected
-          ? `0 4px 20px ${alpha(theme.palette.primary.main, 0.15)}`
-          : "0 2px 12px rgba(0,0,0,0.04)",
+            ? `0 4px 20px ${alpha(theme.palette.primary.main, 0.15)}`
+            : "0 2px 12px rgba(0,0,0,0.04)",
         "&:hover": {
           boxShadow: hasAnyChanges
             ? `0 8px 32px ${alpha("#f44336", 0.2)}`
@@ -2083,11 +2083,11 @@ const MobileItemCard = ({
           background: hasAnyChanges
             ? `#ffcdd2`
             : isSelected
-            ? `linear-gradient(135deg, ${alpha(
+              ? `linear-gradient(135deg, ${alpha(
                 theme.palette.primary.main,
                 0.04
               )} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
-            : `linear-gradient(135deg, ${alpha("#F8FAFC", 0.8)} 0%, ${alpha(
+              : `linear-gradient(135deg, ${alpha("#F8FAFC", 0.8)} 0%, ${alpha(
                 "#F1F5F9",
                 0.6
               )} 100%)`,
@@ -2290,11 +2290,10 @@ const MobileItemCard = ({
                   backgroundColor: item.marked
                     ? alpha(theme.palette.success.main, 0.1)
                     : alpha(theme.palette.grey[500], 0.08),
-                  border: `1px solid ${
-                    item.marked
+                  border: `1px solid ${item.marked
                       ? alpha(theme.palette.success.main, 0.3)
                       : alpha(theme.palette.grey[500], 0.2)
-                  }`,
+                    }`,
                   color: item.marked
                     ? theme.palette.success.main
                     : theme.palette.grey[600],
