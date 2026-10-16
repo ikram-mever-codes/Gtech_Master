@@ -615,17 +615,29 @@ export const getAvailableCurrenciesFromApi = async () => {
   }
 };
 
-export const formatCurrency = (amount: any, currency: any) => {
+export const formatCurrency = (amount: any, currency: any, maxDecimals = 2) => {
   const num = Number(amount ?? 0);
-  const has3Decimals = Math.abs(num - Math.round(num * 100) / 100) > 0.0001;
+  const safeCurrency =
+    currency && typeof currency === "string" && currency.trim()
+      ? currency.trim().toUpperCase()
+      : "EUR";
+  const has3Decimals = maxDecimals > 2 && Math.abs(num - Math.round(num * 100) / 100) > 0.0001;
   const digits = has3Decimals ? 3 : 2;
-  const formatter = new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: currency === "EUR" ? "EUR" : "USD",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: 3,
-  });
-  return formatter.format(num);
+  try {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: safeCurrency === "EUR" ? "EUR" : safeCurrency === "USD" ? "USD" : "EUR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: digits,
+    }).format(num);
+  } catch (e) {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  }
 };
 
 export const formatUnitPrice = (price: number, decimalPlaces = 3): string => {

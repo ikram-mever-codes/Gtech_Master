@@ -1560,7 +1560,8 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     return Array.from(byRate.entries())
       .map(([rate, base]) => {
         const adjustedBase = base * discountFactor;
-        return { rate, base: adjustedBase, tax: adjustedBase * (rate / 100) };
+        const tax = Math.round(adjustedBase * (rate / 100) * 100) / 100;
+        return { rate, base: adjustedBase, tax };
       })
       .sort((a, b) => b.rate - a.rate);
   })();
@@ -1575,16 +1576,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   );
   const subtotalForDisplay = lineItemsSubtotal + shippingTotalForDisplay;
 
-  const vatTaxSum = vatGroups.reduce((sum, g) => sum + g.tax, 0);
-  const displayTotal =
-    subtotalForDisplay -
-    (offer?.discountAmount || 0) +
-    vatTaxSum;
+  const vatTaxSum = Math.round(vatGroups.reduce((sum, g) => sum + g.tax, 0) * 100) / 100;
+  const displayTotal = Math.round(
+    (subtotalForDisplay - (offer?.discountAmount || 0) + vatTaxSum) * 100
+  ) / 100;
 
-  // --- Linked documents (Aufträge) -----------------------------------------
-  // offer.linkedDocuments is now an array of full CustomerOrder records
-  // ({ id, order_no, created_at, offer_id }) coming straight from
-  // getOfferById / getAllOffers on the backend — sorted newest first here.
   const linkedDocuments = sortByCreatedAtDesc(offer?.linkedDocuments || []);
 
   const sourceTabs: {
