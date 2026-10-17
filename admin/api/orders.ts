@@ -258,7 +258,9 @@ export const downloadItemLabel = async (itemId: number | string) => {
     const file = new Blob([response.data], { type: "application/pdf" });
     const fileURL = URL.createObjectURL(file);
 
-    const contentDisposition = response.headers ? response.headers["content-disposition"] : null;
+    const contentDisposition = response.headers
+      ? response.headers["content-disposition"]
+      : null;
     let filename = `label_${itemId}.pdf`;
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/);
@@ -284,7 +286,7 @@ export const downloadItemLabel = async (itemId: number | string) => {
 export const downloadCommercialInvoice = async (
   orderId: any,
   invoiceNo?: string,
-  cargoNo?: string
+  cargoNo?: string,
 ) => {
   try {
     toast.loading("Generating Commercial Invoice...", loadingStyles);
@@ -300,8 +302,10 @@ export const downloadCommercialInvoice = async (
 
     const sanitizedInvoiceNo = (invoiceNo || "").trim() || "CI";
     const sanitizedCargoNo = (cargoNo || "").trim() || "NoCargo";
-    const filename = `${sanitizedInvoiceNo}_${sanitizedCargoNo}.pdf`
-      .replace(/[/\\?%*:|"<>\s]/g, "_");
+    const filename = `${sanitizedInvoiceNo}_${sanitizedCargoNo}.pdf`.replace(
+      /[/\\?%*:|"<>\s]/g,
+      "_",
+    );
 
     link.download = filename;
     document.body.appendChild(link);
@@ -318,4 +322,12 @@ export const downloadCommercialInvoice = async (
     toast.dismiss();
     handleApiError(error, "Failed to generate invoice");
   }
+};
+
+export const getWeiterversandLabel = async (
+  customerOrderId: string | number,
+  index: number,
+) => {
+  const res = await api.get(`/orders/wv-labels/${customerOrderId}/${index}`);
+  return res.data as { success: boolean; data: { name: string; url: string } };
 };

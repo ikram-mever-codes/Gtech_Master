@@ -12,6 +12,7 @@ import {
   splitOrderItem,
   updateOrderItemLabel,
   generateCommercialInvoicePDF,
+  getWeiterversandLabel,
 } from "../controllers/order_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { UserRole } from "../models/users";
@@ -71,6 +72,12 @@ router.put(
   "/items/:id/label",
   authorize(UserRole.SALES, UserRole.PURCHASING),
   updateOrderItemLabel,
+);
+
+router.get(
+  "/wv-labels/:customerOrderId/:index",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  getWeiterversandLabel,
 );
 
 export default router;

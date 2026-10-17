@@ -41,6 +41,7 @@ import {
   type OrderSearchFilters,
   getOrderStatusColor,
   downloadItemLabel,
+  getWeiterversandLabel,
 } from "@/api/orders";
 import {
   getAllCargos,
@@ -79,14 +80,16 @@ import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuanti
 import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 import { formatDate } from "@/utils/date";
+import { openLabel } from "@/utils/openLabel";
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-2.5 h-8 text-xs border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
@@ -146,8 +149,6 @@ type OrderItemRow = {
 
 type Mode = "create" | "edit" | "convert";
 
-
-
 const tabs = [
   {
     id: "nso",
@@ -175,8 +176,6 @@ const tabs = [
     description: "Print and manage labels",
   },
 ] as const;
-
-
 
 const OrderPage: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.user);
@@ -246,6 +245,8 @@ const OrderPage: React.FC = () => {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [openingWvLabel, setOpeningWvLabel] = useState<string | null>(null);
+
   const [targetCargoId, setTargetCargoId] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
@@ -294,13 +295,19 @@ const OrderPage: React.FC = () => {
 
     const filterParam = searchParams.get("filter");
     if (filterParam === "purchase_problem") {
-      return list.filter((i: any) =>
-        (i.problems && (i.problems.toLowerCase().includes("purchase") || i.problems.toLowerCase().includes("buy"))) ||
-        (i.status && String(i.status).toLowerCase().includes("purchase"))
+      return list.filter(
+        (i: any) =>
+          (i.problems &&
+            (i.problems.toLowerCase().includes("purchase") ||
+              i.problems.toLowerCase().includes("buy"))) ||
+          (i.status && String(i.status).toLowerCase().includes("purchase")),
       );
     } else if (filterParam === "check_problem") {
-      return list.filter((i: any) =>
-        (i.problems && (i.problems.toLowerCase().includes("check") || i.problems.toLowerCase().includes("verify")))
+      return list.filter(
+        (i: any) =>
+          i.problems &&
+          (i.problems.toLowerCase().includes("check") ||
+            i.problems.toLowerCase().includes("verify")),
       );
     }
 
@@ -348,7 +355,8 @@ const OrderPage: React.FC = () => {
   };
   const purchaseOrdersList = useMemo(() => {
     return supplierOrdersList.filter((so) => {
-      const isPurchaseOrder = so.order_type?.name === "Purchase Order" && so.is_po_created === 1;
+      const isPurchaseOrder =
+        so.order_type?.name === "Purchase Order" && so.is_po_created === 1;
       if (!isPurchaseOrder) return false;
 
       const searchLower = poSearch.toLowerCase();
@@ -414,41 +422,25 @@ const OrderPage: React.FC = () => {
     return map;
   }, [wvProviders]);
 
-  const renderWeiterversandBadge = (row: any) => {
-    const order = row.parentOrder;
-    if (!order) return <span className="text-gray-300">-</span>;
-
-    const isWV =
-      order.is_weiterversand === true ||
-      order.is_weiterversand === 1 ||
-      order.is_weiterversand === "true" ||
-      order.is_weiterversand === "1" ||
-      order.is_weiterversand === "Yes" ||
-      order.isWeiterversand === true;
-
-    if (!isWV) {
-      return <span className="text-gray-400 text-xs font-medium">Nein</span>;
+  const handleOpenWvLabel = async (
+    customerOrderId: string | number,
+    index: number,
+  ) => {
+    const key = `${customerOrderId}_${index}`;
+    if (openingWvLabel === key) return;
+    const win = window.open("", "_blank");
+    setOpeningWvLabel(key);
+    try {
+      const res = await getWeiterversandLabel(customerOrderId, index);
+      if (!res?.data?.url) throw new Error("Label not found");
+      openLabel(res.data, win);
+    } catch (e) {
+      console.error(e);
+      win?.close();
+      toast.error("Couldn't open the shipping label");
+    } finally {
+      setOpeningWvLabel(null);
     }
-
-    const customerObj = order.customer || customers.find((c) => String(c.id) === String(order.customer_id));
-    const customerName = customerObj?.companyName || customerObj?.company_name || order.customer_name || "";
-
-    const providerName =
-      order.weiterversandServiceProvider?.name ||
-      order.weiterversand_service_provider_name ||
-      wvProviderMap.get(String(order.weiterversand_service_provider_id || order.weiterversandServiceProviderId || "")) ||
-      order.weiterversand_service_provider ||
-      "";
-
-    const labelText = providerName
-      ? `WV-${providerName}`
-      : `Weiterversand`;
-
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm whitespace-nowrap">
-        {labelText}
-      </span>
-    );
   };
   const orderItemDetailsMap = useMemo(() => {
     const map = new Map<string, any>();
@@ -457,7 +449,13 @@ const OrderPage: React.FC = () => {
         map.set(String(it.id), {
           order_no: o.order_no,
           cargo_id: o.cargo_id || it.cargo_id,
-          price: it.price || it.item?.rmb_price || it.item?.RMB_Price || it.item?.rmb_special_price || it.item?.others?.rmbPrice || 0,
+          price:
+            it.price ||
+            it.item?.rmb_price ||
+            it.item?.RMB_Price ||
+            it.item?.rmb_special_price ||
+            it.item?.others?.rmbPrice ||
+            0,
           status:
             it.status ||
             it.item_status ||
@@ -488,7 +486,12 @@ const OrderPage: React.FC = () => {
 
       if (!s) return String(supplierId);
 
-      const englishName = (s.name && !hasChinese(s.name)) ? s.name : ((s.company_name && !hasChinese(s.company_name)) ? s.company_name : null);
+      const englishName =
+        s.name && !hasChinese(s.name)
+          ? s.name
+          : s.company_name && !hasChinese(s.company_name)
+            ? s.company_name
+            : null;
       if (englishName) return englishName;
 
       const chineseName = s.name_cn || s.company_name || s.name;
@@ -515,7 +518,12 @@ const OrderPage: React.FC = () => {
     (supplierId: any) => {
       const s = supplierMap.get(String(supplierId));
       if (!s) return String(supplierId);
-      const englishName = (s.name && !hasChinese(s.name)) ? s.name : ((s.company_name && !hasChinese(s.company_name)) ? s.company_name : null);
+      const englishName =
+        s.name && !hasChinese(s.name)
+          ? s.name
+          : s.company_name && !hasChinese(s.company_name)
+            ? s.company_name
+            : null;
       if (englishName) return englishName;
       const chineseName = s.name_cn || s.company_name || s.name;
       if (chineseName) return chineseName;
@@ -532,7 +540,7 @@ const OrderPage: React.FC = () => {
       normal: new Map<string, any>(),
     };
 
-    const recognizedSet = new Set(suppliers.map(s => String(s.id)));
+    const recognizedSet = new Set(suppliers.map((s) => String(s.id)));
 
     orders.forEach((o: any) => {
       const isExpress = (o.comment || "").toLowerCase().includes("express");
@@ -597,7 +605,16 @@ const OrderPage: React.FC = () => {
       express: filterBySearch(Array.from(groups.express.values())),
       normal: filterBySearch(Array.from(groups.normal.values())),
     };
-  }, [orders, itemById, supplierMap, categoryMap, getSupplierNameOpt, nsoSearch, loadingOrders, suppliers]);
+  }, [
+    orders,
+    itemById,
+    supplierMap,
+    categoryMap,
+    getSupplierNameOpt,
+    nsoSearch,
+    loadingOrders,
+    suppliers,
+  ]);
 
   const isTab1 = true;
   const isTab2 = false;
@@ -855,7 +872,13 @@ const OrderPage: React.FC = () => {
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      const validTabs = ["nso", "supplier_orders", "purchase_order", "problems", "label_print"];
+      const validTabs = [
+        "nso",
+        "supplier_orders",
+        "purchase_order",
+        "problems",
+        "label_print",
+      ];
       if (validTabs.includes(tabParam)) {
         setActiveTab(tabParam as any);
       }
@@ -875,8 +898,10 @@ const OrderPage: React.FC = () => {
     fetchAllItems();
     fetchCargos();
     getWeiterversandServiceProviders()
-      .then((res: any) => setWvProviders(Array.isArray(res) ? res : res?.data || []))
-      .catch(() => { });
+      .then((res: any) =>
+        setWvProviders(Array.isArray(res) ? res : res?.data || []),
+      )
+      .catch(() => {});
   }, [fetchCustomers, fetchCategories, fetchSuppliers, fetchAllItems]);
 
   useEffect(() => {
@@ -943,7 +968,13 @@ const OrderPage: React.FC = () => {
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      const validTabs = ["nso", "supplier_orders", "purchase_order", "problems", "label_print"];
+      const validTabs = [
+        "nso",
+        "supplier_orders",
+        "purchase_order",
+        "problems",
+        "label_print",
+      ];
       if (validTabs.includes(tabParam)) {
         setActiveTab(tabParam as any);
       }
@@ -1059,24 +1090,26 @@ const OrderPage: React.FC = () => {
       comment_delivery_left: so.comment_delivery_left || "",
       comment_delivery_right: so.comment_delivery_right || "",
     });
-    setOrderItems((so.items || []).map((it: any) => {
-      const det = orderItemDetailsMap.get(String(it.id));
-      const resolvedPrice =
-        det?.rmb_special_price ||
-        it.rmb_special_price ||
-        it.rmb_price ||
-        it.item?.rmb_price ||
-        it.item?.rmb_special_price ||
-        it.item?.RMB_Price ||
-        it.item?.others?.rmbPrice ||
-        det?.price ||
-        it.price ||
-        0;
-      return {
-        ...it,
-        price: resolvedPrice
-      };
-    }));
+    setOrderItems(
+      (so.items || []).map((it: any) => {
+        const det = orderItemDetailsMap.get(String(it.id));
+        const resolvedPrice =
+          det?.rmb_special_price ||
+          it.rmb_special_price ||
+          it.rmb_price ||
+          it.item?.rmb_price ||
+          it.item?.rmb_special_price ||
+          it.item?.RMB_Price ||
+          it.item?.others?.rmbPrice ||
+          det?.price ||
+          it.price ||
+          0;
+        return {
+          ...it,
+          price: resolvedPrice,
+        };
+      }),
+    );
     setShowModal(true);
   };
   const handleSavePO = async () => {
@@ -1249,10 +1282,7 @@ const OrderPage: React.FC = () => {
             const id = String(l.item_id ?? "");
             const item = itemById.get(id);
             const resolvedSupplierId =
-              l.supplier_id ||
-              l.item?.supplier_id ||
-              item?.supplier_id ||
-              null;
+              l.supplier_id || l.item?.supplier_id || item?.supplier_id || null;
             return {
               item_id: id,
               itemName:
@@ -1280,7 +1310,8 @@ const OrderPage: React.FC = () => {
                 (item as any)?.supplier?.company_name ||
                 (item as any)?.supplier?.name ||
                 null,
-              taric_code: l.taric_code || l.item?.taric?.code || item?.taric || null,
+              taric_code:
+                l.taric_code || l.item?.taric?.code || item?.taric || null,
             };
           }),
         );
@@ -1355,7 +1386,9 @@ const OrderPage: React.FC = () => {
   const handleUpdateSO = async () => {
     if (!selectedOrder?.id) return;
     try {
-      const isNewTypePO = categories.find(c => String(c.id) === String(form.category_id))?.name === "Purchase Order";
+      const isNewTypePO =
+        categories.find((c) => String(c.id) === String(form.category_id))
+          ?.name === "Purchase Order";
       const isOldTypePO = selectedOrder?.order_type?.name === "Purchase Order";
 
       await updateSupplierOrder(selectedOrder.id, {
@@ -1363,7 +1396,8 @@ const OrderPage: React.FC = () => {
         order_type_id: form.category_id ? Number(form.category_id) : null,
         ref_no: form.ref_no || "",
         remark: form.comment || "",
-        is_po_created: (isNewTypePO && isOldTypePO) ? (selectedOrder?.is_po_created || 0) : 0,
+        is_po_created:
+          isNewTypePO && isOldTypePO ? selectedOrder?.is_po_created || 0 : 0,
       });
       setShowModal(false);
       setIsSOEditing(false);
@@ -1437,7 +1471,11 @@ const OrderPage: React.FC = () => {
     fetchOrders();
   };
 
-  const handleAssignSupplier = async (orderItemId: number | string, supplierId: number, baseItemId?: number | string) => {
+  const handleAssignSupplier = async (
+    orderItemId: number | string,
+    supplierId: number,
+    baseItemId?: number | string,
+  ) => {
     try {
       await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
 
@@ -1445,10 +1483,7 @@ const OrderPage: React.FC = () => {
         await updateItem(Number(baseItemId), { supplier_id: supplierId });
       }
 
-      await Promise.all([
-        fetchOrders(),
-        fetchAllItems()
-      ]);
+      await Promise.all([fetchOrders(), fetchAllItems()]);
 
       toast.success("Supplier assigned successfully");
     } catch (error) {
@@ -1473,36 +1508,48 @@ const OrderPage: React.FC = () => {
       }));
 
       if (o.order_no && String(o.order_no).includes("2608-10")) {
-        console.log("🔍 [DEBUG ORDERS PAGE] RAW items from API for order 2608-10:", rawItems.map((x: any) => ({
-          id: x.id,
-          position: x.position,
-          remark_de: x.remark_de,
-          remark_order_item: x.remark_order_item,
-          _originalIndex: x._originalIndex,
-          item_name: x.item?.item_name || x.item_name
-        })));
+        console.log(
+          "🔍 [DEBUG ORDERS PAGE] RAW items from API for order 2608-10:",
+          rawItems.map((x: any) => ({
+            id: x.id,
+            position: x.position,
+            remark_de: x.remark_de,
+            remark_order_item: x.remark_order_item,
+            _originalIndex: x._originalIndex,
+            item_name: x.item?.item_name || x.item_name,
+          })),
+        );
       }
 
       rawItems.sort((a: any, b: any) => {
         const getSortValue = (item: any, fallbackIdx: number) => {
-          if (item.position !== undefined && item.position !== null && item.position !== "") {
+          if (
+            item.position !== undefined &&
+            item.position !== null &&
+            item.position !== ""
+          ) {
             const p = Number(item.position);
             if (!isNaN(p)) return p;
           }
           return fallbackIdx;
         };
-        return getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex);
+        return (
+          getSortValue(a, a._originalIndex) - getSortValue(b, b._originalIndex)
+        );
       });
 
       if (o.order_no && String(o.order_no).includes("2608-10")) {
-        console.log("🔍 [DEBUG ORDERS PAGE] SORTED items for order 2608-10:", rawItems.map((x: any) => ({
-          id: x.id,
-          position: x.position,
-          remark_de: x.remark_de,
-          remark_order_item: x.remark_order_item,
-          _originalIndex: x._originalIndex,
-          item_name: x.item?.item_name || x.item_name
-        })));
+        console.log(
+          "🔍 [DEBUG ORDERS PAGE] SORTED items for order 2608-10:",
+          rawItems.map((x: any) => ({
+            id: x.id,
+            position: x.position,
+            remark_de: x.remark_de,
+            remark_order_item: x.remark_order_item,
+            _originalIndex: x._originalIndex,
+            item_name: x.item?.item_name || x.item_name,
+          })),
+        );
       }
 
       return rawItems.map((i: any, idx: number) => ({
@@ -1524,33 +1571,52 @@ const OrderPage: React.FC = () => {
       if (filterParam === "unassigned_cargo") {
         allItems = allItems.filter((i: any) => !i.cargo_id || i.cargo_id === 0);
       } else if (filterParam === "purchase_problem") {
-        allItems = allItems.filter((i: any) =>
-          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("purchase") || i.problems.toLowerCase().includes("buy"))) ||
-          (i.status && String(i.status).toLowerCase().includes("purchase"))
+        allItems = allItems.filter(
+          (i: any) =>
+            (i.problems &&
+              i.problems !== "" &&
+              (i.problems.toLowerCase().includes("purchase") ||
+                i.problems.toLowerCase().includes("buy"))) ||
+            (i.status && String(i.status).toLowerCase().includes("purchase")),
         );
       } else if (filterParam === "check_problem") {
-        allItems = allItems.filter((i: any) =>
-          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("check") || i.problems.toLowerCase().includes("verify")))
+        allItems = allItems.filter(
+          (i: any) =>
+            i.problems &&
+            i.problems !== "" &&
+            (i.problems.toLowerCase().includes("check") ||
+              i.problems.toLowerCase().includes("verify")),
         );
       } else if (filterParam === "rmb_special_no_value") {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
           const price = i.rmb_price || it.rmb_price || it.RMB_Price || 0;
-          return it.is_rmb_special === "Y" && (!price || parseFloat(String(price)) === 0);
+          return (
+            it.is_rmb_special === "Y" &&
+            (!price || parseFloat(String(price)) === 0)
+          );
         });
       } else if (filterParam === "eur_special_no_value") {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
-          const hasEUR = (it.price && parseFloat(String(it.price)) > 0) || (it.transfer_price_EUR && parseFloat(String(it.transfer_price_EUR)) > 0);
+          const hasEUR =
+            (it.price && parseFloat(String(it.price)) > 0) ||
+            (it.transfer_price_EUR &&
+              parseFloat(String(it.transfer_price_EUR)) > 0);
           return it.is_eur_special === "Y" && !hasEUR;
         });
       } else if (filterParam === "dimension_special_no_value") {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
-          const hasDim = (it.weight && parseFloat(String(it.weight)) > 0) &&
-            (it.length && parseFloat(String(it.length)) > 0) &&
-            (it.width && parseFloat(String(it.width)) > 0) &&
-            (it.height && parseFloat(String(it.height)) > 0);
+          const hasDim =
+            it.weight &&
+            parseFloat(String(it.weight)) > 0 &&
+            it.length &&
+            parseFloat(String(it.length)) > 0 &&
+            it.width &&
+            parseFloat(String(it.width)) > 0 &&
+            it.height &&
+            parseFloat(String(it.height)) > 0;
           return it.is_dimension_special === "Y" && !hasDim;
         });
       }
@@ -1558,10 +1624,15 @@ const OrderPage: React.FC = () => {
 
     if (!orderNoFilter) return allItems;
     const s = orderNoFilter.toLowerCase();
-    return allItems.filter((i) =>
-      String(i.order_no).toLowerCase().includes(s) ||
-      String(i.ean || i.item?.ean || "").toLowerCase().includes(s) ||
-      String(i.item_name || i.itemName || i.item?.item_name || "").toLowerCase().includes(s)
+    return allItems.filter(
+      (i) =>
+        String(i.order_no).toLowerCase().includes(s) ||
+        String(i.ean || i.item?.ean || "")
+          .toLowerCase()
+          .includes(s) ||
+        String(i.item_name || i.itemName || i.item?.item_name || "")
+          .toLowerCase()
+          .includes(s),
     );
   }, [orders, orderNoFilter, searchParams]);
 
@@ -1571,14 +1642,15 @@ const OrderPage: React.FC = () => {
         o.status !== 1 ||
         o.is_fulfilled ||
         (o.comment || "").includes("[Moved to Fulfillment]") ||
-        !String(o.order_no).startsWith("MA")
+        !String(o.order_no).startsWith("MA"),
     );
     if (!orderNoFilter) return list;
     const s = orderNoFilter.toLowerCase();
-    return list.filter((o: any) =>
-      String(o.order_no).toLowerCase().includes(s) ||
-      String(o.id).toLowerCase().includes(s) ||
-      (o.comment || "").toLowerCase().includes(s),
+    return list.filter(
+      (o: any) =>
+        String(o.order_no).toLowerCase().includes(s) ||
+        String(o.id).toLowerCase().includes(s) ||
+        (o.comment || "").toLowerCase().includes(s),
     );
   }, [orders, orderNoFilter]);
 
@@ -1628,10 +1700,7 @@ const OrderPage: React.FC = () => {
       >
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <PageHeader
-              title="Order Processing"
-              icon={ShoppingCart}
-            />
+            <PageHeader title="Order Processing" icon={ShoppingCart} />
           </div>
         </div>
 
@@ -1643,10 +1712,11 @@ const OrderPage: React.FC = () => {
                 onClick={() => {
                   setActiveTab(tab.id);
                 }}
-                className={`py-3.5 px-1 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${activeTab === tab.id
-                  ? "border-[#8CC21B] text-[#8CC21B]"
-                  : "border-transparent text-gray-500 hover:text-gray-900"
-                  }`}
+                className={`py-3.5 px-1 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? "border-[#8CC21B] text-[#8CC21B]"
+                    : "border-transparent text-gray-500 hover:text-gray-900"
+                }`}
               >
                 {tab.label}
               </button>
@@ -1658,7 +1728,9 @@ const OrderPage: React.FC = () => {
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5 flex-1">
             <div className="flex items-center gap-1 shrink-0 select-none px-0.5">
               <FilterResetIcon
-                isActive={Boolean(nsoSearch || supplierOrderSearch || poSearch || reprintSearch)}
+                isActive={Boolean(
+                  nsoSearch || supplierOrderSearch || poSearch || reprintSearch,
+                )}
                 onReset={() => {
                   setNsoSearch("");
                   setSupplierOrderSearch("");
@@ -1693,11 +1765,20 @@ const OrderPage: React.FC = () => {
                 onChange={(e) => {
                   const val = e.target.value;
                   if (activeTab === "nso") setNsoSearch(val);
-                  else if (activeTab === "supplier_orders") setSupplierOrderSearch(val);
+                  else if (activeTab === "supplier_orders")
+                    setSupplierOrderSearch(val);
                   else if (activeTab === "purchase_order") setPoSearch(val);
                   else setReprintSearch(val);
                 }}
-                className={getInputClass(!!(activeTab === "nso" ? nsoSearch : activeTab === "supplier_orders" ? supplierOrderSearch : activeTab === "purchase_order" ? poSearch : reprintSearch))}
+                className={getInputClass(
+                  !!(activeTab === "nso"
+                    ? nsoSearch
+                    : activeTab === "supplier_orders"
+                      ? supplierOrderSearch
+                      : activeTab === "purchase_order"
+                        ? poSearch
+                        : reprintSearch),
+                )}
               />
             </div>
           </div>
@@ -1738,7 +1819,8 @@ const OrderPage: React.FC = () => {
                         </thead>
                         <tbody className="bg-white">
                           {row.items.map((it: any, idx: number) => {
-                            const d = it.item || itemById.get(String(it.item_id));
+                            const d =
+                              it.item || itemById.get(String(it.item_id));
                             const name =
                               d?.item_name ||
                               d?.name ||
@@ -1842,10 +1924,11 @@ const OrderPage: React.FC = () => {
                                     handleCreateSupplierOrderFromNSO(row);
                                   }}
                                   disabled={row.supplier_id === 0}
-                                  className={`${row.supplier_id === 0
-                                    ? "bg-gray-400 cursor-not-allowed opacity-75"
-                                    : "bg-[#059669] hover:bg-green-700"
-                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
+                                  className={`${
+                                    row.supplier_id === 0
+                                      ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                      : "bg-[#059669] hover:bg-green-700"
+                                  } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
                                 >
                                   <PlusCircleIcon className="h-5 w-5" />
                                   {row.supplier_id === 0
@@ -1857,7 +1940,11 @@ const OrderPage: React.FC = () => {
                           },
                         ]}
                         loading={loadingOrders}
-                        emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Express NSOs found"}
+                        emptyMessage={
+                          loadingOrders
+                            ? "Loading NSO Data..."
+                            : "No Express NSOs found"
+                        }
                         getRowClassName={() => "bg-red-50"}
                         expandedRowId={expandedNsoId}
                         onRowClick={(row) =>
@@ -1923,10 +2010,11 @@ const OrderPage: React.FC = () => {
                                     handleCreateSupplierOrderFromNSO(row);
                                   }}
                                   disabled={row.supplier_id === 0}
-                                  className={`${row.supplier_id === 0
-                                    ? "bg-gray-400 cursor-not-allowed opacity-75"
-                                    : "bg-[#059669] hover:bg-green-700"
-                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
+                                  className={`${
+                                    row.supplier_id === 0
+                                      ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                      : "bg-[#059669] hover:bg-green-700"
+                                  } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
                                 >
                                   <PlusCircleIcon className="h-5 w-5" />
                                   {row.supplier_id === 0
@@ -1938,7 +2026,11 @@ const OrderPage: React.FC = () => {
                           },
                         ]}
                         loading={loadingOrders}
-                        emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Normal NSOs found"}
+                        emptyMessage={
+                          loadingOrders
+                            ? "Loading NSO Data..."
+                            : "No Normal NSOs found"
+                        }
                         expandedRowId={expandedNsoId}
                         onRowClick={(row) =>
                           setExpandedNsoId(
@@ -1986,8 +2078,7 @@ const OrderPage: React.FC = () => {
                                 String(item.id),
                               );
                               const isSo =
-                                parent?.status === "SO" ||
-                                item.status === "SO";
+                                parent?.status === "SO" || item.status === "SO";
                               return (
                                 <div className="flex flex-col gap-1 items-center">
                                   {isSo && (
@@ -2220,9 +2311,7 @@ const OrderPage: React.FC = () => {
                       <div
                         onClick={() =>
                           setExpandedSupplierOrderId(
-                            expandedSupplierOrderId === row.id
-                              ? null
-                              : row.id,
+                            expandedSupplierOrderId === row.id ? null : row.id,
                           )
                         }
                         className="flex items-center justify-center gap-1 group cursor-pointer"
@@ -2287,7 +2376,8 @@ const OrderPage: React.FC = () => {
                     header: "Actions",
                     align: "center",
                     render: (row) => {
-                      const isPurchaseOrder = row.order_type?.name === "Purchase Order";
+                      const isPurchaseOrder =
+                        row.order_type?.name === "Purchase Order";
                       return (
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -2303,7 +2393,9 @@ const OrderPage: React.FC = () => {
                               className={`px-4 py-1.5 rounded-[4px] text-xs font-bold transition flex items-center gap-2 shadow-md ${Number(row.is_po_created) === 1 ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
                             >
                               <DocumentTextIcon className="h-4 w-4" />
-                              {Number(row.is_po_created) === 1 ? "PO Created" : "Create PO"}
+                              {Number(row.is_po_created) === 1
+                                ? "PO Created"
+                                : "Create PO"}
                             </button>
                           )}
                         </div>
@@ -2327,7 +2419,9 @@ const OrderPage: React.FC = () => {
                   {
                     header: "ID",
                     width: "60px",
-                    render: (row) => <span className="font-semibold">{row.id}</span>,
+                    render: (row) => (
+                      <span className="font-semibold">{row.id}</span>
+                    ),
                     align: "center",
                   },
                   {
@@ -2371,8 +2465,15 @@ const OrderPage: React.FC = () => {
                     width: "180px",
                     render: (row) => {
                       const items = row.items || [];
-                      const desc = items.map((i: any) => i.item?.item_name || i.item?.name).filter(Boolean).join(", ");
-                      return <div className="line-clamp-2 text-[10px] text-gray-500">{desc || row.remark || "-"}</div>;
+                      const desc = items
+                        .map((i: any) => i.item?.item_name || i.item?.name)
+                        .filter(Boolean)
+                        .join(", ");
+                      return (
+                        <div className="line-clamp-2 text-[10px] text-gray-500">
+                          {desc || row.remark || "-"}
+                        </div>
+                      );
                     },
                     align: "left",
                   },
@@ -2380,11 +2481,22 @@ const OrderPage: React.FC = () => {
                     header: "Total RMB",
                     width: "100px",
                     render: (row) => {
-                      const total = (row.items || []).reduce((sum: number, it: any) => {
-                        const p = it.price || it.rmb_special_price || 0;
-                        return sum + (Number(p) * (it.qty || 0));
-                      }, 0);
-                      return <span className="font-bold">¥ {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+                      const total = (row.items || []).reduce(
+                        (sum: number, it: any) => {
+                          const p = it.price || it.rmb_special_price || 0;
+                          return sum + Number(p) * (it.qty || 0);
+                        },
+                        0,
+                      );
+                      return (
+                        <span className="font-bold">
+                          ¥{" "}
+                          {total.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      );
                     },
                     align: "right",
                   },
@@ -2429,7 +2541,10 @@ const OrderPage: React.FC = () => {
                         </button>
                         <button
                           onClick={() => {
-                            console.log("Download button clicked for SO ID:", row.id);
+                            console.log(
+                              "Download button clicked for SO ID:",
+                              row.id,
+                            );
                             downloadPurchaseOrder(row.id);
                           }}
                           className="bg-green-700 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-800 transition"
@@ -2465,9 +2580,7 @@ const OrderPage: React.FC = () => {
                       header: "Supplier ID",
                       width: "80px",
                       render: (row) =>
-                        row.parentOrder?.supplier_id ||
-                        row.supplier_id ||
-                        "-",
+                        row.parentOrder?.supplier_id || row.supplier_id || "-",
                       align: "center",
                     },
                     {
@@ -2625,7 +2738,16 @@ const OrderPage: React.FC = () => {
                       header: "Price",
                       width: "70px",
                       render: (row) => {
-                        const val = row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0;
+                        const val =
+                          row.rmb_special_price ||
+                          row.rmb_price ||
+                          row.item?.rmb_price ||
+                          row.item?.rmb_special_price ||
+                          row.item?.RMB_Price ||
+                          row.item?.others?.rmbPrice ||
+                          row.price ||
+                          row.item?.price ||
+                          0;
                         return Number(val).toFixed(2);
                       },
                       align: "center",
@@ -2718,7 +2840,8 @@ const OrderPage: React.FC = () => {
                           row.item?.de_no ||
                           row.item?.itemNo ||
                           (itemById.get(String(row.item_id)) as any)?.de_no ||
-                          (itemById.get(String(row.item_id)) as any)?.ItemID_DE ||
+                          (itemById.get(String(row.item_id)) as any)
+                            ?.ItemID_DE ||
                           row.de_no ||
                           "-";
 
@@ -2735,7 +2858,13 @@ const OrderPage: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              const link = getItemLink(row) || (row.item_id ? `/items?itemId=${row.item_id}` : row.item?.id ? `/items?itemId=${row.item.id}` : undefined);
+                              const link =
+                                getItemLink(row) ||
+                                (row.item_id
+                                  ? `/items?itemId=${row.item_id}`
+                                  : row.item?.id
+                                    ? `/items?itemId=${row.item.id}`
+                                    : undefined);
                               if (link) router.push(link);
                             }}
                             className={`font-medium hover:underline cursor-pointer ${isHighlighted ? "text-[#059669] font-bold" : "text-blue-600"}`}
@@ -2758,7 +2887,13 @@ const OrderPage: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              const link = getItemLink(row) || (row.item_id ? `/items?itemId=${row.item_id}` : row.item?.id ? `/items?itemId=${row.item.id}` : undefined);
+                              const link =
+                                getItemLink(row) ||
+                                (row.item_id
+                                  ? `/items?itemId=${row.item_id}`
+                                  : row.item?.id
+                                    ? `/items?itemId=${row.item.id}`
+                                    : undefined);
                               if (link) router.push(link);
                             }}
                             className="font-semibold text-gray-800 hover:text-blue-600 hover:underline text-left line-clamp-3 leading-tight break-words cursor-pointer"
@@ -2831,8 +2966,8 @@ const OrderPage: React.FC = () => {
                           wvProviderMap.get(
                             String(
                               order?.weiterversand_service_provider_id ||
-                              order?.weiterversandServiceProviderId ||
-                              "",
+                                order?.weiterversandServiceProviderId ||
+                                "",
                             ),
                           ) ||
                           order?.weiterversand_service_provider ||
@@ -2847,14 +2982,57 @@ const OrderPage: React.FC = () => {
                             <span className="text-gray-800 font-medium text-xs">
                               {customerName}
                             </span>
-                            {isWV && (
-                              <span
-                                className="inline-block mt-0.5 px-1 py-0.2 text-[11px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate"
-                                title={customerWVText}
-                              >
-                                {customerWVText}
-                              </span>
-                            )}
+                            {isWV &&
+                              (() => {
+                                const labels: {
+                                  index: number;
+                                  name: string;
+                                }[] = order?.weiterversand_labels_meta || [];
+                                const coId =
+                                  order?.weiterversand_customer_order_id;
+                                const baseCls =
+                                  "inline-flex items-center gap-1 mt-0.5 px-1 text-[11px] font-semibold text-emerald-800 bg-emerald-100 rounded border border-emerald-300 max-w-fit truncate";
+
+                                if (!coId || labels.length === 0) {
+                                  return (
+                                    <span
+                                      className={baseCls}
+                                      title={`${customerWVText} – no label attached`}
+                                    >
+                                      {customerWVText}
+                                    </span>
+                                  );
+                                }
+
+                                return (
+                                  <div className="flex flex-wrap gap-1">
+                                    {labels.map((l) => {
+                                      const busy =
+                                        openingWvLabel === `${coId}_${l.index}`;
+                                      return (
+                                        <button
+                                          key={l.index}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenWvLabel(coId, l.index);
+                                          }}
+                                          disabled={busy}
+                                          title={`Open ${l.name}`}
+                                          className={`${baseCls} cursor-pointer hover:bg-emerald-200 hover:underline disabled:opacity-60`}
+                                        >
+                                          <PrinterIcon
+                                            className={`h-3 w-3 ${busy ? "animate-pulse" : ""}`}
+                                          />
+                                          {labels.length > 1
+                                            ? `${customerWVText} (${l.index + 1})`
+                                            : customerWVText}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
                           </div>
                         );
                       },
@@ -3044,9 +3222,13 @@ const OrderPage: React.FC = () => {
         <CustomModal
           isOpen={showModal}
           onClose={closeModal}
-          width={(activeTab === "purchase_order" || isPOEditing) ? "max-w-6xl" : "max-w-4xl"}
+          width={
+            activeTab === "purchase_order" || isPOEditing
+              ? "max-w-6xl"
+              : "max-w-4xl"
+          }
           title={
-            (activeTab === "purchase_order" || isPOEditing)
+            activeTab === "purchase_order" || isPOEditing
               ? `Purchase Order Items (Order ID: ${selectedOrder?.id})`
               : mode === "convert"
                 ? "CONVERT ORDER"
@@ -3057,7 +3239,7 @@ const OrderPage: React.FC = () => {
                     : "Create New Order"
           }
           footer={
-            (activeTab === "purchase_order" || isPOEditing) ? (
+            activeTab === "purchase_order" || isPOEditing ? (
               <div className="flex gap-3">
                 <button
                   onClick={closeModal}
@@ -3069,7 +3251,9 @@ const OrderPage: React.FC = () => {
                   onClick={handleSavePO}
                   className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all"
                 >
-                  {selectedOrder?.is_po_created ? "Update Purchase Order" : "Create Purchase order"}
+                  {selectedOrder?.is_po_created
+                    ? "Update Purchase Order"
+                    : "Create Purchase order"}
                 </button>
               </div>
             ) : (
@@ -3081,7 +3265,9 @@ const OrderPage: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
+                  onClick={
+                    mode === "edit" ? handleUpdateOrder : handleCreateOrder
+                  }
                   className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all font-bold"
                 >
                   {mode === "edit" ? "Update Order" : "Create Order"}
@@ -3090,19 +3276,33 @@ const OrderPage: React.FC = () => {
             )
           }
         >
-          {(activeTab === "purchase_order" || isPOEditing) ? (
+          {activeTab === "purchase_order" || isPOEditing ? (
             <div className="space-y-6">
               <div className="overflow-x-auto rounded-lg border border-gray-200">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-[#f8f9fa]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">#</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">ID Supplier name</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">ID - Item name</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Model</th>
-                      <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 w-[80px]">QTY</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 w-[100px]">Price (RMB)</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider w-[120px]">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                        #
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                        ID Supplier name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                        ID - Item name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                        Model
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 w-[80px]">
+                        QTY
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 w-[100px]">
+                        Price (RMB)
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider w-[120px]">
+                        Total
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -3110,21 +3310,43 @@ const OrderPage: React.FC = () => {
                       const price = Number(item.price || 0);
                       const qty = Number(item.qty || 0);
                       const total = price * qty;
-                      const sid = item.supplier_id || (item.item as any)?.supplier_id || (selectedOrder as any)?.supplier_id;
-                      const sname = item.supplier_name || (item.item as any)?.supplier?.company_name || (selectedOrder as any)?.supplier?.company_name || "-";
+                      const sid =
+                        item.supplier_id ||
+                        (item.item as any)?.supplier_id ||
+                        (selectedOrder as any)?.supplier_id;
+                      const sname =
+                        item.supplier_name ||
+                        (item.item as any)?.supplier?.company_name ||
+                        (selectedOrder as any)?.supplier?.company_name ||
+                        "-";
                       return (
                         <tr key={idx} className="hover:bg-gray-50/50">
-                          <td className="px-4 py-2 text-sm text-gray-600 border-r border-gray-200">{idx + 1}</td>
-                          <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 font-medium">{sid} - {sname}</td>
                           <td className="px-4 py-2 text-sm text-gray-600 border-r border-gray-200">
-                            <div className="font-semibold text-gray-800">{item.item_id}</div>
-                            <div className="text-[11px] leading-tight text-gray-500">{item.itemName || (item.item as any)?.item_name || (item.item as any)?.name}</div>
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 font-medium">
+                            {sid} - {sname}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600 border-r border-gray-200">
+                            <div className="font-semibold text-gray-800">
+                              {item.item_id}
+                            </div>
+                            <div className="text-[11px] leading-tight text-gray-500">
+                              {item.itemName ||
+                                (item.item as any)?.item_name ||
+                                (item.item as any)?.name}
+                            </div>
                           </td>
                           <td className="px-2 py-1 border-r border-gray-200">
                             <input
                               type="text"
                               value={item.remark_de || ""}
-                              onChange={(e) => handleUpdateOrderItemRemark(item.item_id, e.target.value)}
+                              onChange={(e) =>
+                                handleUpdateOrderItemRemark(
+                                  item.item_id,
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                               placeholder="Model / Remark..."
                             />
@@ -3133,23 +3355,45 @@ const OrderPage: React.FC = () => {
                             <input
                               type="number"
                               value={item.qty}
-                              onChange={(e) => handleUpdateOrderItemQty(item.item_id, Number(e.target.value))}
+                              onChange={(e) =>
+                                handleUpdateOrderItemQty(
+                                  item.item_id,
+                                  Number(e.target.value),
+                                )
+                              }
                               className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-center font-bold"
                             />
                           </td>
                           <td className="px-4 py-2 text-sm text-right text-gray-700 border-r border-gray-200 font-medium">
-                            {price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {price.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                            })}
                           </td>
                           <td className="px-4 py-2 text-sm text-right text-gray-900 font-bold bg-gray-50/30">
-                            {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {total.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                            })}
                           </td>
                         </tr>
                       );
                     })}
                     <tr className="bg-gray-50 font-bold">
-                      <td colSpan={6} className="px-4 py-3 text-center text-sm text-gray-800 uppercase tracking-wider border-r border-gray-200">Grand total</td>
+                      <td
+                        colSpan={6}
+                        className="px-4 py-3 text-center text-sm text-gray-800 uppercase tracking-wider border-r border-gray-200"
+                      >
+                        Grand total
+                      </td>
                       <td className="px-4 py-3 text-sm text-right text-[#059669] text-lg">
-                        {orderItems.reduce((acc, it) => acc + (Number(it.price || 0) * Number(it.qty || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {orderItems
+                          .reduce(
+                            (acc, it) =>
+                              acc + Number(it.price || 0) * Number(it.qty || 0),
+                            0,
+                          )
+                          .toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
                       </td>
                     </tr>
                   </tbody>
@@ -3159,16 +3403,35 @@ const OrderPage: React.FC = () => {
                 {[
                   { label: "Description", key: "po_description" },
                   { label: "Comment below item table", key: "comment_items" },
-                  { label: "Comment below attachments", key: "comment_attachments" },
-                  { label: "Comment below quality criteria", key: "comment_quality" },
-                  { label: "Comment below delivery", key: "comment_delivery_left" },
-                  { label: "Comment below delivery", key: "comment_delivery_right" },
+                  {
+                    label: "Comment below attachments",
+                    key: "comment_attachments",
+                  },
+                  {
+                    label: "Comment below quality criteria",
+                    key: "comment_quality",
+                  },
+                  {
+                    label: "Comment below delivery",
+                    key: "comment_delivery_left",
+                  },
+                  {
+                    label: "Comment below delivery",
+                    key: "comment_delivery_right",
+                  },
                 ].map((field) => (
                   <div key={field.key} className="space-y-2">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">{field.label}</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      {field.label}
+                    </label>
                     <textarea
                       value={(poForm as any)[field.key]}
-                      onChange={(e) => setPoForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                      onChange={(e) =>
+                        setPoForm((prev) => ({
+                          ...prev,
+                          [field.key]: e.target.value,
+                        }))
+                      }
                       rows={4}
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-sm transition-all"
                       placeholder={`Enter ${field.label.toLowerCase()}...`}
@@ -3180,41 +3443,87 @@ const OrderPage: React.FC = () => {
               <div className="pt-8 border-t border-gray-100">
                 <div className="text-center mb-4">
                   <h3 className="text-sm font-bold text-gray-700">
-                    Previously created POs for supplier {getSupplierName(selectedOrder?.supplier_id)}
+                    Previously created POs for supplier{" "}
+                    {getSupplierName(selectedOrder?.supplier_id)}
                   </h3>
                 </div>
                 <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-[#f8f9fa]">
                       <tr>
-                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">#</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">ID</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">PO No.</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Supplier</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Description</th>
-                        <th className="px-4 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Total RMB</th>
-                        <th className="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">Date created</th>
-                        <th className="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">Actions</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">
+                          #
+                        </th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">
+                          ID
+                        </th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">
+                          PO No.
+                        </th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">
+                          Supplier
+                        </th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">
+                          Description
+                        </th>
+                        <th className="px-4 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">
+                          Total RMB
+                        </th>
+                        <th className="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">
+                          Date created
+                        </th>
+                        <th className="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {supplierOrdersList
-                        .filter(so => so.supplier_id === selectedOrder?.supplier_id && so.id !== selectedOrder?.id)
+                        .filter(
+                          (so) =>
+                            so.supplier_id === selectedOrder?.supplier_id &&
+                            so.id !== selectedOrder?.id,
+                        )
                         .map((so, idx) => {
-                          const total = (so.items || []).reduce((sum: number, it: any) => sum + (Number(it.price || 0) * (it.qty || 0)), 0);
+                          const total = (so.items || []).reduce(
+                            (sum: number, it: any) =>
+                              sum + Number(it.price || 0) * (it.qty || 0),
+                            0,
+                          );
                           const items = so.items || [];
-                          const desc = items.map((i: any) => i.item?.item_name || i.item?.name).filter(Boolean).join(", ");
+                          const desc = items
+                            .map((i: any) => i.item?.item_name || i.item?.name)
+                            .filter(Boolean)
+                            .join(", ");
                           return (
-                            <tr key={so.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-2 text-xs text-gray-500">{idx + 1}</td>
-                              <td className="px-4 py-2 text-xs font-semibold text-gray-700">{so.id}</td>
+                            <tr
+                              key={so.id}
+                              className="hover:bg-gray-50 transition-colors"
+                            >
+                              <td className="px-4 py-2 text-xs text-gray-500">
+                                {idx + 1}
+                              </td>
+                              <td className="px-4 py-2 text-xs font-semibold text-gray-700">
+                                {so.id}
+                              </td>
                               <td className="px-4 py-2 text-xs font-bold text-[#059669]">
                                 {`PO${new Date(so.created_at).getFullYear().toString().slice(-2)}${String(so.id).padStart(3, "0")}`}
                               </td>
-                              <td className="px-4 py-2 text-xs text-gray-600">{getSupplierName(so.supplier_id)}</td>
-                              <td className="px-4 py-2 text-xs text-gray-500 max-w-[200px] truncate">{desc || so.remark || "-"}</td>
-                              <td className="px-4 py-2 text-xs text-right font-bold text-gray-900">¥ {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                              <td className="px-4 py-2 text-xs text-center text-gray-500">{formatDate(so.created_at)}</td>
+                              <td className="px-4 py-2 text-xs text-gray-600">
+                                {getSupplierName(so.supplier_id)}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-500 max-w-[200px] truncate">
+                                {desc || so.remark || "-"}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-right font-bold text-gray-900">
+                                ¥{" "}
+                                {total.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-center text-gray-500">
+                                {formatDate(so.created_at)}
+                              </td>
                               <td className="px-4 py-2 text-center">
                                 <button
                                   onClick={() => openPO(so)}
@@ -3226,9 +3535,16 @@ const OrderPage: React.FC = () => {
                             </tr>
                           );
                         })}
-                      {supplierOrdersList.filter(so => so.supplier_id === selectedOrder?.supplier_id && so.id !== selectedOrder?.id).length === 0 && (
+                      {supplierOrdersList.filter(
+                        (so) =>
+                          so.supplier_id === selectedOrder?.supplier_id &&
+                          so.id !== selectedOrder?.id,
+                      ).length === 0 && (
                         <tr>
-                          <td colSpan={8} className="px-4 py-6 text-center text-xs text-gray-400 font-medium italic">
+                          <td
+                            colSpan={8}
+                            className="px-4 py-6 text-center text-xs text-gray-400 font-medium italic"
+                          >
                             No previous records found for this supplier
                           </td>
                         </tr>
@@ -3257,7 +3573,9 @@ const OrderPage: React.FC = () => {
                     disabled={lockAllExceptQty}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                   >
-                    <option value="">{isTab1 ? "Select Order Type" : "Select Category"}</option>
+                    <option value="">
+                      {isTab1 ? "Select Order Type" : "Select Category"}
+                    </option>
                     {categories
                       .filter((c) => {
                         if (!isTab1) return true;
@@ -3277,7 +3595,9 @@ const OrderPage: React.FC = () => {
                   </select>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{isTab1 ? "Select Supplier:" : "Select Customer:"}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {isTab1 ? "Select Supplier:" : "Select Customer:"}
+                  </label>
                   {isTab1 ? (
                     <select
                       value={form.supplier_id}
@@ -3286,7 +3606,11 @@ const OrderPage: React.FC = () => {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     >
                       <option value="">Select Supplier</option>
-                      {suppliers.map((s) => <option key={s.id} value={String(s.id)}>{s.company_name || s.name || "Unnamed Supplier"}</option>)}
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={String(s.id)}>
+                          {s.company_name || s.name || "Unnamed Supplier"}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <select
@@ -3296,13 +3620,19 @@ const OrderPage: React.FC = () => {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     >
                       <option value="">Select Customer</option>
-                      {customers.map((customer) => <option key={customer.id} value={String(customer.id)}>{customer.companyName}</option>)}
+                      {customers.map((customer) => (
+                        <option key={customer.id} value={String(customer.id)}>
+                          {customer.companyName}
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select Item then quantity:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Item then quantity:
+                </label>
                 <ItemSelectorWithQuantity
                   items={effectiveItems}
                   selectedItemId={selectedItemId}
@@ -3312,10 +3642,14 @@ const OrderPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Comment:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Comment:
+                </label>
                 <textarea
                   value={form.comment}
-                  onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, comment: e.target.value }))
+                  }
                   disabled={lockAllExceptQty}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                   placeholder="Enter order comment..."
@@ -3327,25 +3661,48 @@ const OrderPage: React.FC = () => {
                   <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">ID</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b w-[120px]">Item name</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">Qty</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">Item remark</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">Price</th>
-                        <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">Action</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                          ID
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b w-[120px]">
+                          Item name
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                          Qty
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                          Item remark
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                          Price
+                        </th>
+                        <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {orderItems.map((row) => (
                         <tr key={row.item_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.item_id}</td>
-                          <td className="px-4 py-2 text-sm text-gray-700 border-b"><div className="line-clamp-2 leading-tight max-w-[120px]">{row.itemName}</div></td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                            {row.item_id}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                            <div className="line-clamp-2 leading-tight max-w-[120px]">
+                              {row.itemName}
+                            </div>
+                          </td>
                           <td className="px-4 py-2 text-sm text-gray-700 border-b">
                             <input
                               type="number"
                               min={1}
                               value={row.qty}
-                              onChange={(e) => handleUpdateOrderItemQty(row.item_id, Number(e.target.value))}
+                              onChange={(e) =>
+                                handleUpdateOrderItemQty(
+                                  row.item_id,
+                                  Number(e.target.value),
+                                )
+                              }
                               className="w-16 px-2 py-1 border border-gray-300 rounded-[4px]"
                             />
                           </td>
@@ -3353,13 +3710,25 @@ const OrderPage: React.FC = () => {
                             <input
                               type="text"
                               value={row.remark_de}
-                              onChange={(e) => handleUpdateOrderItemRemark(row.item_id, e.target.value)}
+                              onChange={(e) =>
+                                handleUpdateOrderItemRemark(
+                                  row.item_id,
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-2 py-1 border border-gray-300 rounded-[4px]"
                             />
                           </td>
-                          <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.price} {row.currency}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                            {row.price} {row.currency}
+                          </td>
                           <td className="px-4 py-2 text-center border-b">
-                            <button onClick={() => handleRemoveOrderItem(row.item_id)} className="text-red-500 hover:text-red-700"><TrashIcon className="h-5 w-5" /></button>
+                            <button
+                              onClick={() => handleRemoveOrderItem(row.item_id)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <TrashIcon className="h-5 w-5" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -3456,10 +3825,14 @@ const OrderPage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 ml-1">Select Supplier:</label>
+                <label className="text-xs font-bold text-gray-700 ml-1">
+                  Select Supplier:
+                </label>
                 <select
                   value={form.supplier_id}
-                  onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, supplier_id: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-sm"
                 >
                   <option value="">Select Supplier</option>
@@ -3472,10 +3845,14 @@ const OrderPage: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 ml-1">Select Order Type:</label>
+                <label className="text-xs font-bold text-gray-700 ml-1">
+                  Select Order Type:
+                </label>
                 <select
                   value={form.category_id}
-                  onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, category_id: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-sm"
                 >
                   <option value="">Select Order Type</option>
@@ -3499,7 +3876,9 @@ const OrderPage: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-700 ml-1">Reference No:</label>
+              <label className="text-xs font-bold text-gray-700 ml-1">
+                Reference No:
+              </label>
               <input
                 type="text"
                 value={form.ref_no}
@@ -3510,7 +3889,9 @@ const OrderPage: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-700 ml-1">Supplier order remark:</label>
+              <label className="text-xs font-bold text-gray-700 ml-1">
+                Supplier order remark:
+              </label>
               <textarea
                 value={form.comment}
                 onChange={(e) => setForm({ ...form, comment: e.target.value })}
@@ -3531,7 +3912,8 @@ const OrderPage: React.FC = () => {
         >
           <div className="p-4 space-y-4">
             <p className="text-sm text-gray-600">
-              Original Order Qty: <span className="font-bold">{selectedItem.qty}</span>
+              Original Order Qty:{" "}
+              <span className="font-bold">{selectedItem.qty}</span>
             </p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

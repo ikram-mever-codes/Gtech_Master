@@ -22,6 +22,7 @@ import { toast } from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
+import { openLabel, downloadLabel } from "@/utils/openLabel";
 import SystemColourSelect from "@/components/UI/SystemColourSelect";
 import {
   getCustomerOrderById,
@@ -583,7 +584,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         const list = res?.data || res || [];
         if (Array.isArray(list)) {
           const nonPurchasing = list.filter(
-            (u: any) => (u.role || "").toLowerCase() !== "purchasing"
+            (u: any) => (u.role || "").toLowerCase() !== "purchasing",
           );
           setSystemUsers(nonPurchasing);
         }
@@ -632,7 +633,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
     return {
       title: o.title || item1Title || "",
-      ansprechpartner: o.ansprechpartner || currentUser?.name || currentUser?.email || "",
+      ansprechpartner:
+        o.ansprechpartner || currentUser?.name || currentUser?.email || "",
       kundenreferenz: o.kundenreferenz || "",
       status: o.status || "Draft",
       currency: o.currency || "EUR",
@@ -663,10 +665,10 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
         o.is_weiterversand === "Yes",
       weiterversandServiceProviderId:
         o.weiterversand_service_provider_id !== undefined &&
-          o.weiterversand_service_provider_id !== null
+        o.weiterversand_service_provider_id !== null
           ? String(o.weiterversand_service_provider_id)
           : o.weiterversandServiceProvider?.id !== undefined &&
-            o.weiterversandServiceProvider?.id !== null
+              o.weiterversandServiceProvider?.id !== null
             ? String(o.weiterversandServiceProvider.id)
             : "",
       weiterversandLabels: o.weiterversand_labels || "",
@@ -787,43 +789,43 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
     try {
       const payload: any = canEditCommercial
         ? {
-          title: form.title,
-          ansprechpartner: form.ansprechpartner,
-          kundenreferenz: (form.kundenreferenz || "").slice(0, 255),
-          currency: form.currency,
-          taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
-          discountPercentage:
-            parseFlexibleNumber(form.discountPercentage) ?? 0,
-          shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
-          shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
-          paymentMethod: form.paymentMethod || undefined,
-          shippingMethod: form.shippingMethod || undefined,
-          shippingText:
-            form.shippingText !== undefined
-              ? form.shippingText
-              : form.shippingMethod,
-          paymentTerms: form.paymentTerms,
-          deliveryTerms: form.deliveryTerms,
-          termsConditions: form.termsConditions,
-          notes: form.notes,
-          internalNotes: form.internalNotes,
-          highlightColor: form.highlightColor ?? "",
-          dateDelivery: form.dateDelivery,
-          customerSnapshot: form.customerSnapshot,
-          deliveryAddress: form.deliveryAddress,
-          realDeliveryDate: form.realDeliveryDate || null,
-          isWeiterversand: form.isWeiterversand,
-          weiterversandServiceProviderId: form.weiterversandServiceProviderId
-            ? Number(form.weiterversandServiceProviderId)
-            : null,
-          weiterversandLabels: form.weiterversandLabels,
-          weiterversandTracking: form.weiterversandTracking,
-        }
+            title: form.title,
+            ansprechpartner: form.ansprechpartner,
+            kundenreferenz: (form.kundenreferenz || "").slice(0, 255),
+            currency: form.currency,
+            taxRate: parseFlexibleNumber(form.taxRate) ?? 19,
+            discountPercentage:
+              parseFlexibleNumber(form.discountPercentage) ?? 0,
+            shippingCost: parseFlexibleNumber(form.shippingCost) ?? 0,
+            shippingQuantity: parseFlexibleNumber(form.shippingQuantity) ?? 1,
+            paymentMethod: form.paymentMethod || undefined,
+            shippingMethod: form.shippingMethod || undefined,
+            shippingText:
+              form.shippingText !== undefined
+                ? form.shippingText
+                : form.shippingMethod,
+            paymentTerms: form.paymentTerms,
+            deliveryTerms: form.deliveryTerms,
+            termsConditions: form.termsConditions,
+            notes: form.notes,
+            internalNotes: form.internalNotes,
+            highlightColor: form.highlightColor ?? "",
+            dateDelivery: form.dateDelivery,
+            customerSnapshot: form.customerSnapshot,
+            deliveryAddress: form.deliveryAddress,
+            realDeliveryDate: form.realDeliveryDate || null,
+            isWeiterversand: form.isWeiterversand,
+            weiterversandServiceProviderId: form.weiterversandServiceProviderId
+              ? Number(form.weiterversandServiceProviderId)
+              : null,
+            weiterversandLabels: form.weiterversandLabels,
+            weiterversandTracking: form.weiterversandTracking,
+          }
         : {
-          notes: form.notes,
-          internalNotes: form.internalNotes,
-          highlightColor: form.highlightColor ?? "",
-        };
+            notes: form.notes,
+            internalNotes: form.internalNotes,
+            highlightColor: form.highlightColor ?? "",
+          };
 
       const res = await updateCustomerOrder(order.id, payload);
       if (res.success) {
@@ -1182,24 +1184,25 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 Auftrag {order.order_no}
               </p>
               <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.auftrag_status === "delivered" ||
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                  order.auftrag_status === "delivered" ||
                   order.status === "Completed"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : order.auftrag_status === "partially_delivered" ||
-                    order.status === "In Progress"
-                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : order.auftrag_status === "closed"
-                      ? "bg-gray-200 text-gray-700 border-gray-300"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
-                  }`}
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : order.auftrag_status === "partially_delivered" ||
+                        order.status === "In Progress"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : order.auftrag_status === "closed"
+                        ? "bg-gray-200 text-gray-700 border-gray-300"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
               >
                 {order.auftrag_status === "closed"
                   ? "Closed"
                   : order.auftrag_status === "delivered" ||
-                    order.status === "Completed"
+                      order.status === "Completed"
                     ? "Delivered"
                     : order.auftrag_status === "partially_delivered" ||
-                      order.status === "In Progress"
+                        order.status === "In Progress"
                       ? "Partially Delivered"
                       : "Open"}
               </span>
@@ -1574,8 +1577,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   ? !selectedPmObj.is_prepayment
                   : currentPmName
                     ? !/vorkasse|prepayment|paypal|cash|credit/i.test(
-                      currentPmName,
-                    )
+                        currentPmName,
+                      )
                     : false;
 
                 return (
@@ -1615,7 +1618,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                     patch({
                       shippingMethod: val,
                       ...(!form.shippingText ||
-                        form.shippingText === form.shippingMethod
+                      form.shippingText === form.shippingMethod
                         ? { shippingText: val }
                         : {}),
                     });
@@ -1680,7 +1683,8 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                         })}
                         {form.ansprechpartner &&
                           !systemUsers.some(
-                            (u: any) => (u.name || u.email) === form.ansprechpartner
+                            (u: any) =>
+                              (u.name || u.email) === form.ansprechpartner,
                           ) && (
                             <option value={form.ansprechpartner}>
                               {form.ansprechpartner}
@@ -1720,188 +1724,188 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   {(effectiveEdit && canEditCommercial
                     ? form.isWeiterversand
                     : order.is_weiterversand === true ||
-                    order.is_weiterversand === 1 ||
-                    order.is_weiterversand === "true" ||
-                    order.is_weiterversand === "1" ||
-                    order.is_weiterversand === "Yes") && (
-                      <>
-                        <div className="w-48 shrink-0">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Service Provider
-                          </label>
-                          {effectiveEdit && canEditCommercial ? (
-                            <select
-                              className={inputCls}
-                              value={form.weiterversandServiceProviderId || ""}
-                              onChange={(e) =>
-                                patch({
-                                  weiterversandServiceProviderId: e.target.value,
-                                })
-                              }
-                            >
-                              <option value="">Select Provider…</option>
-                              {dbServiceProviders.map((sp) => (
-                                <option key={sp.id} value={sp.id}>
-                                  {sp.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="text-sm font-medium text-gray-800 py-1.5">
-                              {order.weiterversandServiceProvider?.name || "—"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="w-40 shrink-0">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Tracking No.
-                          </label>
-                          {effectiveEdit && canEditCommercial ? (
-                            <input
-                              type="text"
-                              className={inputCls}
-                              placeholder="Tracking No."
-                              value={form.weiterversandTracking || ""}
-                              onChange={(e) =>
-                                patch({ weiterversandTracking: e.target.value })
-                              }
-                            />
-                          ) : (
-                            <div className="text-sm font-medium text-gray-800 py-1.5">
-                              {order.weiterversand_tracking || "—"}
-                            </div>
-                          )}
-                        </div>
-
-                        {effectiveEdit && canEditCommercial && (
-                          <div className="shrink-0 self-end">
-                            <label
-                              htmlFor="weiterversand-label-file"
-                              className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
-                            >
-                              <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
-                              Upload Label(s)
-                            </label>
-                            <input
-                              id="weiterversand-label-file"
-                              type="file"
-                              multiple
-                              className="hidden"
-                              accept="application/pdf,image/*"
-                              onChange={(e) => {
-                                const files = Array.from(e.target.files || []);
-                                if (files.length === 0) return;
-                                const currentList = parseLabels(
-                                  form.weiterversandLabels ||
-                                  order.weiterversand_labels,
-                                );
-                                let count = 0;
-                                files.forEach((file) => {
-                                  const reader = new FileReader();
-                                  reader.onload = (evt) => {
-                                    const dataUrl = evt.target?.result as string;
-                                    currentList.push({
-                                      name: file.name,
-                                      url: dataUrl,
-                                    });
-                                    count++;
-                                    if (count === files.length) {
-                                      patch({
-                                        weiterversandLabels:
-                                          JSON.stringify(currentList),
-                                      });
-                                      toast.success(
-                                        `Attached ${files.length} document(s)`,
-                                      );
-                                    }
-                                  };
-                                  reader.readAsDataURL(file);
-                                });
-                                e.target.value = "";
-                              }}
-                            />
+                      order.is_weiterversand === 1 ||
+                      order.is_weiterversand === "true" ||
+                      order.is_weiterversand === "1" ||
+                      order.is_weiterversand === "Yes") && (
+                    <>
+                      <div className="w-48 shrink-0">
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Service Provider
+                        </label>
+                        {effectiveEdit && canEditCommercial ? (
+                          <select
+                            className={inputCls}
+                            value={form.weiterversandServiceProviderId || ""}
+                            onChange={(e) =>
+                              patch({
+                                weiterversandServiceProviderId: e.target.value,
+                              })
+                            }
+                          >
+                            <option value="">Select Provider…</option>
+                            {dbServiceProviders.map((sp) => (
+                              <option key={sp.id} value={sp.id}>
+                                {sp.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-800 py-1.5">
+                            {order.weiterversandServiceProvider?.name || "—"}
                           </div>
                         )}
-                      </>
-                    )}
+                      </div>
+
+                      <div className="w-40 shrink-0">
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Tracking No.
+                        </label>
+                        {effectiveEdit && canEditCommercial ? (
+                          <input
+                            type="text"
+                            className={inputCls}
+                            placeholder="Tracking No."
+                            value={form.weiterversandTracking || ""}
+                            onChange={(e) =>
+                              patch({ weiterversandTracking: e.target.value })
+                            }
+                          />
+                        ) : (
+                          <div className="text-sm font-medium text-gray-800 py-1.5">
+                            {order.weiterversand_tracking || "—"}
+                          </div>
+                        )}
+                      </div>
+
+                      {effectiveEdit && canEditCommercial && (
+                        <div className="shrink-0 self-end">
+                          <label
+                            htmlFor="weiterversand-label-file"
+                            className="px-3.5 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg cursor-pointer flex items-center gap-1.5 border border-gray-300 transition-colors shadow-2xs"
+                          >
+                            <ArrowUpTrayIcon className="w-4 h-4 text-gray-600" />
+                            Upload Label(s)
+                          </label>
+                          <input
+                            id="weiterversand-label-file"
+                            type="file"
+                            multiple
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length === 0) return;
+                              const currentList = parseLabels(
+                                form.weiterversandLabels ||
+                                  order.weiterversand_labels,
+                              );
+                              let count = 0;
+                              files.forEach((file) => {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  const dataUrl = evt.target?.result as string;
+                                  currentList.push({
+                                    name: file.name,
+                                    url: dataUrl,
+                                  });
+                                  count++;
+                                  if (count === files.length) {
+                                    patch({
+                                      weiterversandLabels:
+                                        JSON.stringify(currentList),
+                                    });
+                                    toast.success(
+                                      `Attached ${files.length} document(s)`,
+                                    );
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              });
+                              e.target.value = "";
+                            }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
                 {(effectiveEdit && canEditCommercial
                   ? form.isWeiterversand
                   : order.is_weiterversand === true ||
-                  order.is_weiterversand === 1 ||
-                  order.is_weiterversand === "true" ||
-                  order.is_weiterversand === "1" ||
-                  order.is_weiterversand === "Yes") && (
-                    (() => {
-                      const currentLabels = parseLabels(
-                        effectiveEdit && canEditCommercial
-                          ? form.weiterversandLabels
-                          : order?.weiterversand_labels || form.weiterversandLabels
-                      );
-                      if (currentLabels.length === 0) {
-                        return !effectiveEdit ? (
-                          <div className="w-full text-xs text-gray-400 italic pt-2">
-                            No label(s) uploaded
-                          </div>
-                        ) : null;
-                      }
-                      return (
-                        <div className="w-full flex flex-wrap items-center gap-2 pt-2.5 border-t border-dashed border-gray-200 mt-2.5">
-                          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                            <DocumentTextIcon className="w-3.5 h-3.5 text-gray-400" />
-                            Attached Label(s):
-                          </span>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {currentLabels.map((lbl, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-amber-50 hover:bg-amber-100/90 border border-amber-200 text-amber-900 rounded-lg transition-colors shadow-2xs"
+                    order.is_weiterversand === 1 ||
+                    order.is_weiterversand === "true" ||
+                    order.is_weiterversand === "1" ||
+                    order.is_weiterversand === "Yes") &&
+                  (() => {
+                    const currentLabels = parseLabels(
+                      effectiveEdit && canEditCommercial
+                        ? form.weiterversandLabels
+                        : order?.weiterversand_labels ||
+                            form.weiterversandLabels,
+                    );
+                    if (currentLabels.length === 0) {
+                      return !effectiveEdit ? (
+                        <div className="w-full text-xs text-gray-400 italic pt-2">
+                          No label(s) uploaded
+                        </div>
+                      ) : null;
+                    }
+                    return (
+                      <div className="w-full flex flex-wrap items-center gap-2 pt-2.5 border-t border-dashed border-gray-200 mt-2.5">
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                          <DocumentTextIcon className="w-3.5 h-3.5 text-gray-400" />
+                          Attached Label(s):
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {currentLabels.map((lbl, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-amber-50 hover:bg-amber-100/90 border border-amber-200 text-amber-900 rounded-lg transition-colors shadow-2xs"
+                            >
+                              <DocumentTextIcon className="w-4 h-4 text-amber-700 shrink-0" />
+                              <button
+                                type="button"
+                                onClick={() => openLabel(lbl)}
+                                className="font-semibold hover:underline max-w-[200px] truncate text-left cursor-pointer"
+                                title={`Click to view ${lbl.name}`}
                               >
-                                <DocumentTextIcon className="w-4 h-4 text-amber-700 shrink-0" />
+                                {lbl.name}
+                              </button>
+                              <div className="flex items-center gap-0.5 ml-1 border-l border-amber-300 pl-1">
                                 <button
                                   type="button"
                                   onClick={() => openLabel(lbl)}
-                                  className="font-semibold hover:underline max-w-[200px] truncate text-left cursor-pointer"
-                                  title={`Click to view ${lbl.name}`}
+                                  className="p-1 hover:bg-amber-200 rounded text-amber-800 transition-colors cursor-pointer"
+                                  title="Open / View PDF"
                                 >
-                                  {lbl.name}
+                                  <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
                                 </button>
-                                <div className="flex items-center gap-0.5 ml-1 border-l border-amber-300 pl-1">
+                                <button
+                                  type="button"
+                                  onClick={() => downloadLabel(lbl)}
+                                  className="p-1 hover:bg-amber-200 rounded text-amber-800 transition-colors cursor-pointer"
+                                  title="Download PDF"
+                                >
+                                  <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+                                </button>
+                                {effectiveEdit && canEditCommercial && (
                                   <button
                                     type="button"
-                                    onClick={() => openLabel(lbl)}
-                                    className="p-1 hover:bg-amber-200 rounded text-amber-800 transition-colors cursor-pointer"
-                                    title="Open / View PDF"
+                                    onClick={() => removeLabel(idx)}
+                                    className="p-1 hover:bg-red-100 rounded text-red-600 hover:text-red-800 transition-colors cursor-pointer ml-0.5"
+                                    title="Remove label"
                                   >
-                                    <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                                    <TrashIcon className="w-3.5 h-3.5" />
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => downloadLabel(lbl)}
-                                    className="p-1 hover:bg-amber-200 rounded text-amber-800 transition-colors cursor-pointer"
-                                    title="Download PDF"
-                                  >
-                                    <ArrowDownTrayIcon className="w-3.5 h-3.5" />
-                                  </button>
-                                  {effectiveEdit && canEditCommercial && (
-                                    <button
-                                      type="button"
-                                      onClick={() => removeLabel(idx)}
-                                      className="p-1 hover:bg-red-100 rounded text-red-600 hover:text-red-800 transition-colors cursor-pointer ml-0.5"
-                                      title="Remove label"
-                                    >
-                                      <TrashIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
+                                )}
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
                         </div>
-                      );
-                    })()
-                  )}
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
           </div>
@@ -2193,12 +2197,12 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                                   ? form.shippingText
                                   : form.shippingMethod || ""
                                 ).split("\n").length ||
-                                Math.ceil(
-                                  (form.shippingText !== undefined
-                                    ? form.shippingText
-                                    : form.shippingMethod || ""
-                                  ).length / 22,
-                                ),
+                                  Math.ceil(
+                                    (form.shippingText !== undefined
+                                      ? form.shippingText
+                                      : form.shippingMethod || ""
+                                    ).length / 22,
+                                  ),
                               ),
                             )}
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white leading-snug resize-y min-h-[34px]"
@@ -2265,7 +2269,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                       <td className="px-2 py-2 text-right font-bold text-gray-800">
                         {formatCurrency(
                           (form.shippingCost || 0) *
-                          (form.shippingQuantity || 1),
+                            (form.shippingQuantity || 1),
                           order?.currency || "EUR",
                         )}
                       </td>
@@ -2404,13 +2408,13 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                   className={inputCls}
                   defaultValue={
                     visibleLineItems[0]?.extraWeight === null ||
-                      visibleLineItems[0]?.extraWeight === undefined
+                    visibleLineItems[0]?.extraWeight === undefined
                       ? ""
                       : (
-                        parseFlexibleNumber(
-                          visibleLineItems[0].extraWeight,
-                        ) ?? 0
-                      ).toFixed(1)
+                          parseFlexibleNumber(
+                            visibleLineItems[0].extraWeight,
+                          ) ?? 0
+                        ).toFixed(1)
                   }
                   placeholder="0"
                   disabled={visibleLineItems.length === 0}
@@ -2530,7 +2534,7 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
                 )}
               </div>
               {linkedDocsCount > 0 ||
-                (order?.linkedDocuments?.payments?.allocations?.length || 0) >
+              (order?.linkedDocuments?.payments?.allocations?.length || 0) >
                 0 ? (
                 <div className="space-y-3">
                   {(
@@ -2634,57 +2638,58 @@ export const AuftragPreviewModal: React.FC<AuftragPreviewModalProps> = ({
 
                   {(order?.linkedDocuments?.payments?.allocations?.length ||
                     0) > 0 && (
-                      <div>
-                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                          Zahlung
-                        </p>
-                        <div className="space-y-1.5 text-sm">
-                          {order.linkedDocuments.payments.allocations.map(
-                            (alloc: any) => {
-                              const allocAmount = Number(alloc.amount) || 0;
-                              const auftragTotal = order?.total_amount;
-                              const differs =
-                                auftragTotal !== undefined &&
-                                amountsDiffer(
-                                  order.linkedDocuments.payments.paid_amount,
-                                  auftragTotal,
-                                );
-                              return (
-                                <div
-                                  key={alloc.id}
-                                  className="flex justify-between items-center text-gray-700"
-                                >
-                                  <span className="text-sm">
-                                    {alloc.paymentInbound?.payer_name ||
-                                      alloc.paymentInbound?.source ||
-                                      "Zahlung"}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${differs
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Zahlung
+                      </p>
+                      <div className="space-y-1.5 text-sm">
+                        {order.linkedDocuments.payments.allocations.map(
+                          (alloc: any) => {
+                            const allocAmount = Number(alloc.amount) || 0;
+                            const auftragTotal = order?.total_amount;
+                            const differs =
+                              auftragTotal !== undefined &&
+                              amountsDiffer(
+                                order.linkedDocuments.payments.paid_amount,
+                                auftragTotal,
+                              );
+                            return (
+                              <div
+                                key={alloc.id}
+                                className="flex justify-between items-center text-gray-700"
+                              >
+                                <span className="text-sm">
+                                  {alloc.paymentInbound?.payer_name ||
+                                    alloc.paymentInbound?.source ||
+                                    "Zahlung"}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 border ${
+                                      differs
                                         ? "text-amber-700 bg-amber-50 border-amber-200"
                                         : "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                        }`}
-                                    >
-                                      {formatCurrency(
-                                        allocAmount,
-                                        order?.currency || "EUR",
-                                      )}
-                                    </span>
-                                    <span className="text-gray-400 text-xs">
-                                      {formatDate(
-                                        alloc.paymentInbound?.received_date ||
+                                    }`}
+                                  >
+                                    {formatCurrency(
+                                      allocAmount,
+                                      order?.currency || "EUR",
+                                    )}
+                                  </span>
+                                  <span className="text-gray-400 text-xs">
+                                    {formatDate(
+                                      alloc.paymentInbound?.received_date ||
                                         alloc.created_at,
-                                      )}
-                                    </span>
-                                  </div>
+                                    )}
+                                  </span>
                                 </div>
-                              );
-                            },
-                          )}
-                        </div>
+                              </div>
+                            );
+                          },
+                        )}
                       </div>
-                    )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">

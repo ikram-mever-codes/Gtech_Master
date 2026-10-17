@@ -70,6 +70,20 @@ const _cjkFontCandidates: string[] = [
 export let _cachedCjkFontPath: string | null = null;
 export let _cachedCjkFontBuffer: Buffer | null = null;
 
+const parseWvLabels = (raw: any): Array<{ name: string; url: string }> => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    if (typeof raw === "string" && raw.trim()) {
+      return [{ name: "Document Label", url: raw.trim() }];
+    }
+  }
+  return [];
+};
+
 (function detectCjkFont() {
   let assetsBase = "";
   let currentDir = __dirname;
@@ -99,7 +113,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) { }
+      } catch (e: any) {}
     }
   }
 })();
@@ -217,18 +231,18 @@ export const createOrder = async (
     const dbItems =
       itemIds.length > 0
         ? await itemRepo
-          .createQueryBuilder("i")
-          .where("i.id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("i")
+            .where("i.id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
     const supplierItems =
       itemIds.length > 0
         ? await supplierItemRepo
-          .createQueryBuilder("si")
-          .where("si.item_id IN (:...itemIds)", { itemIds })
-          .getMany()
+            .createQueryBuilder("si")
+            .where("si.item_id IN (:...itemIds)", { itemIds })
+            .getMany()
         : [];
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
@@ -307,12 +321,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -501,12 +515,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -576,19 +590,19 @@ export const getAllOrders = async (
     const [transferOrders, customerOrders] = await Promise.all([
       allOrderNoLookups.length > 0
         ? AppDataSource.getRepository(TransferOrder).find({
-          where: { order_no: In(allOrderNoLookups) },
-        })
+            where: { order_no: In(allOrderNoLookups) },
+          })
         : Promise.resolve([]),
       allOrderNoLookups.length > 0 || comments.length > 0
         ? AppDataSource.getRepository(CustomerOrder).find({
-          where: [
-            ...(allOrderNoLookups.length
-              ? [{ order_no: In(allOrderNoLookups) }]
-              : []),
-            ...(comments.length ? [{ title: In(comments) }] : []),
-          ],
-          relations: ["weiterversandServiceProvider"],
-        })
+            where: [
+              ...(allOrderNoLookups.length
+                ? [{ order_no: In(allOrderNoLookups) }]
+                : []),
+              ...(comments.length ? [{ title: In(comments) }] : []),
+            ],
+            relations: ["weiterversandServiceProvider"],
+          })
         : Promise.resolve([]),
     ]);
 
@@ -696,7 +710,7 @@ export const getAllOrders = async (
         const newDeNo = `DE${yy}${mm}-${suffix}`;
         ord.order_no = newDeNo;
         renameUpdates.push(
-          orderRepo.update(ord.id, { order_no: newDeNo }).catch(() => { }),
+          orderRepo.update(ord.id, { order_no: newDeNo }).catch(() => {}),
         );
       }
     }
@@ -723,32 +737,29 @@ export const getAllOrders = async (
     const itemRepo = AppDataSource.getRepository(Item);
     const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
 
-    // These three lookups are fully independent of each other — run them
-    // concurrently instead of one-after-another, and skip entirely when
-    // there's nothing to look up instead of querying with a dummy [0] id.
     const [warehouseItems, fallbackItems, supplierItems] = await Promise.all([
       hasItemIds || hasItemIdDEs
         ? warehouseRepo
-          .createQueryBuilder("wi")
-          .where("wi.item_id IN (:...itemIds)", {
-            itemIds: hasItemIds ? itemIds : [0],
-          })
-          .orWhere("wi.ItemID_DE IN (:...itemIdDEs)", {
-            itemIdDEs: hasItemIdDEs ? itemIdDEs : [0],
-          })
-          .getMany()
+            .createQueryBuilder("wi")
+            .where("wi.item_id IN (:...itemIds)", {
+              itemIds: hasItemIds ? itemIds : [0],
+            })
+            .orWhere("wi.ItemID_DE IN (:...itemIdDEs)", {
+              itemIdDEs: hasItemIdDEs ? itemIdDEs : [0],
+            })
+            .getMany()
         : Promise.resolve([]),
       hasItemIdDEs
         ? itemRepo.find({
-          where: { ItemID_DE: In(itemIdDEs) },
-          relations: ["supplier", "taric"],
-        })
+            where: { ItemID_DE: In(itemIdDEs) },
+            relations: ["supplier", "taric"],
+          })
         : Promise.resolve([]),
       hasItemIds
         ? supplierItemRepo.find({
-          where: { item_id: In(itemIds) },
-          relations: ["supplier"],
-        })
+            where: { item_id: In(itemIds) },
+            relations: ["supplier"],
+          })
         : Promise.resolve([]),
     ]);
 
@@ -806,7 +817,9 @@ export const getAllOrders = async (
         order.weiterversandServiceProvider ||
         matchedCustOrder?.weiterversandServiceProvider ||
         null;
-
+      const wvLabels = parseWvLabels(
+        (matchedCustOrder as any)?.weiterversand_labels,
+      );
       return {
         ...order,
         is_weiterversand: isWV,
@@ -816,6 +829,15 @@ export const getAllOrders = async (
           null,
         weiterversandServiceProvider: wvProvider,
         weiterversand_service_provider_name: wvProvider?.name || null,
+        weiterversand_customer_order_id: matchedCustOrder?.id ?? null,
+        weiterversand_labels_meta: wvLabels
+          .map((l, index) => ({
+            index,
+            name: l?.name || `Label ${index + 1}`,
+            hasUrl: !!l?.url,
+          }))
+          .filter((l) => l.hasUrl)
+          .map(({ index, name }) => ({ index, name })),
         cargo_id: validCargoId,
         supplier_name:
           order.supplier?.company_name || order.supplier?.name || "Unassigned",
@@ -911,20 +933,20 @@ export const getAllOrders = async (
               item: itemDetails,
               warehouse_data: warehouseItem
                 ? {
-                  id: warehouseItem.id,
-                  item_no_de: itemDetails?.item_no_de,
-                  item_name_de: warehouseItem.item_name_de,
-                  item_name_en: warehouseItem.item_name_en,
-                  stock_qty: warehouseItem.stock_qty,
-                  msq: warehouseItem.msq,
-                  buffer: warehouseItem.buffer,
-                  is_stock_item: warehouseItem.is_stock_item,
-                  is_SnSI: warehouseItem.is_SnSI,
-                  ship_class: warehouseItem.ship_class,
-                  is_active: warehouseItem.is_active,
-                  is_no_auto_order: warehouseItem.is_no_auto_order,
-                  category_id: warehouseItem.category_id,
-                }
+                    id: warehouseItem.id,
+                    item_no_de: itemDetails?.item_no_de,
+                    item_name_de: warehouseItem.item_name_de,
+                    item_name_en: warehouseItem.item_name_en,
+                    stock_qty: warehouseItem.stock_qty,
+                    msq: warehouseItem.msq,
+                    buffer: warehouseItem.buffer,
+                    is_stock_item: warehouseItem.is_stock_item,
+                    is_SnSI: warehouseItem.is_SnSI,
+                    ship_class: warehouseItem.ship_class,
+                    is_active: warehouseItem.is_active,
+                    is_no_auto_order: warehouseItem.is_no_auto_order,
+                    category_id: warehouseItem.category_id,
+                  }
                 : null,
               cargo_id: oi.cargo_id || null,
             };
@@ -1136,12 +1158,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -1524,7 +1546,7 @@ export const generateLabelPDF = async (
         while (
           trimmed.length > 3 &&
           doc.heightOfString(trimmed + "...", { width: 125 }) >
-          maxAvailableHeight
+            maxAvailableHeight
         ) {
           trimmed = trimmed.slice(0, -2);
         }
@@ -1973,7 +1995,6 @@ const formatCountry = (country?: string | null): string => {
   return formatCountryName(country);
 };
 
-
 const resolveCustomerAddress = (
   customer: Customer | null | undefined,
 ): ResolvedCustomerAddress => {
@@ -1993,9 +2014,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-    starCustomerDetails?.deliveryAddressLine1 ||
-    businessDetails?.address ||
-    "",
+      starCustomerDetails?.deliveryAddressLine1 ||
+      businessDetails?.address ||
+      "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -2013,9 +2034,9 @@ const resolveCustomerAddress = (
       "",
     country: formatCountry(
       customer.country ||
-      starCustomerDetails?.deliveryCountry ||
-      businessDetails?.country ||
-      "",
+        starCustomerDetails?.deliveryCountry ||
+        businessDetails?.country ||
+        "",
     ),
     phone:
       customer.contactPhoneNumber ||
@@ -2176,10 +2197,10 @@ export const generateCommercialInvoicePDF = async (
         const q = Number(it.qty || it.quantity || 0);
         const p = Number(
           it.eur_special_price ||
-          it._fallbackEk ||
-          it.unitPrice ||
-          it.unit_price ||
-          0,
+            it._fallbackEk ||
+            it.unitPrice ||
+            it.unit_price ||
+            0,
         );
         const tot = Number(it.price || it.total_price || q * p);
         return {
@@ -2206,10 +2227,10 @@ export const generateCommercialInvoicePDF = async (
     let subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
     const invoiceGross = Number(
       expandedData?.invoice?.grossTotal ??
-      invoice?.grossTotal ??
-      expandedData?.invoice?.netTotal ??
-      invoice?.netTotal ??
-      0,
+        invoice?.grossTotal ??
+        expandedData?.invoice?.netTotal ??
+        invoice?.netTotal ??
+        0,
     );
     const freightCost = Number(
       expandedData?.invoice?.freightCost ?? invoice?.freightCost ?? 0,
@@ -2262,7 +2283,7 @@ export const generateCommercialInvoicePDF = async (
       customerAddress.contact &&
       customer?.legalName &&
       customerAddress.contact.trim().toLowerCase() ===
-      customer.legalName.trim().toLowerCase()
+        customer.legalName.trim().toLowerCase()
     );
     const shipToContact =
       cargo?.ship_to_contact_person ||
@@ -2436,7 +2457,7 @@ export const generateCommercialInvoicePDF = async (
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
               .text("安徽省...", 152, 101);
-          } catch (e) { }
+          } catch (e) {}
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -2706,8 +2727,8 @@ export const generateCommercialInvoicePDF = async (
       invoice?.orderNumber || expandedData?.invoice?.orderNumber || "";
     const orderForRemark = targetOrderNo
       ? await AppDataSource.getRepository(Order).findOne({
-        where: { order_no: targetOrderNo },
-      })
+          where: { order_no: targetOrderNo },
+        })
       : null;
     const orderComment = orderForRemark?.comment || "";
     if (orderComment) remarkLines.push(orderComment);
@@ -2749,7 +2770,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) { }
+    } catch (e) {}
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;
@@ -2770,5 +2791,34 @@ export const generateCommercialInvoicePDF = async (
     doc.end();
   } catch (error) {
     next(error);
+  }
+};
+
+export const getWeiterversandLabel = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { customerOrderId, index } = req.params;
+    const i = Number(index);
+    if (!customerOrderId || !Number.isInteger(i) || i < 0) {
+      return next(new ErrorHandler("Invalid label reference", 400));
+    }
+
+    const co = await AppDataSource.getRepository(CustomerOrder).findOne({
+      where: { id: customerOrderId as any },
+    });
+    if (!co) return next(new ErrorHandler("Auftrag not found", 404));
+
+    const label = parseWvLabels((co as any).weiterversand_labels)[i];
+    if (!label?.url) return next(new ErrorHandler("Label not found", 404));
+
+    return res.status(200).json({
+      success: true,
+      data: { name: label.name || `Label ${i + 1}`, url: label.url },
+    });
+  } catch (error) {
+    return next(error);
   }
 };
