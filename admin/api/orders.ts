@@ -327,7 +327,11 @@ export const downloadCommercialInvoice = async (
 export const getWeiterversandLabel = async (
   customerOrderId: string | number,
   index: number,
-) => {
-  const res = await api.get(`/orders/wv-labels/${customerOrderId}/${index}`);
-  return res.data as { success: boolean; data: { name: string; url: string } };
+): Promise<{ name: string; url: string } | null> => {
+  const res: any = await api.get(
+    `/orders/wv-labels/${customerOrderId}/${index}`,
+  );
+  const body = res?.data?.success !== undefined ? res.data : res;
+  const label = body?.data ?? body;
+  return label?.url ? label : null;
 };

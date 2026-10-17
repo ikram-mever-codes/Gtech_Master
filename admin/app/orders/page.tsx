@@ -431,9 +431,9 @@ const OrderPage: React.FC = () => {
     const win = window.open("", "_blank");
     setOpeningWvLabel(key);
     try {
-      const res = await getWeiterversandLabel(customerOrderId, index);
-      if (!res?.data?.url) throw new Error("Label not found");
-      openLabel(res.data, win);
+      const label = await getWeiterversandLabel(customerOrderId, index);
+      if (!label) throw new Error("Label not found");
+      openLabel(label, win);
     } catch (e) {
       console.error(e);
       win?.close();
